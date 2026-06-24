@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-06-23 (fix) — Credit note settlement now restocks inventory (Dr Inventory / Cr COGS)
+
+**Problem:** the credit-note (non-POS sales return) path posted **only** the revenue/cash contra at settlement (`pay_credit_note.php`: `Dr Sales Returns & Allowances / Cr Cash`). It never posted the **COGS contra** for the returned goods, so when a customer returned stocked goods the GL was left with **Inventory understated** and **COGS overstated** (gross profit understated). The POS-return path (`postPosReturn`) and the purchase-return path (`postPurchaseReturn`) both post their inventory leg; the credit-note path was the only one dropping it.
+
+**Fix (`core/sales_posting.php`, `api/sales/pay_credit_note.php`):**
+- New `creditNoteRestockCost()` — `Σ(quantity × products.cost_price)` over `credit_note_items JOIN products`, with the same `cost_price > selling_price` guard `posSaleCogs()` uses. Because it JOINs `products`, a **service / price-adjustment line (no product) contributes 0** — only genuine stocked goods reverse COGS.
+- New `postCreditNoteRestock()` — posts `Dr Inventory / Cr Cost of Goods Sold` for the returned cost via `postLedgerEntry`; **best-effort** (never throws), **idempotent** on `(entity_type='credit_note_cogs', entity_id=credit_note_id)`. Plus `reverseCreditNoteRestock()` for symmetry.
+- `pay_credit_note.php` computes the restock cost and posts the leg inside the **existing transaction** at settlement; a posting failure when a cost existed is surfaced as a `restock_warning` so an under-stated Inventory can't slip by silently.
+- Net effect: a settled credit note for stocked goods is now fully double-entered — `Dr Sales Returns / Cr Cash` **and** `Dr Inventory / Cr COGS` — so the Income Statement (COGS) and Balance Sheet (Inventory) state the truth.
+
+**Test:** `tests/test_credit_note_restock_cli.php` — **19/19**: control accounts resolve; the entry is balanced `Dr Inventory / Cr COGS`, `status='posted'`, `entity_type='credit_note_cogs'`, idempotent, and a zero-cost service note posts nothing; the report engine then shows **COGS ↓ by the returned cost**, **Inventory ↑ by the same**, and the **Balance Sheet stays balanced** (difference shift = 0); `assertLedgerBalanced` holds. Runs against a synthetic credit note in a **rolled-back** transaction, so the live DB is untouched.
+
+**Not in scope:** this path still does not restore the **physical stock count** (a separate operational gap) — the fix makes the financial statements truthful, which read the GL, not the stock module.
+
+---
+
 ## 2026-06-23 (fix) — Deleting an invoice is blocked when it has posted revenue/payments (cancel first)
 
 **Problem (account_financial.md #2):** the **cancel** path reverses an invoice's GL correctly (`reverseInvoiceRevenue` + `reverseInvoiceCOGS` + `reverseOutputVat`), but **`delete_invoice.php` bypassed all of it** — it called only the legacy `reverseOutputVat()` and hard-deleted with **no status guard**. Deleting an **approved** invoice orphaned its revenue + COGS entries (`Dr AR / Cr Sales Revenue / Cr Output VAT` and `Dr COGS / Cr Inventory`) → AR, Revenue, Output VAT, COGS, Inventory all overstated; a **paid** one also left its collection entry (`Dr Bank / Cr AR`) dangling — money off-book. (Largest-figure gap of the set.)
