@@ -262,8 +262,8 @@ if (!function_exists('fc_categories')) {
      */
     function fc_natural_sign(string $category): int {
         return match (strtolower($category)) {
-            'asset', 'expense', 'cogs' => 1,
-            'liability', 'equity', 'revenue' => -1,
+            'asset', 'expense', 'cogs', 'finance_cost' => 1,
+            'liability', 'equity', 'revenue', 'other_income' => -1,
             default => 0,
         };
     }
