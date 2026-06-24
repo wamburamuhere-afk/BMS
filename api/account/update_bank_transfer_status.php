@@ -48,7 +48,7 @@ try {
     }
 
     $snap = $pdo->prepare("SELECT transfer_number, from_account_id, to_account_id, amount, charges,
-                                  status AS old_status, transaction_id
+                                  charge_account_id, status AS old_status, transaction_id
                              FROM bank_transfers WHERE id = ?");
     $snap->execute([$id]);
     $t = $snap->fetch(PDO::FETCH_ASSOC);
@@ -62,19 +62,23 @@ try {
         throw new Exception('Only a posted transfer can be reversed.');
     }
 
-    $amount  = (float)$t['amount'];
-    $charges = (float)$t['charges'];
-    $total   = round($amount + $charges, 2);
-    $from    = (int)$t['from_account_id'];
-    $to      = (int)$t['to_account_id'];
+    $amount      = (float)$t['amount'];
+    $charges     = (float)$t['charges'];
+    $total       = round($amount + $charges, 2);
+    $from        = (int)$t['from_account_id'];
+    $to          = (int)$t['to_account_id'];
+    $chargeAccId = $t['charge_account_id'] ? (int)$t['charge_account_id'] : null;
     $ref     = $t['transfer_number'];
     $txnId   = (int)$t['transaction_id'];
 
     $pdo->beginTransaction();
 
-    // Restore both cash balances (mirror of the post: source back up, destination back down).
+    // Restore all balances (mirror of the post: source back up, destination back down, charge account back down).
     applyAccountBalanceDelta($pdo, $from, 'debit',  $total);    // source restored
     applyAccountBalanceDelta($pdo, $to,   'credit', $amount);   // destination restored
+    if ($charges > 0 && $chargeAccId) {
+        applyAccountBalanceDelta($pdo, $chargeAccId, 'credit', $charges); // charge account restored
+    }
 
     if ($txnId > 0) {
         // Remove the canonical journal mirror FIRST (this is the part the old void
