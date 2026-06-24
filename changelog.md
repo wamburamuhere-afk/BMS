@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-06-23 (feat/fix) — Customer payment void (was no correction path)
+
+**Problem (account_financial.md #12a):** a customer receipt posts a balanced entry (`Dr Received-Into / Cr AR [+ Dr WHT Receivable]`) but there was **no void/delete endpoint** for it — `money_in_posting.php` even noted "Reversal = a contra entry, handled by the caller on void," yet no caller existed. A mis-keyed receipt could not be undone.
+
+**Fix:**
+- `core/money_in_posting.php` — new `reversePaymentReceived()` (+ `paymentReceivedReversed()`): posts the exact contra of the `payment` entry (every leg flipped) as `entity_type='payment_void'`; idempotent; best-effort.
+- `api/account/void_payment.php` (new) — gated by `canEdit('invoices')` + CSRF, project-scope-checked per affected invoice. In one transaction it: (1) reverses the receipt ledger entry, (2) marks the payment `cancelled`, (3) recomputes every affected invoice's `paid_amount`/`balance_due`/`status` from remaining completed payments + allocations (handles single-invoice and multi-invoice receipts), (4) reverses the bank-register deposit.
+
+**Test:** `tests/test_payment_void_cli.php` — **18/18**: endpoint wires the full unwind; runtime posts a receipt (`Dr Bank / Cr AR`) then reverses it so Bank and AR net to **zero**, a `payment_void` entry exists, it's idempotent, and `assertLedgerBalanced` holds. Rolled-back transaction.
+
+**Remaining surface (not a ledger gap):** no UI button yet — the endpoint is ready; a "Void" action can be added wherever customer payments are listed (none exists today).
+
+---
+
 ## 2026-06-23 (fix) — Editing a posted journal entry is blocked (immutability guard)
 
 **Problem (account_financial.md #15):** `api/account/update_journal.php` had **no immutability guard** — it would edit a **posted** journal entry in place (replace all `journal_entry_items` + re-sync the legacy mirror), silently rewriting history that is already in the reports. `delete_journal.php` already blocks a posted entry; the **edit** path did not — an inconsistency that let a posted adjustment be altered after the fact.

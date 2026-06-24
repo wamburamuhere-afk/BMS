@@ -114,3 +114,68 @@ if (!function_exists('depositPostReasonMessage')) {
     }
 }
 
+if (!function_exists('paymentReceivedReversed')) {
+    /** True if the receipt entry for this payment has already been reversed. */
+    function paymentReceivedReversed(PDO $pdo, int $paymentId): bool
+    {
+        $s = $pdo->prepare("SELECT 1 FROM journal_entries WHERE entity_type='payment_void' AND entity_id=? AND status='posted' LIMIT 1");
+        $s->execute([$paymentId]);
+        return (bool)$s->fetchColumn();
+    }
+}
+
+if (!function_exists('reversePaymentReceived')) {
+    /**
+     * IN-1/IN-2 reversal (account_financial.md #12a) — void a customer receipt by
+     * posting the exact contra of the original 'payment' entry, with every leg flipped:
+     *
+     *   Original:  Dr Received-Into (net) [+ Dr WHT Receivable] / Cr Accounts Receivable (gross)
+     *   Reversal:  Cr Received-Into (net) [+ Cr WHT Receivable] / Dr Accounts Receivable (gross)
+     *
+     * Posted as entity_type='payment_void'. Idempotent. Best-effort — never throws.
+     * The caller (void_payment.php) also flips the payment status, recomputes the
+     * invoice(s), and reverses the bank-register deposit.
+     *
+     * @return array ['reversed'=>bool, 'reason'=>string, 'entry_id'?=>int]
+     */
+    function reversePaymentReceived(PDO $pdo, int $paymentId, int $userId): array
+    {
+        $out = ['reversed' => false, 'reason' => ''];
+        if ($paymentId <= 0) { $out['reason'] = 'invalid_payment'; return $out; }
+
+        $s = $pdo->prepare("SELECT entry_id FROM journal_entries WHERE entity_type='payment' AND entity_id=? AND status='posted' LIMIT 1");
+        $s->execute([$paymentId]);
+        $origId = (int)$s->fetchColumn();
+        if (!$origId) { $out['reason'] = 'no_payment_entry'; return $out; }
+
+        if (paymentReceivedReversed($pdo, $paymentId)) {
+            $out['reversed'] = true; $out['reason'] = 'already_reversed'; return $out;
+        }
+
+        $rows = $pdo->query("SELECT account_id, type, amount FROM journal_entry_items WHERE entry_id = $origId")->fetchAll(PDO::FETCH_ASSOC);
+        if (!$rows) { $out['reason'] = 'no_lines'; return $out; }
+        $hdr = $pdo->query("SELECT entry_date, project_id FROM journal_entries WHERE entry_id = $origId")->fetch(PDO::FETCH_ASSOC);
+
+        $lines = [];
+        foreach ($rows as $r) {
+            $lines[] = [
+                'account_id'  => (int)$r['account_id'],
+                'type'        => $r['type'] === 'debit' ? 'credit' : 'debit',
+                'amount'      => (float)$r['amount'],
+                'description' => 'Payment reversal — receipt voided',
+            ];
+        }
+        $pid = isset($hdr['project_id']) && $hdr['project_id'] !== null ? (int)$hdr['project_id'] : null;
+
+        try {
+            $entry = postLedgerEntry($pdo, "Payment #$paymentId voided — receipt reversed",
+                $lines, $pid, $paymentId, 'payment_void', date('Y-m-d'), $userId);
+            $out['reversed'] = true; $out['reason'] = 'reversed'; $out['entry_id'] = $entry;
+        } catch (Throwable $e) {
+            error_log("reversePaymentReceived $paymentId: " . $e->getMessage());
+            $out['reason'] = 'reverse_error';
+        }
+        return $out;
+    }
+}
+
