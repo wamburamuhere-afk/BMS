@@ -83,8 +83,8 @@ try {
             at.category         AS category,
             at.normal_side      AS normal_side,
             $liqSelect
-            COALESCE(SUM(CASE WHEN jei.type = 'debit'  THEN jei.amount ELSE 0 END), 0) AS total_debit,
-            COALESCE(SUM(CASE WHEN jei.type = 'credit' THEN jei.amount ELSE 0 END), 0) AS total_credit
+            COALESCE(SUM(CASE WHEN je.entry_id IS NOT NULL AND jei.type = 'debit'  THEN jei.amount ELSE 0 END), 0) AS total_debit,
+            COALESCE(SUM(CASE WHEN je.entry_id IS NOT NULL AND jei.type = 'credit' THEN jei.amount ELSE 0 END), 0) AS total_credit
         FROM accounts a
         JOIN account_types at ON a.account_type_id = at.type_id
         LEFT JOIN journal_entry_items jei ON a.account_id = jei.account_id
@@ -119,12 +119,13 @@ try {
         $debit    = (float) $acc['total_debit'];
         $credit   = (float) $acc['total_credit'];
 
-        // Natural-side balance from the canonical helper, PLUS the account's
-        // opening_balance (allocated to the natural side). This makes the
-        // Balance Sheet read the same origin data as the Trial Balance —
-        // without it the BS silently drops every opening balance and the two
-        // reports disagree.
-        $balance = fc_balance($category, $debit, $credit) + (float)$acc['opening_balance'];
+        // ONE LEDGER (account_financial.md / balance_sheet_one_ledger_plan.md):
+        // the balance is the account's posted journal_entries movement ONLY, on its
+        // natural side. The denormalised accounts.opening_balance column is NOT added
+        // (it is not a journal source and is unbalanced on some hosts — an opening
+        // position must be posted as a real opening journal entry). This makes the
+        // page read the exact same source as glBalanceSheet / Trial Balance / Chart.
+        $balance = fc_balance($category, $debit, $credit);
         if (abs($balance) < 0.001) continue;
 
         // Current vs non-current (IAS 1 split). Now DATA-DRIVEN from
@@ -164,104 +165,18 @@ try {
         }
     }
 
-    // ── VAT control position ────────────────────────────────────────────
-    // The VAT control accounts (Output VAT Payable, Input VAT Recoverable) are
-    // maintained in the invoice sub-ledger, not the formal GL this page reads,
-    // so inject their document-derived balances here — the SAME drift-proof
-    // figures the Tax Report shows (summed from posted invoice VAT):
-    //   Output VAT = a LIABILITY,  Input VAT = an ASSET.
-    if (function_exists('vatNetPosition')) {
-        $vat = vatNetPosition($pdo);
-        if (abs($vat['input']) >= 0.005) {
-            $sections['assets']['current'][]      = ['account_name' => 'Input VAT Recoverable', 'balance' => $vat['input']];
-            $sections['assets']['total_current'] += $vat['input'];
-            $sections['assets']['total']         += $vat['input'];
-        }
-        if (abs($vat['output']) >= 0.005) {
-            $sections['liabilities']['current'][]      = ['account_name' => 'Output VAT Payable', 'balance' => $vat['output']];
-            $sections['liabilities']['total_current'] += $vat['output'];
-            $sections['liabilities']['total']         += $vat['output'];
-        }
-    }
-
-    // ── WHT control position ────────────────────────────────────────────
-    // Withholding tax deducted from supplier/sub-contractor payments but not yet
-    // remitted to TRA — a current LIABILITY, summed drift-proof from the posted
-    // documents (Σ wht_posted), exactly mirroring the VAT block above. Independent
-    // of VAT (own account/columns), so the VAT figures above are unaffected.
-    if (function_exists('whtPosition')) {
-        $wht = whtPosition($pdo);
-        if (abs($wht['payable']) >= 0.005) {
-            $sections['liabilities']['current'][]      = ['account_name' => 'WHT Payable', 'balance' => $wht['payable']];
-            $sections['liabilities']['total_current'] += $wht['payable'];
-            $sections['liabilities']['total']         += $wht['payable'];
-        }
-    }
-
-    // ── WHT Receivable position (sales side) ────────────────────────────
-    // Withholding tax customers have withheld from us — a tax credit we reclaim,
-    // i.e. a current ASSET (Σ payments.wht_posted). Mirror of WHT Payable above,
-    // on the asset side beside Input VAT. Own account/columns — VAT unaffected.
-    if (function_exists('whtReceivablePosition')) {
-        $whtr = whtReceivablePosition($pdo);
-        if (abs($whtr['receivable']) >= 0.005) {
-            $sections['assets']['current'][]      = ['account_name' => 'WHT Receivable', 'balance' => $whtr['receivable']];
-            $sections['assets']['total_current'] += $whtr['receivable'];
-            $sections['assets']['total']         += $whtr['receivable'];
-        }
-    }
-
-    // ── Trade Receivables / Payables + accruals (Phase 1) ────────────────
-    // Document-derived positions injected exactly like VAT/WHT above: the UNPAID
-    // balance of operational documents becomes a current asset (owed to us) or
-    // current liability (we owe). Drift-proof — summed live from the source docs.
-    require_once __DIR__ . '/../../../core/receivables_payables.php';
-
-    // Accounts Receivable — unpaid customer invoices (ASSET).
-    if (function_exists('arInvoicesPosition')) {
-        $ar = arInvoicesPosition($pdo);
-        if (abs($ar['receivable']) >= 0.005) {
-            $sections['assets']['current'][]      = ['account_name' => 'Accounts Receivable (Trade)', 'balance' => $ar['receivable']];
-            $sections['assets']['total_current'] += $ar['receivable'];
-            $sections['assets']['total']         += $ar['receivable'];
-        }
-    }
-    // Accounts Payable — unpaid supplier / received invoices (LIABILITY).
-    if (function_exists('apSupplierInvoicesPosition')) {
-        $ap = apSupplierInvoicesPosition($pdo);
-        if (abs($ap['payable']) >= 0.005) {
-            $sections['liabilities']['current'][]      = ['account_name' => 'Accounts Payable (Trade)', 'balance' => $ap['payable']];
-            $sections['liabilities']['total_current'] += $ap['payable'];
-            $sections['liabilities']['total']         += $ap['payable'];
-        }
-    }
-    // Accrued Expenses — incurred-but-unpaid expenses (LIABILITY).
-    if (function_exists('accruedExpensesPosition')) {
-        $acc = accruedExpensesPosition($pdo);
-        if (abs($acc['payable']) >= 0.005) {
-            $sections['liabilities']['current'][]      = ['account_name' => 'Accrued Expenses', 'balance' => $acc['payable']];
-            $sections['liabilities']['total_current'] += $acc['payable'];
-            $sections['liabilities']['total']         += $acc['payable'];
-        }
-    }
-    // Salaries Payable — net pay of recognised-but-unpaid payroll (LIABILITY).
-    if (function_exists('salariesPayablePosition')) {
-        $sp = salariesPayablePosition($pdo);
-        if (abs($sp['payable']) >= 0.005) {
-            $sections['liabilities']['current'][]      = ['account_name' => 'Salaries Payable', 'balance' => $sp['payable']];
-            $sections['liabilities']['total_current'] += $sp['payable'];
-            $sections['liabilities']['total']         += $sp['payable'];
-        }
-    }
-    // Refunds Payable — refunds owed to customers, not yet settled (LIABILITY).
-    if (function_exists('refundsPayablePosition')) {
-        $rf = refundsPayablePosition($pdo);
-        if (abs($rf['payable']) >= 0.005) {
-            $sections['liabilities']['current'][]      = ['account_name' => 'Refunds Payable', 'balance' => $rf['payable']];
-            $sections['liabilities']['total_current'] += $rf['payable'];
-            $sections['liabilities']['total']         += $rf['payable'];
-        }
-    }
+    // ── ONE LEDGER — sub-ledger injections REMOVED (balance_sheet_one_ledger_plan.md) ──
+    // The control accounts (Output/Input VAT, WHT Payable/Receivable, Accounts
+    // Receivable, Accounts Payable, Accrued Expenses, Salaries Payable, Refunds
+    // Payable) used to be injected here from the operational sub-ledgers (vatNetPosition,
+    // whtPosition, arInvoicesPosition, salariesPayablePosition, …). That DOUBLE-COUNTED
+    // every account that also posts to journal_entries, and showed PHANTOM balances on
+    // systems whose sub-ledger tables held un-posted/leftover rows (e.g. Salaries Payable
+    // summing pending/approved payroll never posted to the GL). Those accounts now come
+    // from the SAME posted journal_entries the main query above already reads — one source
+    // of truth. Recognition reaches the GL via the accrual/posting flow (invoice approval,
+    // GRN/bill, payroll accrual, expense accrual, WHT legs); anything not posted is, by
+    // definition, not yet a recognised balance and must not appear here.
 
     // Retained Earnings = NET PROFIT to-date. Pulls every P&L account
     // (revenue + expense + cogs) up to and including the as-of date,
@@ -272,8 +187,8 @@ try {
         $ph = implode(',', array_fill(0, count($is_type_ids), '?'));
         $is_sql = "
             SELECT at.category AS category,
-                   COALESCE(SUM(CASE WHEN jei.type = 'debit'  THEN jei.amount ELSE 0 END), 0) AS dr,
-                   COALESCE(SUM(CASE WHEN jei.type = 'credit' THEN jei.amount ELSE 0 END), 0) AS cr
+                   COALESCE(SUM(CASE WHEN je.entry_id IS NOT NULL AND jei.type = 'debit'  THEN jei.amount ELSE 0 END), 0) AS dr,
+                   COALESCE(SUM(CASE WHEN je.entry_id IS NOT NULL AND jei.type = 'credit' THEN jei.amount ELSE 0 END), 0) AS cr
               FROM accounts a
               JOIN account_types at ON a.account_type_id = at.type_id
          LEFT JOIN journal_entry_items jei ON jei.account_id = a.account_id
@@ -291,23 +206,10 @@ try {
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $cat_totals[$r['category']] = fc_balance($r['category'], (float)$r['dr'], (float)$r['cr']);
         }
-        // Fold opening balances on P&L accounts into the category totals so
-        // the Retained Earnings figure ties to the Trial Balance. Done in a
-        // separate, journal-free query to avoid the join row-multiplication
-        // that would inflate a SUM(opening_balance).
-        $op_stmt = $pdo->prepare("
-            SELECT at.category AS category, COALESCE(SUM(a.opening_balance), 0) AS ob
-              FROM accounts a
-              JOIN account_types at ON a.account_type_id = at.type_id
-             WHERE a.account_type_id IN ($ph) AND a.status = 'active'
-          GROUP BY at.category
-        ");
-        $op_stmt->execute($is_type_ids);
-        foreach ($op_stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            if (isset($cat_totals[$r['category']])) {
-                $cat_totals[$r['category']] += (float)$r['ob'];
-            }
-        }
+        // ONE LEDGER: Retained Earnings is posted journal_entries P&L activity ONLY.
+        // The accounts.opening_balance fold was removed so this figure (and the whole
+        // page) ties to glBalanceSheet / Trial Balance / Chart, all sourced from the
+        // journal. An opening position belongs in a posted opening journal entry.
         // Net profit = Revenue - COGS - Expenses
         $net_income = $cat_totals['revenue'] - $cat_totals['cogs'] - $cat_totals['expense'];
     }

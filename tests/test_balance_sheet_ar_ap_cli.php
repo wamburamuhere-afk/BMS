@@ -51,13 +51,16 @@ $cancelledAR = (float)$pdo->query("
       FROM invoices WHERE status IN ('cancelled','rejected','deleted')")->fetchColumn();
 chk(true, "cancelled/rejected/deleted invoices excluded (their AR would be ".number_format($cancelledAR,2).", not in the figure)");
 
-echo "\n== 5. Balance Sheet injects all four positions ==\n";
+echo "\n== 5. Balance Sheet reads ONE ledger (sub-ledger injections REMOVED) ==\n";
+// Updated 2026-06-24 (balance_sheet_one_ledger_plan.md): the BS no longer injects
+// these control accounts from the operational sub-ledgers — that double-counted what
+// is already posted to journal_entries and produced phantom balances. The helpers
+// (tested in sections 2-4) still exist for other reports (e.g. AR/AP aging); the
+// Balance Sheet now sources every figure from posted journal_entries.
 $bs = src("$root/app/constant/reports/balance_sheet.php");
-has($bs, "require_once __DIR__ . '/../../../core/receivables_payables.php'", 'BS loads the helper');
-has($bs, "Accounts Receivable (Trade)", 'BS injects Accounts Receivable (asset)');
-has($bs, "Accounts Payable (Trade)",    'BS injects Accounts Payable (liability)');
-has($bs, "Accrued Expenses",            'BS injects Accrued Expenses (liability)');
-has($bs, "Refunds Payable",             'BS injects Refunds Payable (liability)');
-// AR added to assets, AP/accrued/refunds added to liabilities.
-chk(strpos($bs, "\$sections['assets']['current'][]      = ['account_name' => 'Accounts Receivable (Trade)'") !== false, 'AR added to current assets');
-chk(strpos($bs, "\$sections['liabilities']['current'][]      = ['account_name' => 'Accounts Payable (Trade)'") !== false, 'AP added to current liabilities');
+chk(strpos($bs, 'arInvoicesPosition($pdo)') === false,        'BS no longer injects Accounts Receivable (from journal_entries)');
+chk(strpos($bs, 'apSupplierInvoicesPosition($pdo)') === false, 'BS no longer injects Accounts Payable (from journal_entries)');
+chk(strpos($bs, 'accruedExpensesPosition($pdo)') === false,    'BS no longer injects Accrued Expenses (from journal_entries)');
+chk(strpos($bs, 'salariesPayablePosition($pdo)') === false,    'BS no longer injects Salaries Payable (from journal_entries)');
+chk(strpos($bs, 'refundsPayablePosition($pdo)') === false,     'BS no longer injects Refunds Payable (from journal_entries)');
+chk(strpos($bs, 'je.entry_id IS NOT NULL') !== false,          'BS counts only POSTED journal lines (entry_id guard)');
