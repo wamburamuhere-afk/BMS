@@ -53,3 +53,35 @@ section('4. Reverse step: atomic + removes the journal mirror');
     ? pass('reverse removes the journal mirror') : fail('reverse does not unmirror');
 (preg_match('/catch[^{]*\{[^}]*rollBack\(\)/s', $post) === 1)
     ? pass('reverse rolls back on error (atomic)') : fail('reverse lost its rollback');
+
+section('5. Charge account current_balance mirror — post and reversal');
+// On post: charge account must be debited (Dr increases expense balance).
+(strpos($add, 'applyAccountBalanceDelta($pdo, $charge_acc_id, \'debit\', $charges)') !== false)
+    ? pass('post: applyAccountBalanceDelta Dr charge_account_id for charges')
+    : fail('post: charge account current_balance NOT updated on post');
+// The debit is guarded — only when charges > 0 AND a charge account is set.
+(preg_match('/if\s*\(\s*\$charges\s*>\s*0\s*&&\s*\$charge_acc_id\s*\)/', $add) === 1)
+    ? pass('post: charge balance delta guarded by charges > 0 && charge_acc_id')
+    : fail('post: charge balance delta guard missing');
+// On reversal: charge_account_id must be fetched from the DB.
+(strpos($post, 'charge_account_id') !== false)
+    ? pass('reverse: charge_account_id fetched from bank_transfers row')
+    : fail('reverse: charge_account_id not fetched — cannot restore balance');
+// On reversal: charge account must be credited back (Cr reduces expense balance).
+(strpos($post, "applyAccountBalanceDelta(\$pdo, \$chargeAccId, 'credit', \$charges)") !== false)
+    ? pass('reverse: applyAccountBalanceDelta Cr chargeAccId restores expense balance')
+    : fail('reverse: charge account current_balance NOT restored on reversal');
+// Reversal guard mirrors the post guard.
+(preg_match('/if\s*\(\s*\$charges\s*>\s*0\s*&&\s*\$chargeAccId\s*\)/', $post) === 1)
+    ? pass('reverse: charge balance delta guarded by charges > 0 && chargeAccId')
+    : fail('reverse: charge balance delta guard missing');
+
+section('6. Journal entry is balanced including charges (shape check)');
+// The journal items array must contain a debit leg for the charge account.
+(strpos($add, "'account_id' => (int)\$charge_acc_id, 'type' => 'debit', 'amount' => \$charges") !== false)
+    ? pass('journal entry: Dr leg for charge account present')
+    : fail('journal entry: Dr leg for charge account missing');
+// The credit leg must use $total (amount + charges) — not just $amount.
+(strpos($add, "'account_id' => \$from_id, 'type' => 'credit', 'amount' => \$total") !== false)
+    ? pass('journal entry: Cr source uses $total (amount + charges) — balanced')
+    : fail('journal entry: Cr source does not use $total — entry would be unbalanced');
