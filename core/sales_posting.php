@@ -319,3 +319,47 @@ if (!function_exists('reverseCreditNoteRestock')) {
         return reverseAccrualEntry($pdo, 'credit_note_cogs', $creditNoteId, $userId);
     }
 }
+
+if (!function_exists('postCreditNoteRefundVat')) {
+    /**
+     * account_financial.md #3 — a VAT credit-note refund must REVERSE the Output VAT
+     * originally charged on the sale, not bury it in Sales Returns. Posts the 3-leg split:
+     *
+     *   Dr Sales Returns & Allowances (net = gross − tax)   ← contra-revenue
+     *   Dr Output VAT Payable        (tax)                  ← reverses the VAT owed to TRA
+     *      Cr Cash/Bank              (gross)                ← full refund paid to the customer
+     *
+     * Moves the Paid-From cash balance (mirror of postOutflow), and mirrors into the
+     * canonical journal via recordGlobalTransaction. Use ONLY when tax > 0 and net > 0;
+     * a no-VAT note keeps the original 2-leg postOutflow path (zero regression).
+     *
+     * @return int|null transaction_id, or null when it could not post.
+     */
+    function postCreditNoteRefundVat(PDO $pdo, string $ref, int $paidFromAccountId, int $sraAccountId,
+                                     int $outputVatAccountId, float $gross, float $tax, string $date,
+                                     string $desc, ?int $projectId, int $userId): ?int
+    {
+        require_once __DIR__ . '/payment_source.php';   // recordGlobalTransaction (via chain) + applyAccountBalanceDelta
+        $gross = round($gross, 2); $tax = round($tax, 2); $net = round($gross - $tax, 2);
+        if ($paidFromAccountId <= 0 || $sraAccountId <= 0 || $outputVatAccountId <= 0) return null;
+        if ($gross <= 0 || $tax <= 0 || $net <= 0) return null;
+
+        $res = recordGlobalTransaction([
+            'transaction_date' => $date,
+            'amount'           => $gross,
+            'transaction_type' => 'credit_note_refund',
+            'reference_number' => $ref,
+            'description'      => $desc,
+            'project_id'       => $projectId,
+            'journal_items'    => [
+                ['account_id' => $sraAccountId,        'type' => 'debit',  'amount' => $net,   'description' => $desc . ' (net of VAT)'],
+                ['account_id' => $outputVatAccountId,  'type' => 'debit',  'amount' => $tax,   'description' => 'Output VAT reversed (sales return)'],
+                ['account_id' => $paidFromAccountId,   'type' => 'credit', 'amount' => $gross, 'description' => $desc],
+            ],
+        ], $pdo);
+        if (empty($res['success'])) return null;
+
+        applyAccountBalanceDelta($pdo, $paidFromAccountId, 'credit', $gross);   // cash out (mirror of postOutflow)
+        return (int)$res['transaction_id'];
+    }
+}

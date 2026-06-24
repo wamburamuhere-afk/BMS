@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-23 (fix) — Credit-note refund now reverses Output VAT (was left owed to TRA)
+
+**Problem (account_financial.md #3):** `pay_credit_note.php` posted the refund as `Dr Sales Returns & Allowances (gross) / Cr Cash (gross)` — it debited Sales Returns by the **gross** `grand_total` (incl. VAT) and **never reduced Output VAT Payable**. So after refunding a VAT sale, the Output VAT originally charged stayed on the books — you still owed TRA the VAT on goods that came back.
+
+**Fix:**
+- `core/sales_posting.php` — new `postCreditNoteRefundVat()`: posts the 3-leg split `Dr Sales Returns (net) / Dr Output VAT Payable (tax) / Cr Cash (gross)`, moves the Paid-From cash balance (mirror of `postOutflow`), mirrors into the canonical journal.
+- `api/sales/pay_credit_note.php` — when `total_tax > 0` it resolves Output VAT (`outputVatAccountId`), enforces a real cash/bank Paid-From (`requireCashBankAccount`) and posts the split; a **no-VAT note keeps the original 2-leg `postOutflow` path** (zero regression).
+
+**Test:** `tests/test_credit_note_vat_reversal_cli.php` — **12/12**: the endpoint is wired (resolves Output VAT, splits when taxed, keeps the no-VAT fallback); runtime posts a 11,800 / 1,800 VAT refund and asserts Sales Returns = net (10,000), Output VAT debited = tax (1,800), Cash credited = gross (11,800), entry balanced, `assertLedgerBalanced` holds. Existing `test_credit_note_restock_cli.php` still **19/0**. Rolled-back transaction.
+
+---
+
 ## 2026-06-23 (feat/fix) — Customer payment void (was no correction path)
 
 **Problem (account_financial.md #12a):** a customer receipt posts a balanced entry (`Dr Received-Into / Cr AR [+ Dr WHT Receivable]`) but there was **no void/delete endpoint** for it — `money_in_posting.php` even noted "Reversal = a contra entry, handled by the caller on void," yet no caller existed. A mis-keyed receipt could not be undone.
