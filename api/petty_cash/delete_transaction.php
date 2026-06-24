@@ -1,37 +1,69 @@
 <?php
+// api/petty_cash/delete_transaction.php
+//
+// account_financial.md flow #11 (FIX) — deleting a petty-cash transaction now
+// REVERSES its ledger posting. This was a bare `DELETE FROM petty_cash_transactions`
+// that left the journal_entries mirror, the legacy transactions/books_transactions
+// rows AND the accounts.current_balance deltas behind — so after the source was gone
+// the expense stayed in the P&L and Petty Cash stayed reduced (the reports never
+// reacted to the delete).
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/payment_source.php';   // reversePettyCashLedger
 
 header('Content-Type: application/json');
 
 if (!isAuthenticated()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
-    exit();
+    exit;
 }
 
 if (!canDelete('petty_cash')) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to delete petty cash transactions']);
-    exit();
+    exit;
 }
 
 try {
-    $id = $_POST['id'] ?? 0;
-    
+    $id = (int)($_POST['id'] ?? 0);
     if (!$id) {
         throw new Exception("Invalid transaction ID");
     }
-    
-    // Optional: Only allow deletion of recent transactions or by admin
-    // For now, allow logged in user to delete
-    
-    $stmt = $pdo->prepare("DELETE FROM petty_cash_transactions WHERE id = ?");
-    $stmt->execute([$id]);
+
+    // Snapshot the posting (type + ledger txn) + receipt BEFORE deleting, so the
+    // matching journal can be reversed and the file cleaned up.
+    $row = $pdo->prepare("SELECT type, transaction_id, receipt_file FROM petty_cash_transactions WHERE id = ?");
+    $row->execute([$id]);
+    $tx = $row->fetch(PDO::FETCH_ASSOC);
+    if (!$tx) {
+        throw new Exception("Transaction not found.");
+    }
+
+    // Reverse the ledger + delete the record in ONE transaction, so a failure leaves
+    // NOTHING half-done.
+    $pdo->beginTransaction();
+
+    // expense → reverseOutflow (undo the source leg); deposit/top-up →
+    // reverseJournalBalances (undo BOTH legs). Each restores account balances, removes
+    // the journal_entries mirror and the legacy transactions/books_transactions rows.
+    // No-op if the entry was never posted (transaction_id null/0).
+    reversePettyCashLedger($pdo, (string)($tx['type'] ?? ''), (int)($tx['transaction_id'] ?? 0));
+
+    $pdo->prepare("DELETE FROM petty_cash_transactions WHERE id = ?")->execute([$id]);
+
+    $pdo->commit();
+
+    // Remove the receipt file once the row is gone.
+    if (!empty($tx['receipt_file'])) {
+        $path = __DIR__ . '/../../uploads/finance/petty_cash/' . $tx['receipt_file'];
+        if (is_file($path)) @unlink($path);
+    }
 
     // Phase 3b — petty cash deletions are high-sensitivity financial events.
-    logActivity($pdo, $_SESSION['user_id'], "Deleted Petty Cash Transaction", "Transaction ID: $id");
+    logActivity($pdo, $_SESSION['user_id'], "Deleted Petty Cash Transaction", "Transaction ID: $id (ledger reversed)");
 
     echo json_encode(['success' => true, 'message' => 'Transaction deleted successfully']);
-    
+
 } catch (Exception $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }

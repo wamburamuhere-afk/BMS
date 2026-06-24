@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-23 (fix) — Deleting a petty-cash transaction reverses its ledger (was a bare DELETE)
+
+**Problem (account_financial.md #11):** `api/petty_cash/delete_transaction.php` was a bare `DELETE FROM petty_cash_transactions` — it never called `reversePettyCashLedger()`, so the `journal_entries` mirror, the legacy `transactions`/`books_transactions` rows **and** the `accounts.current_balance` deltas were all left behind. After the source row was gone the expense stayed in the P&L and Petty Cash stayed reduced — the reports never reacted to the delete. (The save/update path already reversed correctly; only delete was broken.)
+
+**Fix (`api/petty_cash/delete_transaction.php`):** snapshot `type` + `transaction_id` + `receipt_file`, then in ONE transaction call `reversePettyCashLedger()` (expense → `reverseOutflow`; deposit/top-up → `reverseJournalBalances` — each restores balances, unmirrors the journal, removes the legacy rows) and delete the record; unlink the receipt afterward. No-op safe when the entry was never posted.
+
+**Remediation (`migrations/2026_06_23_petty_cash_delete_orphan_heal.php`):** reverses any legacy `transactions` row of type `petty_cash`/`petty_cash_topup` whose `petty_cash_transactions` parent no longer exists (orphaned by past bare-deletes), with the matching method. Criteria-based + idempotent (a reversed orphan's row is deleted); ledger balanced. Found **0** on the dev DB.
+
+**Test:** `tests/test_petty_cash_delete_reversal_cli.php` — **17/17**: reversal wired in the endpoint; runtime posts an expense (`Dr Expense / Cr Petty Cash`) then reverses it so the journal mirror + legacy rows are removed and `assertLedgerBalanced` holds, idempotent; same for a top-up (`Dr Petty Cash / Cr Bank`, both legs reversed). Rolled-back transaction — live DB untouched.
+
+---
+
 ## 2026-06-23 (fix) — Deleting an asset reverses its ledger (was a bare DELETE that orphaned the GL)
 
 **Problem (account_financial.md #13):** `api/operations/delete_asset.php` was a bare `DELETE FROM assets` — no GL reversal, no status guard, no transaction, not even soft-delete. An asset carries a posted acquisition entry (`Dr Fixed Asset / Cr AP`), **many depreciation charges** (`Dr Depreciation Expense / Cr Accumulated Depreciation`, often across closed periods) and possibly a disposal — deleting the row **orphaned all of it**, overstating Fixed Assets / AP / Accumulated Depreciation / Depreciation Expense with no source document. The orphan-heal migration found **4,729** such entries on the dev DB, confirming large-scale corruption.
