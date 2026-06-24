@@ -8,7 +8,9 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/payment_source.php';
-require_once __DIR__ . '/../../core/money_guard.php';   // postOutflowOrFail / accountFundsWarning
+require_once __DIR__ . '/../../core/money_guard.php';   // postOutflowOrFail / accountFundsWarning / requireCashBankAccount
+require_once __DIR__ . '/../../core/vat.php';           // outputVatAccountId
+require_once __DIR__ . '/../../core/sales_posting.php'; // postCreditNoteRefundVat / creditNoteRestockCost
 
 header('Content-Type: application/json');
 
@@ -69,8 +71,29 @@ try {
     $pdo->beginTransaction();
 
     $desc = "Credit note refund {$cn['credit_note_number']} — " . ($cn['customer_name'] ?? 'customer');
-    $txnId = postOutflowOrFail($pdo, 'credit_note_refund', $paidFrom, $sraAccountId,
-                         $amount, $cn['credit_date'], $cn['credit_note_number'], $desc, $projectId);
+
+    // VAT-aware refund (account_financial.md #3): a sales return reverses the Output VAT
+    // originally charged, so a VAT credit note posts a 3-leg split — Dr Sales Returns
+    // (net) / Dr Output VAT (tax) / Cr Cash (gross) — instead of debiting Sales Returns
+    // by the gross (which left the VAT owed to TRA). A no-VAT note keeps the original
+    // 2-leg postOutflow path (zero regression).
+    $cnTax = round((float)($cn['total_tax'] ?? 0), 2);
+    $cnNet = round($amount - $cnTax, 2);
+    if ($cnTax > 0 && $cnNet > 0) {
+        $outVat = outputVatAccountId($pdo);
+        if (!$outVat) {
+            throw new Exception('Output VAT account is not configured — cannot reverse the VAT on this refund. Ask an admin to set it before refunding a VAT credit note.');
+        }
+        requireCashBankAccount($pdo, $paidFrom, 'Paid From');   // money-safety: real cash/bank only
+        $txnId = postCreditNoteRefundVat($pdo, $cn['credit_note_number'], $paidFrom, $sraAccountId, (int)$outVat,
+                                         $amount, $cnTax, $cn['credit_date'], $desc, $projectId, (int)$_SESSION['user_id']);
+        if (!$txnId) {
+            throw new Exception('The VAT refund could not be posted to the ledger. Nothing was saved.');
+        }
+    } else {
+        $txnId = postOutflowOrFail($pdo, 'credit_note_refund', $paidFrom, $sraAccountId,
+                             $amount, $cn['credit_date'], $cn['credit_note_number'], $desc, $projectId);
+    }
 
     $pdo->prepare("
         UPDATE credit_notes

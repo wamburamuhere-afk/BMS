@@ -1,5 +1,69 @@
 # BMS Changelog
 
+## 2026-06-23 (fix) — Credit-note refund now reverses Output VAT (was left owed to TRA)
+
+**Problem (account_financial.md #3):** `pay_credit_note.php` posted the refund as `Dr Sales Returns & Allowances (gross) / Cr Cash (gross)` — it debited Sales Returns by the **gross** `grand_total` (incl. VAT) and **never reduced Output VAT Payable**. So after refunding a VAT sale, the Output VAT originally charged stayed on the books — you still owed TRA the VAT on goods that came back.
+
+**Fix:**
+- `core/sales_posting.php` — new `postCreditNoteRefundVat()`: posts the 3-leg split `Dr Sales Returns (net) / Dr Output VAT Payable (tax) / Cr Cash (gross)`, moves the Paid-From cash balance (mirror of `postOutflow`), mirrors into the canonical journal.
+- `api/sales/pay_credit_note.php` — when `total_tax > 0` it resolves Output VAT (`outputVatAccountId`), enforces a real cash/bank Paid-From (`requireCashBankAccount`) and posts the split; a **no-VAT note keeps the original 2-leg `postOutflow` path** (zero regression).
+
+**Test:** `tests/test_credit_note_vat_reversal_cli.php` — **12/12**: the endpoint is wired (resolves Output VAT, splits when taxed, keeps the no-VAT fallback); runtime posts a 11,800 / 1,800 VAT refund and asserts Sales Returns = net (10,000), Output VAT debited = tax (1,800), Cash credited = gross (11,800), entry balanced, `assertLedgerBalanced` holds. Existing `test_credit_note_restock_cli.php` still **19/0**. Rolled-back transaction.
+
+---
+
+## 2026-06-23 (feat/fix) — Customer payment void (was no correction path)
+
+**Problem (account_financial.md #12a):** a customer receipt posts a balanced entry (`Dr Received-Into / Cr AR [+ Dr WHT Receivable]`) but there was **no void/delete endpoint** for it — `money_in_posting.php` even noted "Reversal = a contra entry, handled by the caller on void," yet no caller existed. A mis-keyed receipt could not be undone.
+
+**Fix:**
+- `core/money_in_posting.php` — new `reversePaymentReceived()` (+ `paymentReceivedReversed()`): posts the exact contra of the `payment` entry (every leg flipped) as `entity_type='payment_void'`; idempotent; best-effort.
+- `api/account/void_payment.php` (new) — gated by `canEdit('invoices')` + CSRF, project-scope-checked per affected invoice. In one transaction it: (1) reverses the receipt ledger entry, (2) marks the payment `cancelled`, (3) recomputes every affected invoice's `paid_amount`/`balance_due`/`status` from remaining completed payments + allocations (handles single-invoice and multi-invoice receipts), (4) reverses the bank-register deposit.
+
+**Test:** `tests/test_payment_void_cli.php` — **18/18**: endpoint wires the full unwind; runtime posts a receipt (`Dr Bank / Cr AR`) then reverses it so Bank and AR net to **zero**, a `payment_void` entry exists, it's idempotent, and `assertLedgerBalanced` holds. Rolled-back transaction.
+
+**Remaining surface (not a ledger gap):** no UI button yet — the endpoint is ready; a "Void" action can be added wherever customer payments are listed (none exists today).
+
+---
+
+## 2026-06-23 (fix) — Editing a posted journal entry is blocked (immutability guard)
+
+**Problem (account_financial.md #15):** `api/account/update_journal.php` had **no immutability guard** — it would edit a **posted** journal entry in place (replace all `journal_entry_items` + re-sync the legacy mirror), silently rewriting history that is already in the reports. `delete_journal.php` already blocks a posted entry; the **edit** path did not — an inconsistency that let a posted adjustment be altered after the fact.
+
+**Fix (`api/account/update_journal.php`):** before the write, call the canonical `assertJournalNotPosted($pdo, $entry_id)` (from `core/ledger_post.php`) — it allows only a `draft` and throws on posted/void/reversed/missing. A blocked edit returns **409** with: "void it (or post a reversing entry) and create a new one." Drafts remain fully editable (the promote-to-posted path is unchanged).
+
+**Test:** `tests/test_journal_update_immutability_cli.php` — **7/7**: the guard is wired and runs before the write; runtime confirms `assertJournalNotPosted` **throws for a posted** entry and **allows a draft**. Synthetic entries in a rolled-back transaction.
+
+---
+
+## 2026-06-23 (fix) — Deleting a petty-cash transaction reverses its ledger (was a bare DELETE)
+
+**Problem (account_financial.md #11):** `api/petty_cash/delete_transaction.php` was a bare `DELETE FROM petty_cash_transactions` — it never called `reversePettyCashLedger()`, so the `journal_entries` mirror, the legacy `transactions`/`books_transactions` rows **and** the `accounts.current_balance` deltas were all left behind. After the source row was gone the expense stayed in the P&L and Petty Cash stayed reduced — the reports never reacted to the delete. (The save/update path already reversed correctly; only delete was broken.)
+
+**Fix (`api/petty_cash/delete_transaction.php`):** snapshot `type` + `transaction_id` + `receipt_file`, then in ONE transaction call `reversePettyCashLedger()` (expense → `reverseOutflow`; deposit/top-up → `reverseJournalBalances` — each restores balances, unmirrors the journal, removes the legacy rows) and delete the record; unlink the receipt afterward. No-op safe when the entry was never posted.
+
+**Remediation (`migrations/2026_06_23_petty_cash_delete_orphan_heal.php`):** reverses any legacy `transactions` row of type `petty_cash`/`petty_cash_topup` whose `petty_cash_transactions` parent no longer exists (orphaned by past bare-deletes), with the matching method. Criteria-based + idempotent (a reversed orphan's row is deleted); ledger balanced. Found **0** on the dev DB.
+
+**Test:** `tests/test_petty_cash_delete_reversal_cli.php` — **17/17**: reversal wired in the endpoint; runtime posts an expense (`Dr Expense / Cr Petty Cash`) then reverses it so the journal mirror + legacy rows are removed and `assertLedgerBalanced` holds, idempotent; same for a top-up (`Dr Petty Cash / Cr Bank`, both legs reversed). Rolled-back transaction — live DB untouched.
+
+---
+
+## 2026-06-23 (fix) — Deleting an asset reverses its ledger (was a bare DELETE that orphaned the GL)
+
+**Problem (account_financial.md #13):** `api/operations/delete_asset.php` was a bare `DELETE FROM assets` — no GL reversal, no status guard, no transaction, not even soft-delete. An asset carries a posted acquisition entry (`Dr Fixed Asset / Cr AP`), **many depreciation charges** (`Dr Depreciation Expense / Cr Accumulated Depreciation`, often across closed periods) and possibly a disposal — deleting the row **orphaned all of it**, overstating Fixed Assets / AP / Accumulated Depreciation / Depreciation Expense with no source document. The orphan-heal migration found **4,729** such entries on the dev DB, confirming large-scale corruption.
+
+**Fix (`api/operations/delete_asset.php`) — professional immutability policy:**
+- **Posted depreciation or a disposal → BLOCK (409):** that history can span closed, already-reported periods, so it must never be silently unwound — the asset must be **disposed**, not deleted.
+- **Capitalised in error (acquisition entry only, no depreciation, not disposed) →** reverse that single capitalisation via `reverseAccrualEntry($pdo,'asset_acquisition',…)` (idempotent on `asset_acquisition_void`) then **soft-delete** (`status='deleted'`, §12). Wrapped in one transaction with rollback.
+
+**Schema (`migrations/2026_06_23_assets_deleted_status.php`):** adds `'deleted'` to the `assets.status` enum (was `enum('active','maintenance','disposed','written_off')` — every asset query already filtered `status != 'deleted'`, but the value was never valid). Idempotent.
+
+**Remediation (`migrations/2026_06_23_asset_delete_orphan_heal.php`):** reverses every posted asset entry (`entity_type` in `asset_acquisition`/`asset`/`asset_disposal`) whose `entity_id` is absent from `assets` and not already reversed, posting a balanced contra and stamping `reverses_entry_id`. Criteria-based + idempotent (re-run found 0); **healed 4,729 orphans, ledger balanced**.
+
+**Test:** `tests/test_asset_delete_reversal_cli.php` — **18/18**: enum supports the soft-delete value; the endpoint reverses acquisition + checks depreciation/disposal + soft-deletes in a transaction (no bare DELETE); runtime acquires then reverses so Fixed Asset and AP net to **zero**, reversal is idempotent, `assertLedgerBalanced` holds; runs in a rolled-back transaction. Existing `test_asset_depreciation_phase1_cli.php` still **47/0**.
+
+---
+
 ## 2026-06-23 (fix) — Credit note settlement now restocks inventory (Dr Inventory / Cr COGS)
 
 **Problem:** the credit-note (non-POS sales return) path posted **only** the revenue/cash contra at settlement (`pay_credit_note.php`: `Dr Sales Returns & Allowances / Cr Cash`). It never posted the **COGS contra** for the returned goods, so when a customer returned stocked goods the GL was left with **Inventory understated** and **COGS overstated** (gross profit understated). The POS-return path (`postPosReturn`) and the purchase-return path (`postPurchaseReturn`) both post their inventory leg; the credit-note path was the only one dropping it.

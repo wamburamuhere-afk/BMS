@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../helpers/transaction_helper.php';
+require_once __DIR__ . '/../../core/ledger_post.php';   // assertJournalNotPosted (posted journals are immutable)
 global $pdo;
 
 header('Content-Type: application/json');
@@ -40,6 +41,21 @@ try {
 
     if (abs($total_debits - $total_credits) > 0.01) {
         throw new Exception('Journal entry is not balanced');
+    }
+
+    // IMMUTABILITY GUARD (account_financial.md #15): a POSTED journal entry is in the
+    // reports — it must never be edited in place (that silently rewrites history).
+    // assertJournalNotPosted allows only a 'draft'; it throws on posted/void/reversed/
+    // missing. To change a posted entry, void it (or post a reversing entry) and create
+    // a new one. (delete_journal.php already blocks posted; this closes the edit path.)
+    try {
+        assertJournalNotPosted($pdo, (int)$entry_id);
+    } catch (LedgerException $le) {
+        http_response_code(409);
+        echo json_encode(['success' => false, 'message' =>
+            'This journal entry cannot be edited — ' . $le->getMessage()
+            . ' To change a posted entry, void it (or post a reversing entry) and create a new one.']);
+        exit;
     }
 
     $pdo->beginTransaction();
