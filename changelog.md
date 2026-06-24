@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-06-23 (fix) — Deleting an asset reverses its ledger (was a bare DELETE that orphaned the GL)
+
+**Problem (account_financial.md #13):** `api/operations/delete_asset.php` was a bare `DELETE FROM assets` — no GL reversal, no status guard, no transaction, not even soft-delete. An asset carries a posted acquisition entry (`Dr Fixed Asset / Cr AP`), **many depreciation charges** (`Dr Depreciation Expense / Cr Accumulated Depreciation`, often across closed periods) and possibly a disposal — deleting the row **orphaned all of it**, overstating Fixed Assets / AP / Accumulated Depreciation / Depreciation Expense with no source document. The orphan-heal migration found **4,729** such entries on the dev DB, confirming large-scale corruption.
+
+**Fix (`api/operations/delete_asset.php`) — professional immutability policy:**
+- **Posted depreciation or a disposal → BLOCK (409):** that history can span closed, already-reported periods, so it must never be silently unwound — the asset must be **disposed**, not deleted.
+- **Capitalised in error (acquisition entry only, no depreciation, not disposed) →** reverse that single capitalisation via `reverseAccrualEntry($pdo,'asset_acquisition',…)` (idempotent on `asset_acquisition_void`) then **soft-delete** (`status='deleted'`, §12). Wrapped in one transaction with rollback.
+
+**Schema (`migrations/2026_06_23_assets_deleted_status.php`):** adds `'deleted'` to the `assets.status` enum (was `enum('active','maintenance','disposed','written_off')` — every asset query already filtered `status != 'deleted'`, but the value was never valid). Idempotent.
+
+**Remediation (`migrations/2026_06_23_asset_delete_orphan_heal.php`):** reverses every posted asset entry (`entity_type` in `asset_acquisition`/`asset`/`asset_disposal`) whose `entity_id` is absent from `assets` and not already reversed, posting a balanced contra and stamping `reverses_entry_id`. Criteria-based + idempotent (re-run found 0); **healed 4,729 orphans, ledger balanced**.
+
+**Test:** `tests/test_asset_delete_reversal_cli.php` — **18/18**: enum supports the soft-delete value; the endpoint reverses acquisition + checks depreciation/disposal + soft-deletes in a transaction (no bare DELETE); runtime acquires then reverses so Fixed Asset and AP net to **zero**, reversal is idempotent, `assertLedgerBalanced` holds; runs in a rolled-back transaction. Existing `test_asset_depreciation_phase1_cli.php` still **47/0**.
+
+---
+
 ## 2026-06-23 (fix) — Credit note settlement now restocks inventory (Dr Inventory / Cr COGS)
 
 **Problem:** the credit-note (non-POS sales return) path posted **only** the revenue/cash contra at settlement (`pay_credit_note.php`: `Dr Sales Returns & Allowances / Cr Cash`). It never posted the **COGS contra** for the returned goods, so when a customer returned stocked goods the GL was left with **Inventory understated** and **COGS overstated** (gross profit understated). The POS-return path (`postPosReturn`) and the purchase-return path (`postPurchaseReturn`) both post their inventory leg; the credit-note path was the only one dropping it.
