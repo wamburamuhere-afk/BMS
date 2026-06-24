@@ -36,6 +36,10 @@ foreach (['salariesPayablePosition','vatNetPosition','arInvoicesPosition','apSup
     ok(strpos($src, "$fn(\$pdo)") === false, "no longer injects $fn()");
 }
 ok(strpos($src, "fc_balance(\$category, \$debit, \$credit) + (float)\$acc['opening_balance']") === false, 'no longer adds accounts.opening_balance to BS lines');
+// Retained Earnings query must include finance_cost + other_income so bank charges and
+// other-income accounts flow through Retained Earnings (not dropped, causing an imbalance).
+ok(strpos($src, "'finance_cost'") !== false, "retained earnings query includes 'finance_cost' (bank charges, etc.)");
+ok(strpos($src, "'other_income'") !== false, "retained earnings query includes 'other_income'");
 
 // ── 2. Replicate the page's NEW (pure-journal) computation → must balance ────
 section('2. Page computation now balances from journal_entries only');
@@ -58,8 +62,8 @@ foreach ($rows as $r) {
     elseif ($r['category']==='liability') $liab += $bal;
     else $equity += $bal;
 }
-// Retained earnings — posted P&L only (mirrors the page).
-$ids = fc_type_ids_for_categories($pdo, ['revenue','expense','cogs']);
+// Retained earnings — posted P&L only (mirrors the page: revenue+other_income − cogs − expense − finance_cost).
+$ids = fc_type_ids_for_categories($pdo, ['revenue','other_income','expense','finance_cost','cogs']);
 $net = 0.0;
 if ($ids) {
     $ph = implode(',', array_fill(0,count($ids),'?'));
@@ -71,9 +75,11 @@ if ($ids) {
     LEFT JOIN journal_entries je ON je.entry_id=jei.entry_id AND je.entry_date<=? AND je.status='posted'
         WHERE a.account_type_id IN ($ph) AND a.status='active' GROUP BY at.category");
     $st->execute(array_merge([$as_of],$ids));
-    $t=['revenue'=>0.0,'expense'=>0.0,'cogs'=>0.0];
-    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) $t[$r['c']] = fc_balance($r['c'],(float)$r['dr'],(float)$r['cr']);
-    $net = $t['revenue'] - $t['cogs'] - $t['expense'];
+    $t=['revenue'=>0.0,'other_income'=>0.0,'expense'=>0.0,'finance_cost'=>0.0,'cogs'=>0.0];
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        if (array_key_exists($r['c'], $t)) $t[$r['c']] = fc_balance($r['c'],(float)$r['dr'],(float)$r['cr']);
+    }
+    $net = ($t['revenue'] + $t['other_income']) - $t['cogs'] - $t['expense'] - $t['finance_cost'];
 }
 $totalEq = $equity + $net;
 $diff = round($assets - ($liab + $totalEq), 2);

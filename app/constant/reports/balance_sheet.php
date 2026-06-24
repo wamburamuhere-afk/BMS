@@ -181,7 +181,7 @@ try {
     // Retained Earnings = NET PROFIT to-date. Pulls every P&L account
     // (revenue + expense + cogs) up to and including the as-of date,
     // using natural-side aggregation via fc_balance() per account.
-    $is_type_ids = fc_type_ids_for_categories($pdo, ['revenue', 'expense', 'cogs']);
+    $is_type_ids = fc_type_ids_for_categories($pdo, ['revenue', 'other_income', 'expense', 'finance_cost', 'cogs']);
     $net_income = 0.0;
     if (!empty($is_type_ids)) {
         $ph = implode(',', array_fill(0, count($is_type_ids), '?'));
@@ -202,16 +202,18 @@ try {
         ";
         $stmt = $pdo->prepare($is_sql);
         $stmt->execute(array_merge([$as_of_date], $is_type_ids));
-        $cat_totals = ['revenue' => 0.0, 'expense' => 0.0, 'cogs' => 0.0];
+        $cat_totals = ['revenue' => 0.0, 'other_income' => 0.0, 'expense' => 0.0, 'finance_cost' => 0.0, 'cogs' => 0.0];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $cat_totals[$r['category']] = fc_balance($r['category'], (float)$r['dr'], (float)$r['cr']);
+            if (array_key_exists($r['category'], $cat_totals)) {
+                $cat_totals[$r['category']] = fc_balance($r['category'], (float)$r['dr'], (float)$r['cr']);
+            }
         }
         // ONE LEDGER: Retained Earnings is posted journal_entries P&L activity ONLY.
-        // The accounts.opening_balance fold was removed so this figure (and the whole
-        // page) ties to glBalanceSheet / Trial Balance / Chart, all sourced from the
-        // journal. An opening position belongs in a posted opening journal entry.
-        // Net profit = Revenue - COGS - Expenses
-        $net_income = $cat_totals['revenue'] - $cat_totals['cogs'] - $cat_totals['expense'];
+        // Must mirror glBalanceSheet(): revenue + other_income − cogs − expense − finance_cost.
+        $net_income = ($cat_totals['revenue'] + $cat_totals['other_income'])
+                    - $cat_totals['cogs']
+                    - $cat_totals['expense']
+                    - $cat_totals['finance_cost'];
     }
 
     // Retained Earnings goes into Equity. Total Equity = sum of explicit

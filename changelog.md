@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-24 (fix) — Balance Sheet: include finance_cost + other_income in Retained Earnings
+
+**Problem:** The Retained Earnings query on `app/constant/reports/balance_sheet.php` called `fc_type_ids_for_categories($pdo, ['revenue','expense','cogs'])` — missing `'finance_cost'` and `'other_income'`. Any account classified as `finance_cost` (e.g. Bank Charges 6-1900) was excluded from net income. The asset (source bank) decreased by the charge amount but Retained Earnings did not absorb it → Balance Sheet showed "BALANCE SHEET DOES NOT BALANCE. Difference = X.XX (Liab.+Equity exceed Assets)" where X.XX was exactly the charge amount.
+
+**Fix (`app/constant/reports/balance_sheet.php`):**
+- Added `'finance_cost'` and `'other_income'` to the `fc_type_ids_for_categories` call (line 184).
+- Extended `$cat_totals` to hold all 5 categories.
+- Updated `$net_income` formula to mirror `glBalanceSheet()`: `(revenue + other_income) − cogs − expense − finance_cost`.
+
+**Fix (`tests/test_balance_sheet_one_ledger_cli.php`):**
+- Same retained earnings replication query in the test updated to use all 5 categories.
+- Added two source-level regression guards asserting `'finance_cost'` and `'other_income'` are present in the page's query. 13/13 green.
+
+---
+
 ## 2026-06-24 (fix) — Bank transfer charges: restore charge account current_balance on post and reversal
 
 **Problem:** `add_bank_transfer.php` called `applyAccountBalanceDelta` for the source and destination accounts but NOT for the charge account. The journal entry (`journal_entry_items`) was always balanced and correct (`Dr destination + Dr charge account = Cr source gross`), but `accounts.current_balance` on the charge account drifted — never incremented on post, never decremented on reversal.
