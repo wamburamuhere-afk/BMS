@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-06-23 (fix) — Editing a posted journal entry is blocked (immutability guard)
+
+**Problem (account_financial.md #15):** `api/account/update_journal.php` had **no immutability guard** — it would edit a **posted** journal entry in place (replace all `journal_entry_items` + re-sync the legacy mirror), silently rewriting history that is already in the reports. `delete_journal.php` already blocks a posted entry; the **edit** path did not — an inconsistency that let a posted adjustment be altered after the fact.
+
+**Fix (`api/account/update_journal.php`):** before the write, call the canonical `assertJournalNotPosted($pdo, $entry_id)` (from `core/ledger_post.php`) — it allows only a `draft` and throws on posted/void/reversed/missing. A blocked edit returns **409** with: "void it (or post a reversing entry) and create a new one." Drafts remain fully editable (the promote-to-posted path is unchanged).
+
+**Test:** `tests/test_journal_update_immutability_cli.php` — **7/7**: the guard is wired and runs before the write; runtime confirms `assertJournalNotPosted` **throws for a posted** entry and **allows a draft**. Synthetic entries in a rolled-back transaction.
+
+---
+
 ## 2026-06-23 (fix) — Deleting a petty-cash transaction reverses its ledger (was a bare DELETE)
 
 **Problem (account_financial.md #11):** `api/petty_cash/delete_transaction.php` was a bare `DELETE FROM petty_cash_transactions` — it never called `reversePettyCashLedger()`, so the `journal_entries` mirror, the legacy `transactions`/`books_transactions` rows **and** the `accounts.current_balance` deltas were all left behind. After the source row was gone the expense stayed in the P&L and Petty Cash stayed reduced — the reports never reacted to the delete. (The save/update path already reversed correctly; only delete was broken.)
