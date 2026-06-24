@@ -43,13 +43,17 @@ foreach ([
     chk($rc===0, "lint: $f");
 }
 
-// ── 2. Balance Sheet injects every unpaid position ────────────────────────────
-echo "\n== 2. Balance Sheet: unpaid → asset/liability ==\n";
-has($bs, 'Accounts Receivable (Trade)', 'AR (asset) injected');
-has($bs, 'Accounts Payable (Trade)',    'AP (liability) injected');
-has($bs, 'Accrued Expenses',            'Accrued Expenses (liability) injected');
-has($bs, 'Salaries Payable',            'Salaries Payable (liability) injected');
-has($bs, 'Refunds Payable',             'Refunds Payable (liability) injected');
+// ── 2. Balance Sheet reads ONE ledger (sub-ledger injections REMOVED) ─────────
+// Updated 2026-06-24: the BS no longer injects control accounts from the operational
+// sub-ledgers (that double-counted what is already in journal_entries and showed
+// phantom balances — e.g. Salaries Payable summing un-posted payroll). They now come
+// from posted journal_entries via the page's main query (balance_sheet_one_ledger_plan.md).
+echo "\n== 2. Balance Sheet: control accounts come from journal_entries, not injected ==\n";
+chk(strpos($bs, 'arInvoicesPosition($pdo)') === false,        'AR no longer injected (sourced from journal_entries)');
+chk(strpos($bs, 'apSupplierInvoicesPosition($pdo)') === false, 'AP no longer injected (sourced from journal_entries)');
+chk(strpos($bs, 'salariesPayablePosition($pdo)') === false,    'Salaries Payable no longer injected (sourced from journal_entries)');
+chk(strpos($bs, 'refundsPayablePosition($pdo)') === false,     'Refunds Payable no longer injected (sourced from journal_entries)');
+chk(strpos($bs, 'je.entry_id IS NOT NULL') !== false,          'BS counts only POSTED journal lines (entry_id guard)');
 
 // ── 3. Helpers return numeric positions + reconcile to source documents ───────
 echo "\n== 3. Position helpers reconcile to source documents ==\n";
