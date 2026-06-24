@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-06-24 (fix) — fc_natural_sign: add finance_cost (debit-normal) and other_income (credit-normal)
+
+**Root cause:** `fc_natural_sign()` in `core/financial_classification.php` had no case for `'finance_cost'` or `'other_income'` — both fell through to `default => 0`. Since `fc_balance()` multiplies by this sign, `fc_balance('finance_cost', dr, cr)` always returned 0 regardless of the amounts fetched. This meant the Balance Sheet Retained Earnings calculation silently discarded all Finance Cost entries (e.g. Bank Charges): the asset side went down by the charge amount but equity did not → "BALANCE SHEET DOES NOT BALANCE. Difference = X.XX (Liab.+Equity exceed Assets)" where X.XX was exactly the charge.
+
+**Fix (`core/financial_classification.php`):**
+```php
+'asset', 'expense', 'cogs', 'finance_cost' => 1,     // debit-normal
+'liability', 'equity', 'revenue', 'other_income' => -1, // credit-normal
+```
+
+**Tests (`tests/test_balance_sheet_one_ledger_cli.php`):** two new assertions confirm `fc_balance('finance_cost', 10, 0) = 10` and `fc_balance('other_income', 0, 10) = 10`. 15/15 green.
+
+---
+
 ## 2026-06-24 (fix) — Balance Sheet: include finance_cost + other_income in Retained Earnings
 
 **Problem:** The Retained Earnings query on `app/constant/reports/balance_sheet.php` called `fc_type_ids_for_categories($pdo, ['revenue','expense','cogs'])` — missing `'finance_cost'` and `'other_income'`. Any account classified as `finance_cost` (e.g. Bank Charges 6-1900) was excluded from net income. The asset (source bank) decreased by the charge amount but Retained Earnings did not absorb it → Balance Sheet showed "BALANCE SHEET DOES NOT BALANCE. Difference = X.XX (Liab.+Equity exceed Assets)" where X.XX was exactly the charge amount.

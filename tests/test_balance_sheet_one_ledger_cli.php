@@ -40,6 +40,12 @@ ok(strpos($src, "fc_balance(\$category, \$debit, \$credit) + (float)\$acc['openi
 // other-income accounts flow through Retained Earnings (not dropped, causing an imbalance).
 ok(strpos($src, "'finance_cost'") !== false, "retained earnings query includes 'finance_cost' (bank charges, etc.)");
 ok(strpos($src, "'other_income'") !== false, "retained earnings query includes 'other_income'");
+// fc_natural_sign must assign the correct sign for these categories; if it returns 0
+// (the default), fc_balance always returns 0 and the retained-earnings total silently
+// drops the amount even though it was fetched — the same symptom as not fetching it.
+require_once "$root/core/financial_classification.php";
+ok(fc_balance('finance_cost', 10, 0) === 10.0, "fc_balance('finance_cost', dr=10, cr=0) = 10 (debit-normal, sign=+1)");
+ok(fc_balance('other_income', 0, 10) === 10.0,  "fc_balance('other_income', dr=0, cr=10) = 10 (credit-normal, sign=-1)");
 
 // ── 2. Replicate the page's NEW (pure-journal) computation → must balance ────
 section('2. Page computation now balances from journal_entries only');
