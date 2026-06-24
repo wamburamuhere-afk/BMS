@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-06-24 (fix) — Balance Sheet reads ONE ledger (kills the Salaries Payable phantom + makes it balance)
+
+**Problem (balance_sheet_one_ledger_plan.md, Point 1):** the `balance_sheet` page showed a huge phantom **Salaries Payable** (e.g. 2,300,178,497.48) even on systems with no employees/payroll, and did not balance (live: ~17.4B out). Three faults, all "reading something other than the posted ledger":
+1. **Sub-ledger injections** — it summed `salariesPayablePosition()` (raw `payroll` table), plus `vatNetPosition`, `whtPosition`, `arInvoicesPosition`, `apSupplierInvoicesPosition`, `accruedExpensesPosition`, `refundsPayablePosition` — **on top of** the same control accounts already read from `journal_entries`. That double-counted them and, for Salaries Payable, summed **un-posted pending/approved payroll** (a figure in no ledger).
+2. **`accounts.opening_balance`** was added to every line (a non-journal, drift-prone column).
+3. **Draft/void leak** — the per-account sum counted `journal_entry_items` whose parent entry did **not** match the posted/date filter (no `je.entry_id IS NOT NULL` guard), so draft/void/out-of-range lines leaked in (e.g. PAYE Payable showed **−609M** instead of +8.8M).
+
+**Fix (`app/constant/reports/balance_sheet.php`):**
+- Removed **all** sub-ledger injection blocks — control accounts now come from the same posted `journal_entries` the main query reads (one source).
+- Removed the `accounts.opening_balance` add (BS lines **and** the retained-earnings fold) — an opening position must be a posted opening journal entry.
+- Added `je.entry_id IS NOT NULL` to both balance queries so only **posted, in-range** lines count (mirrors `glBalanceSheet`).
+
+**Result:** the page now reproduces the canonical `glBalanceSheet` figures **exactly** and **balances to 0.00**; Salaries Payable shows its journal value (21,295,224 on dev, **0** on an empty system) instead of the 3,731,500,072 payroll-table injection. Balance Sheet = Trial Balance = Chart of Accounts, all from `journal_entries`.
+
+**Test:** `tests/test_balance_sheet_one_ledger_cli.php` — **11/11**: injections + opening removed; the page computation balances (A−(L+E)=0.00); Salaries Payable sourced from the journal not the payroll table; `glBalanceSheet` cross-check balances. Regression: existing Balance Sheet 26/0 + GL 12/0, Trial Balance 30/0, Income Statement 31/0 — all green.
+
+---
+
 ## 2026-06-23 (fix) — Credit-note refund now reverses Output VAT (was left owed to TRA)
 
 **Problem (account_financial.md #3):** `pay_credit_note.php` posted the refund as `Dr Sales Returns & Allowances (gross) / Cr Cash (gross)` — it debited Sales Returns by the **gross** `grand_total` (incl. VAT) and **never reduced Output VAT Payable**. So after refunding a VAT sale, the Output VAT originally charged stayed on the books — you still owed TRA the VAT on goods that came back.
