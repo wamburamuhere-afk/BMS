@@ -530,7 +530,7 @@ if (!function_exists('renderExpenseCatRows')) {
                             <div class="form-text text-muted" id="invoice_id_hint"></div>
                         </div>
                         <div class="col-md-6 d-none" id="payroll_id_block">
-                            <label class="form-label small fw-bold">Payroll Reference <small class="fw-normal text-muted">(Approved, Unpaid)</small></label>
+                            <label class="form-label small fw-bold">Payroll Reference <small class="fw-normal text-muted">(Unpaid)</small></label>
                             <select class="form-select" name="payroll_id" id="payroll_id_select">
                                 <option value="">— Select Payroll (optional) —</option>
                             </select>
@@ -1220,7 +1220,7 @@ $(document).ready(function() {
                     });
                     $('#payroll_id_hint').text(res.data.length + ' payroll(s) available');
                 } else {
-                    $('#payroll_id_hint').text('No approved or partially-paid payroll for this staff');
+                    $('#payroll_id_hint').text('No unpaid payroll records found for this staff');
                 }
                 if ($prlSelect.data('select2')) $prlSelect.select2('destroy');
                 $prlSelect.select2({ theme: 'bootstrap-5', dropdownParent: $('#addExpenseModal'), placeholder: '— Select Payroll (optional) —', allowClear: true, width: '100%' });
