@@ -21,8 +21,8 @@ $budget_id_for_action = null; // Will be set after fetching budget
 
 // Get parameters
 $category_id = $_GET['category_id'] ?? '';
-$year = $_GET['year'] ?? date('Y');
-$month = $_GET['month'] ?? date('n');
+$year  = !empty($_GET['year'])  ? (int)$_GET['year']  : (int)date('Y');
+$month = !empty($_GET['month']) ? (int)$_GET['month'] : (int)date('n');
 
 // Get budget details
 $stmt = $pdo->prepare("
@@ -51,20 +51,29 @@ if (!empty($budget['project_id']) && !userCan('project', (int)$budget['project_i
     die('Access denied: this budget belongs to a project not in your scope.');
 }
 
-// Get expenses for this budget
+// Get expenses for this budget:
+// Match via (1) account's category_id, (2) account name = category name,
+// OR (3) expense_category_map link — so Quick Expense always appears regardless
+// of which GL account the user picked.
 $expenses_stmt = $pdo->prepare("
     SELECT e.*, u.username as created_by_name, ba.account_name as bank_name
     FROM expenses e
     JOIN accounts a ON e.expense_account_id = a.account_id
     LEFT JOIN accounts ba ON e.bank_account_id = ba.account_id
     LEFT JOIN users u ON e.created_by = u.user_id
-    WHERE (a.category_id = ? OR a.account_name = ?) 
-    AND YEAR(e.expense_date) = ? 
+    WHERE (
+        a.category_id = ?
+        OR a.account_name = ?
+        OR e.expense_id IN (
+            SELECT ecm.expense_id FROM expense_category_map ecm WHERE ecm.category_id = ?
+        )
+    )
+    AND YEAR(e.expense_date) = ?
     AND MONTH(e.expense_date) = ?
     AND e.status IN ('pending', 'approved', 'paid')
     ORDER BY e.expense_date DESC
 ");
-$expenses_stmt->execute([$category_id, $budget['category_name'], $year, $month]);
+$expenses_stmt->execute([$category_id, $budget['category_name'], $category_id, $year, $month]);
 $expenses = $expenses_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Calculate statistics
@@ -95,8 +104,10 @@ if (!$exact_match) {
     $using_fallback = false;
 }
 
-// Fetch bank/cash accounts for the quick expense modal
-$bank_accounts = $pdo->query("SELECT account_id, account_name FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%Asset%' OR type_name LIKE '%Bank%' OR type_name LIKE '%Cash%') ORDER BY account_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch bank/cash accounts for the quick expense modal using the canonical helper
+// (same source as every other "Paid From" dropdown in the app)
+require_once __DIR__ . '/../../../core/payment_source.php';
+$bank_accounts = cashBankAccounts($pdo);
 
 global $company_name, $company_logo;
 ?>
@@ -397,69 +408,55 @@ global $company_name, $company_logo;
             <form id="quickExpenseForm">
                 <input type="hidden" name="expense_date" value="<?= date('Y-m-d', mktime(0, 0, 0, $month, 1, $year)) ?>">
                 <input type="hidden" name="status" value="paid">
+                <input type="hidden" name="category_id" value="<?= (int)$category_id ?>">
+                <input type="hidden" name="budget_id" value="<?= (int)($budget['budget_id'] ?? 0) ?>"><?php // links expense to this budget and populates expense_category_map ?>
                 
                 <div class="modal-body p-4">
                     <div id="modal-message"></div>
-                    
+
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Budget Category</label>
                         <input type="text" class="form-control bg-light" value="<?= htmlspecialchars($budget['category_name']) ?>" readonly>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold mb-1">Expense Account <span class="text-danger">*</span></label>
-                        <div class="input-group shadow-sm mb-2">
-                            <select class="form-select <?= $exact_match ? '' : 'border-end-0' ?>" name="expense_account_id" id="accountSelect" required>
-                                <option value="">Select Expense Account...</option>
-                                <?php foreach ($associated_accounts as $acc): ?>
-                                    <option value="<?= $acc['account_id'] ?>" <?= $exact_match ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($acc['account_name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <?php if (!$exact_match): ?>
-                            <button class="btn btn-outline-primary border-start-0" type="button" onclick="toggleNewAccountForm()" title="Create New Account">
-                                <i class="bi bi-plus-lg"></i>
-                            </button>
-                            <?php endif; ?>
+                    <!-- Budget status panel — live-updated as user types amount -->
+                    <?php
+                        $qe_pct   = (float)$utilization_percentage;
+                        $qe_bar   = $qe_pct >= 100 ? 'bg-danger' : ($qe_pct >= 80 ? 'bg-warning' : 'bg-success');
+                        $qe_badge = $qe_pct >= 100 ? 'bg-danger' : ($qe_pct >= 80 ? 'bg-warning text-dark' : ($qe_pct > 0 ? 'bg-info text-dark' : 'bg-secondary'));
+                        $qe_label = $qe_pct >= 100 ? 'Fully Used' : ($qe_pct >= 80 ? 'Nearly Full' : ($qe_pct > 0 ? 'Partially Used' : 'Unused'));
+                    ?>
+                    <div class="mb-3 p-3 rounded border <?= $qe_pct >= 100 ? 'border-danger bg-danger bg-opacity-10' : 'bg-light' ?>">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small fw-bold text-muted">Budget Utilisation</span>
+                            <span class="badge <?= $qe_badge ?>"><?= $qe_label ?> — <?= number_format($qe_pct, 1) ?>%</span>
                         </div>
-                        
-                        <!-- New Account Inline Form (Visible by default if no match) -->
-                        <div id="newAccountForm" class="p-3 bg-light border rounded-3 mb-3 shadow-sm border-primary border-opacity-25" style="<?= $using_fallback ? 'display: block;' : 'display: none;' ?>">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h6 class="small fw-bold mb-0 text-primary"><i class="bi bi-plus-circle-fill"></i> New Expense Account</h6>
-                                <button type="button" class="btn-close smallest" onclick="toggleNewAccountForm()" style="font-size: 0.6rem;"></button>
-                            </div>
-                            <div class="row g-2">
-                                <div class="col-7">
-                                    <label class="smallest fw-600 opacity-75">Account Name</label>
-                                    <input type="text" id="new_acc_name" class="form-control form-control-sm" value="<?= htmlspecialchars($budget['category_name']) ?>">
-                                </div>
-                                <div class="col-5">
-                                    <label class="smallest fw-600 opacity-75">Code</label>
-                                    <input type="text" id="new_acc_code" class="form-control form-control-sm" placeholder="EXP-<?= rand(100, 999) ?>">
-                                </div>
-                                <div class="col-12 mt-2">
-                                    <button type="button" class="btn btn-primary btn-sm w-100" onclick="saveQuickAccount()">
-                                        <i class="bi bi-check2"></i> Create & Link Account
-                                    </button>
-                                </div>
-                            </div>
+                        <div class="progress mb-2" style="height:6px">
+                            <div class="progress-bar <?= $qe_bar ?>" id="qeBudgetBar"
+                                 style="width:<?= min($qe_pct, 100) ?>%"></div>
                         </div>
-
-                        <?php if ($using_fallback): ?>
-                            <div class="form-text text-warning small px-1">
-                                <i class="bi bi-exclamation-triangle"></i> No exact matching account found. Please select manually.
-                            </div>
-                        <?php endif; ?>
+                        <div class="d-flex justify-content-between small">
+                            <span class="text-muted">Used: <strong>TSh <?= number_format((float)$total_expenses, 0) ?></strong></span>
+                            <span class="text-muted">Remaining: <strong id="qeRemaining" class="<?= (float)$remaining_budget <= 0 ? 'text-danger' : 'text-success' ?>">TSh <?= number_format((float)$remaining_budget, 0) ?></strong></span>
+                        </div>
+                        <div id="qeAfterThis" class="small mt-1" style="display:none"></div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label small fw-bold">Bank/Cash Account <span class="text-danger">*</span></label>
-                        <select class="form-select" name="bank_account_id" required>
-                            <option value="">Select Account...</option>
+                        <label class="form-label small fw-bold mb-1">Expense Account <span class="text-danger">*</span></label>
+                        <select name="expense_account_id" id="quickExpenseAccountSelect" style="width:100%" required>
+                            <option value="">Type to search expense account…</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Paid From (Cash/Bank) <span class="text-danger">*</span></label>
+                        <select name="bank_account_id" id="quickBankAccountSelect" style="width:100%" required>
+                            <option value="">Select cash/bank account…</option>
                             <?php foreach ($bank_accounts as $acc): ?>
-                                <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars($acc['account_name']) ?></option>
+                                <option value="<?= $acc['account_id'] ?>">
+                                    <?= htmlspecialchars(($acc['account_code'] ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?>
+                                </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -468,7 +465,7 @@ global $company_name, $company_logo;
                         <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
                         <div class="input-group">
                             <span class="input-group-text">TSh</span>
-                            <input type="number" class="form-control" name="amount" step="0.01" min="0" required placeholder="0.00">
+                            <input type="number" class="form-control" name="amount" id="qeAmount" step="0.01" min="0" required placeholder="0.00">
                         </div>
                     </div>
 
@@ -545,173 +542,148 @@ $(document).ready(function() {
         window.print();
     };
 
-    $('#quickExpenseForm').on('submit', function(e) {
-        e.preventDefault();
-        const $btn = $(this).find('button[type="submit"]');
-        const selectedAccount = $('#accountSelect').val();
-        const isNewAccountVisible = $('#newAccountForm').is(':visible');
-        
-        // Check if we need to create an account first
-        if (!selectedAccount && isNewAccountVisible) {
-            const name = $('#new_acc_name').val();
-            const code = $('#new_acc_code').val();
-            
-            if (!name || !code) {
-                alert('Please provide an account name and code.');
-                return;
-            }
-            
-            // Auto-create account first
-            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Creating Account...');
-            
-            $.ajax({
-                url: '/api/account/save_account.php',
-                type: 'POST',
-                data: {
-                    account_name: name,
-                    account_code: code,
-                    account_type: 'Expense',
-                    category_id: '<?= $category_id ?>',
-                    status: 'active'
-                },
-                success: function(response) {
-                    if (response.success) {
-                        // Success! Now use the new account ID to save the expense
-                        const newId = response.account_id; // Assume API returns account_id
-                        saveExpenseWithAccount(newId);
-                    } else {
-                        alert('Error creating account: ' + response.message);
-                        $btn.prop('disabled', false).html('<i class="bi bi-save"></i> Save Expense');
-                    }
-                },
-                error: function() {
-                    alert('Server error while creating account.');
-                    $btn.prop('disabled', false).html('<i class="bi bi-save"></i> Save Expense');
+    // Init Select2 on both pickers when the modal opens
+    $('#quickExpenseModal').on('shown.bs.modal', function() {
+        if (!$('#quickExpenseAccountSelect').hasClass('select2-hidden-accessible')) {
+            $('#quickExpenseAccountSelect').select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#quickExpenseModal'),
+                width: '100%',
+                placeholder: 'Type to search expense account…',
+                allowClear: true,
+                minimumInputLength: 1,
+                ajax: {
+                    url: '<?= buildUrl('api/search_accounts') ?>',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function(params) { return { q: params.term, type: 'expense' }; },
+                    processResults: function(data) { return { results: data.results }; },
+                    cache: true
                 }
             });
-        } else if (!selectedAccount) {
-            alert('Please select an expense account.');
-        } else {
-            saveExpenseWithAccount(selectedAccount);
+        }
+        if (!$('#quickBankAccountSelect').hasClass('select2-hidden-accessible')) {
+            $('#quickBankAccountSelect').select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#quickExpenseModal'),
+                width: '100%',
+                placeholder: 'Select cash/bank account…',
+                allowClear: true
+            });
         }
     });
 
-    function saveExpenseWithAccount(accountId) {
-        const $btn = $('#quickExpenseForm button[type="submit"]');
-        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Saving Expense...');
-        
-        const formData = $('#quickExpenseForm').serializeArray();
-        // Update or add expense_account_id
-        let found = false;
-        for (let i = 0; i < formData.length; i++) {
-            if (formData[i].name === 'expense_account_id') {
-                formData[i].value = accountId;
-                found = true;
-                break;
-            }
+    // Reset selects when modal closes
+    $('#quickExpenseModal').on('hidden.bs.modal', function() {
+        $('#modal-message').html('');
+        $('#quickExpenseAccountSelect').val(null).trigger('change');
+        $('#quickBankAccountSelect').val(null).trigger('change');
+        $('#quickExpenseForm')[0].reset();
+        $('#qeAfterThis').hide().html('');
+    });
+
+    // Budget constants from PHP (at page render time — reload after saving to get fresh values)
+    const QE_BUDGET_REMAINING = <?= number_format((float)$remaining_budget, 2, '.', '') ?>;
+    const QE_BUDGET_ALLOCATED = <?= number_format((float)$budget['allocated_amount'], 2, '.', '') ?>;
+    const QE_BUDGET_USED      = <?= number_format((float)$total_expenses, 2, '.', '') ?>;
+    const qeFmt = v => 'TSh ' + Math.abs(v).toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+    // Live indicator: update "remaining after this expense" as the user types
+    $(document).on('input', '#qeAmount', function() {
+        const amt = parseFloat($(this).val()) || 0;
+        const $el = $('#qeAfterThis');
+        if (amt <= 0) { $el.hide().html(''); return; }
+        const after = QE_BUDGET_REMAINING - amt;
+        if (after < 0) {
+            $el.show().html('<span class="text-danger fw-bold"><i class="bi bi-exclamation-triangle-fill"></i> EXCEEDS budget by ' + qeFmt(-after) + ' — save will be blocked.</span>');
+        } else {
+            $el.show().html('<span class="text-success"><i class="bi bi-check-circle-fill"></i> After this: <strong>' + qeFmt(after) + '</strong> remaining</span>');
         }
-        if (!found) {
-            formData.push({name: 'expense_account_id', value: accountId});
+    });
+
+    $('#quickExpenseForm').on('submit', function(e) {
+        e.preventDefault();
+        if (!$('#quickExpenseAccountSelect').val()) {
+            $('#modal-message').html('<div class="alert alert-danger">Please select an expense account.</div>');
+            return;
+        }
+        if (!$('#quickBankAccountSelect').val()) {
+            $('#modal-message').html('<div class="alert alert-danger">Please select a cash/bank account.</div>');
+            return;
         }
 
+        // Budget enforcement — hard block before any AJAX call
+        const qeAmt = parseFloat($('#qeAmount').val()) || 0;
+        if (qeAmt > QE_BUDGET_REMAINING) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Cannot Exceed Budget',
+                html: '<p class="mb-3">This expense of <strong>' + qeFmt(qeAmt) + '</strong> would push spending past the approved budget limit.</p>'
+                    + '<table class="table table-sm table-bordered text-start mb-0">'
+                    + '<tr><td class="text-muted">Budget Allocated</td><td class="text-end fw-bold">' + qeFmt(QE_BUDGET_ALLOCATED) + '</td></tr>'
+                    + '<tr><td class="text-muted">Already Used</td><td class="text-end fw-bold text-warning">' + qeFmt(QE_BUDGET_USED) + '</td></tr>'
+                    + '<tr class="table-danger"><td class="fw-bold">Remaining (Maximum)</td><td class="text-end fw-bold text-danger">' + qeFmt(QE_BUDGET_REMAINING) + '</td></tr>'
+                    + '</table>',
+                confirmButtonText: 'OK, I will adjust the amount',
+                confirmButtonColor: '#dc3545'
+            });
+            return;
+        }
+        const $btn = $(this).find('button[type="submit"]');
+        const orig = $btn.html();
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Saving…');
         $.ajax({
-            url: '/api/account/add_expense.php',
+            url: '<?= buildUrl('api/account/add_expense.php') ?>',
             type: 'POST',
-            data: formData,
-            success: function(response) {
-                if (response.success) {
+            data: $(this).serializeArray(),
+            dataType: 'json',
+            success: function(res) {
+                $btn.prop('disabled', false).html(orig);
+                if (res.success) {
+                    let html = '<p class="mb-2">Expense <strong>#' + res.id + '</strong> has been saved.</p>';
+                    if (res.posted && res.ledger) {
+                        html += '<table class="table table-sm table-bordered text-start mt-2 mb-0">'
+                              + '<thead class="table-light"><tr><th>Side</th><th>Account</th><th class="text-end">Amount (TSh)</th></tr></thead>'
+                              + '<tbody>'
+                              + '<tr><td><span class="badge bg-danger">Dr</span></td><td>' + res.ledger.dr + '</td><td class="text-end fw-bold">' + res.ledger.amount + '</td></tr>'
+                              + '<tr><td><span class="badge bg-success">Cr</span></td><td>' + res.ledger.cr + '</td><td class="text-end fw-bold">' + res.ledger.amount + '</td></tr>'
+                              + '</tbody></table>'
+                              + '<p class="text-muted small mt-2 mb-0">Both sides of the ledger are updated. The expense appears in the P&amp;L and cash is reduced on the Balance Sheet.</p>';
+                    } else {
+                        html += '<p class="text-muted small mb-0">Saved as <strong>Pending</strong> — no ledger entry yet. It will post when approved and marked paid.</p>';
+                    }
                     Swal.fire({
                         icon: 'success',
-                        title: 'Success!',
-                        text: 'Expense added and budget updated.',
-                        timer: 1500,
-                        showConfirmButton: false
-                    }).then(() => {
-                        logReportAction('Added Quick Expense', 'User added an expense of ' + formData.find(f => f.name === 'amount').value + ' for budget category <?= addslashes($budget['category_name']) ?>');
-                        location.reload();
-                    });
+                        title: res.posted ? 'Expense Posted to Ledger' : 'Expense Saved',
+                        html: html,
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#0d6efd',
+                        allowOutsideClick: false
+                    }).then(() => location.reload());
                 } else {
-                    $('#modal-message').html('<div class="alert alert-danger">' + response.message + '</div>');
-                    $btn.prop('disabled', false).html('<i class="bi bi-save"></i> Save Expense');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Could Not Save Expense',
+                        text: res.message || 'An unexpected error occurred.',
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#dc3545'
+                    });
                 }
             },
-            error: function() {
-                $('#modal-message').html('<div class="alert alert-danger">Connect Error. Please check server.</div>');
-                $btn.prop('disabled', false).html('<i class="bi bi-save"></i> Save Expense');
+            error: function(xhr) {
+                $btn.prop('disabled', false).html(orig);
+                const msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Server error — please try again.';
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Server Error',
+                    text: msg,
+                    confirmButtonText: 'OK',
+                    confirmButtonColor: '#dc3545'
+                });
             }
         });
-    }
+    });
 });
-
-function toggleNewAccountForm() {
-    const $form = $('#newAccountForm');
-    const $select = $('#accountSelect');
-    if ($form.is(':visible')) {
-        $form.slideUp();
-        $select.prop('disabled', false);
-    } else {
-        $form.slideDown();
-        $select.prop('disabled', true);
-    }
-}
-
-function saveQuickAccount() {
-    const name = $('#new_acc_name').val();
-    const code = $('#new_acc_code').val();
-    const categoryId = '<?= $category_id ?>';
-
-    if (!name || !code) {
-        alert('Please enter both name and code for the new account.');
-        return;
-    }
-
-    const $btn = $('#newAccountForm .btn-primary');
-    const oldText = $btn.html();
-    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Creating...');
-
-    $.ajax({
-        url: '/api/account/save_account.php',
-        type: 'POST',
-        data: {
-            account_name: name,
-            account_code: code,
-            account_type: 'Expense',
-            category_id: categoryId,
-            status: 'active'
-        },
-        success: function(response) {
-            if (response.success) {
-                // Add to select and select it
-                // We'll reload the page part or just add option
-                // For simplicity and correctness with all state, we reload or fetch accounts.
-                // Let's just add it to select and close form.
-                // Since we don't have the new ID easily without response update, let's reload or just use the name to find it?
-                // Most APIs return the ID. Let's assume response.data.account_id or similar?
-                // Based on common patterns.
-                
-                showToast('success', 'Account created! Reloading to sync...');
-                logReportAction('Created Quick Account', 'User created new expense account ' + name + ' from budget view');
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                alert('Error: ' + response.message);
-                $btn.prop('disabled', false).html(oldText);
-            }
-        },
-        error: function() {
-            alert('Server error while creating account.');
-            $btn.prop('disabled', false).html(oldText);
-        }
-    });
-}
-
-function showToast(type, msg) {
-    Swal.fire({
-        icon: type,
-        title: msg,
-        timer: 2000,
-        showConfirmButton: false
-    });
-}
 
 function approveBudget(budgetId) {
     Swal.fire({

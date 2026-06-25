@@ -1,5 +1,57 @@
 # BMS Changelog
 
+## 2026-06-25 (feat) — budget rejection now reverses GL postings + voids linked expenses
+
+- `api/account/update_budget_status.php` — rejection path now wraps in a DB transaction and: (1) marks budget `rejected`, (2) fetches every `paid` expense linked to this budget that has a `transaction_id`, (3) calls `reverseOutflow($pdo, $transaction_id)` on each — which voids the journal entry and restores account balances via `unmirrorTransactionFromJournal`, (4) sets each expense `status = void` and clears `transaction_id`. Success message reports how many GL postings were reversed. Full rollback on any error.
+
+## 2026-06-25 (fix) — budget.php: two-phase aggregation by budget_id FK (eliminates pooling + date mismatch)
+
+- `app/constant/accounts/budget.php` — Replaced category-based expense aggregation with two-phase resolution. Phase 1: group expenses by `expenses.budget_id` (direct FK, set by Quick Expense and budget form); no date filter needed, immune to category pooling and date mismatches — verified b#27 (cat=19, Jan 2024, alloc=78,780) now gets actual=78,780 (100%) via FK instead of 61M from pooling. Phase 2: fallback for legacy expenses with `budget_id IS NULL`, grouped by `category_id + YEAR + MONTH` from ECM or account, matched to budget rows by period. Lookup key changed from `category_id_project_id` to `budget_id` (FK path) or `category_id_year_month` (fallback).
+
+## 2026-06-25 (fix) — budget.php: expenses aggregation missed expense_category_map → always "Unused"
+
+- `app/constant/accounts/budget.php` — The old query joined `expense_categories` via INNER JOIN on `a.category_id` and unreliable LIKE name match, so Quick Expense entries (linked via `expense_category_map`) were never counted → actual_amount = 0 → "Unused" badge even when money was spent. Replaced with a UNION ALL: branch 1 reads `expense_category_map` directly (priority, for Quick Expense and form-linked entries), branch 2 falls back to `accounts.category_id` for older expenses, excluding any expense already in ECM via `NOT EXISTS` to prevent double-counting. Params passed twice (once per branch). Verified against live DB: 19 category-project rows returned, ECM-linked expenses now correctly aggregated.
+
+## 2026-06-25 (feat) — budget.php: spending-state badge + progress bar + colour coding
+
+- `app/constant/accounts/budget.php` — Status column now shows only the spending-utilisation badge (Unused / Partially Used / Nearly Full / Fully Used / Over Budget) — workflow badge removed. Under the badge a 5px progress bar shows % used (coloured) vs % remaining (grey), with two micro-labels: "X% used" and "X% left". Progress bar removed from Budget Name column.
+
+- `app/constant/accounts/budget.php` — Added computed spending-utilisation status (Unused / Partially Used / Nearly Full / Fully Used / Over Budget) as a second badge below the workflow badge in the Status column. Budget Name cell gets a 4px progress bar showing % used at a glance. Actual Amount cell is now colour-coded (green / warning / red) based on usage. Variance % badge now has 4 colour tiers (success / primary / warning / danger) instead of 2.
+
+## 2026-06-25 (feat) — Quick Expense: budget enforcement + utilisation panel
+
+- `app/constant/accounts/budget_details.php` — Added budget utilisation panel inside the Quick Expense modal (progress bar, % badge: Unused / Partially Used / Nearly Full / Fully Used, remaining balance). Live "after this expense" indicator updates as user types — turns red and says "save will be blocked" if amount would exceed budget. Hard pre-submit block: if amount > remaining_budget, SweetAlert shows budget breakdown table (Allocated / Already Used / Remaining) and refuses to call the API. Budget constants are PHP-injected at render time.
+
+## 2026-06-25 (fix) — Quick Expense: expense list, SweetAlert ledger detail, no silent fail
+
+- `app/constant/accounts/budget_details.php` — `$year`/`$month` now use `!empty()` so `month=` (empty string in URL) falls back to current month instead of breaking the query. Expense list query adds OR via `expense_category_map` so Quick Expense always appears regardless of which GL account was selected. SweetAlert: removed `timer`/`showConfirmButton:false`; now shows a Dr/Cr ledger table (account code — name, amount) and waits for user to click OK before reload. Error path surfaces the real server message via `Swal.fire` instead of an inline div.
+- `api/account/add_expense.php` — after commit, fetches both account labels (`CODE — Name`) and returns `ledger: {dr, cr, amount}` in the JSON response so the notification can show exactly what moved. Response now includes `posted: true/false` flag.
+
+## 2026-06-25 (fix) — Quick Expense: Select2 AJAX expense account + correct bank account list
+
+- `app/constant/accounts/budget_details.php` — expense account picker replaced with Select2 AJAX (`type=expense`, `minimumInputLength=1`, `dropdownParent=#quickExpenseModal`); results show "CODE — Name" format from `api/search_accounts.php`. Bank account picker replaced with Select2 static using `cashBankAccounts($pdo)` (same canonical source as every other Paid-From dropdown); options show "CODE — Name". Old broken bank query and inline "new account" form removed. AJAX url uses `buildUrl`. Selects reset on modal close.
+
+## 2026-06-25 (fix) — Quick Expense: immediate GL posting (6-part compliant)
+
+- `api/account/add_expense.php` — added `require_once core/bank_register.php`; status now honours `status=paid` from the request (when `bank_account_id`, `expense_account_id`, and `amount` are all present); after INSERT, calls `postOutflow(Dr expense_account / Cr bank_account)` + stores `transaction_id` on the expense row + writes a `bank_transactions` withdrawal register row. Pending path unchanged.
+- `app/constant/accounts/budget_details.php` — Quick Expense modal form now sends `category_id` (populates `expense_category_map`) and `budget_id` (links expense to the budget record).
+
+**6-part result:** (1) ✅ Dr Expense / Cr Bank posted at submission; (2) ✅ fires when `status=paid` + accounts + amount present; (3) ✅ 2 accounts → `journal_entries` via `books_transaction` mirror; (4–5) ✅ Trial Balance, Income Statement, Balance Sheet, Cash Flow all updated immediately; (6) ✅ paid expense is locked from delete — must void first via `update_expense_status.php` which calls `reverseOutflow` to unwind both the ledger and the bank register.
+
+## 2026-06-24 (feat) — Payroll: NSSF employer contribution + payroll void
+
+### Fix 1 — NSSF Employer Contribution (10%)
+- `migrations/2026_06_24_nssf_employer.php` — adds `payroll.nssf_employer` column (DEFAULT 0, existing rows untouched), `nssf_employer_rate` payroll setting, and `NSSF Employer Expense` GL account with system_settings mapping.
+- `core/payroll_tax.php` — added `nssfEmployerRate()` function; updated `syncStatutoryRemittances()` to sum `nssf_employee + nssf_employer` so the NSSF remittance schedule now reflects the correct total (both halves); also exclude `voided` status from aggregate.
+- `api/process_payroll.php` — computes `nssf_employer = gross × nssfEmployerRate()` per employee; stores it in the `payroll` INSERT; adds it to the payslip breakdown as `employer_cost` item.
+- `core/payment_source.php` (`postPayrollAccrual`) — adds `Dr NSSF Employer Expense` and credits combined `nssf_employee + nssf_employer` to NSSF Payable, giving the correct total NSSF liability on the Balance Sheet. Old records where `nssf_employer = 0` produce identical journal output.
+
+### Fix 2 — Payroll Void (replaces hard delete)
+- `migrations/2026_06_24_payroll_void_status.php` — expands `payment_status` and `status` ENUMs with `voided`; adds `voided_by`, `voided_at`, `void_reason` columns.
+- `api/delete_payroll.php` — replaced hard `DELETE` with `UPDATE ... SET payment_status = 'voided'`; GL reversal (`reversePayrollGl`) is preserved; row kept for audit history.
+- `api/process_payroll.php` — duplicate check now excludes `voided` rows so voided employees can be re-processed for the same period.
+- `app/bms/pos/payroll.php` — `deletePayroll()` renamed to `voidPayroll()` with SweetAlert reason input; voided rows show strikethrough "voided" badge and only a View action (no Pay/Edit/Void again); full badge CSS defined inline.
+
 ## 2026-06-24 (fix) — Payroll GL integrity: 5-phase fix (P-1 through P-5)
 
 **Gaps closed (verified from live DB before fixing):**
