@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-06-25 (feat) — recurring expense traceability gap closed
+
+- `migrations/2026_06_25_expenses_recurring_profile_id.php` — adds `recurring_profile_id INT NULL DEFAULT NULL` to `expenses` table (idempotent)
+- `core/recurring.php` — `recurring_generate_expense()` now writes `recurring_profile_id` in the INSERT, linking each generated expense back to its profile; no GL code reads this column so zero double-posting risk
+- `app/constant/accounts/expenses.php` — expenses list (desktop + mobile) shows a blue `⟳ Recurring` badge next to the description when `recurring_profile_id IS NOT NULL`
+
 ## 2026-06-25 (feat) — budget delete now reverses GL postings + voids linked expenses
 
 - `api/account/delete_budget.php` — delete path now wraps in a DB transaction and: (1) finds every `paid` expense linked to this budget that has a `transaction_id`, (2) calls `reverseOutflow($pdo, $transaction_id)` on each (voids the journal entry, restores account balances), (3) sets each expense `status = void` and clears `transaction_id`, (4) then deletes the budget row. Success message reports how many GL postings were reversed. Full rollback on any error. Approved budgets remain admin-only delete.

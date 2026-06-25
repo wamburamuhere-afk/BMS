@@ -56,8 +56,9 @@ if (!function_exists('recurring_generate_expense')) {
         $stmt = $pdo->prepare("
             INSERT INTO expenses
                 (expense_date, expense_account_id, bank_account_id, category_id, type_id, amount,
-                 description, reference_number, payment_method, paid_to_type, notes, status, project_id, created_by, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, NOW(), NOW())
+                 description, reference_number, payment_method, paid_to_type, notes,
+                 recurring_profile_id, status, project_id, created_by, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, NOW(), NOW())
         ");
         $stmt->execute([
             $forDate,
@@ -71,6 +72,7 @@ if (!function_exists('recurring_generate_expense')) {
             $tpl['payment_method'] ?? null,
             null,
             'Auto-generated from recurring profile #' . (int)$profile['id'],
+            (int)$profile['id'],
             $profile['project_id'] !== null ? (int)$profile['project_id'] : null,
             $profile['created_by'] !== null ? (int)$profile['created_by'] : null,
         ]);
