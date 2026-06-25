@@ -115,10 +115,10 @@ try {
                 ->execute([$expense_id, $category_id]);
         }
 
+        // GAP 1 (pending path) still holds: create defers the posting for pending expenses.
         // Direct-pay path: when status=paid is requested (e.g. Quick Expense), post
-        // Dr Expense / Cr Bank immediately via postOutflow — same engine used by the
-        // manual paid transition in update_expense_status.php. Skipped for pending
-        // expenses, which post only when approved then marked paid through the workflow.
+        // Dr Expense / Cr Bank immediately via postOutflow — same engine as the manual
+        // paid transition in update_expense_status.php.
         if ($status === 'paid') {
             $ref  = 'EXP-' . $expense_id;
             $desc = 'Expense #' . $expense_id . ': ' . substr($description, 0, 100);
