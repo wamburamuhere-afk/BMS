@@ -543,12 +543,16 @@ $(document).ready(function() {
                         'approved':    'status-approved',
                         'pending':     'status-warning',
                         'processing':  'status-processing',
-                        'unprocessed': 'status-unprocessed'
+                        'unprocessed': 'status-unprocessed',
+                        'voided':      'status-voided'
                     };
                     if (data === 'partial') {
                         const remaining = parseFloat(row.net_salary || 0) - parseFloat(row.amount_paid || 0);
                         return `<span class="badge-status status-processing">partial</span>
                                 <div class="small text-muted" style="font-size:0.7rem">${remaining.toLocaleString()} rem.</div>`;
+                    }
+                    if (data === 'voided') {
+                        return `<span class="badge-status status-voided" title="${row.void_reason || ''}"><s>voided</s></span>`;
                     }
                     return `<span class="badge-status ${badges[data] || 'status-unprocessed'}">${data || 'unprocessed'}</span>`;
                 }
@@ -568,6 +572,8 @@ $(document).ready(function() {
 
                     if (status === 'unprocessed') {
                         actions += `<li><a class="dropdown-item py-2" href="#" onclick="processSingle(${row.employee_id}, '${$('#period_picker').val()}')"><i class="bi bi-lightning-charge me-2 text-primary"></i>Process</a></li>`;
+                    } else if (status === 'voided') {
+                        actions += `<li><a class="dropdown-item py-2" href="payroll_details?id=${data}"><i class="bi bi-eye me-2 text-secondary"></i>View (Voided)</a></li>`;
                     } else {
                         actions += `<li><a class="dropdown-item py-2" href="payroll_details?id=${data}"><i class="bi bi-eye me-2 text-primary"></i>View Details</a></li>`;
                         if (['approved', 'processing', 'partial'].includes(status)) {
@@ -576,7 +582,7 @@ $(document).ready(function() {
                         actions += `<li><a class="dropdown-item py-2" href="#" onclick="editPayroll(${data})"><i class="bi bi-pencil me-2 text-info"></i>Edit Record</a></li>`;
                         actions += `<li><a class="dropdown-item py-2" href="payslip?id=${data}" target="_blank"><i class="bi bi-printer me-2 text-secondary"></i>Print Payslip</a></li>`;
                         actions += `<li><hr class="dropdown-divider"></li>`;
-                        actions += `<li><a class="dropdown-item py-2 text-danger" href="#" onclick="deletePayroll(${data})"><i class="bi bi-trash me-2"></i>Delete</a></li>`;
+                        actions += `<li><a class="dropdown-item py-2 text-danger" href="#" onclick="voidPayroll(${data})"><i class="bi bi-x-octagon me-2"></i>Void</a></li>`;
                     }
 
                     actions += `</ul></div>`;
@@ -868,24 +874,33 @@ $('#editPayrollForm').on('submit', function(e) {
     });
 });
 
-// Deletion Logic
-function deletePayroll(id) {
+// Void Logic — record is preserved for audit; GL is reversed
+function voidPayroll(id) {
     Swal.fire({
-        title: 'Delete?',
-        text: "This action is permanent!",
+        title: 'Void Payroll?',
+        html: '<p class="text-muted mb-2">The GL entries will be reversed and the record preserved for audit. This cannot be undone.</p>' +
+              '<input id="swal-void-reason" class="swal2-input" placeholder="Reason for voiding (required)">',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
-        confirmButtonText: 'Yes, delete it'
+        confirmButtonText: 'Yes, Void It',
+        preConfirm: () => {
+            const reason = document.getElementById('swal-void-reason').value.trim();
+            if (!reason) {
+                Swal.showValidationMessage('Please enter a reason for voiding.');
+                return false;
+            }
+            return reason;
+        }
     }).then(res => {
         if (res.isConfirmed) {
-            $.post(APP_URL + '/api/delete_payroll', { payroll_id: id }, r => {
+            $.post(APP_URL + '/api/delete_payroll', { payroll_id: id, void_reason: res.value }, r => {
                 if (r.success) {
-
-                    Swal.fire('Deleted', 'The record has been purged.', 'success');
-                    reloadTable();
+                    Swal.fire('Voided', r.message, 'success').then(() => reloadTable());
+                } else {
+                    Swal.fire('Error', r.message || 'Could not void record.', 'error');
                 }
-            });
+            }, 'json');
         }
     });
 }
@@ -893,6 +908,14 @@ function deletePayroll(id) {
 
 
 <style>
+.badge-status        { display:inline-block; padding:.35em .65em; border-radius:6px; font-size:.72rem; font-weight:600; line-height:1; white-space:nowrap; }
+.status-paid         { background-color:#d1e7dd; color:#0f5132; }
+.status-approved     { background-color:#cff4fc; color:#055160; }
+.status-processing   { background-color:#cfe2ff; color:#084298; }
+.status-warning      { background-color:#fff3cd; color:#664d03; }
+.status-unprocessed  { background-color:#f8f9fa; color:#6c757d; border:1px solid #dee2e6; }
+.status-voided       { background-color:#e2e3e5; color:#6c757d; text-decoration:line-through; }
+
 .custom-stat-card {
     background-color: #d1e7dd !important;
     border-color: #badbcc !important;
