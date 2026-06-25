@@ -23,7 +23,7 @@ $category_id = '';
 $budget_name = $_POST['budget_name'] ?? ($_POST['category_other'] ?? '');
 $allocated_amount = $_POST['allocated_amount'] ?? 0;
 $notes = $_POST['notes'] ?? '';
-$status = 'draft'; // Always start as draft — approval done via sequential workflow
+$status = 'pending'; // Always start as pending — awaiting approval
 $project_id = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
 $payment_reference = $_POST['payment_reference'] ?? '';
 

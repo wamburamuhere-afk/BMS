@@ -599,19 +599,24 @@ for ($year = $current_year - 2; $year <= $current_year + 3; $year++) {
                             }
                             ?>
                             <?php
-                                // Spending utilisation state (independent of approval workflow)
-                                if ($item['allocated_amount'] <= 0) {
-                                    $sp_label = 'No Budget'; $sp_cls = 'bg-secondary'; $sp_icon = 'dash-circle';
-                                } elseif ($usage_percentage == 0) {
-                                    $sp_label = 'Unused'; $sp_cls = 'bg-light text-muted border'; $sp_icon = 'circle';
-                                } elseif ($usage_percentage < 80) {
-                                    $sp_label = 'Partially Used'; $sp_cls = 'bg-info bg-opacity-10 text-info border border-info border-opacity-25'; $sp_icon = 'pie-chart-fill';
-                                } elseif ($usage_percentage < 100) {
-                                    $sp_label = 'Nearly Full'; $sp_cls = 'bg-warning text-dark'; $sp_icon = 'exclamation-circle-fill';
-                                } elseif ($usage_percentage <= 100) {
-                                    $sp_label = 'Fully Used'; $sp_cls = 'bg-success'; $sp_icon = 'check-circle-fill';
+                                // Workflow status first; spending states only when approved
+                                if ($item['status'] === 'pending' || $item['status'] === 'draft') {
+                                    $sp_label = 'Pending Approval'; $sp_cls = 'bg-warning text-dark'; $sp_icon = 'hourglass-split';
+                                } elseif ($item['status'] === 'rejected') {
+                                    $sp_label = 'Rejected'; $sp_cls = 'bg-danger'; $sp_icon = 'x-circle-fill';
+                                } elseif ($item['status'] === 'approved') {
+                                    // Spending state — no "Unused", no "Nearly Full"
+                                    if ($item['allocated_amount'] <= 0) {
+                                        $sp_label = 'No Budget'; $sp_cls = 'bg-secondary'; $sp_icon = 'dash-circle';
+                                    } elseif ($usage_percentage == 0) {
+                                        $sp_label = 'Approved'; $sp_cls = 'bg-success bg-opacity-10 text-success border border-success border-opacity-25'; $sp_icon = 'check-circle';
+                                    } elseif ($usage_percentage < 100) {
+                                        $sp_label = 'Partially Paid'; $sp_cls = 'bg-info bg-opacity-10 text-info border border-info border-opacity-25'; $sp_icon = 'pie-chart-fill';
+                                    } else {
+                                        $sp_label = 'Paid'; $sp_cls = 'bg-success'; $sp_icon = 'check-circle-fill';
+                                    }
                                 } else {
-                                    $sp_label = 'Over Budget'; $sp_cls = 'bg-danger'; $sp_icon = 'exclamation-triangle-fill';
+                                    $sp_label = 'No Budget'; $sp_cls = 'bg-secondary'; $sp_icon = 'dash-circle';
                                 }
                                 // Progress bar colour
                                 $bar_col = $usage_percentage > 100 ? '#dc3545' : ($usage_percentage >= 80 ? '#ffc107' : '#198754');
@@ -661,7 +666,7 @@ for ($year = $current_year - 2; $year <= $current_year + 3; $year++) {
                                     <span class="badge <?= $sp_cls ?>" style="font-size:0.7rem;">
                                         <i class="bi bi-<?= $sp_icon ?>"></i> <?= $sp_label ?>
                                     </span>
-                                    <?php if ($item['allocated_amount'] > 0): ?>
+                                    <?php if ($item['allocated_amount'] > 0 && $item['status'] === 'approved'): ?>
                                     <div class="mt-1" style="height:5px; background:#e9ecef; border-radius:3px; overflow:hidden; min-width:70px;" title="<?= number_format($usage_percentage, 1) ?>% used">
                                         <div style="width:<?= min($usage_percentage, 100) ?>%; height:100%; background:<?= $bar_col ?>; border-radius:3px;"></div>
                                     </div>
@@ -691,6 +696,14 @@ for ($year = $current_year - 2; $year <= $current_year + 3; $year++) {
                                             </li>
                                             <?php endif; ?>
                                             
+                                            <?php if ($item['status'] === 'approved'): ?>
+                                            <li>
+                                                <a class="dropdown-item" href="#" onclick="viewBudgetDetails(<?= $item['category_id'] ?>, <?= $item['budget_year'] ?>, <?= $item['budget_month'] ?>)">
+                                                    <i class="bi bi-cash-coin text-success"></i> Pay
+                                                </a>
+                                            </li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <?php endif; ?>
                                             <?php if ($can_approve_budget && $item['status'] == 'pending'): ?>
                                             <li>
                                                 <a class="dropdown-item" href="#" onclick="updateBudgetStatus(<?= $item['budget_id'] ?>, 'approved')">
@@ -726,6 +739,11 @@ for ($year = $current_year - 2; $year <= $current_year + 3; $year++) {
                                         </button>
                                         <?php endif; ?>
                                         
+                                        <?php if ($item['status'] === 'approved'): ?>
+                                        <button class="btn btn-sm btn-success shadow-sm" onclick="viewBudgetDetails(<?= $item['category_id'] ?>, <?= $item['budget_year'] ?>, <?= $item['budget_month'] ?>)" title="Pay">
+                                            <i class="bi bi-cash-coin"></i>
+                                        </button>
+                                        <?php endif; ?>
                                         <?php if ($can_approve_budget && $item['status'] == 'pending'): ?>
                                         <button class="btn btn-sm btn-outline-success shadow-sm" onclick="updateBudgetStatus(<?= $item['budget_id'] ?>, 'approved')" title="Approve">
                                             <i class="bi bi-check-circle"></i>
