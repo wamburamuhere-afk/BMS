@@ -2,6 +2,7 @@
 // File: api/create_stock_adjustment.php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/stock_posting.php';
 
 // Suppress errors to ensure only clean JSON is returned
 error_reporting(0);
@@ -109,7 +110,8 @@ try {
         $_POST['notes'] ?? '',
         $user_id
     ]);
-    
+    $movement_id = (int)$pdo->lastInsertId();
+
     // Update product_stocks
     $stmt = $pdo->prepare("
         INSERT INTO product_stocks (product_id, warehouse_id, stock_quantity, reserved_quantity)
@@ -134,8 +136,13 @@ try {
     ");
     $stmt->execute([$_POST['product_id']]);
     
+    // GL posting (6-part: two-sided, on create, inventory + equity, Balance Sheet)
+    $project_id_gl = !empty($_POST['project_id']) ? (int)$_POST['project_id'] : null;
+    postStockAdjustmentGl($pdo, $movement_id, $quantity, $movement_type, $unit_cost,
+        $project_id_gl, $user_id, date('Y-m-d'), $reference_number);
+
     $pdo->commit();
-    
+
     // Log activity
     require_once HELPERS_FILE;
     $action = "Stock Adjustment (" . ucfirst(str_replace('_', ' ', $movement_type)) . ")";
