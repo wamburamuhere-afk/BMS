@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-25 (feat) — recurring page: payment flow + dropdown fix
+
+- `app/constant/accounts/recurring.php`:
+  - Fixed action dropdown clipping: `overflow:visible` on table-responsive so Bootstrap dropdown renders over the table
+  - Added expense count badge (pending + approved) on each profile row and in dropdown
+  - Added "View Expenses" in action dropdown → opens Generated Expenses modal (AJAX, filtered by `recurring_profile_id`)
+  - Modal shows Approve (pending) and Pay (approved) buttons per expense
+  - Payment sub-modal: pre-fills date/amount/bank; two-step POST fires `Dr Accrued Expenses / Cr Bank` via canonical `postOutflow()` — no new GL code
+  - Added mobile card "View Expenses" button
+- `api/account/get_expenses.php`: added `recurring_profile_id` GET filter
+
 ## 2026-06-25 (feat) — recurring expense traceability gap closed
 
 - `migrations/2026_06_25_expenses_recurring_profile_id.php` — adds `recurring_profile_id INT NULL DEFAULT NULL` to `expenses` table (idempotent)
