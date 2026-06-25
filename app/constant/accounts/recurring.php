@@ -434,7 +434,8 @@ $(function () {
             recurring_profile_id: profileId,
             length: 100,
             draw: 1,
-            start: 0
+            start: 0,
+            status: ''   // show all statuses — paid included so Void is available
         }, function (res) {
             const rows = res.data || [];
             if (!rows.length) {
@@ -453,9 +454,14 @@ $(function () {
                 <?php if ($can_edit): ?>
                 if (e.status === 'pending') {
                     acts += `<button class="btn btn-sm btn-outline-success me-1" onclick="approveExpense(${e.expense_id})" title="Approve"><i class="bi bi-check-circle"></i> Approve</button>`;
+                    acts += `<button class="btn btn-sm btn-outline-danger" onclick="rejectExpense(${e.expense_id},'pending')" title="Reject"><i class="bi bi-x-circle"></i> Reject</button>`;
                 }
                 if (e.status === 'approved') {
-                    acts += `<button class="btn btn-sm btn-success" onclick="openPayModal(${e.expense_id},${e.amount},${e.bank_account_id||0})" title="Pay"><i class="bi bi-cash-coin"></i> Pay</button>`;
+                    acts += `<button class="btn btn-sm btn-success me-1" onclick="openPayModal(${e.expense_id},${e.amount},${e.bank_account_id||0})" title="Pay"><i class="bi bi-cash-coin"></i> Pay</button>`;
+                    acts += `<button class="btn btn-sm btn-outline-danger" onclick="rejectExpense(${e.expense_id},'approved')" title="Reject"><i class="bi bi-x-circle"></i> Reject</button>`;
+                }
+                if (e.status === 'paid') {
+                    acts += `<button class="btn btn-sm btn-outline-warning" onclick="rejectExpense(${e.expense_id},'paid')" title="Void Payment"><i class="bi bi-arrow-counterclockwise"></i> Void</button>`;
                 }
                 <?php endif; ?>
                 html += `<tr><td class="small">${dt}</td><td class="small">${escapeHtml(e.description||'—')}</td>`
@@ -480,6 +486,30 @@ $(function () {
                     .then(() => location.reload());
                 } else { Swal.fire({ icon:'error', title:'Error', text: res.message }); }
             }, 'json').fail(() => Swal.fire({ icon:'error', title:'Error', text:'Server error.' }));
+        });
+    };
+
+    window.rejectExpense = function (expenseId, currentStatus) {
+        const isPaid     = currentStatus === 'paid';
+        const isApproved = currentStatus === 'approved';
+        const title = isPaid ? 'Void this payment?' : 'Reject this expense?';
+        const text  = isPaid
+            ? 'This will reverse the ledger entry (Dr Bank / Cr Accrued Expenses) and the bank register row.'
+            : isApproved
+                ? 'This will reverse the accrual (Dr Accrued Expenses / Cr Expense) — the charge leaves the P&L.'
+                : 'The expense will be cancelled. No GL entries to reverse.';
+        Swal.fire({ title, text, icon: isPaid ? 'warning' : 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            confirmButtonText: isPaid ? 'Yes, Void' : 'Yes, Reject' })
+        .then(r => { if (!r.isConfirmed) return;
+            $.post(STATUS_EXP, { expense_id: expenseId, status: 'rejected', _csrf: CSRF }, function (res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: isPaid ? 'Voided' : 'Rejected',
+                        text: res.message, timer: 2000, showConfirmButton: false })
+                    .then(() => location.reload());
+                } else { Swal.fire({ icon: 'error', title: 'Error', text: res.message }); }
+            }, 'json').fail(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }));
         });
     };
 
