@@ -244,7 +244,7 @@ $(function () {
 
     if (!$.fn.DataTable.isDataTable('#recTable')) {
         $('#recTable').DataTable({
-            responsive: false, scrollX: true, pageLength: 25,
+            responsive: false, pageLength: 25,
             order: [[5,'asc']], dom: 'rtipB',
             buttons: [{ extend:'excelHtml5', className:'d-none', exportOptions:{ columns:':not(:last-child)' } }],
             columnDefs: [
