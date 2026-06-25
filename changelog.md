@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-24 (fix) — delete_adjustment.php: remove stale requires that fatal on production
+
+**Error (production):** `Error: Failed opening required '.../api/../app/core/session.php'` — line 4 of `api/delete_adjustment.php` tried to `require_once` three legacy paths (`app/core/session.php`, `app/core/database.php`, `app/core/utils.php`) that do not exist on the production server. `roots.php` (line 3) already starts the session and opens the DB, making those requires both redundant and fatal.
+
+**Fix:** removed the three stale `require_once` lines. File now boots correctly via `roots.php` alone and returns proper JSON errors on all failure paths.
+
+---
+
 ## 2026-06-24 (feat) — Stock adjustment GL posting (all 6 accounting requirements)
 
 **Gap closed:** `api/create_stock_adjustment.php` previously wrote only to `stock_movements` with zero journal entries. The Inventory account (1-1300) never moved on stock adjustments, so the Balance Sheet showed stale inventory values.

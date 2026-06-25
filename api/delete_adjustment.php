@@ -1,9 +1,6 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
-require_once __DIR__ . '/../app/core/session.php';
-require_once __DIR__ . '/../app/core/database.php';
-require_once __DIR__ . '/../app/core/utils.php';
 require_once __DIR__ . '/../core/stock_posting.php';
 
 // Check if user is logged in
