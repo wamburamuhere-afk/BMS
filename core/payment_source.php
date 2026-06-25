@@ -415,7 +415,29 @@ if (!function_exists('postSdlAccrual')) {
     function postSdlAccrual(PDO $pdo, string $period, float $sdlAmount, ?int $userId = null): ?int
     {
         $sdlAmount = round(max(0.0, $sdlAmount), 2);
-        $ref = 'SDL-ACC-' . $period;
+        $ref  = 'SDL-ACC-' . $period;
+        $desc = "SDL accrual {$period}";
+
+        // Remove any orphaned journal_entry mirrors for this SDL period whose source
+        // transactions row was deleted without going through reverseJournalBalances().
+        // Without this, a deleted-then-replaced SDL transaction leaves a ghost mirror
+        // that double-counts SDL Expense and SDL Payable in every report.
+        $pdo->prepare("
+            DELETE jei FROM journal_entry_items jei
+            INNER JOIN journal_entries je ON je.entry_id = jei.entry_id
+            LEFT JOIN transactions t ON t.transaction_id = je.entity_id
+            WHERE je.entity_type = 'books_transaction'
+              AND je.description = ?
+              AND t.transaction_id IS NULL
+        ")->execute([$desc]);
+        $pdo->prepare("
+            DELETE je FROM journal_entries je
+            LEFT JOIN transactions t ON t.transaction_id = je.entity_id
+            WHERE je.entity_type = 'books_transaction'
+              AND je.description = ?
+              AND t.transaction_id IS NULL
+        ")->execute([$desc]);
+
         $ex = $pdo->prepare("SELECT transaction_id, amount FROM transactions WHERE transaction_type = 'sdl_accrual' AND reference_number = ? LIMIT 1");
         $ex->execute([$ref]);
         $existing = $ex->fetch(PDO::FETCH_ASSOC);

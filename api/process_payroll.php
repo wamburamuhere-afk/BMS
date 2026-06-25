@@ -269,35 +269,33 @@ try {
             // Gross is always basic + allowances (earnings).
             $gross_salary = $basic_salary + $allowances;
 
-            // Statutory deductions: employee NSSF (pre-tax) + PAYE (progressive, on
-            // gross − NSSF). Resolved AS-OF the payroll period so a re-run of an old
-            // month uses the bracket table that applied then. Single engine
-            // (core/payroll_tax.php) — no duplicated bracket math.
+            // Non-statutory custom deductions from employee_deductions table.
+            // Gated by $include_deductions (user checkbox) and skipped when the
+            // component structure already supplies a deduction breakdown.
             $nssf_employee = 0.0;
-            if ($include_deductions) {
-                // Legacy deduction lump — skipped when the component structure supplies it.
-                if (!$use_components) {
-                    $deduction_stmt = $pdo->prepare("
-                        SELECT SUM(amount) as total
-                        FROM employee_deductions
-                        WHERE employee_id = ? AND status = 'active'
-                    ");
-                    $deduction_stmt->execute([$employee['employee_id']]);
-                    $deduction_result = $deduction_stmt->fetch(PDO::FETCH_ASSOC);
-                    $deductions = floatval($deduction_result['total'] ?? 0);
-                }
+            if ($include_deductions && !$use_components) {
+                $deduction_stmt = $pdo->prepare("
+                    SELECT SUM(amount) as total
+                    FROM employee_deductions
+                    WHERE employee_id = ? AND status = 'active'
+                ");
+                $deduction_stmt->execute([$employee['employee_id']]);
+                $deduction_result = $deduction_stmt->fetch(PDO::FETCH_ASSOC);
+                $deductions = floatval($deduction_result['total'] ?? 0);
+            }
 
-                $stat = computeEmployeeStatutory($pdo, $gross_salary, $payroll_period . '-01');
-                $nssf_employee = $stat['nssf_employee'];
-                $tax_amount    = $stat['paye'];
-
-                // Itemise the statutory lines so the payslip shows them explicitly.
-                if ($nssf_employee > 0) {
-                    $payroll_items_breakdown[] = ['item_type' => 'deduction', 'item_name' => 'NSSF (employee)', 'amount' => $nssf_employee, 'tax_applicable' => 0];
-                }
-                if ($tax_amount > 0) {
-                    $payroll_items_breakdown[] = ['item_type' => 'deduction', 'item_name' => 'PAYE', 'amount' => $tax_amount, 'tax_applicable' => 0];
-                }
+            // STATUTORY deductions — NSSF and PAYE are legal obligations; they are
+            // always computed regardless of the include_deductions UI checkbox.
+            // Resolved AS-OF the payroll period so a re-run of an old month uses the
+            // bracket table that applied then. Single engine (core/payroll_tax.php).
+            $stat = computeEmployeeStatutory($pdo, $gross_salary, $payroll_period . '-01');
+            $nssf_employee = $stat['nssf_employee'];
+            $tax_amount    = $stat['paye'];
+            if ($nssf_employee > 0) {
+                $payroll_items_breakdown[] = ['item_type' => 'deduction', 'item_name' => 'NSSF (employee)', 'amount' => $nssf_employee, 'tax_applicable' => 0];
+            }
+            if ($tax_amount > 0) {
+                $payroll_items_breakdown[] = ['item_type' => 'deduction', 'item_name' => 'PAYE', 'amount' => $tax_amount, 'tax_applicable' => 0];
             }
 
             // Net = gross − (other deductions + NSSF + PAYE).
@@ -351,8 +349,12 @@ try {
             // (Dr Salaries Expense / Cr PAYE + NSSF + Salaries Payable) — recognised
             // regardless of whether the employee is paid yet.
             if ($payment_status === 'approved') {
-                try { ensurePayrollAccrued($pdo, $payroll_id, (int)$_SESSION['user_id']); }
+                $accrualTxn = null;
+                try { $accrualTxn = ensurePayrollAccrued($pdo, $payroll_id, (int)$_SESSION['user_id']); }
                 catch (Throwable $e) { error_log('payroll accrual: ' . $e->getMessage()); }
+                if (!$accrualTxn) {
+                    $errors[] = "Employee {$employee['first_name']} {$employee['last_name']}: GL accrual not posted — verify Salaries Expense, PAYE Payable, NSSF Payable and Salaries Payable account mapping in System Settings.";
+                }
             }
 
             $successful++;

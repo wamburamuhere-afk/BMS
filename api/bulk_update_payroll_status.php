@@ -155,9 +155,14 @@ try {
 
     // Accrual on approval — book each newly-approved record's liabilities
     // (Dr Salaries Expense / Cr PAYE + NSSF + Salaries Payable).
+    $accrual_warnings = [];
     foreach ($to_approve as $p) {
-        try { ensurePayrollAccrued($pdo, (int)$p['payroll_id'], (int)$_SESSION['user_id']); }
+        $txn = null;
+        try { $txn = ensurePayrollAccrued($pdo, (int)$p['payroll_id'], (int)$_SESSION['user_id']); }
         catch (Throwable $e) { error_log('approve accrual: ' . $e->getMessage()); }
+        if (!$txn) {
+            $accrual_warnings[] = "PAY #{$p['payroll_id']}: GL accrual not posted — check account mapping in System Settings.";
+        }
         if (!empty($p['payroll_period'])) $affected_periods[$p['payroll_period']] = true;
     }
 
@@ -176,7 +181,11 @@ try {
         'description' => "Updated status to '$status' for $rowCount payroll records."
     ]);
     
-    echo json_encode(['success' => true, 'message' => "Bulk status update completed. $rowCount records updated successfully."]);
+    $msg = "Bulk status update completed. $rowCount records updated successfully.";
+    if (!empty($accrual_warnings)) {
+        $msg .= ' GL warning: ' . implode('; ', $accrual_warnings);
+    }
+    echo json_encode(['success' => true, 'message' => $msg]);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
 }

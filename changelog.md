@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-06-24 (fix) — Payroll GL integrity: 5-phase fix (P-1 through P-5)
+
+**Gaps closed (verified from live DB before fixing):**
+
+- **P-1 (NSSF always zero):** `api/process_payroll.php` — moved `computeEmployeeStatutory()` (NSSF + PAYE) outside the `$include_deductions` checkbox gate. NSSF and PAYE are statutory obligations; the checkbox now controls only custom `employee_deductions` table entries.
+
+- **P-2 (mark_payroll_paid posts zero GL):** `api/mark_payroll_paid.php` — rewrote the endpoint to require `paid_from_account_id`, call `ensurePayrollAccrued()` defensively, then call `postPayrollPayment()` (Dr Salaries Payable / Cr Bank) inside a transaction. Status update rolls back if GL fails. Note: the main UI uses `bulk_update_payroll_status.php` which already had this wired correctly.
+
+- **P-3 (SDL double-counted):** `core/payment_source.php` `postSdlAccrual()` — added orphan cleanup before re-posting: deletes any `journal_entries` mirrors for the period whose `transactions` source row no longer exists, preventing ghost entries that double-count SDL Expense and SDL Payable. `migrations/2026_06_24_fix_sdl_orphan.php` — deleted the existing orphan (entry_id=20423 for 2026-06, confirmed via DB query). SDL now has exactly 1 entry per period in `journal_entries`.
+
+- **P-4 (historical accruals missing):** `migrations/2026_06_24_payroll_backfill_accruals.php` — backfilled 32 missing accruals for approved/paid payrolls (all periods Jan–Jun 2026). Also cleared 2 ghost `accrual_transaction_id` references pointing to deleted transactions. 1 skipped (zero gross).
+
+- **P-5 (silent GL failures):** `api/approve_payroll.php` — wrapped status update + accrual in a transaction; rolls back and returns a real error if `ensurePayrollAccrued()` returns null. `api/process_payroll.php` — accrual failure on auto-approve now appears in the per-employee error list. `api/bulk_update_payroll_status.php` — accrual warnings collected and included in the response message instead of silently logged.
+
+**Files changed:** `core/payment_source.php`, `api/process_payroll.php`, `api/approve_payroll.php`, `api/bulk_update_payroll_status.php`, `api/mark_payroll_paid.php`, `migrations/2026_06_24_fix_sdl_orphan.php` (new), `migrations/2026_06_24_payroll_backfill_accruals.php` (new).
+
+**Deferred (P-6):** Move payroll GL posting from `recordGlobalTransaction()` legacy path to direct `postLedgerEntry()`. Requires renaming the ID columns stored on `payroll` table and rewriting the reversal in `delete_payroll.php`. Planned for a dedicated session.
+
+---
+
 ## 2026-06-24 (fix) — delete_adjustment.php: remove stale requires that fatal on production
 
 **Error (production):** `Error: Failed opening required '.../api/../app/core/session.php'` — line 4 of `api/delete_adjustment.php` tried to `require_once` three legacy paths (`app/core/session.php`, `app/core/database.php`, `app/core/utils.php`) that do not exist on the production server. `roots.php` (line 3) already starts the session and opens the DB, making those requires both redundant and fatal.
