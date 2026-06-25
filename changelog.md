@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-25 (feat) — budget delete now reverses GL postings + voids linked expenses
+
+- `api/account/delete_budget.php` — delete path now wraps in a DB transaction and: (1) finds every `paid` expense linked to this budget that has a `transaction_id`, (2) calls `reverseOutflow($pdo, $transaction_id)` on each (voids the journal entry, restores account balances), (3) sets each expense `status = void` and clears `transaction_id`, (4) then deletes the budget row. Success message reports how many GL postings were reversed. Full rollback on any error. Approved budgets remain admin-only delete.
+
 ## 2026-06-25 (feat) — budget rejection now reverses GL postings + voids linked expenses
 
 - `api/account/update_budget_status.php` — rejection path now wraps in a DB transaction and: (1) marks budget `rejected`, (2) fetches every `paid` expense linked to this budget that has a `transaction_id`, (3) calls `reverseOutflow($pdo, $transaction_id)` on each — which voids the journal entry and restores account balances via `unmirrorTransactionFromJournal`, (4) sets each expense `status = void` and clears `transaction_id`. Success message reports how many GL postings were reversed. Full rollback on any error.
