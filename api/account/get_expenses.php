@@ -22,10 +22,11 @@ $length = $_GET['length'] ?? 10;
 $searchValue = $_GET['search']['value'] ?? '';
 
 // Custom filters
-$expense_account_id = $_GET['expense_account_id'] ?? '';
-$status = $_GET['status'] ?? '';
-$date_from = $_GET['date_from'] ?? '';
-$date_to = $_GET['date_to'] ?? '';
+$expense_account_id    = $_GET['expense_account_id'] ?? '';
+$status                = $_GET['status'] ?? '';
+$date_from             = $_GET['date_from'] ?? '';
+$date_to               = $_GET['date_to'] ?? '';
+$recurring_profile_id  = (int)($_GET['recurring_profile_id'] ?? 0);
 
 // Left-panel tree filters (Expense Types & Categories): pick a Type to see all its
 // expenses across its categories, or a single Category to see only that one.
@@ -117,6 +118,7 @@ if (!empty($expense_account_id)) { $filterSql .= " AND e.expense_account_id = :e
 if (!empty($status))            { $filterSql .= " AND e.status = :status";                          $params[':status'] = $status; }
 if (!empty($date_from))         { $filterSql .= " AND e.expense_date >= :date_from";                 $params[':date_from'] = $date_from; }
 if (!empty($date_to))           { $filterSql .= " AND e.expense_date <= :date_to";                   $params[':date_to'] = $date_to; }
+if ($recurring_profile_id > 0)  { $filterSql .= " AND e.recurring_profile_id = :recurring_profile_id"; $params[':recurring_profile_id'] = $recurring_profile_id; }
 
 // Left-panel tree filter (category subtree, whole type, or uncategorised).
 if ($filter_uncategorised) {

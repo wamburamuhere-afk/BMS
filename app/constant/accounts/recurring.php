@@ -31,6 +31,25 @@ $profiles = $pdo->query("SELECT * FROM recurring_profiles ORDER BY status='ended
 $stat_active = 0; $stat_paused = 0;
 foreach ($profiles as $p) { if ($p['status'] === 'active') $stat_active++; elseif ($p['status'] === 'paused') $stat_paused++; }
 
+// Count pending/approved generated expenses per profile for badges
+$expCounts = [];
+$profileIds = array_column($profiles, 'id');
+if (!empty($profileIds)) {
+    $ph = implode(',', array_fill(0, count($profileIds), '?'));
+    $cntStmt = $pdo->prepare("
+        SELECT recurring_profile_id,
+               SUM(status = 'pending')  AS pending_count,
+               SUM(status = 'approved') AS approved_count
+        FROM expenses
+        WHERE recurring_profile_id IN ($ph) AND status NOT IN ('rejected','paid','void')
+        GROUP BY recurring_profile_id
+    ");
+    $cntStmt->execute($profileIds);
+    foreach ($cntStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $expCounts[(int)$row['recurring_profile_id']] = $row;
+    }
+}
+
 function rec_badge(string $s): string {
     $map = ['active'=>['#0d6efd','#fff'], 'paused'=>['#e9ecef','#495057'], 'ended'=>['#6c757d','#fff']];
     [$bg,$fg] = $map[$s] ?? ['#e9ecef','#495057'];
@@ -77,7 +96,7 @@ function rec_badge(string $s): string {
 
     <div id="tableView">
         <div class="card border-0 shadow-sm">
-            <div class="table-responsive">
+            <div class="table-responsive" style="overflow:visible;">
                 <table id="recTable" class="table table-hover align-middle w-100 mb-0">
                     <thead class="table-light">
                         <tr>
@@ -93,10 +112,20 @@ function rec_badge(string $s): string {
                     </thead>
                     <tbody>
                         <?php foreach ($profiles as $i => $p):
-                            $tpl = json_decode($p['template_json'], true) ?: []; ?>
+                            $tpl = json_decode($p['template_json'], true) ?: [];
+                            $cnt = $expCounts[(int)$p['id']] ?? [];
+                            $pendingCnt  = (int)($cnt['pending_count']  ?? 0);
+                            $approvedCnt = (int)($cnt['approved_count'] ?? 0);
+                            $dueCnt      = $pendingCnt + $approvedCnt;
+                        ?>
                         <tr data-id="<?= (int)$p['id'] ?>" data-status="<?= htmlspecialchars($p['status']) ?>">
                             <td class="ps-3"><?= $i + 1 ?></td>
-                            <td class="fw-semibold"><?= safe_output($p['name']) ?></td>
+                            <td class="fw-semibold">
+                                <?= safe_output($p['name']) ?>
+                                <?php if ($dueCnt > 0): ?>
+                                <span class="badge bg-warning text-dark ms-1" style="font-size:0.65rem;" title="<?= $pendingCnt ?> pending, <?= $approvedCnt ?> approved"><?= $dueCnt ?> due</span>
+                                <?php endif; ?>
+                            </td>
                             <td><span class="text-capitalize"><?= safe_output($p['doc_type']) ?></span></td>
                             <td>Every <?= (int)$p['interval_count'] ?> <?= safe_output($p['frequency']) ?></td>
                             <td class="text-end"><?= number_format((float)($tpl['amount'] ?? 0), 2) ?></td>
@@ -104,8 +133,15 @@ function rec_badge(string $s): string {
                             <td class="text-center"><?= rec_badge($p['status']) ?></td>
                             <td class="text-end pe-3">
                                 <div class="dropdown d-flex justify-content-end">
-                                    <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear-fill me-1"></i></button>
+                                    <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-gear-fill me-1"></i></button>
                                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                                        <li>
+                                            <button class="dropdown-item py-2 rounded" onclick="viewExpenses(<?= (int)$p['id'] ?>, '<?= addslashes(safe_output($p['name'])) ?>')">
+                                                <i class="bi bi-list-check text-info me-2"></i> View Expenses
+                                                <?php if ($dueCnt > 0): ?><span class="badge bg-warning text-dark ms-1"><?= $dueCnt ?></span><?php endif; ?>
+                                            </button>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
                                         <?php if ($can_edit && $p['status'] === 'active'): ?>
                                         <li><button class="dropdown-item py-2 rounded" onclick="setStatus(<?= (int)$p['id'] ?>,'pause')"><i class="bi bi-pause-circle text-primary me-2"></i> Pause</button></li>
                                         <?php elseif ($can_edit && $p['status'] === 'paused'): ?>
@@ -224,6 +260,66 @@ function rec_badge(string $s): string {
 </div>
 <?php endif; ?>
 
+<!-- ── Generated Expenses Modal ────────────────────────────────────── -->
+<div class="modal fade" id="expensesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-list-check me-2"></i><span id="expModalTitle">Generated Expenses</span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div id="expModalBody" class="p-3">
+                    <div class="text-center py-4"><span class="spinner-border text-primary"></span></div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-0">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Payment Sub-modal ───────────────────────────────────────────── -->
+<div class="modal fade" id="payModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-cash-coin me-2"></i>Make Payment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="payExpenseId">
+                <div id="payMessage" class="mb-2"></div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Payment Date <span class="text-danger">*</span></label>
+                    <input type="date" class="form-control" id="payDate" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
+                    <input type="number" class="form-control" id="payAmount" step="0.01" min="0.01" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Paid From (Bank / Cash Account) <span class="text-danger">*</span></label>
+                    <select class="form-select" id="payBankAccount" required>
+                        <option value="">— Select account —</option>
+                        <?php foreach ($cash_accounts as $a): ?>
+                        <option value="<?= (int)$a['account_id'] ?>"><?= htmlspecialchars(($a['account_code'] ? $a['account_code'] . ' — ' : '') . $a['account_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="alert alert-info border-0 small mb-0"><i class="bi bi-info-circle me-1"></i>
+                    Payment will post <strong>Dr Accrued Expenses / Cr Bank</strong> to the ledger and record a bank withdrawal.
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-0">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success btn-sm px-4" id="btnConfirmPay"><i class="bi bi-check-circle me-1"></i> Confirm Payment</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <link rel="stylesheet" href="/assets/css/dataTables.bootstrap5.min.css">
 <script src="/assets/js/jquery.dataTables.min.js"></script>
 <script src="/assets/js/dataTables.bootstrap5.min.js"></script>
@@ -235,6 +331,7 @@ function rec_badge(string $s): string {
 
 <script>
 const CAN_EDIT = <?= json_encode((bool)$can_edit) ?>;
+function escapeHtml(s) { return s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 $(function () {
     const SAVE_URL   = '<?= buildUrl('api/account/save_recurring_profile.php') ?>';
@@ -323,6 +420,115 @@ $(function () {
         });
     };
 
+    // ── Generated Expenses ─────────────────────────────────────────────
+    const EXP_URL    = '<?= buildUrl('api/get_expenses.php') ?>';
+    const STATUS_EXP = '<?= buildUrl('api/account/update_expense_status.php') ?>';
+    const UPDATE_EXP = '<?= buildUrl('api/account/update_expense.php') ?>';
+
+    window.viewExpenses = function (profileId, profileName) {
+        $('#expModalTitle').text('Generated Expenses — ' + profileName);
+        $('#expModalBody').html('<div class="text-center py-4"><span class="spinner-border text-primary"></span></div>');
+        new bootstrap.Modal(document.getElementById('expensesModal')).show();
+
+        $.getJSON(EXP_URL, {
+            recurring_profile_id: profileId,
+            length: 100,
+            draw: 1,
+            start: 0
+        }, function (res) {
+            const rows = res.data || [];
+            if (!rows.length) {
+                $('#expModalBody').html('<div class="text-center text-muted py-4"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No generated expenses yet.<br><small>Click "Run Due Now" to generate.</small></div>');
+                return;
+            }
+            const statusClass = { pending:'warning', approved:'success', paid:'info', rejected:'danger', reviewed:'primary' };
+            let html = '<table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr>'
+                     + '<th>Date</th><th>Description</th><th class="text-end">Amount</th><th>Status</th><th class="text-end">Actions</th>'
+                     + '</tr></thead><tbody>';
+            rows.forEach(function (e) {
+                const sc  = statusClass[e.status] || 'secondary';
+                const lbl = e.status ? e.status.charAt(0).toUpperCase() + e.status.slice(1) : '—';
+                const dt  = e.expense_date ? new Date(e.expense_date).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+                let acts  = '';
+                <?php if ($can_edit): ?>
+                if (e.status === 'pending') {
+                    acts += `<button class="btn btn-sm btn-outline-success me-1" onclick="approveExpense(${e.expense_id})" title="Approve"><i class="bi bi-check-circle"></i> Approve</button>`;
+                }
+                if (e.status === 'approved') {
+                    acts += `<button class="btn btn-sm btn-success" onclick="openPayModal(${e.expense_id},${e.amount},${e.bank_account_id||0})" title="Pay"><i class="bi bi-cash-coin"></i> Pay</button>`;
+                }
+                <?php endif; ?>
+                html += `<tr><td class="small">${dt}</td><td class="small">${escapeHtml(e.description||'—')}</td>`
+                      + `<td class="text-end small fw-bold">${typeof formatCurrency==='function'?formatCurrency(e.amount):e.amount}</td>`
+                      + `<td><span class="badge bg-${sc}">${lbl}</span></td>`
+                      + `<td class="text-end">${acts||'<span class="text-muted small">—</span>'}</td></tr>`;
+            });
+            html += '</tbody></table>';
+            $('#expModalBody').html(html);
+        }).fail(function () {
+            $('#expModalBody').html('<div class="text-danger p-3">Failed to load expenses.</div>');
+        });
+    };
+
+    window.approveExpense = function (expenseId) {
+        Swal.fire({ title:'Approve this expense?', text:'This will post Dr Expense / Cr Accrued Expenses to the ledger.',
+            icon:'question', showCancelButton:true, confirmButtonColor:'#198754', confirmButtonText:'Approve' })
+        .then(r => { if (!r.isConfirmed) return;
+            $.post(STATUS_EXP, { expense_id: expenseId, status: 'approved', _csrf: CSRF }, function (res) {
+                if (res.success) {
+                    Swal.fire({ icon:'success', title:'Approved', text: res.sig_warning || res.message, timer:2000, showConfirmButton:false })
+                    .then(() => location.reload());
+                } else { Swal.fire({ icon:'error', title:'Error', text: res.message }); }
+            }, 'json').fail(() => Swal.fire({ icon:'error', title:'Error', text:'Server error.' }));
+        });
+    };
+
+    window.openPayModal = function (expenseId, amount, bankAccountId) {
+        $('#payExpenseId').val(expenseId);
+        $('#payDate').val(new Date().toISOString().split('T')[0]);
+        $('#payAmount').val(parseFloat(amount).toFixed(2));
+        $('#payBankAccount').val(bankAccountId > 0 ? bankAccountId : '');
+        $('#payMessage').html('');
+        // Hide expenses modal, show pay modal
+        bootstrap.Modal.getInstance(document.getElementById('expensesModal'))?.hide();
+        setTimeout(() => new bootstrap.Modal(document.getElementById('payModal')).show(), 300);
+    };
+
+    $('#btnConfirmPay').on('click', function () {
+        const expId    = $('#payExpenseId').val();
+        const date     = $('#payDate').val();
+        const amount   = $('#payAmount').val();
+        const bankId   = $('#payBankAccount').val();
+        if (!date || !amount || !bankId) {
+            $('#payMessage').html('<div class="alert alert-warning py-2 small">Please fill all fields.</div>'); return;
+        }
+        const btn = $(this); const orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Processing...');
+
+        // Step 1: update expense with payment details
+        $.post(UPDATE_EXP, {
+            expense_id: expId, expense_date: date, amount: amount,
+            bank_account_id: bankId, description: 'Recurring expense', _csrf: CSRF
+        }, function (res) {
+            if (!res.success) {
+                btn.prop('disabled', false).html(orig);
+                $('#payMessage').html('<div class="alert alert-danger py-2 small">' + (res.message||'Update failed.') + '</div>'); return;
+            }
+            // Step 2: mark paid — this fires the GL posting
+            $.post(STATUS_EXP, { expense_id: expId, status: 'paid', _csrf: CSRF }, function (res2) {
+                btn.prop('disabled', false).html(orig);
+                if (res2.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('payModal'))?.hide();
+                    Swal.fire({ icon:'success', title:'Payment Posted', text:'Ledger updated: Dr Accrued Expenses / Cr Bank.', timer:2200, showConfirmButton:false })
+                    .then(() => location.reload());
+                } else { $('#payMessage').html('<div class="alert alert-danger py-2 small">' + (res2.message||'Payment failed.') + '</div>'); }
+            }, 'json').fail(() => { btn.prop('disabled', false).html(orig); $('#payMessage').html('<div class="alert alert-danger py-2 small">Server error.</div>'); });
+        }, 'json').fail(() => { btn.prop('disabled', false).html(orig); $('#payMessage').html('<div class="alert alert-danger py-2 small">Server error.</div>'); });
+    });
+
+    // Clear payMessage when pay modal closes
+    document.getElementById('payModal').addEventListener('hidden.bs.modal', () => { $('#payMessage').html(''); });
+
     $('#btnRunNow').on('click', function () {
         Swal.fire({ title:'Generate due documents now?', text:'Any profiles due today (or overdue) will create their pending expense.',
             icon:'question', showCancelButton:true, confirmButtonColor:'#0d6efd', confirmButtonText:'Yes, run' })
@@ -350,7 +556,8 @@ function renderCards() {
         if (td.length < 8) return;
         const id     = parseInt($(this).data('id'));
         const status = $(this).data('status');
-        let btns = '';
+        const name   = $(this).find('td').eq(1).text().replace(/\d+ due/,'').trim();
+        let btns = `<button class="btn btn-sm btn-outline-info" onclick="viewExpenses(${id},'${name.replace(/'/g,"\\'")}\')" title="View Expenses" style="${btnStyle}"><i class="bi bi-list-check"></i></button>`;
         if (status === 'active' && CAN_EDIT)
             btns += `<button class="btn btn-sm btn-outline-warning" onclick="setStatus(${id},'pause')" title="Pause" style="${btnStyle}"><i class="bi bi-pause-circle"></i></button>`;
         if (status === 'paused' && CAN_EDIT)
