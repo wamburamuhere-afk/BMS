@@ -53,7 +53,7 @@ try {
         // 3. Reverse each GL posting and void the expense
         foreach ($paid_expenses as $exp) {
             reverseOutflow($pdo, (int)$exp['transaction_id']);
-            $pdo->prepare("UPDATE expenses SET status = 'void', transaction_id = NULL WHERE expense_id = ?")
+            $pdo->prepare("UPDATE expenses SET status = 'rejected', transaction_id = NULL WHERE expense_id = ?")
                 ->execute([$exp['expense_id']]);
         }
 
