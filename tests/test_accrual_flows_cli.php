@@ -23,9 +23,27 @@ function section($t){ echo "\n\033[1m── $t ──\033[0m\n"; }
 function approx($a, $b){ return abs((float)$a - (float)$b) < 0.01; }
 function bal(PDO $pdo, int $id){ $s=$pdo->prepare("SELECT current_balance FROM accounts WHERE account_id=?"); $s->execute([$id]); return (float)$s->fetchColumn(); }
 function totalCash(PDO $pdo){ return (float)$pdo->query("SELECT COALESCE(SUM(current_balance),0) FROM accounts WHERE account_type='asset' AND cash_flow_category='cash'")->fetchColumn(); }
+// Legacy path (books_transactions) — used by postPayrollAccrual
 function legsBalanced(PDO $pdo, int $txn){
     $r = $pdo->query("SELECT COALESCE(SUM(CASE WHEN type='debit' THEN amount ELSE 0 END),0) d, COALESCE(SUM(CASE WHEN type='credit' THEN amount ELSE 0 END),0) c FROM books_transactions WHERE transaction_id=$txn")->fetch(PDO::FETCH_ASSOC);
     return approx($r['d'], $r['c']) && $r['d'] > 0;
+}
+// Canonical ledger path (journal_entry_items) — used by postSdlAccrual (postLedgerEntry)
+function legsBalancedJei(PDO $pdo, int $entryId){
+    $s = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN type='debit' THEN amount ELSE 0 END),0) d, COALESCE(SUM(CASE WHEN type='credit' THEN amount ELSE 0 END),0) c FROM journal_entry_items WHERE entry_id=?");
+    $s->execute([$entryId]);
+    $r = $s->fetch(PDO::FETCH_ASSOC);
+    return approx($r['d'], $r['c']) && $r['d'] > 0;
+}
+function jeiDebit(PDO $pdo, int $entryId, int $accountId): float {
+    $s = $pdo->prepare("SELECT COALESCE(SUM(amount),0) FROM journal_entry_items WHERE entry_id=? AND account_id=? AND type='debit'");
+    $s->execute([$entryId, $accountId]);
+    return (float)$s->fetchColumn();
+}
+function jeiCredit(PDO $pdo, int $entryId, int $accountId): float {
+    $s = $pdo->prepare("SELECT COALESCE(SUM(amount),0) FROM journal_entry_items WHERE entry_id=? AND account_id=? AND type='credit'");
+    $s->execute([$entryId, $accountId]);
+    return (float)$s->fetchColumn();
 }
 
 register_shutdown_function(function(){ global $pass,$fail,$pdo; if($pdo && $pdo->inTransaction()) $pdo->rollBack(); echo "\nPasses:   \033[32m$pass\033[0m\nFailures: ".($fail===0?"\033[32m0\033[0m":"\033[31m$fail\033[0m")."\n"; });
@@ -39,12 +57,12 @@ try {
     if ($sdlExp > 0 && $sdlPay > 0) {
         $pdo->beginTransaction();
         try {
-            $eBefore = bal($pdo, $sdlExp); $pBefore = bal($pdo, $sdlPay); $cashBefore = totalCash($pdo);
-            $txn = postSdlAccrual($pdo, '2099-12', 1000.00);   // far-future period → no collision
-            ok($txn > 0, 'postSdlAccrual posted a transaction');
-            ok(approx(bal($pdo, $sdlExp) - $eBefore, 1000.00), 'SDL Expense INCREASED by 1000');
-            ok(approx(bal($pdo, $sdlPay) - $pBefore, 1000.00), 'SDL Payable INCREASED by 1000');
-            ok(legsBalanced($pdo, (int)$txn), 'ledger balanced (Dr = Cr)');
+            $cashBefore = totalCash($pdo);
+            $entryId = postSdlAccrual($pdo, '2099-12', 1000.00);   // far-future period → no collision
+            ok($entryId > 0, 'postSdlAccrual posted an entry');
+            ok(approx(jeiDebit($pdo, (int)$entryId, $sdlExp), 1000.00), 'SDL Expense INCREASED by 1000');
+            ok(approx(jeiCredit($pdo, (int)$entryId, $sdlPay), 1000.00), 'SDL Payable INCREASED by 1000');
+            ok(legsBalancedJei($pdo, (int)$entryId), 'ledger balanced (Dr = Cr)');
             ok(approx(totalCash($pdo), $cashBefore), 'NO cash/bank account was touched');
             $pdo->rollBack();
             ok(!$pdo->inTransaction(), 'rolled back — nothing persisted');
@@ -72,8 +90,8 @@ try {
             ];
             $txn = postPayrollAccrual($pdo, $p);
             if ($txn) {
-                ok(approx(bal($pdo, $salExp) - $eBefore, 1000000), 'Salaries Expense INCREASED by gross (1,000,000)');
-                ok(legsBalanced($pdo, (int)$txn), 'payroll accrual ledger balanced (Dr = Cr)');
+                ok(approx(jeiDebit($pdo, (int)$txn, $salExp), 1000000), 'Salaries Expense INCREASED by gross (1,000,000)');
+                ok(legsBalancedJei($pdo, (int)$txn), 'payroll accrual ledger balanced (Dr = Cr)');
                 ok(approx(totalCash($pdo), $cashBefore), 'NO cash/bank account was touched');
             } else {
                 ok(true, 'payroll accrual not posted (some payable accounts unmapped) — skipped (n/a)');

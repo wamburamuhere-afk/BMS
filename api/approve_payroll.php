@@ -29,21 +29,34 @@ if (function_exists('assertScopeForEmployeeRecord')) {
 }
 
 try {
-    $stmt = $pdo->prepare("UPDATE payroll SET payment_status = 'approved' WHERE payroll_id = ?");
-    $stmt->execute([$payroll_id]);
+    $pdo->beginTransaction();
 
-    // Accrual model — book the liabilities on approval (Dr Salaries Expense /
-    // Cr PAYE + NSSF + Salaries Payable), then refresh the period schedule + SDL.
+    $pdo->prepare("UPDATE payroll SET payment_status = 'approved' WHERE payroll_id = ?")->execute([$payroll_id]);
+
+    // Accrual model — book the liabilities on approval:
+    //   Dr Salaries Expense / Cr PAYE Payable + NSSF Payable + Salaries Payable
+    $accrualTxn = null;
+    try { $accrualTxn = ensurePayrollAccrued($pdo, (int)$payroll_id, (int)$_SESSION['user_id']); }
+    catch (Throwable $e) { error_log('approve accrual: ' . $e->getMessage()); }
+
+    if (!$accrualTxn) {
+        $pdo->rollBack();
+        echo json_encode(['success' => false,
+            'message' => 'GL accrual could not be posted — ensure Salaries Expense, PAYE Payable, NSSF Payable and Salaries Payable accounts are mapped in System Settings, then try again.']);
+        exit;
+    }
+
+    $pdo->commit();
+
+    // SDL refresh outside the transaction (idempotent; failure must not unwind the approval)
     try {
-        ensurePayrollAccrued($pdo, (int)$payroll_id, (int)$_SESSION['user_id']);
         $per = $pdo->query("SELECT payroll_period FROM payroll WHERE payroll_id = " . (int)$payroll_id)->fetchColumn();
         if ($per) {
             $rs = syncStatutoryRemittances($pdo, $per, (int)$_SESSION['user_id']);
             postSdlAccrual($pdo, $per, (float)($rs['amounts']['sdl'] ?? 0), (int)$_SESSION['user_id']);
         }
-    } catch (Throwable $e) { error_log('approve accrual: ' . $e->getMessage()); }
+    } catch (Throwable $e) { error_log('sdl sync: ' . $e->getMessage()); }
 
-    // Log approval action
     logAudit($pdo, $_SESSION['user_id'], 'approve_payroll', [
         'activity_type' => 'update',
         'entity_type' => 'payroll',
@@ -51,8 +64,9 @@ try {
         'description' => "Approved payroll record ID: $payroll_id"
     ]);
 
-    echo json_encode(['success' => true, 'message' => 'Payroll approved successfully.']);
+    echo json_encode(['success' => true, 'message' => 'Payroll approved and GL accrual posted.']);
 } catch (Exception $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
     echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
 }
 ?>
