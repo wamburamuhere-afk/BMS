@@ -4,6 +4,7 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../app/core/session.php';
 require_once __DIR__ . '/../app/core/database.php';
 require_once __DIR__ . '/../app/core/utils.php';
+require_once __DIR__ . '/../core/stock_posting.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -81,6 +82,10 @@ try {
         }
         // If reversing subtracts and no entry exists, we can't really subtract below zero but let's assume valid state.
     }
+
+    // GL reversal (6-part rule 6: delete reverses the journal entry)
+    $ref = $adjustment['reference_number'] ?? "ADJ-$adjustment_id";
+    reverseStockAdjustmentGl($pdo, $adjustment_id, (int)$_SESSION['user_id'], $ref);
 
     // Delete the movement record
     $delete_stmt = $pdo->prepare("DELETE FROM stock_movements WHERE movement_id = ?");

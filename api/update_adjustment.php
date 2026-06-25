@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/stock_posting.php';
 
 // Check permissions
 if (!isset($_SESSION['user_id'])) {
@@ -139,6 +140,15 @@ try {
         $new_stock_after,
         $movement_id
     ]);
+
+    // GL: reverse the old entry, then post the updated values (6-part rule 6)
+    $ref          = $old_adj['reference_number'] ?? "ADJ-$movement_id";
+    $effective_cost = $unit_cost > 0 ? $unit_cost : (float)($old_adj['unit_cost'] ?? 0);
+    $project_id_gl  = $project_id ?: (isset($old_adj['project_id']) ? (int)$old_adj['project_id'] : null);
+
+    reverseStockAdjustmentGl($pdo, $movement_id, (int)$_SESSION['user_id'], $ref);
+    postStockAdjustmentGl($pdo, $movement_id, $quantity, $movement_type, $effective_cost,
+        $project_id_gl, (int)$_SESSION['user_id'], date('Y-m-d'), $ref);
 
     // Log action
     logAudit($pdo, $_SESSION['user_id'], 'update_adjustment', ['description' => "Updated adjustment #$movement_id"]);

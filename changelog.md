@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-06-24 (feat) — Stock adjustment GL posting (all 6 accounting requirements)
+
+**Gap closed:** `api/create_stock_adjustment.php` previously wrote only to `stock_movements` with zero journal entries. The Inventory account (1-1300) never moved on stock adjustments, so the Balance Sheet showed stale inventory values.
+
+**Implementation:**
+- **`core/stock_posting.php`** (new) — two functions:
+  - `postStockAdjustmentGl()`: UP types (`adjustment_in`, `found`) → Dr Inventory / Cr Historical Balancing Equity; DOWN types (all others) → Dr Historical Balancing Equity / Cr Inventory. Amount = abs(qty) × unit_cost.
+  - `reverseStockAdjustmentGl()`: reads original posted lines, flips Dr↔Cr, posts contra-entry with `entity_type='stock_adjustment_void'`.
+- **`api/create_stock_adjustment.php`**: captures `$movement_id` after INSERT; calls `postStockAdjustmentGl()` inside the transaction before `commit()`.
+- **`api/delete_adjustment.php`**: calls `reverseStockAdjustmentGl()` inside the transaction before the DELETE and `commit()`.
+- **`api/update_adjustment.php`**: calls `reverseStockAdjustmentGl()` then `postStockAdjustmentGl()` with the new values inside the transaction before `commit()`.
+
+**Accounts:** `inventoryAccountId()` → 1-1300 Inventory · `takeOnEquityAccountId()` → 3-9999 Historical Balancing.
+**Reports affected:** Balance Sheet (both accounts are BS) and Trial Balance.
+
+---
+
 ## 2026-06-24 (fix) — fc_natural_sign: add finance_cost (debit-normal) and other_income (credit-normal)
 
 **Root cause:** `fc_natural_sign()` in `core/financial_classification.php` had no case for `'finance_cost'` or `'other_income'` — both fell through to `default => 0`. Since `fc_balance()` multiplies by this sign, `fc_balance('finance_cost', dr, cr)` always returned 0 regardless of the amounts fetched. This meant the Balance Sheet Retained Earnings calculation silently discarded all Finance Cost entries (e.g. Bank Charges): the asset side went down by the charge amount but equity did not → "BALANCE SHEET DOES NOT BALANCE. Difference = X.XX (Liab.+Equity exceed Assets)" where X.XX was exactly the charge.
