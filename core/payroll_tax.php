@@ -158,6 +158,14 @@ if (!function_exists('sdlMinEmployees')) {
     }
 }
 
+if (!function_exists('nssfEmployerRate')) {
+    function nssfEmployerRate(PDO $pdo): float
+    {
+        $v = payrollSetting($pdo, 'nssf_employer_rate', null);
+        return ($v !== null) ? (float)$v : (float)PR_DEFAULT_NSSF_EMPLOYEE_RATE;
+    }
+}
+
 if (!function_exists('activeTaxBrackets')) {
     /**
      * PAYE bands in force on $asOfDate (YYYY-MM-DD). Falls back to the seeded
@@ -277,11 +285,11 @@ if (!function_exists('syncStatutoryRemittances')) {
     function syncStatutoryRemittances(PDO $pdo, string $period, ?int $userId = null): array
     {
         $agg = $pdo->prepare("SELECT COUNT(*) AS cnt,
-                                     COALESCE(SUM(gross_salary),0) AS gross,
-                                     COALESCE(SUM(tax_amount),0)    AS paye,
-                                     COALESCE(SUM(nssf_employee),0) AS nssf
+                                     COALESCE(SUM(gross_salary),0)                               AS gross,
+                                     COALESCE(SUM(tax_amount),0)                                 AS paye,
+                                     COALESCE(SUM(nssf_employee + COALESCE(nssf_employer,0)),0)  AS nssf
                                 FROM payroll
-                               WHERE payroll_period = ? AND payment_status <> 'cancelled'");
+                               WHERE payroll_period = ? AND payment_status NOT IN ('cancelled','voided')");
         $agg->execute([$period]);
         $r = $agg->fetch(PDO::FETCH_ASSOC) ?: ['cnt' => 0, 'gross' => 0, 'paye' => 0, 'nssf' => 0];
 

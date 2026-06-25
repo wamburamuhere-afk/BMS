@@ -16,7 +16,8 @@ if (!canDelete('payroll')) {
     exit();
 }
 
-$payroll_id = $_POST['payroll_id'] ?? null;
+$payroll_id  = $_POST['payroll_id']  ?? null;
+$void_reason = trim($_POST['void_reason'] ?? 'Voided by user');
 
 if (!$payroll_id) {
     echo json_encode(['success' => false, 'message' => 'Payroll ID required']);
@@ -30,7 +31,7 @@ if (function_exists('assertScopeForEmployeeRecord')) {
 
 try {
     // Check if record exists
-    $stmt = $pdo->prepare("SELECT payroll_number, payroll_period, accrual_transaction_id, payment_transaction_id FROM payroll WHERE payroll_id = ?");
+    $stmt = $pdo->prepare("SELECT payroll_number, payroll_period, payment_status, accrual_transaction_id, payment_transaction_id FROM payroll WHERE payroll_id = ?");
     $stmt->execute([$payroll_id]);
     $payroll = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -38,32 +39,40 @@ try {
         throw new Exception('Payroll record not found');
     }
 
-    // Accrual model — unwind the ledger before removing the record: reverse the
-    // payment (Dr Salaries Payable / Cr Bank) and the accrual (Dr Salaries Expense /
-    // Cr PAYE + NSSF + Salaries Payable), restoring all account balances.
-    if (!empty($payroll['payment_transaction_id'])) reverseJournalBalances($pdo, (int)$payroll['payment_transaction_id']);
-    if (!empty($payroll['accrual_transaction_id'])) reverseJournalBalances($pdo, (int)$payroll['accrual_transaction_id']);
+    if (($payroll['payment_status'] ?? '') === 'voided') {
+        throw new Exception('This payroll record is already voided.');
+    }
 
-    $stmt = $pdo->prepare("DELETE FROM payroll WHERE payroll_id = ?");
-    $stmt->execute([$payroll_id]);
+    // Reverse all GL entries (accrual + payment) before marking voided.
+    // reversePayrollGl handles both the canonical P-6 path and the legacy path.
+    reversePayrollGl($pdo, (int)$payroll_id, (int)$_SESSION['user_id'], $payroll);
 
-    // The period's totals changed — refresh the remittance schedule + SDL accrual.
+    // Mark voided — keep the row for audit and statutory history.
+    $pdo->prepare("UPDATE payroll
+                      SET payment_status = 'voided',
+                          status         = 'voided',
+                          voided_by      = ?,
+                          voided_at      = NOW(),
+                          void_reason    = ?
+                    WHERE payroll_id = ?")
+        ->execute([(int)$_SESSION['user_id'], $void_reason, (int)$payroll_id]);
+
+    // Period totals changed — refresh the remittance schedule + SDL accrual.
     if (!empty($payroll['payroll_period'])) {
         try {
             $rs = syncStatutoryRemittances($pdo, $payroll['payroll_period'], (int)$_SESSION['user_id']);
             postSdlAccrual($pdo, $payroll['payroll_period'], (float)($rs['amounts']['sdl'] ?? 0), (int)$_SESSION['user_id']);
-        } catch (Throwable $e) { error_log('delete statutory refresh: ' . $e->getMessage()); }
+        } catch (Throwable $e) { error_log('void statutory refresh: ' . $e->getMessage()); }
     }
 
-    // Log delete action
-    logAudit($pdo, $_SESSION['user_id'], 'delete_payroll', [
-        'activity_type' => 'delete',
-        'entity_type' => 'payroll',
-        'entity_id' => $payroll_id,
-        'description' => "Deleted payroll record #" . $payroll['payroll_number'] . " (ID: $payroll_id)"
+    logAudit($pdo, $_SESSION['user_id'], 'void_payroll', [
+        'activity_type' => 'void',
+        'entity_type'   => 'payroll',
+        'entity_id'     => $payroll_id,
+        'description'   => "Voided payroll #" . $payroll['payroll_number'] . " — {$void_reason}",
     ]);
 
-    echo json_encode(['success' => true, 'message' => 'Payroll record deleted successfully']);
+    echo json_encode(['success' => true, 'message' => 'Payroll record voided and GL reversed. Record preserved for audit.']);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
 }
