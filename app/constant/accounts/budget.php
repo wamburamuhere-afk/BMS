@@ -157,20 +157,63 @@ $total_actual_stmt = $pdo->prepare($total_actual_sql);
 $total_actual_stmt->execute(array_merge($exp_where_params, $e_scope_where_params));
 $summary['total_actual'] = $total_actual_stmt->fetchColumn() ?: 0;
 
-// Get actual expenses grouped by category and project
-$expenses_sql = "
-    SELECT
-        CONCAT(ec.id, '_', COALESCE(e.project_id, 0)) as key_id,
-        SUM(e.amount) as total_expenses
+// ── Actual-amount resolution (two-phase) ────────────────────────────────────
+//
+// Phase 1 — Primary: group by expenses.budget_id (the direct FK).
+//   Quick Expense and the budget form both set this column at save time.
+//   No date filter needed — the FK is the exact budget link, immune to date
+//   mismatches and free from category-pooling across multiple budget rows.
+//
+$by_budget_stmt = $pdo->prepare("
+    SELECT e.budget_id AS bkey, SUM(e.amount) AS total
     FROM expenses e
-    JOIN accounts a ON e.expense_account_id = a.account_id
-    JOIN expense_categories ec ON (a.category_id = ec.id OR a.account_name LIKE CONCAT('%', ec.name, '%'))
-    WHERE $exp_date_filter e.status IN ('approved', 'paid') $e_scope_where_sql
-    GROUP BY ec.id, e.project_id
-";
-$expenses_stmt = $pdo->prepare($expenses_sql);
-$expenses_stmt->execute(array_merge($exp_where_params, $e_scope_where_params));
-$actual_expenses = $expenses_stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    WHERE e.budget_id IS NOT NULL
+      AND e.status IN ('approved', 'paid')
+      $e_scope_where_sql
+    GROUP BY e.budget_id
+");
+$by_budget_stmt->execute($e_scope_where_params);
+$actual_by_budget = $by_budget_stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+
+// Phase 2 — Fallback: for legacy expenses that pre-date the budget_id column
+//   (budget_id IS NULL). Group by category_id + expense year/month so they
+//   can be matched to a budget row by period. Checked only when Phase 1 gives
+//   nothing for a budget row.
+//   Branch A: linked via expense_category_map.
+//   Branch B: linked via the GL account's category_id, not already in ECM.
+//
+$by_period_stmt = $pdo->prepare("
+    SELECT
+        CONCAT(cat_id, '_', yr, '_', mo) AS pkey,
+        SUM(amount) AS total
+    FROM (
+        SELECT e.amount, ecm.category_id AS cat_id,
+               YEAR(e.expense_date) AS yr, MONTH(e.expense_date) AS mo
+        FROM expenses e
+        JOIN expense_category_map ecm ON ecm.expense_id = e.expense_id
+        WHERE e.budget_id IS NULL
+          AND e.status IN ('approved', 'paid')
+          $e_scope_where_sql
+
+        UNION ALL
+
+        SELECT e.amount, a.category_id AS cat_id,
+               YEAR(e.expense_date) AS yr, MONTH(e.expense_date) AS mo
+        FROM expenses e
+        JOIN accounts a ON e.expense_account_id = a.account_id
+        WHERE e.budget_id IS NULL
+          AND e.status IN ('approved', 'paid')
+          $e_scope_where_sql
+          AND a.category_id IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM expense_category_map ecm2 WHERE ecm2.expense_id = e.expense_id
+          )
+    ) combined
+    GROUP BY cat_id, yr, mo
+");
+$by_period_stmt->execute(array_merge($e_scope_where_params, $e_scope_where_params));
+$actual_by_period = $by_period_stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Get budget performance data
 $joinProjects   = ($enable_projects == '1') ? "LEFT JOIN projects p ON b.project_id = p.project_id" : "";
@@ -196,10 +239,15 @@ $performance_stmt = $pdo->prepare("
 $performance_stmt->execute($where_params);
 $performance_data = $performance_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Inject dynamic actual amounts
+// Inject actual amounts: Phase 1 (budget_id FK) first, Phase 2 (period) as fallback.
 foreach ($performance_data as &$item) {
-    $key = $item['category_id'] . '_' . ($item['project_id'] ?? 0);
-    $item['actual_amount'] = $actual_expenses[$key] ?? 0;
+    $bid = (int)$item['budget_id'];
+    if (isset($actual_by_budget[$bid])) {
+        $item['actual_amount'] = (float)$actual_by_budget[$bid];
+    } else {
+        $pkey = $item['category_id'] . '_' . $item['budget_year'] . '_' . $item['budget_month'];
+        $item['actual_amount'] = isset($actual_by_period[$pkey]) ? (float)$actual_by_period[$pkey] : 0.0;
+    }
 }
 unset($item);
 
@@ -550,6 +598,28 @@ for ($year = $current_year - 2; $year <= $current_year + 3; $year++) {
                                 }
                             }
                             ?>
+                            <?php
+                                // Spending utilisation state (independent of approval workflow)
+                                if ($item['allocated_amount'] <= 0) {
+                                    $sp_label = 'No Budget'; $sp_cls = 'bg-secondary'; $sp_icon = 'dash-circle';
+                                } elseif ($usage_percentage == 0) {
+                                    $sp_label = 'Unused'; $sp_cls = 'bg-light text-muted border'; $sp_icon = 'circle';
+                                } elseif ($usage_percentage < 80) {
+                                    $sp_label = 'Partially Used'; $sp_cls = 'bg-info bg-opacity-10 text-info border border-info border-opacity-25'; $sp_icon = 'pie-chart-fill';
+                                } elseif ($usage_percentage < 100) {
+                                    $sp_label = 'Nearly Full'; $sp_cls = 'bg-warning text-dark'; $sp_icon = 'exclamation-circle-fill';
+                                } elseif ($usage_percentage <= 100) {
+                                    $sp_label = 'Fully Used'; $sp_cls = 'bg-success'; $sp_icon = 'check-circle-fill';
+                                } else {
+                                    $sp_label = 'Over Budget'; $sp_cls = 'bg-danger'; $sp_icon = 'exclamation-triangle-fill';
+                                }
+                                // Progress bar colour
+                                $bar_col = $usage_percentage > 100 ? '#dc3545' : ($usage_percentage >= 80 ? '#ffc107' : '#198754');
+                                // Actual amount colour
+                                $amt_col = $usage_percentage > 100 ? 'text-danger' : ($usage_percentage >= 80 ? 'text-warning' : 'text-success');
+                                // Variance % colour
+                                $pct_badge = $usage_percentage > 100 ? 'danger' : ($usage_percentage >= 80 ? 'warning' : ($usage_percentage >= 50 ? 'primary' : 'success'));
+                            ?>
                             <tr>
                                 <td class="text-center text-muted small fw-bold" data-label="S/NO"><?= $sn++ ?></td>
                                 <td data-label="Budget Name">
@@ -575,7 +645,7 @@ for ($year = $current_year - 2; $year <= $current_year + 3; $year++) {
                                     <strong><?= number_format($item['allocated_amount'], 2) ?></strong>
                                 </td>
                                 <td data-label="Actual Amount">
-                                    <strong class="text-primary"><?= number_format($item['actual_amount'], 2) ?></strong>
+                                    <strong class="<?= $amt_col ?>"><?= number_format($item['actual_amount'], 2) ?></strong>
                                 </td>
                                 <td data-label="Variance">
                                     <span class="badge bg-<?= get_variance_color($variance) ?>">
@@ -583,14 +653,23 @@ for ($year = $current_year - 2; $year <= $current_year + 3; $year++) {
                                     </span>
                                 </td>
                                 <td data-label="Variance %">
-                                    <span class="badge bg-<?= $usage_percentage > 100 ? 'danger' : 'info' ?>">
+                                    <span class="badge bg-<?= $pct_badge ?><?= $pct_badge === 'warning' ? ' text-dark' : '' ?>">
                                         <?= number_format($usage_percentage, 1) ?>%
                                     </span>
                                 </td>
                                 <td data-label="Status">
-                                    <span class="badge bg-<?= get_status_badge($item['status']) ?>">
-                                        <?= ucfirst($item['status']) ?>
+                                    <span class="badge <?= $sp_cls ?>" style="font-size:0.7rem;">
+                                        <i class="bi bi-<?= $sp_icon ?>"></i> <?= $sp_label ?>
                                     </span>
+                                    <?php if ($item['allocated_amount'] > 0): ?>
+                                    <div class="mt-1" style="height:5px; background:#e9ecef; border-radius:3px; overflow:hidden; min-width:70px;" title="<?= number_format($usage_percentage, 1) ?>% used">
+                                        <div style="width:<?= min($usage_percentage, 100) ?>%; height:100%; background:<?= $bar_col ?>; border-radius:3px;"></div>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-1" style="font-size:0.6rem; color:#6c757d;">
+                                        <span><?= number_format(min($usage_percentage, 100), 1) ?>% used</span>
+                                        <span><?= number_format(max(100 - $usage_percentage, 0), 1) ?>% left</span>
+                                    </div>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="text-end" data-label="Actions">
                                     <!-- Desktop: Gear Dropdown -->
