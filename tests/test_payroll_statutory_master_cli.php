@@ -90,7 +90,7 @@ has(src("$root/api/process_payroll.php"), 'ensurePayrollAccrued', 'process accru
 has(src("$root/api/approve_payroll.php"), 'ensurePayrollAccrued', 'approve accrues');
 has(src("$root/api/bulk_update_payroll_status.php"), 'ensurePayrollAccrued', 'bulk approve accrues');
 has(src("$root/api/bulk_update_payroll_status.php"), 'postPayrollPayment', 'pay settles via postPayrollPayment');
-has(src("$root/api/delete_payroll.php"), 'reverseJournalBalances', 'delete reverses the ledger');
+has(src("$root/api/delete_payroll.php"), 'reversePayrollGl', 'delete reverses the ledger');
 has(src("$root/api/remit_statutory.php"), "'sdl'  => 'default_sdl_payable_account_id'", 'remit clears SDL Payable');
 has(src("$root/app/bms/pos/payroll.php"), '>Allowance<', 'payroll header shows Allowance');
 has(src("$root/app/bms/pos/paye_register.php"), 'PAYE Register', 'PAYE register report exists (per-employee PAYE)');
@@ -127,34 +127,40 @@ else {
              'approved', 'approved', NOW())")->execute([$pnum, $emp, $period]);
         $pid = (int)$pdo->lastInsertId();
 
-        $salPayBefore = bal($pdo, $salPay); $payeBefore = bal($pdo, $payeAcc); $nssfBefore = bal($pdo, $nssfAcc);
+        // Helper: sum a type in journal_entry_items for a given entry
+        $jeiSum = function(int $entryId, string $type, ?int $acctId = null) use ($pdo): float {
+            $sql = "SELECT COALESCE(SUM(amount),0) FROM journal_entry_items WHERE entry_id=? AND type=?";
+            $params = [$entryId, $type];
+            if ($acctId !== null) { $sql .= " AND account_id=?"; $params[] = $acctId; }
+            $s = $pdo->prepare($sql); $s->execute($params); return (float)$s->fetchColumn();
+        };
 
         // ACCRUE (what approval does)
         $acc = ensurePayrollAccrued($pdo, $pid, null);
         chk($acc > 0, 'accrual posted on approve');
-        $dr = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM books_transactions WHERE transaction_id=$acc AND type='debit'")->fetchColumn();
-        $cr = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM books_transactions WHERE transaction_id=$acc AND type='credit'")->fetchColumn();
-        chk(near($dr,800000) && near($cr,800000), "accrual balances: Dr $dr = Cr $cr = gross 800,000");
-        chk(near(bal($pdo,$salPay) - $salPayBefore, 660000), 'Salaries Payable +660,000 (unpaid wages → Balance Sheet)');
-        chk(near(bal($pdo,$payeAcc) - $payeBefore, 60000),  'PAYE Payable +60,000 (owed regardless of payment)');
-        chk(near(bal($pdo,$nssfAcc) - $nssfBefore, 80000),  'NSSF Payable +80,000');
+        if ($acc > 0) {
+            $dr = $jeiSum($acc, 'debit'); $cr = $jeiSum($acc, 'credit');
+            chk(near($dr,800000) && near($cr,800000), "accrual balances: Dr $dr = Cr $cr = gross 800,000");
+            chk(near($jeiSum($acc,'credit',$salPay), 660000),  'Salaries Payable +660,000 (unpaid wages → Balance Sheet)');
+            chk(near($jeiSum($acc,'credit',$payeAcc), 60000),  'PAYE Payable +60,000 (owed regardless of payment)');
+            chk(near($jeiSum($acc,'credit',$nssfAcc), 80000),  'NSSF Payable +80,000');
+        }
 
         // PAY (settle staff)
         $p = $pdo->query("SELECT * FROM payroll WHERE payroll_id=$pid")->fetch(PDO::FETCH_ASSOC);
-        $bankBefore = bal($pdo, $cash);
         $txn = postPayrollPayment($pdo, $p, $cash, null);
         chk($txn > 0, 'payment posted');
-        $pdr = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM books_transactions WHERE transaction_id=$txn AND type='debit'")->fetchColumn();
-        $pcr = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM books_transactions WHERE transaction_id=$txn AND type='credit'")->fetchColumn();
-        chk(near($pdr,660000) && near($pcr,660000), "payment balances: Dr $pdr = Cr $pcr = net 660,000");
-        chk(near(bal($pdo,$salPay) - $salPayBefore, 0), 'Salaries Payable back to baseline after pay (liability cleared)');
-        chk(near($bankBefore - bal($pdo,$cash), 660000), 'bank reduced by net only (660,000)');
+        if ($txn > 0) {
+            $pdr = $jeiSum($txn,'debit'); $pcr = $jeiSum($txn,'credit');
+            chk(near($pdr,660000) && near($pcr,660000), "payment balances: Dr $pdr = Cr $pcr = net 660,000");
+            chk(near($jeiSum($txn,'debit',$salPay), 660000),  'Salaries Payable debit 660,000 (liability cleared)');
+            chk(near($jeiSum($txn,'credit',$cash),  660000),  'bank credited 660,000 (cash reduced)');
+        }
 
-        // SDL accrual (Dr SDL Expense / Cr SDL Payable)
+        // SDL accrual (Dr SDL Expense / Cr SDL Payable) — posts via postLedgerEntry
         $sdlExp=(int)getSetting('default_sdl_expense_account_id',0); $sdlPay=(int)getSetting('default_sdl_payable_account_id',0);
-        $sdlPayBefore = bal($pdo,$sdlPay);
         $sdlTxn = postSdlAccrual($pdo, $period, 350000, null);
-        chk($sdlTxn > 0 && near(bal($pdo,$sdlPay)-$sdlPayBefore, 350000), 'SDL accrual: SDL Payable +350,000');
+        chk($sdlTxn > 0 && near($jeiSum($sdlTxn,'credit',$sdlPay), 350000), 'SDL accrual: SDL Payable +350,000');
     } catch (Throwable $e) {
         no('runtime error: ' . $e->getMessage());
     } finally {

@@ -235,8 +235,10 @@ try {
         : fail('partial postPayrollPayment returned null');
 
     if ($txn1) {
-        // postPayrollPayment uses recordGlobalTransaction → books_transactions (not journal_entry_items)
-        $items1 = $pdo->query("SELECT type, SUM(amount) as total FROM books_transactions WHERE transaction_id=$txn1 GROUP BY type")->fetchAll(PDO::FETCH_ASSOC);
+        // postPayrollPayment posts via postLedgerEntry → journal_entry_items
+        $items1 = $pdo->prepare("SELECT type, SUM(amount) as total FROM journal_entry_items WHERE entry_id=? GROUP BY type");
+        $items1->execute([$txn1]);
+        $items1 = $items1->fetchAll(PDO::FETCH_ASSOC);
         $totals1 = array_column($items1, 'total', 'type');
         (abs((float)($totals1['debit']??0)  - $partial_amt) < 0.01 &&
          abs((float)($totals1['credit']??0) - $partial_amt) < 0.01)
