@@ -122,8 +122,11 @@ try {
         $sample = null;
         foreach ($rows as $rw) { if (!empty($rw['accrual_transaction_id'])) { $sample = $rw; break; } }
         if ($sample) {
+            // accrual_transaction_id now holds a journal_entries.entry_id (postLedgerEntry path)
             $txn = (int)$sample['accrual_transaction_id'];
-            $legs = $pdo->query("SELECT account_id, type, amount FROM books_transactions WHERE transaction_id=$txn")->fetchAll(PDO::FETCH_ASSOC);
+            $legsStmt = $pdo->prepare("SELECT account_id, type, amount FROM journal_entry_items WHERE entry_id=?");
+            $legsStmt->execute([$txn]);
+            $legs = $legsStmt->fetchAll(PDO::FETCH_ASSOC);
             $dr = 0.0; $cr = 0.0; $drExp = 0.0;
             foreach ($legs as $l) { $t=(float)$l['amount']; if($l['type']==='debit'){$dr+=$t; if((int)$l['account_id']===$salExp)$drExp+=$t;} else $cr+=$t; }
             (count($legs) >= 2) ? pass("accrual has " . count($legs) . " legs") : fail('accrual has < 2 legs');
@@ -131,8 +134,10 @@ try {
             (abs($drExp - (float)$sample['gross_salary']) < 0.01)
                 ? pass('Salaries Expense debited the gross salary')
                 : fail("Salaries Expense debit ($drExp) != gross ({$sample['gross_salary']})");
-            $mir = (int)$pdo->query("SELECT COUNT(*) FROM journal_entries WHERE entity_type='books_transaction' AND entity_id=$txn AND status='posted'")->fetchColumn();
-            ($mir === 1) ? pass('accrual mirrored into the canonical journal_entries (reports see it)') : fail('accrual not in journal_entries');
+            $inJe = (int)$pdo->prepare("SELECT COUNT(*) FROM journal_entries WHERE entry_id=? AND status='posted'")->execute([$txn]) ? 1 : 0;
+            $jeRow = $pdo->prepare("SELECT COUNT(*) FROM journal_entries WHERE entry_id=? AND status='posted'");
+            $jeRow->execute([$txn]);
+            ($jeRow->fetchColumn() > 0) ? pass('accrual is in journal_entries (reports see it)') : fail('accrual not in journal_entries');
         }
 
         $g = assertLedgerBalanced($pdo);

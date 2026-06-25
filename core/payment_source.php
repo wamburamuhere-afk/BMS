@@ -290,55 +290,141 @@ if (!function_exists('reverseJournalBalances')) {
     }
 }
 
+if (!function_exists('reversePayrollGl')) {
+    /**
+     * Reverse all GL entries for a payroll record on delete.
+     *
+     * New path (P-6): finds journal_entries with entity_type IN
+     * ('payroll_accrual','payroll_payment') for the given payroll_id, posts a
+     * contra entry for each, and marks the originals 'reversed'.
+     *
+     * Old path fallback: if no canonical entries are found (record was posted
+     * before P-6 via recordGlobalTransaction), falls back to reverseJournalBalances()
+     * using the stored accrual_transaction_id / payment_transaction_id.
+     */
+    function reversePayrollGl(PDO $pdo, int $payrollId, int $userId, array $payroll): void
+    {
+        require_once __DIR__ . '/ledger_post.php';
+
+        // New canonical path — entries posted directly via postLedgerEntry
+        $stmt = $pdo->prepare("
+            SELECT DISTINCT je.entry_id, je.project_id
+              FROM journal_entries je
+             WHERE je.entity_type IN ('payroll_accrual', 'payroll_payment')
+               AND je.entity_id = ?
+               AND je.status = 'posted'
+        ");
+        $stmt->execute([$payrollId]);
+        $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!empty($entries)) {
+            foreach ($entries as $je) {
+                $entryId   = (int)$je['entry_id'];
+                $projectId = $je['project_id'] ? (int)$je['project_id'] : null;
+                $lineStmt  = $pdo->prepare("SELECT account_id, type, amount FROM journal_entry_items WHERE entry_id = ?");
+                $lineStmt->execute([$entryId]);
+                $lines = $lineStmt->fetchAll(PDO::FETCH_ASSOC);
+                if (empty($lines)) continue;
+                $contra = [];
+                foreach ($lines as $l) {
+                    $contra[] = [
+                        'account_id' => (int)$l['account_id'],
+                        'type'       => $l['type'] === 'debit' ? 'credit' : 'debit',
+                        'amount'     => (float)$l['amount'],
+                    ];
+                }
+                try {
+                    postLedgerEntry($pdo, "Reversal payroll #{$payrollId} JE #{$entryId}", $contra,
+                        $projectId, $payrollId, 'payroll_void', date('Y-m-d'), $userId);
+                    $pdo->prepare("UPDATE journal_entries SET status = 'reversed' WHERE entry_id = ?")->execute([$entryId]);
+                } catch (Throwable $e) {
+                    error_log("reversePayrollGl entry {$entryId}: " . $e->getMessage());
+                }
+            }
+            return; // canonical entries handled — do not also run old path
+        }
+
+        // Old path fallback: pre-P6 records stored transaction_id in these columns
+        if (!empty($payroll['payment_transaction_id'])) reverseJournalBalances($pdo, (int)$payroll['payment_transaction_id']);
+        if (!empty($payroll['accrual_transaction_id'])) reverseJournalBalances($pdo, (int)$payroll['accrual_transaction_id']);
+    }
+}
+
 if (!function_exists('postPayrollAccrual')) {
     /**
      * Accrual journal for ONE payroll record, posted when it is APPROVED (incurred):
      *   Dr Salaries Expense (gross)             → Income Statement (period earned)
-     *   Cr PAYE Payable / Cr NSSF Payable       → owed to TRA / NSSF regardless of pay
+     *   Dr NSSF Employer Expense (employer 10%) → separate company cost (not staff deduction)
+     *   Cr PAYE Payable                         → owed to TRA
+     *   Cr NSSF Payable (employee + employer)   → total owed to NSSF
      *   Cr Accounts Payable (other deductions)
      *   Cr Salaries Payable (net)               → owed to STAFF until paid (Balance Sheet)
-     * Returns transaction_id, or null when accounts are unmapped / amount invalid.
+     * Returns entry_id, or null when accounts are unmapped / amount invalid.
      */
     function postPayrollAccrual(PDO $pdo, array $p, ?int $userId = null): ?int
     {
-        $gross = round((float)($p['gross_salary']  ?? 0), 2);
-        $paye  = round((float)($p['tax_amount']    ?? 0), 2);
-        $nssf  = round((float)($p['nssf_employee'] ?? 0), 2);
-        $other = round((float)($p['deductions']    ?? 0), 2);
-        $ref   = (string)($p['payroll_number'] ?? ('PAY-' . ($p['payroll_id'] ?? '')));
-        $date  = !empty($p['payroll_date']) ? $p['payroll_date'] : date('Y-m-d');
+        $gross    = round((float)($p['gross_salary']  ?? 0), 2);
+        $paye     = round((float)($p['tax_amount']    ?? 0), 2);
+        $nssfEmp  = round((float)($p['nssf_employee'] ?? 0), 2);
+        $nssfEmr  = round((float)($p['nssf_employer'] ?? 0), 2);
+        $other    = round((float)($p['deductions']    ?? 0), 2);
+        $ref      = (string)($p['payroll_number'] ?? ('PAY-' . ($p['payroll_id'] ?? '')));
+        $date     = !empty($p['payroll_date']) ? $p['payroll_date'] : date('Y-m-d');
         $projectId = (isset($p['project_id']) && $p['project_id'] !== null) ? (int)$p['project_id'] : null;
         if ($gross <= 0) return null;
 
-        $salExp = (int)getSetting('default_salaries_expense_account_id', 0);
-        $payeAcc= (int)getSetting('default_paye_payable_account_id', 0);
-        $nssfAcc= (int)getSetting('default_nssf_payable_account_id', 0);
-        $salPay = (int)getSetting('default_salaries_payable_account_id', 0);
-        $apAcc  = defaultPayableAccountId($pdo);
-        if (!$salExp || !$salPay || ($paye>0 && !$payeAcc) || ($nssf>0 && !$nssfAcc) || ($other>0 && !$apAcc)) return null;
+        $salExp     = (int)getSetting('default_salaries_expense_account_id',       0);
+        $nssfExpAcc = (int)getSetting('default_nssf_employer_expense_account_id',  0);
+        $payeAcc    = (int)getSetting('default_paye_payable_account_id',           0);
+        $nssfAcc    = (int)getSetting('default_nssf_payable_account_id',           0);
+        $salPay     = (int)getSetting('default_salaries_payable_account_id',       0);
+        $apAcc      = defaultPayableAccountId($pdo);
 
+        if (!$salExp || !$salPay
+            || ($paye>0    && !$payeAcc)
+            || (($nssfEmp+$nssfEmr)>0 && !$nssfAcc)
+            || ($nssfEmr>0 && !$nssfExpAcc)
+            || ($other>0   && !$apAcc)) return null;
+
+        // Debit legs
         $items = [['account_id'=>$salExp,'type'=>'debit','amount'=>$gross,'description'=>"Payroll {$ref} — gross (accrued)"]];
+        if ($nssfEmr > 0) {
+            $items[] = ['account_id'=>$nssfExpAcc,'type'=>'debit','amount'=>$nssfEmr,'description'=>"NSSF employer cost {$ref}"];
+        }
+
+        // Credit legs
         $credits = 0.0;
-        if ($paye>0)  { $items[]=['account_id'=>$payeAcc,'type'=>'credit','amount'=>$paye,'description'=>"PAYE payable {$ref}"];      $credits+=$paye; }
-        if ($nssf>0)  { $items[]=['account_id'=>$nssfAcc,'type'=>'credit','amount'=>$nssf,'description'=>"NSSF payable {$ref}"];      $credits+=$nssf; }
-        if ($other>0) { $items[]=['account_id'=>$apAcc, 'type'=>'credit','amount'=>$other,'description'=>"Staff deductions {$ref}"]; $credits+=$other; }
-        $netPay = round($gross - $credits, 2);   // Salaries Payable = the balancing remainder
+        if ($paye>0) {
+            $items[]=['account_id'=>$payeAcc,'type'=>'credit','amount'=>$paye,'description'=>"PAYE payable {$ref}"];
+            $credits += $paye;
+        }
+        $nssfTotal = round($nssfEmp + $nssfEmr, 2);
+        if ($nssfTotal > 0) {
+            $items[]=['account_id'=>$nssfAcc,'type'=>'credit','amount'=>$nssfTotal,'description'=>"NSSF payable {$ref} (employee + employer)"];
+            $credits += $nssfTotal;
+        }
+        if ($other > 0) {
+            $items[]=['account_id'=>$apAcc,'type'=>'credit','amount'=>$other,'description'=>"Staff deductions {$ref}"];
+            $credits += $other;
+        }
+
+        // Salaries Payable = net wages owed to staff (balancing remainder on staff gross only)
+        $netPay = round($gross - ($paye + $nssfEmp + $other), 2);
         if ($netPay < 0) return null;
-        if ($netPay > 0) $items[] = ['account_id'=>$salPay,'type'=>'credit','amount'=>$netPay,'description'=>"Net wages payable {$ref}"];
+        if ($netPay > 0) {
+            $items[] = ['account_id'=>$salPay,'type'=>'credit','amount'=>$netPay,'description'=>"Net wages payable {$ref}"];
+        }
 
-        $res = recordGlobalTransaction([
-            'transaction_date'=>$date,'amount'=>$gross,'transaction_type'=>'payroll_accrual',
-            'reference_number'=>$ref,'description'=>"Payroll {$ref} accrual",'project_id'=>$projectId,
-            'journal_items'=>$items,
-        ], $pdo);
-        if (empty($res['success'])) return null;
-
-        applyAccountBalanceDelta($pdo, $salExp, 'debit', $gross);
-        if ($paye>0)  applyAccountBalanceDelta($pdo, $payeAcc, 'credit', $paye);
-        if ($nssf>0)  applyAccountBalanceDelta($pdo, $nssfAcc, 'credit', $nssf);
-        if ($other>0) applyAccountBalanceDelta($pdo, $apAcc,   'credit', $other);
-        if ($netPay>0) applyAccountBalanceDelta($pdo, $salPay, 'credit', $netPay);
-        return (int)$res['transaction_id'];
+        require_once __DIR__ . '/ledger_post.php';
+        $uid       = $userId ?: (int)($_SESSION['user_id'] ?? 0) ?: 1;
+        $payrollId = (int)($p['payroll_id'] ?? 0);
+        try {
+            return postLedgerEntry($pdo, "Payroll {$ref} accrual", $items,
+                $projectId, $payrollId ?: null, 'payroll_accrual', $date, $uid);
+        } catch (Throwable $e) {
+            error_log('postPayrollAccrual: ' . $e->getMessage());
+            return null;
+        }
     }
 }
 
@@ -347,14 +433,21 @@ if (!function_exists('ensurePayrollAccrued')) {
     function ensurePayrollAccrued(PDO $pdo, int $payrollId, ?int $userId = null): ?int
     {
         if ($payrollId <= 0) return null;
+        // Primary check: canonical journal_entries (posted via P-6 postLedgerEntry path)
+        $chk = $pdo->prepare("SELECT entry_id FROM journal_entries WHERE entity_type = 'payroll_accrual' AND entity_id = ? AND status = 'posted' LIMIT 1");
+        $chk->execute([$payrollId]);
+        $existingEntry = $chk->fetchColumn();
+        if ($existingEntry) return (int)$existingEntry;
+        // Fallback: pre-P6 records stored transaction_id in accrual_transaction_id
         $row = $pdo->prepare("SELECT * FROM payroll WHERE payroll_id = ?");
         $row->execute([$payrollId]);
         $p = $row->fetch(PDO::FETCH_ASSOC);
         if (!$p) return null;
         if (!empty($p['accrual_transaction_id'])) return (int)$p['accrual_transaction_id'];
-        $txn = postPayrollAccrual($pdo, $p, $userId);
-        if ($txn) $pdo->prepare("UPDATE payroll SET accrual_transaction_id = ? WHERE payroll_id = ?")->execute([$txn, $payrollId]);
-        return $txn;
+        // Neither found — post fresh accrual via canonical path
+        $entryId = postPayrollAccrual($pdo, $p, $userId);
+        if ($entryId) $pdo->prepare("UPDATE payroll SET accrual_transaction_id = ? WHERE payroll_id = ?")->execute([$entryId, $payrollId]);
+        return $entryId;
     }
 }
 
@@ -389,18 +482,17 @@ if (!function_exists('postPayrollPayment')) {
             return postOutflow($pdo, 'payroll', $paidFromAccountId, defaultPayableAccountId($pdo), $payAmt, $date, $ref, "Payroll {$ref} paid (net)", $projectId);
         }
 
-        $res = recordGlobalTransaction([
-            'transaction_date'=>$date,'amount'=>$payAmt,'transaction_type'=>'payroll',
-            'reference_number'=>$ref,'description'=>"Payroll {$ref} paid (net)",'project_id'=>$projectId,
-            'journal_items'=>[
-                ['account_id'=>$salPay,'type'=>'debit','amount'=>$payAmt,'description'=>"Settle net wages {$ref}"],
-                ['account_id'=>$paidFromAccountId,'type'=>'credit','amount'=>$payAmt,'description'=>"Payroll {$ref} paid"],
-            ],
-        ], $pdo);
-        if (empty($res['success'])) return null;
-        applyAccountBalanceDelta($pdo, $salPay, 'debit', $payAmt);             // staff liability ↓
-        applyAccountBalanceDelta($pdo, $paidFromAccountId, 'credit', $payAmt); // bank ↓
-        return (int)$res['transaction_id'];
+        require_once __DIR__ . '/ledger_post.php';
+        $uid = $userId ?: (int)($_SESSION['user_id'] ?? 0) ?: 1;
+        try {
+            return postLedgerEntry($pdo, "Payroll {$ref} paid (net)", [
+                ['account_id' => $salPay,             'type' => 'debit',  'amount' => $payAmt, 'description' => "Settle net wages {$ref}"],
+                ['account_id' => $paidFromAccountId,  'type' => 'credit', 'amount' => $payAmt, 'description' => "Payroll {$ref} paid"],
+            ], $projectId, $pid ?: null, 'payroll_payment', $date, $uid);
+        } catch (Throwable $e) {
+            error_log('postPayrollPayment: ' . $e->getMessage());
+            return null;
+        }
     }
 }
 
@@ -411,56 +503,73 @@ if (!function_exists('postSdlAccrual')) {
      * Idempotent with recompute: if the period's SDL changed (more employees, edits)
      * the prior accrual is reversed and re-posted; if it dropped to zero it is removed.
      * Caller supplies the computed SDL amount (from computeSdl()).
+     *
+     * P-6: posts directly to journal_entries via postLedgerEntry.
+     * entity_type = 'sdl_accrual', entity_id = period as YYYYMM int (e.g. 202606).
+     * Dual idempotency: checks canonical path first, falls back to old transactions path
+     * for records posted before P-6.
      */
     function postSdlAccrual(PDO $pdo, string $period, float $sdlAmount, ?int $userId = null): ?int
     {
-        $sdlAmount = round(max(0.0, $sdlAmount), 2);
-        $ref  = 'SDL-ACC-' . $period;
-        $desc = "SDL accrual {$period}";
+        require_once __DIR__ . '/ledger_post.php';
+        $sdlAmount  = round(max(0.0, $sdlAmount), 2);
+        $ref        = 'SDL-ACC-' . $period;
+        $desc       = "SDL accrual {$period}";
+        $periodInt  = (int)str_replace('-', '', $period);  // '2026-06' → 202606
+        $uid        = $userId ?: (int)($_SESSION['user_id'] ?? 0) ?: 1;
 
-        // Remove any orphaned journal_entry mirrors for this SDL period whose source
-        // transactions row was deleted without going through reverseJournalBalances().
-        // Without this, a deleted-then-replaced SDL transaction leaves a ghost mirror
-        // that double-counts SDL Expense and SDL Payable in every report.
-        $pdo->prepare("
-            DELETE jei FROM journal_entry_items jei
-            INNER JOIN journal_entries je ON je.entry_id = jei.entry_id
-            LEFT JOIN transactions t ON t.transaction_id = je.entity_id
-            WHERE je.entity_type = 'books_transaction'
-              AND je.description = ?
-              AND t.transaction_id IS NULL
-        ")->execute([$desc]);
-        $pdo->prepare("
-            DELETE je FROM journal_entries je
-            LEFT JOIN transactions t ON t.transaction_id = je.entity_id
-            WHERE je.entity_type = 'books_transaction'
-              AND je.description = ?
-              AND t.transaction_id IS NULL
-        ")->execute([$desc]);
+        // Primary check: canonical journal_entries (P-6 path or post-migration reclassified)
+        $chkNew = $pdo->prepare("
+            SELECT je.entry_id, SUM(jei.amount) AS amount
+              FROM journal_entries je
+              JOIN journal_entry_items jei ON jei.entry_id = je.entry_id AND jei.type = 'debit'
+             WHERE je.entity_type = 'sdl_accrual' AND je.entity_id = ? AND je.status = 'posted'
+             GROUP BY je.entry_id LIMIT 1
+        ");
+        $chkNew->execute([$periodInt]);
+        $existingNew = $chkNew->fetch(PDO::FETCH_ASSOC);
 
-        $ex = $pdo->prepare("SELECT transaction_id, amount FROM transactions WHERE transaction_type = 'sdl_accrual' AND reference_number = ? LIMIT 1");
-        $ex->execute([$ref]);
-        $existing = $ex->fetch(PDO::FETCH_ASSOC);
-        if ($existing) {
-            if (abs((float)$existing['amount'] - $sdlAmount) < 0.01) return (int)$existing['transaction_id'];
-            reverseJournalBalances($pdo, (int)$existing['transaction_id']);   // changed → unwind, repost below
+        if ($existingNew) {
+            if (abs((float)$existingNew['amount'] - $sdlAmount) < 0.01) return (int)$existingNew['entry_id'];
+            // Amount changed — post contra then mark original reversed
+            $origId    = (int)$existingNew['entry_id'];
+            $origLines = $pdo->prepare("SELECT account_id, type, amount FROM journal_entry_items WHERE entry_id = ?");
+            $origLines->execute([$origId]);
+            $contra = [];
+            foreach ($origLines->fetchAll(PDO::FETCH_ASSOC) as $l) {
+                $contra[] = ['account_id'=>(int)$l['account_id'],'type'=>$l['type']==='debit'?'credit':'debit','amount'=>(float)$l['amount']];
+            }
+            if (!empty($contra)) {
+                try {
+                    postLedgerEntry($pdo, "Reversal SDL accrual {$period}", $contra, null, $periodInt, 'sdl_accrual_void', date('Y-m-d'), $uid);
+                } catch (Throwable $e) { error_log('SDL reversal: ' . $e->getMessage()); }
+            }
+            $pdo->prepare("UPDATE journal_entries SET status = 'reversed' WHERE entry_id = ?")->execute([$origId]);
+        } else {
+            // Fallback: pre-P6 records (or pre-migration) still in transactions table
+            $chkOld = $pdo->prepare("SELECT transaction_id, amount FROM transactions WHERE transaction_type = 'sdl_accrual' AND reference_number = ? LIMIT 1");
+            $chkOld->execute([$ref]);
+            $existingOld = $chkOld->fetch(PDO::FETCH_ASSOC);
+            if ($existingOld) {
+                if (abs((float)$existingOld['amount'] - $sdlAmount) < 0.01) return (int)$existingOld['transaction_id'];
+                reverseJournalBalances($pdo, (int)$existingOld['transaction_id']);
+            }
         }
+
         if ($sdlAmount <= 0) return null;
         $sdlExp = (int)getSetting('default_sdl_expense_account_id', 0);
         $sdlPay = (int)getSetting('default_sdl_payable_account_id', 0);
         if (!$sdlExp || !$sdlPay) return null;
-        $res = recordGlobalTransaction([
-            'transaction_date'=>date('Y-m-d'),'amount'=>$sdlAmount,'transaction_type'=>'sdl_accrual',
-            'reference_number'=>$ref,'description'=>"SDL accrual {$period}",
-            'journal_items'=>[
-                ['account_id'=>$sdlExp,'type'=>'debit','amount'=>$sdlAmount,'description'=>"SDL expense {$period}"],
+
+        try {
+            return postLedgerEntry($pdo, $desc, [
+                ['account_id'=>$sdlExp,'type'=>'debit', 'amount'=>$sdlAmount,'description'=>"SDL expense {$period}"],
                 ['account_id'=>$sdlPay,'type'=>'credit','amount'=>$sdlAmount,'description'=>"SDL payable {$period}"],
-            ],
-        ], $pdo);
-        if (empty($res['success'])) return null;
-        applyAccountBalanceDelta($pdo, $sdlExp, 'debit', $sdlAmount);
-        applyAccountBalanceDelta($pdo, $sdlPay, 'credit', $sdlAmount);
-        return (int)$res['transaction_id'];
+            ], null, $periodInt, 'sdl_accrual', date('Y-m-d'), $uid);
+        } catch (Throwable $e) {
+            error_log('postSdlAccrual: ' . $e->getMessage());
+            return null;
+        }
     }
 }
 

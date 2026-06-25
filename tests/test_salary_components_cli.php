@@ -63,7 +63,7 @@ $proc = src($root, 'api/process_payroll.php');
 has($proc, "resolveEmployeeSalaryComponents", 'process_payroll uses the component resolver');
 has($proc, "writePayrollItems", 'process_payroll writes payroll_items');
 has($proc, "if (\$use_components)", 'process_payroll only overrides when components exist');
-has($proc, "if (!\$use_components)", 'process_payroll keeps the legacy deduction path otherwise');
+has($proc, "if (\$include_deductions && !\$use_components)", 'process_payroll keeps the legacy deduction path otherwise');
 has(src($root, 'api/preview_payroll.php'), "resolveEmployeeSalaryComponents", 'preview mirrors the component logic');
 has(src($root, 'api/get_payroll_details.php'), "FROM payroll_items WHERE payroll_id", 'payslip prefers payroll_items breakdown');
 
