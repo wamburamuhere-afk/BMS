@@ -47,20 +47,24 @@ try {
 
     // DB Hardening: Ensure columns and ENUM values exist to prevent processing crashes
     try {
-        $pdo->exec("ALTER TABLE payroll MODIFY COLUMN payment_status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed','partial') DEFAULT 'pending'");
-        $pdo->exec("ALTER TABLE payroll MODIFY COLUMN status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed','partial') DEFAULT 'pending'");
+        $pdo->exec("ALTER TABLE payroll MODIFY COLUMN payment_status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed','partial','voided') DEFAULT 'pending'");
+        $pdo->exec("ALTER TABLE payroll MODIFY COLUMN status ENUM('pending','paid','cancelled','approved','processing','rejected','unprocessed','partial','voided') DEFAULT 'pending'");
 
         // Ensure consistency columns exist
         $cols = [
-            'payroll_number' => "VARCHAR(50) AFTER payroll_id",
-            'gross_salary' => "DECIMAL(15,2) DEFAULT 0.00 AFTER tax_amount",
-            'nssf_employee' => "DECIMAL(15,2) DEFAULT 0.00 AFTER tax_amount",
-            'month' => "INT(2) AFTER net_salary",
-            'year' => "INT(4) AFTER month",
-            'payment_method' => "VARCHAR(50) DEFAULT 'bank' AFTER status",
-            'notes' => "TEXT AFTER payment_method",
-            'created_by' => "INT AFTER notes",
-            'updated_at' => "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at"
+            'payroll_number'       => "VARCHAR(50) AFTER payroll_id",
+            'gross_salary'         => "DECIMAL(15,2) DEFAULT 0.00 AFTER tax_amount",
+            'nssf_employee'        => "DECIMAL(15,2) DEFAULT 0.00 AFTER tax_amount",
+            'nssf_employer'        => "DECIMAL(15,2) DEFAULT 0.00 AFTER nssf_employee",
+            'month'                => "INT(2) AFTER net_salary",
+            'year'                 => "INT(4) AFTER month",
+            'payment_method'       => "VARCHAR(50) DEFAULT 'bank' AFTER status",
+            'notes'                => "TEXT AFTER payment_method",
+            'created_by'           => "INT AFTER notes",
+            'updated_at'           => "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at",
+            'voided_by'            => "INT NULL DEFAULT NULL",
+            'voided_at'            => "DATETIME NULL DEFAULT NULL",
+            'void_reason'          => "TEXT NULL DEFAULT NULL",
         ];
         foreach ($cols as $col => $def) {
             try { $pdo->exec("ALTER TABLE payroll ADD COLUMN $col $def"); } catch(Exception $e) {}
@@ -149,6 +153,7 @@ try {
             FROM payroll
             WHERE payroll_period = ?
             AND employee_id IN ($placeholders)
+            AND payment_status != 'voided'
         ";
 
         $check_params = array_merge([$payroll_period], $employee_ids_to_process);
@@ -291,11 +296,16 @@ try {
             $stat = computeEmployeeStatutory($pdo, $gross_salary, $payroll_period . '-01');
             $nssf_employee = $stat['nssf_employee'];
             $tax_amount    = $stat['paye'];
+            // Employer NSSF — separate company cost, not deducted from staff net pay.
+            $nssf_employer = round($gross_salary * nssfEmployerRate($pdo) / 100, 2);
             if ($nssf_employee > 0) {
-                $payroll_items_breakdown[] = ['item_type' => 'deduction', 'item_name' => 'NSSF (employee)', 'amount' => $nssf_employee, 'tax_applicable' => 0];
+                $payroll_items_breakdown[] = ['item_type' => 'deduction',     'item_name' => 'NSSF (employee)',  'amount' => $nssf_employee, 'tax_applicable' => 0];
+            }
+            if ($nssf_employer > 0) {
+                $payroll_items_breakdown[] = ['item_type' => 'employer_cost', 'item_name' => 'NSSF (employer)',  'amount' => $nssf_employer, 'tax_applicable' => 0];
             }
             if ($tax_amount > 0) {
-                $payroll_items_breakdown[] = ['item_type' => 'deduction', 'item_name' => 'PAYE', 'amount' => $tax_amount, 'tax_applicable' => 0];
+                $payroll_items_breakdown[] = ['item_type' => 'deduction',     'item_name' => 'PAYE',             'amount' => $tax_amount,    'tax_applicable' => 0];
             }
 
             // Net = gross − (other deductions + NSSF + PAYE).
@@ -313,10 +323,10 @@ try {
                 INSERT INTO payroll (
                     payroll_number, employee_id, payroll_period, payroll_date,
                     basic_salary, allowances, deductions, gross_salary,
-                    tax_amount, nssf_employee, net_salary, month, year,
+                    tax_amount, nssf_employee, nssf_employer, net_salary, month, year,
                     payment_status, status, payment_method, notes,
                     created_by, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ");
 
             $insert_stmt->execute([
@@ -330,11 +340,12 @@ try {
                 $gross_salary,
                 $tax_amount,
                 $nssf_employee,
+                $nssf_employer,
                 $net_salary,
                 $month,
                 $year,
                 $payment_status,
-                $payment_status, // Use payment_status for the status column
+                $payment_status,
                 $employee['payment_method'] ?? 'bank',
                 $notes,
                 $_SESSION['user_id']
