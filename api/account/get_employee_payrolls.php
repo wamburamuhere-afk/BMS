@@ -32,9 +32,9 @@ try {
     $stmt = $pdo->prepare("
         SELECT payroll_id, payroll_number, payroll_period, net_salary, amount_paid, payment_status
         FROM payroll
-        WHERE employee_id      = ?
-          AND status           = 'approved'
-          AND (payment_status NOT IN ('paid') OR payroll_id = ?)
+        WHERE employee_id = ?
+          AND status         NOT IN ('voided', 'cancelled')
+          AND (payment_status NOT IN ('paid', 'voided', 'cancelled') OR payroll_id = ?)
         ORDER BY payroll_period DESC
     ");
     $stmt->execute([$employee_id, $current_payroll_id]);
