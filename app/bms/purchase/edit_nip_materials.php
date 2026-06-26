@@ -3,8 +3,9 @@
 // scope-audit: skip — NIP material edit form; scope by project_id pending Phase G-2
 require_once __DIR__ . '/../../../roots.php';
 
-// Enforce permission
-autoEnforcePermission('purchase');
+// Enforce permission — must match the other NIP pages (nip_materials, view_nip_materials,
+// view_material_list) so canEdit('nip_materials') in the list page agrees with the actual gate here.
+autoEnforcePermission('nip_materials');
 logActivity($pdo, $_SESSION['user_id'], 'VIEW', '[Edit NIP Materials] Page viewed');
 
 includeHeader();
