@@ -151,6 +151,7 @@ $childStmt = $pdo->prepare("
            (SELECT COUNT(*) FROM accounts c WHERE c.parent_account_id = a.account_id) AS grandchildren
       FROM accounts a
      WHERE a.parent_account_id = ? AND a.account_id <> ?
+       AND a.is_subledger = 0
      ORDER BY a.account_code, a.account_name
 ");
 $childStmt->execute([$account_id, $account_id]);

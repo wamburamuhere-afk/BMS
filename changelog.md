@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-06-25 (fix) — void orphan payroll_accrual test entries (Salaries Payable cleanup)
+
+- `migrations/2026_06_25_payroll_accrual_orphan_cleanup.php` — soft-voids posted `payroll_accrual` journal entries whose `entity_id` has no matching `payroll` row (test-script accruals: future-dated 2031, fake payroll ids, incl. a 2-billion fake salary). 154 voided on local dev DB. Criteria-based + idempotent (re-run finds 0); each orphan is internally balanced so the ledger stays balanced (Dr−Cr 0.00 → 0.00). Removes ~44.3B bogus **Salaries Payable** (all-dates) + matching **Wages & Salaries** expense. **No-op on a clean DB** (production never runs the offending test, so this heals nothing harmful there). Root cause is a local-only test-teardown gap.
+
+## 2026-06-25 (refactor) — actors as subsidiary ledger, Phase 2-3 (hide + drill)
+
+- Hid the flagged actor sub-accounts (`is_subledger=1`) from every "account" surface (control accounts kept):
+  - `api/account/get_chart_of_accounts.php` — chart tree (`baseQuery` + `AND a.is_subledger = 0`)
+  - `api/account/get_accounts.php` — generic account dropdown feed
+  - `api/account/search_accounts.php` — journal account search (generic + both bank branches)
+  - `app/constant/accounts/edit_journal.php` — Dr/Cr account dropdowns
+  - `app/constant/accounts/chart_of_accounts.php` — parent cascade picker (`ACCOUNTS_LIST`)
+- `app/constant/accounts/account_details.php` — excluded `is_subledger` children from the Account Composition panel, so a control account no longer lists the dormant zero-balance sub-accounts. The existing per-vendor (AP) and per-customer (AR) sub-ledger cards (sourced from `supplier_invoices` / `invoices`+`payments`, already with a S/No column) remain the drill-in view.
+- Employee/Salaries sub-ledger deferred (pre-existing payroll-posting integrity issue). No posting change.
+
+## 2026-06-25 (refactor) — actors as subsidiary ledger, Phase 1 (classify)
+
+- `migrations/2026_06_25_accounts_is_subledger.php` — adds `accounts.is_subledger TINYINT(1) NOT NULL DEFAULT 0` (idempotent `SHOW COLUMNS` guard); backfills `is_subledger=1` for the per-actor GL sub-accounts created by `actor_account.php` (`account_code REGEXP '-(CUST|SUP|SUB|EMP)-'`). Control accounts (Trade Debtors/Creditors/Salaries Payable) untouched. No hard-coded ids.
+- `core/actor_account.php` — `ensureActorLedgerAccount()` INSERT now sets `is_subledger=1`, so every new customer/supplier/sub-contractor/employee sub-account is born flagged.
+- No posting change: these per-actor accounts are dormant (verified 0 lines in `journal_entries`); money posts to the control accounts.
+
 ## 2026-06-25 (ui) — header date/location smaller on mobile (match vikundi)
 
 - `header.php` — inside `@media (max-width: 576px)`: `.date-location-box` font-size `0.7rem` → `0.52rem`; added child override for `.date-text` / `.location-text` at `0.52rem !important` so the inline `0.85rem` on those elements is beaten on phones (previously only the `|` separator shrank). Desktop unchanged; header only.
