@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-06-25 (fix) — void orphan payroll_accrual test entries (Salaries Payable cleanup)
+
+- `migrations/2026_06_25_payroll_accrual_orphan_cleanup.php` — soft-voids posted `payroll_accrual` journal entries whose `entity_id` has **no matching `payroll` row** (test-script accruals: future-dated 2031, fake payroll ids `9000xxxx`, incl. a 2-billion fake salary, 22 reruns). **154 voided locally.** Criteria-based + idempotent (re-run finds 0). Each orphan is an internally-balanced entry, so the ledger stays balanced (Dr−Cr diff 0.00 → 0.00). Removes ~44.3B of bogus **Salaries Payable** (all-dates 44,357,073,837.63 → 56,770,999.63) and the matching **Wages & Salaries** expense.
+- Diagnosis confirmed the posting engine is sound: across 247 real posted txns (payroll/bills/invoices/receipts) **0 one-sided, 0 unbalanced**. The 44B was balanced-but-bogus test data, not a posting bug.
+- Note: today's reports already excluded these (future-dated), so this is all-time/future-period hygiene. Root cause to address separately: payroll tests writing into the real ledger.
+
 ## 2026-06-25 (refactor) — actors as subsidiary ledger, Phase 2-3 (hide + drill)
 
 - Hid the flagged actor sub-accounts (`is_subledger=1`) from every "account" surface (chart top 399→103 visible; control accounts kept):
