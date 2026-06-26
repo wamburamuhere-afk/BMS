@@ -21,6 +21,27 @@ $user_id_filter = $_GET['user_id'] ?? '';
 $date_from = $_GET['date_from'] ?? '';
 $date_to = $_GET['date_to'] ?? '';
 
+// ── Period is the authoritative date filter. It drives BOTH the activity table
+//    and the summary-card scope + label. Default = today. 'custom' uses the
+//    From/To inputs; everything else is computed server-side so client/server
+//    can never drift. (audit_log.md §6)
+$period = $_GET['period'] ?? 'today';
+$period_labels = [
+    'today' => 'Today', 'week' => 'This Week', 'month' => 'This Month',
+    'year'  => 'This Year', 'all' => 'All Time', 'custom' => 'Selected Range',
+];
+if (!isset($period_labels[$period])) $period = 'today';
+$today = date('Y-m-d');
+switch ($period) {
+    case 'today':  $date_from = $today; $date_to = $today; break;
+    case 'week':   $date_from = date('Y-m-d', strtotime('monday this week')); $date_to = $today; break;
+    case 'month':  $date_from = date('Y-m-01'); $date_to = $today; break;
+    case 'year':   $date_from = date('Y-01-01'); $date_to = $today; break;
+    case 'all':    $date_from = ''; $date_to = ''; break;
+    case 'custom': /* keep the From/To inputs as submitted */ break;
+}
+$period_label = $period_labels[$period];
+
 // Get users for filter dropdown
 $users = $pdo->query("SELECT user_id, username FROM users ORDER BY username")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -89,8 +110,6 @@ $company_vrn = get_setting('company_vrn', '');
     if ($user_id_filter) { $scope_where[] = "user_id = :su"; $scope_params[':su'] = $user_id_filter; }
     if ($date_from)      { $scope_where[] = "created_at >= :sdf"; $scope_params[':sdf'] = $date_from . ' 00:00:00'; }
     if ($date_to)        { $scope_where[] = "created_at <= :sdt"; $scope_params[':sdt'] = $date_to . ' 23:59:59'; }
-    $stats_is_today = (!$date_from && !$date_to);   // no date filter → "Today"
-    if ($stats_is_today) { $scope_where[] = "DATE(created_at) = CURDATE()"; }
 
     $stat_cols = ['created' => 'create', 'viewed' => 'view', 'updated' => 'edit', 'deleted' => 'delete'];
     $statSelects = []; $statParams = $scope_params;
@@ -104,8 +123,8 @@ $company_vrn = get_setting('company_vrn', '');
     $stats_stmt = $pdo->prepare($stats_sql);
     $stats_stmt->execute($statParams);
     $today_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
-    // Label suffix shown on the cards so it's clear what scope they count.
-    $stats_scope_label = $stats_is_today ? 'Today' : 'In range';
+    // Card label follows the chosen Period (Today / This Week / This Month / …).
+    $stats_scope_label = $period_label;
 
     $where_clause = !empty($conditions) ? "WHERE " . implode(" AND ", $conditions) : "";
 
@@ -759,21 +778,23 @@ $page_title = "Activity Log";
                 <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase">Period</label>
                     <select class="form-select border-0 bg-light" id="filterPeriod">
-                        <option value="">All Time</option>
-                        <option value="today">Today</option>
-                        <option value="week">This Week</option>
-                        <option value="month">This Month</option>
-                        <option value="year">This Year</option>
-                        <option value="custom">Custom Range</option>
+                        <option value="today"  <?= $period === 'today'  ? 'selected' : '' ?>>Today</option>
+                        <option value="week"   <?= $period === 'week'   ? 'selected' : '' ?>>This Week</option>
+                        <option value="month"  <?= $period === 'month'  ? 'selected' : '' ?>>This Month</option>
+                        <option value="year"   <?= $period === 'year'   ? 'selected' : '' ?>>This Year</option>
+                        <option value="all"    <?= $period === 'all'    ? 'selected' : '' ?>>All Time</option>
+                        <option value="custom" <?= $period === 'custom' ? 'selected' : '' ?>>➕ Custom (specify)…</option>
                     </select>
                 </div>
-                <div class="col-md-2">
+                <!-- Custom date range — revealed only when Period = Custom (like the
+                     "Other → specify" pattern). Hidden otherwise. -->
+                <div class="col-md-2 custom-date-field" id="customDateFrom" style="<?= $period === 'custom' ? '' : 'display:none;' ?>">
                     <label class="form-label small fw-bold text-muted text-uppercase">From</label>
-                    <input type="date" class="form-control border-0 bg-light" name="date_from" id="filterDateFrom" value="<?= $date_from ?>">
+                    <input type="date" class="form-control border-0 bg-light" name="date_from" id="filterDateFrom" value="<?= htmlspecialchars($date_from) ?>">
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-2 custom-date-field" id="customDateTo" style="<?= $period === 'custom' ? '' : 'display:none;' ?>">
                     <label class="form-label small fw-bold text-muted text-uppercase">To</label>
-                    <input type="date" class="form-control border-0 bg-light" name="date_to" id="filterDateTo" value="<?= $date_to ?>">
+                    <input type="date" class="form-control border-0 bg-light" name="date_to" id="filterDateTo" value="<?= htmlspecialchars($date_to) ?>">
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase">Limit</label>
@@ -906,6 +927,8 @@ function loadPage(page) {
     formData.forEach(item => {
         params[item.name] = item.value;
     });
+    // Period drives the date range + card labels server-side.
+    params.period = $('#filterPeriod').val();
     
     $.ajax({
         url: '<?= getUrl('activity_log') ?>',
@@ -949,9 +972,27 @@ $('#filterForm').on('submit', function(e) {
     loadPage(1);
 });
 
-// Optional: Auto-load on change
-$('#filterType, #filterUser, #filterDateFrom, #filterDateTo, #filterLimit').on('change', function() {
+// Auto-load on change for the simple filters.
+$('#filterType, #filterUser, #filterLimit').on('change', function() {
     loadPage(1);
+});
+
+// Period: reveal the custom From/To only for "Custom (specify)"; otherwise the
+// server computes the range. For non-custom we reload immediately; for custom we
+// wait until the user actually picks a date.
+$('#filterPeriod').on('change', function() {
+    const isCustom = $(this).val() === 'custom';
+    $('.custom-date-field').toggle(isCustom);
+    if (isCustom) {
+        $('#filterDateFrom').focus();
+    } else {
+        loadPage(1);
+    }
+});
+
+// When a custom date is set, reload (only meaningful while Period = Custom).
+$('#filterDateFrom, #filterDateTo').on('change', function() {
+    if ($('#filterPeriod').val() === 'custom') loadPage(1);
 });
 // Helper to log actions
 
@@ -1003,66 +1044,8 @@ function exportCSV() {
     logReportAction('Exported Activity Log', 'Exported activity log records to CSV file');
 }
 
-// ── Period preset ────────────────────────────────────────────────────────────
-function applyPeriodPreset(period) {
-    const today = new Date();
-    const fmt   = d => d.toISOString().slice(0, 10);
-
-    if (period === '') {
-        $('#filterDateFrom').val('');
-        $('#filterDateTo').val('');
-        loadPage(1);
-    } else if (period === 'today') {
-        $('#filterDateFrom').val(fmt(today));
-        $('#filterDateTo').val(fmt(today));
-        loadPage(1);
-    } else if (period === 'week') {
-        const mon = new Date(today);
-        const day = mon.getDay() || 7; // treat Sunday as 7 so Monday = start
-        mon.setDate(mon.getDate() - day + 1);
-        $('#filterDateFrom').val(fmt(mon));
-        $('#filterDateTo').val(fmt(today));
-        loadPage(1);
-    } else if (period === 'month') {
-        $('#filterDateFrom').val(fmt(new Date(today.getFullYear(), today.getMonth(), 1)));
-        $('#filterDateTo').val(fmt(today));
-        loadPage(1);
-    } else if (period === 'year') {
-        $('#filterDateFrom').val(fmt(new Date(today.getFullYear(), 0, 1)));
-        $('#filterDateTo').val(fmt(today));
-        loadPage(1);
-    }
-    // 'custom': leave From/To for manual input — existing change handler fires on user edit
-}
-
-// Detect period preset on page load when URL already has dates
-(function initPeriodDropdown() {
-    const from = $('#filterDateFrom').val();
-    const to   = $('#filterDateTo').val();
-    if (!from && !to) return;
-
-    const today = new Date();
-    const fmt   = d => d.toISOString().slice(0, 10);
-    const mon   = new Date(today);
-    const day   = mon.getDay() || 7;
-    mon.setDate(mon.getDate() - day + 1);
-
-    if (from === fmt(today) && to === fmt(today)) {
-        $('#filterPeriod').val('today');
-    } else if (from === fmt(mon) && to === fmt(today)) {
-        $('#filterPeriod').val('week');
-    } else if (from === fmt(new Date(today.getFullYear(), today.getMonth(), 1)) && to === fmt(today)) {
-        $('#filterPeriod').val('month');
-    } else if (from === fmt(new Date(today.getFullYear(), 0, 1)) && to === fmt(today)) {
-        $('#filterPeriod').val('year');
-    } else {
-        $('#filterPeriod').val('custom');
-    }
-})();
-
-$('#filterPeriod').on('change', function () {
-    applyPeriodPreset($(this).val());
-});
+// (Period is now server-authoritative — see the #filterPeriod change handler
+//  above. The old client-side date-preset logic was removed.)
 
 // ── Purge matching logs ──────────────────────────────────────────────────────
 async function initiatePurge() {
