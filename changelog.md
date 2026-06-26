@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-26 (feat) — self-growing "Other → type → saved" dropdowns (customers)
+
+Extends the supplier/sub-contractor pattern to the Customer form (Add + Edit).
+
+- `migrations/2026_06_26_form_lookups_customer.php` — seeds `customer_type` (individual/business/government/ngo, its own list) + adds `cash` to the shared `payment_terms`; **widens `customers.customer_type` from a restrictive ENUM to VARCHAR(100)** so a typed value can actually be stored (matches suppliers/sub-contractors). Idempotent.
+- `app/bms/customer/customers.php` — Add+Edit modals: customer_type, year (1950→next yr searchable), category (`customer_categories`), payment_terms, currency → `renderOtherSelect()`; generic Other→input JS; edit-populate injects typed values. (No project column in the customer list, so no project-display fix needed.)
+- `api/add_customer.php`, `api/process_edit_customer.php` — resolve "Other", create-new-category against `customer_categories`, persist new values via `upsertFormLookup()`.
+- `tests/test_form_lookups_customer_cli.php` — 17 checks incl. a real end-to-end create+save through `add_customer.php` (self-cleaning). Green.
+
 ## 2026-06-26 (feat) — self-growing "Other → type → saved" dropdowns (suppliers + sub-contractors)
 
 Reference-data dropdowns are now flexible: pick an option, or choose **"Other"** to swap the dropdown for a text input, type a new value, and it is **saved for next time** — no code/DB edits ever needed. Applied to **both Add and Edit** forms.
