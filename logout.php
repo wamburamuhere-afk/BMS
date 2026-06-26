@@ -4,6 +4,27 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// ── Session tracking: close the open session row + log a Logout event BEFORE
+//    the session is destroyed (best-effort — must never block sign-out). ──────
+try {
+    $logout_uid = $_SESSION['user_id'] ?? null;
+    $logout_sid = $_SESSION['session_row_id'] ?? null;
+    if ($logout_uid && $logout_sid) {
+        require_once __DIR__ . '/includes/config.php';        // $pdo
+        require_once __DIR__ . '/core/session_tracker.php';
+        require_once __DIR__ . '/helpers.php';
+        if (isset($pdo) && $pdo instanceof PDO) {
+            $dur = endUserSession($pdo, (int) $logout_sid, 'manual');
+            if (function_exists('logActivity')) {
+                logActivity($pdo, (int) $logout_uid, 'Logout',
+                    'Logged out of the system — session lasted ' . formatDuration($dur));
+            }
+        }
+    }
+} catch (Throwable $e) {
+    error_log('logout session-tracking: ' . $e->getMessage());
+}
+
 // Unset all session variables
 $_SESSION = array();
 
