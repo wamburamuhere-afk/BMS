@@ -16,6 +16,8 @@ if (!$can_view_customers) {
     exit();
 }
 
+logActivity($pdo, $_SESSION['user_id'], 'View customers', 'User viewed the customers management list');
+
 // Get company type for conditional features
 $settings_stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'company_type'");
 $settings_stmt->execute();

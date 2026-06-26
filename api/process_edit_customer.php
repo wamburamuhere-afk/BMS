@@ -246,7 +246,7 @@ try {
     $stmt->execute($params);
 
     // Log Activity
-    logActivity($pdo, $_SESSION['user_id'], "Updated customer: {$data['customer_name']} (ID: $customerId)");
+    logActivity($pdo, $_SESSION['user_id'], 'Edit customer', "User edited customer: {$data['customer_name']} (ID $customerId)");
 
     echo json_encode([
         'success' => true,

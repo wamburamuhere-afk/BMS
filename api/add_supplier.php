@@ -241,7 +241,7 @@ try {
     }
     
     // Log the action using standard helper
-    logActivity($pdo, $_SESSION['user_id'], "Created supplier: $supplier_name" . ($company_name ? " ($company_name)" : ""));
+    logActivity($pdo, $_SESSION['user_id'], 'Create supplier', "User created a new supplier: $supplier_name (ID $supplier_id)");
     
     header('Content-Type: application/json');
     echo json_encode([

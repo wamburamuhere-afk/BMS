@@ -8,6 +8,8 @@ autoEnforcePermission('invoices');
 
 includeHeader();
 
+logActivity($pdo, $_SESSION['user_id'], 'View invoices', 'User viewed the invoices management list');
+
 // Three-approval workflow capabilities (mirrored to JS below)
 $inv_can_review  = canReview('invoices');
 $inv_can_approve = canApprove('invoices');
