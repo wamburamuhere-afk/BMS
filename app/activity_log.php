@@ -37,40 +37,51 @@ $company_vrn = get_setting('company_vrn', '');
     $conditions = [];
     $params = [];
 
-    // Get today's stats for cards
-    $stats_stmt = $pdo->query("
-        SELECT 
-            COUNT(CASE WHEN (action LIKE 'Created%' OR action LIKE 'Added%' OR description LIKE 'Created%' OR description LIKE 'Added%') THEN 1 END) as created,
-            COUNT(CASE WHEN (action LIKE 'Viewed%' OR description LIKE 'Viewed%' OR action LIKE 'View %' OR description LIKE 'View %') THEN 1 END) as viewed,
-            COUNT(CASE WHEN (action LIKE 'Updated%' OR description LIKE 'Updated%' OR action LIKE 'Edited%' OR description LIKE 'Edited%') THEN 1 END) as updated,
-            COUNT(CASE WHEN (action LIKE 'Deleted%' OR description LIKE 'Deleted%' OR action LIKE 'Removed%' OR description LIKE 'Removed%') THEN 1 END) as deleted
-        FROM activity_logs 
-        WHERE DATE(created_at) = CURDATE()
-    ");
-    $today_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
-
-    // Canonical activity types — the six the filter exposes. Each maps to the
-    // real verb variants currently written to activity_logs.action/description,
-    // so selecting "Edit" also catches "Updated…", "Create" catches "Added…", etc.
+    // ── Canonical audit activities (see audit_log.md). ONE shared map drives the
+    //    filter, the summary cards AND the Type column, so they always agree.
+    //    Each canonical verb absorbs the legacy/inconsistent variants in the data
+    //    (e.g. page_view → View, update_* → Edit, Recorded → Create).
     $activity_type_map = [
-        'view'    => ['View',    'Viewed'],
-        'create'  => ['Create',  'Created',  'Add',    'Added'],
-        'edit'    => ['Edit',    'Edited',   'Update',  'Updated'],
-        'delete'  => ['Delete',  'Deleted',  'Remove',  'Removed'],
-        'review'  => ['Review',  'Reviewed'],
+        'view'    => ['View', 'Viewed', 'page_view'],
+        'create'  => ['Create', 'Created', 'Add', 'Added', 'Recorded'],
+        'edit'    => ['Edit', 'Edited', 'Update', 'Updated', 'update_', 'Changed'],
+        'delete'  => ['Delete', 'Deleted', 'Remove', 'Removed', 'Void', 'Voided'],
+        'review'  => ['Review', 'Reviewed'],
         'approve' => ['Approve', 'Approved'],
     ];
 
-    if ($type_filter && isset($activity_type_map[$type_filter])) {
-        $ors = [];
-        foreach ($activity_type_map[$type_filter] as $i => $verb) {
-            $k = ":vt{$i}";
-            // Match the verb at the START of the action OR description (the entry
-            // "starts with the real activity", e.g. "Deleted role …", "Viewed …").
+    // Build a "(action LIKE … OR description LIKE …)" fragment that matches any of a
+    // canonical type's verbs at the START of action OR description. '_' is escaped
+    // so 'page_view' / 'update_' match literally (LIKE treats '_' as a wildcard).
+    $buildTypeSql = function (string $type, string $tag) use ($activity_type_map) {
+        $ors = []; $p = [];
+        foreach (($activity_type_map[$type] ?? []) as $i => $verb) {
+            $k = ":{$tag}{$i}";
             $ors[] = "action LIKE $k OR description LIKE $k";
-            $params[$k] = "$verb%";
+            $p[$k] = str_replace('_', '\\_', $verb) . '%';
         }
-        $conditions[] = '(' . implode(' OR ', $ors) . ')';
+        return [$ors ? '(' . implode(' OR ', $ors) . ')' : '1=0', $p];
+    };
+
+    // Today's summary cards — same canonical mapping as the filter (audit_log.md §6),
+    // so each card equals what its matching filter would return. No drifting logic.
+    $stat_cols = ['created' => 'create', 'viewed' => 'view', 'updated' => 'edit', 'deleted' => 'delete'];
+    $statSelects = []; $statParams = [];
+    foreach ($stat_cols as $col => $type) {
+        [$frag, $fp] = $buildTypeSql($type, "s_{$col}_");
+        $statSelects[] = "COUNT(CASE WHEN $frag THEN 1 END) AS $col";
+        $statParams = array_merge($statParams, $fp);
+    }
+    $stats_stmt = $pdo->prepare("SELECT " . implode(", ", $statSelects)
+        . " FROM activity_logs WHERE DATE(created_at) = CURDATE()");
+    $stats_stmt->execute($statParams);
+    $today_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
+
+    // Apply the Activity Type filter via the same map.
+    if ($type_filter && isset($activity_type_map[$type_filter])) {
+        [$frag, $fp] = $buildTypeSql($type_filter, 'ft_');
+        $conditions[] = $frag;
+        $params = array_merge($params, $fp);
     }
     if ($user_id_filter) {
         $conditions[] = "activity_logs.user_id = :user_id";
@@ -122,45 +133,52 @@ $company_vrn = get_setting('company_vrn', '');
     $stmt->execute();
     $raw_activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Normalise any legacy/inconsistent verb to one of the six canonical audit
+    // verbs (audit_log.md §1/§4) so the Type column reads short & smart, e.g.
+    // "Delete invoice", "View customers". Non-core verbs (Login, Logout, …) pass
+    // through unchanged so nothing is mislabelled.
+    $canonVerb = function (string $v): string {
+        $v = strtolower(trim($v));
+        if (strpos($v, 'update') === 0) return 'Edit';
+        if (strpos($v, 'page_view') === 0) return 'View';
+        static $m = [
+            'view'=>'View','viewed'=>'View',
+            'create'=>'Create','created'=>'Create','add'=>'Create','added'=>'Create','recorded'=>'Create',
+            'edit'=>'Edit','edited'=>'Edit','update'=>'Edit','updated'=>'Edit','changed'=>'Edit',
+            'delete'=>'Delete','deleted'=>'Delete','remove'=>'Delete','removed'=>'Delete','void'=>'Delete','voided'=>'Delete',
+            'review'=>'Review','reviewed'=>'Review',
+            'approve'=>'Approve','approved'=>'Approve',
+        ];
+        return $m[$v] ?? ucfirst($v);
+    };
+
     // Process activities to separate type and description properly
     $activities = [];
     foreach ($raw_activities as $activity) {
         $type = '';
         $description = '';
-        
+
         // Get raw data - prefer description field, fallback to action if description is empty or null
-        $raw_desc = !empty($activity['raw_description']) ? trim($activity['raw_description']) : trim($activity['raw_action'] ?? '');
-        
-        // Parse to extract action and entity, put details in description
-        // Enhanced pattern to catch "Added new customer", "Created new expense", "Printed Customers list", etc.
-        if (preg_match('/^(Created|Added|Updated|Deleted|Suspended|Activated|Deactivated|Approved|Rejected|Sent|Received|Paid|Cancelled|Imported|Voided|Restored|Marked|Applied|Active|Inactive|Blacklisted|Printed|Copied|Exported|Downloaded)\s+(?:new\s+|a\s+)?(customer|supplier|product|expense|invoice|payment|employee|loan|sale|order|stock|document|user|report|category|tax|asset|budget|project|task|leave|shift|attendance|payroll|transaction|items|list|template)(.*)$/i', $raw_desc, $matches)) {
-            // Pattern: "Action [new/a] Entity: Details"
-            $action = ucfirst(strtolower($matches[1]));
-            $entity = ucfirst(strtolower($matches[2]));
-            $details = trim($matches[3], ': ');
-            
-            $type = "$action $entity";
-            $description = $details ?: '-';
+        $raw_action = trim($activity['raw_action'] ?? '');
+        $raw_desc   = !empty($activity['raw_description']) ? trim($activity['raw_description']) : $raw_action;
+
+        // ── Smart short Type = "<Canonical verb> <entity>" (audit_log.md §2). ────
+        //  Verb  : first word of the action (fallback: first word of description),
+        //          normalised to one of the six canonical verbs.
+        //  Entity: the first recognised business entity mentioned in action/desc.
+        $verbSource = $raw_action !== '' ? $raw_action : $raw_desc;
+        $firstWord  = preg_split('/\s+/', $verbSource)[0] ?? $verbSource;
+        $verb       = $canonVerb($firstWord);
+
+        $entity = '';
+        if (preg_match('/\b(sub-?contractor|purchase order|sales order|sales return|purchase return|credit note|debit note|bank transfer|payment voucher|customer|supplier|product|expense|invoice|payment|employee|payroll|loan|quotation|voucher|asset|budget|project|warehouse|stock|document|user|role|report|category|tax|transaction|journal)\b/i', $raw_action . ' ' . $raw_desc, $em)) {
+            $entity = strtolower($em[1]);
         }
-        elseif (preg_match('/^(customer|supplier|product|expense|invoice|payment|employee|loan|sale|order|stock|document|user|report|category|tax|asset|budget|project|task|leave|shift|attendance|payroll|transaction|items|list|template)\s+(created|added|updated|deleted|suspended|activated|deactivated|approved|rejected|sent|received|paid|cancelled|imported|voided|restored|marked|applied|active|inactive|blacklisted|printed|copied|exported|downloaded)(.*)$/i', $raw_desc, $matches)) {
-            // Pattern: "Entity Action: Details"
-            $entity = ucfirst(strtolower($matches[1]));
-            $action = ucfirst(strtolower($matches[2]));
-            $details = trim($matches[3], ': ');
-            
-            $type = "$action $entity";
-            $description = $details ?: '-';
-        }
-        elseif (preg_match('/^(.+?):\s*(.+)$/i', $raw_desc, $matches)) {
-            // Pattern: "Type: Description" - keep as is
-            $type = ucfirst(trim($matches[1]));
-            $description = trim($matches[2]);
-        }
-        else {
-            // Default: Use raw_action as type, full desc as description
-            $type = ucfirst($activity['raw_action'] ?? 'Activity');
-            $description = $raw_desc ?: '-';
-        }
+
+        $type = trim($verb . ($entity !== '' ? ' ' . $entity : ''));
+        if ($type === '') $type = 'Activity';
+        // Description column shows the full, human detail exactly as logged.
+        $description = $raw_desc !== '' ? $raw_desc : '-';
 
         // --- STRICT REFERENCE LOGIC ---
         $reference = '-';

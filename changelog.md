@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-26 (feat) — Activity Logs: audit standard (audit_log.md) + smart Type + accurate cards
+
+- `audit_log.md` (new) — the audit/activity-log standard: the six core activities (View/Create/Edit/Delete/Review/Approve), the **Type** format (`<Verb> <entity>`, e.g. "Delete invoice"), the **Description** format (starts with the past-tense action + entity + id, e.g. "deleted invoice with id 7"), the `logActivity()` calling convention, legacy-verb normalisation, session "time in system", and the roll-out order (Delete→Edit→View→Create→Review→Approve).
+- `app/activity_log.php`:
+  - **One shared canonical verb map** now drives the filter, the summary cards AND the Type column, so they always agree (audit_log.md §6). Map absorbs legacy variants (page_view→View, update_*→Edit, Recorded→Create, Void→Delete).
+  - **Summary cards fixed** — they were undercounting badly (e.g. "Viewed Today" 55 while 572 `page_view` rows existed). Now Viewed≈627, Created 68→147, using the same mapping as the filter. Underscore-escaped so `page_view`/`update_` match literally.
+  - **Type column** is now the smart short `<Verb> <entity>` (verb from the action's first word normalised to canonical; entity = first recognised business entity). Description column shows the full logged detail.
+- Note: legacy inconsistent log strings still render best-effort until each action type is standardised to audit_log.md (the next phase: Delete→…→Approve).
+
 ## 2026-06-26 (feat) — Activity Logs: 6-type filter, role-delete logging, session/time-in-system tracking
 
 **Activity Type filter (`app/activity_log.php`)** — replaced the messy auto-built distinct-action dropdown with the six canonical types **View / Create / Edit / Delete / Review / Approve**. Each maps to the real verb variants in the data (Edit→Updated/Edited, Create→Created/Added, Delete→Deleted/Removed, …) and matches at the START of action OR description, so filtering returns exactly that kind. Verified against live data (e.g. delete→1,301 rows).
