@@ -312,7 +312,7 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                     <td class="d-print-none text-center">
                                         <div class="dropdown">
                                             <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                                <i class="bi bi-gear-fill me-1"></i> Actions
+                                                <i class="bi bi-gear-fill"></i>
                                             </button>
                                             <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
                                                 <!-- View Options -->
