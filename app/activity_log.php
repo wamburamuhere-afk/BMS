@@ -6,6 +6,7 @@ require_once __DIR__ . '/../roots.php';
 // this page before; now only admins or roles explicitly granted 'audit_logs'
 // can see the system-wide activity log.
 autoEnforcePermission('audit_logs');
+logActivity($pdo, $_SESSION['user_id'], 'View activity log', 'User viewed the activity log');
 $is_admin = isAdmin();
 
 // Pagination setup
