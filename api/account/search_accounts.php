@@ -35,21 +35,23 @@ try {
                              COALESCE(b.bank_name, 'Bank') as bank_name
                       FROM accounts a 
                       LEFT JOIN banks b ON a.bank_id = b.bank_id
-                      WHERE a.status = 'active' 
+                      WHERE a.status = 'active'
+                      AND a.is_subledger = 0
                       AND (a.account_name LIKE :search OR a.account_code LIKE :search2)
                       AND a.account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%Asset%' OR type_name LIKE '%Bank%' OR type_name LIKE '%Cash%')";
         } else {
             $query = "SELECT a.account_id as id, a.account_name as text, a.current_balance as balance, a.account_code as account_number, 
                              'Bank' as bank_name
                       FROM accounts a 
-                      WHERE a.status = 'active' 
+                      WHERE a.status = 'active'
+                      AND a.is_subledger = 0
                       AND (a.account_name LIKE :search OR a.account_code LIKE :search2)
                       AND a.account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%Asset%' OR type_name LIKE '%Bank%' OR type_name LIKE '%Cash%')";
         }
     } else {
         // Show the account CODE on the left of every option (agreed convention):
         // "1-1200 — Trade Debtors". Matches received_invoices.php's picker format.
-        $query = "SELECT account_id as id, CONCAT(account_code, ' — ', account_name) as text FROM accounts WHERE status = 'active' AND (account_name LIKE :search OR account_code LIKE :search2)";
+        $query = "SELECT account_id as id, CONCAT(account_code, ' — ', account_name) as text FROM accounts WHERE status = 'active' AND is_subledger = 0 AND (account_name LIKE :search OR account_code LIKE :search2)";
         
         if ($type === 'expense') {
             $query .= " AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%Expense%')";

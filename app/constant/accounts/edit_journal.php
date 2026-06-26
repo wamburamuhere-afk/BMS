@@ -128,10 +128,11 @@ $credits = array_filter($items, function($item) { return $item['type'] === 'cred
 
 // Fetch accounts for dropdowns
 $accounts = $pdo->query("
-    SELECT ca.*, at.type_name as account_type 
-    FROM accounts ca 
-    LEFT JOIN account_types at ON ca.account_type_id = at.type_id 
-    WHERE ca.status = 'active' 
+    SELECT ca.*, at.type_name as account_type
+    FROM accounts ca
+    LEFT JOIN account_types at ON ca.account_type_id = at.type_id
+    WHERE ca.status = 'active'
+      AND ca.is_subledger = 0
     ORDER BY at.type_name, ca.account_name
 ")->fetchAll(PDO::FETCH_ASSOC);
 
