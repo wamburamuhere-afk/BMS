@@ -274,8 +274,11 @@ try {
 
     $pdo->commit();
 
-    logActivity($pdo, $user_id, $is_update ? "Updated Asset" : "Created Asset",
-        "Asset ID: $asset_id, name: $asset_name, code: $asset_code, cost: $cost");
+    if ($is_update) {
+        logActivity($pdo, $user_id, 'Edit asset', "User edited asset: $asset_name ($asset_code, ID $asset_id)");
+    } else {
+        logActivity($pdo, $user_id, 'Create asset', "User created a new asset: $asset_name ($asset_code)");
+    }
     logAssetAudit($pdo, (int)$asset_id, $is_update ? 'update' : 'create',
         null, null, $is_update ? null : $asset_code, (int)$user_id);
 

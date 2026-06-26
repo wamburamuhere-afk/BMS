@@ -15,6 +15,8 @@ if (!$can_view) {
     exit();
 }
 
+logActivity($pdo, $_SESSION['user_id'], 'View leads', 'User viewed the CRM leads management list');
+
 // Lead detail page ships in a later phase — only show the View action once it exists
 $lead_view_ready = file_exists(CRM_DIR . '/crm_lead_view.php');
 

@@ -163,8 +163,7 @@ try {
         dn_save_attachments($pdo, $delivery_id, $att_pairs, $user_id, $project_id ?: null);
     }
 
-    $label = ($dn_type === 'inbound') ? 'Record (inbound)' : 'Create (outbound)';
-    logActivity($pdo, $user_id, "Created $label Delivery Note #$dn_number with status $status");
+    logActivity($pdo, $user_id, 'Create delivery note', "User created a new delivery note: $dn_number (ID $delivery_id)");
 
     $pdo->commit();
 
