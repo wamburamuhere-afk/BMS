@@ -72,8 +72,8 @@ try {
     $pdo->prepare("UPDATE asset_categories SET status = 'deleted' WHERE category_id = ?")
         ->execute([$category_id]);
 
-    logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Deleted Asset Category',
-        "id={$category_id}, name={$cat['category_name']}");
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Delete asset category',
+        "deleted asset category \"{$cat['category_name']}\" with id $category_id");
 
     echo json_encode(['success' => true, 'message' => 'Category deleted.']);
 } catch (Throwable $e) {

@@ -44,7 +44,7 @@ try {
     $stmt = $pdo->prepare("DELETE FROM pos_held_sales WHERE hold_id = ?");
     $stmt->execute([$hold_id]);
 
-    logActivity($pdo, $user_id, "Deleted Held POS Sale", "Hold ID: $hold_id");
+    logActivity($pdo, $user_id, "Delete held sale", "deleted held POS sale with id $hold_id");
 
     echo json_encode([
         'success' => true,

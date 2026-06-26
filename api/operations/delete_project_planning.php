@@ -42,7 +42,7 @@ try {
     $pdo->commit();
 
     // Phase 3c — project planning is foundational; deletion erases scope baselines.
-    logActivity($pdo, $_SESSION['user_id'], "Deleted Project Planning", "Project ID: $project_id");
+    logActivity($pdo, $_SESSION['user_id'], "Delete project planning", "deleted project planning for project id $project_id");
 
     echo json_encode(['success' => true, 'message' => 'Project plan deleted successfully']);
 

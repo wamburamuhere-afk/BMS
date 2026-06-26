@@ -133,8 +133,8 @@ try {
     $pdo->commit();
 
     // Phase 3a — chart-of-accounts changes are high-sensitivity.
-    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Account Category",
-        "Category: '$categoryName' (ID: $categoryId) — deleted $deletedAccounts account(s), unlinked $unlinkedAccounts, reassigned $reassignedAccounts, moved $movedSubCategories sub-categor(ies)");
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Delete account category",
+        "deleted account category \"$categoryName\" with id $categoryId — deleted $deletedAccounts account(s), unlinked $unlinkedAccounts, reassigned $reassignedAccounts, moved $movedSubCategories sub-categor(ies)");
 
     // Build success message
     $message = "Category '{$categoryName}' deleted.";

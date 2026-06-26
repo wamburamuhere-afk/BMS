@@ -42,7 +42,7 @@ try {
     $pdo->commit();
 
     // Phase 3b — deleting a shift removes audit history; high-sensitivity event.
-    logActivity($pdo, $_SESSION['user_id'], "Deleted Cash Register Shift", "Shift ID: $shift_id (transactions removed, sales detached)");
+    logActivity($pdo, $_SESSION['user_id'], "Delete cash register shift", "deleted cash register shift with id $shift_id (transactions removed, sales detached)");
 
     echo json_encode([
         'success' => true,

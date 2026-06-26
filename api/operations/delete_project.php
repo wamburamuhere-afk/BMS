@@ -30,7 +30,7 @@ try {
     $stmt->execute([$id]);
 
     // Phase 3c — project deletes have wide downstream impact (POs, GRNs, payroll).
-    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Project", "Project ID: $id");
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Delete project", "deleted project with id $id");
 
     echo json_encode(["success" => true, "message" => "Project deleted successfully"]);
 } catch (Exception $e) {

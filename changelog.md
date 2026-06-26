@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-26 (fix) — Delete sweep batches 6-7: Parties/HR + Ops/Docs/Settings delete logs
+
+Standardized the remaining delete endpoints to `audit_log.md` (Type `Delete
+<entity>`, Description `deleted <entity> <number/name> with id …`). Delete
+behaviour unchanged.
+
+- **Parties/HR:** `delete_supplier.php` (both paths), `delete_sub_contractor.php`, `delete_leave.php`, `pos/delete_salary_component.php`, `payroll/delete_tax_bracket.php`, `suppliers/delete_project_payment.php`.
+- **Ops/Docs/Settings:** `operations/delete_project.php`, `delete_ipc.php`, `delete_inspection.php`, `delete_scope_document.php`, `delete_scope_addendum.php`, `delete_project_doc.php`, `delete_project_planning.php`; `delete_document_template.php`, `delete_email_template.php`, `delete_sms_template.php`, `delete_brand.php`, `delete_category.php`, `delete_compliance.php`, `delete_notification.php`; `document/delete_signature.php`, `document/delete_collateral_document.php`, `assets/delete_asset_category.php`, `account/delete_account.php`, `account/delete_account_category.php`, `cash_register/delete_shift.php`, `pos/delete_held_sale.php`.
+
+This completes the delete sweep: every delete endpoint/handler with a real delete now logs to the Activity Log in the standard format; the only deletes left unlogged are non-deletes (edit re-inserts, rate-limit cleanup) which were deliberately skipped per audit_log.md §8.
+
 ## 2026-06-26 (fix) — Delete sweep batch 5: standardize Sales/CRM delete logs
 
 Standardized to `audit_log.md` (Type `Delete <entity>`, Description `deleted

@@ -85,7 +85,7 @@ try {
     $stmt = $pdo->prepare("DELETE FROM accounts WHERE account_id = ?");
     $stmt->execute([$account_id]);
 
-    logActivity($pdo, $_SESSION['user_id'], "Deleted account: $account_display");
+    logActivity($pdo, $_SESSION['user_id'], "Delete account", "deleted account $account_display with id $account_id");
     
     echo json_encode([
         'success' => true,

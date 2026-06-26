@@ -37,7 +37,7 @@ $stmt = $pdo->prepare("UPDATE sub_contractors SET status = 'deleted', updated_at
 try {
     $stmt->execute([$supplier_id]);
     
-    logActivity($pdo, $_SESSION['user_id'], "Deleted sub-contractor ID: $supplier_id");
+    logActivity($pdo, $_SESSION['user_id'], "Delete sub-contractor", "deleted sub-contractor with id $supplier_id");
     
     header('Content-Type: application/json');
     echo json_encode(['success' => true, 'message' => 'Sub-Contractor deleted successfully']);
