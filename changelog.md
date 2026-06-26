@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-26 (fix) — supplier/sub-contractor: action button + "Projects Involved" primary project
+
+- `app/bms/Suppliers/suppliers.php`, `app/bms/operations/sub_contractors.php` — removed the "Actions" text from the per-row action button (gear icon only).
+- `app/bms/Suppliers/supplier_details.php`, `app/bms/operations/sub_contractor_details.php` — "Projects Involved" now UNIONs the `*_projects` junction with the **primary project chosen at registration** (`*.project_id`), which was previously missing ("No projects involved" even though a project was selected on creation). The primary row shows a "Primary" badge, no "Remove from Project" (it's the registration link, not a junction row), and — per request — its **Assigned on / Assigned by** are populated from the supplier/sub-contractor's `created_at` / `created_by` (who registered it and when).
+
 ## 2026-06-26 (feat) — self-growing "Other → type → saved" dropdowns (customers)
 
 Extends the supplier/sub-contractor pattern to the Customer form (Add + Edit).
