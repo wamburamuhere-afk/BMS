@@ -12,6 +12,8 @@ $c_logo = getSetting('company_logo', '');
 // Include the header
 includeHeader();
 
+logActivity($pdo, $_SESSION['user_id'], 'View employees', 'User viewed the employees management list');
+
 // Permission flags for UI elements
 $can_edit_employees = isAdmin() || canEdit('employees');
 $can_delete_employees = isAdmin() || canDelete('employees');

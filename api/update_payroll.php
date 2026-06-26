@@ -100,6 +100,8 @@ try {
         } catch (Throwable $e) { error_log('update statutory refresh: ' . $e->getMessage()); }
     }
 
+    logActivity($pdo, $_SESSION['user_id'], 'Edit payroll', "User edited payroll record for period: {$existing['payroll_period']} (ID $payroll_id)");
+
     // Log update action
     logAudit($pdo, $_SESSION['user_id'], 'update_payroll', [
         'activity_type' => 'update',
