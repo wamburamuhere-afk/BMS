@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-06-26 (fix) — Delete sweep batch 2: silent IN-PAGE deletes now logged
+
+Per `audit_log.md` §8, in-page delete handlers (delete logic inside `app/**`
+pages, not `api/` endpoints) that were silent on the Activity Log now write a
+`logActivity('Delete <entity>', 'deleted <entity> … with id …')`. No delete
+behaviour changed.
+
+- `app/bms/customer/customer_documents.php` — `deleteCustomerDocument()` now logs `Delete document` ("deleted customer document with id N"). *(This is the silent path the user hit.)*
+- `app/constant/document/customer_documents.php` — logs `Delete document` for each real source (customer_attachments / additional_attachments / profile-doc clear).
+- `app/constant/document/loan_documents.php` — logs `Delete document` ("deleted loan document with id N (loan id L)") **before** the redirect (which exits).
+- `app/bms/pos/api/pos_controller.php` `handleDeleteHeldSale()` — logs `Delete held sale` alongside its existing `logAudit`.
+
+Deliberately SKIPPED (not user-facing deletes, per the rule): `edit_journal.php` (its `DELETE journal_entry_items` is part of an edit re-insert) and `pos/includes/security.php` (`DELETE rate_limits` is internal cleanup). Avoided depending on unverifiable columns (table `customer_documents` not present locally) — log uses the id.
+
 ## 2026-06-26 (feat) — Activity Logs: server-side DataTables (sort / search / paginate over 65k+ rows)
 
 - `app/activity_log.php` — replaced the custom AJAX pagination with a **server-side jQuery DataTable** (`serverSide: true`) on the activity table. New `?draw=` endpoint (reuses the filter conditions) returns DataTables JSON with each row rendered to the 6 columns (S/NO, Time, **Type**, **Description**, Reference, User). Adds column **sorting**, a **search box**, and proper paging across all 65k+ rows (not just the current page).

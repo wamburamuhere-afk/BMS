@@ -30,6 +30,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['doc_i
     $doc_id = $_GET['doc_id'];
     $source = $_GET['source'] ?? 'customer_attachments';
     
+    $_del_logged = false;
     if ($source === 'customer_attachments') {
         $stmt = $pdo->prepare("SELECT file_path FROM customer_attachments WHERE id = ? AND customer_id = ?");
         $stmt->execute([(int)$doc_id, $customer_id]);
@@ -37,6 +38,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['doc_i
         if ($doc) {
             if (file_exists($doc['file_path'])) unlink($doc['file_path']);
             $pdo->prepare("DELETE FROM customer_attachments WHERE id = ?")->execute([(int)$doc_id]);
+            if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
+                logActivity($pdo, (int)$_SESSION['user_id'], 'Delete document',
+                    "deleted customer attachment with id " . (int)$doc_id . " (customer id {$customer_id})");
+                $_del_logged = true;
+            }
         }
     } elseif ($source === 'customer_additional_attachments') {
         $stmt = $pdo->prepare("SELECT attachment_path FROM customer_additional_attachments WHERE attachment_id = ? AND customer_id = ?");
@@ -45,15 +51,25 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['doc_i
         if ($doc) {
             if (file_exists($doc['attachment_path'])) unlink($doc['attachment_path']);
             $pdo->prepare("DELETE FROM customer_additional_attachments WHERE attachment_id = ?")->execute([(int)$doc_id]);
+            if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
+                logActivity($pdo, (int)$_SESSION['user_id'], 'Delete document',
+                    "deleted customer additional attachment with id " . (int)$doc_id . " (customer id {$customer_id})");
+                $_del_logged = true;
+            }
         }
     } elseif ($source === 'customer_profile') {
         // For profile columns, we just CLEAR the path in the customers table
         $allowed_fields = ['photo_path', 'id_attachment_path', 'incorporation_cert_path', 'tin_cert_path', 'vat_cert_path', 'tax_clearance_path', 'business_license_path', 'memart_cert_path', 'board_resolution_path', 'bank_statement_path', 'financial_statement_path', 'lease_agreement_path', 'brela_certificate_path', 'tin_certificate_path', 'local_gov_letter_path'];
         if (in_array($doc_id, $allowed_fields)) {
             $pdo->prepare("UPDATE customers SET $doc_id = NULL WHERE customer_id = ?")->execute([$customer_id]);
+            if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
+                logActivity($pdo, (int)$_SESSION['user_id'], 'Delete document',
+                    "deleted customer profile document ({$doc_id}) for customer id {$customer_id}");
+                $_del_logged = true;
+            }
         }
     }
-    
+
     header("Location: /customers/documents?customer_id=" . $customer_id . "&msg=deleted");
     exit();
 }
