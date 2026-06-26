@@ -75,8 +75,8 @@ function ensureActorLedgerAccount(PDO $pdo, string $actorType, int $actorId, str
         $ins = $pdo->prepare("
             INSERT INTO accounts
                 (account_code, account_name, account_type, account_type_id, parent_account_id, level,
-                 normal_balance, status, is_system, opening_balance, current_balance, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 0, 0.00, 0.00, NOW())
+                 normal_balance, status, is_system, is_subledger, opening_balance, current_balance, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 0, 1, 0.00, 0.00, NOW())
         ");
         $ins->execute([
             $code,

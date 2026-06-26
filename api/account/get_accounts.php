@@ -26,6 +26,7 @@ try {
         LEFT JOIN account_sub_types st ON a.sub_type_id = st.sub_type_id
         LEFT JOIN accounts pa ON a.parent_account_id = pa.account_id
         LEFT JOIN account_types at ON a.account_type_id = at.type_id
+        WHERE a.is_subledger = 0
         ORDER BY at.type_name, a.account_name
     ";
     
