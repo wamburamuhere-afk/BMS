@@ -82,7 +82,9 @@ foreach ($patterns as [$table, $pk, $where, $prefix]) {
 
     $pattern_ok = 0;
     foreach ($rows as $row) {
-        if (!preg_match('/^\d-\d{4}-' . $prefix . '-\d{5}$/', $row['account_code'])) {
+        // actor_account.php zero-pads the id to a MINIMUM of 5 digits (str_pad),
+        // so larger ids legitimately produce 6+ digit codes (e.g. SUP-100161).
+        if (!preg_match('/^\d-\d{4}-' . $prefix . '-\d{5,}$/', $row['account_code'])) {
             fail("$table #{$row[$pk]} has bad code: {$row['account_code']}");
             $bad++;
         } else {

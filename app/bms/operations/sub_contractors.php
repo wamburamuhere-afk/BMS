@@ -49,11 +49,13 @@ $query = "
     SELECT
         s.*,
         sc.category_name,
+        pp.project_name AS primary_project_name,
         u1.username as created_by_name,
         u2.username as updated_by_name,
         COUNT(scp.project_id) as project_count
     FROM sub_contractors s
     LEFT JOIN supplier_categories sc ON s.category_id = sc.category_id
+    LEFT JOIN projects pp ON pp.project_id = s.project_id
     LEFT JOIN users u1 ON s.created_by = u1.user_id
     LEFT JOIN users u2 ON s.updated_by = u2.user_id
     LEFT JOIN sub_contractor_projects scp ON s.supplier_id = scp.supplier_id
@@ -78,6 +80,16 @@ $blacklisted_sc = array_filter($sub_contractors, function($sc) {
 
 // Get categories
 $categories = $pdo->query("SELECT * FROM supplier_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
+
+// Self-growing dropdown catalogues (Other → type new → saved). Type is its own
+// list; payment_terms + currency are shared with suppliers.
+require_once __DIR__ . '/../../../core/form_lookups.php';
+$lk_sc_type       = formLookupOptions($pdo, 'sub_contractor_type');
+$lk_payment_terms = formLookupOptions($pdo, 'payment_terms');
+$lk_currency      = formLookupOptions($pdo, 'currency');
+$lk_categories    = array_map(fn($c) => ['value' => (string)$c['category_id'], 'label' => $c['category_name']], $categories);
+$lk_years = [];
+for ($y = (int)date('Y') + 1; $y >= 1950; $y--) { $lk_years[] = ['value' => (string)$y, 'label' => (string)$y]; }
 // Active WHT rates for the sub-contractor "Default WHT" picker (auto-fills on their invoice payments).
 $sc_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage FROM tax_rates WHERE tax_kind = 'wht' AND status = 'active' ORDER BY rate_percentage")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -284,7 +296,11 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                     </td>
                                     <td><span class="badge bg-secondary"><?= safe_output($sc['category_name'] ?? 'General') ?></span></td>
                                     <td>
-                                        <?php if ($sc['project_count'] > 0): ?>
+                                        <?php if (!empty($sc['primary_project_name'])): ?>
+                                        <a href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc['supplier_id'] ?>" class="badge bg-primary text-white text-decoration-none">
+                                            <i class="bi bi-briefcase me-1"></i><?= safe_output($sc['primary_project_name']) ?><?php if ($sc['project_count'] > 0): ?> +<?= (int)$sc['project_count'] ?><?php endif; ?>
+                                        </a>
+                                        <?php elseif ($sc['project_count'] > 0): ?>
                                         <a href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc['supplier_id'] ?>" class="badge bg-primary text-white text-decoration-none">
                                             <?= (int)$sc['project_count'] ?> <?= $sc['project_count'] == 1 ? 'project' : 'projects' ?>
                                         </a>
@@ -362,7 +378,9 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                     <?php endif; ?>
                                     <div class="small text-muted">
                                         <i class="bi bi-briefcase me-1"></i>
-                                        <?php if ($sc['project_count'] > 0): ?>
+                                        <?php if (!empty($sc['primary_project_name'])): ?>
+                                        <?= safe_output($sc['primary_project_name']) ?><?php if ($sc['project_count'] > 0): ?> +<?= (int)$sc['project_count'] ?><?php endif; ?>
+                                        <?php elseif ($sc['project_count'] > 0): ?>
                                         <?= (int)$sc['project_count'] ?> project<?= $sc['project_count'] != 1 ? 's' : '' ?>
                                         <?php else: ?><span>No projects</span><?php endif; ?>
                                     </div>
@@ -449,46 +467,15 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="sc_type" class="form-label">Sub-Contractor Type</label>
-                                    <select class="form-select" id="sc_type" name="supplier_type">
-                                        <option value="">Select Type</option>
-                                        <option value="Manufacturer">Manufacturer</option>
-                                        <option value="Distributor">Distributor</option>
-                                        <option value="Wholesaler">Wholesaler</option>
-                                        <option value="Retailer">Retailer</option>
-                                        <option value="Service Provider">Service Provider</option>
-                                        <option value="Contractor">Contractor</option>
-                                        <option value="Consultant">Consultant</option>
-                                        <option value="Other">Other</option>
-                                    </select>
+                                    <?= renderOtherSelect('sc_type', 'supplier_type', $lk_sc_type, '', 'supplier_type_other', 'Select Type') ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="sc_year" class="form-label">Year <span class="text-danger">*</span></label>
-                                    <select class="form-select" id="sc_year" name="year" required>
-                                        <option value="">Select Year</option>
-                                        <?php 
-                                        $current_year = date('Y');
-                                        for ($y = $current_year; $y >= $current_year - 10; $y--) {
-                                            echo "<option value=\"$y\">$y</option>";
-                                        }
-                                        ?>
-                                        <option value="other">Other...</option>
-                                    </select>
-                                    <div id="sc_year_other_wrap" class="mt-2" style="display:none;">
-                                        <input type="text" class="form-control" id="sc_year_other" name="year_other" placeholder="Ingiza mwaka mwingine...">
-                                    </div>
+                                    <?= renderOtherSelect('sc_year', 'year', $lk_years, '', 'year_other', 'Select Year', true) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="category_id" class="form-label">Category</label>
-                                    <select class="form-select select2-enable" id="category_id" name="category_id">
-                                        <option value="">Select Category</option>
-                                        <?php foreach ($categories as $category): ?>
-                                        <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
-                                        <?php endforeach; ?>
-                                        <option value="other">Other...</option>
-                                    </select>
-                                    <div id="category_id_other_wrap" class="mt-2" style="display:none;">
-                                        <input type="text" class="form-control" id="category_id_other" name="category_other" placeholder="Ingiza kategoria nyingine...">
-                                    </div>
+                                    <?= renderOtherSelect('category_id', 'category_id', $lk_categories, '', 'category_other', 'Select Category') ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="status" class="form-label">Status</label>
@@ -616,41 +603,11 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="payment_terms" class="form-label">Payment Terms</label>
-                                    <div class="other-select-wrap">
-                                        <select class="form-select select2-enable other-select" id="payment_terms" name="payment_terms"
-                                                data-other-input="payment_terms_input" data-other-name="payment_terms">
-                                            <option value="">Select Terms</option>
-                                            <option value="cod">Cash on Delivery</option>
-                                            <option value="7_days">7 Days</option>
-                                            <option value="15_days">15 Days</option>
-                                            <option value="30_days">30 Days</option>
-                                            <option value="60_days">60 Days</option>
-                                            <option value="90_days">90 Days</option>
-                                            <option value="other">Other...</option>
-                                        </select>
-                                        <div class="other-input-wrap" style="display:none;">
-                                            <input type="text" class="form-control other-custom-input" id="payment_terms_input" name="payment_terms" placeholder="Specify">
-                                            <small class="other-back-link text-primary" style="cursor:pointer;" data-target-select="payment_terms"><i class="bi bi-arrow-left"></i> Back to List</small>
-                                        </div>
-                                    </div>
+                                    <?= renderOtherSelect('payment_terms', 'payment_terms', $lk_payment_terms, '', 'payment_terms_other', 'Select Terms') ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="currency" class="form-label">Currency</label>
-                                    <div class="other-select-wrap">
-                                        <select class="form-select select2-enable other-select" id="currency" name="currency"
-                                                data-other-input="currency_input" data-other-name="currency">
-                                            <option value="TZS" selected>Tanzanian Shilling (TZS)</option>
-                                            <option value="USD">US Dollar (USD)</option>
-                                            <option value="EUR">Euro (EUR)</option>
-                                            <option value="GBP">British Pound (GBP)</option>
-                                            <option value="KES">Kenyan Shilling (KES)</option>
-                                            <option value="other">Other...</option>
-                                        </select>
-                                        <div class="other-input-wrap" style="display:none;">
-                                            <input type="text" class="form-control other-custom-input" id="currency_input" name="currency" placeholder="e.g. AED, CHF...">
-                                            <small class="other-back-link text-primary" style="cursor:pointer;" data-target-select="currency"><i class="bi bi-arrow-left"></i> Back to List</small>
-                                        </div>
-                                    </div>
+                                    <?= renderOtherSelect('currency', 'currency', $lk_currency, 'TZS', 'currency_other', 'Select Currency') ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="bank_name" class="form-label">Bank Name</label>
@@ -743,46 +700,15 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_sc_type" class="form-label">Sub-Contractor Type</label>
-                                    <select class="form-select" id="edit_sc_type" name="supplier_type">
-                                        <option value="">Select Type</option>
-                                        <option value="Manufacturer">Manufacturer</option>
-                                        <option value="Distributor">Distributor</option>
-                                        <option value="Wholesaler">Wholesaler</option>
-                                        <option value="Retailer">Retailer</option>
-                                        <option value="Service Provider">Service Provider</option>
-                                        <option value="Contractor">Contractor</option>
-                                        <option value="Consultant">Consultant</option>
-                                        <option value="Other">Other</option>
-                                    </select>
+                                    <?= renderOtherSelect('edit_sc_type', 'supplier_type', $lk_sc_type, '', 'supplier_type_other', 'Select Type') ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_sc_year" class="form-label">Year <span class="text-danger">*</span></label>
-                                    <select class="form-select" id="edit_sc_year" name="year" required>
-                                        <option value="">Select Year</option>
-                                        <?php 
-                                        $current_year = date('Y');
-                                        for ($y = $current_year; $y >= $current_year - 10; $y--) {
-                                            echo "<option value=\"$y\">$y</option>";
-                                        }
-                                        ?>
-                                        <option value="other">Other...</option>
-                                    </select>
-                                    <div id="edit_sc_year_other_wrap" class="mt-2" style="display:none;">
-                                        <input type="text" class="form-control" id="edit_sc_year_other" name="year_other" placeholder="Ingiza mwaka mwingine...">
-                                    </div>
+                                    <?= renderOtherSelect('edit_sc_year', 'year', $lk_years, '', 'year_other', 'Select Year', true) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_category_id" class="form-label">Category</label>
-                                    <select class="form-select select2-enable" id="edit_category_id" name="category_id">
-                                        <option value="">Select Category</option>
-                                        <?php foreach ($categories as $category): ?>
-                                        <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
-                                        <?php endforeach; ?>
-                                        <option value="other">Other...</option>
-                                    </select>
-                                    <div id="edit_category_id_other_wrap" class="mt-2" style="display:none;">
-                                        <input type="text" class="form-control" id="edit_category_id_other" name="category_other" placeholder="Ingiza kategoria nyingine...">
-                                    </div>
+                                    <?= renderOtherSelect('edit_category_id', 'category_id', $lk_categories, '', 'category_other', 'Select Category') ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_status" class="form-label">Status</label>
@@ -912,41 +838,11 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_payment_terms" class="form-label">Payment Terms</label>
-                                    <div class="other-select-wrap">
-                                        <select class="form-select select2-enable other-select" id="edit_payment_terms" name="payment_terms"
-                                                data-other-input="edit_payment_terms_input" data-other-name="payment_terms">
-                                            <option value="">Select Terms</option>
-                                            <option value="cod">Cash on Delivery</option>
-                                            <option value="7_days">7 Days</option>
-                                            <option value="15_days">15 Days</option>
-                                            <option value="30_days">30 Days</option>
-                                            <option value="60_days">60 Days</option>
-                                            <option value="90_days">90 Days</option>
-                                            <option value="other">Other...</option>
-                                        </select>
-                                        <div class="other-input-wrap" style="display:none;">
-                                            <input type="text" class="form-control other-custom-input" id="edit_payment_terms_input" name="payment_terms" placeholder="Specify">
-                                            <small class="other-back-link text-primary" style="cursor:pointer;" data-target-select="edit_payment_terms"><i class="bi bi-arrow-left"></i> Back to List</small>
-                                        </div>
-                                    </div>
+                                    <?= renderOtherSelect('edit_payment_terms', 'payment_terms', $lk_payment_terms, '', 'payment_terms_other', 'Select Terms') ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_currency" class="form-label">Currency</label>
-                                    <div class="other-select-wrap">
-                                        <select class="form-select select2-enable other-select" id="edit_currency" name="currency"
-                                                data-other-input="edit_currency_input" data-other-name="currency">
-                                            <option value="TZS" selected>Tanzanian Shilling (TZS)</option>
-                                            <option value="USD">US Dollar (USD)</option>
-                                            <option value="EUR">Euro (EUR)</option>
-                                            <option value="GBP">British Pound (GBP)</option>
-                                            <option value="KES">Kenyan Shilling (KES)</option>
-                                            <option value="other">Other...</option>
-                                        </select>
-                                        <div class="other-input-wrap" style="display:none;">
-                                            <input type="text" class="form-control other-custom-input" id="edit_currency_input" name="currency" placeholder="e.g. AED, CHF...">
-                                            <small class="other-back-link text-primary" style="cursor:pointer;" data-target-select="edit_currency"><i class="bi bi-arrow-left"></i> Back to List</small>
-                                        </div>
-                                    </div>
+                                    <?= renderOtherSelect('edit_currency', 'currency', $lk_currency, '', 'currency_other', 'Select Currency') ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_bank_name" class="form-label">Bank Name</label>
@@ -989,6 +885,36 @@ $(document).ready(function() {
         width: '100%'
     });
 
+    // "Other" dropdowns (renderOtherSelect): searchable Select2; choosing "Other"
+    // swaps the dropdown for a text input. Typed value is saved server-side and
+    // appears next time. Generic — every .other-trigger in the given scope.
+    function initOtherSelects(scopeSelector, $parent) {
+        $(scopeSelector).find('.other-trigger').each(function() {
+            const $el = $(this);
+            if ($el.hasClass('select2-hidden-accessible')) return;
+            $el.select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $parent,
+                width: '100%',
+                allowClear: true,
+                placeholder: $el.data('placeholder') || 'Select…'
+            });
+        });
+    }
+    $(document).off('change.otherSel').on('change.otherSel', 'select.other-trigger', function() {
+        const $sel = $(this), $wrap = $sel.closest('.other-field-wrap'), $box = $wrap.find('.other-input-box');
+        if ($sel.val() === 'other') {
+            $sel.addClass('d-none').next('.select2-container').addClass('d-none');
+            $box.removeClass('d-none').find('.other-input').val('').trigger('focus');
+        } else { $box.addClass('d-none'); }
+    });
+    $(document).off('click.otherBack').on('click.otherBack', '.other-back', function() {
+        const $wrap = $(this).closest('.other-field-wrap'), $sel = $wrap.find('select.other-trigger');
+        $wrap.find('.other-input-box').addClass('d-none').find('.other-input').val('');
+        $sel.removeClass('d-none').next('.select2-container').removeClass('d-none');
+        $sel.val('').trigger('change.select2');
+    });
+
     // Select2 for Add modal
     $('#addSubContractorModal').on('shown.bs.modal', function() {
         $(this).find('.select2-enable').each(function() {
@@ -1002,6 +928,7 @@ $(document).ready(function() {
                 });
             }
         });
+        initOtherSelects('#addSubContractorModal', $('#addSubContractorModal'));
     });
 
     // Select2 for Edit modal
@@ -1017,6 +944,7 @@ $(document).ready(function() {
                 });
             }
         });
+        initOtherSelects('#editSCModal', $('#editSCModal'));
     });
 
     // ── other-select-wrap: show free-text input when "Other..." is chosen ────
@@ -1059,6 +987,14 @@ $(document).ready(function() {
             $inputWrap.hide();
             $select.prop('name', $select.data('orig-name')).show().val('').trigger('change');
             if ($select.hasClass('select2-hidden-accessible')) $select.trigger('change.select2');
+        });
+        // New "Other → input" widgets: restore the dropdown, clear/hide the input.
+        $(containerSelector).find('.other-field-wrap').each(function() {
+            var $wrap = $(this);
+            $wrap.find('.other-input-box').addClass('d-none').find('.other-input').val('');
+            var $sel = $wrap.find('select.other-trigger');
+            $sel.removeClass('d-none');
+            $sel.next('.select2-container').removeClass('d-none');
         });
     }
 
@@ -1131,9 +1067,18 @@ function editSC(id) {
             $('#edit_sc_name').val(d.supplier_name);
             $('#edit_company_name').val(d.company_name);
             $('#edit_acronym').val(d.acronym);
-            $('#edit_sc_type').val(d.supplier_type);
-            $('#edit_sc_year').val(d.year);
-            $('#edit_category_id').val(d.category_id);
+            // Set value, injecting an option first if the stored value isn't listed
+            // (e.g. a previously-typed "Other" value), so it shows as selected.
+            function setOrInject(sel, val) {
+                val = (val == null) ? '' : String(val);
+                if (val !== '' && $(sel + ' option').filter(function(){ return this.value === val; }).length === 0) {
+                    $(sel).append(new Option(val, val, true, true));
+                }
+                $(sel).val(val).trigger('change');
+            }
+            setOrInject('#edit_sc_type', d.supplier_type);
+            setOrInject('#edit_sc_year', d.year);
+            setOrInject('#edit_category_id', d.category_id);
             $('#edit_status').val(d.status);
             $('#edit_project_id').val(d.project_id);
             $('#edit_credit_limit').val(d.credit_limit);
@@ -1163,8 +1108,8 @@ function editSC(id) {
             $('#edit_tax_id').val(d.tax_id);
             $('#edit_vat_number').val(d.vat_number);
             $('#edit_default_wht_rate_id').val(d.default_wht_rate_id || '');
-            $('#edit_payment_terms').val(d.payment_terms);
-            $('#edit_currency').val(d.currency);
+            setOrInject('#edit_payment_terms', d.payment_terms);
+            setOrInject('#edit_currency', d.currency);
             $('#edit_bank_name').val(d.bank_name);
             $('#edit_bank_account').val(d.bank_account);
             $('#edit_bank_address').val(d.bank_address);
