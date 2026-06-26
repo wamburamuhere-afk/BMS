@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-06-25 (refactor) — actors as subsidiary ledger, Phase 1 (classify)
+
+- `migrations/2026_06_25_accounts_is_subledger.php` — adds `accounts.is_subledger TINYINT(1) NOT NULL DEFAULT 0` (idempotent `SHOW COLUMNS` guard); backfills `is_subledger=1` for the per-actor GL sub-accounts created by `actor_account.php` (`account_code REGEXP '-(CUST|SUP|SUB|EMP)-'`) — flagged 296 locally. Control accounts (Trade Debtors/Creditors/Salaries Payable) untouched. No hard-coded ids.
+- `core/actor_account.php` — `ensureActorLedgerAccount()` INSERT now sets `is_subledger=1`, so every new customer/supplier/sub-contractor/employee sub-account is born flagged.
+- No posting change: these per-actor accounts are dormant (verified 0 lines in `journal_entries`); money posts to the control accounts. Phase 2 (hide from chart-top + account pickers) and Phase 3 (S/No subsidiary-ledger view) to follow.
+
 ## 2026-06-25 (ui) — header date/location smaller on mobile (match vikundi)
 
 - `header.php` — inside `@media (max-width: 576px)`: `.date-location-box` font-size `0.7rem` → `0.52rem`; added child override for `.date-text` / `.location-text` at `0.52rem !important` so the inline `0.85rem` on those elements is beaten on phones (previously only the `|` separator shrank). Desktop unchanged; header only.
