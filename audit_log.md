@@ -135,3 +135,52 @@ Standardise existing logging to this spec, file by file, in this order:
 real, then ensure it calls `logActivity()` in the §2/§3 format.
 
 _Done: Delete-role (`user_roles.php`) logs `Deleted role "<name>" (ID …)`._
+
+---
+
+## 8. The 3-part mechanism (simple, repeatable — follow this for EVERY delete)
+
+A delete is "fully covered" only when all three parts are true. Nothing is done
+silently; the output is always visible on `activity_log.php`.
+
+### PART 1 — `user_roles.php` = WHO may delete (the gate)
+- Every deletable thing has a **page-key** with a `delete` permission row in the
+  `permissions` table, manageable on `user_roles.php`.
+- The delete handler must call **`canDelete('<page_key>')`** before deleting.
+- **If the page-key/permission does not exist → ADD it** (seed it so it appears on
+  `user_roles.php` and an admin can grant/revoke "who deletes what").
+- This is the ONLY place we add anything. We never add a delete button/endpoint
+  that wasn't already there.
+
+### PART 2 — the delete handler = REPORT on delete (never silent)
+A "delete handler" is **anywhere a real delete happens**, in either form:
+- an **API endpoint**: `api/**/delete_*.php`, OR
+- an **in-page handler**: a `function delete*()` / inline `DELETE FROM …` /
+  `UPDATE … SET status='deleted'` inside an `app/**` page.
+
+For each, **without changing the delete behaviour**:
+1. Capture the entity **name/number BEFORE** deleting.
+2. After the delete succeeds, call exactly:
+   ```php
+   logActivity($pdo, $_SESSION['user_id'], 'Delete <entity>',
+       "deleted <entity> \"<name>\" with id <id>");
+   ```
+   (keep any existing `logAudit` call too).
+- **Do NOT add a delete where none exists.** If a file/page has no delete, skip it.
+
+### PART 3 — `activity_log.php` = the OUTPUT (already done)
+- Reads `activity_logs`, renders **Type** = `Delete <entity>` and **Description** =
+  the sentence, shows who/when/IP, and the **Delete** filter catches it.
+- Nothing to change per delete — Part 2's `logActivity` makes it appear here.
+
+### How EVERY delete is discovered (so none is missed)
+1. `api/**/delete_*.php` (the endpoint deletes).
+2. `grep` across `app/**` for in-page deletes:
+   `DELETE FROM`, `status = 'deleted'`, `function delete`.
+3. A delete is DONE when: it has a `canDelete()` gate (Part 1) **and** a
+   `logActivity('Delete <entity>', …)` on success (Part 2).
+
+### Verification per file
+- Trigger the real delete (or simulate its path) → confirm one new
+  `activity_logs` row with action `Delete <entity>` and a `deleted … with id …`
+  description → confirm it shows under the **Delete** filter on `activity_log.php`.

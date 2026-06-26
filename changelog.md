@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-26 (feat) — Activity Logs: server-side DataTables (sort / search / paginate over 65k+ rows)
+
+- `app/activity_log.php` — replaced the custom AJAX pagination with a **server-side jQuery DataTable** (`serverSide: true`) on the activity table. New `?draw=` endpoint (reuses the filter conditions) returns DataTables JSON with each row rendered to the 6 columns (S/NO, Time, **Type**, **Description**, Reference, User). Adds column **sorting**, a **search box**, and proper paging across all 65k+ rows (not just the current page).
+  - Extracted the row formatter into reusable top-level functions `acFormatActivity()` / `acBadgeClass()` (one source of truth for Type/Description/Reference).
+  - **All 6 columns kept**; **Description stays the widest** (35% vs 15%).
+  - The activity **filters** (Type / User / Period / Custom range) drive a **full page reload** so the period-aware summary cards + the Time-in-System panel re-render correctly; the table sends the current filter values with every DataTables request. The "Limit" dropdown maps to DataTables page length.
+  - Verified end-to-end: draw endpoint returns recordsTotal 66,529, server-side ordering/paging, `type=delete` → 1,322, search "deleted document" → 16, "login" → 3.
+
 ## 2026-06-26 (fix) — Delete sweep batch 1: silent deletes now appear on Activity Log
 
 Per `audit_log.md`, deletes that were invisible on the Activity Log (they wrote
