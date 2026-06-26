@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
 require_once __DIR__ . '/../core/actor_account.php';
+require_once __DIR__ . '/../core/form_lookups.php';
 global $pdo;
 
 // Check if user is logged in
@@ -64,6 +65,29 @@ if (empty($payment_terms) || $payment_terms === 'other') {
 if (empty($currency) || $currency === 'other') {
     $currency = trim($_POST['currency_other'] ?? 'TZS');
 }
+if ($supplier_type === 'other') {
+    $supplier_type = trim($_POST['supplier_type_other'] ?? '');
+}
+// Category "Other" — create the category on the fly if a new name was typed.
+if ($category_id === 'other' || (empty($category_id) && !empty(trim($_POST['category_other'] ?? '')))) {
+    $cat_other = trim($_POST['category_other'] ?? '');
+    if ($cat_other !== '') {
+        $cc = $pdo->prepare("SELECT category_id FROM supplier_categories WHERE LOWER(category_name)=LOWER(?) AND status='active'");
+        $cc->execute([$cat_other]);
+        $cid = $cc->fetchColumn();
+        if ($cid) { $category_id = $cid; }
+        else {
+            $pdo->prepare("INSERT INTO supplier_categories (category_name, status, created_at) VALUES (?, 'active', NOW())")->execute([$cat_other]);
+            $category_id = $pdo->lastInsertId();
+        }
+    } else { $category_id = null; }
+}
+
+// Self-growing dropdowns: persist any newly-typed value so it appears next time.
+$lk_uid = (int)($_SESSION['user_id'] ?? 0) ?: null;
+upsertFormLookup($pdo, 'sub_contractor_type', $supplier_type, $lk_uid);
+upsertFormLookup($pdo, 'payment_terms',       $payment_terms, $lk_uid);
+upsertFormLookup($pdo, 'currency',            $currency,      $lk_uid);
 
 // Validate required fields
 if (empty($supplier_name)) {

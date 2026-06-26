@@ -213,6 +213,19 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     <!-- Select2 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <style>
+        /* Global Select2-in-modal behaviour: float above the modal and let the
+           results list scroll on its own (fixes the "hard to scroll" feel). The
+           "closes on click" part is fixed by disabling the modal focus-trap in footer.php. */
+        .select2-container--open { z-index: 1060 !important; }
+        .select2-dropdown { z-index: 1060 !important; }
+        .select2-results__options {
+            max-height: 240px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+        }
+    </style>
     
     <link rel="stylesheet" href="<?= getUrl('style.css') ?>">
     <link rel="stylesheet" href="<?= getUrl('assets/css/responsive.css') ?>">
