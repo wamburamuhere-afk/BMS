@@ -18,7 +18,7 @@ try {
 
     $pdo->prepare("UPDATE crm_lead_activities SET status='deleted' WHERE activity_id=?")->execute([$activity_id]);
 
-    logActivity($pdo, $_SESSION['user_id'], "Deleted activity #$activity_id: {$row['subject']}");
+    logActivity($pdo, $_SESSION['user_id'], "Delete activity", "deleted activity \"{$row['subject']}\" with id $activity_id");
     echo json_encode(['success'=>true,'message'=>'Activity deleted.']);
 } catch (PDOException $e) {
     error_log('delete_activity error: '.$e->getMessage());

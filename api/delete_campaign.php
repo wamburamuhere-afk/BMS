@@ -19,7 +19,7 @@ try {
     $stmt = $pdo->prepare("DELETE FROM marketing_campaigns WHERE campaign_id = ?");
     $stmt->execute([$id]);
 
-    logActivity($pdo, $userId, "Deleted Marketing Campaign", "Campaign ID: $id");
+    logActivity($pdo, $userId, "Delete campaign", "deleted marketing campaign with id $id");
 
     echo json_encode(['success' => true, 'message' => "Campaign deleted successfully"]);
 } catch (Exception $e) {

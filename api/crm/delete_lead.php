@@ -52,7 +52,7 @@ try {
         ->execute([$_SESSION['user_id'], $lead_id]);
 
     // 6. Activity log
-    logActivity($pdo, $_SESSION['user_id'], "Deleted lead: {$lead['lead_code']}");
+    logActivity($pdo, $_SESSION['user_id'], "Delete lead", "deleted lead {$lead['lead_code']} with id $lead_id");
 
     echo json_encode(['success' => true, 'message' => "Lead {$lead['lead_code']} deleted."]);
 

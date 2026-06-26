@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-26 (fix) — Delete sweep batch 5: standardize Sales/CRM delete logs
+
+Standardized to `audit_log.md` (Type `Delete <entity>`, Description `deleted
+<entity> <number/name> with id …`). Delete behaviour unchanged.
+
+- `api/delete_customer.php`, `api/account/delete_sales_order.php`, `api/account/delete_quotation.php`
+- `api/sales/delete_return.php` (sales return), `api/customer/delete_lpo.php`
+- `api/crm/delete_lead.php`, `api/delete_lead.php`, `api/crm/delete_campaign.php`, `api/delete_campaign.php`, `api/crm/delete_activity.php`
+
 ## 2026-06-26 (fix) — Delete sweep batch 4: standardize Procurement/Stock delete logs
 
 Standardized to `audit_log.md` (Type `Delete <entity>`, Description `deleted
