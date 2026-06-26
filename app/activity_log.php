@@ -49,9 +49,28 @@ $company_vrn = get_setting('company_vrn', '');
     ");
     $today_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($type_filter) {
-        $conditions[] = "action LIKE :type";
-        $params[':type'] = "%$type_filter%";
+    // Canonical activity types — the six the filter exposes. Each maps to the
+    // real verb variants currently written to activity_logs.action/description,
+    // so selecting "Edit" also catches "Updated…", "Create" catches "Added…", etc.
+    $activity_type_map = [
+        'view'    => ['View',    'Viewed'],
+        'create'  => ['Create',  'Created',  'Add',    'Added'],
+        'edit'    => ['Edit',    'Edited',   'Update',  'Updated'],
+        'delete'  => ['Delete',  'Deleted',  'Remove',  'Removed'],
+        'review'  => ['Review',  'Reviewed'],
+        'approve' => ['Approve', 'Approved'],
+    ];
+
+    if ($type_filter && isset($activity_type_map[$type_filter])) {
+        $ors = [];
+        foreach ($activity_type_map[$type_filter] as $i => $verb) {
+            $k = ":vt{$i}";
+            // Match the verb at the START of the action OR description (the entry
+            // "starts with the real activity", e.g. "Deleted role …", "Viewed …").
+            $ors[] = "action LIKE $k OR description LIKE $k";
+            $params[$k] = "$verb%";
+        }
+        $conditions[] = '(' . implode(' OR ', $ors) . ')';
     }
     if ($user_id_filter) {
         $conditions[] = "activity_logs.user_id = :user_id";
@@ -177,9 +196,37 @@ $company_vrn = get_setting('company_vrn', '');
         ];
     }
 
-    // Get unique activity types for filter
-    $types_stmt = $pdo->query("SELECT DISTINCT action FROM activity_logs ORDER BY action");
-    $activity_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
+    // The filter exposes only the six canonical activity types (keys of the map
+    // defined above). value = key the WHERE understands; label = display text.
+    $activity_types = [
+        'view'    => 'View',
+        'create'  => 'Create',
+        'edit'    => 'Edit',
+        'delete'  => 'Delete',
+        'review'  => 'Review',
+        'approve' => 'Approve',
+    ];
+
+    // ── "Time in system" summary — only when a single user is filtered. Honours
+    //    the same date range as the feed. Powers the session panel below. ──────
+    $session_summary = null;
+    $session_rows = [];
+    if ($user_id_filter && function_exists('userSessionSummary')) {
+        require_once __DIR__ . '/../core/session_tracker.php';
+        $sumFrom = $date_from ? $date_from . ' 00:00:00' : null;
+        $sumTo   = $date_to   ? $date_to   . ' 23:59:59' : null;
+        $session_summary = userSessionSummary($pdo, (int)$user_id_filter, $sumFrom, $sumTo);
+        // Recent sessions for this user (newest first) for the audit detail list.
+        try {
+            $srWhere = "user_id = ?"; $srParams = [(int)$user_id_filter];
+            if ($sumFrom) { $srWhere .= " AND login_at >= ?"; $srParams[] = $sumFrom; }
+            if ($sumTo)   { $srWhere .= " AND login_at <= ?"; $srParams[] = $sumTo; }
+            $srStmt = $pdo->prepare("SELECT login_at, logout_at, duration_seconds, logout_type, ip_address
+                                       FROM user_sessions WHERE $srWhere ORDER BY login_at DESC LIMIT 15");
+            $srStmt->execute($srParams);
+            $session_rows = $srStmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) { $session_rows = []; }
+    }
 
 
 
@@ -567,6 +614,85 @@ $page_title = "Activity Log";
         </div>
     </div>
 
+    <?php if ($session_summary !== null):
+        // Resolve the filtered user's display name for the panel header.
+        $sel_user_name = '';
+        foreach ($users as $_u) { if ((int)$_u['user_id'] === (int)$user_id_filter) { $sel_user_name = $_u['username']; break; } }
+    ?>
+    <!-- Time-in-System panel — shows only when a single user is filtered -->
+    <div class="card mb-4 shadow-sm border-0" style="border-radius: 15px; border-left: 4px solid #0d6efd !important;">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-clock-history text-primary me-2"></i>Time in System — <?= htmlspecialchars($sel_user_name ?: ('User #' . (int)$user_id_filter)) ?></h5>
+                <span class="text-muted small"><?= $date_from || $date_to ? 'For selected date range' : 'All time' ?></span>
+            </div>
+            <div class="row g-3">
+                <div class="col-6 col-md-3">
+                    <div class="border rounded p-3 text-center h-100">
+                        <div class="text-muted text-uppercase fw-bold mb-1" style="font-size:0.62rem;">Total Time in System</div>
+                        <div class="fs-5 fw-bold text-primary"><?= formatDuration($session_summary['total_seconds']) ?></div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="border rounded p-3 text-center h-100">
+                        <div class="text-muted text-uppercase fw-bold mb-1" style="font-size:0.62rem;">Sessions</div>
+                        <div class="fs-5 fw-bold"><?= (int)$session_summary['sessions'] ?>
+                            <?php if ($session_summary['open'] > 0): ?><span class="badge bg-warning text-dark ms-1" style="font-size:0.55rem;" title="Sessions with no recorded logout (browser closed / timed out)"><?= (int)$session_summary['open'] ?> open</span><?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="border rounded p-3 text-center h-100">
+                        <div class="text-muted text-uppercase fw-bold mb-1" style="font-size:0.62rem;">Avg / Session</div>
+                        <div class="fs-5 fw-bold"><?= formatDuration($session_summary['avg_seconds']) ?></div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="border rounded p-3 text-center h-100">
+                        <div class="text-muted text-uppercase fw-bold mb-1" style="font-size:0.62rem;">Last Login</div>
+                        <div class="fw-bold small"><?= $session_summary['last_login'] ? date('d M Y, H:i', strtotime($session_summary['last_login'])) : '—' ?></div>
+                    </div>
+                </div>
+            </div>
+
+            <?php if (!empty($session_rows)): ?>
+            <div class="table-responsive mt-3">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-3">Login</th>
+                            <th>Logout</th>
+                            <th>Duration</th>
+                            <th>How it ended</th>
+                            <th class="pe-3">IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($session_rows as $sr): ?>
+                        <tr>
+                            <td class="ps-3"><?= date('d M Y, H:i:s', strtotime($sr['login_at'])) ?></td>
+                            <td><?= $sr['logout_at'] ? date('d M Y, H:i:s', strtotime($sr['logout_at'])) : '<span class="text-muted">—</span>' ?></td>
+                            <td class="fw-semibold"><?= formatDuration($sr['duration_seconds'] !== null ? (int)$sr['duration_seconds'] : null) ?></td>
+                            <td>
+                                <?php if ($sr['logout_type'] === 'manual'): ?>
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">Logged out</span>
+                                <?php else: ?>
+                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle" title="No logout recorded — browser closed or session timed out">Open / timed out</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="pe-3 text-muted small"><?= htmlspecialchars($sr['ip_address'] ?? '—') ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+            <p class="text-muted small mb-0 mt-2">No login sessions recorded for this user in the selected range. (Sessions are tracked from the time this feature went live.)</p>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Filter Card -->
     <div class="card mb-4 shadow-sm border-0 no-print" style="border-radius: 15px;">
         <div class="card-body p-4">
@@ -575,13 +701,11 @@ $page_title = "Activity Log";
                     <label class="form-label small fw-bold text-muted text-uppercase">Activity Type</label>
                     <select class="form-select border-0 bg-light" name="type" id="filterType">
                         <option value="">All Types</option>
-                        <?php if (!empty($activity_types)): ?>
-                            <?php foreach ($activity_types as $activity_type): ?>
-                                <option value="<?= htmlspecialchars($activity_type) ?>" <?= $type_filter == $activity_type ? 'selected' : '' ?>>
-                                    <?= ucfirst(str_replace('_', ' ', $activity_type)) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                        <?php foreach ($activity_types as $type_key => $type_label): ?>
+                            <option value="<?= htmlspecialchars($type_key) ?>" <?= $type_filter === $type_key ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($type_label) ?>
+                            </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-md-2">
