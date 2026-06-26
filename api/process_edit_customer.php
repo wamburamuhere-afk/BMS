@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/form_lookups.php';
 // Note: roots.php already includes config.php, helpers.php and permissions.php
 
 header('Content-Type: application/json');
@@ -43,6 +44,41 @@ try {
     if (empty($_POST['customer_name'])) {
         throw new Exception('Customer name is required');
     }
+
+    // ── Self-growing dropdowns: resolve "Other" → typed value, then persist. ──
+    $customer_type = trim($_POST['customer_type'] ?? 'individual');
+    $payment_terms = trim($_POST['payment_terms'] ?? '');
+    $currency      = trim($_POST['currency'] ?? 'TZS');
+    $year          = trim($_POST['year'] ?? date('Y'));
+    if ($customer_type === 'other') $customer_type = trim($_POST['customer_type_other'] ?? '');
+    if ($payment_terms === 'other') $payment_terms = trim($_POST['payment_terms_other'] ?? '');
+    if ($currency === 'other')      $currency      = trim($_POST['currency_other'] ?? 'TZS');
+    if ($year === 'other')          $year          = trim($_POST['year_other'] ?? date('Y'));
+
+    $category_id = !empty($_POST['category_id']) ? $_POST['category_id'] : null;
+    if ($category_id === 'other' || (empty($category_id) && !empty(trim($_POST['category_other'] ?? '')))) {
+        $cat_other = trim($_POST['category_other'] ?? '');
+        if ($cat_other !== '') {
+            $cc = $pdo->prepare("SELECT category_id FROM customer_categories WHERE LOWER(category_name)=LOWER(?) AND status='active'");
+            $cc->execute([$cat_other]);
+            $cid = $cc->fetchColumn();
+            if ($cid) { $category_id = $cid; }
+            else {
+                $pdo->prepare("INSERT INTO customer_categories (category_name, status, created_at) VALUES (?, 'active', NOW())")->execute([$cat_other]);
+                $category_id = $pdo->lastInsertId();
+            }
+        } else { $category_id = null; }
+    }
+    $_POST['customer_type'] = $customer_type;
+    $_POST['payment_terms'] = $payment_terms;
+    $_POST['currency']      = $currency;
+    $_POST['year']          = $year;
+    $_POST['category_id']   = $category_id;
+
+    $lk_uid = (int)($_SESSION['user_id'] ?? 0) ?: null;
+    upsertFormLookup($pdo, 'customer_type', $customer_type, $lk_uid);
+    upsertFormLookup($pdo, 'payment_terms', $payment_terms, $lk_uid);
+    upsertFormLookup($pdo, 'currency',      $currency,      $lk_uid);
 
     // Prepare update data
     $data = [
