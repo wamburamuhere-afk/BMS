@@ -37,10 +37,18 @@ if (!function_exists('acFormatActivity')) {
         $raw_desc   = !empty($activity['raw_description']) ? trim($activity['raw_description']) : $raw_action;
 
         $verbSource = $raw_action !== '' ? $raw_action : $raw_desc;
-        $firstWord  = preg_split('/\s+/', $verbSource)[0] ?? $verbSource;
+        $awords     = preg_split('/\s+/', trim($verbSource));
+        $firstWord  = $awords[0] ?? $verbSource;
         $verb       = $canon($firstWord);
+        $isCanonical = in_array($verb, ['View','Create','Edit','Delete','Review','Approve'], true);
+
         $entity = '';
-        if (preg_match('/\b(sub-?contractor|purchase order|sales order|sales return|purchase return|credit note|debit note|bank transfer|payment voucher|customer|supplier|product|expense|invoice|payment|employee|payroll|loan|quotation|voucher|asset|budget|project|warehouse|stock|document template|document|user|role|report|category|tax|transaction|journal|grn|attendance|backup)\b/i', $raw_action . ' ' . $raw_desc, $em)) {
+        // If the action is already a SHORT, clean "<verb> <entity>" (our standard,
+        // e.g. "Delete sub-contractor payment"), take the entity straight from it so
+        // multi-word entities show in full. Otherwise detect the entity by keyword.
+        if ($isCanonical && count($awords) >= 2 && count($awords) <= 4) {
+            $entity = strtolower(trim(implode(' ', array_slice($awords, 1))));
+        } elseif (preg_match('/\b(sub-?contractor|purchase order|sales order|sales return|purchase return|credit note|debit note|bank transfer|payment voucher|customer|supplier|product|expense|invoice|payment|employee|payroll|loan|quotation|voucher|asset|budget|project|warehouse|stock|document template|document|user|role|report|category|tax|transaction|journal|grn|attendance|backup|held sale)\b/i', $raw_action . ' ' . $raw_desc, $em)) {
             $entity = strtolower($em[1]);
         }
         $type = trim($verb . ($entity !== '' ? ' ' . $entity : '')); if ($type === '') $type = 'Activity';

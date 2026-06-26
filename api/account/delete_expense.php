@@ -102,7 +102,7 @@ try {
     $delete_result = $delete_stmt->execute([$expense_id]);
 
     if ($delete_result) {
-        logActivity($pdo, $user_id, "Deleted expense ID: " . $expense_id);
+        logActivity($pdo, $user_id, "Delete expense", "deleted expense with id " . $expense_id);
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'Expense deleted successfully']);
     } else {

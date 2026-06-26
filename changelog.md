@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-26 (fix) — Delete sweep batch 3: standardize Finance-group delete logs + smarter Type
+
+Standardized the `logActivity` format of Finance delete endpoints to `audit_log.md`
+(Type `Delete <entity>`, Description `deleted <entity> … with id …`). Delete
+behaviour unchanged.
+
+- `api/account/delete_invoice.php`, `delete_expense.php`, `delete_voucher.php`, `delete_journal.php`, `delete_budget.php`, `delete_reconciliation.php`
+- `api/delete_supplier_payment.php`, `api/sc/delete_payment.php`
+- `api/sales/delete_credit_note.php`, `api/purchase/delete_debit_note.php`
+
+Also improved the Type-column parser in `app/activity_log.php`: when an action is
+already a short clean "`<verb> <entity>`" (our standard) it renders the **full**
+multi-word entity (e.g. "Delete sub-contractor payment", "Delete payment voucher"),
+falling back to keyword detection only for messy legacy strings. Verified.
+
 ## 2026-06-26 (fix) — Delete sweep batch 2: silent IN-PAGE deletes now logged
 
 Per `audit_log.md` §8, in-page delete handlers (delete logic inside `app/**`
