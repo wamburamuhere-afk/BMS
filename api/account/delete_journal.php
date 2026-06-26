@@ -42,7 +42,7 @@ try {
     $pdo->prepare("DELETE FROM journal_entry_items WHERE entry_id = ?")->execute([$id]);
     $pdo->prepare("DELETE FROM journal_entries WHERE entry_id = ?")->execute([$id]);
 
-    logActivity($pdo, $_SESSION['user_id'], "Deleted journal entry #$id ({$entry['reference_number']}, status {$entry['status']})");
+    logActivity($pdo, $_SESSION['user_id'], "Delete journal", "deleted journal entry {$entry['reference_number']} with id $id (status {$entry['status']})");
     $pdo->commit();
 
     echo json_encode(['success' => true, 'message' => 'Journal entry deleted.']);

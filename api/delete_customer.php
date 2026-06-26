@@ -66,7 +66,7 @@ try {
         $message = 'Customer permanently deleted';
     }
 
-    logActivity($pdo, $_SESSION['user_id'], "Deleted customer: {$customer['customer_name']} (ID: $customerId)");
+    logActivity($pdo, $_SESSION['user_id'], "Delete customer", "deleted customer \"{$customer['customer_name']}\" with id $customerId");
 
     echo json_encode([
         'success' => true,

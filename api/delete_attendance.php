@@ -54,8 +54,13 @@ try {
     ");
     
     if ($delete_stmt->execute([$employee_id, $attendance_date])) {
-        
-        // Log Activity
+
+        // Resolve the employee's name so the log states clearly WHO it was for.
+        $emp = $pdo->prepare("SELECT CONCAT(first_name,' ',last_name) FROM employees WHERE employee_id = ?");
+        $emp->execute([$employee_id]);
+        $emp_name = $emp->fetchColumn() ?: ('employee #' . $employee_id);
+
+        // Audit trail (rich) + Activity Log feed (visible on activity_log.php).
         logAudit($pdo, $_SESSION['user_id'], 'delete_attendance', [
             'activity_type' => 'delete',
             'entity_type' => 'employee',
@@ -63,7 +68,9 @@ try {
             'description' => "Deleted attendance record for employee ID {$employee_id} on {$attendance_date}",
             'old_values' => $existing
         ]);
-        
+        logActivity($pdo, $_SESSION['user_id'], 'Delete attendance',
+            "deleted attendance record for employee {$emp_name} (id {$employee_id}) on {$attendance_date}");
+
         echo json_encode(['success' => true, 'message' => 'Attendance record deleted successfully']);
     } else {
         throw new Exception('Failed to delete attendance record');

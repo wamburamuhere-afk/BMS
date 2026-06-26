@@ -14,6 +14,72 @@ if (!in_array($limit, [10, 25, 50, 100, -1])) $limit = 10; // Validate limit
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $offset = ($limit === -1) ? 0 : ($page - 1) * $limit;
 
+// ── Row formatter (audit_log.md §2/§3): turn a raw activity_logs row into the
+//    smart Type + clear Description + Reference used by both the table and the
+//    server-side DataTables endpoint. Single source of truth.
+if (!function_exists('acFormatActivity')) {
+    function acFormatActivity(array $activity): array {
+        $canon = function (string $v): string {
+            $v = strtolower(trim($v));
+            if (strpos($v, 'update') === 0) return 'Edit';
+            if (strpos($v, 'page_view') === 0) return 'View';
+            static $m = [
+                'view'=>'View','viewed'=>'View',
+                'create'=>'Create','created'=>'Create','add'=>'Create','added'=>'Create','recorded'=>'Create',
+                'edit'=>'Edit','edited'=>'Edit','update'=>'Edit','updated'=>'Edit','changed'=>'Edit',
+                'delete'=>'Delete','deleted'=>'Delete','remove'=>'Delete','removed'=>'Delete','void'=>'Delete','voided'=>'Delete',
+                'review'=>'Review','reviewed'=>'Review',
+                'approve'=>'Approve','approved'=>'Approve',
+            ];
+            return $m[$v] ?? ucfirst($v);
+        };
+        $raw_action = trim($activity['raw_action'] ?? '');
+        $raw_desc   = !empty($activity['raw_description']) ? trim($activity['raw_description']) : $raw_action;
+
+        $verbSource = $raw_action !== '' ? $raw_action : $raw_desc;
+        $awords     = preg_split('/\s+/', trim($verbSource));
+        $firstWord  = $awords[0] ?? $verbSource;
+        $verb       = $canon($firstWord);
+        $isCanonical = in_array($verb, ['View','Create','Edit','Delete','Review','Approve'], true);
+
+        $entity = '';
+        // If the action is already a SHORT, clean "<verb> <entity>" (our standard,
+        // e.g. "Delete sub-contractor payment"), take the entity straight from it so
+        // multi-word entities show in full. Otherwise detect the entity by keyword.
+        if ($isCanonical && count($awords) >= 2 && count($awords) <= 4) {
+            $entity = strtolower(trim(implode(' ', array_slice($awords, 1))));
+        } elseif (preg_match('/\b(sub-?contractor|purchase order|sales order|sales return|purchase return|credit note|debit note|bank transfer|payment voucher|customer|supplier|product|expense|invoice|payment|employee|payroll|loan|quotation|voucher|asset|budget|project|warehouse|stock|document template|document|user|role|report|category|tax|transaction|journal|grn|attendance|backup|held sale)\b/i', $raw_action . ' ' . $raw_desc, $em)) {
+            $entity = strtolower($em[1]);
+        }
+        $type = trim($verb . ($entity !== '' ? ' ' . $entity : '')); if ($type === '') $type = 'Activity';
+        $description = $raw_desc !== '' ? $raw_desc : '-';
+
+        $reference = '-';
+        if (preg_match('/([A-Z]{2,}-?[A-Z0-9-]*\d[A-Z0-9-]*)/i', $raw_desc, $rm) && preg_match('/\d/', strtoupper($rm[1]))) {
+            $reference = strtoupper($rm[1]);
+        }
+        if ($reference === '-' && preg_match('/(?:#|ID:?\s*)(\d+)/i', $raw_desc, $rm)) $reference = '#' . $rm[1];
+        if ($reference === '-') $reference = 'REF-' . str_pad((string)($activity['id'] ?? 0), 5, '0', STR_PAD_LEFT);
+
+        return [
+            'id' => $activity['id'] ?? 0, 'type' => $type, 'description' => $description,
+            'timestamp' => $activity['timestamp'] ?? null, 'reference' => $reference,
+            'user_name' => $activity['user_name'] ?? 'System',
+        ];
+    }
+}
+// Bootstrap class for a Type badge.
+if (!function_exists('acBadgeClass')) {
+    function acBadgeClass(string $type): string {
+        $t = strtolower($type);
+        if (strpos($t, 'delete') !== false) return 'danger';
+        if (strpos($t, 'payment') !== false) return 'success';
+        if (strpos($t, 'sale') !== false || strpos($t, 'pos') !== false) return 'info';
+        if (strpos($t, 'customer') !== false) return 'warning';
+        return 'primary';
+    }
+}
+
 try {
 // Get filter parameters
 $type_filter = $_GET['type'] ?? '';
@@ -101,6 +167,82 @@ $company_vrn = get_setting('company_vrn', '');
     if ($date_to) {
         $conditions[] = "activity_logs.created_at <= :date_to";
         $params[':date_to'] = $date_to . ' 23:59:59';
+    }
+
+    // ══ Server-side DataTables endpoint ═══════════════════════════════════════
+    // DataTables sends `draw` + start/length/order/search. It handles ONLY the
+    // table (sort/search/paginate) within the current filter set; the cards and
+    // the Time-in-System panel are server-rendered on full page load (filters
+    // navigate, not ajax), so they stay correct. Reuses the filter $conditions.
+    if (isset($_GET['draw'])) {
+        $dt_base = "FROM activity_logs LEFT JOIN users u ON activity_logs.user_id = u.user_id";
+        $whereFilters = !empty($conditions) ? "WHERE " . implode(' AND ', $conditions) : "";
+
+        // recordsTotal — current filter set, no DataTables search.
+        $rt = $pdo->prepare("SELECT COUNT(*) $dt_base $whereFilters");
+        foreach ($params as $k => $v) $rt->bindValue($k, $v);
+        $rt->execute();
+        $recordsTotal = (int) $rt->fetchColumn();
+
+        // recordsFiltered — filter set + the DataTables search box.
+        $searchVal = trim($_GET['search']['value'] ?? '');
+        $dtConds = $conditions; $dtParams = $params;
+        if ($searchVal !== '') {
+            $dtConds[] = "(activity_logs.action LIKE :dts OR activity_logs.description LIKE :dts OR u.username LIKE :dts)";
+            $dtParams[':dts'] = '%' . $searchVal . '%';
+        }
+        $whereDt = !empty($dtConds) ? "WHERE " . implode(' AND ', $dtConds) : "";
+        $rf = $pdo->prepare("SELECT COUNT(*) $dt_base $whereDt");
+        foreach ($dtParams as $k => $v) $rf->bindValue($k, $v);
+        $rf->execute();
+        $recordsFiltered = (int) $rf->fetchColumn();
+
+        // Ordering — map DataTables column index → a real DB column.
+        $dt_cols = [0 => 'activity_logs.id', 1 => 'activity_logs.created_at', 2 => 'activity_logs.action',
+                    3 => 'activity_logs.description', 4 => 'activity_logs.ip_address', 5 => 'u.username'];
+        $ocol = isset($_GET['order'][0]['column']) ? (int) $_GET['order'][0]['column'] : 1;
+        $odir = (isset($_GET['order'][0]['dir']) && strtolower($_GET['order'][0]['dir']) === 'asc') ? 'ASC' : 'DESC';
+        $orderBy = ($dt_cols[$ocol] ?? 'activity_logs.created_at') . ' ' . $odir;
+
+        $dstart  = isset($_GET['start']) ? max(0, (int) $_GET['start']) : 0;
+        $dlength = isset($_GET['length']) ? (int) $_GET['length'] : 10;
+        if ($dlength < 0) $dlength = 100000000; // "All"
+
+        $dsql = "SELECT activity_logs.id, activity_logs.action AS raw_action,
+                        activity_logs.description AS raw_description, activity_logs.created_at AS timestamp,
+                        activity_logs.ip_address AS reference, u.username AS user_name
+                 $dt_base $whereDt ORDER BY $orderBy LIMIT :dlen OFFSET :dstart";
+        $ds = $pdo->prepare($dsql);
+        foreach ($dtParams as $k => $v) $ds->bindValue($k, $v);
+        $ds->bindValue(':dlen', $dlength, PDO::PARAM_INT);
+        $ds->bindValue(':dstart', $dstart, PDO::PARAM_INT);
+        $ds->execute();
+
+        $data = []; $sn = $dstart + 1;
+        foreach ($ds->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $f = acFormatActivity($r);
+            $badge = acBadgeClass($f['type']);
+            $ref = (string) $f['reference'];
+            $refHtml = ($ref !== '' && strpos($ref, '.') === false && strpos($ref, ':') === false)
+                ? '<code class="text-dark bg-light px-2 py-1 rounded">' . htmlspecialchars($ref) . '</code>'
+                : '<span class="text-muted">-</span>';
+            $data[] = [
+                '<span class="text-muted">' . ($sn++) . '</span>',
+                '<small class="text-muted text-nowrap">' . date('d/m/y, H:i', strtotime($f['timestamp'])) . '</small>',
+                '<span class="badge bg-' . $badge . ' rounded-pill">' . htmlspecialchars($f['type']) . '</span>',
+                htmlspecialchars($f['description']),
+                $refHtml,
+                htmlspecialchars($f['user_name']),
+            ];
+        }
+        header('Content-Type: application/json');
+        echo json_encode([
+            'draw' => (int) $_GET['draw'],
+            'recordsTotal' => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'data' => $data,
+        ]);
+        exit;
     }
 
     // ── Summary cards — now reflect the ACTIVE filters (user + date range), NOT a
@@ -851,150 +993,95 @@ $page_title = "Activity Log";
                             <th class="pe-3" style="width: 15%;">User</th>
                         </tr>
                     </thead>
-                    <tbody id="activityRows">
-                        <?php if (!empty($activities)): ?>
-                            <?php $si = $offset + 1; foreach ($activities as $activity): ?>
-                            <tr>
-                                <td class="text-center" data-label="S/NO"><?= $si++ ?></td>
-                                <td class="ps-3 text-muted" data-label="Time">
-                                    <small><?= date('d/m/y, H:i', strtotime($activity['timestamp'])) ?></small>
-                                </td>
-                                <td class="col-type" data-label="Type">
-                                    <?php 
-                                    $badge_class = 'primary';
-                                    $t = strtolower($activity['type']);
-                                    if (strpos($t, 'payment') !== false) { $badge_class = 'success'; }
-                                    elseif (strpos($t, 'sale') !== false || strpos($t, 'pos') !== false) { $badge_class = 'info'; }
-                                    elseif (strpos($t, 'delete') !== false) { $badge_class = 'danger'; }
-                                    elseif (strpos($t, 'customer') !== false) { $badge_class = 'warning'; }
-                                    ?>
-                                    <span class="badge bg-<?= $badge_class ?> rounded-pill">
-                                        <?= ucfirst(str_replace('_', ' ', $activity['type'] ?? 'Unknown')) ?>
-                                    </span>
-                                </td>
-                                <td data-label="Description"><?= htmlspecialchars($activity['description'] ?? '-') ?></td>
-                                <td data-label="Reference">
-                                    <?php 
-                                    $ref = (string)$activity['reference'];
-                                    // Show reference if it's not an IP address
-                                    if (!empty($ref) && strpos($ref, '.') === false && strpos($ref, ':') === false) {
-                                        echo '<code class="text-dark bg-light px-2 py-1 rounded">' . htmlspecialchars($ref) . '</code>';
-                                    } else {
-                                        echo '<span class="text-muted">-</span>';
-                                    }
-                                    ?>
-                                </td>
-                                <td class="pe-3" data-label="User"><?= htmlspecialchars($activity['user_name'] ?? 'System') ?></td>
-                            </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="5" class="text-center py-5 text-muted">
-                                    No activities found for this period.
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
+                    <!-- Rows are loaded server-side by DataTables (sort / search /
+                         paginate over 65k+ rows). Filters drive a full reload. -->
+                    <tbody id="activityRows"></tbody>
                 </table>
             </div>
         </div>
     </div>
-
-    <div id="paginationContainer" class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 no-print">
-        <div id="paginationInfo" class="small text-muted fw-bold">
-            Showing <span class="text-dark"><?= ($total_items > 0 ? $offset + 1 : 0) ?></span> to
-            <span class="text-dark"><?= ($limit === -1 ? $total_items : min($offset + $limit, $total_items)) ?></span> of
-            <span class="text-dark"><?= number_format($total_items) ?></span> entries
-        </div>
-        <nav id="paginationNav">
-            <?php if ($total_pages > 1): ?>
-            <ul class="pagination mb-0">
-                <?php echo renderSmartPagination($page, $total_pages); ?>
-            </ul>
-            <?php endif; ?>
-        </nav>
-    </div>
 </div>
 
 <script>
-function loadPage(page) {
-    if (page < 1) return;
-    
-    $('#activityRows').css('opacity', '0.5');
-    
-    const formData = $('#filterForm').serializeArray();
-    let params = { ajax: 1, page: page };
-    formData.forEach(item => {
-        params[item.name] = item.value;
-    });
-    // Period drives the date range + card labels server-side.
-    params.period = $('#filterPeriod').val();
-    
-    $.ajax({
-        url: '<?= getUrl('activity_log') ?>',
-        type: 'GET',
-        data: params,
-        dataType: 'json',
-        cache: false,
-        success: function(response) {
-            if (response.success) {
-                $('#activityRows').html(response.rows).css('opacity', '1');
-                $('#paginationNav').html(response.pagination);
-                $('#paginationInfo').text(response.info);
-                // Summary cards follow the active filters (user + date range).
-                if (response.stats) {
-                    const fmt = n => Number(n).toLocaleString();
-                    $('#stat-created').text(fmt(response.stats.created));
-                    $('#stat-viewed').text(fmt(response.stats.viewed));
-                    $('#stat-updated').text(fmt(response.stats.updated));
-                    $('#stat-deleted').text(fmt(response.stats.deleted));
-                    $('.stat-scope-label').text(response.stats.label || '');
-                }
-                $('html, body').animate({
-                    scrollTop: $("#activityTable").offset().top - 100
-                }, 100);
-            } else {
-                Swal.fire('Error', response.error || 'Failed to load data', 'error');
-                $('#activityRows').css('opacity', '1');
+let acTable = null;
+$(function () {
+    // ── Server-side DataTables: sort / search / paginate over 65k+ rows. The
+    //    activity FILTERS (Type / User / Period / Custom range) drive a full page
+    //    reload so the summary cards + Time-in-System panel re-render correctly;
+    //    DataTables sends the current filter values with every request. ──────────
+    acTable = $('#activityTable').DataTable({
+        serverSide: true,
+        processing: true,
+        ordering: true,
+        autoWidth: false,
+        order: [[1, 'desc']],                 // Time, newest first
+        pageLength: <?= $limit === -1 ? -1 : (int)$limit ?>,
+        lengthChange: false,                  // page size is the existing "Limit" dropdown
+        dom: '<"d-flex justify-content-end mb-2"f>rt<"d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 no-print"ip>',
+        ajax: {
+            url: '<?= getUrl('activity_log') ?>',
+            type: 'GET',
+            data: function (d) {
+                d.type      = $('#filterType').val();
+                d.user_id   = $('#filterUser').val();
+                d.period    = $('#filterPeriod').val();
+                d.date_from = $('#filterDateFrom').val();
+                d.date_to   = $('#filterDateTo').val();
+            },
+            error: function (xhr) {
+                console.error('Activity DataTables error:', xhr.status, xhr.statusText);
             }
         },
-        error: function(xhr) {
-            console.error('AJAX Error:', xhr.status, xhr.statusText);
-            Swal.fire('Error', 'Connection failed (Code: ' + xhr.status + '). Please try again.', 'error');
-            $('#activityRows').css('opacity', '1');
+        columns: [
+            { orderable: false, className: 'text-center', width: '5%'  }, // S/NO
+            { width: '15%' },                                            // Time
+            { width: '15%' },                                            // Type
+            { width: '35%' },                                            // Description (widest)
+            { orderable: false, width: '15%' },                          // Reference
+            { width: '15%' }                                             // User
+        ],
+        language: {
+            search: 'Search:',
+            processing: 'Loading…',
+            emptyTable: 'No activities found for this filter.',
+            zeroRecords: 'No matching activities found.',
+            info: 'Showing _START_ to _END_ of _TOTAL_ entries',
+            infoEmpty: 'Showing 0 entries',
+            infoFiltered: '(filtered from _MAX_ total)'
         }
     });
-}
 
-// Handle real-time filtering if preferred, or just the submit button
-$('#filterForm').on('submit', function(e) {
-    e.preventDefault();
-    loadPage(1);
-});
-
-// Auto-load on change for the simple filters.
-$('#filterType, #filterUser, #filterLimit').on('change', function() {
-    loadPage(1);
-});
-
-// Period: reveal the custom From/To only for "Custom (specify)"; otherwise the
-// server computes the range. For non-custom we reload immediately; for custom we
-// wait until the user actually picks a date.
-$('#filterPeriod').on('change', function() {
-    const isCustom = $(this).val() === 'custom';
-    $('.custom-date-field').toggle(isCustom);
-    if (isCustom) {
-        $('#filterDateFrom').focus();
-    } else {
-        loadPage(1);
+    // Filters → full reload (so cards + session panel stay correct server-side).
+    function acApplyFilters() {
+        const p = new URLSearchParams();
+        const t = $('#filterType').val();   if (t) p.set('type', t);
+        const u = $('#filterUser').val();   if (u) p.set('user_id', u);
+        p.set('period', $('#filterPeriod').val() || 'today');
+        const df = $('#filterDateFrom').val(); if (df) p.set('date_from', df);
+        const dt = $('#filterDateTo').val();   if (dt) p.set('date_to', dt);
+        const lim = $('#filterLimit').val();   if (lim) p.set('limit', lim);
+        window.location = '<?= getUrl('activity_log') ?>?' + p.toString();
     }
-});
 
-// When a custom date is set, reload (only meaningful while Period = Custom).
-$('#filterDateFrom, #filterDateTo').on('change', function() {
-    if ($('#filterPeriod').val() === 'custom') loadPage(1);
+    $('#filterForm').on('submit', function (e) { e.preventDefault(); acApplyFilters(); });
+    $('#filterType, #filterUser').on('change', acApplyFilters);
+
+    // Limit = DataTables page length (no reload needed).
+    $('#filterLimit').on('change', function () {
+        acTable.page.len(this.value === 'all' ? -1 : parseInt(this.value, 10)).draw();
+    });
+
+    // Period: reveal Custom From/To only for "Custom (specify)"; non-custom reloads
+    // immediately, custom waits for a date to be picked.
+    $('#filterPeriod').on('change', function () {
+        const isCustom = $(this).val() === 'custom';
+        $('.custom-date-field').toggle(isCustom);
+        if (isCustom) { $('#filterDateFrom').focus(); } else { acApplyFilters(); }
+    });
+    $('#filterDateFrom, #filterDateTo').on('change', function () {
+        if ($('#filterPeriod').val() === 'custom') acApplyFilters();
+    });
 });
-// Helper to log actions
 
 function printLog() {
     logReportAction('Printed Activity Log', 'Generated a printed report of the system activity logs');
@@ -1140,7 +1227,9 @@ async function initiatePurge() {
             html : `<strong>${purgeData.count.toLocaleString()}</strong> log entries have been permanently deleted.`,
             confirmButtonColor: '#28a745'
         });
-        loadPage(1);
+        // Reload the table (and refresh cards by reloading the page).
+        if (acTable) acTable.ajax.reload(null, false);
+        location.reload();
     } else {
         Swal.fire('Error', purgeData.error || 'Purge failed', 'error');
     }

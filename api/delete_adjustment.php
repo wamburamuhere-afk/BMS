@@ -92,7 +92,7 @@ try {
     
     // Log activity
     require_once __DIR__ . '/../helpers.php';
-    logActivity($pdo, $_SESSION['user_id'], "Deleted stock adjustment #$adjustment_id", "Reversed quantity: $reverse_quantity for product #$product_id");
+    logActivity($pdo, $_SESSION['user_id'], "Delete stock adjustment", "deleted stock adjustment with id $adjustment_id (reversed quantity $reverse_quantity for product #$product_id)");
     logAudit($pdo, $_SESSION['user_id'], "delete", [
         'entity_type' => 'stock_adjustment',
         'entity_id' => $adjustment_id,

@@ -42,7 +42,7 @@ try {
     }
     $pdo->prepare("DELETE FROM sc_payments WHERE id = ?")->execute([$id]);
 
-    logActivity($pdo, $_SESSION['user_id'], "Deleted Sub-Contractor Payment", "Payment ID: $id");
+    logActivity($pdo, $_SESSION['user_id'], "Delete sub-contractor payment", "deleted sub-contractor payment with id $id");
 
     echo json_encode(['success' => true, 'message' => 'Payment deleted successfully']);
 } catch (PDOException $e) {

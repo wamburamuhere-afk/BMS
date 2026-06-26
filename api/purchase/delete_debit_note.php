@@ -27,8 +27,8 @@ try {
 
     require_once __DIR__ . '/../../helpers.php';
     $user_name = $_SESSION['username'] ?? 'User';
-    logActivity($pdo, $_SESSION['user_id'], 'Delete Debit Note',
-        "$user_name deleted Debit Note #{$dn['debit_note_number']}");
+    logActivity($pdo, $_SESSION['user_id'], 'Delete debit note',
+        "deleted debit note #{$dn['debit_note_number']} with id $id");
 
     echo json_encode(['success' => true, 'message' => 'Debit note deleted successfully.']);
 } catch (PDOException $e) {

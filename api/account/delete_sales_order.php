@@ -62,8 +62,8 @@ try {
     $type_label = ($order['is_quote'] == 1) ? 'Quotation' : 'Sales Order';
     $user_name = $_SESSION['username'] ?? 'User';
     $order_num = $order['order_number'] ?? 'Unknown';
-    $description = "$user_name deleted $type_label #$order_num";
-    
+    $description = "deleted " . strtolower($type_label) . " #$order_num with id $order_id";
+
     logActivity($pdo, $_SESSION['user_id'], "Delete $type_label", $description);
 
     echo json_encode(['success' => true, 'message' => 'Order deleted successfully']);

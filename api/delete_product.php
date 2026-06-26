@@ -77,7 +77,7 @@ try {
 
     $pdo->commit();
 
-    logActivity($pdo, $_SESSION['user_id'], 'Deleted Product', "Deleted product: {$product['product_name']} (SKU: {$product['sku']})");
+    logActivity($pdo, $_SESSION['user_id'], 'Delete product', "deleted product \"{$product['product_name']}\" with id $product_id (SKU {$product['sku']})");
 
     echo json_encode(['success' => true, 'message' => "Product '{$product['product_name']}' deleted successfully"]);
 

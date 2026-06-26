@@ -20,7 +20,7 @@ try {
     // Also retire any active employee assignments of this component.
     $pdo->prepare("UPDATE employee_salary_components SET status = 'inactive', updated_at = NOW() WHERE component_id = ? AND status = 'active'")->execute([$id]);
 
-    logActivity($pdo, $_SESSION['user_id'], "Deleted salary component", "Component ID: $id");
+    logActivity($pdo, $_SESSION['user_id'], "Delete salary component", "deleted salary component with id $id");
     echo json_encode(['success' => true, 'message' => 'Component deleted.']);
 
 } catch (Exception $e) {
