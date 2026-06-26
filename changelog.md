@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-26 (feat) — Activity Logs: Period-driven cards + Custom (specify) date range
+
+- `app/activity_log.php` — **Period** is now the authoritative date filter (server-side), driving both the table and the summary cards. Default **Today**; options Today / This Week / This Month / This Year / All Time / Custom. The card label follows it: **"Created Today" → "Created This Month" / This Week / This Year / All Time** (verified: Today 177 created → This Month 4,436 → All Time 5,078). Range computed server-side so client/server can't drift.
+- **Custom (specify)** — the From/To date inputs are now hidden and only revealed when Period = "➕ Custom (specify)…" (the same "Other → specify" pattern used on the supplier form); a custom date reload fires when a date is picked. Removed the old client-side date-preset JS (replaced by the server-authoritative logic).
+
 ## 2026-06-26 (feat) — Activity Logs: summary cards now follow the active filters (live)
 
 - `app/activity_log.php` — the Created/Viewed/Updated/Deleted cards were fixed to "today, all users". They now reflect the **active user + date-range filters** (the Type filter is excluded — the cards ARE the per-type breakdown). When no date is set they default to today; the label switches **"Today" → "In range"** accordingly. Cards update **live** on AJAX filter change (stats added to the AJAX JSON; card values + label refreshed in JS). Verified scoping (today/all = 162 created vs user#4/all-dates = 4,893).
