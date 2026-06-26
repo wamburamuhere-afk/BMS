@@ -29,7 +29,7 @@ try {
     $pdo->beginTransaction();
     $pdo->prepare("DELETE FROM delivery_items WHERE delivery_id = ?")->execute([$delivery_id]);
     $pdo->prepare("DELETE FROM deliveries WHERE delivery_id = ?")->execute([$delivery_id]);
-    logActivity($pdo, $user_id, "Deleted Delivery Note #" . $dn['delivery_number']);
+    logActivity($pdo, $user_id, "Delete delivery note", "deleted delivery note #" . $dn['delivery_number'] . " with id $delivery_id");
     $pdo->commit();
 
     echo json_encode(['success'=>true, 'message'=>'Delivery Note deleted successfully.']);

@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-26 (fix) — Delete sweep batch 4: standardize Procurement/Stock delete logs
+
+Standardized to `audit_log.md` (Type `Delete <entity>`, Description `deleted
+<entity> <number/name> with id …`). Delete behaviour unchanged.
+
+- `api/delete_purchase_order.php`, `api/account/delete_purchase_order.php`
+- `api/delete_purchase_return.php`, `api/account/delete_purchase_return.php`
+- `api/delete_dn.php` (delivery note), `api/delete_rfq.php`, `api/delete_product.php`
+- `api/delete_adjustment.php` (stock adjustment), `api/operations/delete_warehouse.php`
+- `api/operations/delete_asset.php`, `api/operations/delete_maintenance_log.php`
+
 ## 2026-06-26 (fix) — Delete sweep batch 3: standardize Finance-group delete logs + smarter Type
 
 Standardized the `logActivity` format of Finance delete endpoints to `audit_log.md`
