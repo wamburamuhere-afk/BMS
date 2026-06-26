@@ -21,7 +21,7 @@ try {
     }
 
     $pdo->prepare("DELETE FROM project_inspections WHERE inspection_id=?")->execute([$id]);
-    logActivity($pdo, $_SESSION['user_id'], "Deleted inspection ID: {$id}");
+    logActivity($pdo, $_SESSION['user_id'], "Delete inspection", "deleted inspection with id $id");
     echo json_encode(['success'=>true,'message'=>'Inspection deleted successfully']);
 } catch (PDOException $e) {
     echo json_encode(['success'=>false,'message'=>'DB error: '.$e->getMessage()]);

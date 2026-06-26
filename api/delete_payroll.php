@@ -65,12 +65,15 @@ try {
         } catch (Throwable $e) { error_log('void statutory refresh: ' . $e->getMessage()); }
     }
 
+    // Audit trail (rich) + Activity Log feed. A void is a Delete in audit terms.
     logAudit($pdo, $_SESSION['user_id'], 'void_payroll', [
         'activity_type' => 'void',
         'entity_type'   => 'payroll',
         'entity_id'     => $payroll_id,
         'description'   => "Voided payroll #" . $payroll['payroll_number'] . " — {$void_reason}",
     ]);
+    logActivity($pdo, $_SESSION['user_id'], 'Delete payroll',
+        "deleted (voided) payroll #{$payroll['payroll_number']} with id {$payroll_id} — {$void_reason}");
 
     echo json_encode(['success' => true, 'message' => 'Payroll record voided and GL reversed. Record preserved for audit.']);
 } catch (Exception $e) {

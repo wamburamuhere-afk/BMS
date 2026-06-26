@@ -29,7 +29,7 @@ try {
     $pdo->prepare("DELETE FROM rfq WHERE rfq_id = ?")->execute([$rfq_id]);
     $pdo->commit();
 
-    logActivity($pdo, $_SESSION['user_id'], "Deleted RFQ #{$rfq['rfq_number']}");
+    logActivity($pdo, $_SESSION['user_id'], "Delete rfq", "deleted RFQ #{$rfq['rfq_number']} with id $rfq_id");
     echo json_encode(['success' => true, 'message' => "RFQ #{$rfq['rfq_number']} deleted successfully."]);
 
 } catch (Exception $e) {

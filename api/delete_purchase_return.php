@@ -48,7 +48,7 @@ try {
 
     $pdo->commit();
 
-    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Purchase Return", "Return ID: $returnId");
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Delete purchase return", "deleted purchase return with id $returnId");
 
     echo json_encode(['success' => true, 'message' => 'Return deleted successfully']);
 

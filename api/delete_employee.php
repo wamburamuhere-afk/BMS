@@ -43,7 +43,8 @@ try {
     $stmt = $pdo->prepare("UPDATE employees SET status = 'terminated', employment_status = 'terminated', updated_by = ? WHERE employee_id = ?");
     $stmt->execute([$_SESSION['user_id'], $employee_id]);
 
-    // Log Audit
+    // Audit trail (rich) + Activity Log feed (visible on activity_log.php).
+    $emp_name = trim(($old_values['first_name'] ?? '') . ' ' . ($old_values['last_name'] ?? '')) ?: ('employee #' . $employee_id);
     logAudit($pdo, $_SESSION['user_id'], 'delete', [
         'activity_type' => 'delete',
         'entity_type' => 'employee',
@@ -51,6 +52,8 @@ try {
         'description' => "Deleted (Terminated) employee: {$old_values['first_name']} {$old_values['last_name']}",
         'old_values' => $old_values
     ]);
+    logActivity($pdo, $_SESSION['user_id'], 'Delete employee',
+        "deleted (terminated) employee \"{$emp_name}\" with id {$employee_id}");
 
     $pdo->commit();
     echo json_encode(['success' => true, 'message' => 'Employee deleted successfully']);

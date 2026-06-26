@@ -1,5 +1,90 @@
 # BMS Changelog
 
+## 2026-06-26 (fix) — Delete sweep batches 6-7: Parties/HR + Ops/Docs/Settings delete logs
+
+Standardized the remaining delete endpoints to `audit_log.md` (Type `Delete
+<entity>`, Description `deleted <entity> <number/name> with id …`). Delete
+behaviour unchanged.
+
+- **Parties/HR:** `delete_supplier.php` (both paths), `delete_sub_contractor.php`, `delete_leave.php`, `pos/delete_salary_component.php`, `payroll/delete_tax_bracket.php`, `suppliers/delete_project_payment.php`.
+- **Ops/Docs/Settings:** `operations/delete_project.php`, `delete_ipc.php`, `delete_inspection.php`, `delete_scope_document.php`, `delete_scope_addendum.php`, `delete_project_doc.php`, `delete_project_planning.php`; `delete_document_template.php`, `delete_email_template.php`, `delete_sms_template.php`, `delete_brand.php`, `delete_category.php`, `delete_compliance.php`, `delete_notification.php`; `document/delete_signature.php`, `document/delete_collateral_document.php`, `assets/delete_asset_category.php`, `account/delete_account.php`, `account/delete_account_category.php`, `cash_register/delete_shift.php`, `pos/delete_held_sale.php`.
+
+This completes the delete sweep: every delete endpoint/handler with a real delete now logs to the Activity Log in the standard format; the only deletes left unlogged are non-deletes (edit re-inserts, rate-limit cleanup) which were deliberately skipped per audit_log.md §8.
+
+## 2026-06-26 (fix) — Delete sweep batch 5: standardize Sales/CRM delete logs
+
+Standardized to `audit_log.md` (Type `Delete <entity>`, Description `deleted
+<entity> <number/name> with id …`). Delete behaviour unchanged.
+
+- `api/delete_customer.php`, `api/account/delete_sales_order.php`, `api/account/delete_quotation.php`
+- `api/sales/delete_return.php` (sales return), `api/customer/delete_lpo.php`
+- `api/crm/delete_lead.php`, `api/delete_lead.php`, `api/crm/delete_campaign.php`, `api/delete_campaign.php`, `api/crm/delete_activity.php`
+
+## 2026-06-26 (fix) — Delete sweep batch 4: standardize Procurement/Stock delete logs
+
+Standardized to `audit_log.md` (Type `Delete <entity>`, Description `deleted
+<entity> <number/name> with id …`). Delete behaviour unchanged.
+
+- `api/delete_purchase_order.php`, `api/account/delete_purchase_order.php`
+- `api/delete_purchase_return.php`, `api/account/delete_purchase_return.php`
+- `api/delete_dn.php` (delivery note), `api/delete_rfq.php`, `api/delete_product.php`
+- `api/delete_adjustment.php` (stock adjustment), `api/operations/delete_warehouse.php`
+- `api/operations/delete_asset.php`, `api/operations/delete_maintenance_log.php`
+
+## 2026-06-26 (fix) — Delete sweep batch 3: standardize Finance-group delete logs + smarter Type
+
+Standardized the `logActivity` format of Finance delete endpoints to `audit_log.md`
+(Type `Delete <entity>`, Description `deleted <entity> … with id …`). Delete
+behaviour unchanged.
+
+- `api/account/delete_invoice.php`, `delete_expense.php`, `delete_voucher.php`, `delete_journal.php`, `delete_budget.php`, `delete_reconciliation.php`
+- `api/delete_supplier_payment.php`, `api/sc/delete_payment.php`
+- `api/sales/delete_credit_note.php`, `api/purchase/delete_debit_note.php`
+
+Also improved the Type-column parser in `app/activity_log.php`: when an action is
+already a short clean "`<verb> <entity>`" (our standard) it renders the **full**
+multi-word entity (e.g. "Delete sub-contractor payment", "Delete payment voucher"),
+falling back to keyword detection only for messy legacy strings. Verified.
+
+## 2026-06-26 (fix) — Delete sweep batch 2: silent IN-PAGE deletes now logged
+
+Per `audit_log.md` §8, in-page delete handlers (delete logic inside `app/**`
+pages, not `api/` endpoints) that were silent on the Activity Log now write a
+`logActivity('Delete <entity>', 'deleted <entity> … with id …')`. No delete
+behaviour changed.
+
+- `app/bms/customer/customer_documents.php` — `deleteCustomerDocument()` now logs `Delete document` ("deleted customer document with id N"). *(This is the silent path the user hit.)*
+- `app/constant/document/customer_documents.php` — logs `Delete document` for each real source (customer_attachments / additional_attachments / profile-doc clear).
+- `app/constant/document/loan_documents.php` — logs `Delete document` ("deleted loan document with id N (loan id L)") **before** the redirect (which exits).
+- `app/bms/pos/api/pos_controller.php` `handleDeleteHeldSale()` — logs `Delete held sale` alongside its existing `logAudit`.
+
+Deliberately SKIPPED (not user-facing deletes, per the rule): `edit_journal.php` (its `DELETE journal_entry_items` is part of an edit re-insert) and `pos/includes/security.php` (`DELETE rate_limits` is internal cleanup). Avoided depending on unverifiable columns (table `customer_documents` not present locally) — log uses the id.
+
+## 2026-06-26 (feat) — Activity Logs: server-side DataTables (sort / search / paginate over 65k+ rows)
+
+- `app/activity_log.php` — replaced the custom AJAX pagination with a **server-side jQuery DataTable** (`serverSide: true`) on the activity table. New `?draw=` endpoint (reuses the filter conditions) returns DataTables JSON with each row rendered to the 6 columns (S/NO, Time, **Type**, **Description**, Reference, User). Adds column **sorting**, a **search box**, and proper paging across all 65k+ rows (not just the current page).
+  - Extracted the row formatter into reusable top-level functions `acFormatActivity()` / `acBadgeClass()` (one source of truth for Type/Description/Reference).
+  - **All 6 columns kept**; **Description stays the widest** (35% vs 15%).
+  - The activity **filters** (Type / User / Period / Custom range) drive a **full page reload** so the period-aware summary cards + the Time-in-System panel re-render correctly; the table sends the current filter values with every DataTables request. The "Limit" dropdown maps to DataTables page length.
+  - Verified end-to-end: draw endpoint returns recordsTotal 66,529, server-side ordering/paging, `type=delete` → 1,322, search "deleted document" → 16, "login" → 3.
+
+## 2026-06-26 (fix) — Delete sweep batch 1: silent deletes now appear on Activity Log
+
+Per `audit_log.md`, deletes that were invisible on the Activity Log (they wrote
+only to `audit_logs` via `logAudit`, or nothing at all) now also write a clear
+`logActivity` entry — Type `Delete <entity>`, Description `deleted <entity> <name>
+with id …`. No delete behaviour changed; existing `logAudit` calls kept.
+
+- `api/delete_attendance.php` — + `Delete attendance` ("deleted attendance record for employee <name> (id N) on <date>"); fetches employee name.
+- `api/delete_employee.php` — + `Delete employee` ("deleted (terminated) employee \"<name>\" with id N").
+- `api/delete_grn.php` — + `Delete grn` ("deleted GRN #<no> with id N (was <status>)").
+- `api/document/delete_document.php` — + `Delete document` ("deleted document \"<name>\" with id N"); SELECT now pulls document_name/original_filename.
+- `api/document/delete_document_template.php` — + `Delete document template`; captures template_name before delete; moved logging before output.
+- `api/delete_payroll.php` — + `Delete payroll` ("deleted (voided) payroll #<no> with id N — <reason>") (a void = Delete in audit terms).
+- `api/delete_backup.php` — was fully silent (no logging); + `Delete backup` ("deleted backup file \"<name>\""). NOTE: this endpoint still has its permission check commented out — flagged, not changed (out of scope for this logging task).
+
+Verified end-to-end (a real delete writes the expected activity_logs row) and that all seven render as smart Type `Delete <entity>` and are caught by the Delete filter. Shims (`api/delete_account.php`, `delete_budget.php`, `delete_expense.php`, `delete_account_category.php`) just include the `account/` versions which already log — untouched.
+
 ## 2026-06-26 (feat) — Activity Logs: Period-driven cards + Custom (specify) date range
 
 - `app/activity_log.php` — **Period** is now the authoritative date filter (server-side), driving both the table and the summary cards. Default **Today**; options Today / This Week / This Month / This Year / All Time / Custom. The card label follows it: **"Created Today" → "Created This Month" / This Week / This Year / All Time** (verified: Today 177 created → This Month 4,436 → All Time 5,078). Range computed server-side so client/server can't drift.

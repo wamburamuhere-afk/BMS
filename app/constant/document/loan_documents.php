@@ -22,6 +22,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['doc_i
     if ($doc) {
         if (file_exists($doc['file_path'])) unlink($doc['file_path']);
         $pdo->prepare("DELETE FROM loan_documents WHERE id = ?")->execute([$doc_id]);
+        // Activity Log feed (audit_log.md) BEFORE the redirect (which exits).
+        if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
+            logActivity($pdo, (int)$_SESSION['user_id'], 'Delete document',
+                "deleted loan document with id {$doc_id} (loan id {$loan_id})");
+        }
         redirectTo("loans/documents?loan_id=$loan_id&msg=deleted");
     }
 }

@@ -49,8 +49,8 @@ try {
     $pdo->commit();
 
     $user_name = $_SESSION['username'] ?? 'User';
-    logActivity($pdo, $_SESSION['user_id'], "Delete Quotation",
-        "$user_name deleted Quotation #" . ($quotation['order_number'] ?? 'Unknown'));
+    logActivity($pdo, $_SESSION['user_id'], "Delete quotation",
+        "deleted quotation #" . ($quotation['order_number'] ?? 'Unknown') . " with id $quotation_id");
 
     echo json_encode(['success' => true, 'message' => 'Quotation deleted successfully']);
 

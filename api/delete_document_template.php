@@ -27,7 +27,7 @@ try {
     $stmt = $pdo->prepare("DELETE FROM document_templates WHERE id = ?");
     $stmt->execute([$id]);
 
-    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Document Template", "Template ID: $id");
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Delete document template", "deleted document template with id $id");
 
     echo json_encode(['success' => true, 'message' => "Template deleted successfully"]);
 } catch (Exception $e) {
