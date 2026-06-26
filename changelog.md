@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-06-25 (refactor) — actors as subsidiary ledger, Phase 2-3 (hide + drill)
+
+- Hid the flagged actor sub-accounts (`is_subledger=1`) from every "account" surface (chart top 399→103 visible; control accounts kept):
+  - `api/account/get_chart_of_accounts.php` — chart tree (`baseQuery` + `AND a.is_subledger = 0`)
+  - `api/account/get_accounts.php` — generic account dropdown feed
+  - `api/account/search_accounts.php` — journal account search (generic + both bank branches)
+  - `app/constant/accounts/edit_journal.php` — Dr/Cr account dropdowns
+  - `app/constant/accounts/chart_of_accounts.php` — parent cascade picker (`ACCOUNTS_LIST`)
+- `app/constant/accounts/account_details.php` — excluded `is_subledger` children from the Account Composition panel, so a control account no longer lists the 296 dormant zero-balance sub-accounts. The existing **per-vendor (AP)** and **per-customer (AR)** sub-ledger cards — sourced from `supplier_invoices` / `invoices`+`payments`, already with a S/No (`#`) column — remain the drill-in view (suppliers, sub-contractors, customers covered).
+- **Employee/Salaries sub-ledger DEFERRED (honest):** GL Salaries Payable balance (≈42.34B) does not reconcile with payroll Σ(net−paid) (≈2.25B) — a pre-existing payroll-posting integrity issue (incl. a negative-net payroll row). A per-employee sub-ledger must not be shipped until that reconciles.
+- No posting change (actor accounts remain dormant).
+
 ## 2026-06-25 (refactor) — actors as subsidiary ledger, Phase 1 (classify)
 
 - `migrations/2026_06_25_accounts_is_subledger.php` — adds `accounts.is_subledger TINYINT(1) NOT NULL DEFAULT 0` (idempotent `SHOW COLUMNS` guard); backfills `is_subledger=1` for the per-actor GL sub-accounts created by `actor_account.php` (`account_code REGEXP '-(CUST|SUP|SUB|EMP)-'`) — flagged 296 locally. Control accounts (Trade Debtors/Creditors/Salaries Payable) untouched. No hard-coded ids.

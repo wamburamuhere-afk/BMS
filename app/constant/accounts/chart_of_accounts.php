@@ -67,6 +67,7 @@ try {
                                    FROM accounts a
                                    LEFT JOIN account_types at ON a.account_type_id = at.type_id
                                   WHERE a.status != 'deleted'
+                                    AND a.is_subledger = 0
                                   ORDER BY a.account_code");
     $accounts = $accountsStmt->fetchAll(PDO::FETCH_ASSOC);
     

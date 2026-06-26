@@ -45,6 +45,7 @@ try {
         LEFT JOIN account_sub_types st ON a.sub_type_id = st.sub_type_id
         LEFT JOIN acct_tree atr ON atr.account_id = a.account_id
         WHERE 1=1
+          AND a.is_subledger = 0
     ";
 
     // Apply category filter
