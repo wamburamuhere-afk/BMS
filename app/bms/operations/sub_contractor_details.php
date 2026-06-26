@@ -99,19 +99,34 @@ if (!empty($_SESSION['scope']['is_admin'])) {
     }
 }
 
-// Fetch all projects this sub-contractor is assigned to (many-to-many)
+// Fetch all projects this sub-contractor is involved in: the UNION of the
+// sub_contractor_projects junction AND the PRIMARY project chosen at creation
+// (sub_contractors.project_id), which is otherwise missing from "Projects Involved".
 $sc_projects_stmt = $pdo->prepare("
     SELECT p.project_id, p.project_name, p.status, p.contract_sum,
            scp.assigned_at,
            CONCAT(u.first_name, ' ', u.last_name) AS assigned_by_name,
-           u.user_role AS assigned_by_role
+           u.user_role AS assigned_by_role,
+           0 AS is_primary
     FROM sub_contractor_projects scp
     JOIN projects p ON scp.project_id = p.project_id
     LEFT JOIN users u ON scp.assigned_by = u.user_id
     WHERE scp.supplier_id = ?
-    ORDER BY scp.assigned_at DESC
+    UNION
+    SELECT p.project_id, p.project_name, p.status, p.contract_sum,
+           s.created_at AS assigned_at,
+           CONCAT(cu.first_name, ' ', cu.last_name) AS assigned_by_name,
+           cu.user_role AS assigned_by_role,
+           1 AS is_primary
+    FROM sub_contractors s
+    JOIN projects p ON p.project_id = s.project_id
+    LEFT JOIN users cu ON cu.user_id = s.created_by
+    WHERE s.supplier_id = ?
+      AND s.project_id IS NOT NULL
+      AND s.project_id NOT IN (SELECT project_id FROM sub_contractor_projects WHERE supplier_id = ?)
+    ORDER BY is_primary DESC, assigned_at DESC
 ");
-$sc_projects_stmt->execute([$supplier_id]);
+$sc_projects_stmt->execute([$supplier_id, $supplier_id, $supplier_id]);
 $sc_projects = $sc_projects_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Cash/bank (Paid From) source accounts — same canonical list every payment form uses.
@@ -420,6 +435,9 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                                 <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>&sc_id=<?= $supplier_id ?>" class="fw-bold text-decoration-none">
                                                     <?= htmlspecialchars($proj['project_name']) ?>
                                                 </a>
+                                                <?php if (!empty($proj['is_primary'])): ?>
+                                                    <span class="badge bg-info-subtle text-info border border-info-subtle ms-1" title="Linked when this sub-contractor was created">Primary</span>
+                                                <?php endif; ?>
                                             </td>
                                             <td><?= format_currency($proj['contract_sum'] ?? 0) ?></td>
                                             <td><?= $proj['assigned_at'] ? date('d M Y', strtotime($proj['assigned_at'])) : '—' ?></td>
@@ -432,6 +450,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                                 <?php if ($role): ?>
                                                     <br><small class="text-muted"><?= htmlspecialchars($role) ?></small>
                                                 <?php endif; ?>
+                                                <?php if (!empty($proj['is_primary'])): ?><br><small class="text-muted fst-italic">at registration</small><?php endif; ?>
                                             </td>
                                             <td><span class="badge bg-<?= get_status_badge($proj['status']) ?>"><?= ucfirst($proj['status']) ?></span></td>
                                             <td class="text-end">
@@ -445,7 +464,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                                                 <i class="bi bi-eye text-info me-2"></i> View Project
                                                             </a>
                                                         </li>
-                                                        <?php if ($can_edit): ?>
+                                                        <?php if ($can_edit && empty($proj['is_primary'])): ?>
                                                         <li><hr class="dropdown-divider"></li>
                                                         <li>
                                                             <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="removeFromProject(<?= $proj['project_id'] ?>, '<?= htmlspecialchars(addslashes($proj['project_name'])) ?>'); return false;">

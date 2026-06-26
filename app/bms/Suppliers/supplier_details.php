@@ -91,19 +91,35 @@ $ri_stmt = $pdo->prepare("SELECT COUNT(*) FROM supplier_invoices WHERE supplier_
 $ri_stmt->execute([$supplier_id]);
 $received_invoices_count = (int)$ri_stmt->fetchColumn();
 
-// Fetch all projects this supplier is assigned to (via supplier_projects table)
+// Fetch all projects this supplier is involved in. This is the UNION of:
+//  (a) the projects assigned via the supplier_projects junction, AND
+//  (b) the PRIMARY project chosen at creation (suppliers.project_id) — which is
+//      not in the junction, so it used to be missing from "Projects Involved".
 $proj_stmt = $pdo->prepare("
     SELECT p.project_id, p.project_name, p.status, p.contract_sum,
            sp.assigned_at,
            CONCAT(u.first_name, ' ', u.last_name) AS assigned_by_name,
-           u.user_role AS assigned_by_role
+           u.user_role AS assigned_by_role,
+           0 AS is_primary
     FROM supplier_projects sp
     JOIN projects p ON sp.project_id = p.project_id
     LEFT JOIN users u ON sp.assigned_by = u.user_id
     WHERE sp.supplier_id = ?
-    ORDER BY sp.assigned_at DESC
+    UNION
+    SELECT p.project_id, p.project_name, p.status, p.contract_sum,
+           s.created_at AS assigned_at,
+           CONCAT(cu.first_name, ' ', cu.last_name) AS assigned_by_name,
+           cu.user_role AS assigned_by_role,
+           1 AS is_primary
+    FROM suppliers s
+    JOIN projects p ON p.project_id = s.project_id
+    LEFT JOIN users cu ON cu.user_id = s.created_by
+    WHERE s.supplier_id = ?
+      AND s.project_id IS NOT NULL
+      AND s.project_id NOT IN (SELECT project_id FROM supplier_projects WHERE supplier_id = ?)
+    ORDER BY is_primary DESC, assigned_at DESC
 ");
-$proj_stmt->execute([$supplier_id]);
+$proj_stmt->execute([$supplier_id, $supplier_id, $supplier_id]);
 $supplier_projects = $proj_stmt->fetchAll(PDO::FETCH_ASSOC);
 $total_supplier_projects = count($supplier_projects);
 
@@ -642,6 +658,9 @@ global $company_name, $company_logo;
                                                 <a href="<?= getUrl('project_view') ?>?id=<?= $proj['project_id'] ?>&supplier_id=<?= $supplier_id ?>" class="fw-bold text-decoration-none">
                                                     <?= htmlspecialchars($proj['project_name']) ?>
                                                 </a>
+                                                <?php if (!empty($proj['is_primary'])): ?>
+                                                    <span class="badge bg-info-subtle text-info border border-info-subtle ms-1" title="Linked when this supplier was created">Primary</span>
+                                                <?php endif; ?>
                                             </td>
                                             <td><?= format_currency($proj['contract_sum'] ?? 0) ?></td>
                                             <td><?= !empty($proj['assigned_at']) ? date('d M Y', strtotime($proj['assigned_at'])) : '—' ?></td>
@@ -649,6 +668,7 @@ global $company_name, $company_logo;
                                                 <?php $aname = trim($proj['assigned_by_name'] ?? ''); $arole = ucwords($proj['assigned_by_role'] ?? ''); ?>
                                                 <?= $aname ? htmlspecialchars($aname) : '—' ?>
                                                 <?php if ($arole): ?><br><small class="text-muted"><?= htmlspecialchars($arole) ?></small><?php endif; ?>
+                                                <?php if (!empty($proj['is_primary'])): ?><br><small class="text-muted fst-italic">at registration</small><?php endif; ?>
                                             </td>
                                             <td><span class="badge bg-<?= get_status_badge($proj['status']) ?>"><?= ucfirst($proj['status']) ?></span></td>
                                             <td class="text-end">
@@ -662,7 +682,7 @@ global $company_name, $company_logo;
                                                                 <i class="bi bi-eye text-info me-2"></i> View Project
                                                             </a>
                                                         </li>
-                                                        <?php if ($can_edit): ?>
+                                                        <?php if ($can_edit && empty($proj['is_primary'])): ?>
                                                         <li><hr class="dropdown-divider"></li>
                                                         <li>
                                                             <a class="dropdown-item py-2 rounded text-danger" href="#" onclick="removeFromProject(<?= $proj['project_id'] ?>, '<?= htmlspecialchars(addslashes($proj['project_name'])) ?>'); return false;">
