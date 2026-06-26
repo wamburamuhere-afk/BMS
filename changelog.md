@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-06-25 (ui) — header date/location smaller on mobile (match vikundi)
+
+- `header.php` — inside `@media (max-width: 576px)`: `.date-location-box` font-size `0.7rem` → `0.52rem`; added child override for `.date-text` / `.location-text` at `0.52rem !important` so the inline `0.85rem` on those elements is beaten on phones (previously only the `|` separator shrank). Desktop unchanged; header only.
+
 ## 2026-06-25 (feat) — recurring page: payment flow + dropdown fix
 
 - `app/constant/accounts/recurring.php`:
