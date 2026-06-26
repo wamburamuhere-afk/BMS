@@ -474,8 +474,12 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
             }
 
             .date-location-box {
-                font-size: 0.7rem !important;
+                font-size: 0.52rem !important;
                 flex-shrink: 0;
+            }
+            .date-location-box .date-text,
+            .date-location-box .location-text {
+                font-size: 0.52rem !important;
             }
 
             body { padding-top: 72px; } /* fallback before JS runs */
