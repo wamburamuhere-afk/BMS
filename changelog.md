@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-26 (feat) — self-growing "Other → type → saved" dropdowns (suppliers + sub-contractors)
+
+Reference-data dropdowns are now flexible: pick an option, or choose **"Other"** to swap the dropdown for a text input, type a new value, and it is **saved for next time** — no code/DB edits ever needed. Applied to **both Add and Edit** forms.
+
+- `migrations/2026_06_26_form_lookups.php` — new `form_lookups` table `(lookup_key,value,label,sort_order,status,…)` + seeds `supplier_type`, `payment_terms`, `currency`. Idempotent.
+- `migrations/2026_06_26_form_lookups_subcontractor.php` — seeds `sub_contractor_type` (separate list); payment_terms + currency shared with suppliers.
+- `core/form_lookups.php` — `formLookupOptions()`, `renderOtherSelect()` (the reusable dropdown+Other-input widget), `upsertFormLookup()` (persists a typed value).
+- `api/lookups/get_lookups.php` — Select2-AJAX source for these lists.
+- `app/bms/Suppliers/suppliers.php` — Add+Edit modals: supplier_type, year (1950→next yr, searchable), category, payment_terms, currency → `renderOtherSelect()`; generic Other→input JS; project-list now shows the **primary project name** (was "—").
+- `api/add_supplier.php`, `api/update_supplier.php` — resolve "Other", persist new values via `upsertFormLookup()`.
+- `app/bms/operations/sub_contractors.php` — same 10 widgets (own `sub_contractor_type` list) + generic JS + edit-populate injects typed values + project-list fix.
+- `api/add_sub_contractor.php`, `api/update_sub_contractor.php` — resolve "Other", create-new-category, persist new values.
+- `header.php` + `footer.php` — global Select2-in-modal fix: disable Bootstrap modal focus-trap (`Modal.Default.focus=false`) + Select2 dropdown z-index/independent scroll, so dropdowns don't close on click. System-wide; future modals inherit it.
+- `tests/test_form_lookups_subcontractor_cli.php` — 19 checks incl. a real end-to-end create+save through `add_sub_contractor.php` (self-cleaning). Green.
+
 ## 2026-06-25 (fix) — void orphan payroll_accrual test entries (Salaries Payable cleanup)
 
 - `migrations/2026_06_25_payroll_accrual_orphan_cleanup.php` — soft-voids posted `payroll_accrual` journal entries whose `entity_id` has no matching `payroll` row (test-script accruals: future-dated 2031, fake payroll ids, incl. a 2-billion fake salary). 154 voided on local dev DB. Criteria-based + idempotent (re-run finds 0); each orphan is internally balanced so the ledger stays balanced (Dr−Cr 0.00 → 0.00). Removes ~44.3B bogus **Salaries Payable** (all-dates) + matching **Wages & Salaries** expense. **No-op on a clean DB** (production never runs the offending test, so this heals nothing harmful there). Root cause is a local-only test-teardown gap.

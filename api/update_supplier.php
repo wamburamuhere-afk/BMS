@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/form_lookups.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -62,6 +63,16 @@ if (empty($payment_terms) || $payment_terms === 'other') {
 if (empty($currency) || $currency === 'other') {
     $currency = trim($_POST['currency_other'] ?? 'TZS');
 }
+if ($supplier_type === 'other') {
+    $supplier_type = trim($_POST['supplier_type_other'] ?? '');
+}
+
+// Self-growing dropdowns: persist any newly-typed value so it appears next time.
+$lk_uid = (int)($_SESSION['user_id'] ?? 0) ?: null;
+upsertFormLookup($pdo, 'supplier_type', $supplier_type, $lk_uid);
+upsertFormLookup($pdo, 'payment_terms', $payment_terms, $lk_uid);
+upsertFormLookup($pdo, 'currency',      $currency,      $lk_uid);
+
 // Category "Other" – create new category on the fly if needed
 if ($category_id === 'other' || ($category_id === null && !empty(trim($_POST['category_other'] ?? '')))) {
     $cat_other = trim($_POST['category_other'] ?? '');

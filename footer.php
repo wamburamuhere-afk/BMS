@@ -34,6 +34,22 @@ echo '
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
+<!-- Global fix: keep Select2 (and other plugin) dropdowns from being closed by the
+     Bootstrap modal focus-trap. Sets focus:false as the DEFAULT for every modal —
+     present and future, however created — so click-and-search dropdowns stay open.
+     No per-modal markup needed. This is the system-wide standard going forward. -->
+<script>
+    try {
+        if (window.bootstrap && bootstrap.Modal && bootstrap.Modal.Default) {
+            bootstrap.Modal.Default.focus = false;
+        }
+    } catch (e) { /* no-op */ }
+    // Belt-and-suspenders: also stamp the attribute on any modals already in the DOM.
+    document.querySelectorAll('.modal').forEach(function (m) {
+        if (!m.hasAttribute('data-bs-focus')) m.setAttribute('data-bs-focus', 'false');
+    });
+</script>
+
 <!-- Global Modal Close on Success -->
 <script>
 $(document).ajaxSuccess(function(event, xhr, settings, data) {
