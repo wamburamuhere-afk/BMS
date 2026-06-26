@@ -141,7 +141,7 @@ try {
         }
     }
 
-    logActivity($pdo, $_SESSION['user_id'], "Updated complex journal entry ID: $entry_id - $description (Total: " . number_format($total_debits, 2) . ")");
+    logActivity($pdo, $_SESSION['user_id'], 'Edit journal entry', "User edited journal entry: $reference_number (ID $entry_id)");
 
     $pdo->commit();
 

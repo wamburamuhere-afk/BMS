@@ -125,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ->execute([$txnResult['transaction_id'], $entry_id]);
 
         // Log activity
-        logActivity($pdo, $_SESSION['user_id'], "Created journal entry: $description ($reference_number)");
+        logActivity($pdo, $_SESSION['user_id'], 'Create journal entry', "User created a new journal entry: $reference_number (ID $entry_id)");
         
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'Journal entry created successfully']);

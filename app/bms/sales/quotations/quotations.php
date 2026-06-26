@@ -7,6 +7,8 @@ autoEnforcePermission('sales_orders');
 
 includeHeader();
 
+logActivity($pdo, $_SESSION['user_id'], 'View quotations', 'User viewed the quotations management list');
+
 global $pdo;
 
 // Get filter parameters

@@ -13,6 +13,8 @@ global $pdo;
 
 autoEnforcePermission('revenue');
 
+logActivity($pdo, $_SESSION['user_id'], 'View revenue', 'User viewed the revenue management list');
+
 $can_create  = canCreate('revenue');
 $can_edit    = canEdit('revenue');
 $can_review  = canReview('revenue');

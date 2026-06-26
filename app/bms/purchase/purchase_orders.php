@@ -14,6 +14,8 @@ $po_is_admin    = isAdmin();
 
 includeHeader();
 
+logActivity($pdo, $_SESSION['user_id'], 'View purchase orders', 'User viewed the purchase orders management list');
+
 // Get filter defaults
 $supplier_id = $_GET['supplier'] ?? '';
 $status = $_GET['status'] ?? '';

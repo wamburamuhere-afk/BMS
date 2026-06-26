@@ -156,7 +156,7 @@ try {
             );
         }
 
-        logActivity($pdo, $created_by, "Added new expense: " . $description . " (Amount: " . $amount . ")");
+        logActivity($pdo, $created_by, 'Create expense', "User created a new expense: $description (ID $expense_id)");
 
         $pdo->commit();
 

@@ -16,6 +16,8 @@ autoEnforcePermission('expenses');
 
 includeHeader();
 
+logActivity($pdo, $_SESSION['user_id'], 'View expenses', 'User viewed the expenses management list');
+
 // Fetch Expense Accounts (canonical: active expense + finance_cost)
 $expense_accounts = expenseAccounts($pdo);
 
