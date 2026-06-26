@@ -63,20 +63,6 @@ $company_vrn = get_setting('company_vrn', '');
         return [$ors ? '(' . implode(' OR ', $ors) . ')' : '1=0', $p];
     };
 
-    // Today's summary cards — same canonical mapping as the filter (audit_log.md §6),
-    // so each card equals what its matching filter would return. No drifting logic.
-    $stat_cols = ['created' => 'create', 'viewed' => 'view', 'updated' => 'edit', 'deleted' => 'delete'];
-    $statSelects = []; $statParams = [];
-    foreach ($stat_cols as $col => $type) {
-        [$frag, $fp] = $buildTypeSql($type, "s_{$col}_");
-        $statSelects[] = "COUNT(CASE WHEN $frag THEN 1 END) AS $col";
-        $statParams = array_merge($statParams, $fp);
-    }
-    $stats_stmt = $pdo->prepare("SELECT " . implode(", ", $statSelects)
-        . " FROM activity_logs WHERE DATE(created_at) = CURDATE()");
-    $stats_stmt->execute($statParams);
-    $today_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
-
     // Apply the Activity Type filter via the same map.
     if ($type_filter && isset($activity_type_map[$type_filter])) {
         [$frag, $fp] = $buildTypeSql($type_filter, 'ft_');
@@ -95,6 +81,31 @@ $company_vrn = get_setting('company_vrn', '');
         $conditions[] = "activity_logs.created_at <= :date_to";
         $params[':date_to'] = $date_to . ' 23:59:59';
     }
+
+    // ── Summary cards — now reflect the ACTIVE filters (user + date range), NOT a
+    //    fixed "today". The Type filter is intentionally excluded: the cards ARE
+    //    the per-type breakdown. When no date is chosen, default to today.
+    $scope_where = []; $scope_params = [];
+    if ($user_id_filter) { $scope_where[] = "user_id = :su"; $scope_params[':su'] = $user_id_filter; }
+    if ($date_from)      { $scope_where[] = "created_at >= :sdf"; $scope_params[':sdf'] = $date_from . ' 00:00:00'; }
+    if ($date_to)        { $scope_where[] = "created_at <= :sdt"; $scope_params[':sdt'] = $date_to . ' 23:59:59'; }
+    $stats_is_today = (!$date_from && !$date_to);   // no date filter → "Today"
+    if ($stats_is_today) { $scope_where[] = "DATE(created_at) = CURDATE()"; }
+
+    $stat_cols = ['created' => 'create', 'viewed' => 'view', 'updated' => 'edit', 'deleted' => 'delete'];
+    $statSelects = []; $statParams = $scope_params;
+    foreach ($stat_cols as $col => $type) {
+        [$frag, $fp] = $buildTypeSql($type, "s_{$col}_");
+        $statSelects[] = "COUNT(CASE WHEN $frag THEN 1 END) AS $col";
+        $statParams = array_merge($statParams, $fp);
+    }
+    $stats_sql = "SELECT " . implode(", ", $statSelects) . " FROM activity_logs"
+               . (!empty($scope_where) ? " WHERE " . implode(" AND ", $scope_where) : "");
+    $stats_stmt = $pdo->prepare($stats_sql);
+    $stats_stmt->execute($statParams);
+    $today_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
+    // Label suffix shown on the cards so it's clear what scope they count.
+    $stats_scope_label = $stats_is_today ? 'Today' : 'In range';
 
     $where_clause = !empty($conditions) ? "WHERE " . implode(" AND ", $conditions) : "";
 
@@ -352,7 +363,15 @@ if (isset($_GET['ajax'])) {
         'pagination' => $pagination,
         'info' => "Showing " . ($total_items > 0 ? $offset + 1 : 0) . " to " . ($limit === -1 ? $total_items : min($offset + $limit, $total_items)) . " of $total_items entries",
         'page' => $page,
-        'total_pages' => $total_pages
+        'total_pages' => $total_pages,
+        // Summary cards reflect the active filter scope (audit_log.md §6).
+        'stats' => [
+            'created' => (int)($today_stats['created'] ?? 0),
+            'viewed'  => (int)($today_stats['viewed'] ?? 0),
+            'updated' => (int)($today_stats['updated'] ?? 0),
+            'deleted' => (int)($today_stats['deleted'] ?? 0),
+            'label'   => $stats_scope_label,
+        ],
     ]);
     exit;
 }
@@ -601,32 +620,32 @@ $page_title = "Activity Log";
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm" style="background-color: #d1e7dd; border-radius: 15px;">
                 <div class="card-body p-3 text-center">
-                    <h6 class="text-success text-uppercase small fw-bold mb-1" style="font-size: 0.65rem;">Created Today</h6>
-                    <h3 class="fw-bold mb-0 text-success"><?= number_format($today_stats['created'] ?? 0) ?></h3>
+                    <h6 class="text-success text-uppercase small fw-bold mb-1" style="font-size: 0.65rem;">Created <span class="stat-scope-label"><?= htmlspecialchars($stats_scope_label) ?></span></h6>
+                    <h3 class="fw-bold mb-0 text-success" id="stat-created"><?= number_format($today_stats['created'] ?? 0) ?></h3>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm" style="background-color: #d1e7dd; border-radius: 15px;">
                 <div class="card-body p-3 text-center">
-                    <h6 class="text-success text-uppercase small fw-bold mb-1" style="font-size: 0.65rem;">Viewed Today</h6>
-                    <h3 class="fw-bold mb-0 text-success"><?= number_format($today_stats['viewed'] ?? 0) ?></h3>
+                    <h6 class="text-success text-uppercase small fw-bold mb-1" style="font-size: 0.65rem;">Viewed <span class="stat-scope-label"><?= htmlspecialchars($stats_scope_label) ?></span></h6>
+                    <h3 class="fw-bold mb-0 text-success" id="stat-viewed"><?= number_format($today_stats['viewed'] ?? 0) ?></h3>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm" style="background-color: #d1e7dd; border-radius: 15px;">
                 <div class="card-body p-3 text-center">
-                    <h6 class="text-success text-uppercase small fw-bold mb-1" style="font-size: 0.65rem;">Updated Today</h6>
-                    <h3 class="fw-bold mb-0 text-success"><?= number_format($today_stats['updated'] ?? 0) ?></h3>
+                    <h6 class="text-success text-uppercase small fw-bold mb-1" style="font-size: 0.65rem;">Updated <span class="stat-scope-label"><?= htmlspecialchars($stats_scope_label) ?></span></h6>
+                    <h3 class="fw-bold mb-0 text-success" id="stat-updated"><?= number_format($today_stats['updated'] ?? 0) ?></h3>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm" style="background-color: #d1e7dd; border-radius: 15px;">
                 <div class="card-body p-3 text-center">
-                    <h6 class="text-success text-uppercase small fw-bold mb-1" style="font-size: 0.65rem;">Deleted Today</h6>
-                    <h3 class="fw-bold mb-0 text-success"><?= number_format($today_stats['deleted'] ?? 0) ?></h3>
+                    <h6 class="text-success text-uppercase small fw-bold mb-1" style="font-size: 0.65rem;">Deleted <span class="stat-scope-label"><?= htmlspecialchars($stats_scope_label) ?></span></h6>
+                    <h3 class="fw-bold mb-0 text-success" id="stat-deleted"><?= number_format($today_stats['deleted'] ?? 0) ?></h3>
                 </div>
             </div>
         </div>
@@ -899,6 +918,15 @@ function loadPage(page) {
                 $('#activityRows').html(response.rows).css('opacity', '1');
                 $('#paginationNav').html(response.pagination);
                 $('#paginationInfo').text(response.info);
+                // Summary cards follow the active filters (user + date range).
+                if (response.stats) {
+                    const fmt = n => Number(n).toLocaleString();
+                    $('#stat-created').text(fmt(response.stats.created));
+                    $('#stat-viewed').text(fmt(response.stats.viewed));
+                    $('#stat-updated').text(fmt(response.stats.updated));
+                    $('#stat-deleted').text(fmt(response.stats.deleted));
+                    $('.stat-scope-label').text(response.stats.label || '');
+                }
                 $('html, body').animate({
                     scrollTop: $("#activityTable").offset().top - 100
                 }, 100);

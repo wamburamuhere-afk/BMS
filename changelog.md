@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-26 (feat) — Activity Logs: summary cards now follow the active filters (live)
+
+- `app/activity_log.php` — the Created/Viewed/Updated/Deleted cards were fixed to "today, all users". They now reflect the **active user + date-range filters** (the Type filter is excluded — the cards ARE the per-type breakdown). When no date is set they default to today; the label switches **"Today" → "In range"** accordingly. Cards update **live** on AJAX filter change (stats added to the AJAX JSON; card values + label refreshed in JS). Verified scoping (today/all = 162 created vs user#4/all-dates = 4,893).
+- (Session "time in system" was already implemented: filter by one user → the Time-in-System panel shows total/sessions/avg/last-login + a recent-sessions table with login→logout→duration→how-it-ended→IP.)
+
 ## 2026-06-26 (feat) — Activity Logs: audit standard (audit_log.md) + smart Type + accurate cards
 
 - `audit_log.md` (new) — the audit/activity-log standard: the six core activities (View/Create/Edit/Delete/Review/Approve), the **Type** format (`<Verb> <entity>`, e.g. "Delete invoice"), the **Description** format (starts with the past-tense action + entity + id, e.g. "deleted invoice with id 7"), the `logActivity()` calling convention, legacy-verb normalisation, session "time in system", and the roll-out order (Delete→Edit→View→Create→Review→Approve).
