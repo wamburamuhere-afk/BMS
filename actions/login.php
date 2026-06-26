@@ -35,6 +35,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             loadUserPermissions($_SESSION['role_id']);
         }
 
+        // ── Session tracking (best-effort, never blocks login) ──────────────
+        // Open a user_sessions row so we can measure how long the user stays,
+        // and record a Login event in the activity feed (who / when / IP).
+        try {
+            require_once __DIR__ . '/../core/session_tracker.php';
+            require_once __DIR__ . '/../helpers.php';
+            $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+            $ua = $_SERVER['HTTP_USER_AGENT'] ?? null;
+            $sid = startUserSession($pdo, (int) $user['user_id'], $ip, $ua);
+            if ($sid) $_SESSION['session_row_id'] = $sid;
+            if (function_exists('logActivity')) {
+                logActivity($pdo, (int) $user['user_id'], 'Login', 'Logged in to the system');
+            }
+        } catch (Throwable $e) {
+            error_log('login session-tracking: ' . $e->getMessage());
+        }
+
         $response['success'] = true;
     } else {
         $response['message'] = 'Invalid username or password.';

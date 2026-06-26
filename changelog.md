@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-06-26 (feat) — Activity Logs: 6-type filter, role-delete logging, session/time-in-system tracking
+
+**Activity Type filter (`app/activity_log.php`)** — replaced the messy auto-built distinct-action dropdown with the six canonical types **View / Create / Edit / Delete / Review / Approve**. Each maps to the real verb variants in the data (Edit→Updated/Edited, Create→Created/Added, Delete→Deleted/Removed, …) and matches at the START of action OR description, so filtering returns exactly that kind. Verified against live data (e.g. delete→1,301 rows).
+
+**Role delete logging (`app/constant/settings/user_roles.php`)** — the existing delete (kept as-is: real delete, shown only when role has 0 users and isn't Administrator) now captures the role **name** + permission count BEFORE deleting, so the activity entry reads clearly, e.g. `Deleted role "Secretary" (ID 5) and its 23 permission setting(s)`. Renders correctly across activity_log.php's columns (Type/Description/Reference #5/User/Time). Who + when are captured automatically by logActivity.
+
+**Login/logout session tracking + "Time in System":**
+- `migrations/2026_06_26_user_sessions.php` — new `user_sessions` ledger (user_id, login_at, logout_at, duration_seconds, logout_type, ip, user_agent). Idempotent.
+- `core/session_tracker.php` — `startUserSession` / `endUserSession` (idempotent, computes duration) / `formatDuration` ("2h 15m") / `userSessionSummary`. All best-effort (never block auth).
+- `actions/login.php` — opens a session row + writes a `Login` activity event (who/when/IP).
+- `logout.php` — before destroying the session, closes the row (stamps logout + duration) + writes a `Logout` event: *"Logged out — session lasted 2h 15m"*. Bootstraps the DB; fully wrapped so sign-out never breaks.
+- `app/activity_log.php` — when filtered by a single user, shows a **Time in System** panel: total time, # sessions (+ open badge), avg/session, last login, and a recent-sessions table (login, logout, duration, how-it-ended, IP). Open/timed-out sessions are shown honestly (no faked end time).
+
 ## 2026-06-26 (fix) — supplier/sub-contractor: action button + "Projects Involved" primary project
 
 - `app/bms/Suppliers/suppliers.php`, `app/bms/operations/sub_contractors.php` — removed the "Actions" text from the per-row action button (gear icon only).
