@@ -53,13 +53,15 @@ try {
 
     $pdo->commit();
 
-    // Log Audit
+    // Audit trail (rich) + Activity Log feed (visible on activity_log.php).
     logAudit($pdo, $_SESSION['user_id'], "delete", [
         'activity_type' => 'delete',
         'entity_type' => 'grn',
         'entity_id' => $receipt_id,
         'description' => "Deleted Goods Received Note #{$grn['receipt_number']} (Previous status: {$grn['status']})"
     ]);
+    logActivity($pdo, $_SESSION['user_id'], 'Delete grn',
+        "deleted GRN #{$grn['receipt_number']} with id {$receipt_id} (was {$grn['status']})");
 
     echo json_encode(['success' => true, 'message' => "GRN #{$grn['receipt_number']} deleted successfully"]);
 

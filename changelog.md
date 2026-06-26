@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-06-26 (fix) — Delete sweep batch 1: silent deletes now appear on Activity Log
+
+Per `audit_log.md`, deletes that were invisible on the Activity Log (they wrote
+only to `audit_logs` via `logAudit`, or nothing at all) now also write a clear
+`logActivity` entry — Type `Delete <entity>`, Description `deleted <entity> <name>
+with id …`. No delete behaviour changed; existing `logAudit` calls kept.
+
+- `api/delete_attendance.php` — + `Delete attendance` ("deleted attendance record for employee <name> (id N) on <date>"); fetches employee name.
+- `api/delete_employee.php` — + `Delete employee` ("deleted (terminated) employee \"<name>\" with id N").
+- `api/delete_grn.php` — + `Delete grn` ("deleted GRN #<no> with id N (was <status>)").
+- `api/document/delete_document.php` — + `Delete document` ("deleted document \"<name>\" with id N"); SELECT now pulls document_name/original_filename.
+- `api/document/delete_document_template.php` — + `Delete document template`; captures template_name before delete; moved logging before output.
+- `api/delete_payroll.php` — + `Delete payroll` ("deleted (voided) payroll #<no> with id N — <reason>") (a void = Delete in audit terms).
+- `api/delete_backup.php` — was fully silent (no logging); + `Delete backup` ("deleted backup file \"<name>\""). NOTE: this endpoint still has its permission check commented out — flagged, not changed (out of scope for this logging task).
+
+Verified end-to-end (a real delete writes the expected activity_logs row) and that all seven render as smart Type `Delete <entity>` and are caught by the Delete filter. Shims (`api/delete_account.php`, `delete_budget.php`, `delete_expense.php`, `delete_account_category.php`) just include the `account/` versions which already log — untouched.
+
 ## 2026-06-26 (feat) — Activity Logs: Period-driven cards + Custom (specify) date range
 
 - `app/activity_log.php` — **Period** is now the authoritative date filter (server-side), driving both the table and the summary cards. Default **Today**; options Today / This Week / This Month / This Year / All Time / Custom. The card label follows it: **"Created Today" → "Created This Month" / This Week / This Year / All Time** (verified: Today 177 created → This Month 4,436 → All Time 5,078). Range computed server-side so client/server can't drift.
