@@ -46,7 +46,9 @@ try {
         'cost_price'        => floatval($_POST['cost_price'] ?? 0),
         'selling_price'     => $selling_price,
         'min_selling_price' => !empty($_POST['min_selling_price']) ? floatval($_POST['min_selling_price']) : $calculated_min_price,
-        'contract_item_no'  => !empty($_POST['contract_item_no']) ? trim($_POST['contract_item_no']) : null,
+        'contract_item_no'  => !empty($_POST['contract_item_no'])
+                                ? trim($_POST['contract_item_no'])
+                                : 'NIP-' . str_pad($product_id, 5, '0', STR_PAD_LEFT),
         'assembly_quantity' => !empty($_POST['assembly_quantity']) ? floatval($_POST['assembly_quantity']) : 1.00,
         'warehouse_id'      => !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null,
         'project_id'        => !empty($_POST['project_id'])   ? intval($_POST['project_id'])   : null,
