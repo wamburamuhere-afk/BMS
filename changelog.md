@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-06-26 (feat) — User Login History with GeoIP + Device detection
+
+**New feature inspired by WorkDo ERPGo — professional login audit trail.**
+
+- `migrations/2026_06_26_user_sessions_geo_device.php` — added 9 columns to `user_sessions`: `city`, `country`, `country_code`, `isp`, `org`, `timezone`, `browser`, `os`, `device_type`
+- `core/session_tracker.php` — added `parseUserAgent()` (browser/OS/device type from raw UA string) and `lookupGeoIP()` (ip-api.com call returning city/country/ISP/org/timezone); updated `startUserSession()` to enrich every login row with this data
+- `api/get_login_history.php` — new DataTables-compatible API returning paginated, filterable login history
+- `app/constant/settings/login_history.php` — new Admin-only Login History page: stats cards (Total/Today/Unique Users/Active Now), user+date filters, table with columns: User, IP, Location & Device, ISP/Org, Role badge, Login Time, Duration
+- `roots.php` — added `login_history` route
+- `header.php` — added "Login History" link under Admin → User Management
+
+---
+
 ## 2026-06-26 (feat) — Audit log View/Create/Edit standardisation (all 5 phases)
 
 Standardised `logActivity()` calls across every module to the canonical 4-arg format:
