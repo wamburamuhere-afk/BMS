@@ -1534,8 +1534,8 @@ function get_progress_color($percentage) {
                         <?php if (!empty($recent_activities)): ?>
                             <?php foreach ($recent_activities as $activity): ?>
                             <div class="list-group-item list-group-item-action">
-                                <div class="d-flex w-100 justify-content-between">
-                                    <h6 class="mb-1">
+                                <div class="d-flex w-100 justify-content-between gap-2">
+                                    <h6 class="mb-1" style="min-width:0; flex:1;">
                                         <?php 
                                         $icon = 'bi-activity'; $color = 'text-secondary';
                                         $t = isset($activity['type']) ? strtolower((string)$activity['type']) : '';
@@ -1984,6 +1984,14 @@ $(document).keydown(function(e) {
 .list-group-item {
     border-left: none;
     border-right: none;
+}
+
+/* Recent Activities — long descriptions must wrap, not overflow */
+.list-group-item h6 {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    min-width: 0;
+    white-space: normal;
 }
 
 .list-group-item:first-child {
