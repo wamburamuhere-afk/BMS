@@ -6,7 +6,6 @@ require_once __DIR__ . '/../roots.php';
 // this page before; now only admins or roles explicitly granted 'audit_logs'
 // can see the system-wide activity log.
 autoEnforcePermission('audit_logs');
-logActivity($pdo, $_SESSION['user_id'], 'View activity log', 'User viewed the activity log');
 $is_admin = isAdmin();
 
 // Pagination setup
@@ -48,7 +47,7 @@ if (!function_exists('acFormatActivity')) {
         // e.g. "Delete sub-contractor payment"), take the entity straight from it so
         // multi-word entities show in full. Otherwise detect the entity by keyword.
         if ($isCanonical && count($awords) >= 2 && count($awords) <= 4) {
-            $entity = strtolower(trim(implode(' ', array_slice($awords, 1))));
+            $entity = ucwords(strtolower(trim(implode(' ', array_slice($awords, 1)))));
         } elseif (preg_match('/\b(sub-?contractor|purchase order|sales order|sales return|purchase return|credit note|debit note|bank transfer|payment voucher|customer|supplier|product|expense|invoice|payment|employee|payroll|loan|quotation|voucher|asset|budget|project|warehouse|stock|document template|document|user|role|report|category|tax|transaction|journal|grn|attendance|backup|held sale)\b/i', $raw_action . ' ' . $raw_desc, $em)) {
             $entity = strtolower($em[1]);
         }
@@ -171,50 +170,88 @@ $company_vrn = get_setting('company_vrn', '');
     }
 
     // ══ Server-side DataTables endpoint ═══════════════════════════════════════
-    // DataTables sends `draw` + start/length/order/search. It handles ONLY the
-    // table (sort/search/paginate) within the current filter set; the cards and
-    // the Time-in-System panel are server-rendered on full page load (filters
-    // navigate, not ajax), so they stay correct. Reuses the filter $conditions.
+    // Uses a LAG-based dedup subquery so consecutive View events (same user) are
+    // collapsed: only the first of a back-to-back run appears. Both the count and
+    // the data query run over the same deduped subquery so pagination is accurate.
     if (isset($_GET['draw'])) {
-        $dt_base = "FROM activity_logs LEFT JOIN users u ON activity_logs.user_id = u.user_id";
-        $whereFilters = !empty($conditions) ? "WHERE " . implode(' AND ', $conditions) : "";
+        // ── Inner scope: user + date filters go INSIDE the subquery so LAG()
+        //    sees prev_action correctly within the filtered window.
+        $innerConds = []; $innerP = [];
+        if ($user_id_filter) {
+            $innerConds[] = 'al.user_id = :iuid';
+            $innerP[':iuid'] = $user_id_filter;
+        }
+        if ($date_from) {
+            $innerConds[] = 'al.created_at >= :idf';
+            $innerP[':idf'] = $date_from . ' 00:00:00';
+        }
+        if ($date_to) {
+            $innerConds[] = 'al.created_at <= :idt';
+            $innerP[':idt'] = $date_to . ' 23:59:59';
+        }
+        $innerWhere = $innerConds ? 'WHERE ' . implode(' AND ', $innerConds) : '';
 
-        // recordsTotal — current filter set, no DataTables search.
-        $rt = $pdo->prepare("SELECT COUNT(*) $dt_base $whereFilters");
-        foreach ($params as $k => $v) $rt->bindValue($k, $v);
+        // Dedup subquery — LAG gives each row the previous action for that user.
+        // Handles both old-style 'page_view' entries and new 'View X' entries.
+        $dt_base = "FROM (
+            SELECT al.id, al.action, al.description, al.created_at,
+                   al.ip_address, u.username,
+                   LAG(al.action) OVER (PARTITION BY al.user_id ORDER BY al.created_at, al.id) AS prev_action
+            FROM activity_logs al
+            LEFT JOIN users u ON al.user_id = u.user_id
+            $innerWhere
+        ) _log";
+
+        $dedup_cond = "NOT (
+            (action LIKE 'View %' OR action LIKE 'Viewed %' OR action = 'page_view')
+            AND (prev_action LIKE 'View %' OR prev_action LIKE 'Viewed %' OR prev_action = 'page_view')
+        )";
+
+        // ── Outer conditions: dedup + type filter (type goes outside so LAG is
+        //    still computed over ALL types, not just the filtered one).
+        $outerConds = [$dedup_cond]; $outerP = $innerP;
+        if ($type_filter && isset($activity_type_map[$type_filter])) {
+            [$frag, $fp] = $buildTypeSql($type_filter, 'dt_ft_');
+            $outerConds[] = $frag;
+            $outerP = array_merge($outerP, $fp);
+        }
+        $whereOuter = 'WHERE ' . implode(' AND ', $outerConds);
+
+        // recordsTotal — deduped + type filter, no DT search.
+        $rt = $pdo->prepare("SELECT COUNT(*) $dt_base $whereOuter");
+        foreach ($outerP as $k => $v) $rt->bindValue($k, $v);
         $rt->execute();
         $recordsTotal = (int) $rt->fetchColumn();
 
-        // recordsFiltered — filter set + the DataTables search box.
+        // recordsFiltered — add the DataTables search-box term.
         $searchVal = trim($_GET['search']['value'] ?? '');
-        $dtConds = $conditions; $dtParams = $params;
+        $dtConds = $outerConds; $dtP = $outerP;
         if ($searchVal !== '') {
-            $dtConds[] = "(activity_logs.action LIKE :dts OR activity_logs.description LIKE :dts OR u.username LIKE :dts)";
-            $dtParams[':dts'] = '%' . $searchVal . '%';
+            $dtConds[] = "(action LIKE :dts OR description LIKE :dts OR username LIKE :dts)";
+            $dtP[':dts'] = '%' . $searchVal . '%';
         }
-        $whereDt = !empty($dtConds) ? "WHERE " . implode(' AND ', $dtConds) : "";
+        $whereDt = 'WHERE ' . implode(' AND ', $dtConds);
         $rf = $pdo->prepare("SELECT COUNT(*) $dt_base $whereDt");
-        foreach ($dtParams as $k => $v) $rf->bindValue($k, $v);
+        foreach ($dtP as $k => $v) $rf->bindValue($k, $v);
         $rf->execute();
         $recordsFiltered = (int) $rf->fetchColumn();
 
-        // Ordering — map DataTables column index → a real DB column.
-        $dt_cols = [0 => 'activity_logs.id', 1 => 'activity_logs.created_at', 2 => 'activity_logs.action',
-                    3 => 'activity_logs.description', 4 => 'activity_logs.ip_address', 5 => 'u.username'];
+        // Ordering — plain column names from the subquery (no table prefix).
+        $dt_cols = [0 => 'id', 1 => 'created_at', 2 => 'action',
+                    3 => 'description', 4 => 'ip_address', 5 => 'username'];
         $ocol = isset($_GET['order'][0]['column']) ? (int) $_GET['order'][0]['column'] : 1;
-        $odir = (isset($_GET['order'][0]['dir']) && strtolower($_GET['order'][0]['dir']) === 'asc') ? 'ASC' : 'DESC';
-        $orderBy = ($dt_cols[$ocol] ?? 'activity_logs.created_at') . ' ' . $odir;
+        $odir = (strtolower($_GET['order'][0]['dir'] ?? '') === 'asc') ? 'ASC' : 'DESC';
+        $orderBy = ($dt_cols[$ocol] ?? 'created_at') . ' ' . $odir;
 
-        $dstart  = isset($_GET['start']) ? max(0, (int) $_GET['start']) : 0;
-        $dlength = isset($_GET['length']) ? (int) $_GET['length'] : 10;
-        if ($dlength < 0) $dlength = 100000000; // "All"
+        $dstart  = max(0, (int) ($_GET['start'] ?? 0));
+        $dlength = (int) ($_GET['length'] ?? 10);
+        if ($dlength < 0) $dlength = 100000000;
 
-        $dsql = "SELECT activity_logs.id, activity_logs.action AS raw_action,
-                        activity_logs.description AS raw_description, activity_logs.created_at AS timestamp,
-                        activity_logs.ip_address AS reference, u.username AS user_name
+        $dsql = "SELECT id, action AS raw_action, description AS raw_description,
+                        created_at AS timestamp, ip_address AS reference, username AS user_name
                  $dt_base $whereDt ORDER BY $orderBy LIMIT :dlen OFFSET :dstart";
         $ds = $pdo->prepare($dsql);
-        foreach ($dtParams as $k => $v) $ds->bindValue($k, $v);
+        foreach ($dtP as $k => $v) $ds->bindValue($k, $v);
         $ds->bindValue(':dlen', $dlength, PDO::PARAM_INT);
         $ds->bindValue(':dstart', $dstart, PDO::PARAM_INT);
         $ds->execute();
@@ -238,10 +275,10 @@ $company_vrn = get_setting('company_vrn', '');
         }
         header('Content-Type: application/json');
         echo json_encode([
-            'draw' => (int) $_GET['draw'],
-            'recordsTotal' => $recordsTotal,
+            'draw'            => (int) $_GET['draw'],
+            'recordsTotal'    => $recordsTotal,
             'recordsFiltered' => $recordsFiltered,
-            'data' => $data,
+            'data'            => $data,
         ]);
         exit;
     }
@@ -336,16 +373,18 @@ $company_vrn = get_setting('company_vrn', '');
         $raw_desc   = !empty($activity['raw_description']) ? trim($activity['raw_description']) : $raw_action;
 
         // ── Smart short Type = "<Canonical verb> <entity>" (audit_log.md §2). ────
-        //  Verb  : first word of the action (fallback: first word of description),
-        //          normalised to one of the six canonical verbs.
-        //  Entity: the first recognised business entity mentioned in action/desc.
         $verbSource = $raw_action !== '' ? $raw_action : $raw_desc;
-        $firstWord  = preg_split('/\s+/', $verbSource)[0] ?? $verbSource;
+        $awords     = preg_split('/\s+/', trim($verbSource));
+        $firstWord  = $awords[0] ?? $verbSource;
         $verb       = $canonVerb($firstWord);
+        $isCanon    = in_array($verb, ['View','Create','Edit','Delete','Review','Approve'], true);
 
         $entity = '';
-        if (preg_match('/\b(sub-?contractor|purchase order|sales order|sales return|purchase return|credit note|debit note|bank transfer|payment voucher|customer|supplier|product|expense|invoice|payment|employee|payroll|loan|quotation|voucher|asset|budget|project|warehouse|stock|document|user|role|report|category|tax|transaction|journal)\b/i', $raw_action . ' ' . $raw_desc, $em)) {
-            $entity = strtolower($em[1]);
+        // If the action is already a short "Verb Entity" phrase, use it directly.
+        if ($isCanon && count($awords) >= 2 && count($awords) <= 4) {
+            $entity = ucwords(strtolower(trim(implode(' ', array_slice($awords, 1)))));
+        } elseif (preg_match('/\b(sub-?contractor|purchase order|sales order|sales return|purchase return|credit note|debit note|bank transfer|payment voucher|customer|supplier|product|expense|invoice|payment|employee|payroll|loan|quotation|voucher|asset|budget|project|warehouse|stock|document|user|role|report|category|tax|transaction|journal)\b/i', $raw_action . ' ' . $raw_desc, $em)) {
+            $entity = ucwords(strtolower($em[1]));
         }
 
         $type = trim($verb . ($entity !== '' ? ' ' . $entity : ''));

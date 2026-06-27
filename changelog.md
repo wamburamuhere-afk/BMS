@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-06-27 (feat) — Smart Activity Log: human-readable page-view labels + consecutive-View deduplication
+
+- `header.php` — replaced raw `page_view` + URL logging with URL-to-name conversion; now logs `"View Dashboard"` / `"User viewed Dashboard page"` instead of raw paths like `/bms/dashboard`
+- `app/activity_log.php` — removed duplicate manual `logActivity` view call (header.php handles it); rewrote DataTables endpoint to use a LAG-based dedup subquery that collapses consecutive View rows per user; fixed `acFormatActivity` and legacy processor to ucwords entity names so Type shows "View Activity Log" not "view activity log"
+
+---
+
 ## 2026-06-26 (feat) — User Login History with GeoIP + Device detection
 
 **New feature inspired by WorkDo ERPGo — professional login audit trail.**
