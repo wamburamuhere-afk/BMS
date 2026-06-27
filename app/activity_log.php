@@ -1221,23 +1221,15 @@ $page_title = "Activity Log";
         </div>
     </div>
 
-    <?php if ($is_admin):
-        $ai_logo         = getSetting('company_logo', '');
-        $ai_company_name = getSetting('company_name', $GLOBALS['DISPLAY_COMPANY_NAME'] ?? 'BUSINESS MANAGEMENT SYSTEM');
-    ?>
+    <?php if ($is_admin): ?>
     <!-- AI Audit Intelligence — print-only section (revealed by body.ai-printing CSS class) -->
+    <!-- Company header comes from the global renderPrintHeader() in header.php — no duplication needed -->
     <div id="aiPrintSection" style="display:none;">
-        <div class="bms-print-header">
-            <?php if (!empty($ai_logo)): ?>
-            <img src="<?= htmlspecialchars(getUrl($ai_logo)) ?>" alt="Logo">
-            <?php endif; ?>
-            <h1 class="bph-company"><?= htmlspecialchars($ai_company_name) ?></h1>
-        </div>
         <div class="text-center pb-3 mb-3" style="border-bottom: 2px solid #0d6efd; margin-top: 8px;">
             <h5 id="aiPrintDocLabel" style="text-transform:uppercase; letter-spacing:1px; color:#333; margin:6px 0 2px; font-size:13pt;"></h5>
             <p id="aiPrintMetaLine" style="color:#64748b; font-size:10pt; margin:0;"></p>
         </div>
-        <div id="aiPrintBody" style="font-size:12pt; line-height:1.7; color:#1e293b;"></div>
+        <div id="aiPrintBody" style="font-size:12pt; line-height:1.7; color:#1e293b; padding-bottom:12mm;"></div>
     </div>
     <?php endif; ?>
 
