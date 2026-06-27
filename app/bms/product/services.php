@@ -1435,7 +1435,9 @@ function openEditSvcModal(product) {
     document.getElementById('edit_svc_project_id').value = product.project_id || '';
     filterWarehouses(product.project_id, 'edit_svc_warehouse_id'); // Re-filter before setting value
     document.getElementById('edit_svc_warehouse_id').value = product.warehouse_id || '';
-    document.getElementById('edit_svc_contract_no').value = product.contract_item_no || '';
+    // Auto-generate Item Code if this product never had one
+    const generatedCode = product.contract_item_no || ('NIP-' + String(product.product_id).padStart(5, '0'));
+    document.getElementById('edit_svc_contract_no').value = generatedCode;
     document.getElementById('edit_svc_assembly_qty').value = product.assembly_quantity || 1;
     
     document.getElementById('edit-svc-message').innerHTML = '';
