@@ -125,8 +125,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($stmt->execute([$username, $email, $first_name, $last_name, $role_id, $password_hash])) {
             $new_user_id = $pdo->lastInsertId();
             $success = true;
-            
+
             // Log action
+            logActivity($pdo, $_SESSION['user_id'], 'Create user', "User created a new user: $first_name $last_name ($username, ID $new_user_id)");
             logAudit($pdo, $_SESSION['user_id'], 'create_user', [
                 'entity_type' => 'user',
                 'entity_id' => $new_user_id,

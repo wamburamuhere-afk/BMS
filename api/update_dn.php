@@ -126,7 +126,7 @@ try {
         dn_save_attachments($pdo, $delivery_id, $att_pairs, $user_id, $project_id ?: null);
     }
 
-    logActivity($pdo, $user_id, "Updated Delivery Note #" . ($dn['dn_number'] ?: $dn['delivery_number']));
+    logActivity($pdo, $user_id, 'Edit delivery note', "User edited delivery note: " . ($dn['dn_number'] ?: $dn['delivery_number']) . " (ID $delivery_id)");
     $pdo->commit();
 
     echo json_encode(['success' => true, 'message' => 'Delivery Note updated successfully.', 'delivery_id' => $delivery_id]);

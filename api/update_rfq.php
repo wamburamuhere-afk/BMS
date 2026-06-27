@@ -105,7 +105,7 @@ try {
         }
     }
 
-    logActivity($pdo, $_SESSION['user_id'], "Updated RFQ #{$rfq['rfq_number']}");
+    logActivity($pdo, $_SESSION['user_id'], 'Edit RFQ', "User edited RFQ: {$rfq['rfq_number']} (ID $rfq_id)");
     echo json_encode(['success' => true, 'message' => "RFQ #{$rfq['rfq_number']} updated successfully."]);
 
 } catch (Exception $e) {

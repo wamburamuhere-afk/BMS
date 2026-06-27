@@ -197,16 +197,17 @@ try {
 
     $pdo->commit();
 
-    $action      = $is_update ? 'Edit Quotation' : 'Create Quotation';
-    $verb        = $is_update ? 'updated' : 'created';
     $log_number  = $order_number ?? '';
     if ($is_update && $log_number === '') {
         $s = $pdo->prepare("SELECT order_number FROM quotations WHERE sales_order_id = ?");
         $s->execute([$quotation_id]);
         $log_number = $s->fetchColumn();
     }
-    $user_name = $_SESSION['username'] ?? 'User';
-    logActivity($pdo, $_SESSION['user_id'], $action, "$user_name $verb Quotation #$log_number");
+    if ($is_update) {
+        logActivity($pdo, $_SESSION['user_id'], 'Edit quotation', "User edited quotation: $log_number (ID $quotation_id)");
+    } else {
+        logActivity($pdo, $_SESSION['user_id'], 'Create quotation', "User created a new quotation: $log_number (ID $quotation_id)");
+    }
 
     echo json_encode([
         'success'      => true,

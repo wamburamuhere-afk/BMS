@@ -24,6 +24,7 @@ $pass = 0; $fail = 0;
 function ok($c, $m) { global $pass, $fail; if ($c) { $pass++; echo "  \033[32m✅\033[0m $m\n"; } else { $fail++; echo "  \033[31m❌ $m\033[0m\n"; } }
 
 $invId = 0;
+$whtJeId = 0;
 try {
     $sid = (int)$pdo->query("SELECT supplier_id FROM suppliers WHERE status!='deleted' LIMIT 1")->fetchColumn();
     // Seed a paid invoice carrying a posted WHT of 50,000 (whtPosition sums wht_posted).
@@ -31,6 +32,14 @@ try {
                    VALUES ('supplier', ?, '__wht_bs_test', ?, ?, 1180000, 1000000, 180000, 'paid', 5, 1000000, 50000, 50000, 4, NOW(), NOW())")
         ->execute([$sid, date('Y-m-d'), date('Y-m-d')]);
     $invId = (int)$pdo->lastInsertId();
+    // Balance Sheet reads only from posted journal_entries (one-ledger plan). Seed a
+    // posted journal entry that credits the WHT Payable account (account_id=19) so the
+    // Balance Sheet actually shows the "WHT Payable" line.
+    $pdo->prepare("INSERT INTO journal_entries (entry_date,reference_number,description,status,created_by,created_at) VALUES (?,?,'WHT BS test seed','posted',4,NOW())")
+        ->execute([date('Y-m-d'), '__wht_bs_je_test']);
+    $whtJeId = (int)$pdo->lastInsertId();
+    $pdo->prepare("INSERT INTO journal_entry_items (entry_id,account_id,type,amount,description,created_at) VALUES (?,?,?,?,?,NOW())")->execute([$whtJeId, 3, 'debit', 50000, 'WHT BS test']);
+    $pdo->prepare("INSERT INTO journal_entry_items (entry_id,account_id,type,amount,description,created_at) VALUES (?,?,?,?,?,NOW())")->execute([$whtJeId, 19, 'credit', 50000, 'WHT BS test']);
 
     $payable = whtPosition($pdo)['payable'];
     ok($payable >= 50000, "whtPosition reflects the seeded WHT (payable = " . number_format($payable, 2) . ")");
@@ -47,6 +56,10 @@ try {
     ok(false, "exception: " . $e->getMessage());
 } finally {
     if ($invId) { try { $pdo->prepare("DELETE FROM supplier_invoices WHERE id=?")->execute([$invId]); } catch (Throwable $e) {} }
+    if ($whtJeId) {
+        try { $pdo->prepare("DELETE FROM journal_entry_items WHERE entry_id=?")->execute([$whtJeId]); } catch (Throwable $e) {}
+        try { $pdo->prepare("DELETE FROM journal_entries WHERE entry_id=?")->execute([$whtJeId]); } catch (Throwable $e) {}
+    }
 }
 
 echo "\nPasses:   \033[32m$pass\033[0m\n";

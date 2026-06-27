@@ -83,7 +83,7 @@ try {
     ]);
     $id = (int)$pdo->lastInsertId();
 
-    logActivity($pdo, $_SESSION['user_id'], "Created revenue $revenue_number (amount " . number_format($amount, 2) . ")");
+    logActivity($pdo, $_SESSION['user_id'], 'Create revenue', "User created a new revenue record: $revenue_number (ID $id)");
 
     echo json_encode(['success' => true, 'message' => "Revenue $revenue_number created.", 'id' => $id, 'revenue_number' => $revenue_number]);
 

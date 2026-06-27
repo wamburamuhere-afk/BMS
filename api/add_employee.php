@@ -206,6 +206,8 @@ try {
     );
     ensureActorLedgerAccount($pdo, 'employee', (int) $employee_id, $empFullName);
 
+    logActivity($pdo, $_SESSION['user_id'], 'Create employee', "User created a new employee: $empFullName ({$_POST['employee_number']})");
+
     // Log Audit
     logAudit($pdo, $_SESSION['user_id'], 'create', [
         'activity_type' => 'create',

@@ -287,12 +287,11 @@ try {
     $pdo->commit();
 
     // Phase 3a — financial-write audit trail.
-    logActivity(
-        $pdo,
-        $_SESSION['user_id'] ?? 0,
-        $is_update ? "Updated Purchase Order" : "Created Purchase Order",
-        "PO ID: $purchase_order_id" . (!empty($order_number) ? ", number: $order_number" : '')
-    );
+    if ($is_update) {
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Edit purchase order', "User edited purchase order: $order_number (ID $purchase_order_id)");
+    } else {
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Create purchase order', "User created a new purchase order: $order_number (ID $purchase_order_id)");
+    }
 
     echo json_encode([
         'success' => true,

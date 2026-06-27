@@ -10,6 +10,9 @@ require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('journals');
 
 includeHeader();
+
+logActivity($pdo, $_SESSION['user_id'], 'View journal entries', 'User viewed the journal entries management list');
+
 // safe_output() is provided globally by helpers.php (do not redeclare here —
 // a local copy fatals with "Cannot redeclare safe_output()").
 ?>

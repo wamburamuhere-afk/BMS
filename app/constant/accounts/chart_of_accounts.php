@@ -17,6 +17,8 @@ $c_name = getSetting('company_name', 'BMS');
 
 includeHeader();
 
+logActivity($pdo, $_SESSION['user_id'], 'View chart of accounts', 'User viewed the chart of accounts');
+
 // Fetch necessary data for dropdowns (categories and types)
 try {
     // Fetch categories with type and account counts for the sidebar

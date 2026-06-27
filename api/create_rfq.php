@@ -114,7 +114,7 @@ try {
         }
     }
 
-    logActivity($pdo, $_SESSION['user_id'], "Created RFQ #{$rfq_number}");
+    logActivity($pdo, $_SESSION['user_id'], 'Create RFQ', "User created a new RFQ: $rfq_number (ID $rfq_id)");
     echo json_encode(['success' => true, 'message' => "RFQ #{$rfq_number} created successfully.", 'rfq_id' => $rfq_id]);
 
 } catch (Exception $e) {

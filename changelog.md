@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-06-26 (feat) — Audit log View/Create/Edit standardisation (all 5 phases)
+
+Standardised `logActivity()` calls across every module to the canonical 4-arg format:
+Type = `'View customers'` / `'Create warehouse'` / `'Edit customer'`; Description = `'User viewed …'` / `'User created a new …: Name (ID X)'` / `'User edited …: Name (ID X)'`.
+
+**Phase 1** — Customers, Suppliers, Invoices, Products  
+`app/bms/customer/customers.php`, `app/bms/Suppliers/suppliers.php`, `app/bms/invoice/invoices.php`, `app/bms/product/products.php`; `api/add_customer.php`, `api/process_edit_customer.php`, `api/add_supplier.php`, `api/update_supplier.php`, `api/account/save_invoice.php`, `api/create_product.php`, `api/update_product.php`
+
+**Phase 2** — Finance (POs, Sales Orders, Quotations, Expenses, Revenue, Vouchers, Journals, Bank Reconciliation)  
+`app/bms/purchase/purchase_orders.php`, `app/bms/sales/sales_orders.php`, `app/bms/sales/quotations/quotations.php`, `app/constant/accounts/expenses.php`, `app/constant/accounts/revenue.php`, `app/constant/accounts/payment_vouchers.php`, `app/constant/accounts/journals.php`, `app/constant/accounts/bank_reconciliation.php`; `api/account/add_expense.php`, `api/account/update_expense.php`, `api/account/add_revenue.php`, `api/account/save_purchase_order.php`, `api/account/save_sales_order.php`, `api/account/save_quotation.php`, `api/account/save_voucher.php`, `api/account/save_journal.php`, `api/account/update_journal.php`, `api/account/create_reconciliation.php`, `api/account/update_reconciliation.php`
+
+**Phase 3** — HR (Employees, Leave, Payroll)  
+`app/bms/pos/employees.php`, `app/bms/pos/leaves.php`, `app/bms/pos/payroll.php`; `api/add_employee.php`, `api/update_employee.php`, `api/apply_leave.php`, `api/update_leave.php` (also fixed undefined \$reference_number bug), `api/update_payroll.php`
+
+**Phase 4** — Operations & CRM (Delivery Notes, LPO, RFQ, Warehouses, Tenders, Assets, Leads, Campaigns)  
+`app/bms/grn/delivery_notes.php`, `app/bms/operations/assets.php`, `app/bms/purchase/rfq.php`, `app/bms/stock/warehouses.php`, `app/bms/tenders/tenders.php`, `app/bms/crm/crm_leads.php`; `api/create_dn.php`, `api/update_dn.php`, `api/create_rfq.php`, `api/update_rfq.php`, `api/operations/save_asset.php`, `api/customer/add_lpo.php`, `api/customer/update_lpo.php`, `api/crm/add_lead.php`, `api/crm/edit_lead.php`, `api/crm/save_campaign.php`
+
+**Phase 5** — Settings & COA (Users, Chart of Accounts, Activity Log, Roles, Tenders detail pages)  
+`app/activity_log.php`, `app/constant/accounts/chart_of_accounts.php`, `app/constant/settings/add_user.php`, `app/constant/settings/edit_user.php`, `app/constant/settings/user_roles.php`, `app/bms/tenders/tender_create.php`, `app/bms/tenders/tender_edit.php`, `app/bms/tenders/tender_view.php`; `api/account/save_account.php`
+
 ## 2026-06-26 (fix) — Delete sweep batches 6-7: Parties/HR + Ops/Docs/Settings delete logs
 
 Standardized the remaining delete endpoints to `audit_log.md` (Type `Delete

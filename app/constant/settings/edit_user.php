@@ -148,7 +148,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Log action
                 $description = "Updated user: $username";
                 if (!empty($password)) $description .= " (Password changed)";
-                
+
+                logActivity($pdo, $_SESSION['user_id'], 'Edit user', "User edited user: $first_name $last_name ($username, ID $user_id)");
                 logAudit($pdo, $_SESSION['user_id'], 'update_user', [
                     'entity_type' => 'user',
                     'entity_id' => $user_id,
