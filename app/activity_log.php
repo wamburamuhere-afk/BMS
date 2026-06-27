@@ -704,6 +704,9 @@ $page_title = "Activity Log";
     padding: 1rem;
     color: #1e293b;
     border-bottom: 1px solid #f1f5f9;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 .pagination {
@@ -1193,7 +1196,7 @@ $page_title = "Activity Log";
 
     <div class="card mb-4 shadow-sm border-0 report-card">
         <div class="card-body p-0">
-            <div class="table-responsive" style="overflow: visible !important;">
+            <div style="overflow-x: hidden;">
                 <table class="table table-hover align-middle mb-0" id="activityTable">
                     <thead class="bg-light">
                         <tr>
