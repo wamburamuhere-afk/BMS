@@ -149,7 +149,28 @@ try {
 // ─────────────────────────────────────────────────────────────────────────
 section('6. Runtime — account picked → balance cards + detail rendered');
 // ─────────────────────────────────────────────────────────────────────────
-// account_id=2 is "Opening Balance Equity" — has 1 known entry on 2026-01-17.
+// Seed two test entries for account_id=2 (Opening Balance Equity) in a
+// rolled-back transaction so the GL renders with known figures:
+//   opening = 12,000.00 (entry before 2026-01-01)
+//   closing = 13,000.00 (+ 1,000 in-period entry on 2026-01-17)
+$pdo->beginTransaction();
+try {
+    $gl6_e = $pdo->prepare("INSERT INTO journal_entries (entry_date,reference_number,description,status,created_by,created_at) VALUES (?,?,?,'posted',4,NOW())");
+    $gl6_i = $pdo->prepare("INSERT INTO journal_entry_items (entry_id,account_id,type,amount,description,created_at) VALUES (?,?,?,?,?,NOW())");
+    $gl6_e->execute(['2025-12-15','GL-TEST-PRE','GL test seed pre-period']);
+    $gl6_pre = (int)$pdo->lastInsertId();
+    $gl6_i->execute([$gl6_pre, 3, 'debit',  12000, 'GL test']);
+    $gl6_i->execute([$gl6_pre, 2, 'credit', 12000, 'GL test']);
+    $gl6_e->execute(['2026-01-17','GL-TEST-IN','GL test seed in-period']);
+    $gl6_in = (int)$pdo->lastInsertId();
+    $gl6_i->execute([$gl6_in, 3, 'debit',  1000, 'GL test']);
+    $gl6_i->execute([$gl6_in, 2, 'credit', 1000, 'GL test']);
+} catch (Throwable $e) {
+    $pdo->rollBack();
+    fail('section 6 seed threw: ' . $e->getMessage());
+    goto gl_section7;
+}
+
 $_GET = ['account_id' => 2, 'start_date' => '2026-01-01', 'end_date' => '2026-05-31'];
 $prevErr = error_reporting(error_reporting() & ~E_WARNING);
 ob_start();
@@ -174,7 +195,10 @@ try {
     error_reporting($prevErr);
     ob_get_clean();
     fail('partial threw with account_id=2: ' . $e->getMessage());
+} finally {
+    if ($pdo->inTransaction()) $pdo->rollBack();
 }
+gl_section7:
 
 // ─────────────────────────────────────────────────────────────────────────
 section('7. Account dropdown has BS + IS optgroups (live DB has both)');
