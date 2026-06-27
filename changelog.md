@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-06-27 (fix) — activity_log.php: AI print — remove duplicate header, fix footer overlap
+
+- `app/activity_log.php` — Removed `bms-print-header` div from `#aiPrintSection`; global `renderPrintHeader()` in header.php already outputs the company logo + name on every print (no duplication needed); added `padding-bottom: 12mm` to `#aiPrintBody` so the fixed `.bms-print-footer` cannot overlap the last line of AI content
+
+---
+
 ## 2026-06-27 (feat) — activity_log.php: AI Audit Intelligence print header/footer
 
 - `app/activity_log.php` — Print button in AI Audit Intelligence panel now uses `window.print()` on the main page instead of a popup window; added hidden `#aiPrintSection` div (revealed by `body.ai-printing` CSS class) using `renderPrintHeader()` pattern: company logo via `getSetting('company_logo')` + `getUrl()`, company name via `getSetting('company_name')`, both styled by the global `.bms-print-header`/`.bph-company` classes from `responsive.css`; print footer is the existing `.bms-print-footer` from `footer.php` — no custom footer code written; `@page` margin updated from `1cm` to canonical `10mm 8mm 16mm 8mm`; `body.ai-printing` CSS rules added in `@media print` to hide all main-content siblings and show only `#aiPrintSection`; `afterprint` event cleans up the class after print completes
