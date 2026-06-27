@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-06-27 (feat) — AI Audit Intelligence panel in Activity Log (admin-only)
+
+- `api/ai_audit_analysis.php` — new admin-only POST endpoint; aggregates activity_logs into a ~600-token context block (totals by type, per-user breakdown with 30-day baseline comparison, off-hours access, sensitive module access, recent significant events) and calls aiComplete() for four modes
+- `app/activity_log.php` — added collapsible AI Audit Intelligence card (admin-only, purple left border) with 4 switchable modes: Daily Briefing (plain-English narrative + risk level), Anomaly Scanner (severity-rated findings vs baseline), Ask the Log (free-form Q&A with quick-question chips), Audit Report (formal management/compliance narrative with custom user+date scope); includes Print and Copy actions on AI output
+
+---
+
 ## 2026-06-27 (feat) — Smart Activity Log: human-readable page-view labels + consecutive-View deduplication
 
 - `header.php` — replaced raw `page_view` + URL logging with URL-to-name conversion; now logs `"View Dashboard"` / `"User viewed Dashboard page"` instead of raw paths like `/bms/dashboard`
