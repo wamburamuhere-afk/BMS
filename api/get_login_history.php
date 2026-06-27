@@ -62,6 +62,19 @@ try {
     $countStmt->execute($params);
     $filtered = $countStmt->fetchColumn();
 
+    // Column ordering
+    $colMap = [
+        1 => 'u.username',
+        2 => 'us.ip_address',
+        3 => 'us.city',
+        4 => 'us.isp',
+        6 => 'us.login_at',
+        7 => 'us.duration_seconds',
+    ];
+    $orderCol = intval($_GET['order'][0]['column'] ?? 6);
+    $orderDir = (($_GET['order'][0]['dir'] ?? 'desc') === 'asc') ? 'ASC' : 'DESC';
+    $orderSQL = 'ORDER BY ' . ($colMap[$orderCol] ?? 'us.login_at') . ' ' . $orderDir;
+
     // Data rows
     $limitSQL = $length > 0 ? "LIMIT " . intval($start) . ", " . intval($length) : "";
     $dataStmt = $pdo->prepare("
@@ -74,7 +87,7 @@ try {
         LEFT JOIN users u ON u.user_id = us.user_id
         LEFT JOIN roles r ON r.role_id = u.role_id
         WHERE $whereSQL
-        ORDER BY us.login_at DESC
+        $orderSQL
         $limitSQL
     ");
     $dataStmt->execute($params);

@@ -187,7 +187,7 @@ ok(str_contains($apiContent, 'browser'),        "API file selects browser column
 ok(str_contains($apiContent, 'device_type'),    "API file selects device_type column");
 ok(str_contains($apiContent, 'isp'),            "API file selects isp column");
 ok(str_contains($apiContent, 'timezone'),       "API file selects timezone column");
-ok(str_contains($apiContent, 'ORDER BY us.login_at DESC'), "API orders newest logins first");
+ok(str_contains($apiContent, "'us.login_at'"), "API orders by login_at column");
 
 // ── 7. Page file checks ──────────────────────────────────────────────────────
 echo "\n[7] Page — login_history.php content checks\n";
