@@ -130,12 +130,11 @@ try {
 
     // Phase 3a — payment-voucher writes are high-sensitivity financial events.
     $isUpdate = ($_POST['voucher_id'] ?? 0) > 0;
-    logActivity(
-        $pdo,
-        $_SESSION['user_id'] ?? 0,
-        $isUpdate ? "Updated Payment Voucher" : "Created Payment Voucher",
-        "Voucher ID: $voucher_id, payee: '$payee_name', amount: $amount"
-    );
+    if ($isUpdate) {
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Edit payment voucher', "User edited payment voucher: $payee_name (ID $voucher_id)");
+    } else {
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Create payment voucher', "User created a new payment voucher: $payee_name (ID $voucher_id)");
+    }
 
     echo json_encode(['success' => true, 'message' => $message, 'id' => $voucher_id]);
 

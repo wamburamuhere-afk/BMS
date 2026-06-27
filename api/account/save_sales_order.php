@@ -296,21 +296,20 @@ try {
     $pdo->commit();
     
     // Log Activity
-    $type_label = ($is_quote) ? 'Quotation' : 'Sales Order';
-    $action = ($is_update) ? "Edit $type_label" : "Create $type_label";
-    
+    $type_label = ($is_quote) ? 'quotation' : 'sales order';
+
     $log_order_num = $order_number ?? '';
     if ($is_update && empty($log_order_num)) {
         $stmt_num = $pdo->prepare("SELECT order_number FROM sales_orders WHERE sales_order_id = ?");
         $stmt_num->execute([$sales_order_id]);
         $log_order_num = $stmt_num->fetchColumn();
     }
-    
-    $user_name = $_SESSION['username'] ?? 'User';
-    $verb = ($is_update) ? "updated" : "created";
-    $description = "$user_name $verb $type_label #$log_order_num";
-    
-    logActivity($pdo, $_SESSION['user_id'], $action, $description);
+
+    if ($is_update) {
+        logActivity($pdo, $_SESSION['user_id'], "Edit $type_label", "User edited $type_label: $log_order_num (ID $sales_order_id)");
+    } else {
+        logActivity($pdo, $_SESSION['user_id'], "Create $type_label", "User created a new $type_label: $log_order_num (ID $sales_order_id)");
+    }
 
     echo json_encode([
         'success' => true, 

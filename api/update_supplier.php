@@ -260,7 +260,7 @@ $params = array_merge($params, [
 try {
     $update_stmt->execute($params);
     
-    logActivity($pdo, $_SESSION['user_id'], "Updated supplier: $supplier_name");
+    logActivity($pdo, $_SESSION['user_id'], 'Edit supplier', "User edited supplier: $supplier_name (ID $supplier_id)");
     
     header('Content-Type: application/json');
     echo json_encode([

@@ -184,6 +184,8 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($update_params);
 
+    logActivity($pdo, $_SESSION['user_id'], 'Edit employee', "User edited employee: {$_POST['first_name']} {$_POST['last_name']} (ID $employee_id)");
+
     // Log Audit
     logAudit($pdo, $_SESSION['user_id'], 'update', [
         'activity_type' => 'update',

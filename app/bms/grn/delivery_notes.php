@@ -10,6 +10,8 @@ autoEnforcePermission('grn');
 // Include the header
 includeHeader();
 
+logActivity($pdo, $_SESSION['user_id'], 'View delivery notes', 'User viewed the delivery notes management list');
+
 // Permission flags
 $can_view_grn = isAdmin() || canView('grn');
 $can_create_grn = isAdmin() || canCreate('grn');

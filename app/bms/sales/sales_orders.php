@@ -25,6 +25,8 @@ if (!$can_view_sales_orders) {
     exit();
 }
 
+logActivity($pdo, $_SESSION['user_id'], 'View sales orders', 'User viewed the sales orders management list');
+
 // Get filter parameters
 $status_filter = isset($_GET['status']) ? $_GET['status'] : '';
 $customer_filter = isset($_GET['customer']) ? intval($_GET['customer']) : 0;

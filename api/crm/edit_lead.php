@@ -133,7 +133,7 @@ try {
         }
     }
 
-    logActivity($pdo, $_SESSION['user_id'], "Updated lead: {$lead['lead_code']}");
+    logActivity($pdo, $_SESSION['user_id'], 'Edit lead', "User edited lead: {$lead['lead_code']} (ID $lead_id)");
 
     echo json_encode(['success' => true, 'message' => "Lead {$lead['lead_code']} updated successfully."]);
 

@@ -147,7 +147,7 @@ try {
         }
     }
 
-    logActivity($pdo, $_SESSION['user_id'], "Updated LPO #{$lpo_number} (ID: {$lpo_id})");
+    logActivity($pdo, $_SESSION['user_id'], 'Edit LPO', "User edited LPO: $lpo_number (ID $lpo_id)");
 
     echo json_encode(['success' => true, 'message' => 'LPO updated successfully.']);
 } catch (PDOException $e) {

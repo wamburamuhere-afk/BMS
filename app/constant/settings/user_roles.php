@@ -96,12 +96,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'permissions_count' => count($submitted_permissions)
                 ]
             ]);
-            logActivity(
-                $pdo,
-                $_SESSION['user_id'],
-                $role_id ? 'Updated role permissions' : 'Created role',
-                "$message: '$role_name' (" . count($submitted_permissions) . " permission row(s))"
-            );
+            if ($role_id) {
+                logActivity($pdo, $_SESSION['user_id'], 'Edit role', "User edited role permissions: $role_name (ID $role_id)");
+            } else {
+                logActivity($pdo, $_SESSION['user_id'], 'Create role', "User created a new role: $role_name");
+            }
         } catch (Exception $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             $error_messages[] = "Error saving role: " . $e->getMessage();
@@ -193,12 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'description' => "Updated role for user ID: $user_id to role ID: $role_id",
                 'new_values' => ['role_id' => $role_id]
             ]);
-            logActivity(
-                $pdo,
-                $_SESSION['user_id'],
-                'Changed user role assignment',
-                "Set user ID $user_id to role ID $role_id"
-            );
+            logActivity($pdo, $_SESSION['user_id'], 'Edit user role', "User changed role assignment for user ID $user_id to role ID $role_id");
         } catch (Exception $e) {
             $error_messages[] = "Error updating user role: " . $e->getMessage();
         }

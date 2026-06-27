@@ -9,6 +9,8 @@ autoEnforcePermission('bank_reconciliation');
 // Include the header
 includeHeader();
 
+logActivity($pdo, $_SESSION['user_id'], 'View bank reconciliation', 'User viewed the bank reconciliation management list');
+
 // Fetch company settings for print
 $c_logo = getSetting('company_logo', '');
 $c_name = getSetting('company_name', 'BMS');

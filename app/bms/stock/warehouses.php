@@ -108,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $user_id
                 ]);
 
-                logActivity($pdo, $user_id, 'Created Warehouse', "User created a new warehouse: $warehouse_name ($warehouse_code)");
+                logActivity($pdo, $user_id, 'Create warehouse', "User created a new warehouse: $warehouse_name ($warehouse_code)");
                 $_SESSION['success'] = "Warehouse added successfully!";
                 header("Location: warehouses.php");
                 exit();
@@ -187,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $capacity, $status, $is_primary, $project_id, $notes, $user_id, $warehouse_id
                 ]);
 
-                logActivity($pdo, $user_id, 'Updated Warehouse', "User updated warehouse: $warehouse_name ($warehouse_code)");
+                logActivity($pdo, $user_id, 'Edit warehouse', "User edited warehouse: $warehouse_name ($warehouse_code)");
                 $_SESSION['success'] = "Warehouse updated successfully!";
                 header("Location: warehouses.php");
                 exit();
@@ -250,6 +250,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Include the header
 includeHeader();
+
+logActivity($pdo, $_SESSION['user_id'], 'View warehouses', 'User viewed the warehouses management list');
 
 // Generate CSRF token
 if (!isset($_SESSION['csrf_token'])) {

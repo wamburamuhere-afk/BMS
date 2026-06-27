@@ -12,6 +12,8 @@ autoEnforcePermission('payment_vouchers');
 includeHeader();
 global $pdo;
 
+logActivity($pdo, $_SESSION['user_id'], 'View payment vouchers', 'User viewed the payment vouchers management list');
+
 $expense_accounts = [];
 try { $expense_accounts = expenseAccounts($pdo); } catch (Exception $e) {}
 

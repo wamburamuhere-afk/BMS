@@ -205,9 +205,12 @@ try {
 
     // Log activity
     require_once __DIR__ . '/../../helpers.php';
-    $action_verb = $is_update ? "Updated" : "Created";
     $invoice_num = $invoice_number ?? ($_POST['invoice_number'] ?? "ID: $invoice_id");
-    logActivity($pdo, $_SESSION['user_id'], "$action_verb Invoice: $invoice_num (Amount: " . number_format($grand_total, 2) . ")");
+    if ($is_update) {
+        logActivity($pdo, $_SESSION['user_id'], 'Edit invoice', "User edited invoice: $invoice_num (ID $invoice_id)");
+    } else {
+        logActivity($pdo, $_SESSION['user_id'], 'Create invoice', "User created a new invoice: $invoice_num (ID $invoice_id)");
+    }
 
     echo json_encode(['success' => true, 'message' => 'Invoice saved successfully', 'invoice_id' => $invoice_id]);
 

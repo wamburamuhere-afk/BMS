@@ -222,7 +222,7 @@ try {
 
     // Log activity
     require_once __DIR__ . '/../helpers.php';
-    logActivity($pdo, $user_id, "Updated product: " . $product_data['product_name'] . ($product_data['sku'] ? " ({$product_data['sku']})" : ""));
+    logActivity($pdo, $user_id, 'Edit product', "User edited product: {$product_data['product_name']}" . ($product_data['sku'] ? " ({$product_data['sku']})" : "") . " (ID $product_id)");
     
     echo json_encode([
         'success' => true,

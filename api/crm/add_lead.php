@@ -124,7 +124,7 @@ try {
     }
 
     $full_name = trim($first_name . ' ' . ($_POST['last_name'] ?? ''));
-    logActivity($pdo, $_SESSION['user_id'], "Created lead: $full_name ($lead_code)");
+    logActivity($pdo, $_SESSION['user_id'], 'Create lead', "User created a new lead: $full_name ($lead_code)");
 
     echo json_encode(['success' => true, 'message' => "Lead $lead_code created successfully.", 'lead_id' => $lead_id, 'lead_code' => $lead_code]);
 

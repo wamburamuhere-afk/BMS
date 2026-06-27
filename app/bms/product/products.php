@@ -7,6 +7,8 @@ require_once 'header.php';
 // Check user role for product permissions
 requireViewPermission('products');
 
+logActivity($pdo, $_SESSION['user_id'], 'View products', 'User viewed the products management list');
+
 $can_create_products = canCreate('products');
 $can_edit_products = canEdit('products');
 $can_delete_products = canDelete('products');

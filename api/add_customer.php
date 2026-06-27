@@ -150,7 +150,7 @@ try {
     }
 
     // Log activity
-    logActivity($pdo, $_SESSION['user_id'], "Created customer: {$data['customer_name']} ({$customerCode})");
+    logActivity($pdo, $_SESSION['user_id'], 'Create customer', "User created a new customer: {$data['customer_name']} ($customerCode)");
 
     echo json_encode([
         'success' => true, 

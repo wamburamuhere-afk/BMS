@@ -133,7 +133,7 @@ try {
         }
     }
 
-    logActivity($pdo, $_SESSION['user_id'], "Added LPO #{$lpo_number} for customer ID {$customer_id}");
+    logActivity($pdo, $_SESSION['user_id'], 'Create LPO', "User created a new LPO: $lpo_number (ID $lpo_id)");
 
     echo json_encode(['success' => true, 'message' => 'LPO added successfully.', 'lpo_id' => $lpo_id]);
 } catch (PDOException $e) {

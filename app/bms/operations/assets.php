@@ -41,6 +41,8 @@ $asset_settings = getAssetSettings($pdo);
 // Include the header
 includeHeader();
 
+logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets management list');
+
 ?>
 
 <div class="container-fluid mt-4">
