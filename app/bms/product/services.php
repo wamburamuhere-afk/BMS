@@ -410,24 +410,26 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
     <div id="tableView" class="view-section">
         <div class="card border-0 shadow-sm rounded-4">
         <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" id="servicesTable" style="width:100%;">
+            <div>
+                <table class="table table-hover align-middle mb-0" id="servicesTable" style="width:100%; table-layout:fixed;">
                     <thead class="table-light text-uppercase small fw-bold">
                         <tr>
-                            <th class="ps-3" style="width:70px;">S/NO</th>
+                            <th class="ps-3" style="width:50px;">S/NO</th>
+                            <th style="width:110px;">Item Code</th>
                             <th>Product Name</th>
-                            <th style="width:150px;">Project</th>
-                            <th style="width:130px;">Selling Price</th>
-                            <th style="width:100px;">Tax</th>
-                            <th style="width:90px;">Status</th>
-                            <th class="text-end pe-3 d-print-none" style="width:80px;">Actions</th>
+                            <th style="width:120px;">Project</th>
+                            <th style="width:120px;">Selling Price</th>
+                            <th style="width:90px;">Tax</th>
+                            <th style="width:80px;">Status</th>
+                            <th class="text-end pe-3 d-print-none" style="width:70px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                 <?php foreach ($all_nip_services as $i => $svc): ?>
                         <tr>
                             <td class="ps-3 text-muted fw-bold text-center"><?= $offset + $i + 1 ?></td>
-                            <td>
+                            <td><code class="small fw-bold text-primary"><?= htmlspecialchars($svc['contract_item_no'] ?? '—') ?></code></td>
+                            <td style="word-break:break-word; overflow-wrap:break-word; white-space:normal;">
                                 <div class="d-flex align-items-center gap-2">
                                     <div class="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center flex-shrink-0"
                                         style="width:36px;height:36px;">
@@ -1612,15 +1614,16 @@ $(function () {
             responsive: false,
             autoWidth: false,
             pageLength: 25,
-            order: [[1, 'asc']],
+            order: [[2, 'asc']],
             columnDefs: [
                 { targets: 0, width: '50px',  orderable: false, searchable: false },
-                { targets: 1, width: '35%'  },  // Product Name — widest column
-                { targets: 2, width: '12%'  },
-                { targets: 3, width: '11%'  },
-                { targets: 4, width: '10%'  },
-                { targets: 5, width: '8%'   },
-                { targets: 6, width: '70px', orderable: false, searchable: false }
+                { targets: 1, width: '110px' },  // Item Code
+                { targets: 2, width: '35%'   },  // Product Name — widest, text wraps
+                { targets: 3, width: '120px' },
+                { targets: 4, width: '120px' },
+                { targets: 5, width: '90px'  },
+                { targets: 6, width: '80px'  },
+                { targets: 7, width: '70px',  orderable: false, searchable: false }
             ],
             dom: '<"d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2"lf>rt<"d-flex justify-content-between align-items-center mt-2 px-1 flex-wrap gap-2"ip>',
             language: {
