@@ -15,7 +15,7 @@ $search      = isset($_GET['search'])   ? trim($_GET['search'])        : '';
 $category_id = isset($_GET['category']) ? intval($_GET['category'])    : 0;
 $status_filter = isset($_GET['status']) ? $_GET['status']              : 'active';
 // Pagination
-$per_page_raw = isset($_GET['per_page']) ? $_GET['per_page'] : 25;
+$per_page_raw = isset($_GET['per_page']) ? $_GET['per_page'] : 'all';
 $per_page = ($per_page_raw === 'all') ? 1000000 : (int)$per_page_raw;
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($page - 1) * $per_page;
@@ -262,8 +262,8 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                         <div class="col-md-5">
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-0"><i class="bi bi-search"></i></span>
-                                <input type="text" class="form-control border-0 bg-light" name="search"
-                                    placeholder="Search products..." value="<?= htmlspecialchars($search) ?>">
+                                <input type="text" class="form-control border-0 bg-light" id="svcTableSearch"
+                                    placeholder="Search products..." autocomplete="off">
                             </div>
                         </div>
                         <div class="col-md-3">
@@ -300,17 +300,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                 <i class="bi bi-grid-3x3-gap"></i>
                             </button>
                         </div>
-                        <div class="d-flex align-items-center gap-2">
-                            <label class="small text-muted mb-0">Show:</label>
-                            <select class="form-select form-select-sm border-0 bg-light" style="width: auto;" 
-                                onchange="updatePerPage(this.value)">
-                                <?php foreach ([10, 25, 50, 100, 'all'] as $val): ?>
-                                <option value="<?= $val ?>" <?= ($per_page == $val || ($val == 'all' && $per_page > 10000)) ? 'selected' : '' ?>>
-                                    <?= ucfirst($val) ?>
-                                </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
+                        <div class="d-flex align-items-center gap-2 d-none">
                     </div>
                 </div>
             </div>
@@ -420,25 +410,26 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
     <div id="tableView" class="view-section">
         <div class="card border-0 shadow-sm rounded-4">
         <div class="card-body p-0">
-            <?php if (count($all_nip_services) > 0): ?>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" id="servicesTable" style="width:100%;">
+            <div>
+                <table class="table table-hover align-middle mb-0" id="servicesTable" style="width:100%; table-layout:fixed;">
                     <thead class="table-light text-uppercase small fw-bold">
                         <tr>
-                            <th class="ps-3" style="width:70px;">S/NO</th>
+                            <th class="ps-3" style="width:50px;">S/NO</th>
+                            <th style="width:110px;">Item Code</th>
                             <th>Product Name</th>
-                            <th style="width:150px;">Project</th>
-                            <th style="width:130px;">Selling Price</th>
-                            <th style="width:100px;">Tax</th>
-                            <th style="width:90px;">Status</th>
-                            <th class="text-end pe-3 d-print-none" style="width:80px;">Actions</th>
+                            <th style="width:120px;">Project</th>
+                            <th style="width:120px;">Selling Price</th>
+                            <th style="width:90px;">Tax</th>
+                            <th style="width:80px;">Status</th>
+                            <th class="text-end pe-3 d-print-none" style="width:70px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                 <?php foreach ($all_nip_services as $i => $svc): ?>
                         <tr>
                             <td class="ps-3 text-muted fw-bold text-center"><?= $offset + $i + 1 ?></td>
-                            <td>
+                            <td><code class="small fw-bold text-primary"><?= htmlspecialchars($svc['contract_item_no'] ?? '—') ?></code></td>
+                            <td style="word-break:break-word; overflow-wrap:break-word; white-space:normal;">
                                 <div class="d-flex align-items-center gap-2">
                                     <div class="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center flex-shrink-0"
                                         style="width:36px;height:36px;">
@@ -514,51 +505,6 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                     </tbody>
                 </table>
             </div>
-
-            <!-- Pagination -->
-            <?php if ($total_pages > 1): ?>
-            <div class="d-flex justify-content-between align-items-center px-3 py-3 border-top d-print-none">
-                <small class="text-muted">
-                    Showing <?= $offset + 1 ?>–<?= min($offset + $per_page, $total_count) ?> of <?= $total_count ?> items
-                </small>
-                <nav>
-                    <ul class="pagination pagination-sm mb-0">
-                        <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
-                            <a class="page-link" href="<?= svc_pagination_url(1) ?>"><i class="bi bi-chevron-double-left"></i></a>
-                        </li>
-                        <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
-                            <a class="page-link" href="<?= svc_pagination_url($page - 1) ?>"><i class="bi bi-chevron-left"></i></a>
-                        </li>
-                        <?php for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++): ?>
-                        <li class="page-item <?= $page == $i ? 'active' : '' ?>">
-                            <a class="page-link" href="<?= svc_pagination_url($i) ?>"><?= $i ?></a>
-                        </li>
-                        <?php endfor; ?>
-                        <li class="page-item <?= $page >= $total_pages ? 'disabled' : '' ?>">
-                            <a class="page-link" href="<?= svc_pagination_url($page + 1) ?>"><i class="bi bi-chevron-right"></i></a>
-                        </li>
-                        <li class="page-item <?= $page >= $total_pages ? 'disabled' : '' ?>">
-                            <a class="page-link" href="<?= svc_pagination_url($total_pages) ?>"><i class="bi bi-chevron-double-right"></i></a>
-                        </li>
-                    </ul>
-                </nav>
-            </div>
-            <?php endif; ?>
-
-            <?php else: ?>
-            <div class="text-center py-5">
-                <i class="bi bi-gear display-1 text-muted opacity-25 d-block mb-3"></i>
-                <h5 class="fw-bold text-dark">No Services Found</h5>
-                <p class="text-muted small mb-4">
-                    <?= !empty($search) ? 'No services match your search.' : 'You have not added any Non-Inventory services yet.' ?>
-                </p>
-                <?php if ($can_create): ?>
-                <button type="button" class="btn btn-primary" onclick="openAddSvcModal()">
-                    <i class="bi bi-plus-circle me-1"></i> Add First Service
-                </button>
-                <?php endif; ?>
-            </div>
-            <?php endif; ?>
         </div>
     </div> <!-- end tableView -->
     
@@ -971,10 +917,16 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
     .badge { border: 1px solid #000 !important; color: black !important; background: transparent !important; }
     .container-fluid { width: 100% !important; max-width: none !important; padding: 0 !important; margin: 0 !important; }
     @page { margin: 1cm; size: auto; }
-    
+
     .row > [class*="col-"] { float: left !important; width: 25% !important; }
     .card-body { padding: 10px !important; }
     .table-responsive table { table-layout: auto !important; }
+
+    /* Hide DataTable controls — show only the raw table */
+    .dataTables_length,
+    .dataTables_filter,
+    .dataTables_info,
+    .dataTables_paginate { display: none !important; }
 
     /* Fixed Footer for Print */
     .d-print-block.mt-5.pt-3.border-top.text-center {
@@ -1655,10 +1607,44 @@ function updatePerPage(val) {
     window.location.href = url.toString();
 }
 
-// §UI-3 — make the DB-backed Category filter a searchable Select2.
-// (Search / status / pagination remain server-side via the GET form, so no
-//  client-side DataTable is added — that would conflict with server paging.)
 $(function () {
+    // DataTable — Product Name column is wider; DataTable handles pagination & sorting
+    if ($.fn.DataTable && !$.fn.DataTable.isDataTable('#servicesTable')) {
+        const svcTable = $('#servicesTable').DataTable({
+            responsive: false,
+            autoWidth: false,
+            pageLength: 25,
+            order: [[2, 'asc']],
+            columnDefs: [
+                { targets: 0, width: '50px',  orderable: false, searchable: false },
+                { targets: 1, width: '110px' },  // Item Code
+                { targets: 2, width: '35%'   },  // Product Name — widest, text wraps
+                { targets: 3, width: '120px' },
+                { targets: 4, width: '120px' },
+                { targets: 5, width: '90px'  },
+                { targets: 6, width: '80px'  },
+                { targets: 7, width: '70px',  orderable: false, searchable: false }
+            ],
+            dom: '<"d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2"lf>rt<"d-flex justify-content-between align-items-center mt-2 px-1 flex-wrap gap-2"ip>',
+            language: {
+                search: '',
+                searchPlaceholder: 'Filter table...',
+                lengthMenu: 'Show _MENU_',
+                emptyTable: 'No non-inventory products found.',
+                info: 'Showing _START_ to _END_ of _TOTAL_ items',
+                infoEmpty: 'No items to show',
+                infoFiltered: '(filtered from _MAX_ total)',
+                paginate: { first: '«', last: '»', next: '›', previous: '‹' }
+            }
+        });
+
+        // Wire the custom search input to DataTable (instant client-side search)
+        $('#svcTableSearch').on('keyup input', function () {
+            svcTable.search(this.value).draw();
+        });
+    }
+
+    // §UI-3 — make the DB-backed Category filter a searchable Select2.
     if ($('#svcCategoryFilter').length && !$('#svcCategoryFilter').hasClass('select2-hidden-accessible')) {
         $('#svcCategoryFilter').select2({
             theme: 'bootstrap-5',
