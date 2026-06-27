@@ -8,23 +8,132 @@
  * (logged to error_log only).
  */
 
+if (!function_exists('parseUserAgent')) {
+    /**
+     * Parse a raw User-Agent string into browser, OS, and device_type.
+     * Returns ['browser'=>string, 'os'=>string, 'device_type'=>string].
+     */
+    function parseUserAgent(?string $ua): array
+    {
+        if (empty($ua)) return ['browser' => 'Unknown', 'os' => 'Unknown', 'device_type' => 'Unknown'];
+
+        // Device type
+        if (preg_match('/tablet|ipad|playbook|silk/i', $ua)) {
+            $device = 'Tablet';
+        } elseif (preg_match('/mobile|iphone|ipod|android.*mobile|blackberry|opera mini|iemobile|wpdesktop/i', $ua)) {
+            $device = 'Mobile';
+        } else {
+            $device = 'Desktop';
+        }
+
+        // Browser
+        if (preg_match('/Edg\//i', $ua))           $browser = 'Edge';
+        elseif (preg_match('/OPR\//i', $ua))        $browser = 'Opera';
+        elseif (preg_match('/SamsungBrowser/i', $ua)) $browser = 'Samsung Browser';
+        elseif (preg_match('/UCBrowser/i', $ua))    $browser = 'UC Browser';
+        elseif (preg_match('/Chrome/i', $ua))       $browser = 'Chrome';
+        elseif (preg_match('/Firefox/i', $ua))      $browser = 'Firefox';
+        elseif (preg_match('/Safari/i', $ua))       $browser = 'Safari';
+        elseif (preg_match('/MSIE|Trident/i', $ua)) $browser = 'Internet Explorer';
+        else                                         $browser = 'Other';
+
+        // OS
+        if (preg_match('/Windows NT 10/i', $ua)) {
+            // Chrome/Edge send Sec-CH-UA-Platform-Version: platform major >= 13 = Windows 11
+            $chVer = trim($_SERVER['HTTP_SEC_CH_UA_PLATFORM_VERSION'] ?? '', '"');
+            if ($chVer !== '' && version_compare(explode('.', $chVer)[0], '13', '>=')) {
+                $os = 'Windows 11';
+            } elseif ($chVer !== '') {
+                $os = 'Windows 10';
+            } else {
+                $os = 'Windows 10/11'; // Firefox/older browsers — genuinely ambiguous
+            }
+        } elseif (preg_match('/Windows NT 6\.3/i', $ua))  $os = 'Windows 8.1';
+        elseif (preg_match('/Windows NT 6\.1/i', $ua))  $os = 'Windows 7';
+        elseif (preg_match('/Windows/i', $ua))          $os = 'Windows';
+        elseif (preg_match('/iPhone.*OS ([\d_]+)/i', $ua, $m)) $os = 'iOS ' . str_replace('_', '.', $m[1]);
+        elseif (preg_match('/iPad.*OS ([\d_]+)/i', $ua, $m))   $os = 'iPadOS ' . str_replace('_', '.', $m[1]);
+        elseif (preg_match('/Android ([\d.]+)/i', $ua, $m))    $os = 'Android ' . $m[1];
+        elseif (preg_match('/Mac OS X/i', $ua))         $os = 'macOS';
+        elseif (preg_match('/Linux/i', $ua))             $os = 'Linux';
+        else                                             $os = 'Other';
+
+        return ['browser' => $browser, 'os' => $os, 'device_type' => $device];
+    }
+}
+
+if (!function_exists('lookupGeoIP')) {
+    /**
+     * Call ip-api.com to resolve an IP to city/country/ISP/org/timezone.
+     * Returns an array or null on failure. 45-req/min free limit is fine for logins.
+     * Never called for loopback/private IPs.
+     */
+    function lookupGeoIP(?string $ip): ?array
+    {
+        if (empty($ip)) return null;
+        // Skip private/loopback addresses — no geo data available
+        if (in_array($ip, ['127.0.0.1', '::1'], true) || substr($ip, 0, 3) === '10.'
+            || substr($ip, 0, 4) === '192.' || substr($ip, 0, 7) === '172.16.'
+        ) {
+            return ['city' => 'Local', 'region' => '', 'country' => 'Local', 'country_code' => '--',
+                    'isp' => 'Internal Network', 'org' => 'Internal', 'timezone' => date_default_timezone_get()];
+        }
+        try {
+            $url = 'http://ip-api.com/json/' . urlencode($ip) . '?fields=status,city,regionName,country,countryCode,isp,org,timezone';
+            $ctx = stream_context_create(['http' => ['timeout' => 3]]);
+            $raw = @file_get_contents($url, false, $ctx);
+            if ($raw === false) return null;
+            $data = json_decode($raw, true);
+            if (!$data || ($data['status'] ?? '') !== 'success') return null;
+            return [
+                'city'         => $data['city']        ?? null,
+                'region'       => $data['regionName']  ?? null,
+                'country'      => $data['country']     ?? null,
+                'country_code' => $data['countryCode'] ?? null,
+                'isp'          => $data['isp']         ?? null,
+                'org'          => $data['org']         ?? null,
+                'timezone'     => $data['timezone']    ?? null,
+            ];
+        } catch (Throwable $e) {
+            error_log('lookupGeoIP: ' . $e->getMessage());
+            return null;
+        }
+    }
+}
+
 if (!function_exists('startUserSession')) {
     /**
-     * Open a session row on successful login. Returns the new row id (to stash
-     * in $_SESSION) or null on failure.
+     * Open a session row on successful login. Enriches with GeoIP + parsed UA.
+     * Returns the new row id (to stash in $_SESSION) or null on failure.
      */
     function startUserSession(PDO $pdo, int $userId, ?string $ip = null, ?string $ua = null): ?int
     {
         if ($userId <= 0) return null;
         try {
+            $geo    = lookupGeoIP($ip);
+            $device = parseUserAgent($ua);
+
             $stmt = $pdo->prepare(
-                "INSERT INTO user_sessions (user_id, login_at, ip_address, user_agent)
-                 VALUES (?, NOW(), ?, ?)"
+                "INSERT INTO user_sessions
+                    (user_id, login_at, ip_address, user_agent,
+                     city, region, country, country_code, isp, org, timezone,
+                     browser, os, device_type)
+                 VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             );
             $stmt->execute([
                 $userId,
-                $ip !== null ? substr($ip, 0, 45) : null,
-                $ua !== null ? substr($ua, 0, 255) : null,
+                $ip !== null ? substr($ip, 0, 45)  : null,
+                $ua !== null ? substr($ua, 0, 255)  : null,
+                $geo['city']         ?? null,
+                $geo['region']       ?? null,
+                $geo['country']      ?? null,
+                $geo['country_code'] ?? null,
+                $geo['isp']          ?? null,
+                $geo['org']          ?? null,
+                $geo['timezone']     ?? null,
+                $device['browser'],
+                $device['os'],
+                $device['device_type'],
             ]);
             return (int) $pdo->lastInsertId();
         } catch (Throwable $e) {

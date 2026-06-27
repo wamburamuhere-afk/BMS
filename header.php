@@ -1030,6 +1030,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('users') ?>"><i class="bi bi-people"></i> Users</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('user_roles') ?>"><i class="bi bi-shield-check"></i> Roles & Permissions</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('user_projects') ?>"><i class="bi bi-diagram-3"></i> Project Assignments</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('login_history') ?>"><i class="bi bi-clock-history"></i> Login History</a></li>
                                 <li><h6 class="dropdown-header">System Configuration</h6></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i> Settings</a></li>
                                 <?php if (isAdmin()): ?>
