@@ -108,12 +108,26 @@ $GLOBALS['DISPLAY_COMPANY_NAME'] = $company_name;
 // Company Logo
 $company_logo = get_setting('company_logo');
 
-// Page-visit logging (Vikundi-style) — record every authenticated page load.
-// Uses existing logActivity() infrastructure; fails silently so it never breaks a load.
+// Page-visit logging — record every authenticated page load with a human-readable name.
 if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     try {
-        $page_url = $_SERVER['REQUEST_URI'] ?? 'unknown';
-        logActivity($pdo, (int)$_SESSION['user_id'], 'page_view', $page_url);
+        $req_path  = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
+        $base      = function_exists('getBasePath') ? trim(getBasePath(), '/') : '';
+        $clean     = trim($base !== '' ? ltrim(substr($req_path, strlen('/' . $base)), '/') : ltrim($req_path, '/'), '/');
+        $parts     = array_values(array_filter(explode('/', $clean)));
+        $last      = array_pop($parts) ?? 'page';
+        $parent    = $parts ? array_pop($parts) : '';
+        // If last segment is a generic action word, prepend the parent segment for context.
+        if (in_array(strtolower($last), ['view', 'details', 'edit', 'add', 'create', 'list', 'index', ''], true) && $parent !== '') {
+            $page_seg = $parent . ' ' . $last;
+        } else {
+            $page_seg = $last;
+        }
+        $page_name = ucwords(str_replace(['_', '-'], ' ', trim($page_seg)));
+        if ($page_name === '') $page_name = 'Page';
+        logActivity($pdo, (int)$_SESSION['user_id'],
+            'View ' . $page_name,
+            'User viewed ' . $page_name . ' page');
     } catch (Throwable $e) { /* never break page load */ }
 }
 ?>
