@@ -8,7 +8,9 @@ require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
 require_once __DIR__ . '/../../../core/session_tracker.php';
 
-if (!isAuthenticated() || !isAdmin()) {
+autoEnforcePermission('login_history');
+
+if (!isAdmin()) {
     header('Location: ' . getUrl('unauthorized'));
     exit;
 }
