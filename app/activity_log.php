@@ -589,8 +589,13 @@ $page_title = "Activity Log";
 
 @media print {
     @page {
-        margin: 1cm;
+        margin: 10mm 8mm 16mm 8mm; /* canonical: top right bottom left */
     }
+
+    /* AI print mode: show only the AI section, hide everything else in main-content */
+    body.ai-printing .main-content > *:not(#aiPrintSection) { display: none !important; }
+    body.ai-printing #aiPrintSection { display: block !important; }
+    body.ai-printing #aiPrintSection .bms-print-header { display: block !important; }
     
     html, body {
         margin: 0 !important;
@@ -1215,6 +1220,27 @@ $page_title = "Activity Log";
             </div>
         </div>
     </div>
+
+    <?php if ($is_admin):
+        $ai_logo         = getSetting('company_logo', '');
+        $ai_company_name = getSetting('company_name', $GLOBALS['DISPLAY_COMPANY_NAME'] ?? 'BUSINESS MANAGEMENT SYSTEM');
+    ?>
+    <!-- AI Audit Intelligence — print-only section (revealed by body.ai-printing CSS class) -->
+    <div id="aiPrintSection" style="display:none;">
+        <div class="bms-print-header">
+            <?php if (!empty($ai_logo)): ?>
+            <img src="<?= htmlspecialchars(getUrl($ai_logo)) ?>" alt="Logo">
+            <?php endif; ?>
+            <h1 class="bph-company"><?= htmlspecialchars($ai_company_name) ?></h1>
+        </div>
+        <div class="text-center pb-3 mb-3" style="border-bottom: 2px solid #0d6efd; margin-top: 8px;">
+            <h5 id="aiPrintDocLabel" style="text-transform:uppercase; letter-spacing:1px; color:#333; margin:6px 0 2px; font-size:13pt;"></h5>
+            <p id="aiPrintMetaLine" style="color:#64748b; font-size:10pt; margin:0;"></p>
+        </div>
+        <div id="aiPrintBody" style="font-size:12pt; line-height:1.7; color:#1e293b;"></div>
+    </div>
+    <?php endif; ?>
+
 </div>
 
 <script>
@@ -1594,19 +1620,27 @@ function renderAiMarkdown(text) {
 function printAiResult() {
     const content = document.getElementById('aiText')?.innerHTML || '';
     const meta    = document.getElementById('aiResultMeta')?.textContent || '';
-    const win = window.open('', '_blank', 'width=800,height=700');
-    win.document.write(`<!DOCTYPE html><html><head><title>AI Audit Report</title>
-        <style>body{font-family:Arial,sans-serif;padding:30px;font-size:13px;line-height:1.7;color:#1e293b;}
-        .badge{padding:2px 7px;border-radius:10px;font-size:11px;}
-        h1{font-size:16px;font-weight:bold;border-bottom:2px solid #7c3aed;padding-bottom:8px;color:#7c3aed;}
-        .meta{color:#64748b;font-size:11px;margin-bottom:18px;}</style>
-        </head><body>
-        <h1>🤖 AI Audit Intelligence Report</h1>
-        <div class="meta">${meta}</div>
-        ${content}
-        </body></html>`);
-    win.document.close();
-    win.print();
+    const modeLabels = {
+        briefing : 'Daily Briefing',
+        anomalies: 'Anomaly Scanner',
+        ask      : 'Ask the Log',
+        report   : 'Audit Report',
+    };
+
+    document.getElementById('aiPrintDocLabel').textContent =
+        'AI Audit Intelligence — ' + (modeLabels[_aiCurrentMode] || _aiCurrentMode);
+    document.getElementById('aiPrintMetaLine').textContent = meta;
+    document.getElementById('aiPrintBody').innerHTML = content;
+
+    document.body.classList.add('ai-printing');
+
+    const cleanup = () => {
+        document.body.classList.remove('ai-printing');
+        window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+
+    window.print();
 }
 
 function copyAiResult() {
