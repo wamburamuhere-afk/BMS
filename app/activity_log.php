@@ -852,6 +852,178 @@ $page_title = "Activity Log";
         </div>
     </div>
 
+    <?php if ($is_admin): require_once ROOT_DIR . '/core/ai_service.php'; ?>
+    <!-- ══ AI Audit Intelligence — admin-only ══════════════════════════════════ -->
+    <div class="card mb-4 shadow-sm border-0 no-print" id="aiAuditCard"
+         style="border-radius: 15px; border-left: 5px solid #7c3aed !important;">
+        <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center px-4 py-3"
+             style="border-radius: 15px 15px 0 0; cursor:pointer;" onclick="toggleAiPanel()">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span style="font-size:1.3rem;">🤖</span>
+                <span class="fw-bold text-dark fs-6">AI Audit Intelligence</span>
+                <span class="badge rounded-pill text-white ms-1" style="background:#7c3aed; font-size:0.6rem; letter-spacing:.05em;">ADMIN ONLY</span>
+                <?php if (!aiConfigured()): ?>
+                <span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem;">Not configured —
+                    <a href="<?= getUrl('ai_settings') ?>" class="text-dark" onclick="event.stopPropagation()">Set up AI</a>
+                </span>
+                <?php endif; ?>
+            </div>
+            <i class="bi bi-chevron-down text-muted" id="aiPanelChevron" style="transition:transform .25s;"></i>
+        </div>
+
+        <div id="aiPanelBody" class="d-none">
+            <?php if (aiConfigured()): ?>
+            <!-- Mode selector tabs -->
+            <div class="d-flex border-bottom flex-wrap gap-0 px-3 pt-2" style="background:#f8fafc; border-radius:0;">
+                <?php
+                $modes = [
+                    'briefing'  => ['icon' => 'bi-file-text',            'label' => 'Daily Briefing',    'color' => '#7c3aed'],
+                    'anomalies' => ['icon' => 'bi-exclamation-triangle',  'label' => 'Anomaly Scanner',   'color' => '#dc2626'],
+                    'ask'       => ['icon' => 'bi-chat-dots',             'label' => 'Ask the Log',       'color' => '#0d6efd'],
+                    'report'    => ['icon' => 'bi-journal-bookmark-fill', 'label' => 'Audit Report',      'color' => '#059669'],
+                ];
+                foreach ($modes as $mk => $mv): ?>
+                <button type="button"
+                        class="btn btn-sm ai-mode-tab px-4 py-2 border-0 border-bottom border-3 rounded-0 fw-semibold"
+                        style="font-size:.82rem; color:#64748b; border-color:transparent !important;"
+                        data-mode="<?= $mk ?>"
+                        data-color="<?= $mv['color'] ?>"
+                        onclick="selectAiMode('<?= $mk ?>', this)">
+                    <i class="bi <?= $mv['icon'] ?> me-1"></i><?= $mv['label'] ?>
+                </button>
+                <?php endforeach; ?>
+            </div>
+
+            <!-- Mode content panes -->
+            <div class="px-4 py-3">
+
+                <!-- BRIEFING -->
+                <div class="ai-pane" id="ai-pane-briefing">
+                    <p class="text-muted small mb-3">
+                        AI reads the current period's activity and writes a plain-English narrative — who did what, what modules were used, and what deserves attention. Risk level included.
+                    </p>
+                    <button class="btn btn-sm fw-semibold text-white" style="background:#7c3aed; border-radius:8px;"
+                            onclick="runAiAnalysis('briefing')">
+                        <i class="bi bi-stars me-1"></i> Generate Briefing
+                    </button>
+                </div>
+
+                <!-- ANOMALIES -->
+                <div class="ai-pane d-none" id="ai-pane-anomalies">
+                    <p class="text-muted small mb-3">
+                        AI compares each user's activity against their 30-day baseline, checks for off-hours access, bulk deletions, and sensitive module access by unexpected users. Returns a structured findings list with severity ratings.
+                    </p>
+                    <button class="btn btn-sm fw-semibold text-white" style="background:#dc2626; border-radius:8px;"
+                            onclick="runAiAnalysis('anomalies')">
+                        <i class="bi bi-shield-exclamation me-1"></i> Scan for Anomalies
+                    </button>
+                </div>
+
+                <!-- ASK -->
+                <div class="ai-pane d-none" id="ai-pane-ask">
+                    <p class="text-muted small mb-3">
+                        Ask any question about the activity log in plain language. AI answers from aggregated data within the current period filter.
+                    </p>
+                    <div class="d-flex gap-2 mb-2" style="max-width:620px;">
+                        <input type="text" id="aiAskInput" class="form-control form-control-sm"
+                               placeholder="e.g. Who made deletions this week?  |  Did anyone access payroll?"
+                               onkeydown="if(event.key==='Enter') runAiAnalysis('ask')">
+                        <button class="btn btn-sm fw-semibold text-white px-3" style="background:#0d6efd; border-radius:8px; white-space:nowrap;"
+                                onclick="runAiAnalysis('ask')">
+                            <i class="bi bi-send"></i>
+                        </button>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mt-1">
+                        <button class="btn btn-xs btn-outline-secondary" style="font-size:.75rem;"
+                                onclick="aiQuick('Who made the most deletions this period?')">Most deletions</button>
+                        <button class="btn btn-xs btn-outline-secondary" style="font-size:.75rem;"
+                                onclick="aiQuick('Were there any off-hours logins or access?')">Off-hours access</button>
+                        <button class="btn btn-xs btn-outline-secondary" style="font-size:.75rem;"
+                                onclick="aiQuick('Who accessed payroll or financial modules?')">Financial access</button>
+                        <button class="btn btn-xs btn-outline-secondary" style="font-size:.75rem;"
+                                onclick="aiQuick('Summarise what each user did and how busy they were')">User summary</button>
+                        <button class="btn btn-xs btn-outline-secondary" style="font-size:.75rem;"
+                                onclick="aiQuick('Are there any suspicious patterns I should investigate?')">Suspicious patterns</button>
+                    </div>
+                </div>
+
+                <!-- REPORT -->
+                <div class="ai-pane d-none" id="ai-pane-report">
+                    <p class="text-muted small mb-3">
+                        Generate a formal audit narrative for management or compliance. Optionally scope to one user and a custom date range independent of the page filter.
+                    </p>
+                    <div class="row g-2 mb-3" style="max-width:600px;">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted text-uppercase" style="font-size:.68rem;">User (optional)</label>
+                            <select class="form-select form-select-sm" id="rptUser">
+                                <option value="">All Users</option>
+                                <?php foreach ($users as $u): ?>
+                                <option value="<?= $u['user_id'] ?>"><?= htmlspecialchars($u['username']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted text-uppercase" style="font-size:.68rem;">From</label>
+                            <input type="date" class="form-control form-control-sm" id="rptFrom"
+                                   value="<?= htmlspecialchars($date_from ?: date('Y-m-01')) ?>">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted text-uppercase" style="font-size:.68rem;">To</label>
+                            <input type="date" class="form-control form-control-sm" id="rptTo"
+                                   value="<?= htmlspecialchars($date_to ?: date('Y-m-d')) ?>">
+                        </div>
+                    </div>
+                    <button class="btn btn-sm fw-semibold text-white" style="background:#059669; border-radius:8px;"
+                            onclick="runAiAnalysis('report')">
+                        <i class="bi bi-journal-bookmark-fill me-1"></i> Generate Audit Report
+                    </button>
+                </div>
+
+                <!-- Result area — shared across all modes -->
+                <div id="aiResultArea" class="mt-4 d-none">
+                    <!-- Loading -->
+                    <div id="aiLoading" class="text-center py-4 d-none">
+                        <div class="spinner-border" style="width:1.8rem;height:1.8rem;color:#7c3aed;"></div>
+                        <p class="text-muted small mt-2 mb-0">AI is analysing the activity log…</p>
+                    </div>
+                    <!-- Output -->
+                    <div id="aiOutput" class="d-none">
+                        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                            <span class="text-muted small" id="aiResultMeta"></span>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-secondary" style="font-size:.75rem;" onclick="printAiResult()">
+                                    <i class="bi bi-printer me-1"></i>Print
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" style="font-size:.75rem;" onclick="copyAiResult()">
+                                    <i class="bi bi-clipboard me-1"></i>Copy
+                                </button>
+                            </div>
+                        </div>
+                        <div id="aiText"
+                             style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:1.2rem; font-size:.88rem; line-height:1.8; color:#1e293b;">
+                        </div>
+                    </div>
+                    <!-- Error -->
+                    <div id="aiError" class="d-none">
+                        <div class="alert alert-danger mb-0">
+                            <i class="bi bi-exclamation-circle me-1"></i>
+                            <span id="aiErrorMsg"></span>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /px-4 py-3 -->
+            <?php else: ?>
+            <div class="px-4 py-3 text-muted small">
+                AI is not configured yet. Go to
+                <a href="<?= getUrl('ai_settings') ?>">AI Settings</a> to connect a provider (OpenAI, Claude, Gemini, or any OpenAI-compatible API).
+            </div>
+            <?php endif; ?>
+        </div><!-- /aiPanelBody -->
+    </div>
+    <!-- ══ end AI Audit Intelligence ══════════════════════════════════════════ -->
+    <?php endif; // $is_admin ?>
+
     <?php if ($session_summary !== null):
         // Resolve the filtered user's display name for the panel header.
         $sel_user_name = '';
@@ -1267,12 +1439,180 @@ async function initiatePurge() {
             html : `<strong>${purgeData.count.toLocaleString()}</strong> log entries have been permanently deleted.`,
             confirmButtonColor: '#28a745'
         });
-        // Reload the table (and refresh cards by reloading the page).
         if (acTable) acTable.ajax.reload(null, false);
         location.reload();
     } else {
         Swal.fire('Error', purgeData.error || 'Purge failed', 'error');
     }
+}
+
+// ── AI Audit Intelligence ─────────────────────────────────────────────────────
+let _aiCurrentMode = 'briefing';
+
+function toggleAiPanel() {
+    const body    = document.getElementById('aiPanelBody');
+    const chevron = document.getElementById('aiPanelChevron');
+    if (!body) return;
+    const opening = body.classList.contains('d-none');
+    body.classList.toggle('d-none', !opening);
+    chevron.style.transform = opening ? 'rotate(180deg)' : '';
+    // Auto-select first tab on first open
+    if (opening && !body.dataset.initialized) {
+        body.dataset.initialized = '1';
+        const firstTab = body.querySelector('.ai-mode-tab');
+        if (firstTab) selectAiMode(firstTab.dataset.mode, firstTab);
+    }
+}
+
+function selectAiMode(mode, btn) {
+    _aiCurrentMode = mode;
+    // Update tab styles
+    document.querySelectorAll('.ai-mode-tab').forEach(b => {
+        b.style.color       = '#64748b';
+        b.style.borderColor = 'transparent';
+        b.style.fontWeight  = '500';
+    });
+    if (btn) {
+        btn.style.color       = btn.dataset.color || '#7c3aed';
+        btn.style.borderColor = btn.dataset.color || '#7c3aed';
+        btn.style.fontWeight  = '700';
+    }
+    // Show the right pane
+    document.querySelectorAll('.ai-pane').forEach(p => p.classList.add('d-none'));
+    const pane = document.getElementById('ai-pane-' + mode);
+    if (pane) pane.classList.remove('d-none');
+    // Clear previous result
+    document.getElementById('aiResultArea').classList.add('d-none');
+    document.getElementById('aiOutput').classList.add('d-none');
+    document.getElementById('aiError').classList.add('d-none');
+    document.getElementById('aiLoading').classList.add('d-none');
+}
+
+function aiQuick(question) {
+    const inp = document.getElementById('aiAskInput');
+    if (inp) { inp.value = question; inp.focus(); }
+    runAiAnalysis('ask');
+}
+
+async function runAiAnalysis(mode) {
+    // Build payload from current page filter + mode-specific inputs
+    const dateFrom = $('#filterDateFrom').val() || '<?= $date_from ?>';
+    const dateTo   = $('#filterDateTo').val()   || '<?= $date_to ?>';
+    const userId   = $('#filterUser').val()     || '';
+
+    const payload = {
+        _csrf    : CSRF_TOKEN,
+        mode     : mode,
+        date_from: dateFrom,
+        date_to  : dateTo,
+        user_id  : userId,
+    };
+
+    if (mode === 'ask') {
+        const q = (document.getElementById('aiAskInput')?.value || '').trim();
+        if (!q) { Swal.fire({ icon:'warning', title:'Please enter a question first.' }); return; }
+        payload.query = q;
+    }
+    if (mode === 'report') {
+        payload.report_user_id = document.getElementById('rptUser')?.value  || '';
+        payload.report_from    = document.getElementById('rptFrom')?.value  || dateFrom;
+        payload.report_to      = document.getElementById('rptTo')?.value    || dateTo;
+    }
+
+    // Show loading
+    const area = document.getElementById('aiResultArea');
+    area.classList.remove('d-none');
+    document.getElementById('aiLoading').classList.remove('d-none');
+    document.getElementById('aiOutput').classList.add('d-none');
+    document.getElementById('aiError').classList.add('d-none');
+
+    try {
+        const res = await $.ajax({
+            url     : '<?= buildUrl('api/ai_audit_analysis.php') ?>',
+            type    : 'POST',
+            data    : payload,
+            dataType: 'json',
+        });
+        document.getElementById('aiLoading').classList.add('d-none');
+
+        if (res.success) {
+            const modeLabels = {
+                briefing : '📋 Daily Briefing',
+                anomalies: '🔍 Anomaly Scan',
+                ask      : '💬 Ask the Log',
+                report   : '📄 Audit Report',
+            };
+            const usage  = res.usage || {};
+            const tokens = (usage.prompt || 0) + (usage.completion || 0);
+            document.getElementById('aiResultMeta').textContent =
+                (modeLabels[res.mode] || res.mode) +
+                (tokens ? '  ·  ' + tokens.toLocaleString() + ' tokens' : '') +
+                '  ·  ' + new Date().toLocaleTimeString();
+            document.getElementById('aiText').innerHTML = renderAiMarkdown(res.text || '');
+            document.getElementById('aiOutput').classList.remove('d-none');
+        } else {
+            document.getElementById('aiErrorMsg').textContent = res.message || 'Unknown error.';
+            document.getElementById('aiError').classList.remove('d-none');
+        }
+    } catch (e) {
+        document.getElementById('aiLoading').classList.add('d-none');
+        document.getElementById('aiErrorMsg').textContent = 'Request failed. Check your connection.';
+        document.getElementById('aiError').classList.remove('d-none');
+    }
+}
+
+function renderAiMarkdown(text) {
+    if (!text) return '';
+    return text
+        // Severity badges
+        .replace(/🔴\s*(High|CRITICAL)/gi,  '<span class="badge text-white me-1" style="background:#dc2626;">🔴 High</span>')
+        .replace(/🟡\s*(Medium|MODERATE)/gi, '<span class="badge text-dark me-1" style="background:#fbbf24;">🟡 Medium</span>')
+        .replace(/🟢\s*(Low|CLEAN)/gi,       '<span class="badge text-white me-1" style="background:#16a34a;">🟢 Low</span>')
+        // Risk level lines
+        .replace(/RISK LEVEL\s*:\s*/gi, '<strong class="text-danger">RISK LEVEL: </strong>')
+        // Bold
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        // Section headers (## or ALL CAPS line followed by ---)
+        .replace(/^#{1,3}\s+(.+)$/gm, '<div class="fw-bold text-primary mt-3 mb-1" style="font-size:.9rem;border-bottom:1px solid #e2e8f0;padding-bottom:3px;">$1</div>')
+        .replace(/^([A-Z][A-Z\s\/&]{4,}):?\s*$/gm, '<div class="fw-bold text-uppercase mt-3 mb-1" style="font-size:.78rem;color:#7c3aed;letter-spacing:.07em;">$1</div>')
+        // Bullet lines starting with - or •
+        .replace(/^[\-•]\s+(.+)$/gm, '<div class="ms-3 mb-1">• $1</div>')
+        // FINDING / DETAIL / ACTION / SEVERITY labels
+        .replace(/\b(SEVERITY|FINDING|DETAIL|ACTION|RECOMMENDATION[S]?|SCOPE|METHODOLOGY)\s*:/g,
+                 '<span class="fw-bold text-dark" style="font-size:.8rem;">$1:</span>')
+        // Checkmark
+        .replace(/✅/g, '<span class="text-success">✅</span>')
+        .replace(/⚠️/g, '<span class="text-warning">⚠️</span>')
+        // Double newline → paragraph break
+        .replace(/\n\n+/g, '<br><br>')
+        .replace(/\n/g, '<br>');
+}
+
+function printAiResult() {
+    const content = document.getElementById('aiText')?.innerHTML || '';
+    const meta    = document.getElementById('aiResultMeta')?.textContent || '';
+    const win = window.open('', '_blank', 'width=800,height=700');
+    win.document.write(`<!DOCTYPE html><html><head><title>AI Audit Report</title>
+        <style>body{font-family:Arial,sans-serif;padding:30px;font-size:13px;line-height:1.7;color:#1e293b;}
+        .badge{padding:2px 7px;border-radius:10px;font-size:11px;}
+        h1{font-size:16px;font-weight:bold;border-bottom:2px solid #7c3aed;padding-bottom:8px;color:#7c3aed;}
+        .meta{color:#64748b;font-size:11px;margin-bottom:18px;}</style>
+        </head><body>
+        <h1>🤖 AI Audit Intelligence Report</h1>
+        <div class="meta">${meta}</div>
+        ${content}
+        </body></html>`);
+    win.document.close();
+    win.print();
+}
+
+function copyAiResult() {
+    const text = document.getElementById('aiText')?.innerText || '';
+    navigator.clipboard.writeText(text).then(() => {
+        Swal.fire({ icon:'success', title:'Copied!', text:'AI analysis copied to clipboard.', timer:1500, showConfirmButton:false });
+    }).catch(() => {
+        Swal.fire({ icon:'error', title:'Copy failed', text:'Please select and copy manually.' });
+    });
 }
 </script>
 
