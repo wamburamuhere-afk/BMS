@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-06-27 (feat) — services.php: convert table to DataTable + wider Product Name column + print fix
+
+- `app/bms/product/services.php` — DataTable initialized on #servicesTable; Product Name column set to 35% width (wider than all others); default per_page changed to 'all' so all records load client-side; PHP pagination block removed; custom search input wired to DataTable client-side search; server-side "Show:" selector hidden; DataTable controls (.dataTables_length/.filter/.info/.paginate) hidden in @media print so printing always shows clean table view only
+
+---
+
 ## 2026-06-27 (fix) — Non-Inventory Product: remove product_name length limit + auto-generate Item Code
 
 - `migrations/2026_06_27_product_name_text.php` — alters `products.product_name` from `VARCHAR(255)` to `TEXT` (drops and recreates prefix index); fixes SQLSTATE[22001] truncation error on long names
