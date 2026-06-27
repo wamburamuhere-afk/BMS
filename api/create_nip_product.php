@@ -94,6 +94,11 @@ try {
         }
     }
 
+    // Auto-generate Item Code from product_id: NIP-00001
+    $item_code = 'NIP-' . str_pad($product_id, 5, '0', STR_PAD_LEFT);
+    $pdo->prepare("UPDATE products SET contract_item_no = ? WHERE product_id = ?")
+        ->execute([$item_code, $product_id]);
+
     $pdo->commit();
 
     // Log Activity
@@ -103,7 +108,8 @@ try {
     echo json_encode([
         'success' => true,
         'message' => 'Non-Inventory product created successfully!',
-        'product_id' => $product_id
+        'product_id' => $product_id,
+        'item_code' => $item_code
     ]);
 
 } catch (Exception $e) {
