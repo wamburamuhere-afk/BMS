@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-27 (fix) — Non-Inventory Product: remove product_name length limit + auto-generate Item Code
+
+- `migrations/2026_06_27_product_name_text.php` — alters `products.product_name` from `VARCHAR(255)` to `TEXT` (drops and recreates prefix index); fixes SQLSTATE[22001] truncation error on long names
+- `api/create_nip_product.php` — after INSERT, auto-generates `contract_item_no` as `NIP-XXXXX` (zero-padded product_id) and updates the row; returned in response JSON as `item_code`
+- `app/bms/product/services.php` — Item Code field in Add and Edit modals set to `readonly` with "Auto-generated on save" placeholder
+
+---
+
 ## 2026-06-27 (feat) — AI Audit Intelligence panel in Activity Log (admin-only)
 
 - `api/ai_audit_analysis.php` — new admin-only POST endpoint; aggregates activity_logs into a ~600-token context block (totals by type, per-user breakdown with 30-day baseline comparison, off-hours access, sensitive module access, recent significant events) and calls aiComplete() for four modes
