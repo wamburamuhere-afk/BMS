@@ -101,36 +101,46 @@ $stats = $pdo->query("
         </div>
     </div>
 
-    <!-- Table -->
+    <!-- Table / Card -->
     <div class="card border shadow-sm" style="border-color:#b6ccfe!important;border-radius:12px;overflow:hidden;">
         <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between py-3">
             <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-list-columns-reverse me-2"></i>Login Records</h6>
-            <span class="badge bg-primary" id="total-badge">—</span>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table id="loginTable" class="table table-hover align-middle mb-0 w-100">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="ps-3">#</th>
-                            <th>User</th>
-                            <th>IP Address</th>
-                            <th>Location &amp; Device</th>
-                            <th>ISP / Org</th>
-                            <th>Role</th>
-                            <th>Login Time</th>
-                            <th class="pe-3">Duration</th>
-                        </tr>
-                    </thead>
-                    <tbody id="loginTbody">
-                        <tr><td colspan="8" class="text-center py-4 text-muted">Loading…</td></tr>
-                    </tbody>
-                </table>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary" id="total-badge">—</span>
+                <!-- View toggle — desktop only -->
+                <div class="btn-group d-none d-md-flex" id="viewToggle" role="group" aria-label="View mode">
+                    <button class="btn btn-sm btn-outline-secondary active" id="btnTableView" title="Table view">
+                        <i class="bi bi-table"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" id="btnCardView" title="Card view">
+                        <i class="bi bi-grid-3x2-gap"></i>
+                    </button>
+                </div>
             </div>
         </div>
-        <div class="card-footer bg-white border-top py-2 d-flex align-items-center justify-content-between flex-wrap gap-2">
-            <div id="dt-info" class="small text-muted"></div>
-            <div id="dt-pager" class="d-flex gap-1"></div>
+        <div class="card-body p-0">
+            <!-- Table view -->
+            <div id="loginTableWrap">
+                <div class="table-responsive">
+                    <table id="loginTable" class="table table-hover align-middle mb-0 w-100">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">#</th>
+                                <th>User</th>
+                                <th>IP Address</th>
+                                <th>Location &amp; Device</th>
+                                <th>ISP / Org</th>
+                                <th>Role</th>
+                                <th>Login Time</th>
+                                <th class="pe-3">Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- Card view (mobile default, optional on desktop) -->
+            <div id="loginCards" class="row g-2 p-3 d-none"></div>
         </div>
     </div>
 
@@ -142,185 +152,247 @@ function safeOutput(s) {
     return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
 
-(function () {
-    'use strict';
+function deviceIcon(type) {
+    if (!type) return '';
+    const icons = { Mobile: 'bi-phone', Tablet: 'bi-tablet', Desktop: 'bi-display' };
+    return `<i class="bi ${icons[type] || 'bi-laptop'} me-1"></i>`;
+}
 
-    const API = '<?= buildUrl('api/get_login_history.php') ?>';
-    let draw = 0, currentPage = 0, perPage = 25, totalFiltered = 0;
+function roleColor(role) {
+    if (!role) return 'secondary';
+    const r = role.toLowerCase();
+    if (r.includes('admin'))      return 'danger';
+    if (r.includes('manager'))    return 'warning';
+    if (r.includes('accountant')) return 'info';
+    if (r.includes('hr'))         return 'success';
+    return 'primary';
+}
 
-    function deviceIcon(type) {
-        if (!type) return '';
-        const icons = { Mobile: 'bi-phone', Tablet: 'bi-tablet', Desktop: 'bi-display' };
-        return `<i class="bi ${icons[type] || 'bi-laptop'} me-1"></i>`;
+function formatDur(secs) {
+    if (!secs) return '—';
+    secs = parseInt(secs);
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m`;
+    if (m > 0) return `${m}m ${String(s).padStart(2,'0')}s`;
+    return `${s}s`;
+}
+
+function tzFormat(tz) {
+    if (!tz || tz === 'Local') return '';
+    const parts = tz.split('/');
+    const city = (parts[1] || parts[0]).replace(/_/g, ' ');
+    const area = parts.length > 1 ? parts[0] : '';
+    return city + (area ? ` (${area})` : '');
+}
+
+function locLine1(r) { return r.city || '—'; }
+function locLine2(r) { return [r.region, r.country].filter(Boolean).join(', '); }
+function ispLine(r)  { return [r.isp, r.org].filter(Boolean).join(' / ') || '—'; }
+
+// Render the Location & Device cell HTML (shared by table column renderer and card)
+function renderLocDevice(r) {
+    const l1  = safeOutput(locLine1(r));
+    const l2  = safeOutput(locLine2(r));
+    const dev = safeOutput(r.device || '—');
+    const tz  = tzFormat(r.timezone);
+    return `
+        <div class="fw-semibold small">${l1}</div>
+        ${l2 ? `<div class="text-muted small">${l2}</div>` : ''}
+        <div class="text-muted small">${deviceIcon(r.device_type)}${dev}</div>
+        ${tz ? `<div class="text-muted" style="font-size:.75rem"><i class="bi bi-clock me-1"></i>${safeOutput(tz)}</div>` : ''}`;
+}
+
+// Render cards grid from a DataTables rows data array
+function renderCards(rows) {
+    if (!rows.length) {
+        $('#loginCards').html('<div class="col-12 text-center py-5 text-muted"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No login records found</div>');
+        return;
     }
+    let html = '';
+    rows.forEach(r => {
+        const isActive   = !r.logout_at;
+        const activeBadge = isActive
+            ? '<span class="badge bg-success-subtle text-success border border-success-subtle ms-1">Active</span>'
+            : '';
+        const roleBadge  = r.role_name
+            ? `<span class="badge bg-${roleColor(r.role_name)}">${safeOutput(r.role_name)}</span>`
+            : '';
+        const loginTime  = r.login_at ? new Date(r.login_at).toLocaleString() : '—';
 
-    function roleColor(role) {
-        if (!role) return 'secondary';
-        const r = role.toLowerCase();
-        if (r.includes('admin'))       return 'danger';
-        if (r.includes('manager'))     return 'warning';
-        if (r.includes('accountant'))  return 'info';
-        if (r.includes('hr'))          return 'success';
-        return 'primary';
-    }
-
-    function formatDur(secs) {
-        if (!secs) return '—';
-        secs = parseInt(secs);
-        const h = Math.floor(secs / 3600);
-        const m = Math.floor((secs % 3600) / 60);
-        const s = secs % 60;
-        if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m`;
-        if (m > 0) return `${m}m ${String(s).padStart(2,'0')}s`;
-        return `${s}s`;
-    }
-
-    function load(page) {
-        page = page || 0;
-        const userId   = $('#f-user').val() || '';
-        const dateFrom = $('#f-from').val() || '';
-        const dateTo   = $('#f-to').val()   || '';
-        const search   = $('#f-search').val().trim();
-
-        draw++;
-        const localDraw = draw;
-
-        $.ajax({
-            url: API,
-            data: {
-                draw:      localDraw,
-                start:     page * perPage,
-                length:    perPage,
-                user_id:   userId,
-                date_from: dateFrom,
-                date_to:   dateTo,
-                search:    { value: search }
-            },
-            dataType: 'json',
-            success: function (res) {
-                if (res.draw < localDraw) return; // stale response
-                currentPage   = page;
-                totalFiltered = res.recordsFiltered || 0;
-
-                $('#total-badge').text(totalFiltered.toLocaleString());
-                $('#dt-info').text(
-                    totalFiltered === 0 ? 'No records found'
-                    : `Showing ${page * perPage + 1}–${Math.min((page + 1) * perPage, totalFiltered)} of ${totalFiltered.toLocaleString()}`
-                );
-
-                renderRows(res.data || [], page * perPage);
-                renderPager();
-            },
-            error: function () {
-                $('#loginTbody').html('<tr><td colspan="8" class="text-center text-danger py-4">Failed to load data</td></tr>');
-            }
-        });
-    }
-
-    function renderRows(rows, offset) {
-        if (!rows.length) {
-            $('#loginTbody').html('<tr><td colspan="8" class="text-center py-5 text-muted"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No login records found</td></tr>');
-            return;
-        }
-
-        let html = '';
-        rows.forEach((r, i) => {
-            // Location: City line + Region/Country line
-            const city    = r.city    || '';
-            const region  = r.region  || '';
-            const country = r.country || '';
-            const locLine1 = city || '—';
-            const locLine2 = [region, country].filter(Boolean).join(', ');
-
-            // Timezone: "Africa/Dar_es_Salaam" → "Dar es Salaam (Africa)"
-            let tzDisplay = '';
-            if (r.timezone && r.timezone !== 'Local') {
-                const parts = r.timezone.split('/');
-                const tzCity = (parts[1] || parts[0]).replace(/_/g, ' ');
-                const tzArea = parts.length > 1 ? parts[0] : '';
-                tzDisplay = tzCity + (tzArea ? ` (${tzArea})` : '');
-            }
-
-            const dev  = r.device   || '—';
-            const isp  = [r.isp, r.org].filter(Boolean).join(' / ') || '—';
-            const tzHtml = tzDisplay
-                ? `<div class="text-muted" style="font-size:.75rem"><i class="bi bi-clock me-1"></i>${safeOutput(tzDisplay)}</div>`
-                : '';
-            const statusBadge = !r.logout_at
-                ? '<span class="badge bg-success-subtle text-success border border-success-subtle ms-1">Active</span>'
-                : '';
-
-            html += `
-            <tr>
-                <td class="ps-3 text-muted small">${offset + i + 1}</td>
-                <td>
-                    <div class="fw-semibold">${safeOutput(r.username)}</div>
-                    <div class="text-muted small">${safeOutput(r.email)}</div>
-                </td>
-                <td>
-                    <code class="small">${safeOutput(r.ip_address) || '—'}</code>
-                </td>
-                <td>
-                    <div class="fw-semibold small">${safeOutput(locLine1)}</div>
-                    ${locLine2 ? `<div class="text-muted small">${safeOutput(locLine2)}</div>` : ''}
-                    <div class="text-muted small">${deviceIcon(r.device_type)}${safeOutput(dev)}</div>
-                    ${tzHtml}
-                </td>
-                <td>
-                    <div class="small">${safeOutput(isp)}</div>
-                </td>
-                <td>
-                    ${r.role_name ? `<span class="badge bg-${roleColor(r.role_name)}">${safeOutput(r.role_name)}</span>` : '—'}
-                </td>
-                <td>
-                    <div class="small fw-semibold">${r.login_at ? new Date(r.login_at).toLocaleString() : '—'}</div>
-                    ${statusBadge}
-                </td>
-                <td class="pe-3 text-muted small">${formatDur(r.duration_seconds)}</td>
-            </tr>`;
-        });
-        $('#loginTbody').html(html);
-    }
-
-    function renderPager() {
-        const totalPages = Math.ceil(totalFiltered / perPage);
-        if (totalPages <= 1) { $('#dt-pager').html(''); return; }
-
-        let html = '';
-        // Prev
-        html += `<button class="btn btn-sm btn-outline-secondary" onclick="goPage(${currentPage - 1})" ${currentPage === 0 ? 'disabled' : ''}><i class="bi bi-chevron-left"></i></button>`;
-        // Page numbers (show at most 5 around current)
-        const start = Math.max(0, currentPage - 2);
-        const end   = Math.min(totalPages - 1, currentPage + 2);
-        if (start > 0) html += `<button class="btn btn-sm btn-outline-secondary" onclick="goPage(0)">1</button>${start > 1 ? '<span class="btn btn-sm disabled">…</span>' : ''}`;
-        for (let p = start; p <= end; p++) {
-            html += `<button class="btn btn-sm ${p === currentPage ? 'btn-primary' : 'btn-outline-secondary'}" onclick="goPage(${p})">${p + 1}</button>`;
-        }
-        if (end < totalPages - 1) html += `${end < totalPages - 2 ? '<span class="btn btn-sm disabled">…</span>' : ''}<button class="btn btn-sm btn-outline-secondary" onclick="goPage(${totalPages - 1})">${totalPages}</button>`;
-        // Next
-        html += `<button class="btn btn-sm btn-outline-secondary" onclick="goPage(${currentPage + 1})" ${currentPage >= totalPages - 1 ? 'disabled' : ''}><i class="bi bi-chevron-right"></i></button>`;
-
-        $('#dt-pager').html(html);
-    }
-
-    window.goPage = function (p) {
-        const totalPages = Math.ceil(totalFiltered / perPage);
-        if (p < 0 || p >= totalPages) return;
-        load(p);
-    };
-
-    // Init Select2 on user filter
-    $(document).ready(function () {
-        if ($.fn.select2) {
-            $('#f-user').select2({ theme: 'bootstrap-5', placeholder: 'All Users', allowClear: true, width: '100%' });
-        }
-
-        $('#btn-filter').on('click', function () { load(0); });
-        $('#f-search').on('keydown', function (e) { if (e.key === 'Enter') load(0); });
-
-        load(0);
+        html += `
+        <div class="col-12 col-sm-6 col-lg-4">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:10px;overflow:hidden;">
+                <div class="card-header py-2 px-3 d-flex align-items-center justify-content-between"
+                     style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);">
+                    <div>
+                        <div class="fw-bold text-dark small">${safeOutput(r.username)}</div>
+                        <div class="text-muted" style="font-size:.72rem">${safeOutput(r.email)}</div>
+                    </div>
+                    ${roleBadge}
+                </div>
+                <div class="card-body p-3" style="font-size:.82rem;">
+                    <div class="mb-2">
+                        <span class="text-muted me-1"><i class="bi bi-calendar-event me-1"></i></span>
+                        <strong>${loginTime}</strong>${activeBadge}
+                    </div>
+                    <div class="mb-1 text-muted"><i class="bi bi-hdd-network me-1"></i><code style="font-size:.78rem">${safeOutput(r.ip_address) || '—'}</code></div>
+                    <div class="mb-1">${renderLocDevice(r)}</div>
+                    <div class="text-muted small mb-1"><i class="bi bi-wifi me-1"></i>${safeOutput(ispLine(r))}</div>
+                </div>
+                <div class="card-footer bg-white border-top py-2 px-3 d-flex justify-content-between align-items-center">
+                    <span class="text-muted small"><i class="bi bi-stopwatch me-1"></i>Duration</span>
+                    <span class="fw-semibold small ${isActive ? 'text-success' : 'text-secondary'}">${isActive ? 'Ongoing' : formatDur(r.duration_seconds)}</span>
+                </div>
+            </div>
+        </div>`;
     });
-}());
+    $('#loginCards').html(html);
+}
+
+// ── View mode ──────────────────────────────────────────────────────────────
+let viewMode = 'table';
+
+function applyView() {
+    if (window.innerWidth < 768) {
+        // Mobile: always cards, no toggle shown
+        $('#loginTableWrap').addClass('d-none');
+        $('#loginCards').removeClass('d-none');
+        $('#viewToggle').addClass('d-none');
+    } else {
+        $('#viewToggle').removeClass('d-none');
+        if (viewMode === 'card') {
+            $('#loginTableWrap').addClass('d-none');
+            $('#loginCards').removeClass('d-none');
+            $('#btnCardView').addClass('active');
+            $('#btnTableView').removeClass('active');
+        } else {
+            $('#loginTableWrap').removeClass('d-none');
+            $('#loginCards').addClass('d-none');
+            $('#btnTableView').addClass('active');
+            $('#btnCardView').removeClass('active');
+        }
+    }
+}
+
+$(document).ready(function () {
+
+    // Select2 on user filter
+    if ($.fn.select2) {
+        $('#f-user').select2({ theme: 'bootstrap-5', placeholder: 'All Users', allowClear: true, width: '100%' });
+    }
+
+    // ── DataTables — server-side ─────────────────────────────────────────
+    const lhTable = $('#loginTable').DataTable({
+        serverSide:  true,
+        processing:  true,
+        ordering:    true,
+        autoWidth:   false,
+        order:       [[6, 'desc']],   // Login Time, newest first
+        pageLength:  25,
+        lengthChange: false,
+        dom: 'rt<"d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2 px-3 pb-3"ip>',
+        ajax: {
+            url:  '<?= buildUrl('api/get_login_history.php') ?>',
+            type: 'GET',
+            data: function (d) {
+                d.user_id   = $('#f-user').val()   || '';
+                d.date_from = $('#f-from').val()   || '';
+                d.date_to   = $('#f-to').val()     || '';
+            },
+            error: function (xhr) {
+                console.error('Login History DataTables error:', xhr.status, xhr.statusText);
+            }
+        },
+        columns: [
+            {   // # — row counter
+                data: null, orderable: false, className: 'ps-3 text-muted small',
+                render: function (data, type, row, meta) {
+                    return meta.row + meta.settings._iDisplayStart + 1;
+                }
+            },
+            {   // User
+                data: null, orderable: true,
+                render: function (data, type, row) {
+                    return `<div class="fw-semibold">${safeOutput(row.username)}</div>`
+                         + `<div class="text-muted small">${safeOutput(row.email)}</div>`;
+                }
+            },
+            {   // IP Address
+                data: 'ip_address', orderable: false,
+                render: function (data) {
+                    return `<code class="small">${safeOutput(data) || '—'}</code>`;
+                }
+            },
+            {   // Location & Device
+                data: null, orderable: false,
+                render: function (data, type, row) { return renderLocDevice(row); }
+            },
+            {   // ISP / Org
+                data: null, orderable: false,
+                render: function (data, type, row) {
+                    return `<div class="small">${safeOutput(ispLine(row))}</div>`;
+                }
+            },
+            {   // Role
+                data: 'role_name', orderable: false,
+                render: function (data) {
+                    return data
+                        ? `<span class="badge bg-${roleColor(data)}">${safeOutput(data)}</span>`
+                        : '—';
+                }
+            },
+            {   // Login Time
+                data: 'login_at', orderable: true,
+                render: function (data, type, row) {
+                    const active = !row.logout_at
+                        ? '<span class="badge bg-success-subtle text-success border border-success-subtle ms-1">Active</span>'
+                        : '';
+                    const dt = data ? new Date(data).toLocaleString() : '—';
+                    return `<div class="small fw-semibold">${dt}</div>${active}`;
+                }
+            },
+            {   // Duration
+                data: 'duration_seconds', orderable: false, className: 'pe-3 text-muted small',
+                render: function (data) { return formatDur(data); }
+            }
+        ],
+        language: {
+            processing:  'Loading…',
+            emptyTable:  'No login records found.',
+            zeroRecords: 'No matching records.',
+            info:        'Showing _START_–_END_ of _TOTAL_',
+            infoEmpty:   'Showing 0 records',
+            infoFiltered: '(filtered from _MAX_ total)'
+        },
+        drawCallback: function () {
+            const api = this.api();
+            $('#total-badge').text(api.page.info().recordsTotal.toLocaleString());
+            const rows = api.rows({ page: 'current' }).data().toArray();
+            renderCards(rows);
+            applyView();
+        }
+    });
+
+    // ── Filters ─────────────────────────────────────────────────────────
+    function applyFilters() {
+        lhTable.search($('#f-search').val().trim()).draw();
+    }
+
+    $('#btn-filter').on('click', applyFilters);
+    $('#f-search').on('keydown', function (e) { if (e.key === 'Enter') applyFilters(); });
+
+    // ── View toggle ──────────────────────────────────────────────────────
+    $('#btnTableView').on('click', function () { viewMode = 'table'; applyView(); });
+    $('#btnCardView').on('click',  function () { viewMode = 'card';  applyView(); });
+
+    $(window).on('resize', applyView);
+
+    // Initial view based on screen width
+    if (window.innerWidth < 768) viewMode = 'card';
+    applyView();
+});
 </script>
 
 <?php require_once __DIR__ . '/../../../footer.php'; ?>
