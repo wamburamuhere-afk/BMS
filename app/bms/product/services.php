@@ -644,7 +644,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label fw-bold small text-primary">Item Code</label>
-                                    <input type="text" class="form-control form-control-sm border-0 bg-light fw-bold" name="contract_item_no" placeholder="e.g. ITEM-001">
+                                    <input type="text" class="form-control form-control-sm border-0 bg-secondary bg-opacity-10 fw-bold text-muted" name="contract_item_no" placeholder="Auto-generated on save" readonly>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label fw-bold small text-primary">Unit</label>
@@ -828,7 +828,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                     </div>
                                     <div class="col-md-4">
                                         <label class="form-label fw-bold small text-primary">Item Code</label>
-                                        <input type="text" class="form-control form-control-sm border-0 bg-light fw-bold" name="contract_item_no" id="edit_svc_contract_no">
+                                        <input type="text" class="form-control form-control-sm border-0 bg-secondary bg-opacity-10 fw-bold text-muted" name="contract_item_no" id="edit_svc_contract_no" readonly>
                                     </div>
                                     <div class="col-md-4">
                                         <label class="form-label fw-bold small text-primary">Unit</label>
