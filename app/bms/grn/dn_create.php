@@ -23,6 +23,9 @@ if ($edit_id > 0) {
 includeHeader();
 
 $project_id = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
+// Origin context (URL only): where the user came FROM. Drives the post-save redirect so
+// editing a project-linked DN from the general area does NOT jump into the project.
+$origin_project_id = $project_id;
 $po_id      = isset($_GET['po_id'])      ? intval($_GET['po_id'])      : 0;
 $is_edit    = $edit_id > 0;
 $is_from_po = $po_id > 0;
@@ -121,7 +124,7 @@ if ($dn) {
 
 $return_url = $is_from_po
     ? getUrl('purchase_order_details') . '?id=' . $po_id
-    : ($has_project ? getUrl('project_view') . '?id=' . $project_id . '&tab=procurement' : getUrl('delivery_notes'));
+    : ($origin_project_id > 0 ? getUrl('project_view') . '?id=' . $origin_project_id . '&tab=procurement' : getUrl('delivery_notes'));
 ?>
 
 <link href="/assets/css/select2.min.css" rel="stylesheet" />

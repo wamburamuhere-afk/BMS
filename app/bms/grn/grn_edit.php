@@ -57,9 +57,17 @@ $stmtAtt->execute([$receipt_id]);
 $attachments = $stmtAtt->fetchAll(PDO::FETCH_ASSOC);
 
 // Build return URL for project context
-$project_return_url = $project_id_param > 0 
+$project_return_url = $project_id_param > 0
     ? getUrl('project_view') . '?id=' . $project_id_param . '&tab=procurement'
     : null;
+
+// Origin context (URL only): where the user came FROM. Drives the post-save redirect so
+// editing a project-linked GRN from the general area does NOT jump into the project.
+// (The GRN keeps its own project link via projectIdHidden below — unchanged.)
+$origin_project_id = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
+$origin_return_url = $origin_project_id > 0
+    ? getUrl('project_view') . '?id=' . $origin_project_id . '&tab=procurement'
+    : '';
 
 // Get current user info
 $user_id = $_SESSION['user_id'];
@@ -551,7 +559,7 @@ function generate_grn_number() {
                 <input type="hidden" name="total_received" id="totalReceivedHidden" value="0">
                 <input type="hidden" name="status" value="<?= $grn['status'] ?>">
                 <input type="hidden" name="project_id" id="projectIdHidden" value="<?= $project_id_param ?>">
-                <input type="hidden" name="return_url" id="returnUrlHidden" value="<?= htmlspecialchars($project_return_url ?? '') ?>">
+                <input type="hidden" name="return_url" id="returnUrlHidden" value="<?= htmlspecialchars($origin_return_url) ?>">
                 
                 <!-- Form Actions -->
                 <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
