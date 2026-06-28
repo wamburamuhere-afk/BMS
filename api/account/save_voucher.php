@@ -72,8 +72,19 @@ try {
     }
 
     if ($voucher_id > 0) {
-        // Re-code a legacy voucher number on edit.
+        // Ledger lock — only a pending voucher may be edited; once approved/paid
+        // (posted) it is finalised. Corrections go through void/reverse.
         require_once __DIR__ . '/../../core/code_generator.php';
+        $pvStatusStmt = $pdo->prepare("SELECT status FROM payment_vouchers WHERE id = ?");
+        $pvStatusStmt->execute([$voucher_id]);
+        $pvCurStatus = (string)$pvStatusStmt->fetchColumn();
+        if (documentGlPosted($pdo, 'payment_voucher', $voucher_id) || in_array($pvCurStatus, ['paid', 'approved', 'cancelled'], true)) {
+            http_response_code(409);
+            echo json_encode(['success' => false, 'message' => 'This payment voucher is finalised/posted and locked. Void or reverse it to make changes.']);
+            exit();
+        }
+
+        // Re-code a legacy voucher number on edit.
         $curPv = $pdo->prepare("SELECT voucher_number FROM payment_vouchers WHERE id = ?");
         $curPv->execute([$voucher_id]);
         $oldPv = (string)$curPv->fetchColumn();

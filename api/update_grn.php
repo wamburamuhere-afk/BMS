@@ -44,6 +44,14 @@ try {
         assertScopeForRecord('purchase_receipts', 'receipt_id', $receipt_id);
     }
 
+    // Ledger lock — a posted or approved GRN is immutable (it has posted to the
+    // ledger and moved stock). Corrections go through void/reverse, not edit.
+    require_once __DIR__ . '/../core/code_generator.php';
+    if (documentGlPosted($pdo, 'grn', $receipt_id) || ($oldGrn['status'] ?? '') === 'approved') {
+        echo json_encode(['success' => false, 'message' => 'This GRN is posted/approved and locked. Void or reverse it to make changes.']);
+        exit();
+    }
+
     $pdo->beginTransaction();
 
     // Get form data

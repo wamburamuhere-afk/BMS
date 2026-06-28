@@ -51,6 +51,17 @@ try {
         exit;
     }
 
+    // Ledger lock — a posted invoice is immutable. Corrections go through
+    // void/reverse, never an in-place edit (keeps the GL + audit trail intact).
+    if ($is_update) {
+        require_once __DIR__ . '/../../core/code_generator.php';
+        if (documentGlPosted($pdo, 'invoice', $invoice_id)) {
+            http_response_code(409);
+            echo json_encode(['success' => false, 'message' => 'This invoice is posted to the ledger and locked. Void or reverse it to make changes.']);
+            exit;
+        }
+    }
+
     $pdo->beginTransaction();
 
     $customer_id = $_POST['customer_id'] ?? 0;
