@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/form_lookups.php';
+require_once __DIR__ . '/../core/code_generator.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -200,7 +201,17 @@ $params = array_merge($params, [
 
 try {
     $update_stmt->execute($params);
-    
+
+    // Re-code on edit (sub-contractors are always editable): upgrade a legacy
+    // "SBCxxxxYYMM" code to the company format. No-op if already converted/manual.
+    $sccur = $pdo->prepare("SELECT supplier_code FROM sub_contractors WHERE supplier_id = ?");
+    $sccur->execute([$supplier_id]);
+    $oldSbcCode = (string)$sccur->fetchColumn();
+    $newSbcCode = codeForEdit($pdo, 'SBC', $oldSbcCode, 'SBC\\d+', 'sub_contractors', (int)$supplier_id);
+    if ($newSbcCode !== $oldSbcCode) {
+        $pdo->prepare("UPDATE sub_contractors SET supplier_code = ? WHERE supplier_id = ?")->execute([$newSbcCode, $supplier_id]);
+    }
+
     require_once __DIR__ . '/../helpers.php';
     logActivity($pdo, $_SESSION['user_id'], "Updated sub-contractor: $supplier_name");
     

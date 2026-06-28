@@ -91,14 +91,11 @@ $contract_employees = array_filter($employees, function($employee) {
     return $employee['employment_status'] == 'contract';
 });
 
-// Calculate next employee number
-$last_emp_stmt = $pdo->query("SELECT employee_number FROM employees ORDER BY employee_id DESC LIMIT 1");
-$last_emp = $last_emp_stmt->fetch();
-$last_no = $last_emp ? $last_emp['employee_number'] : 'EMP-000';
-// Extract numerical part and increment
-preg_match('/(\d+)/', $last_no, $matches);
-$next_val = $matches ? intval($matches[1]) + 1 : 1;
-$next_employee_number = 'EMP-' . str_pad($next_val, 3, '0', STR_PAD_LEFT);
+// Suggested next employee number (company format, e.g. BFS-EMP-0001). This is a
+// preview only — peekNextCode() does NOT advance the sequence; the real number is
+// allocated at save in api/add_employee.php.
+require_once __DIR__ . '/../../../core/code_generator.php';
+$next_employee_number = peekNextCode($pdo, 'EMP');
 
 // Helper functions removed, now in helpers.php
 ?>
