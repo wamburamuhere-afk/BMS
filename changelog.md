@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-06-28 (fix) — Lock posted/finalized documents from in-place edit (ledger integrity)
+
+Once a document is posted to the ledger (`journal_entries`) it must not be edited in place —
+corrections go through void/reverse. Audit showed **Invoice, GRN, and Payment Voucher** edit
+endpoints still accepted edits after posting (the others — Debit/Credit Note, Purchase/Sales
+Return, Expense, Manual Journal — were already locked to `pending`/`draft`/non-`paid`). Added a
+server-side **409 lock** on the three open edit endpoints, keyed off the authoritative
+`documentGlPosted()` (links by integer `entity_id`, never the display code):
+
+- `api/account/save_invoice.php` — edit branch refuses if `documentGlPosted('invoice', id)`
+- `api/update_grn.php` — refuses if `documentGlPosted('grn', id)` OR status `approved`
+- `api/account/save_voucher.php` — edit branch refuses if posted OR status `paid`/`approved`/`cancelled`
+
+Guards run before any write and only on the edit path (create flows untouched); approval/posting
+transitions live in other endpoints, so the workflow is unaffected. Verified: `php -l` clean on
+all three; runtime test 8/8 — posted/approved/paid rows blocked, pending/draft rows still editable.
+
 ## 2026-06-28 (fix) — Edit/Save no longer force-jumps into the project when opened externally
 
 Editing a project-linked **Purchase Order, GRN, Delivery/Received Note, or Sales Order** from the
