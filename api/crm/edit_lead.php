@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/code_generator.php';
 
 header('Content-Type: application/json');
 
@@ -122,6 +123,14 @@ try {
         $_SESSION['user_id'],
         $lead_id,
     ]);
+
+    // Re-code on edit (leads are always editable): upgrade a legacy "LEAD-#####"
+    // code to the company format. No-op if already converted or manually set.
+    $newLeadCode = codeForEdit($pdo, 'LEAD', (string)$lead['lead_code'], 'LEAD-\\d+', 'crm_leads', $lead_id);
+    if ($newLeadCode !== $lead['lead_code']) {
+        $pdo->prepare("UPDATE crm_leads SET lead_code = ? WHERE lead_id = ?")->execute([$newLeadCode, $lead_id]);
+        $lead['lead_code'] = $newLeadCode;
+    }
 
     // Replace labels (join table only — no status column, so hard replace is correct)
     $pdo->prepare("DELETE FROM crm_lead_labels WHERE lead_id = ?")->execute([$lead_id]);
