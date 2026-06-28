@@ -56,14 +56,21 @@ try {
     
     if (empty($items)) throw new Exception('No items provided');
 
+    // Re-code on edit, but only while this GRN is not yet posted to the GL.
+    require_once __DIR__ . '/../core/code_generator.php';
+    $grn_number = codeForEditUnlessPosted(
+        $pdo, 'GRN', (string)$oldGrn['receipt_number'], 'GRN-[0-9].*',
+        'grn', (int)$receipt_id, 'purchase_receipts'
+    );
+
     // Update purchase_receipts
     $stmt = $pdo->prepare("
         UPDATE purchase_receipts SET
-            supplier_id = ?, warehouse_id = ?, receipt_date = ?,
+            receipt_number = ?, supplier_id = ?, warehouse_id = ?, receipt_date = ?,
             delivery_note = ?, notes = ?
         WHERE receipt_id = ?
     ");
-    $stmt->execute([$supplier_id, $warehouse_id, $receipt_date, $delivery_note, $notes, $receipt_id]);
+    $stmt->execute([$grn_number, $supplier_id, $warehouse_id, $receipt_date, $delivery_note, $notes, $receipt_id]);
 
     // Handle Stock Reversal if old GRN was completed
     if ($oldGrn['status'] === 'completed') {

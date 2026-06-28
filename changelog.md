@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-06-27 (feat) — Company-prefixed sequential document codes (Group B — edit side / re-code-on-edit)
+
+Editable documents now upgrade a legacy code to `PREFIX-TYPE-NNNN` when edited & saved —
+**but only while the document is not yet posted to the GL** (a posted invoice/GRN keeps the
+number already shown on statements & printed PDFs). Decision confirmed with owner.
+
+- `core/code_generator.php` — added `documentGlPosted()` (true if a posted `journal_entries` row exists for the doc) and `codeForEditUnlessPosted()` (re-code only when not GL-posted; else return the code unchanged)
+- GL-posting docs (freeze once posted): `api/account/save_invoice.php` (INV, entity 'invoice'), `api/update_grn.php` (GRN, entity 'grn')
+- Non-GL docs (re-code whenever the form allows the edit, after any existing status-lock guard): `save_purchase_order.php` (PO), `save_quotation.php` (QT, after approved-lock), `save_sales_order.php` (SO/QT), `save_purchase_return.php` (PR), `save_voucher.php` (PV), `update_dn.php` (DN outbound only — inbound keeps the supplier's own number), `update_material_list.php` (ML), `update_rfq.php` (RFQ, draft-only), `customer/update_lpo.php` (LPO — preserves a manually-typed number)
+- Skipped (correct by the rule): Stock Adjustments (always GL-posted on create → code frozen), Delivery Orders (no doc-edit handler, only status change)
+- Runtime-verified: quotation edit re-codes legacy `QT-20260101-0001` → `BFS-QT-0002`, and a second edit does not re-burn; posted invoice #46 stays frozen while an unposted one re-codes
+- `company_code_prefix_plan.md` — Group B edit side marked done
+
+---
+
 ## 2026-06-27 (feat) — Company-prefixed sequential document codes (Group B — create side)
 
 All remaining auto-generated document codes now use `nextCode()` → `PREFIX-TYPE-NNNN`

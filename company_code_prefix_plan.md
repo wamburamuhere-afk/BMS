@@ -94,9 +94,12 @@ All CREATE paths now use `nextCode()`. Runtime-verified via real endpoints: `cre
 | Delivery Order | DO | `create_do.php` | `operations/edit_do.php` | |
 | Customer (alt paths) | CUST | `import_customers.php`, `quick_add_customer.php`, `crm/convert_lead.php` | — | |
 
-**Still TODO for Group B:** the EDIT re-code-on-edit hooks for the doc types that have
-edit branches (INV, PO, QT, SO, GRN, DN, PR, PV, ML, ADJ, RFQ, DO, LPO) — place
-`codeForEdit()` AFTER each endpoint's existing status-lock guard.
+**Group B EDIT side — DONE ✅** (rule: re-code on edit only while NOT yet GL-posted).
+- Helper: `codeForEditUnlessPosted()` + `documentGlPosted()` in `core/code_generator.php`.
+- GL-posting (freeze once posted): INV (`save_invoice.php`, entity 'invoice'), GRN (`update_grn.php`, entity 'grn').
+- Non-GL (re-code after existing lock guard): PO, QT (after approved-lock), SO, PR, PV, DN (outbound only), ML, RFQ (draft-only), LPO (preserves manual number).
+- Skipped by rule: ADJ (always GL-posted on create → frozen), DO (no doc-edit handler).
+- Runtime-verified: quotation legacy→`BFS-QT-0002`, no re-burn; posted invoice frozen, unposted re-codes.
 
 ### Excluded (intentional)
 Journal entries (`JRNL`, no form), Warehouse codes (manual), POS Shift/receipt (POS scope deferred),

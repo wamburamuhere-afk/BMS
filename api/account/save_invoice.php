@@ -100,16 +100,26 @@ try {
     $grand_total = $subtotal + $tax_total - $discount + $shipping;
 
     if ($invoice_id > 0) {
+        // Re-code on edit, but only while the invoice is NOT yet posted to the GL
+        // (a posted invoice keeps the number already shown on statements/PDFs).
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $curNo = $pdo->prepare("SELECT invoice_number FROM invoices WHERE invoice_id = ?");
+        $curNo->execute([$invoice_id]);
+        $invoice_number = codeForEditUnlessPosted(
+            $pdo, 'INV', (string)$curNo->fetchColumn(), 'INV-[0-9].*',
+            'invoice', (int)$invoice_id, 'invoices'
+        );
+
         // Update existing
         $stmt = $pdo->prepare("
-            UPDATE invoices SET 
-                customer_id = ?, order_id = ?, project_id = ?, invoice_date = ?, due_date = ?,
+            UPDATE invoices SET
+                invoice_number = ?, customer_id = ?, order_id = ?, project_id = ?, invoice_date = ?, due_date = ?,
                 subtotal = ?, tax_amount = ?, discount_amount = ?, shipping_cost = ?, grand_total = ?,
                 currency = ?, notes = ?, terms_conditions = ?, status = ?, updated_by = ?, updated_at = NOW()
             WHERE invoice_id = ?
         ");
         $stmt->execute([
-            $customer_id, $order_id ?: null, $project_id, $invoice_date, $due_date,
+            $invoice_number, $customer_id, $order_id ?: null, $project_id, $invoice_date, $due_date,
             $subtotal, $tax_total, $discount, $shipping, $grand_total,
             $currency, $notes, $terms, $status, $_SESSION['user_id'], $invoice_id
         ]);

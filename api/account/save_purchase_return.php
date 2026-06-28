@@ -72,16 +72,22 @@ try {
     }
 
     if ($return_id > 0) {
+        // Re-code a legacy return number on edit (purchase returns don't post to the GL here).
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $curPr = $pdo->prepare("SELECT return_number FROM purchase_returns WHERE purchase_return_id = ?");
+        $curPr->execute([$return_id]);
+        $return_number = codeForEdit($pdo, 'PR', (string)$curPr->fetchColumn(), 'PR-[0-9].*', 'purchase_returns', (int)$return_id);
+
         // Update
         $stmt = $pdo->prepare("
-            UPDATE purchase_returns SET 
-                supplier_id = ?, purchase_order_id = ?, return_date = ?, 
+            UPDATE purchase_returns SET
+                return_number = ?, supplier_id = ?, purchase_order_id = ?, return_date = ?,
                 reason = ?, reason_details = ?, notes = ?, total_amount = ?,
                 status = ?, updated_at = NOW(), updated_by = ?
             WHERE purchase_return_id = ?
         ");
         $stmt->execute([
-            $supplier_id, $purchase_order_id, $return_date,
+            $return_number, $supplier_id, $purchase_order_id, $return_date,
             $reason, $reason_details, $notes, $total_amount,
             $status, $_SESSION['user_id'], $return_id
         ]);

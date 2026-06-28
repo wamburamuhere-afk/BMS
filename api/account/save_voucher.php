@@ -72,6 +72,16 @@ try {
     }
 
     if ($voucher_id > 0) {
+        // Re-code a legacy voucher number on edit.
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $curPv = $pdo->prepare("SELECT voucher_number FROM payment_vouchers WHERE id = ?");
+        $curPv->execute([$voucher_id]);
+        $oldPv = (string)$curPv->fetchColumn();
+        $newPv = codeForEdit($pdo, 'PV', $oldPv, 'PV-[0-9].*', 'payment_vouchers', (int)$voucher_id);
+        if ($newPv !== $oldPv) {
+            $pdo->prepare("UPDATE payment_vouchers SET voucher_number = ? WHERE id = ?")->execute([$newPv, $voucher_id]);
+        }
+
         // Update
         $stmt = $pdo->prepare("
             UPDATE payment_vouchers
