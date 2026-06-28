@@ -5,6 +5,7 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../core/permissions.php';
 require_once __DIR__ . '/../core/actor_account.php';
 require_once __DIR__ . '/../core/form_lookups.php';
+require_once __DIR__ . '/../core/code_generator.php';
 
 header('Content-Type: application/json');
 
@@ -70,10 +71,9 @@ try {
     upsertFormLookup($pdo, 'payment_terms', $payment_terms, $lk_uid);
     upsertFormLookup($pdo, 'currency',      $currency,      $lk_uid);
 
-    // Generate Customer Code (if not provided or auto-generated)
-    $stmt = $pdo->query("SELECT MAX(customer_id) FROM customers");
-    $nextId = $stmt->fetchColumn() + 1;
-    $customerCode = 'CUST-' . str_pad($nextId, 5, '0', STR_PAD_LEFT);
+    // Company-prefixed sequential Customer Code, e.g. BFS-CUST-0001
+    // (gap-free via core/code_generator.php).
+    $customerCode = nextCode($pdo, 'CUST');
 
     // Prepare data
     $data = [

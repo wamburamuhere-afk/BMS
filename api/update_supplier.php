@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/form_lookups.php';
+require_once __DIR__ . '/../core/code_generator.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -259,7 +260,17 @@ $params = array_merge($params, [
 
 try {
     $update_stmt->execute($params);
-    
+
+    // Re-code on edit (suppliers are always editable): upgrade a legacy "SUPxxxxYYMM"
+    // code to the company format. No-op if already converted or manually set.
+    $scur = $pdo->prepare("SELECT supplier_code FROM suppliers WHERE supplier_id = ?");
+    $scur->execute([$supplier_id]);
+    $oldSupCode = (string)$scur->fetchColumn();
+    $newSupCode = codeForEdit($pdo, 'SUP', $oldSupCode, 'SUP\\d+', 'suppliers', (int)$supplier_id);
+    if ($newSupCode !== $oldSupCode) {
+        $pdo->prepare("UPDATE suppliers SET supplier_code = ? WHERE supplier_id = ?")->execute([$newSupCode, $supplier_id]);
+    }
+
     logActivity($pdo, $_SESSION['user_id'], 'Edit supplier', "User edited supplier: $supplier_name (ID $supplier_id)");
     
     header('Content-Type: application/json');

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/form_lookups.php';
+require_once __DIR__ . '/../core/code_generator.php';
 // Note: roots.php already includes config.php, helpers.php and permissions.php
 
 header('Content-Type: application/json');
@@ -80,8 +81,15 @@ try {
     upsertFormLookup($pdo, 'payment_terms', $payment_terms, $lk_uid);
     upsertFormLookup($pdo, 'currency',      $currency,      $lk_uid);
 
+    // Re-code on edit (customers are always editable): upgrade a legacy "CUST-#####"
+    // code to the company format. No-op if already converted or manually set.
+    $ccur = $pdo->prepare("SELECT customer_code FROM customers WHERE customer_id = ?");
+    $ccur->execute([(int)$customerId]);
+    $customer_code_new = codeForEdit($pdo, 'CUST', (string)$ccur->fetchColumn(), 'CUST-\\d+', 'customers', (int)$customerId);
+
     // Prepare update data
     $data = [
+        'customer_code' => $customer_code_new,
         'customer_name' => $_POST['customer_name'],
         'company_name' => $_POST['company_name'] ?? null,
         'acronym' => $_POST['acronym'] ?? null,

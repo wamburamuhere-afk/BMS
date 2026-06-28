@@ -32,6 +32,7 @@ $default_settings = [
     'company_logo' => '',
     'company_tin' => '',
     'company_vrn' => '',
+    'company_code_prefix' => '',
     'company_postal_address' => '',
     'company_physical_address' => '',
     // Equity setting used by the Balance Sheet report.
@@ -46,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $allowed_fields = [
             'company_name', 'company_email', 'company_phone',
             'company_website', 'company_currency',
-            'company_tin', 'company_vrn',
+            'company_tin', 'company_vrn', 'company_code_prefix',
             'company_postal_address', 'company_physical_address',
             'share_capital_paid_in',
         ];
@@ -54,7 +55,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($allowed_fields as $field) {
             if (isset($_POST[$field])) {
                 $value = trim($_POST[$field]);
-                
+
+                // Document-code prefix: letters only, uppercase, 2–5 chars.
+                if ($field === 'company_code_prefix') {
+                    $value = strtoupper(preg_replace('/[^A-Za-z]/', '', $value));
+                    $value = substr($value, 0, 5);
+                }
+
                 // Check if setting exists
                 $check = $pdo->prepare("SELECT COUNT(*) FROM system_settings WHERE setting_key = ?");
                 $check->execute([$field]);
@@ -191,6 +198,25 @@ try {
                             </div>
 
                             <div class="col-md-6">
+                                <label for="company_code_prefix" class="form-label">
+                                    Document Code Prefix
+                                    <i class="bi bi-info-circle text-muted" title="The 3-letter tag that starts every auto-generated code (invoices, POs, items, customers...). Auto-suggested from the company name; you can override it."></i>
+                                </label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control text-uppercase fw-bold" id="company_code_prefix" name="company_code_prefix"
+                                           value="<?= htmlspecialchars($current_settings['company_code_prefix']) ?>"
+                                           maxlength="5" style="max-width:120px" placeholder="e.g. BFS">
+                                    <button type="button" class="btn btn-outline-secondary" id="suggestPrefixBtn" title="Suggest from company name">
+                                        <i class="bi bi-magic"></i>
+                                    </button>
+                                </div>
+                                <div class="form-text">
+                                    New codes will look like <code id="prefixPreview">BFS-INV-0001</code>.
+                                    Existing documents keep their old code unless re-saved while still editable.
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
                                 <label for="company_phone" class="form-label">Phone Number</label>
                                 <input type="text" class="form-control" id="company_phone" name="company_phone" value="<?= htmlspecialchars($current_settings['company_phone']) ?>">
                             </div>
@@ -276,7 +302,47 @@ try {
     </div>
 </div>
 
-<?php 
+<script>
+// Mirror of deriveCompanyPrefix() in core/code_generator.php:
+// drop parenthetical noise like "(T)", take the first letter of the first three
+// remaining words, uppercase.
+function derivePrefix(name) {
+    const cleaned = (name || '').replace(/\([^)]*\)/g, ' ');
+    const words = cleaned.split(/[^A-Za-z0-9]+/).filter(Boolean);
+    let letters = '';
+    for (const w of words) { letters += w[0].toUpperCase(); if (letters.length >= 3) break; }
+    return letters.slice(0, 3);
+}
+
+(function () {
+    const nameEl    = document.getElementById('company_name');
+    const prefixEl  = document.getElementById('company_code_prefix');
+    const previewEl = document.getElementById('prefixPreview');
+    const suggestBtn= document.getElementById('suggestPrefixBtn');
+    if (!prefixEl) return;
+
+    function refreshPreview() {
+        const p = (prefixEl.value || derivePrefix(nameEl.value) || 'CMP').toUpperCase();
+        previewEl.textContent = p + '-INV-0001';
+    }
+    // Keep the field uppercase / letters-only as the user types.
+    prefixEl.addEventListener('input', function () {
+        prefixEl.value = prefixEl.value.replace(/[^A-Za-z]/g, '').toUpperCase();
+        refreshPreview();
+    });
+    // If the prefix is still blank, follow the company name live.
+    nameEl.addEventListener('input', function () {
+        if (!prefixEl.value) refreshPreview();
+    });
+    suggestBtn.addEventListener('click', function () {
+        prefixEl.value = derivePrefix(nameEl.value);
+        refreshPreview();
+    });
+    refreshPreview();
+})();
+</script>
+
+<?php
 require_once __DIR__ . '/../../../footer.php';
-ob_end_flush(); 
+ob_end_flush();
 ?>

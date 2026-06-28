@@ -2,25 +2,40 @@
 
 ## §18. Constant Conventions (Codes, Currency, Country, Helpers)
 
-**Entity code prefixes** (auto-generated, zero-padded to 5 digits):
-| Entity | Prefix | Example |
-|---|---|---|
-| Customer | `CUST-` | `CUST-00001` |
-| Supplier | `SUP-` | `SUP-00042` |
-| Sub-contractor | `SUB-` | `SUB-00007` |
-| Product | `PRD-` | `PRD-00128` |
-| Invoice | `INV-` | `INV-2026-0001` |
-| Purchase Order | `PO-` | `PO-2026-0001` |
-| Delivery Note | `DN-` | `DN-2026-0001` |
-| GRN | `GRN-` | `GRN-2026-0001` |
-| Quotation | `QUO-` | `QUO-2026-0001` |
+**Entity codes are company-prefixed, sequential, and gap-free** — format
+`PREFIX-TYPE-NNNN` (e.g. `BFS-CUST-0001`, `BFS-INV-0042`). `PREFIX` is the
+3-letter company tag from `system_settings.company_code_prefix` (auto-suggested
+from the company name, admin-editable on the Company Profile page). `TYPE` is the
+entity tag below; `NNNN` is a strictly sequential counter.
 
-Generation pattern:
+| Entity | Type tag | Example |
+|---|---|---|
+| Customer | `CUST` | `BFS-CUST-0001` |
+| Supplier | `SUP` | `BFS-SUP-0042` |
+| Sub-contractor | `SBC` | `BFS-SBC-0007` |
+| NIP Product | `NIP` | `BFS-NIP-0128` |
+| Invoice | `INV` | `BFS-INV-0001` |
+| Purchase Order | `PO` | `BFS-PO-0001` |
+| Delivery Note | `DN` | `BFS-DN-0001` |
+| GRN | `GRN` | `BFS-GRN-0001` |
+| Quotation | `QT` | `BFS-QT-0001` |
+
+Generation pattern — **never use `MAX(id)+1` or `rand()`** (they leave gaps and
+produce out-of-order numbers). Use the central generator:
 ```php
-$stmt = $pdo->query("SELECT MAX(customer_id) FROM customers");
-$nextId = $stmt->fetchColumn() + 1;
-$code = 'CUST-' . str_pad($nextId, 5, '0', STR_PAD_LEFT);
+require_once __DIR__ . '/../core/code_generator.php';   // adjust depth
+
+// On CREATE — allocate the next sequential code (inside the same txn as the insert):
+$code = nextCode($pdo, 'CUST');                 // -> BFS-CUST-0001
+
+// On EDIT — upgrade a still-editable legacy code to the new format (only if the
+// record is not status-locked; the caller enforces that gate first). Bases the
+// decision on the STORED code so an omitted form field can't burn a number:
+$code = codeForEdit($pdo, 'CUST', $existingCode, 'CUST-\\d+', 'customers', $id);
 ```
+Existing/posted codes are never touched: `journal_entries` link to sources by the
+integer `entity_id`, not the display code, so re-coding never affects the GL or
+reports. See `core/code_generator.php` and `company_code_prefix_plan.md`.
 
 **Defaults on every new record:** `country='Tanzania'`, `currency='TZS'`, `year=date('Y')`, `status='active'`, `created_by=$_SESSION['user_id']`, `created_at=NOW()`
 

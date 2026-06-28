@@ -3,6 +3,7 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
 require_once __DIR__ . '/../core/actor_account.php';
 require_once __DIR__ . '/../core/form_lookups.php';
+require_once __DIR__ . '/../core/code_generator.php';
 global $pdo;
 
 // Check if user is logged in
@@ -196,8 +197,7 @@ if (!function_exists('clean_phone')) {
 $phone = clean_phone($phone);
 $mobile = clean_phone($mobile);
 
-// Generate supplier code
-$supplier_code = 'SUP' . str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT) . date('ym');
+// Supplier code is generated inside the transaction below (gap-free, sequential).
 
 // Insert new supplier
 $insert_stmt = $pdo->prepare("
@@ -212,6 +212,8 @@ $insert_stmt = $pdo->prepare("
 
 try {
     $pdo->beginTransaction();
+    // Company-prefixed sequential code, e.g. BFS-SUP-0001 (shares this txn → no gaps).
+    $supplier_code = nextCode($pdo, 'SUP');
     $insert_stmt->execute([
         $supplier_name, $company_name, $acronym, $supplier_type, $year, $contact_person, $contact_title,
         $email, $company_email, $phone, $mobile, $fax, $website, $address, $postal_address, $council, $ward,

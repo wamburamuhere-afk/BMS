@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-06-27 (feat) — Company-prefixed sequential document codes (foundation + Group A)
+
+- `core/code_generator.php` — NEW central generator: `nextCode()` (atomic, gap-free, shares caller's txn so a rolled-back insert releases the number), `codeForEdit()` (re-code a still-editable legacy code to `PREFIX-TYPE-NNNN`; keeps already-converted/manual codes), `peekNextCode()` (non-incrementing preview), `deriveCompanyPrefix()` (e.g. "BJP Technologies (T) Ltd" → BTL), `companyCodePrefix()`, `logCodeChange()`
+- `migrations/2026_06_27_company_code_sequences.php` — NEW: creates `code_sequences` (counter per type; column `last_no` — `last_value` is reserved in MySQL 8.4) + `code_change_log` (old→new audit); seeds `system_settings.company_code_prefix` (auto-derived, INSERT IGNORE) and 29 sequence types at 0. Idempotent
+- `app/constant/settings/company_profile.php` — added editable "Document Code Prefix" field (uppercase, letters-only, 2–5 chars) with live auto-suggest from company name + `PREFIX-INV-0001` preview
+- `.claude/security.md` — §18 updated: codes are now `PREFIX-TYPE-NNNN` via `nextCode()`/`codeForEdit()`; never `MAX(id)+1`/`rand()`
+- `api/create_nip_product.php`, `api/update_nip_product.php` — NIP item code via `nextCode`/`codeForEdit` (legacy `NIP-#####`)
+- `api/add_customer.php`, `api/process_edit_customer.php` — Customer code (CUST), create + re-code-on-edit
+- `api/add_supplier.php`, `api/update_supplier.php` — Supplier code (SUP), generated inside txn + re-code-on-edit
+- `api/add_sub_contractor.php`, `api/update_sub_contractor.php` — Sub-contractor code (SBC), same pattern
+- `api/crm/add_lead.php`, `api/crm/edit_lead.php` — Lead code (LEAD), create + re-code-on-edit
+- `api/add_employee.php`, `api/update_employee.php`, `app/bms/pos/employees.php` — Employee number (EMP): generate at save when blank/auto pattern, honor custom; page-load preview uses `peekNextCode()`; edit syncs `employee_code`
+- `company_code_prefix_plan.md` — NEW rollout tracker (foundation + Group A done; Group B pending). Existing/posted codes untouched; GL traces by integer `entity_id`, never the display code
+
+---
+
 ## 2026-06-27 (fix) — activity_log.php: AI print — remove duplicate header, fix footer overlap
 
 - `app/activity_log.php` — Removed `bms-print-header` div from `#aiPrintSection`; global `renderPrintHeader()` in header.php already outputs the company logo + name on every print (no duplication needed); added `padding-bottom: 12mm` to `#aiPrintBody` so the fixed `.bms-print-footer` cannot overlap the last line of AI content

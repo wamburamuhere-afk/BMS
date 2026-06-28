@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/code_generator.php';
 global $pdo;
 
 try {
@@ -94,8 +95,10 @@ try {
         }
     }
 
-    // Auto-generate Item Code from product_id: NIP-00001
-    $item_code = 'NIP-' . str_pad($product_id, 5, '0', STR_PAD_LEFT);
+    // Auto-generate the company-prefixed Item Code, e.g. BFS-NIP-0001.
+    // Sequential & gap-free via core/code_generator.php; the allocation shares
+    // this open transaction, so a rolled-back insert releases the number (no gaps).
+    $item_code = nextCode($pdo, 'NIP');
     $pdo->prepare("UPDATE products SET contract_item_no = ? WHERE product_id = ?")
         ->execute([$item_code, $product_id]);
 
