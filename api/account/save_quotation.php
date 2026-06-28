@@ -115,10 +115,17 @@ try {
     $grand_total = ($subtotal - $discount_amount_total) + $tax_total + $shipping_cost;
 
     if ($is_update) {
+        // Re-code a legacy quotation number on edit. The approved-lock guard above
+        // already blocks locked quotes, so reaching here means it's still editable.
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $curQt = $pdo->prepare("SELECT order_number FROM quotations WHERE sales_order_id = ?");
+        $curQt->execute([$quotation_id]);
+        $order_number = codeForEdit($pdo, 'QT', (string)$curQt->fetchColumn(), '(QT|QUO)-[0-9].*', 'quotations', (int)$quotation_id);
+
         // Editing never changes the workflow status.
         $stmt = $pdo->prepare("
             UPDATE quotations SET
-                customer_id = ?, order_date = ?, delivery_date = ?, salesperson_id = ?,
+                order_number = ?, customer_id = ?, order_date = ?, delivery_date = ?, salesperson_id = ?,
                 currency = ?, payment_terms = ?, reference = ?,
                 subtotal = ?, tax_amount = ?, discount_amount = ?, shipping_cost = ?, grand_total = ?,
                 total_ordered = ?, notes = ?, terms_conditions = ?, is_quote = 1,
@@ -127,7 +134,7 @@ try {
             WHERE sales_order_id = ?
         ");
         $stmt->execute([
-            $customer_id, $order_date, $delivery_date, $salesperson_id,
+            $order_number, $customer_id, $order_date, $delivery_date, $salesperson_id,
             $currency, $payment_terms, $reference,
             $subtotal, $tax_total, $discount_amount_total, $shipping_cost, $grand_total,
             $total_ordered, $notes, $terms_conditions,
@@ -138,8 +145,8 @@ try {
         $pdo->prepare("DELETE FROM quotation_items WHERE order_id = ?")->execute([$quotation_id]);
     } else {
         // A new quotation always enters the workflow at 'pending'.
-        $max_id       = $pdo->query("SELECT MAX(sales_order_id) FROM quotations")->fetchColumn();
-        $order_number = 'QT-' . date('Ymd') . '-' . str_pad(($max_id + 1), 4, '0', STR_PAD_LEFT);
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $order_number = nextCode($pdo, 'QT');   // e.g. BFS-QT-0001
 
         $stmt = $pdo->prepare("
             INSERT INTO quotations (

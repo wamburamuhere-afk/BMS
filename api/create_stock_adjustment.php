@@ -81,9 +81,9 @@ try {
     // Unit cost - use provided or product cost
     $unit_cost = floatval($_POST['unit_cost']) > 0 ? floatval($_POST['unit_cost']) : floatval($product['cost_price']);
     
-    // Generate reference number if not provided
-    $reference_number = !empty($_POST['reference_number']) ? $_POST['reference_number'] : 
-                        'ADJ-' . date('Ymd') . '-' . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT);
+    // Use the supplied reference, else a company-prefixed sequential one (BFS-ADJ-0001).
+    require_once __DIR__ . '/../core/code_generator.php';
+    $reference_number = !empty($_POST['reference_number']) ? $_POST['reference_number'] : nextCode($pdo, 'ADJ');
     
     // Insert stock movement
     $stmt = $pdo->prepare("

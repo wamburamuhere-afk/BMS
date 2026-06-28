@@ -66,9 +66,9 @@ try {
 
     $pdo->beginTransaction();
 
-    // Receipt number (advance prefix so it's recognisable on statements).
-    $max = (int)$pdo->query("SELECT MAX(payment_id) FROM payments")->fetchColumn();
-    $payment_number = 'ADV-' . date('Ymd') . '-' . str_pad((string)($max + 1), 4, '0', STR_PAD_LEFT);
+    // Advance number — company-prefixed sequential (BFS-ADV-0001), recognisable on statements.
+    require_once __DIR__ . '/../../core/code_generator.php';
+    $payment_number = nextCode($pdo, 'ADV');
 
     // Payment row — no invoice (this is an on-account deposit).
     $pdo->prepare("

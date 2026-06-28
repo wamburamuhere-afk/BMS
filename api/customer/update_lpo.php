@@ -61,6 +61,11 @@ try {
         exit;
     }
 
+    // Re-code on edit: convert a legacy auto "LPO-YYYY-NNNNN" to the company format.
+    // A custom number the user typed (not the auto pattern) is preserved as-is.
+    require_once __DIR__ . '/../../core/code_generator.php';
+    $lpo_number = codeForEdit($pdo, 'LPO', $lpo_number, 'LPO-[0-9].*', 'customer_lpos', (int)$lpo_id, 5);
+
     $document_path = $existing['document_path'];
     if (!empty($_FILES['document']['name'])) {
         $ext = strtolower(pathinfo($_FILES['document']['name'], PATHINFO_EXTENSION));

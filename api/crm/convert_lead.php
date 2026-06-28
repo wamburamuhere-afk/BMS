@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/code_generator.php';
 header('Content-Type: application/json');
 
 if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
@@ -19,9 +20,8 @@ try {
 
     $pdo->beginTransaction();
 
-    // Step A — create Customer
-    $next_cust = (int)$pdo->query("SELECT MAX(customer_id) FROM customers")->fetchColumn() + 1;
-    $cust_code = 'CUST-' . str_pad($next_cust, 5, '0', STR_PAD_LEFT);
+    // Step A — create Customer (company-prefixed sequential code, BFS-CUST-0001).
+    $cust_code = nextCode($pdo, 'CUST');
     $full_name  = trim(($lead['first_name'] ?? '') . ' ' . ($lead['last_name'] ?? ''));
     $cust_name  = $lead['company_name'] ?: ($full_name ?: 'Lead #' . $lead_id);
 
@@ -45,10 +45,8 @@ try {
     ]);
     $customer_id = (int)$pdo->lastInsertId();
 
-    // Step B — create Quotation (is_quote=1)
-    $year = date('Y');
-    $next_quote = (int)$pdo->query("SELECT MAX(sales_order_id) FROM quotations")->fetchColumn() + 1;
-    $quote_code = 'QUO-' . $year . '-' . str_pad($next_quote, 4, '0', STR_PAD_LEFT);
+    // Step B — create Quotation (is_quote=1), company-prefixed sequential (BFS-QT-0001).
+    $quote_code = nextCode($pdo, 'QT');
 
     $pdo->prepare("
         INSERT INTO quotations

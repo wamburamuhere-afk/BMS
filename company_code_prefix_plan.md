@@ -63,35 +63,48 @@ existing status-lock guard). Legacy regex is what `codeForEdit` treats as "auto"
 code only when the number is blank or matches the auto pattern; a custom number the user
 types is honored. Page-load uses `peekNextCode()` (preview only, no number burned).
 
-### Group B — documents (re-code only while unlocked; respect existing guards) — PENDING
-| Entity | Type | Create file | Edit file | Notes |
+### Group B — documents (CREATE side done ✅; runtime-tested ML + QT) — edit re-code PENDING
+All CREATE paths now use `nextCode()`. Runtime-verified via real endpoints: `create_material_list.php`→BFS-ML-0001, `save_quotation.php`→BFS-QT-0001.
+
+| Entity | Type | Create file (DONE) | Edit re-code (TODO) | Notes |
 |---|---|---|---|---|
-| Customer Invoice | INV | `api/account/save_invoice.php` | (same, update branch) | lock once approved/posted |
-| Supplier Invoice | SINV | `api/account/po_to_supplier_invoice.php`, `api/received_invoices.php` | — | |
-| Purchase Order | PO | `api/account/save_purchase_order.php` | (same) | |
-| GRN | GRN | `api/approve_dn.php` | `api/update_grn.php` | |
-| Delivery Note | DN | `api/create_dn.php` | `api/update_dn.php` | hard lock at approved |
-| Quotation | QT | `api/account/save_quotation.php` | (same) | hard lock at approved |
-| Sales Order | SO | `api/account/save_sales_order.php` | (same) | |
-| Payment | PAY | `api/account/record_payment.php` | — | |
-| Receipt | RCP | `api/account/save_receipt.php` | — | |
-| Supplier Payment | SPY | `api/add_supplier_payment.php` | `api/update_supplier_payment.php` | |
-| Customer Advance | ADV | `api/account/record_customer_advance.php` | — | |
-| Payment Voucher | PV | `api/account/save_voucher.php` | (same) | |
-| Purchase Return | PR | `api/account/save_purchase_return.php` | (same) | |
-| Material List | ML | `api/create_material_list.php` | `api/update_material_list.php` | no status |
-| Stock Adjustment | ADJ | `api/create_stock_adjustment.php` | `api/update_adjustment.php` | user-overridable ref |
-| Bank Transfer | TRF | `api/account/add_bank_transfer.php` | — | |
-| Revenue | REV | `api/account/add_revenue.php` | — | |
-| Reconciliation | REC | `api/account/create_reconciliation.php` | — | |
-| Customer LPO | LPO | `api/customer/add_lpo.php` | — | |
-| Inspection | INS | `api/operations/save_inspection.php` | — | |
-| IPC | IPC | `api/operations/save_ipc.php` | — | |
-| RFQ | RFQ | `api/create_rfq.php` | `api/update_rfq.php` | |
-| Delivery Order | DO | `api/create_do.php` | `api/operations/edit_do.php` | |
+| Customer Invoice | INV | `save_invoice.php` (+ `operations/create_invoice_from_ipc.php`) | save_invoice update branch | honors manual number; lock once approved/posted |
+| Supplier Invoice | SINV | `po_to_supplier_invoice.php` | — | `received_invoices.php` left: supplier's own ref |
+| Purchase Order | PO | `save_purchase_order.php` | (same) | |
+| GRN | GRN | `approve_dn.php` | `update_grn.php` | |
+| Delivery Note | DN | `create_dn.php`, `create_return_dn.php` | `update_dn.php` | hard lock at approved |
+| Quotation | QT | `save_quotation.php` (+ `crm/convert_lead.php`) | (same) | hard lock at approved |
+| Sales Order | SO | `save_sales_order.php` (+ `convert_quote_to_order.php`) | (same) | |
+| Payment | PAY | `record_payment.php` | — | create-only |
+| Receipt | RCP | `save_receipt.php` | — | create-only |
+| Supplier Payment | SPY | `add_supplier_payment.php`, `suppliers/add_project_payment.php` | — | create-only |
+| Customer Advance | ADV | `record_customer_advance.php` | — | create-only |
+| Payment Voucher | PV | `save_voucher.php` | (same) | |
+| Purchase Return | PR | `save_purchase_return.php` | (same) | |
+| Material List | ML | `create_material_list.php` | `update_material_list.php` | no status |
+| Stock Adjustment | ADJ | `create_stock_adjustment.php` | `update_adjustment.php` | keeps manual ref override |
+| Bulk Adjustment | BULK | `process_bulk_adjustment.php` | — | |
+| Bank Transfer | TRF | `add_bank_transfer.php` | — | create-only |
+| Revenue | REV | `add_revenue.php` | — | create-only |
+| Reconciliation | REC | `create_reconciliation.php` | — | |
+| Customer LPO | LPO | `customer/add_lpo.php` | `customer/update_lpo.php` (manual field) | |
+| Inspection | INS | `operations/save_inspection.php` | — | now company-wide seq (was per-project) |
+| IPC | IPC | `operations/save_ipc.php` | — | now company-wide seq (was per-project) |
+| RFQ | RFQ | `create_rfq.php` | `update_rfq.php` | |
+| Delivery Order | DO | `create_do.php` | `operations/edit_do.php` | |
+| Customer (alt paths) | CUST | `import_customers.php`, `quick_add_customer.php`, `crm/convert_lead.php` | — | |
+
+**Group B EDIT side — DONE ✅** (rule: re-code on edit only while NOT yet GL-posted).
+- Helper: `codeForEditUnlessPosted()` + `documentGlPosted()` in `core/code_generator.php`.
+- GL-posting (freeze once posted): INV (`save_invoice.php`, entity 'invoice'), GRN (`update_grn.php`, entity 'grn').
+- Non-GL (re-code after existing lock guard): PO, QT (after approved-lock), SO, PR, PV, DN (outbound only), ML, RFQ (draft-only), LPO (preserves manual number).
+- Skipped by rule: ADJ (always GL-posted on create → frozen), DO (no doc-edit handler).
+- Runtime-verified: quotation legacy→`BFS-QT-0002`, no re-burn; posted invoice frozen, unposted re-codes.
 
 ### Excluded (intentional)
-Journal entries (`JRNL`, no form), Warehouse codes (manual), POS Shift (`SH`), Chart-of-Accounts (hierarchical).
+Journal entries (`JRNL`, no form), Warehouse codes (manual), POS Shift/receipt (POS scope deferred),
+Chart-of-Accounts (hierarchical), Payroll (`PAY-YYMM-empid` structured per-employee),
+`received_invoices` ref (supplier's own number).
 
 ---
 

@@ -26,8 +26,9 @@ try {
         throw new Exception("Customer name is required");
     }
     
-    // Generate customer code
-    $customer_code = 'CUST-' . date('Ymd') . '-' . mt_rand(100, 999);
+    // Company-prefixed sequential customer code (BFS-CUST-0001).
+    require_once __DIR__ . '/../core/code_generator.php';
+    $customer_code = nextCode($pdo, 'CUST');
     
     // Insert customer
     $stmt = $pdo->prepare("

@@ -43,6 +43,16 @@ try {
 
     $pdo->beginTransaction();
 
+    // Re-code a legacy list number on edit (material lists don't post to the GL).
+    require_once __DIR__ . '/../core/code_generator.php';
+    $curMl = $pdo->prepare("SELECT list_no FROM nip_material_lists WHERE id = ?");
+    $curMl->execute([$id]);
+    $oldMl = (string)$curMl->fetchColumn();
+    $newMl = codeForEdit($pdo, 'ML', $oldMl, 'ML-[0-9].*', 'nip_material_lists', (int)$id);
+    if ($newMl !== $oldMl) {
+        $pdo->prepare("UPDATE nip_material_lists SET list_no = ? WHERE id = ?")->execute([$newMl, $id]);
+    }
+
     $pdo->prepare("
         UPDATE nip_material_lists
         SET name=?, project_id=?, warehouse_id=?, updated_at=NOW()

@@ -142,6 +142,52 @@ if (!function_exists('peekNextCode')) {
     }
 }
 
+if (!function_exists('documentGlPosted')) {
+    /**
+     * True if this source document already has a POSTED journal entry — i.e. it is
+     * locked into the ledger. Used to freeze a document's display code once posted,
+     * even if its edit form technically still allows changes.
+     *
+     * @param string $glEntityType journal_entries.entity_type for this doc
+     *                             (e.g. 'invoice', 'grn', 'stock_adjustment').
+     */
+    function documentGlPosted(PDO $pdo, string $glEntityType, int $entityId): bool {
+        try {
+            $st = $pdo->prepare(
+                "SELECT 1 FROM journal_entries
+                 WHERE entity_type = ? AND entity_id = ? AND status = 'posted' LIMIT 1"
+            );
+            $st->execute([$glEntityType, $entityId]);
+            return (bool)$st->fetchColumn();
+        } catch (Throwable $e) {
+            // If we cannot prove it's unposted, be safe and treat it as posted
+            // (i.e. do NOT re-code) so we never touch a possibly-posted document.
+            return true;
+        }
+    }
+}
+
+if (!function_exists('codeForEditUnlessPosted')) {
+    /**
+     * Re-code a document on edit ONLY while it is not yet posted to the GL.
+     * Once a posted journal entry exists for it, the code is frozen (returned as-is).
+     * For document types that never post to the ledger, this behaves exactly like
+     * codeForEdit() (always eligible to convert a legacy code).
+     *
+     * @param string $glEntityType The doc's journal_entries.entity_type.
+     * @param int    $recordId      The doc's primary key (== journal_entries.entity_id).
+     */
+    function codeForEditUnlessPosted(
+        PDO $pdo, string $type, ?string $current, ?string $legacyRegex,
+        string $glEntityType, int $recordId, ?string $table = null, int $digits = 4
+    ): string {
+        if (documentGlPosted($pdo, $glEntityType, $recordId)) {
+            return (string)$current;   // frozen — already in the ledger
+        }
+        return codeForEdit($pdo, $type, $current, $legacyRegex, $table, $recordId, $digits);
+    }
+}
+
 if (!function_exists('logCodeChange')) {
     /**
      * Record an old -> new code conversion so a document is still findable by its
