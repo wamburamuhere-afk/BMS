@@ -87,13 +87,9 @@ try {
         ]);
         $message = "Voucher updated successfully";
     } else {
-        // Generate Voucher Number
-        $last = $pdo->query("SELECT voucher_number FROM payment_vouchers ORDER BY id DESC LIMIT 1")->fetchColumn();
-        $nextNum = 1;
-        if ($last && preg_match('/PV-(\d+)/', $last, $matches)) {
-            $nextNum = intval($matches[1]) + 1;
-        }
-        $voucher_number = 'PV-' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+        // Company-prefixed sequential voucher number (BFS-PV-0001), gap-free.
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $voucher_number = nextCode($pdo, 'PV');
 
         // Insert
         $stmt = $pdo->prepare("

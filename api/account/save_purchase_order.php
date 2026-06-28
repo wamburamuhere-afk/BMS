@@ -122,10 +122,9 @@ try {
         $pdo->prepare("DELETE FROM purchase_order_items WHERE purchase_order_id = ?")->execute([$purchase_order_id]);
         
     } else {
-        // Generate order number
-        $stmt = $pdo->query("SELECT MAX(purchase_order_id) FROM purchase_orders");
-        $max_id = $stmt->fetchColumn();
-        $order_number = 'PO-' . date('Ymd') . '-' . str_pad(($max_id + 1), 4, '0', STR_PAD_LEFT);
+        // Company-prefixed sequential order number (BFS-PO-0001), gap-free.
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $order_number = nextCode($pdo, 'PO');
 
         // Snapshot creator info
         $creator_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));

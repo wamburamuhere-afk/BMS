@@ -102,7 +102,7 @@ has($apiC, 'party_type',                    'create_dn.php: reads party_type');
 has($apiC, 'subcontractor_id',              'create_dn.php: stores subcontractor_id');
 has($apiC, 'sub_contractors',               'create_dn.php: validates against sub_contractors');
 has($apiC, 'dn_collect_attachment_pairs',   'create_dn.php: collects named attachments');
-has($apiC, "DN-' . date('Ymd')",            'create_dn.php: auto-generates internal number');
+has($apiC, "nextCode(\$pdo, 'DN')",          'create_dn.php: auto-generates internal number (company-prefixed sequential)');
 has($apiC, 'beginTransaction',              'create_dn.php: transaction present');
 has($apiC, 'logActivity',                   'create_dn.php: logActivity present');
 

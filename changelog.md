@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-06-27 (feat) — Company-prefixed sequential document codes (Group B — create side)
+
+All remaining auto-generated document codes now use `nextCode()` → `PREFIX-TYPE-NNNN`
+(gap-free, sequential, inside the insert's transaction so a rollback releases the number).
+Replaces the old `MAX(id)+1` / `mt_rand()` / `COUNT(*)+1` patterns (which gapped and
+jumped). Runtime-verified against the real endpoints (BFS-ML-0001, BFS-QT-0001).
+
+- Sales/AR: `api/account/save_invoice.php` (INV, honors a manually-entered number), `save_quotation.php` (QT), `save_sales_order.php` (QT/SO), `save_receipt.php` (RCP), `record_payment.php` (PAY), `record_customer_advance.php` (ADV), `customer/add_lpo.php` (LPO)
+- Purchase/AP: `save_purchase_order.php` (PO), `save_purchase_return.php` (PR), `po_to_supplier_invoice.php` (SINV), `save_voucher.php` (PV), `add_supplier_payment.php` + `suppliers/add_project_payment.php` (SPY), `create_rfq.php` (RFQ)
+- Inventory/Ops: `approve_dn.php` (GRN), `create_dn.php` + `create_return_dn.php` (DN), `create_do.php` (DO), `create_material_list.php` (ML), `create_stock_adjustment.php` (ADJ, keeps manual override), `process_bulk_adjustment.php` (BULK), `operations/save_inspection.php` (INS), `operations/save_ipc.php` (IPC) — INS/IPC changed from per-project to company-wide sequence
+- Banking: `account/add_bank_transfer.php` (TRF), `add_revenue.php` (REV), `create_reconciliation.php` (REC)
+- Alternate create paths unified: `crm/convert_lead.php` (CUST+QT), `account/convert_quote_to_order.php` (SO), `import_customers.php` + `quick_add_customer.php` (CUST), `operations/create_invoice_from_ipc.php` (INV)
+- Left intentionally unchanged: payroll period codes, POS receipt generator (POS scope deferred), `received_invoices.php` invoice_ref (the supplier's own number), journal entries
+- `company_code_prefix_plan.md` — Group B create side marked done; edit-side re-code hooks still pending
+
+---
+
 ## 2026-06-27 (feat) — Company-prefixed sequential document codes (foundation + Group A)
 
 - `core/code_generator.php` — NEW central generator: `nextCode()` (atomic, gap-free, shares caller's txn so a rolled-back insert releases the number), `codeForEdit()` (re-code a still-editable legacy code to `PREFIX-TYPE-NNNN`; keeps already-converted/manual codes), `peekNextCode()` (non-incrementing preview), `deriveCompanyPrefix()` (e.g. "BJP Technologies (T) Ltd" → BTL), `companyCodePrefix()`, `logCodeChange()`

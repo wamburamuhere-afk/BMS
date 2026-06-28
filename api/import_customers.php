@@ -224,10 +224,9 @@ while (($row = fgetcsv($handle)) !== false) {
         } else {
             // Insert new customer
             if ($import_action === 'add_new' || $import_action === 'add_update') {
-                // Generate customer code
-                $count_stmt = $pdo->query("SELECT MAX(customer_id) FROM customers");
-                $nextId = $count_stmt->fetchColumn() + 1;
-                $customer_code = 'CUST-' . str_pad($nextId, 5, '0', STR_PAD_LEFT);
+                // Company-prefixed sequential customer code (BFS-CUST-0001).
+                require_once __DIR__ . '/../core/code_generator.php';
+                $customer_code = nextCode($pdo, 'CUST');
 
                 $insert_stmt->execute([
                     $customer_name, $company_name, $customer_type, $contact_person, $contact_title,

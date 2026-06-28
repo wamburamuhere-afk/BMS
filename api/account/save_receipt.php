@@ -95,9 +95,9 @@ try {
         throw new Exception('The allocated total (' . number_format($allocTotal, 2) . ') must equal the receipt amount (' . number_format($amount, 2) . ').');
     }
 
-    // Receipt number.
-    $max = (int)$pdo->query("SELECT MAX(payment_id) FROM payments")->fetchColumn();
-    $payment_number = 'RCP-' . date('Ymd') . '-' . str_pad((string)($max + 1), 4, '0', STR_PAD_LEFT);
+    // Receipt number — company-prefixed sequential (BFS-RCP-0001).
+    require_once __DIR__ . '/../../core/code_generator.php';
+    $payment_number = nextCode($pdo, 'RCP');
 
     // Parent payment row (invoice_id = primary, for back-compat).
     $pdo->prepare("

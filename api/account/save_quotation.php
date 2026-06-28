@@ -138,8 +138,8 @@ try {
         $pdo->prepare("DELETE FROM quotation_items WHERE order_id = ?")->execute([$quotation_id]);
     } else {
         // A new quotation always enters the workflow at 'pending'.
-        $max_id       = $pdo->query("SELECT MAX(sales_order_id) FROM quotations")->fetchColumn();
-        $order_number = 'QT-' . date('Ymd') . '-' . str_pad(($max_id + 1), 4, '0', STR_PAD_LEFT);
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $order_number = nextCode($pdo, 'QT');   // e.g. BFS-QT-0001
 
         $stmt = $pdo->prepare("
             INSERT INTO quotations (

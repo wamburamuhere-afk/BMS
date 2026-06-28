@@ -88,11 +88,9 @@ try {
         
         $pdo->prepare("DELETE FROM purchase_return_items WHERE purchase_return_id = ?")->execute([$return_id]);
     } else {
-        // Insert
-        // Generate return number
-        $stmt = $pdo->query("SELECT MAX(purchase_return_id) FROM purchase_returns");
-        $max_id = $stmt->fetchColumn();
-        $return_number = 'PR-' . date('Ymd') . '-' . str_pad(($max_id + 1), 4, '0', STR_PAD_LEFT);
+        // Insert — company-prefixed sequential return number (BFS-PR-0001).
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $return_number = nextCode($pdo, 'PR');
 
         $stmt = $pdo->prepare("
             INSERT INTO purchase_returns (

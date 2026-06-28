@@ -128,14 +128,18 @@ try {
         $pdo->prepare("DELETE FROM invoice_items WHERE invoice_id = ?")->execute([$invoice_id]);
         
     } else {
-        // Create new
-        $invoice_number = $_POST['invoice_number'] ?? ('INV-' . time()); // Fallback
-        
-        // Verify unique invoice number
-        $stmt = $pdo->prepare("SELECT count(*) FROM invoices WHERE invoice_number = ?");
-        $stmt->execute([$invoice_number]);
-        if ($stmt->fetchColumn() > 0) {
-            $invoice_number = 'INV-' . date('Ymd') . '-' . mt_rand(1000, 9999);
+        // Create new — auto-generate the company invoice number (BFS-INV-0001)
+        // unless one was explicitly supplied; on a clash, allocate a fresh one.
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $invoice_number = trim($_POST['invoice_number'] ?? '');
+        if ($invoice_number === '') {
+            $invoice_number = nextCode($pdo, 'INV');
+        } else {
+            $stmt = $pdo->prepare("SELECT count(*) FROM invoices WHERE invoice_number = ?");
+            $stmt->execute([$invoice_number]);
+            if ($stmt->fetchColumn() > 0) {
+                $invoice_number = nextCode($pdo, 'INV');
+            }
         }
 
         $stmt = $pdo->prepare("

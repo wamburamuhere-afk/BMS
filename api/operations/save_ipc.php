@@ -88,9 +88,9 @@ try {
         logActivity($pdo, $_SESSION['user_id'], "Updated IPC {$ipc_id} on project {$project_id}");
         echo json_encode(['success'=>true,'message'=>'IPC updated successfully','net_payable'=>$net_payable]);
     } else {
-        $count = $pdo->prepare("SELECT COUNT(*) FROM interim_payment_certificates WHERE project_id=?");
-        $count->execute([$project_id]);
-        $no = 'IPC-' . str_pad($count->fetchColumn() + 1, 3, '0', STR_PAD_LEFT);
+        // Company-wide sequential IPC number (BFS-IPC-0001).
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $no = nextCode($pdo, 'IPC');
 
         $stmt = $pdo->prepare("INSERT INTO interim_payment_certificates
             (project_id, sales_order_id, ipc_number, ipc_date, period_from, period_to,

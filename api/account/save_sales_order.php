@@ -214,11 +214,9 @@ try {
         
         $pdo->prepare("DELETE FROM sales_order_items WHERE order_id = ?")->execute([$sales_order_id]);
     } else {
-        // Insert
-        $stmt = $pdo->query("SELECT MAX(sales_order_id) FROM sales_orders");
-        $max_id = $stmt->fetchColumn();
-        $prefix = $is_quote ? 'QT' : 'SO';
-        $order_number = $prefix . '-' . date('Ymd') . '-' . str_pad(($max_id + 1), 4, '0', STR_PAD_LEFT);
+        // Insert — company-prefixed sequential number (BFS-SO-0001 / BFS-QT-0001).
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $order_number = nextCode($pdo, $is_quote ? 'QT' : 'SO');
 
         if ($hasPoNoColumn) {
             $stmt = $pdo->prepare("
