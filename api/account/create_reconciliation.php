@@ -34,10 +34,8 @@ try {
 
     // Generate Reconciliation Number (REC-YYYYMM-XXXX)
     $datePart = date('Ym');
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM bank_reconciliations WHERE DATE_FORMAT(created_at, '%Y%m') = ?");
-    $stmt->execute([$datePart]);
-    $count = $stmt->fetchColumn() + 1;
-    $reconciliation_number = 'REC-' . $datePart . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+    require_once __DIR__ . '/../../core/code_generator.php';
+    $reconciliation_number = nextCode($pdo, 'REC');   // company-prefixed sequential (BFS-REC-0001)
 
     // Always derive the book balance from the ledger for this account; keep the
     // submitted value only if the account lookup somehow returns nothing.

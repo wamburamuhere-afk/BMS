@@ -6,6 +6,7 @@
 // never be converted twice.
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/code_generator.php';
 
 header('Content-Type: application/json');
 
@@ -53,9 +54,8 @@ try {
 
     $pdo->beginTransaction();
 
-    // Build the new sales order number.
-    $maxId     = $pdo->query("SELECT MAX(sales_order_id) FROM sales_orders")->fetchColumn();
-    $so_number = 'SO-' . date('Ymd') . '-' . str_pad(($maxId + 1), 4, '0', STR_PAD_LEFT);
+    // Build the new sales order number (company-prefixed sequential, BFS-SO-0001).
+    $so_number = nextCode($pdo, 'SO');
 
     // Copy the header into sales_orders. Only columns that exist in BOTH tables
     // are carried over — quotation-only columns (quote_valid_until, reviewed_by,

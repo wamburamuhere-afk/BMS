@@ -67,8 +67,8 @@ try {
 
     // REV-YYYY-NNNN.
     $year = date('Y', strtotime($revenue_date));
-    $seq  = (int)$pdo->query("SELECT COUNT(*) FROM revenues WHERE YEAR(revenue_date) = " . (int)$year)->fetchColumn() + 1;
-    $revenue_number = 'REV-' . $year . '-' . str_pad((string)$seq, 4, '0', STR_PAD_LEFT);
+    require_once __DIR__ . '/../../core/code_generator.php';
+    $revenue_number = nextCode($pdo, 'REV');   // company-prefixed sequential (BFS-REV-0001)
 
     $stmt = $pdo->prepare("
         INSERT INTO revenues

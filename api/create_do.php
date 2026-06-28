@@ -44,14 +44,9 @@ try {
     $exists->execute([$dn_id]);
     if ($exists->fetch()) throw new Exception('A Delivery Order already exists for this DN.');
 
-    // Generate DO number
-    $do_number = 'DO-' . date('Ymd') . '-' . mt_rand(100, 999);
-    $check = $pdo->prepare("SELECT COUNT(*) FROM delivery_orders WHERE do_number = ?");
-    $check->execute([$do_number]);
-    while ($check->fetchColumn() > 0) {
-        $do_number = 'DO-' . date('Ymd') . '-' . mt_rand(1000, 9999);
-        $check->execute([$do_number]);
-    }
+    // Company-prefixed sequential DO number (BFS-DO-0001).
+    require_once __DIR__ . '/../core/code_generator.php';
+    $do_number = nextCode($pdo, 'DO');
 
     $pdo->beginTransaction();
 

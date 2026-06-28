@@ -77,9 +77,9 @@ try {
 
     $pdo->beginTransaction();
 
-    // Generate list_no: ML-YYYYMMDD-NNNN (based on current max id)
-    $max_id  = (int)$pdo->query("SELECT COALESCE(MAX(id),0) FROM nip_material_lists")->fetchColumn();
-    $list_no = 'ML-' . date('Ymd') . '-' . str_pad($max_id + 1, 4, '0', STR_PAD_LEFT);
+    // Company-prefixed sequential list number (BFS-ML-0001).
+    require_once __DIR__ . '/../core/code_generator.php';
+    $list_no = nextCode($pdo, 'ML');
 
     // Insert material list
     $stmt = $pdo->prepare("

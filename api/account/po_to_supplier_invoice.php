@@ -133,14 +133,9 @@ try {
     }
 
     // Generate next invoice_ref  (INV-YYYY-NNNN)
-    $year = date('Y');
-    $maxStmt = $pdo->prepare(
-        "SELECT MAX(CAST(SUBSTRING_INDEX(invoice_ref, '-', -1) AS UNSIGNED))
-         FROM supplier_invoices WHERE invoice_ref LIKE ?"
-    );
-    $maxStmt->execute(["INV-{$year}-%"]);
-    $maxNum    = (int)$maxStmt->fetchColumn();
-    $invoice_ref = 'INV-' . $year . '-' . str_pad($maxNum + 1, 4, '0', STR_PAD_LEFT);
+    // Company-prefixed sequential supplier-invoice ref (BFS-SINV-0001).
+    require_once __DIR__ . '/../../core/code_generator.php';
+    $invoice_ref = nextCode($pdo, 'SINV');
 
     $pdo->beginTransaction();
 

@@ -171,6 +171,16 @@ try {
     }
 
     if ($sales_order_id > 0) {
+        // Re-code a legacy SO/QT number on edit (sales orders don't post to the GL).
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $curSo = $pdo->prepare("SELECT order_number FROM sales_orders WHERE sales_order_id = ?");
+        $curSo->execute([$sales_order_id]);
+        $oldSo = (string)$curSo->fetchColumn();
+        $newSo = codeForEdit($pdo, $is_quote ? 'QT' : 'SO', $oldSo, '(SO|QT)-[0-9].*', 'sales_orders', (int)$sales_order_id);
+        if ($newSo !== $oldSo) {
+            $pdo->prepare("UPDATE sales_orders SET order_number = ? WHERE sales_order_id = ?")->execute([$newSo, $sales_order_id]);
+        }
+
         // Update
         if ($hasPoNoColumn) {
             $stmt = $pdo->prepare("
@@ -214,11 +224,9 @@ try {
         
         $pdo->prepare("DELETE FROM sales_order_items WHERE order_id = ?")->execute([$sales_order_id]);
     } else {
-        // Insert
-        $stmt = $pdo->query("SELECT MAX(sales_order_id) FROM sales_orders");
-        $max_id = $stmt->fetchColumn();
-        $prefix = $is_quote ? 'QT' : 'SO';
-        $order_number = $prefix . '-' . date('Ymd') . '-' . str_pad(($max_id + 1), 4, '0', STR_PAD_LEFT);
+        // Insert — company-prefixed sequential number (BFS-SO-0001 / BFS-QT-0001).
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $order_number = nextCode($pdo, $is_quote ? 'QT' : 'SO');
 
         if ($hasPoNoColumn) {
             $stmt = $pdo->prepare("

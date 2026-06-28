@@ -87,10 +87,9 @@ try {
 
     $pdo->beginTransaction();
 
-    // Generate unique payment_number (Fix for Duplicate entry error)
-    $stmtNum = $pdo->query("SELECT MAX(payment_id) FROM payments");
-    $max_id = $stmtNum->fetchColumn() ?: 0;
-    $payment_number = 'PAY-' . date('Ymd') . '-' . str_pad(($max_id + 1), 4, '0', STR_PAD_LEFT);
+    // Company-prefixed sequential payment number (BFS-PAY-0001), gap-free.
+    require_once __DIR__ . '/../../core/code_generator.php';
+    $payment_number = nextCode($pdo, 'PAY');
 
     // Insert Payment
     $stmt = $pdo->prepare("

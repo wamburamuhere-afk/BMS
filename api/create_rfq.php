@@ -31,11 +31,9 @@ try {
         throw new Exception('Access denied: this project is not in your scope.');
     }
 
-    // ── Generate RFQ number ─────────────────────────────────────────────
-    $year  = date('Y');
-    $month = date('m');
-    $last  = $pdo->query("SELECT MAX(CAST(SUBSTRING(rfq_number, -4) AS UNSIGNED)) FROM rfq WHERE rfq_number LIKE 'RFQ-{$year}{$month}-%'")->fetchColumn() ?: 0;
-    $rfq_number = 'RFQ-' . $year . $month . '-' . str_pad($last + 1, 4, '0', STR_PAD_LEFT);
+    // ── Company-prefixed sequential RFQ number (BFS-RFQ-0001) ───────────
+    require_once __DIR__ . '/../core/code_generator.php';
+    $rfq_number = nextCode($pdo, 'RFQ');
 
     $pdo->beginTransaction();
 

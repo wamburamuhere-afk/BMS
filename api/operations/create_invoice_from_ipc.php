@@ -35,11 +35,9 @@ if (!empty($ipc['project_id']) && function_exists('userCan') && !userCan('projec
     exit();
 }
 
-// Auto invoice number
-$last = $pdo->query("SELECT invoice_number FROM invoices ORDER BY invoice_id DESC LIMIT 1")->fetchColumn();
-$next_no = 1;
-if ($last && preg_match('/(\d+)$/', $last, $m)) $next_no = intval($m[1]) + 1;
-$invoice_number = 'INV-' . str_pad($next_no, 5, '0', STR_PAD_LEFT);
+// Auto invoice number — company-prefixed sequential (BFS-INV-0001).
+require_once __DIR__ . '/../../core/code_generator.php';
+$invoice_number = nextCode($pdo, 'INV');
 
 $invoice_date = date('Y-m-d');
 $due_date = date('Y-m-d', strtotime('+30 days'));

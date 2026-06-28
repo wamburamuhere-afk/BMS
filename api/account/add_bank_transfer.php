@@ -83,8 +83,8 @@ try {
 
     // Transfer number: TRF-YYYY-NNNN (per §18 / §UI-6).
     $year = date('Y', strtotime($transfer_date));
-    $seq  = (int)$pdo->query("SELECT COUNT(*) FROM bank_transfers WHERE YEAR(transfer_date) = " . (int)$year)->fetchColumn() + 1;
-    $transfer_number = 'TRF-' . $year . '-' . str_pad((string)$seq, 4, '0', STR_PAD_LEFT);
+    require_once __DIR__ . '/../../core/code_generator.php';
+    $transfer_number = nextCode($pdo, 'TRF');   // company-prefixed sequential (BFS-TRF-0001)
 
     $uid  = (int)$_SESSION['user_id'];
     $desc = 'Transfer ' . $transfer_number . ($description !== '' ? ': ' . substr($description, 0, 100) : '');
