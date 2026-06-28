@@ -9479,7 +9479,7 @@ function renderGRNs(grns) {
                         <i class="bi bi-gear"></i>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                        <li><a class="dropdown-item py-2" href="grn_view?id=${g.receipt_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                        <li><a class="dropdown-item py-2" href="grn_view?id=${g.receipt_id}&project_id=<?= $project_id ?>"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
                         <li><a class="dropdown-item py-2" href="grn_print?id=${g.receipt_id}" target="_blank"><i class="bi bi-printer text-dark me-2"></i>Print GRN</a></li>
                     </ul>
                 </div>
@@ -9498,7 +9498,7 @@ function renderGRNs(grns) {
                 <td><small class="text-muted">${g.receipt_number}</small></td>
                 <td><span class="badge bg-${getStatusBadgeColor(g.status)}">${g.status}</span></td>
                 <td class="text-end d-print-none">
-                    <a href="grn_view?id=${g.receipt_id}" class="btn btn-sm btn-outline-info"><i class="bi bi-eye"></i></a>
+                    <a href="grn_view?id=${g.receipt_id}&project_id=<?= $project_id ?>" class="btn btn-sm btn-outline-info"><i class="bi bi-eye"></i></a>
                 </td>
             </tr>`;
         }

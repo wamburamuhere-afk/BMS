@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-06-28 (fix) — Edit/Save no longer force-jumps into the project when opened externally
+
+Editing a project-linked **Purchase Order, GRN, Delivery/Received Note, or Sales Order** from the
+general (external) area used to redirect to the project page after Save, because the redirect read
+the project stored **on the record**. The post-save redirect now follows the **origin** only — a
+project flag in the URL means "I came from inside the project":
+- came from a project → return to the project
+- opened externally → stay external (the document's own view / its list)
+
+The record keeps its own project link and still appears inside its project (unchanged). Create-new
+flows were already correct and left alone.
+
+- `app/bms/purchase/purchase_order_create.php` — added `$origin_project_id` (URL-only); PO edit redirect uses it instead of the record's `$project_id`
+- `app/bms/sales/sales_order_create.php` — redirect uses `$origin_project_id`, not the record/quote-derived `$back_project_id`
+- `app/bms/grn/dn_create.php` — DN edit `return_url` keys off `$origin_project_id`, not record/PO-derived
+- `app/bms/grn/grn_edit.php` — added `$origin_return_url` (URL-only) feeding the `return_url` hidden field; saved project link (`projectIdHidden`) unchanged
+- `app/bms/grn/grn_view.php` — reads `project_id` origin; Edit link forwards it; "Back to Project" button shows only when present (so in-project GRN editing still returns to the project)
+- `app/bms/operations/project_view.php` — GRN view links now carry `&project_id` so the in-project chain (project → GRN view → edit) keeps its origin
+- Verified: `php -l` clean on all 6; redirect render-check shows EXTERNAL → list/own-view and IN-PROJECT → project_view for all four documents (record project deliberately ignored)
+- Untouched (already correct): Debit Note, Purchase Return, Quotation, Sales Return, Credit Note
+
+---
+
 ## 2026-06-27 (feat) — Company-prefixed sequential document codes (Group B — edit side / re-code-on-edit)
 
 Editable documents now upgrade a legacy code to `PREFIX-TYPE-NNNN` when edited & saved —
