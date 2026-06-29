@@ -99,7 +99,12 @@ kill-switch + idempotent • fully logged • backward-compatible.
   - [x] Bell already unified — engine writes to the `notifications` table that `api/get_notifications.php` reads per user
   - [x] `dashboard.php` "System requires your attention" now also surfaces the engine's per-user unread **action** notifications (via `get_system_alerts`), excluding event types the inline alerts already compute (no double-count); title+message render branches added
   - [x] Tested 2/2: lint clean; engine query includes action items, excludes `invoice.overdue` (dedup)
-- [ ] **Phase 9 — AI smart layer (optional, after core)**: digest, priority scoring, anomaly events, drafted text; setting + fallback
+- [x] **Phase 9 — AI smart layer: daily digest (DONE)**
+  - [x] `aiSummarizeNotifications()` — reuses provider-agnostic `aiComplete()` (core/ai_service.php) for a prioritized HTML briefing; deterministic grouped fallback when AI off/blocked
+  - [x] `sendNotificationDigests()` — one digest email/user/day (opt-in `notif_digest_enabled`, gated by master + global email, deduped per user/day) → queued via the outbox worker
+  - [x] `cron/send_notification_digests.php` + header.php once/day throttle; admin toggle "AI daily digest" on the rules page (+ `rules_api` set_global/list)
+  - [x] Tested: fallback summary includes items; fresh-process cron queued 1 digest/1 user with the item in the body (same-request `get_setting` caching is a test artifact — production toggles in a prior request, so it reads fresh)
+  - [ ] Priority scoring / anomaly events / AI-drafted per-event text → future (digest is the high-value piece)
 - [ ] **Phase 10 — Hardening, tests, rollout**: no-leak/integration/idempotency/perf/security; master switch default-off; changelog; staged rollout
 
 ---

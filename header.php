@@ -100,6 +100,13 @@ if (function_exists('get_setting') && (time() - (int)get_setting('notif_outbox_l
     @include_once __DIR__ . '/cron/process_notifications.php';
 }
 
+// AI daily digest — one summary email per user with pending items, once per day.
+// Opt-in (notif_digest_enabled). Self-contained + fail-silent.
+if (function_exists('get_setting') && get_setting('notif_digest_enabled', '0') === '1'
+    && get_setting('notif_digest_last_run') !== date('Y-m-d')) {
+    @include_once __DIR__ . '/cron/send_notification_digests.php';
+}
+
 // Get company type + location from settings
 $settings_stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'company_type'");
 $settings_stmt->execute();
