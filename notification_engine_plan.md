@@ -82,7 +82,11 @@ kill-switch + idempotent • fully logged • backward-compatible.
   - [x] Tested 7/7: dispatch enqueued 4 emails, dedupe (1st/2nd), worker processed queue + requeued on SMTP failure (attempts=1, error captured), setting restored
   - [ ] Digest batching (group many items into one email) → deferred (immediate per-event for v1; revisit with Phase 9 AI digest)
   - [ ] WhatsApp/SMS channels → deferred (worker has the `channel` switch ready)
-- [ ] **Phase 5 — Admin config UI**: `notification_rules.php` (event → role/user → channels; live access check; test send)
+- [x] **Phase 5 — Routing rules + Admin UI (DONE)**
+  - [x] 5a Engine: migration `2026_06_28_notification_rules.php` (`notification_rules` + `notification_rules` page_key); `resolveRecipients()` applies rules (target = permission|role|user) and sets per-recipient channels; `dispatchEvent()` uses per-recipient channels; `previewRecipients()` added; fixed a `$base`/URL-base variable collision in the dispatch loop
+  - [x] 5a Tested 12/12: rule narrowing (role/user/permission), **safety: rule to no-access user → nobody**, per-rule channels, cross-entity no-collision regression, idempotent, preview (saved + override rules)
+  - [x] 5b Admin page `app/constant/settings/notification_rules.php` (accordion by module; per-event rule chips; Add Target modal with role/user Select2; event on/off; global master/email switches) + `api/notifications/rules_api.php` (list/save/delete/toggle_event/set_global/preview/test_send); route in `roots.php` + menu link in `header.php`; UI standard applied
+  - [x] 5b Tested: lint clean (API+page+roots+header); save→preview→delete data-flow 5/5 (user-rule narrows preview to 1, delete restores all)
 - [ ] **Phase 6 — Scheduler**: `cron/run_notification_checks.php` + header.php throttle line (reuse existing pattern)
 - [ ] **Phase 7 — Emit at source actions**: one `dispatchEvent()` after each approval/posting/finance/HR/stock action (behind kill-switch)
 - [ ] **Phase 8 — Dashboard + bell unification**: read from the engine, per-user permission/scope filtered; deep action_url
