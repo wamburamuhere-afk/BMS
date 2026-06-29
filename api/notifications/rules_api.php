@@ -77,6 +77,7 @@ try {
             'globals' => [
                 'notif_master_enabled'       => (string)get_setting('notif_master_enabled', '1'),
                 'enable_email_notifications'  => (string)get_setting('enable_email_notifications', '0'),
+                'notif_digest_enabled'        => (string)get_setting('notif_digest_enabled', '0'),
             ],
         ]);
         exit;
@@ -141,7 +142,7 @@ try {
     // ── SET global toggle ───────────────────────────────────────────────
     if ($action === 'set_global') {
         $key = $_POST['key'] ?? '';
-        if (!in_array($key, ['notif_master_enabled', 'enable_email_notifications'], true)) throw new Exception('Invalid setting');
+        if (!in_array($key, ['notif_master_enabled', 'enable_email_notifications', 'notif_digest_enabled'], true)) throw new Exception('Invalid setting');
         $val = !empty($_POST['value']) ? '1' : '0';
         save_setting($key, $val);
         echo json_encode(['success' => true, 'message' => 'Setting updated']);

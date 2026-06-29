@@ -431,6 +431,125 @@ if (!function_exists('processNotificationOutbox')) {
     }
 }
 
+if (!function_exists('aiSummarizeNotifications')) {
+    /**
+     * Turn a user's pending notification items into a short prioritized HTML
+     * briefing. Uses the provider-agnostic aiComplete() when AI is configured;
+     * otherwise returns a deterministic grouped list. Never throws.
+     *
+     * @param array $items each: ['title','message','priority'(low|medium|high)]
+     */
+    function aiSummarizeNotifications(array $items): string
+    {
+        $fallback = function () use ($items) {
+            $byPrio = ['high' => [], 'medium' => [], 'low' => []];
+            foreach ($items as $it) {
+                $p = in_array(($it['priority'] ?? 'medium'), ['high', 'medium', 'low'], true) ? $it['priority'] : 'medium';
+                $byPrio[$p][] = $it;
+            }
+            $html = '<p>You have <strong>' . count($items) . '</strong> item(s) needing attention:</p>';
+            foreach (['high' => 'Urgent', 'medium' => 'Important', 'low' => 'For information'] as $k => $lbl) {
+                if (empty($byPrio[$k])) continue;
+                $html .= '<p style="margin:10px 0 4px;"><strong>' . $lbl . '</strong></p><ul style="margin:0 0 8px;">';
+                foreach ($byPrio[$k] as $it) {
+                    $html .= '<li>' . htmlspecialchars((string)$it['title'], ENT_QUOTES, 'UTF-8')
+                          . ' — ' . htmlspecialchars((string)$it['message'], ENT_QUOTES, 'UTF-8') . '</li>';
+                }
+                $html .= '</ul>';
+            }
+            return $html;
+        };
+
+        require_once __DIR__ . '/ai_service.php';
+        if (!function_exists('aiConfigured') || !aiConfigured()) {
+            return $fallback();
+        }
+
+        $lines = '';
+        foreach ($items as $it) {
+            $lines .= '- [' . ($it['priority'] ?? 'medium') . '] ' . ($it['title'] ?? '') . ': ' . ($it['message'] ?? '') . "\n";
+        }
+        $messages = [
+            ['role' => 'system', 'content' =>
+                'You are an assistant for a Tanzanian business management system (ERP). Summarize the '
+              . 'user\'s pending notifications into a brief, prioritized daily briefing in simple business '
+              . 'English. Group by urgency (most urgent first), be concise, no preamble or sign-off. '
+              . 'Output simple HTML using only <p>, <ul>, <li>, <strong>.'],
+            ['role' => 'user', 'content' => "My pending notifications:\n" . $lines],
+        ];
+        $res = aiComplete($messages, ['feature' => 'notif_digest', 'max_tokens' => 500, 'temperature' => 0.3]);
+        if (!empty($res['ok']) && trim((string)$res['text']) !== '') {
+            return (string)$res['text'];
+        }
+        return $fallback(); // AI failed/blocked → deterministic briefing
+    }
+}
+
+if (!function_exists('sendNotificationDigests')) {
+    /**
+     * Build and queue ONE daily digest email per user who has unread engine
+     * notifications. Opt-in (notif_digest_enabled) and gated by the master switch
+     * + global email toggle. Deduped per user per day. Never throws.
+     *
+     * @return array ['users'=>int,'queued'=>int]
+     */
+    function sendNotificationDigests(PDO $pdo): array
+    {
+        $sum = ['users' => 0, 'queued' => 0];
+
+        $on = function (string $k, string $def = '0') {
+            return function_exists('get_setting') && (string)get_setting($k, $def) === '1';
+        };
+        if (!$on('notif_master_enabled', '1') || !$on('notif_digest_enabled') || !$on('enable_email_notifications')) {
+            return $sum;
+        }
+
+        try {
+            $users = $pdo->query("
+                SELECT DISTINCT n.user_id, u.email,
+                       TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS name
+                FROM notifications n
+                JOIN users u ON u.user_id = n.user_id
+                WHERE n.is_read = 0 AND n.event_key IS NOT NULL
+                  AND u.is_active = 1 AND u.email IS NOT NULL AND u.email <> ''
+            ")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            error_log('sendNotificationDigests users: ' . $e->getMessage());
+            return $sum;
+        }
+
+        $itemStmt = $pdo->prepare("
+            SELECT title, message, priority, event_key
+            FROM notifications
+            WHERE user_id = ? AND is_read = 0 AND event_key IS NOT NULL
+            ORDER BY FIELD(priority,'high','medium','low'), created_at DESC
+            LIMIT 30
+        ");
+
+        foreach ($users as $u) {
+            $uid = (int)$u['user_id'];
+            $itemStmt->execute([$uid]);
+            $items = $itemStmt->fetchAll(PDO::FETCH_ASSOC);
+            if (!$items) continue;
+            $sum['users']++;
+
+            $bodyInner = aiSummarizeNotifications($items);
+            $dedupe = 'digest|u' . $uid . '|' . date('Y-m-d');
+            if (enqueueEmail($pdo, [
+                'event_key'         => 'digest.daily',
+                'recipient_user_id' => $uid,
+                'to_email'          => $u['email'],
+                'subject'           => 'Your BMS daily summary — ' . date('d M Y'),
+                'body'              => $bodyInner,
+                'dedupe_key'        => $dedupe,
+            ])) {
+                $sum['queued']++;
+            }
+        }
+        return $sum;
+    }
+}
+
 if (!function_exists('dispatchEvent')) {
     /**
      * The bus. Resolve recipients for $eventKey and create in-app notifications
