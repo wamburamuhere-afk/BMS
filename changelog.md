@@ -8,6 +8,7 @@ event coverage (same fail-safe, kill-switched `dispatchEvent()` pattern as Phase
 - Action-based emits (after the successful create): `api/purchase/create_debit_note.php` → `debit_note.pending`; `api/sales/create_credit_note.php` → `credit_note.pending`; `api/sales/create_return.php` → `sales_return.pending`; `api/create_purchase_return.php` → `purchase_return.pending`; `api/account/add_expense.php` → `expense.needs_review`; `api/create_grn.php` → `grn.pending`; `api/account/save_voucher.php` (create) → `voucher.needs_approval`
 - Time-based checks added to `cron/run_notification_checks.php`: `quotation.expiring` (quotations.quote_valid_until within 7 days, still open) and `tender.deadline` (tenders.submission_deadline within 7 days, not awarded/closed)
 - Verified: lint clean (8 files); all 9 events resolve recipients + dispatch (9/9); scheduler runs all three checks cleanly; test artifacts cleaned up
+- Added permanent regression suite `tests/test_notification_engine_cli.php` (gated by the pre-push hook + CI): files/lint, schema, seeded catalog, helpers, dispatch pipeline + idempotency, enqueue dedupe, mute logic, rule narrowing + no-access safety, mailer fail-silent, digest fallback, and a static check that every wired source file emits its event. 77/0, idempotent, self-cleaning. (It caught that `core/notify.php` doesn't auto-load `core/mailer.php` — fine in prod since the outbox worker loads it on demand; the test loads it explicitly.)
 
 ## 2026-06-28 (feat) — Smart Notification Engine: Phases 1–2 (mailer + role-aware core)
 
