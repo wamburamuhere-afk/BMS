@@ -87,6 +87,19 @@ if (function_exists('get_setting') && get_setting('leave_accrual_last_run') !== 
     @include_once __DIR__ . '/cron/run_leave_accrual.php';
 }
 
+// Smart notification engine — time-based event checks (overdue/expiring/due),
+// at most once per day. Self-contained + fail-silent (see cron/run_notification_checks.php).
+if (function_exists('get_setting') && get_setting('notif_checks_last_run') !== date('Y-m-d')) {
+    @include_once __DIR__ . '/cron/run_notification_checks.php';
+}
+
+// Notification email worker — drain a small batch from the outbox, throttled to
+// ~2 minutes so it never noticeably slows a page load. (Use a server cron for volume.)
+if (function_exists('get_setting') && (time() - (int)get_setting('notif_outbox_last_ts', '0')) >= 120) {
+    if (function_exists('save_setting')) save_setting('notif_outbox_last_ts', (string)time());
+    @include_once __DIR__ . '/cron/process_notifications.php';
+}
+
 // Get company type + location from settings
 $settings_stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'company_type'");
 $settings_stmt->execute();

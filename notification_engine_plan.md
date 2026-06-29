@@ -87,7 +87,10 @@ kill-switch + idempotent • fully logged • backward-compatible.
   - [x] 5a Tested 12/12: rule narrowing (role/user/permission), **safety: rule to no-access user → nobody**, per-rule channels, cross-entity no-collision regression, idempotent, preview (saved + override rules)
   - [x] 5b Admin page `app/constant/settings/notification_rules.php` (accordion by module; per-event rule chips; Add Target modal with role/user Select2; event on/off; global master/email switches) + `api/notifications/rules_api.php` (list/save/delete/toggle_event/set_global/preview/test_send); route in `roots.php` + menu link in `header.php`; UI standard applied
   - [x] 5b Tested: lint clean (API+page+roots+header); save→preview→delete data-flow 5/5 (user-rule narrows preview to 1, delete restores all)
-- [ ] **Phase 6 — Scheduler**: `cron/run_notification_checks.php` + header.php throttle line (reuse existing pattern)
+- [x] **Phase 6 — Scheduler (DONE)**
+  - [x] `cron/run_notification_checks.php` — time-based checks (invoice.overdue implemented; extensible per-check) emitting via `dispatchEvent`, deduped once/day per record
+  - [x] `header.php` wiring: run checks once/day + drain the email outbox (throttled ~2 min, fail-silent); both also runnable via server cron
+  - [x] Tested 3/3: scanned 5 overdue invoices → 11 in-app (per-invoice scope filtering proven), 2nd run idempotent (0 new), cleaned up
 - [ ] **Phase 7 — Emit at source actions**: one `dispatchEvent()` after each approval/posting/finance/HR/stock action (behind kill-switch)
 - [ ] **Phase 8 — Dashboard + bell unification**: read from the engine, per-user permission/scope filtered; deep action_url
 - [ ] **Phase 9 — AI smart layer (optional, after core)**: digest, priority scoring, anomaly events, drafted text; setting + fallback
