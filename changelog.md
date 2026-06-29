@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-29 — fix: POS Dashboard filter UI and safeOutput bug
+
+- `app/bms/pos/pos_dashboard.php`: defined `safeOutput()` locally (was undefined causing DataTable/dashboard JS errors)
+- `app/bms/pos/pos_dashboard.php`: changed default period from Monthly to Yearly
+- `app/bms/pos/pos_dashboard.php`: replaced From/To date range with period-specific pickers — Daily (single date), Weekly (any day → Mon–Sun computed), Monthly (month+year selects), Quarterly (Q1–Q4 + year), Yearly (year select)
+- `app/bms/pos/pos_dashboard.php`: `getDateRange()` / `showFilterPanel()` replace `setPeriodDates()`; all Apply buttons use class-based delegation
+- `tests/test_pos_dashboard_cli.php`: updated to 88 checks (all passing)
+
 ## 2026-06-29 — feat: rewrite POS Dashboard (sales history first + period filter + toolbar)
 
 - `app/bms/pos/pos_dashboard.php`: complete rewrite — Sales History section shown at top (always visible), Dashboard section below (always visible); removed old toggle buttons (#btnViewDashboard / #btnViewHistory)

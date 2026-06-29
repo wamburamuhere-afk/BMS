@@ -45,26 +45,90 @@ $company_logo = getSetting('company_logo', '');
                     <div class="btn-group btn-group-sm" role="group" id="periodGroup">
                         <button type="button" class="btn btn-outline-primary period-btn" data-period="daily">Daily</button>
                         <button type="button" class="btn btn-outline-primary period-btn" data-period="weekly">Weekly</button>
-                        <button type="button" class="btn btn-primary period-btn active" data-period="monthly">Monthly</button>
+                        <button type="button" class="btn btn-outline-primary period-btn" data-period="monthly">Monthly</button>
                         <button type="button" class="btn btn-outline-primary period-btn" data-period="quarterly">Quarterly</button>
-                        <button type="button" class="btn btn-outline-primary period-btn" data-period="yearly">Yearly</button>
+                        <button type="button" class="btn btn-primary period-btn active" data-period="yearly">Yearly</button>
                     </div>
                 </div>
-                <div class="row g-2 align-items-end">
-                    <div class="col-6 col-md-3">
-                        <label class="form-label small mb-1">From</label>
-                        <input type="date" id="fFrom" class="form-control form-control-sm">
+
+                <!-- Daily: single date -->
+                <div id="fp-daily" class="filter-panel d-none row g-2 align-items-end">
+                    <div class="col-auto">
+                        <label class="form-label small mb-1">Date</label>
+                        <input type="date" id="fDay" class="form-control form-control-sm">
                     </div>
-                    <div class="col-6 col-md-3">
-                        <label class="form-label small mb-1">To</label>
-                        <input type="date" id="fTo" class="form-control form-control-sm">
-                    </div>
-                    <div class="col-12 col-md-2">
-                        <button id="btnFilter" class="btn btn-primary btn-sm w-100">
-                            <i class="bi bi-funnel me-1"></i> Apply
-                        </button>
+                    <div class="col-auto">
+                        <button class="btn btn-primary btn-sm apply-btn"><i class="bi bi-funnel me-1"></i> Apply</button>
                     </div>
                 </div>
+
+                <!-- Weekly: any date in week → Mon–Sun computed -->
+                <div id="fp-weekly" class="filter-panel d-none row g-2 align-items-end">
+                    <div class="col-auto">
+                        <label class="form-label small mb-1">Any day in week</label>
+                        <input type="date" id="fWeekDay" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-auto d-flex align-items-end">
+                        <span id="weekRangeLabel" class="small text-muted mb-2 ms-1"></span>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-primary btn-sm apply-btn"><i class="bi bi-funnel me-1"></i> Apply</button>
+                    </div>
+                </div>
+
+                <!-- Monthly: month + year -->
+                <div id="fp-monthly" class="filter-panel d-none row g-2 align-items-end">
+                    <div class="col-auto">
+                        <label class="form-label small mb-1">Month</label>
+                        <select id="fMonth" class="form-select form-select-sm">
+                            <option value="1">January</option><option value="2">February</option>
+                            <option value="3">March</option><option value="4">April</option>
+                            <option value="5">May</option><option value="6">June</option>
+                            <option value="7">July</option><option value="8">August</option>
+                            <option value="9">September</option><option value="10">October</option>
+                            <option value="11">November</option><option value="12">December</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small mb-1">Year</label>
+                        <select id="fMonthYear" class="form-select form-select-sm"></select>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-primary btn-sm apply-btn"><i class="bi bi-funnel me-1"></i> Apply</button>
+                    </div>
+                </div>
+
+                <!-- Quarterly: Q1–Q4 + year -->
+                <div id="fp-quarterly" class="filter-panel d-none row g-2 align-items-end">
+                    <div class="col-auto">
+                        <label class="form-label small mb-1">Quarter</label>
+                        <select id="fQuarter" class="form-select form-select-sm">
+                            <option value="1">Q1 (Jan–Mar)</option>
+                            <option value="2">Q2 (Apr–Jun)</option>
+                            <option value="3">Q3 (Jul–Sep)</option>
+                            <option value="4">Q4 (Oct–Dec)</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small mb-1">Year</label>
+                        <select id="fQuarterYear" class="form-select form-select-sm"></select>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-primary btn-sm apply-btn"><i class="bi bi-funnel me-1"></i> Apply</button>
+                    </div>
+                </div>
+
+                <!-- Yearly: year selector only -->
+                <div id="fp-yearly" class="filter-panel row g-2 align-items-end">
+                    <div class="col-auto">
+                        <label class="form-label small mb-1">Year</label>
+                        <select id="fYear" class="form-select form-select-sm"></select>
+                    </div>
+                    <div class="col-auto">
+                        <button id="btnFilter" class="btn btn-primary btn-sm apply-btn"><i class="bi bi-funnel me-1"></i> Apply</button>
+                    </div>
+                </div>
+
             </div>
         </div>
 
@@ -381,6 +445,11 @@ const CO_LOGO     = '<?= addslashes(getUrl($company_logo)) ?>';
 const money = n => (parseFloat(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmt   = d => d ? new Date(d.replace(' ','T')).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—';
 
+function safeOutput(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+
 function statusBadge(s) {
     const map = {
         completed: ['#0d6efd','#fff'], paid: ['#052c65','#fff'],
@@ -396,25 +465,73 @@ function statusBadge(s) {
 function padZ(n) { return String(n).padStart(2, '0'); }
 function fmtDate(d) { return d.getFullYear() + '-' + padZ(d.getMonth()+1) + '-' + padZ(d.getDate()); }
 
-function setPeriodDates(period) {
+function getActivePeriod() {
+    return $('.period-btn.active').data('period') || 'yearly';
+}
+
+function getDateRange() {
+    const period = getActivePeriod();
     const now = new Date();
-    let from, to;
-    const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+    const y = now.getFullYear(), m = now.getMonth();
+    let start, end;
 
     if (period === 'daily') {
-        from = to = fmtDate(now);
+        const day = $('#fDay').val() || fmtDate(now);
+        start = end = day;
     } else if (period === 'weekly') {
-        const wFrom = new Date(now); wFrom.setDate(d - 6);
-        from = fmtDate(wFrom); to = fmtDate(now);
+        const refDay = $('#fWeekDay').val() ? new Date($('#fWeekDay').val() + 'T00:00:00') : new Date();
+        const dow = refDay.getDay();
+        const mon = new Date(refDay); mon.setDate(refDay.getDate() - (dow === 0 ? 6 : dow - 1));
+        const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+        start = fmtDate(mon); end = fmtDate(sun);
     } else if (period === 'monthly') {
-        from = fmtDate(new Date(y, m, 1)); to = fmtDate(new Date(y, m+1, 0));
+        const mo = parseInt($('#fMonth').val()) || (m + 1);
+        const my = parseInt($('#fMonthYear').val()) || y;
+        start = my + '-' + padZ(mo) + '-01';
+        end = fmtDate(new Date(my, mo, 0));
     } else if (period === 'quarterly') {
-        const q = Math.floor(m / 3);
-        from = fmtDate(new Date(y, q*3, 1)); to = fmtDate(new Date(y, q*3+3, 0));
-    } else { // yearly
-        from = fmtDate(new Date(y, 0, 1)); to = fmtDate(new Date(y, 11, 31));
+        const q = parseInt($('#fQuarter').val()) || Math.ceil((m + 1) / 3);
+        const qy = parseInt($('#fQuarterYear').val()) || y;
+        start = fmtDate(new Date(qy, (q - 1) * 3, 1));
+        end = fmtDate(new Date(qy, q * 3, 0));
+    } else {
+        const fy = parseInt($('#fYear').val()) || y;
+        start = fy + '-01-01';
+        end = fy + '-12-31';
     }
-    $('#fFrom').val(from); $('#fTo').val(to);
+    return { start, end };
+}
+
+function showFilterPanel(period) {
+    $('.filter-panel').addClass('d-none');
+    $('#fp-' + period).removeClass('d-none');
+    if (period === 'weekly') updateWeekLabel();
+}
+
+function updateWeekLabel() {
+    const refDay = $('#fWeekDay').val() ? new Date($('#fWeekDay').val() + 'T00:00:00') : new Date();
+    const dow = refDay.getDay();
+    const mon = new Date(refDay); mon.setDate(refDay.getDate() - (dow === 0 ? 6 : dow - 1));
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    const opts = { day:'numeric', month:'short' };
+    const label = mon.toLocaleDateString('en-GB', opts) + ' – ' + sun.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+    $('#weekRangeLabel').text('(' + label + ')');
+}
+
+function initFilterDefaults() {
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth() + 1, curQ = Math.ceil(m / 3);
+
+    let yearOpts = '';
+    for (let yr = y; yr >= y - 5; yr--) {
+        yearOpts += `<option value="${yr}"${yr === y ? ' selected' : ''}>${yr}</option>`;
+    }
+    $('#fYear, #fMonthYear, #fQuarterYear').html(yearOpts);
+
+    $('#fDay').val(fmtDate(now));
+    $('#fWeekDay').val(fmtDate(now));
+    $('#fMonth').val(m);
+    $('#fQuarter').val(curQ);
 }
 
 // ══════════════════════ DATATABLE ══════════════════════
@@ -471,7 +588,7 @@ function initHistoryTable() {
                             ${CO_LOGO ? `<img src="${CO_LOGO}" style="height:60px;margin-bottom:6px;display:block;margin:0 auto 6px;"><br>` : ''}
                             <h1 style="color:#0d6efd;font-weight:800;text-transform:uppercase;margin:0;font-size:18pt;">${CO_NAME}</h1>
                             <h2 style="color:#495057;font-weight:600;text-transform:uppercase;margin:4px 0;font-size:12pt;">POS Sales History Report</h2>
-                            <p style="color:#6c757d;margin:0;font-size:9pt;">Period: ${$('#fFrom').val()} to ${$('#fTo').val()} &nbsp;|&nbsp; Printed by: ${PRINT_USER} on ${new Date().toLocaleString()}</p>
+                            <p style="color:#6c757d;margin:0;font-size:9pt;">Period: ${(function(){const r=getDateRange();return r.start+' to '+r.end;})()} &nbsp;|&nbsp; Printed by: ${PRINT_USER} on ${new Date().toLocaleString()}</p>
                         </div>`
                     );
                 }
@@ -503,8 +620,7 @@ function printTable() { table.button('.buttons-print').trigger(); }
 // ══════════════════════ LOAD SALES ══════════════════════
 function loadSales() {
     if (!table) return;
-    const from = $('#fFrom').val(), to = $('#fTo').val();
-    if (!from || !to) { Swal.fire({ icon:'warning', title:'Date required', text:'Please select a date range.' }); return; }
+    const { start: from, end: to } = getDateRange();
 
     $('#stat-net,#stat-count,#stat-returns,#stat-voided').html('<span class="spinner-border spinner-border-sm text-primary"></span>');
 
@@ -781,22 +897,26 @@ $('#receiveForm').on('submit', function (e) {
 
 // ══════════════════════ INIT ══════════════════════
 $(document).ready(function () {
+    initFilterDefaults();
+    showFilterPanel('yearly');
+
     // Period buttons
     $('.period-btn').on('click', function () {
         $('.period-btn').removeClass('btn-primary').addClass('btn-outline-primary');
         $(this).removeClass('btn-outline-primary').addClass('btn-primary');
-        setPeriodDates($(this).data('period'));
+        showFilterPanel($(this).data('period'));
         if (table) loadSales();
     });
 
-    // Apply button
-    $('#btnFilter').on('click', loadSales);
+    // Apply buttons (all panels)
+    $(document).on('click', '.apply-btn', function () { loadSales(); });
+
+    // Week label update on date change
+    $('#fWeekDay').on('change', updateWeekLabel);
 
     // Resize
     $(window).on('resize', applyView);
 
-    // Set default period (monthly) and load
-    setPeriodDates('monthly');
     initHistoryTable();
     loadSales();
     loadDashboard();

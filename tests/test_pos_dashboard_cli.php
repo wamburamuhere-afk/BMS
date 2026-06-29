@@ -85,14 +85,26 @@ try {
     foreach (['daily', 'weekly', 'monthly', 'quarterly', 'yearly'] as $period) {
         ok(strpos($p, "data-period=\"$period\"") !== false, "Period button '$period' present");
     }
-    ok(strpos($p, 'function setPeriodDates') !== false, 'setPeriodDates() defined');
-    ok(strpos($p, "id=\"fFrom\"") !== false && strpos($p, "id=\"fTo\"") !== false, 'From/To date inputs present');
+    ok(strpos($p, 'function getDateRange') !== false, 'getDateRange() defined');
+    ok(strpos($p, 'function showFilterPanel') !== false, 'showFilterPanel() defined');
+    ok(strpos($p, 'function updateWeekLabel') !== false, 'updateWeekLabel() defined');
+    ok(strpos($p, 'function initFilterDefaults') !== false, 'initFilterDefaults() defined');
+    ok(strpos($p, 'id="fDay"') !== false,     'Daily date input #fDay present');
+    ok(strpos($p, 'id="fWeekDay"') !== false, 'Weekly date input #fWeekDay present');
+    ok(strpos($p, 'id="fMonth"') !== false,   'Monthly month select #fMonth present');
+    ok(strpos($p, 'id="fYear"') !== false,    'Yearly year select #fYear present');
+    ok(strpos($p, 'id="fQuarter"') !== false, 'Quarterly select #fQuarter present');
     ok(strpos($p, 'id="btnFilter"') !== false, 'Apply filter button present');
+    ok(strpos($p, "class=\"apply-btn\"") !== false || strpos($p, 'apply-btn') !== false, 'apply-btn class used on all filter panels');
+    ok(strpos($p, "id=\"fp-daily\"") !== false,     'Daily filter panel #fp-daily present');
+    ok(strpos($p, "id=\"fp-weekly\"") !== false,    'Weekly filter panel #fp-weekly present');
+    ok(strpos($p, "id=\"fp-monthly\"") !== false,   'Monthly filter panel #fp-monthly present');
+    ok(strpos($p, "id=\"fp-quarterly\"") !== false, 'Quarterly filter panel #fp-quarterly present');
+    ok(strpos($p, "id=\"fp-yearly\"") !== false,    'Yearly filter panel #fp-yearly present');
 
-    // Monthly is the default active period (btn-primary on the monthly button)
-    // We just need both btn-primary and monthly to appear together in the period group
-    $btnGroupMatch = preg_match('/btn-primary[^<]*monthly|monthly[^<]*btn-primary/', $p);
-    ok((bool)$btnGroupMatch, 'Monthly period button is active (btn-primary) by default');
+    // Yearly is the default active period
+    $btnGroupMatch = preg_match('/btn-primary[^<]*yearly|yearly[^<]*btn-primary/', $p);
+    ok((bool)$btnGroupMatch, 'Yearly period button is active (btn-primary) by default');
 
     // ── D. Toolbar (Copy / CSV / Print + Show:) ───────────────
     section('D. Toolbar (Copy/CSV/Print)');
@@ -122,6 +134,7 @@ try {
     ok(strpos($p, 'btn-close-white') !== false, 'Modal close buttons: btn-close-white');
     ok(!preg_match('/\balert\s*\(/', $p), 'No raw alert() — SweetAlert used instead');
     ok(strpos($p, 'Swal.fire')    !== false, 'SweetAlert (Swal.fire) present');
+    ok(strpos($p, 'function safeOutput') !== false, 'safeOutput() defined locally (not a global)');
     ok(strpos($p, 'safeOutput(')  !== false, 'safeOutput() used in JS templates');
 
     // Dashboard error handling — .fail() so "Loading…" can't stick
