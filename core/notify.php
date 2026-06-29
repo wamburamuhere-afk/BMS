@@ -208,7 +208,7 @@ if (!function_exists('resolveRecipients')) {
      *
      * @param array $event row from notification_events
      */
-    function resolveRecipients(PDO $pdo, array $event, array $ctx = []): array
+    function resolveRecipients(PDO $pdo, array $event, array $ctx = [], ?array $overrideRules = null): array
     {
         $pageKey = (string)($event['page_key'] ?? '');
         $verb    = (string)($event['required_verb'] ?? 'view');
@@ -247,7 +247,83 @@ if (!function_exists('resolveRecipients')) {
             }
         }
 
-        return $recipients;
+        // ── Admin-configured rules: narrow the audience + decide channels ──
+        // The set above is the SECURITY CEILING (RBAC ∩ scope − mutes). Rules can
+        // only narrow WITHIN it, so a rule pointing at someone without access is
+        // silently ignored (a key safety property). When no active rule exists for
+        // the event, fall back to: in-app for everyone + email if the global toggle
+        // is on (keeps prior behaviour until the admin configures routing).
+        $rules = $overrideRules;
+        if ($rules === null) {
+            try {
+                $rs = $pdo->prepare("SELECT target_type, target_id, channel_email, channel_inapp
+                                     FROM notification_rules WHERE event_key = ? AND is_active = 1");
+                $rs->execute([$eventKey]);
+                $rules = $rs->fetchAll(PDO::FETCH_ASSOC);
+            } catch (Throwable $e) {
+                error_log('resolveRecipients rules: ' . $e->getMessage());
+                $rules = [];
+            }
+        }
+
+        if (empty($rules)) {
+            $emailDefault = function_exists('get_setting') && (string)get_setting('enable_email_notifications', '0') === '1';
+            foreach ($recipients as $uid => &$u) {
+                $u['channels'] = ['inapp' => true, 'email' => $emailDefault];
+            }
+            unset($u);
+            return $recipients;
+        }
+
+        $out = [];
+        foreach ($recipients as $uid => $u) {
+            $inapp = false; $email = false; $matched = false;
+            foreach ($rules as $r) {
+                $tt  = $r['target_type'] ?? 'permission';
+                $tid = isset($r['target_id']) ? (int)$r['target_id'] : 0;
+                $hit = ($tt === 'permission')                                    // everyone with access
+                    || ($tt === 'role' && (int)$u['role_id'] === $tid)          // a specific role
+                    || ($tt === 'user' && (int)$uid === $tid);                  // a specific user
+                if ($hit) {
+                    $matched = true;
+                    if (!empty($r['channel_inapp'])) $inapp = true;
+                    if (!empty($r['channel_email'])) $email = true;
+                }
+            }
+            if ($matched) {
+                $u['channels'] = ['inapp' => $inapp, 'email' => $email];
+                $out[$uid] = $u;
+            }
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('previewRecipients')) {
+    /**
+     * For the admin UI: exactly who would receive $eventKey right now (a
+     * company-wide instance), with their channels. Pass $overrideRules to preview
+     * an UNSAVED rule set live in the form. Returns a display-friendly list.
+     */
+    function previewRecipients(PDO $pdo, string $eventKey, ?array $overrideRules = null): array
+    {
+        $ev = $pdo->prepare("SELECT * FROM notification_events WHERE event_key = ? LIMIT 1");
+        $ev->execute([$eventKey]);
+        $event = $ev->fetch(PDO::FETCH_ASSOC);
+        if (!$event) return [];
+
+        $recips = resolveRecipients($pdo, $event, [], $overrideRules);
+        $out = [];
+        foreach ($recips as $uid => $u) {
+            $out[] = [
+                'user_id'  => (int)$uid,
+                'name'     => $u['name'] ?? '',
+                'email'    => $u['email'] ?? '',
+                'is_admin' => !empty($u['is_admin']),
+                'channels' => $u['channels'] ?? ['inapp' => true, 'email' => false],
+            ];
+        }
+        return $out;
     }
 }
 
@@ -409,37 +485,36 @@ if (!function_exists('dispatchEvent')) {
                 'loan_id'     => $ctx['loan_id']     ?? null,
             ];
 
-            // Email channel is opt-in: only when the global toggle is on. Per-event /
-            // per-recipient rule narrowing arrives in Phase 5; until then "on" means
-            // every resolved recipient (who already passed RBAC + scope + mute).
-            $emailOn = function_exists('get_setting') && (string)get_setting('enable_email_notifications', '0') === '1';
-
             foreach ($recipients as $uid => $u) {
+                // Channels were decided by resolveRecipients (rules or defaults).
+                $ch = $u['channels'] ?? ['inapp' => true, 'email' => false];
+
                 // ── In-app channel (own dedupe) ──
-                $dkIn = ($ctx['dedupe_key'] ?? $base) . '|u' . $uid . '|inapp';
-                if (notifClaimDedupe($pdo, $dkIn)) {
-                    $nid = createNotification($pdo, (int)$uid, $payload);
-                    if ($nid > 0) {
-                        $summary['created']++;
-                        notifLog($pdo, [
-                            'event_key' => $eventKey, 'recipient_user_id' => $uid, 'channel' => 'inapp',
-                            'status' => 'created', 'entity_type' => $entityType, 'entity_id' => $entityId,
-                        ]);
+                if (!empty($ch['inapp'])) {
+                    $dkIn = ($ctx['dedupe_key'] ?? $base) . '|u' . $uid . '|inapp';
+                    if (notifClaimDedupe($pdo, $dkIn)) {
+                        $nid = createNotification($pdo, (int)$uid, $payload);
+                        if ($nid > 0) {
+                            $summary['created']++;
+                            notifLog($pdo, [
+                                'event_key' => $eventKey, 'recipient_user_id' => $uid, 'channel' => 'inapp',
+                                'status' => 'created', 'entity_type' => $entityType, 'entity_id' => $entityId,
+                            ]);
+                        }
+                    } else {
+                        $summary['skipped']++; // already in-app notified this period
                     }
-                } else {
-                    $summary['skipped']++; // already in-app notified this period
                 }
 
                 // ── Email channel (own dedupe via the outbox unique key) ──
-                if ($emailOn && !empty($u['email'])) {
+                if (!empty($ch['email']) && !empty($u['email'])) {
                     $dkEm = ($ctx['dedupe_key'] ?? $base) . '|u' . $uid . '|email';
                     $link = (string)($payload['action_url'] ?? '');
                     if ($link !== '' && stripos($link, 'http') !== 0) {
-                        // Prefer a configured absolute base (works in cron/CLI where there is
-                        // no HTTP_HOST); fall back to buildUrl() in a web request; else relative.
-                        $base = function_exists('get_setting') ? rtrim((string)get_setting('app_url', ''), '/') : '';
-                        if ($base !== '') {
-                            $link = $base . '/' . ltrim($link, '/');
+                        // Prefer a configured absolute base (cron/CLI-safe); else buildUrl() in web.
+                        $linkBase = function_exists('get_setting') ? rtrim((string)get_setting('app_url', ''), '/') : '';
+                        if ($linkBase !== '') {
+                            $link = $linkBase . '/' . ltrim($link, '/');
                         } elseif (!empty($_SERVER['HTTP_HOST']) && function_exists('buildUrl')) {
                             $link = buildUrl(ltrim($link, '/'));
                         }

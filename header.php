@@ -87,6 +87,19 @@ if (function_exists('get_setting') && get_setting('leave_accrual_last_run') !== 
     @include_once __DIR__ . '/cron/run_leave_accrual.php';
 }
 
+// Smart notification engine — time-based event checks (overdue/expiring/due),
+// at most once per day. Self-contained + fail-silent (see cron/run_notification_checks.php).
+if (function_exists('get_setting') && get_setting('notif_checks_last_run') !== date('Y-m-d')) {
+    @include_once __DIR__ . '/cron/run_notification_checks.php';
+}
+
+// Notification email worker — drain a small batch from the outbox, throttled to
+// ~2 minutes so it never noticeably slows a page load. (Use a server cron for volume.)
+if (function_exists('get_setting') && (time() - (int)get_setting('notif_outbox_last_ts', '0')) >= 120) {
+    if (function_exists('save_setting')) save_setting('notif_outbox_last_ts', (string)time());
+    @include_once __DIR__ . '/cron/process_notifications.php';
+}
+
 // Get company type + location from settings
 $settings_stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'company_type'");
 $settings_stmt->execute();
@@ -1056,6 +1069,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('tax_settings') ?>"><i class="bi bi-percent"></i> Tax</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('payment_settings') ?>"><i class="bi bi-credit-card"></i> Payments</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('notification_settings') ?>"><i class="bi bi-bell"></i> Notifications</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('notification_rules') ?>"><i class="bi bi-bell-fill"></i> Notification Rules</a></li>
                             </ul>
                         </li>
                         <?php endif; ?>
