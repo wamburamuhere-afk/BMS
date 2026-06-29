@@ -10,7 +10,7 @@ if (!isAuthenticated()) {
 }
 
 // Check permission dynamically
-if (!canCreate('budgets')) {
+if (!canCreate('budget')) {
     header('Content-Type: application/json');
     echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to create budgets']);
     exit();
@@ -123,7 +123,9 @@ try {
     ]);
     
     $budget_id = $pdo->lastInsertId();
-    logActivity($pdo, $_SESSION['user_id'], "Created detailed budget for project ID: $project_id, Category ID: $category_id, Amount: $allocated_amount");
+    $log_period = date('F Y', mktime(0, 0, 0, $budget_month, 1, $budget_year));
+    $log_project = $project_id ? " (Project #$project_id)" : '';
+    logActivity($pdo, $_SESSION['user_id'], "Created budget: '$budget_name' — TZS " . number_format($allocated_amount, 2) . " for $log_period$log_project");
     
     header('Content-Type: application/json');
     echo json_encode(['success' => true, 'message' => 'Budget added successfully', 'budget_id' => $budget_id]);

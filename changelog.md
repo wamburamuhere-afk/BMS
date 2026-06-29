@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-06-29 — fix: budget permission key mismatch and activity log
+
+- `api/account/add_budget.php`: fixed `canCreate('budgets')` → `canCreate('budget')` (key mismatch was blocking all non-admins even when granted permission)
+- `api/account/add_budget.php`: improved activity log from raw IDs to human-readable message e.g. "Created budget: 'Office Supplies' — TZS 500,000.00 for January 2026"
+- `app/constant/accounts/budget.php`: added `$can_create_budget = canCreate('budget')` and switched both Add/Create Budget buttons to use it (previously incorrectly gated on `$can_edit_budget`)
+
 ## 2026-06-29 — fix: project_view.php print footer text and page margins
 
 - `app/bms/operations/project_view.php`: added JS on DOMContentLoaded to replace "This document was" with "This report was" in the `.bms-print-footer` (only on this page; footer.php untouched)
