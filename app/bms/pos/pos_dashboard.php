@@ -25,9 +25,14 @@ $company_logo = getSetting('company_logo', '');
     <!-- ── Page header ── -->
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h4 class="mb-0 text-primary"><i class="bi bi-shop me-2"></i>POS Workspace</h4>
-        <a href="<?= getUrl('pos') ?>" class="btn btn-primary btn-sm">
-            <i class="bi bi-bag-plus me-1"></i> Open POS
-        </a>
+        <div class="d-flex align-items-center gap-2">
+            <button id="btnToggleDash" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-speedometer2 me-1"></i> Sales Dashboard
+            </button>
+            <a href="<?= getUrl('pos') ?>" class="btn btn-primary btn-sm">
+                <i class="bi bi-bag-plus me-1"></i> Open POS
+            </a>
+        </div>
     </div>
 
     <!-- ═══════════════════ SALES HISTORY (top) ═══════════════════ -->
@@ -214,8 +219,8 @@ $company_logo = getSetting('company_logo', '');
 
     </div><!-- /paneHistory -->
 
-    <!-- ═══════════════════ DASHBOARD (below history) ═══════════════════ -->
-    <div id="paneDashboard" class="mt-5">
+    <!-- ═══════════════════ DASHBOARD (toggle) ═══════════════════ -->
+    <div id="paneDashboard" class="mt-2 d-none">
 
         <div class="d-flex align-items-center mb-3 flex-wrap gap-2">
             <h5 class="mb-0 text-primary"><i class="bi bi-speedometer2 me-2"></i>Sales Dashboard</h5>
@@ -295,9 +300,22 @@ $company_logo = getSetting('company_logo', '');
                     <div class="card-header bg-white border-0 fw-bold text-primary">
                         <i class="bi bi-exclamation-triangle me-1"></i> Low Stock
                     </div>
-                    <div class="card-body p-2">
-                        <div id="lowStock" class="small text-center text-muted py-3">
+                    <div class="card-body p-0">
+                        <div id="lowStockSpinner" class="small text-center text-muted py-3">
                             <span class="spinner-border spinner-border-sm me-1"></span> Loading…
+                        </div>
+                        <div id="lowStockWrap" class="d-none">
+                            <table id="lowStockTable" class="table table-sm table-hover align-middle w-100 mb-0">
+                                <thead>
+                                    <tr class="text-primary">
+                                        <th class="text-primary text-center" style="width:40px">S/NO</th>
+                                        <th class="text-primary">Product</th>
+                                        <th class="text-primary text-end">In Stock</th>
+                                        <th class="text-primary text-end">Min</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -307,9 +325,23 @@ $company_logo = getSetting('company_logo', '');
                     <div class="card-header bg-white border-0 fw-bold text-primary">
                         <i class="bi bi-clock-history me-1"></i> Recent Sales
                     </div>
-                    <div class="card-body p-2">
-                        <div id="recentSales" class="small text-center text-muted py-3">
+                    <div class="card-body p-0">
+                        <div id="recentSalesSpinner" class="small text-center text-muted py-3">
                             <span class="spinner-border spinner-border-sm me-1"></span> Loading…
+                        </div>
+                        <div id="recentSalesWrap" class="d-none">
+                            <table id="recentSalesTable" class="table table-sm table-hover align-middle w-100 mb-0">
+                                <thead>
+                                    <tr class="text-primary">
+                                        <th class="text-primary text-center" style="width:40px">S/NO</th>
+                                        <th class="text-primary">Receipt</th>
+                                        <th class="text-primary">Customer</th>
+                                        <th class="text-primary text-end">Total</th>
+                                        <th class="text-primary">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -466,7 +498,7 @@ function padZ(n) { return String(n).padStart(2, '0'); }
 function fmtDate(d) { return d.getFullYear() + '-' + padZ(d.getMonth()+1) + '-' + padZ(d.getDate()); }
 
 function getActivePeriod() {
-    return $('.period-btn.active').data('period') || 'yearly';
+    return $('.period-btn.btn-primary').data('period') || 'yearly';
 }
 
 function getDateRange() {
@@ -535,7 +567,33 @@ function initFilterDefaults() {
 }
 
 // ══════════════════════ DATATABLE ══════════════════════
-let table;
+let table, dtRecent, dtLowStock;
+
+function initDashboardTables() {
+    dtLowStock = $('#lowStockTable').DataTable({
+        responsive: false, pageLength: 10, dom: 'tip', order: [[2,'asc']],
+        columns: [
+            { data: null, orderable: false, className: 'text-center text-muted', render: (d,t,r,m) => m.row+1 },
+            { data: 'name', render: d => safeOutput(d) },
+            { data: 'current', className: 'text-end fw-bold',
+              render: (d,t,r) => `<span class="${d<=0?'text-danger':'text-primary'}">${(+d).toLocaleString()}</span>` },
+            { data: 'min', className: 'text-end text-muted', render: d => (+d).toLocaleString() }
+        ],
+        language: { emptyTable: 'All stock above minimum.', info: 'Showing _START_–_END_ of _TOTAL_', infoEmpty: '', paginate: { previous:'‹', next:'›' } }
+    });
+
+    dtRecent = $('#recentSalesTable').DataTable({
+        responsive: false, pageLength: 8, dom: 'tip', order: [],
+        columns: [
+            { data: null, orderable: false, className: 'text-center text-muted', render: (d,t,r,m) => m.row+1 },
+            { data: 'receipt_number', render: (d,t,r) => (r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(d) },
+            { data: 'party', render: d => safeOutput(d) },
+            { data: 'grand_total', className: 'text-end fw-bold', render: d => money(d) },
+            { data: 'sale_status', render: d => statusBadge(d) }
+        ],
+        language: { emptyTable: 'No recent sales.', info: 'Showing _START_–_END_ of _TOTAL_', infoEmpty: '', paginate: { previous:'‹', next:'›' } }
+    });
+}
 
 function payBadge(row) {
     if (row.is_return_sale) return '';
@@ -650,14 +708,18 @@ function loadSales() {
 let trendChart;
 function loadDashboard() {
     $('#btnRefreshDash').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
-    $('#topProducts,#lowStock,#recentSales').html('<div class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Loading…</div>');
+    $('#topProducts').html('<div class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Loading…</div>');
+    $('#lowStockSpinner,#recentSalesSpinner').removeClass('d-none');
+    $('#lowStockWrap,#recentSalesWrap').addClass('d-none');
     $('#stat-today-net,#stat-today-count,#stat-today-aov,#stat-today-items,#stat-month-net,#stat-low-stock').html('<span class="spinner-border spinner-border-sm text-primary"></span>');
 
     $.getJSON(DASH_URL, function (res) {
         $('#btnRefreshDash').prop('disabled', false).html('<i class="bi bi-arrow-clockwise me-1"></i> Refresh');
         if (!res.success) {
-            const errMsg = res.message || 'Dashboard failed to load.';
-            $('#topProducts,#lowStock,#recentSales').html(`<div class="text-danger text-center py-3"><i class="bi bi-exclamation-triangle me-1"></i>${errMsg}</div>`);
+            const errMsg = safeOutput(res.message || 'Dashboard failed to load.');
+            $('#topProducts').html(`<div class="text-danger text-center py-3"><i class="bi bi-exclamation-triangle me-1"></i>${errMsg}</div>`);
+            $('#lowStockSpinner').html(`<div class="text-danger text-center py-3"><i class="bi bi-exclamation-triangle me-1"></i>${errMsg}</div>`);
+            $('#recentSalesSpinner').html(`<div class="text-danger text-center py-3"><i class="bi bi-exclamation-triangle me-1"></i>${errMsg}</div>`);
             $('#stat-today-net,#stat-today-count,#stat-today-aov,#stat-today-items,#stat-month-net,#stat-low-stock').text('—');
             return;
         }
@@ -687,56 +749,33 @@ function loadDashboard() {
             }
         });
 
-        // Top products
+        // Top products (plain table — no DT needed for 5 rows)
         if (!d.top_products.length) {
             $('#topProducts').html('<div class="text-muted text-center py-3">No sales this month</div>');
         } else {
-            let html = '<table class="table table-sm mb-0"><tbody>';
+            let html = '<table class="table table-sm mb-0"><thead><tr class="text-primary"><th class="text-primary text-center" style="width:35px">S/NO</th><th class="text-primary">Product</th><th class="text-primary text-end">Qty</th><th class="text-primary text-end">Revenue</th></tr></thead><tbody>';
             d.top_products.forEach((p, i) => {
-                html += `<tr>
-                    <td class="text-muted">${i+1}.</td>
-                    <td>${safeOutput(p.name)}</td>
-                    <td class="text-end fw-bold">${(p.qty).toLocaleString()}</td>
-                    <td class="text-end text-primary">${money(p.revenue)}</td>
-                </tr>`;
+                html += `<tr><td class="text-center text-muted">${i+1}</td><td>${safeOutput(p.name)}</td><td class="text-end fw-bold">${(+p.qty).toLocaleString()}</td><td class="text-end text-primary">${money(p.revenue)}</td></tr>`;
             });
             $('#topProducts').html(html + '</tbody></table>');
         }
 
-        // Low stock
-        if (!d.low_stock.length) {
-            $('#lowStock').html('<div class="text-success text-center py-3"><i class="bi bi-check-circle me-1"></i>All stock above minimum</div>');
-        } else {
-            let html = '<table class="table table-sm mb-0"><thead><tr class="text-primary"><th class="text-primary">Product</th><th class="text-primary text-end">In Stock</th><th class="text-primary text-end">Min</th></tr></thead><tbody>';
-            d.low_stock.forEach(s => {
-                html += `<tr>
-                    <td>${safeOutput(s.name)}</td>
-                    <td class="text-end fw-bold ${s.current <= 0 ? 'text-danger' : 'text-primary'}">${(s.current).toLocaleString()}</td>
-                    <td class="text-end text-muted">${(s.min).toLocaleString()}</td>
-                </tr>`;
-            });
-            $('#lowStock').html(html + '</tbody></table>');
-        }
+        // Low Stock DataTable
+        $('#lowStockSpinner').addClass('d-none');
+        $('#lowStockWrap').removeClass('d-none');
+        dtLowStock.clear().rows.add(d.low_stock).draw();
 
-        // Recent sales
-        if (!d.recent.length) {
-            $('#recentSales').html('<div class="text-muted text-center py-3">No sales yet</div>');
-        } else {
-            let html = '<table class="table table-sm table-hover mb-0"><thead><tr class="text-primary"><th class="text-primary">Receipt</th><th class="text-primary">Customer</th><th class="text-primary text-end">Total</th><th class="text-primary">Status</th></tr></thead><tbody>';
-            d.recent.forEach(r => {
-                const ret = r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '';
-                html += `<tr style="cursor:pointer" onclick="window.open('${RECEIPT_URL}?id=${r.sale_id}','_blank')">
-                    <td>${ret}${safeOutput(r.receipt_number)}</td>
-                    <td>${safeOutput(r.party)}</td>
-                    <td class="text-end fw-bold">${money(r.grand_total)}</td>
-                    <td>${statusBadge(r.sale_status)}</td>
-                </tr>`;
-            });
-            $('#recentSales').html(html + '</tbody></table>');
-        }
+        // Recent Sales DataTable
+        $('#recentSalesSpinner').addClass('d-none');
+        $('#recentSalesWrap').removeClass('d-none');
+        dtRecent.clear().rows.add(d.recent).draw();
+
     }).fail(() => {
         $('#btnRefreshDash').prop('disabled', false).html('<i class="bi bi-arrow-clockwise me-1"></i> Refresh');
-        $('#topProducts,#lowStock,#recentSales').html('<div class="text-danger text-center py-3"><i class="bi bi-exclamation-triangle me-1"></i> Server error — click Refresh to retry.</div>');
+        const errHtml = '<div class="text-danger text-center py-3"><i class="bi bi-exclamation-triangle me-1"></i> Server error — click Refresh to retry.</div>';
+        $('#topProducts').html(errHtml);
+        $('#lowStockSpinner').html(errHtml).removeClass('d-none');
+        $('#recentSalesSpinner').html(errHtml).removeClass('d-none');
         $('#stat-today-net,#stat-today-count,#stat-today-aov,#stat-today-items,#stat-month-net,#stat-low-stock').text('Err');
     });
 }
@@ -914,12 +953,29 @@ $(document).ready(function () {
     // Week label update on date change
     $('#fWeekDay').on('change', updateWeekLabel);
 
+    // ── Sales Dashboard toggle ──
+    $('#btnToggleDash').on('click', function () {
+        const dashVisible = !$('#paneDashboard').hasClass('d-none');
+        if (dashVisible) {
+            // Hide dashboard, show history
+            $('#paneDashboard').addClass('d-none');
+            $('#paneHistory').removeClass('d-none');
+            $(this).removeClass('btn-primary').addClass('btn-outline-primary');
+        } else {
+            // Show dashboard, hide history
+            $('#paneHistory').addClass('d-none');
+            $('#paneDashboard').removeClass('d-none');
+            $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+            loadDashboard();
+        }
+    });
+
     // Resize
     $(window).on('resize', applyView);
 
     initHistoryTable();
+    initDashboardTables();
     loadSales();
-    loadDashboard();
     applyView();
 });
 </script>
