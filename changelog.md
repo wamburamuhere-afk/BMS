@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-29 — fix: project_view.php print footer text and page margins
+
+- `app/bms/operations/project_view.php`: added JS on DOMContentLoaded to replace "This document was" with "This report was" in the `.bms-print-footer` (only on this page; footer.php untouched)
+- `app/bms/operations/project_view.php`: changed `@page { size: A3 landscape; margin: 10mm !important; }` to `@page { margin: 10mm 8mm 16mm 8mm; }` to match the `i_e_print.md` standard and remove the incorrect A3 landscape override
+
+## 2026-06-29 — fix: projects.php edit form contract sum
+
+- `app/bms/operations/projects.php`: use `d.form_contract_sum` instead of `d.contract_sum` in `editProject()` so the Contract Sum field shows the original stored value, not the milestone-calculated total
+
 ## 2026-06-29 (feat) — Smart Notification Engine: remaining emit points wired
 
 Wired the rest of the seeded events into their source actions/scheduler, completing
