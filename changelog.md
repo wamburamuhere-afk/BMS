@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-06-29 — fix: POS Dashboard stat cards + DataTables + toggle behaviour
+
+- `app/bms/pos/pos_dashboard.php`: fixed stat cards not updating on period change — `getActivePeriod()` was reading `.active` CSS class but click handler only swapped `btn-primary`; now reads `.btn-primary` correctly
+- `app/bms/pos/pos_dashboard.php`: Sales Dashboard hidden by default; "Sales Dashboard" toggle button added to header row (top-right, next to "Open POS"); turns blue when dashboard is active
+- `app/bms/pos/pos_dashboard.php`: Recent Sales and Low Stock now use DataTables with S/NO column (`#recentSalesTable`, `#lowStockTable`, `initDashboardTables()`); Top Products table also gains S/NO column
+- `app/bms/pos/pos_dashboard.php`: Dashboard only loads when user opens it (toggle), not on every page load
+- `tests/test_pos_dashboard_cli.php`: updated to 95 checks (all passing)
+
 ## 2026-06-29 — fix: POS Dashboard filter UI and safeOutput bug
 
 - `app/bms/pos/pos_dashboard.php`: defined `safeOutput()` locally (was undefined causing DataTable/dashboard JS errors)

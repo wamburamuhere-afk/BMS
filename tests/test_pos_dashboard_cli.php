@@ -57,9 +57,12 @@ try {
     ok(strpos($p, 'id="paneHistory"')   !== false, '#paneHistory section present');
     ok(strpos($p, 'id="paneDashboard"') !== false, '#paneDashboard section present');
 
-    // paneHistory not hidden via d-none on the element itself
-    ok(!preg_match('/<[^>]*id="paneHistory"[^>]*d-none/', $p), '#paneHistory not hidden by d-none at page load');
-    ok(!preg_match('/<[^>]*id="paneDashboard"[^>]*d-none/', $p), '#paneDashboard not hidden by d-none at page load');
+    // By default: history visible, dashboard hidden (toggle behaviour)
+    ok(!preg_match('/<[^>]*id="paneHistory"[^>]*d-none/', $p), '#paneHistory NOT hidden by d-none at page load (shown by default)');
+    ok((bool)preg_match('/<[^>]*id="paneDashboard"[^>]*d-none/', $p), '#paneDashboard IS hidden by d-none at page load (toggle reveals it)');
+
+    // Toggle button present
+    ok(strpos($p, 'id="btnToggleDash"') !== false, 'Sales Dashboard toggle button #btnToggleDash present');
 
     // Sales History (paneHistory) must appear BEFORE Dashboard (paneDashboard)
     $posH = strpos($p, 'id="paneHistory"');
@@ -141,6 +144,16 @@ try {
     ok(strpos($p, 'function loadDashboard') !== false, 'loadDashboard() defined');
     ok((bool)preg_match('/\.fail\s*\(/', $p), 'loadDashboard() has .fail() error handler');
     ok(strpos($p, 'Server error — click Refresh to retry') !== false, 'Dashboard shows user-friendly error on AJAX fail');
+
+    // getActivePeriod reads btn-primary (not .active class) — this was the stat-card bug
+    ok(strpos($p, ".period-btn.btn-primary") !== false, 'getActivePeriod() reads .btn-primary (correct; not stale .active)');
+
+    // Dashboard DataTables
+    ok(strpos($p, 'id="lowStockTable"')    !== false, 'Low Stock DataTable #lowStockTable present');
+    ok(strpos($p, 'id="recentSalesTable"') !== false, 'Recent Sales DataTable #recentSalesTable present');
+    ok(strpos($p, 'function initDashboardTables') !== false, 'initDashboardTables() defined');
+    ok(strpos($p, 'dtRecent')     !== false, 'dtRecent DataTable variable present');
+    ok(strpos($p, 'dtLowStock')   !== false, 'dtLowStock DataTable variable present');
 
     // Modals
     ok(strpos($p, 'id="returnModal"')  !== false, 'Return/Refund modal present');
