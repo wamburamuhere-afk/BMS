@@ -22093,12 +22093,10 @@ function loadProjectStaffDropdown(selector, selectedId) {
     }
 }
 
-// Change "This document was" → "This report was" in the footer text node only (preserves <strong> bold tags)
+// Change "This document was Printed by" → "This report was Printed by" only on this page
 document.addEventListener('DOMContentLoaded', function () {
     var line1 = document.querySelector('.bms-print-footer .bpf-line1');
-    if (line1) line1.childNodes.forEach(function(n) {
-        if (n.nodeType === 3) n.textContent = n.textContent.replace('This document was', 'This report was');
-    });
+    if (line1) line1.innerHTML = line1.innerHTML.replace('This document was', 'This report was');
 });
 
 </script>
