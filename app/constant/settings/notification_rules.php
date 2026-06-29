@@ -31,6 +31,10 @@ require_once __DIR__ . '/../../../header.php';
                 <input class="form-check-input" type="checkbox" id="g_email" onchange="setGlobal('enable_email_notifications', this.checked)">
                 <label class="form-check-label fw-semibold" for="g_email">Email channel <span class="text-muted small">(global on/off)</span></label>
             </div>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="g_digest" onchange="setGlobal('notif_digest_enabled', this.checked)">
+                <label class="form-check-label fw-semibold" for="g_digest">AI daily digest <span class="text-muted small">(one summary email/day)</span></label>
+            </div>
             <div class="text-muted small ms-auto"><i class="bi bi-info-circle me-1"></i>In-app always works; email also needs SMTP set in <a href="<?= getUrl('system_settings') ?>">Settings → Email</a>.</div>
         </div>
     </div>
@@ -113,6 +117,7 @@ function loadRules() {
         NR_DATA = res;
         $('#g_master').prop('checked', res.globals.notif_master_enabled === '1');
         $('#g_email').prop('checked', res.globals.enable_email_notifications === '1');
+        $('#g_digest').prop('checked', res.globals.notif_digest_enabled === '1');
         renderAccordion(res.events);
         $('#nrLoading').addClass('d-none'); $('#nrAccordion').removeClass('d-none');
     }).fail(() => { $('#nrLoading').html('<span class="text-danger">Failed to load.</span>'); });
