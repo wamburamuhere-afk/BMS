@@ -91,7 +91,10 @@ kill-switch + idempotent • fully logged • backward-compatible.
   - [x] `cron/run_notification_checks.php` — time-based checks (invoice.overdue implemented; extensible per-check) emitting via `dispatchEvent`, deduped once/day per record
   - [x] `header.php` wiring: run checks once/day + drain the email outbox (throttled ~2 min, fail-silent); both also runnable via server cron
   - [x] Tested 3/3: scanned 5 overdue invoices → 11 in-app (per-invoice scope filtering proven), 2nd run idempotent (0 new), cleaned up
-- [ ] **Phase 7 — Emit at source actions**: one `dispatchEvent()` after each approval/posting/finance/HR/stock action (behind kill-switch)
+- [~] **Phase 7 — Emit at source actions (mechanism done; representative emits wired)**
+  - [x] Pattern established: one fail-safe `dispatchEvent()` after the successful write, behind the kill-switch
+  - [x] `save_purchase_order.php` (create) → `po.needs_approval`; `save_invoice.php` (create) → `invoice.needs_review`. Lint clean; both events resolve recipients (4) + dispatch.
+  - [ ] Remaining emit points (same one-liner): GRN approved, quotation/SO submitted, returns/notes pending, voucher needs-approval, expense needs-review, low-stock — add per endpoint as desired
 - [ ] **Phase 8 — Dashboard + bell unification**: read from the engine, per-user permission/scope filtered; deep action_url
 - [ ] **Phase 9 — AI smart layer (optional, after core)**: digest, priority scoring, anomaly events, drafted text; setting + fallback
 - [ ] **Phase 10 — Hardening, tests, rollout**: no-leak/integration/idempotency/perf/security; master switch default-off; changelog; staged rollout
