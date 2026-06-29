@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-06-29 — fix: POS Dashboard print footer injected into DataTables print window
+
+- `app/bms/pos/pos_dashboard.php`: added `PRINT_ROLE` and `PRINT_YEAR` JS constants; `PRINT_USER` now correctly reads from session before footer.php runs
+- `app/bms/pos/pos_dashboard.php`: DataTables print `customize` callback now appends the standard BMS print footer (name, role, datetime, BJP Technologies copyright) to the print window — matching what footer.php renders via `@media print` on other pages
+- `tests/test_pos_dashboard_cli.php`: 3 new checks (BJP Technologies line, PRINT_ROLE, PRINT_YEAR); 98 total, all passing
+
 ## 2026-06-29 — fix: POS Dashboard stat cards + DataTables + toggle behaviour
 
 - `app/bms/pos/pos_dashboard.php`: fixed stat cards not updating on period change — `getActivePeriod()` was reading `.active` CSS class but click handler only swapped `btn-primary`; now reads `.btn-primary` correctly

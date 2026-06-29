@@ -469,8 +469,12 @@ const CAN_DELETE  = <?= json_encode($can_delete) ?>;
 const CAN_EDIT    = <?= json_encode($can_edit) ?>;
 <?php
 $_print_username = htmlspecialchars(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
+$_print_role     = htmlspecialchars($_SESSION['user_role'] ?? 'User');
+$_print_year     = date('Y');
 ?>
 const PRINT_USER  = '<?= addslashes($_print_username) ?>';
+const PRINT_ROLE  = '<?= addslashes($_print_role) ?>';
+const PRINT_YEAR  = '<?= $_print_year ?>';
 const CO_NAME     = '<?= addslashes(htmlspecialchars($company_name)) ?>';
 const CO_LOGO     = '<?= addslashes(getUrl($company_logo)) ?>';
 
@@ -647,6 +651,12 @@ function initHistoryTable() {
                             <h1 style="color:#0d6efd;font-weight:800;text-transform:uppercase;margin:0;font-size:18pt;">${CO_NAME}</h1>
                             <h2 style="color:#495057;font-weight:600;text-transform:uppercase;margin:4px 0;font-size:12pt;">POS Sales History Report</h2>
                             <p style="color:#6c757d;margin:0;font-size:9pt;">Period: ${(function(){const r=getDateRange();return r.start+' to '+r.end;})()} &nbsp;|&nbsp; Printed by: ${PRINT_USER} on ${new Date().toLocaleString()}</p>
+                        </div>`
+                    );
+                    $(win.document.body).append(
+                        `<div style="position:fixed;bottom:0;left:0;right:0;width:100%;padding:1mm 10mm;border-top:1px solid #ddd;background:#fff;display:flex;flex-direction:column;align-items:center;text-align:center;">
+                            <span style="font-size:8pt;color:#444;">This document was <strong>Printed</strong> by <strong>${PRINT_USER} - ${PRINT_ROLE}</strong> on ${new Date().toLocaleString()}</span>
+                            <span style="font-size:7.5pt;font-weight:700;color:#0d6efd;">Powered by BJP Technologies &copy; ${PRINT_YEAR}, All Rights Reserved.</span>
                         </div>`
                     );
                 }
