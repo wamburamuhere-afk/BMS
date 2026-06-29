@@ -6,6 +6,10 @@
 - `api/account/add_budget.php`: improved activity log from raw IDs to human-readable message e.g. "Created budget: 'Office Supplies' — TZS 500,000.00 for January 2026"
 - `app/constant/accounts/budget.php`: added `$can_create_budget = canCreate('budget')` and switched both Add/Create Budget buttons to use it (previously incorrectly gated on `$can_edit_budget`)
 
+## 2026-06-29 — fix: project_view.php scope footer text to Reports tab only
+
+- `app/bms/operations/project_view.php`: replaced DOMContentLoaded blanket text swap with beforeprint/afterprint listeners; "This report was" now appears only when the #performance (Reports) tab is active — all other tabs keep "This document was"; afterprint always restores to "document"
+
 ## 2026-06-29 — fix: project_view.php print footer text and page margins
 
 - `app/bms/operations/project_view.php`: added JS on DOMContentLoaded to replace "This document was" with "This report was" in the `.bms-print-footer` (only on this page; footer.php untouched)
