@@ -7806,8 +7806,8 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
         body.overview-print .print-header-overview { display: block !important; }
         body.overview-print .workspace-card-main { display: none !important; }
         
-        /* Force Landscape for the whole page */
-        @page { size: A3 landscape; margin: 10mm !important; }
+        /* Standard page margins for all prints from this page */
+        @page { margin: 10mm 8mm 16mm 8mm; }
 
         /* Overview Financial Cards — Force single row with 6 equal columns in print */
         body.overview-print #overviewFinancialCards {
@@ -22093,6 +22093,11 @@ function loadProjectStaffDropdown(selector, selectedId) {
     }
 }
 
+// Change "This document was Printed by" → "This report was Printed by" only on this page
+document.addEventListener('DOMContentLoaded', function () {
+    var line1 = document.querySelector('.bms-print-footer .bpf-line1');
+    if (line1) line1.innerHTML = line1.innerHTML.replace('This document was', 'This report was');
+});
 
 </script>
 
