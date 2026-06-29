@@ -52,7 +52,7 @@ $company_logo = getSetting('company_logo', '');
                         <button type="button" class="btn btn-outline-primary period-btn" data-period="weekly">Weekly</button>
                         <button type="button" class="btn btn-outline-primary period-btn" data-period="monthly">Monthly</button>
                         <button type="button" class="btn btn-outline-primary period-btn" data-period="quarterly">Quarterly</button>
-                        <button type="button" class="btn btn-primary period-btn active" data-period="yearly">Yearly</button>
+                        <button type="button" class="btn btn-primary period-btn" data-period="yearly">Yearly</button>
                     </div>
                 </div>
 
@@ -813,7 +813,7 @@ function voidSale(saleId, receipt) {
         $.ajax({
             url: VOID_URL, type: 'POST', data: fd, contentType: false, processData: false, dataType: 'json',
             success: function (res) {
-                if (res.success) { loadSales(); loadDashboard(); Swal.fire({ icon:'success', title:'Voided', text: res.message, timer:2000, showConfirmButton:false }); }
+                if (res.success) { loadSales(); if (!$('#paneDashboard').hasClass('d-none')) loadDashboard(); Swal.fire({ icon:'success', title:'Voided', text: res.message, timer:2000, showConfirmButton:false }); }
                 else { Swal.fire({ icon:'error', title:'Error', text: res.message || 'Failed.' }); }
             },
             error: function () { Swal.fire({ icon:'error', title:'Error', text:'Server error.' }); }
@@ -908,7 +908,7 @@ $('#returnForm').on('submit', function (e) {
         success: function (res) {
             if (res.success) {
                 bootstrap.Modal.getInstance(document.getElementById('returnModal')).hide();
-                loadSales(); loadDashboard();
+                loadSales(); if (!$('#paneDashboard').hasClass('d-none')) loadDashboard();
                 Swal.fire({ icon:'success', title:'Return processed', text: res.message, timer:2200, showConfirmButton:false });
             } else { Swal.fire({ icon:'error', title:'Error', text: res.message || 'Failed.' }); }
         },

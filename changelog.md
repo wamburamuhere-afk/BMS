@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-06-29 — fix: POS Dashboard period button double-selection + redundant dashboard reload
+
+- `app/bms/pos/pos_dashboard.php`: removed redundant Bootstrap `active` class from yearly period button — with `btn-outline-primary.active`, Bootstrap renders it as filled blue so clicking Daily made both Daily and Yearly look selected simultaneously; `btn-primary` alone correctly shows the selected state
+- `app/bms/pos/pos_dashboard.php`: `voidSale()` and `openReturn()` now only call `loadDashboard()` if the dashboard panel is currently visible; previously they fired a redundant AJAX request every time regardless of panel state
+
 ## 2026-06-29 — fix: POS Dashboard print footer injected into DataTables print window
 
 - `app/bms/pos/pos_dashboard.php`: added `PRINT_ROLE` and `PRINT_YEAR` JS constants; `PRINT_USER` now correctly reads from session before footer.php runs
