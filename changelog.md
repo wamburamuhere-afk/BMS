@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-06-29 — fix: POS Dashboard filter UI and safeOutput bug
+
+- `app/bms/pos/pos_dashboard.php`: defined `safeOutput()` locally (was undefined causing DataTable/dashboard JS errors)
+- `app/bms/pos/pos_dashboard.php`: changed default period from Monthly to Yearly
+- `app/bms/pos/pos_dashboard.php`: replaced From/To date range with period-specific pickers — Daily (single date), Weekly (any day → Mon–Sun computed), Monthly (month+year selects), Quarterly (Q1–Q4 + year), Yearly (year select)
+- `app/bms/pos/pos_dashboard.php`: `getDateRange()` / `showFilterPanel()` replace `setPeriodDates()`; all Apply buttons use class-based delegation
+- `tests/test_pos_dashboard_cli.php`: updated to 88 checks (all passing)
+
+## 2026-06-29 — feat: rewrite POS Dashboard (sales history first + period filter + toolbar)
+
+- `app/bms/pos/pos_dashboard.php`: complete rewrite — Sales History section shown at top (always visible), Dashboard section below (always visible); removed old toggle buttons (#btnViewDashboard / #btnViewHistory)
+- `app/bms/pos/pos_dashboard.php`: added period filter (Daily/Weekly/Monthly/Quarterly/Yearly) with smart date defaults; Monthly is the default; Apply button triggers table reload
+- `app/bms/pos/pos_dashboard.php`: Copy/CSV/Print toolbar matching suppliers.php style (white bordered box with icons); Show: page-length selector
+- `app/bms/pos/pos_dashboard.php`: fixed dashboard "Loading…" stuck bug — `.fail()` error handler updates all widget divs with user-friendly error + Refresh button
+- `app/bms/pos/pos_dashboard.php`: full ui-constants.md compliance (stat card bg:#e7f0ff + border:#b6ccfe, modal headers bg-primary, gear-fill action dropdown, no raw alert())
+- `tests/test_pos_dashboard_cli.php`: updated regression suite (74 checks, all passing)
+
 ## 2026-06-29 — fix: budget permission key mismatch and activity log
 
 - `api/account/add_budget.php`: fixed `canCreate('budgets')` → `canCreate('budget')` (key mismatch was blocking all non-admins even when granted permission)
