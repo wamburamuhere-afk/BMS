@@ -95,7 +95,10 @@ kill-switch + idempotent • fully logged • backward-compatible.
   - [x] Pattern established: one fail-safe `dispatchEvent()` after the successful write, behind the kill-switch
   - [x] `save_purchase_order.php` (create) → `po.needs_approval`; `save_invoice.php` (create) → `invoice.needs_review`. Lint clean; both events resolve recipients (4) + dispatch.
   - [ ] Remaining emit points (same one-liner): GRN approved, quotation/SO submitted, returns/notes pending, voucher needs-approval, expense needs-review, low-stock — add per endpoint as desired
-- [ ] **Phase 8 — Dashboard + bell unification**: read from the engine, per-user permission/scope filtered; deep action_url
+- [x] **Phase 8 — Dashboard + bell unification (DONE)**
+  - [x] Bell already unified — engine writes to the `notifications` table that `api/get_notifications.php` reads per user
+  - [x] `dashboard.php` "System requires your attention" now also surfaces the engine's per-user unread **action** notifications (via `get_system_alerts`), excluding event types the inline alerts already compute (no double-count); title+message render branches added
+  - [x] Tested 2/2: lint clean; engine query includes action items, excludes `invoice.overdue` (dedup)
 - [ ] **Phase 9 — AI smart layer (optional, after core)**: digest, priority scoring, anomaly events, drafted text; setting + fallback
 - [ ] **Phase 10 — Hardening, tests, rollout**: no-leak/integration/idempotency/perf/security; master switch default-off; changelog; staged rollout
 
