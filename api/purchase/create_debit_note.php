@@ -125,6 +125,18 @@ try {
 
     $msg = 'Debit note created successfully.';
     if ($att['saved'] > 0) $msg .= " {$att['saved']} attachment(s) uploaded.";
+
+    // Smart-notification: a new debit note needs attention. Fail-safe + kill-switched.
+    require_once __DIR__ . '/../../core/notify.php';
+    dispatchEvent($pdo, 'debit_note.pending', [
+        'entity_type' => 'debit_note',
+        'entity_id'   => (int)$dn_id,
+        'project_id'  => $project_id !== null ? (int)$project_id : null,
+        'title'       => 'Debit note pending: ' . $number,
+        'message'     => 'A new debit note ' . $number . ' has been created and needs attention.',
+        'action_url'  => 'debit_note_view?id=' . (int)$dn_id,
+    ]);
+
     echo json_encode(['success' => true, 'id' => $dn_id, 'message' => $msg,
                       'attachment_errors' => $att['errors']]);
 

@@ -300,6 +300,17 @@ try {
         'description' => "Created Goods Received Note #$receipt_number for supplier ID $supplier_id"
     ]);
 
+    // Smart-notification: a new GRN is pending review/approval. Fail-safe + kill-switched.
+    require_once __DIR__ . '/../core/notify.php';
+    dispatchEvent($pdo, 'grn.pending', [
+        'entity_type' => 'grn',
+        'entity_id'   => (int)$receipt_id,
+        'project_id'  => !empty($project_id) ? (int)$project_id : null,
+        'title'       => 'GRN pending: ' . $receipt_number,
+        'message'     => 'A new goods received note ' . $receipt_number . ' has been created and needs review/approval.',
+        'action_url'  => 'grn_view?id=' . (int)$receipt_id,
+    ]);
+
     echo json_encode([
         'success' => true,
         'message' => 'GRN created successfully',
