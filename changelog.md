@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-29 — feat: rewrite POS Dashboard (sales history first + period filter + toolbar)
+
+- `app/bms/pos/pos_dashboard.php`: complete rewrite — Sales History section shown at top (always visible), Dashboard section below (always visible); removed old toggle buttons (#btnViewDashboard / #btnViewHistory)
+- `app/bms/pos/pos_dashboard.php`: added period filter (Daily/Weekly/Monthly/Quarterly/Yearly) with smart date defaults; Monthly is the default; Apply button triggers table reload
+- `app/bms/pos/pos_dashboard.php`: Copy/CSV/Print toolbar matching suppliers.php style (white bordered box with icons); Show: page-length selector
+- `app/bms/pos/pos_dashboard.php`: fixed dashboard "Loading…" stuck bug — `.fail()` error handler updates all widget divs with user-friendly error + Refresh button
+- `app/bms/pos/pos_dashboard.php`: full ui-constants.md compliance (stat card bg:#e7f0ff + border:#b6ccfe, modal headers bg-primary, gear-fill action dropdown, no raw alert())
+- `tests/test_pos_dashboard_cli.php`: updated regression suite (74 checks, all passing)
+
 ## 2026-06-29 — fix: budget permission key mismatch and activity log
 
 - `api/account/add_budget.php`: fixed `canCreate('budgets')` → `canCreate('budget')` (key mismatch was blocking all non-admins even when granted permission)
