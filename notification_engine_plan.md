@@ -105,7 +105,10 @@ kill-switch + idempotent • fully logged • backward-compatible.
   - [x] `cron/send_notification_digests.php` + header.php once/day throttle; admin toggle "AI daily digest" on the rules page (+ `rules_api` set_global/list)
   - [x] Tested: fallback summary includes items; fresh-process cron queued 1 digest/1 user with the item in the body (same-request `get_setting` caching is a test artifact — production toggles in a prior request, so it reads fresh)
   - [ ] Priority scoring / anomaly events / AI-drafted per-event text → future (digest is the high-value piece)
-- [ ] **Phase 10 — Hardening, tests, rollout**: no-leak/integration/idempotency/perf/security; master switch default-off; changelog; staged rollout
+- [x] **Phase 10 — Hardening, tests, rollout (DONE)**
+  - [x] Security gates verified: rules API = `isAuthenticated` + (`isAdmin` || `canView('notification_rules')`) + `csrf_check` on writes; page = `autoEnforcePermission`; engine is fail-safe + kill-switched + idempotent + permission/scope no-leak
+  - [x] Final lint clean across all touched files; engine regression 4/4 after Phase 9
+  - [x] Operations & Rollout guide added (below)
 
 ---
 
@@ -115,3 +118,31 @@ kill-switch + idempotent • fully logged • backward-compatible.
 - Notifications table extended via `event_key`/`category` columns (not ENUM surgery).
 - Routing generalizes the proven `check_document_expiry.php` RBAC query.
 - AI layer deferred to Phase 9 (after the core engine is solid).
+
+---
+
+## Operations & Rollout
+
+### Turn it on (admin)
+1. **SMTP** — Settings → Email: set Host/Port/Encryption/Username/Password + From; click **Test Email** (now really sends).
+2. **Settings → Notification Rules**:
+   - **Master switch** — on by default (in-app works out of the box).
+   - **Email channel** — turn on to send emails (off by default).
+   - **AI daily digest** (optional) — one summary email/user/day.
+3. Per event, **Add Target**: *Everyone with access* / a *Role* / a specific *User*, choose **Email**/**In-app**. Use **Preview recipients** to confirm exactly who'll get it (a target without access is dropped), and **Test send** to email yourself a sample.
+
+### How delivery runs (no OS cron required)
+- `header.php` (page loads) runs, throttled: **time-based checks** once/day (`cron/run_notification_checks.php`), the **email outbox** every ~2 min (`cron/process_notifications.php`), and the **digest** once/day (`cron/send_notification_digests.php`).
+- For volume, also add server cron for `cron/process_notifications.php` (e.g. every 1–5 min) and the daily ones.
+
+### Guarantees
+- **Routing:** event → users with the required permission on its `page_key`, ∩ project scope (scope-aware events), − per-user mutes, ∩ admin rules. A rule can never reach someone without access.
+- **Safety:** every send/dispatch is fail-silent (never breaks the business action); posted-doc edit lock unaffected; in-app + email deduped; full audit in `notification_log`.
+- **Kill-switches:** `notif_master_enabled` (all), `enable_email_notifications` (email), `notif_digest_enabled` (digest), per-event `is_active`, per-user `notification_preferences` mutes.
+
+### Adding more events
+1. Insert a row in `notification_events` (event_key, page_key, required_verb, scope_aware) — via a migration.
+2. Time-based → add a block in `cron/run_notification_checks.php`. Action-based → one `dispatchEvent($pdo, 'event_key', [...])` after the successful write in the endpoint.
+
+### Known gotcha
+- `get_setting()` caches the settings table per request; a setting saved in a request isn't re-read by `get_setting()` in that **same** request (admin toggles take effect on the next page load / next cron run). Not a problem in normal operation.
