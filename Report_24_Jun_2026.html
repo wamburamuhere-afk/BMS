@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Work Report — 24 June 2026</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: #fff; padding: 40px 60px; max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .meta { font-size: 12px; color: #555; margin-bottom: 5px; }
+  .meta strong { color: #1a1a1a; }
+  hr { border: none; border-top: 2px solid #1a1a1a; margin: 20px 0; }
+  hr.thin { border-top: 1px solid #ccc; margin: 16px 0; }
+  h2 { font-size: 15px; font-weight: 700; margin: 24px 0 8px; color: #0d3b6e; border-left: 4px solid #0d3b6e; padding-left: 8px; }
+  h3 { font-size: 13px; font-weight: 700; margin: 16px 0 6px; color: #1a1a1a; }
+  p { margin: 6px 0 8px; line-height: 1.65; }
+  ul, ol { margin: 6px 0 10px 22px; }
+  li { margin-bottom: 5px; line-height: 1.65; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 14px; font-size: 12px; }
+  th { background: #0d3b6e; color: #fff; text-align: left; padding: 6px 10px; font-weight: 600; }
+  td { padding: 5px 10px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
+  tr:nth-child(even) td { background: #f5f8fc; }
+  em { font-style: italic; }
+  strong { font-weight: 700; }
+  .footer { margin-top: 30px; font-size: 11px; color: #888; font-style: italic; border-top: 1px solid #ccc; padding-top: 10px; }
+  @media print {
+    body { padding: 20px 30px; font-size: 11.5px; }
+    h2 { page-break-after: avoid; }
+    h3 { page-break-after: avoid; }
+    table { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Work Report — 24 June 2026</h1>
+<div class="meta"><strong>Prepared by:</strong> W. Nyagawa</div>
+<div class="meta"><strong>System:</strong> Business Management System (BMS) — BJP Technologies Co. Ltd</div>
+<div class="meta"><strong>Date:</strong> 24 June 2026</div>
+<hr>
+
+<h2>Overview</h2>
+<p>At the end of yesterday's report I made one promise: the Balance Sheet was showing a wrong figure because of double-counting, and fixing it was the next step. That fix is the first thing I completed today, and the Balance Sheet now balances.</p>
+<p>From there the day moved in three directions. I found and corrected two classification errors that were silently hiding certain expenses and other income from the profit calculation. I extended the same principle — <em>every money movement must record accounting on both sides</em> — to stock adjustments, which had never produced any accounting entry at all. And I brought the payroll area into full integrity, fixing five specific gaps in how payroll amounts were reaching the books, adding the employer's share of NSSF, and replacing the hard-delete action with a proper void.</p>
+<p>Along the way I also resolved three operations that appeared to work on the local test machine but were hard-failing on the live server whenever a user tried them.</p>
+<p>This report covers only what changed since yesterday.</p>
+
+<hr class="thin">
+
+<h2>1. Balance Sheet — the promise from yesterday is kept</h2>
+
+<p><strong>What yesterday's investigation found:</strong> the Balance Sheet page was showing a wrong total even though the underlying books were perfectly balanced. Three specific faults explained it:</p>
+<ol>
+  <li>The page was reading seven separate sub-ledger summaries — payroll pending, VAT, receivables, payables, and more — and adding them <em>on top of</em> the same figures already in the posted ledger. This counted every one of those amounts twice. For payroll, it was adding payroll that had never been approved or posted anywhere — money still in a pending queue — creating a phantom Salaries Payable balance in the billions.</li>
+  <li>The page was also adding an opening-balance column from the accounts table to every line. That column is never updated by the posting engine, so it drifts silently and does not match the books.</li>
+  <li>Draft and voided entries were leaking into the figures because the status filter was not applied correctly.</li>
+</ol>
+<p><strong>My fix:</strong> all three faults are now closed. The Balance Sheet page reads only the single posted ledger — nothing else. The same source every other financial report already uses. The phantom Salaries Payable is gone. The double-counting is gone. The Balance Sheet now agrees with the books.</p>
+<p>An automated test (13 checks) confirms the new behaviour.</p>
+
+<hr class="thin">
+
+<h2>2. Finance Costs and Other Income — two categories were invisible to the Balance Sheet</h2>
+
+<p><strong>What was wrong:</strong> the Balance Sheet calculates Retained Earnings by summing up all profit since the business started. That calculation was reading Revenue, Cost of Goods Sold, and Expenses — but two account types were missing: Finance Costs (for example, bank charges) and Other Income. Both were silently returning zero instead of their real values.</p>
+<p><strong>What this caused on the Balance Sheet:</strong> when a bank charge was posted, the bank account correctly went down by the charge amount. But Retained Earnings did not absorb the charge, because Finance Costs were returning zero. The asset side fell; the equity side did not follow. The Balance Sheet therefore showed "DOES NOT BALANCE — difference = X.XX" where X.XX was exactly the bank charge amount.</p>
+<p><strong>My fix:</strong> both categories are now correctly included in the profit calculation:</p>
+<table>
+  <tr><th>Category</th><th>Effect on profit</th></tr>
+  <tr><td>Revenue</td><td>+ adds to profit</td></tr>
+  <tr><td>Other Income</td><td>+ adds to profit</td></tr>
+  <tr><td>Cost of Goods Sold</td><td>− reduces profit</td></tr>
+  <tr><td>Expense</td><td>− reduces profit</td></tr>
+  <tr><td>Finance Cost (bank charges, etc.)</td><td>− reduces profit</td></tr>
+</table>
+<p>The Balance Sheet no longer shows a gap caused by bank charges or other income entries. An automated test (15 checks) confirms both categories return their correct values.</p>
+
+<hr class="thin">
+
+<h2>3. Bank Transfer charges — the charge account balance was not being updated</h2>
+
+<p><strong>What was wrong:</strong> when a bank transfer is made with a bank charge, the central ledger entry is correct — the charge account is debited, the destination account is debited, and the source account is credited, and the two sides balance. However, the <em>running balance</em> on the charge account itself was never being updated when the transfer was posted, and never restored when the transfer was reversed. Every charge was therefore invisible in the charge account's own balance, even though the journal entries behind it were correct.</p>
+<p><strong>How a bank transfer with a charge records</strong> (example: transferring 1,000,000 between accounts with a 5,000 bank charge):</p>
+<table>
+  <tr><th>Account</th><th>Debit</th><th>Credit</th></tr>
+  <tr><td>Destination Bank Account</td><td>1,000,000</td><td></td></tr>
+  <tr><td>Bank Charge Expense</td><td>5,000</td><td></td></tr>
+  <tr><td>Source Bank Account</td><td></td><td>1,005,000</td></tr>
+  <tr><td><strong>Total</strong></td><td><strong>1,005,000</strong></td><td><strong>1,005,000</strong></td></tr>
+</table>
+<p><strong>My fix:</strong> the charge account balance now correctly increases when the transfer is posted, and correctly restores when a transfer is reversed. The journal entry was already sound; this fix keeps the account's running balance in step with it. An automated test (16 checks) confirms the charge mirrors on both post and reversal, and that the three-leg entry always balances.</p>
+
+<hr class="thin">
+
+<h2>4. Three operations that worked locally were failing on the live server</h2>
+
+<p><strong>What was wrong:</strong> three specific operations — settling a credit note (refunding a customer), settling a debit note (receiving a refund from a supplier), and topping up the petty cash float — were producing the following error when users tried them on the live production server: <em>"The receipt/payment could not be written to the ledger — the double entry did not post. Nothing was saved."</em></p>
+<p>The root cause was that these three transaction types had not been registered in a list that the live database enforces strictly. The local test server is lenient and ignores unknown types silently; the live server rejects them with a hard error. The result was that every attempt to complete these three operations failed on the live system.</p>
+<p><strong>My fix:</strong> all three types are now correctly registered. Settling credit notes, settling debit notes, and topping up petty cash all post successfully to the ledger on the live server.</p>
+
+<hr class="thin">
+
+<h2>5. Stock Adjustments — every adjustment now records accounting</h2>
+
+<p><strong>What was wrong:</strong> when we adjust stock — discovering damaged goods, finding extra items in a stocktake, writing off expired products, or making a manual correction — those adjustments change the quantity in stock. Before today they were recorded only in the stock movement log. They created <strong>no accounting entry</strong>. The Inventory figure on the Balance Sheet was therefore always stale after any adjustment, and the books had no record of why the inventory value had changed.</p>
+<p><strong>The correct accounting — two rules covering all adjustment types:</strong></p>
+<p>When inventory goes <strong>up</strong> (goods found or adjusted in):</p>
+<table>
+  <tr><th>Account</th><th>Debit</th><th>Credit</th></tr>
+  <tr><td>Inventory (stock increased)</td><td>amount</td><td></td></tr>
+  <tr><td>Historical Balancing Equity</td><td></td><td>amount</td></tr>
+  <tr><td><strong>Total</strong></td><td><strong>amount</strong></td><td><strong>amount</strong></td></tr>
+</table>
+<p>When inventory goes <strong>down</strong> (damaged, expired, written off, or adjusted out):</p>
+<table>
+  <tr><th>Account</th><th>Debit</th><th>Credit</th></tr>
+  <tr><td>Historical Balancing Equity</td><td>amount</td><td></td></tr>
+  <tr><td>Inventory (stock reduced)</td><td></td><td>amount</td></tr>
+  <tr><td><strong>Total</strong></td><td><strong>amount</strong></td><td><strong>amount</strong></td></tr>
+</table>
+<p>Amount in all cases = quantity × unit cost.</p>
+<p><strong>My fix:</strong> every stock adjustment now produces the correct accounting entry when it is created. Editing an adjustment first reverses the original entry, then posts a fresh one with the new values. Deleting an adjustment reverses the original entry before removing the record. The Balance Sheet Inventory figure now stays accurate after every adjustment. The Trial Balance is also affected, as both sides of the entry appear there.</p>
+
+<hr class="thin">
+
+<h2>6. Payroll — employer NSSF, proper void, and five GL integrity gaps</h2>
+
+<h3>The employer's share of NSSF was not being recorded</h3>
+<p><strong>What was wrong:</strong> Tanzania law requires both the employee and the employer to contribute to NSSF. The employee's share was being deducted from salary and posted correctly. The employer's share — 10% of gross salary — was not being computed, not stored, and not reaching the books. The NSSF Payable figure on the Balance Sheet was therefore showing only half of what we actually owe.</p>
+<p><strong>How it records now:</strong></p>
+<table>
+  <tr><th>Account</th><th>Debit</th><th>Credit</th></tr>
+  <tr><td>NSSF Employer Expense</td><td>employer's 10%</td><td></td></tr>
+  <tr><td>NSSF Payable (combined total)</td><td></td><td>employee share + employer share</td></tr>
+  <tr><td><strong>Total</strong></td><td><strong>combined</strong></td><td><strong>combined</strong></td></tr>
+</table>
+<p>The payslip breakdown now also shows the employer's cost as a separate line, visible to both the employee and the accounts team.</p>
+
+<h3>Deleting a payroll run now voids it — the history is kept</h3>
+<p><strong>What was wrong:</strong> when a payroll run was deleted, the record was permanently removed. The accounting reversal still ran, but the payroll row itself was gone — leaving no audit trail of what had been paid, to whom, or why it was cancelled.</p>
+<p><strong>My fix:</strong> deleting a payroll run now performs a <strong>Void</strong> rather than erasing the record. The payroll stays in the system, marked as voided with a reason and a timestamp. The accounting is still reversed. A voided employee can be re-processed for the same period if needed. On the payroll screen, voided runs are shown with a strikethrough and a "voided" badge — visible for the record but no further actions are available on them.</p>
+
+<h3>Five gaps in how payroll amounts reached the books</h3>
+<p>Using the same six-point inspection method from yesterday, I found and closed five specific gaps in the payroll posting chain.</p>
+<table>
+  <tr><th>Gap</th><th>What was wrong</th><th>What I fixed</th></tr>
+  <tr><td><strong>NSSF and PAYE were sometimes skipped</strong></td><td>Statutory deductions (NSSF and PAYE) were tied to an optional checkbox. When the checkbox was not ticked, the tax obligations were simply not computed — even though they are not optional by law</td><td>Statutory deductions now always compute, regardless of the checkbox. The checkbox controls only voluntary deductions</td></tr>
+  <tr><td><strong>Marking payroll as Paid recorded no accounting</strong></td><td>The "Mark as Paid" action updated the payroll status to Paid but posted no journal entry — so Salaries Payable was never cleared and the bank account was never reduced</td><td>The action now posts the correct entry (Debit Salaries Payable / Credit Bank) and rolls back if the accounting fails</td></tr>
+  <tr><td><strong>SDL expense was being double-counted</strong></td><td>The Skills Development Levy calculation re-posted its entry each time it ran without removing the previous one, so the SDL expense and liability doubled every time the period was recalculated</td><td>The posting now removes any existing entry for the period before creating a new one. One confirmed duplicate was also removed from the live data</td></tr>
+  <tr><td><strong>32 past payrolls had no accounting entry</strong></td><td>Payrolls from January to June 2026 that were approved and paid had incomplete or missing accounting entries — in many cases because the records they pointed to had been deleted</td><td>All 32 were corrected by re-running the accrual calculation. One zero-gross payroll was intentionally skipped</td></tr>
+  <tr><td><strong>Accounting failures were silent</strong></td><td>When payroll posting failed for any reason, the error was written only to an internal log. The user saw a success message and the payroll appeared to complete normally</td><td>All three places where payroll can be approved or paid now surface a real error message if the accounting fails, and roll back the entire operation so nothing is left half-done</td></tr>
+</table>
+
+<hr class="thin">
+
+<h2>What I achieved today</h2>
+
+<h3>The Balance Sheet now balances</h3>
+<p>The promise made at the end of yesterday's report is kept. The double-counting is gone, the phantom Salaries Payable is gone, the draft-and-void leak is closed, and the Balance Sheet agrees with the books.</p>
+
+<h3>Finance Costs and Other Income now reach Retained Earnings</h3>
+<p>Bank charges and other income no longer disappear silently from the profit calculation. The gap they created on the Balance Sheet is closed.</p>
+
+<h3>Bank Transfer charges are correctly tracked</h3>
+<p>The charge account balance now moves in step with every transfer posted and every transfer reversed.</p>
+
+<h3>Three live-server failures are resolved</h3>
+<p>Settling credit notes, settling debit notes, and topping up petty cash all work correctly on the live server.</p>
+
+<h3>Stock Adjustments now produce correct accounting</h3>
+<p>Every inventory adjustment creates a balanced ledger entry. Editing and deleting both handle the reversal correctly. The Balance Sheet Inventory figure is now accurate after every adjustment.</p>
+
+<h3>Payroll GL is fully wired</h3>
+<p>The employer NSSF share is computed and posted. Payroll deletions are now soft voids with an audit trail. All five posting gaps are closed — statutory deductions always compute, marking payroll paid moves money correctly, SDL has one entry per period, the 32 historical gaps are backfilled, and failures surface as real errors rather than silent success messages.</p>
+
+<hr>
+
+<h2>Summary</h2>
+<p>At the end of today the financial reports are <strong>balanced</strong>. This is the direct result of the mechanism put in place over the past two days: a single central double-entry ledger is the only source any report reads; every money movement writes to it on both sides; and every deletion, void, or correction writes the reverse entry before the record is touched.</p>
+<p>The six-point method introduced yesterday identified the gaps; today's work closed the last of them within scope. For every area that has been wired, the books are balanced and all four reports — Trial Balance, Income Statement, Balance Sheet, and Cash Flow — now read from the same single source and agree with each other.</p>
+
+<div class="footer">This report covers the work completed on 24 June 2026.</div>
+
+</body>
+</html>

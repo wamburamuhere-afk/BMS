@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Work Report — 27 June 2026</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; font-size: 10.5pt; line-height: 1.65; color: #1a1a2e; background: #fff; }
+  .page { max-width: 780px; margin: 0 auto; padding: 36px 48px 48px; }
+  .report-header { border-bottom: 3px solid #1e3a8a; padding-bottom: 18px; margin-bottom: 28px; }
+  .report-header h1 { font-size: 22pt; font-weight: 700; color: #1e3a8a; letter-spacing: -0.5px; }
+  .report-meta { display: flex; gap: 32px; margin-top: 10px; font-size: 9.5pt; color: #555; flex-wrap: wrap; }
+  .report-meta span strong { color: #1a1a2e; }
+  .overview-band { background: #f0f4ff; border-left: 4px solid #1e3a8a; border-radius: 0 8px 8px 0; padding: 14px 18px; margin-bottom: 30px; font-size: 10pt; color: #1a1a2e; }
+  h2 { font-size: 13pt; font-weight: 700; color: #1e3a8a; margin: 32px 0 10px; padding-bottom: 5px; border-bottom: 1.5px solid #c7d7f5; page-break-after: avoid; }
+  h3 { font-size: 10.5pt; font-weight: 600; color: #2d4a8a; margin: 18px 0 6px; page-break-after: avoid; }
+  p { margin-bottom: 10px; }
+  p:last-child { margin-bottom: 0; }
+  ul, ol { margin: 8px 0 10px 22px; }
+  li { margin-bottom: 4px; }
+  hr { border: none; border-top: 1px solid #dde5f5; margin: 28px 0; }
+  .report-footer { margin-top: 40px; padding-top: 14px; border-top: 1.5px solid #c7d7f5; font-size: 9pt; color: #888; text-align: center; }
+  @media print { body { font-size: 10pt; } .page { padding: 0; max-width: 100%; } h2 { page-break-before: auto; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="report-header">
+    <h1>Work Report &mdash; 27 June 2026</h1>
+    <div class="report-meta">
+      <span><strong>Prepared by:</strong> W. Nyagawa</span>
+      <span><strong>System:</strong> Business Management System (BMS) &mdash; BJP Technologies Co. Ltd</span>
+      <span><strong>Date:</strong> 27 June 2026</span>
+    </div>
+  </div>
+
+  <div class="overview-band">
+    The work since the last report delivered several substantial upgrades that, together, make the system noticeably more <strong>intelligent, professional, and trustworthy</strong>.<br><br>
+    The headline pieces are: an <strong>AI-powered audit assistant</strong> built into the Activity Log that can read the system's activity and explain it in plain language, scan for unusual behaviour, answer questions, and produce a formal audit report; a new <strong>automatic numbering system</strong> that gives every customer, supplier, product, invoice and document a clean, company-branded, sequential reference code; and an entirely new <strong>Smart Notification System</strong> that actively alerts the right staff &mdash; by email and on screen &mdash; whenever something needs their attention. Alongside these, posted financial records were sealed against tampering, document navigation was made predictable, and several lists were polished for speed and readability.
+  </div>
+
+  <h2>1. AI Audit Intelligence in the Activity Log</h2>
+  <p>The Activity Log already records everything that happens in the system. It has now been given an <strong>AI assistant</strong> that can actually <em>understand and interpret</em> that activity for an administrator, presented as four clear modes:</p>
+  <p><strong>Daily Briefing</strong> &mdash; With one click, the AI reads the activity for the chosen period and writes a plain-English narrative: who did what, which parts of the system were used, and what deserves attention. It even assigns an overall <strong>risk level</strong>, so a manager can grasp the day's activity at a glance instead of scrolling through thousands of rows.</p>
+  <p><strong>Anomaly Scanner</strong> &mdash; The AI scans the activity for anything <strong>unusual or suspicious</strong> &mdash; for example, activity at odd hours, an unusual burst of deletions, or a pattern that stands out from normal behaviour &mdash; and flags it for review. This turns the audit log from a passive record into an active watchdog.</p>
+  <p><strong>Ask the Log</strong> &mdash; An administrator can simply <strong>ask a question in plain language</strong> &mdash; such as "what changed in payroll this week?" &mdash; and the AI answers based on the actual recorded activity, without needing to know how to build filters or queries.</p>
+  <p><strong>Audit Report</strong> &mdash; The AI produces a <strong>formal, structured audit report</strong> for the selected period, suitable for management or compliance review, with a clean print layout that matches the rest of the system's printed documents.</p>
+  <p>This feature is <strong>admin-only</strong>, and it complements (does not replace) the existing log: the raw, factual record is always there; the AI simply adds a layer of understanding on top of it. The Activity Log's display was also refined so that long entries wrap neatly and remain readable, and repeated "view" entries are sensibly grouped rather than cluttering the list.</p>
+
+  <h2>2. Automatic, Company-Branded Reference Numbers</h2>
+  <p>Previously, many records and documents were numbered inconsistently &mdash; some used random numbers, some could leave gaps, and some required manual entry. This has been replaced with a single, professional <strong>automatic numbering system</strong>.</p>
+  <p>Every newly created record now receives a clean reference in the form <strong>COMPANY-TYPE-NUMBER</strong> &mdash; for example a customer becomes something like <em>BFS-CUST-0001</em>, an invoice <em>BFS-INV-0042</em>, a purchase order <em>BFS-PO-0007</em>. The company prefix is taken from the company profile (and can be adjusted by an administrator), the middle tag identifies the type of record, and the final number is <strong>strictly sequential and gap-free</strong>.</p>
+  <p>This now applies across the board:</p>
+  <ul>
+    <li><strong>Master records</strong> &mdash; customers, suppliers, sub-contractors, leads, employees, and products (including non-inventory items).</li>
+    <li><strong>Documents</strong> &mdash; invoices, purchase orders, goods-received notes, delivery notes, quotations, sales orders, returns, payment vouchers, material lists and more.</li>
+  </ul>
+  <p>Two important safeguards were built in. When an existing record is <strong>edited</strong>, the system tidies an old-style number into the new format &mdash; <strong>but only while the record is still in an editable stage</strong>; once a document has been posted into the accounts, its number is <strong>frozen forever</strong> so that statements and printed copies never change. And a clear assurance was established: because the accounts link back to each document by its permanent internal identity rather than its printed number, <strong>upgrading a reference number can never disturb the financial reports</strong>.</p>
+  <p>Existing non-inventory products that previously had no item code were also given proper codes automatically, so nothing is left without a clean reference.</p>
+
+  <h2>3. The Smart Notification System</h2>
+  <p>This was the largest single piece of work. The system previously had only basic on-screen notices and <strong>no working email capability at all</strong> &mdash; the email feature merely pretended to send. It has been replaced with a complete, professional notification platform that genuinely reaches staff and, crucially, reaches <strong>only the right staff</strong>.</p>
+  <p>The guiding principle is simple but powerful: <strong>a notification about a particular area should only go to the people who are actually responsible for that area.</strong> An HR matter reaches HR; a procurement matter reaches procurement; a finance matter reaches finance. Nobody is buried under alerts that are not theirs, and nothing is dumped into a single shared mailbox where it becomes impossible to know who should act.</p>
+
+  <h3>What the system now does</h3>
+  <p><strong>It sends real emails.</strong> A proper email engine was built and connected to the company's email settings. The previous "test email" that only pretended to work now genuinely sends, and the same engine powers every notification. It is safe by design &mdash; if email is not yet configured, the system simply records the situation and carries on rather than failing.</p>
+  <p><strong>It sends each alert only to the people with access to that area.</strong> Every notification is matched against the system's existing roles-and-permissions structure, so a person only receives an alert if their role actually grants them access to that part of the system. This is enforced automatically and invisibly &mdash; there is no way to accidentally notify someone who should not even be able to see the information.</p>
+  <p><strong>It respects project boundaries.</strong> When an alert concerns a specific project, only people assigned to that project (plus administrators) receive it.</p>
+  <p><strong>It lets each person quiet what they don't want.</strong> Individual staff can mute categories of notifications they don't wish to receive, and that preference is always respected.</p>
+  <p><strong>Administrators control everything from one screen.</strong> A new <strong>Notification Rules</strong> page under Settings lets an administrator decide, for each type of event, exactly who is notified (everyone with access, a specific role, or a specific named person) and how (email, on-screen, or both). A <strong>"Preview recipients"</strong> feature shows the exact list of people who would be notified &mdash; and warns if a chosen person would not actually receive it because they lack access. A <strong>"Test send"</strong> button confirms email is working end to end. Master on/off switches exist for the whole system, the email channel, and the optional daily summary.</p>
+  <p><strong>It works on its own schedule.</strong> Each day the system checks, by itself, for situations that need attention even when nobody triggered them directly &mdash; invoices past their due date, quotations about to expire, and approaching tender submission deadlines &mdash; and notifies the responsible people, never sending the same reminder twice in a day.</p>
+  <p><strong>It notifies automatically as work happens.</strong> Whenever a key document is created and needs attention or approval &mdash; purchase orders, invoices, goods-received notes, debit and credit notes, sales and purchase returns, expenses, and payment vouchers &mdash; the relevant people are alerted immediately, with a direct link to the document.</p>
+  <p><strong>Everything appears in the familiar places.</strong> Notifications show on both the <strong>dashboard's "System requires your attention"</strong> panel and the <strong>notification bell</strong>, each person seeing only the items that are genuinely theirs.</p>
+  <p><strong>It offers an optional AI daily summary.</strong> If switched on, each person can receive a single intelligent <strong>daily digest</strong> &mdash; one tidy email that summarises and prioritises everything currently needing their attention. When AI is not enabled, the same digest is still produced in a clear, organised plain format.</p>
+
+  <h3>Built to last and to be safe</h3>
+  <p>Every notification is <strong>fail-safe</strong> &mdash; if anything ever went wrong while sending an alert, it can never interrupt or break the actual business task that triggered it. Nothing is ever sent twice, every notification is recorded for audit, and the design deliberately leaves room to add <strong>WhatsApp and SMS</strong> later with no rework.</p>
+
+  <h2>4. Protecting Posted Financial Records From Being Altered</h2>
+  <p>Every financial event &mdash; an approved invoice, a received goods note, a paid voucher &mdash; eventually gets <strong>posted into the accounting records</strong> that feed the financial statements. Professional accounting practice is absolute: <strong>once something is posted, it must not be edited in place.</strong> Otherwise the audit trail breaks, closed periods could shift, and approvals lose their meaning.</p>
+  <p>A careful review checked every document type that posts into the accounts. Most were already protected, but <strong>three had a gap</strong> &mdash; invoices, goods-received notes, and payment vouchers could still be edited after posting. Those gaps were closed: the system now firmly refuses to edit any of them once posted, approved, or paid, for <strong>every</strong> user without exception, enforced at the deepest level. Documents still in their early stages remain fully editable. To change a posted record, the correct route is to reverse it and re-issue &mdash; exactly as accounting standards require.</p>
+
+  <h2>5. Smarter Navigation &mdash; Documents Stay Where You Open Them</h2>
+  <p>Linked documents (purchase orders, goods-received notes, delivery notes, sales orders) used to throw the user <strong>into a project</strong> after saving, even when the user had opened them from the general company-wide area. The system now follows one intuitive rule: <strong>it returns you to wherever you came from</strong> &mdash; into the project if you started there, or back to the general area if that's where you were working. A document still belongs to its project exactly as before; it simply no longer drags you somewhere you didn't ask to go.</p>
+
+  <h2>6. List &amp; Page Refinements</h2>
+  <p>Several lists were polished for speed and clarity:</p>
+  <ul>
+    <li><strong>Login History</strong> (the access-tracking page introduced previously) was upgraded with professional pagination and a switch between a full table view and a mobile-friendly card view.</li>
+    <li><strong>Non-inventory products (Services)</strong> &mdash; the list was rebuilt as a proper sortable, searchable table with a wider Product Name column, a stable layout that no longer scrolls awkwardly sideways, a tidy Item Code column, and a corrected print layout. The restriction that limited how long a product name could be was also removed.</li>
+    <li><strong>Activity Log and dashboard</strong> &mdash; long text now wraps neatly so entries stay readable.</li>
+  </ul>
+
+  <h2>7. Quality Assurance</h2>
+  <p>The new work was verified as it was built, not merely assumed to work &mdash; checked against real data to confirm, for example, that an alert reaches exactly the right people and nobody else, that a rule aimed at someone without access correctly reaches no one, that reminders never duplicate, and that posted records genuinely refuse edits while draft ones still allow them.</p>
+  <p>In addition, a <strong>permanent automated test</strong> was created for the entire notification system. From now on it runs by itself every time changes are submitted and will block any future change that accidentally damages the system. The full company-wide automated test suite was confirmed to pass cleanly with all of these additions in place.</p>
+
+  <hr>
+
+  <h2>What was achieved</h2>
+  <p><strong>The system became more intelligent.</strong> The Activity Log can now explain itself, watch for unusual behaviour, answer plain-language questions, and produce formal audit reports &mdash; and the whole system can summarise each person's outstanding work in a daily digest.</p>
+  <p><strong>The system became more professional.</strong> Every record and document now carries a clean, company-branded, sequential reference number, applied consistently and protected once posted.</p>
+  <p><strong>The system gained a genuine voice.</strong> It now actively reaches the right people &mdash; and only the right people &mdash; by email and on screen, automatically as work happens and on a daily schedule, all controlled from a single administrator screen.</p>
+  <p><strong>The system became more trustworthy.</strong> Posted financial records can no longer be altered, navigation is predictable, and the financial reports remain safe regardless of reference-number changes.</p>
+
+  <hr>
+
+  <h2>Summary</h2>
+  <p>Where the system could previously only wait passively for users to check it, it can now actively and intelligently support the business &mdash; interpreting its own audit trail, numbering everything cleanly and consistently, and reaching out privately and precisely to the people responsible whenever something needs doing. Combined with sealing posted records against alteration and making navigation dependable, the result is a system that is both safer to rely on and more capable of driving the business forward on its own.</p>
+
+  <div class="report-footer">
+    This report covers the work completed on 27 June 2026.
+  </div>
+
+</div>
+</body>
+</html>
