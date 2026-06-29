@@ -52,7 +52,7 @@ $company_logo = getSetting('company_logo', '');
                         <button type="button" class="btn btn-outline-primary period-btn" data-period="weekly">Weekly</button>
                         <button type="button" class="btn btn-outline-primary period-btn" data-period="monthly">Monthly</button>
                         <button type="button" class="btn btn-outline-primary period-btn" data-period="quarterly">Quarterly</button>
-                        <button type="button" class="btn btn-primary period-btn active" data-period="yearly">Yearly</button>
+                        <button type="button" class="btn btn-primary period-btn" data-period="yearly">Yearly</button>
                     </div>
                 </div>
 
@@ -469,8 +469,12 @@ const CAN_DELETE  = <?= json_encode($can_delete) ?>;
 const CAN_EDIT    = <?= json_encode($can_edit) ?>;
 <?php
 $_print_username = htmlspecialchars(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
+$_print_role     = htmlspecialchars($_SESSION['user_role'] ?? 'User');
+$_print_year     = date('Y');
 ?>
 const PRINT_USER  = '<?= addslashes($_print_username) ?>';
+const PRINT_ROLE  = '<?= addslashes($_print_role) ?>';
+const PRINT_YEAR  = '<?= $_print_year ?>';
 const CO_NAME     = '<?= addslashes(htmlspecialchars($company_name)) ?>';
 const CO_LOGO     = '<?= addslashes(getUrl($company_logo)) ?>';
 
@@ -649,6 +653,12 @@ function initHistoryTable() {
                             <p style="color:#6c757d;margin:0;font-size:9pt;">Period: ${(function(){const r=getDateRange();return r.start+' to '+r.end;})()} &nbsp;|&nbsp; Printed by: ${PRINT_USER} on ${new Date().toLocaleString()}</p>
                         </div>`
                     );
+                    $(win.document.body).append(
+                        `<div style="position:fixed;bottom:0;left:0;right:0;width:100%;padding:1mm 10mm;border-top:1px solid #ddd;background:#fff;display:flex;flex-direction:column;align-items:center;text-align:center;">
+                            <span style="font-size:8pt;color:#444;">This document was <strong>Printed</strong> by <strong>${PRINT_USER} - ${PRINT_ROLE}</strong> on ${new Date().toLocaleString()}</span>
+                            <span style="font-size:7.5pt;font-weight:700;color:#0d6efd;">Powered by BJP Technologies &copy; ${PRINT_YEAR}, All Rights Reserved.</span>
+                        </div>`
+                    );
                 }
             }
         ],
@@ -803,7 +813,7 @@ function voidSale(saleId, receipt) {
         $.ajax({
             url: VOID_URL, type: 'POST', data: fd, contentType: false, processData: false, dataType: 'json',
             success: function (res) {
-                if (res.success) { loadSales(); loadDashboard(); Swal.fire({ icon:'success', title:'Voided', text: res.message, timer:2000, showConfirmButton:false }); }
+                if (res.success) { loadSales(); if (!$('#paneDashboard').hasClass('d-none')) loadDashboard(); Swal.fire({ icon:'success', title:'Voided', text: res.message, timer:2000, showConfirmButton:false }); }
                 else { Swal.fire({ icon:'error', title:'Error', text: res.message || 'Failed.' }); }
             },
             error: function () { Swal.fire({ icon:'error', title:'Error', text:'Server error.' }); }
@@ -898,7 +908,7 @@ $('#returnForm').on('submit', function (e) {
         success: function (res) {
             if (res.success) {
                 bootstrap.Modal.getInstance(document.getElementById('returnModal')).hide();
-                loadSales(); loadDashboard();
+                loadSales(); if (!$('#paneDashboard').hasClass('d-none')) loadDashboard();
                 Swal.fire({ icon:'success', title:'Return processed', text: res.message, timer:2200, showConfirmButton:false });
             } else { Swal.fire({ icon:'error', title:'Error', text: res.message || 'Failed.' }); }
         },
