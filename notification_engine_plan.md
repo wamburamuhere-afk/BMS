@@ -74,7 +74,14 @@ kill-switch + idempotent • fully logged • backward-compatible.
   - [x] `resolveRecipients()` adds **project-scope filtering** (scope-aware event + `project_id` → admins + `user_projects` members only) and **per-user mute** (`notifUserMuted()` honoring `notifications_enabled`/`muted_events`/`muted_categories`, backward-compatible)
   - [x] Tested 12/12: mute logic (5), is_admin flag, no-scope == all, scope filter actually drops non-assigned non-admins (4→1), mute excludes a real user (4→3) with prefs backed-up/restored
   - [ ] `previewRecipients()` for the admin UI → deferred to Phase 5 (where it's consumed)
-- [ ] **Phase 4 — Channels & delivery**: InApp + Email channels (+ WhatsApp/SMS stubs); `notification_outbox` + `cron/process_notifications.php`; digest batching
+- [x] **Phase 4 — Channels & delivery (DONE)**
+  - [x] Migration `2026_06_28_notification_outbox.php` — `notification_outbox` queue (status/attempts/dedupe/scheduled_for)
+  - [x] `dispatchEvent()` now ALSO enqueues email per recipient (gated by `enable_email_notifications`), with an "Open in BMS" action button; separate in-app vs email dedupe
+  - [x] `enqueueEmail()` (dedupe via unique key) + `processNotificationOutbox()` worker (retry/backoff, give-up at max_attempts, logged) + `cron/process_notifications.php` runner
+  - [x] Email link uses configurable `app_url` (cron-safe), falls back to `buildUrl()` in web
+  - [x] Tested 7/7: dispatch enqueued 4 emails, dedupe (1st/2nd), worker processed queue + requeued on SMTP failure (attempts=1, error captured), setting restored
+  - [ ] Digest batching (group many items into one email) → deferred (immediate per-event for v1; revisit with Phase 9 AI digest)
+  - [ ] WhatsApp/SMS channels → deferred (worker has the `channel` switch ready)
 - [ ] **Phase 5 — Admin config UI**: `notification_rules.php` (event → role/user → channels; live access check; test send)
 - [ ] **Phase 6 — Scheduler**: `cron/run_notification_checks.php` + header.php throttle line (reuse existing pattern)
 - [ ] **Phase 7 — Emit at source actions**: one `dispatchEvent()` after each approval/posting/finance/HR/stock action (behind kill-switch)

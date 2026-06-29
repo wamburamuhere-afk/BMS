@@ -15,6 +15,7 @@ to the people who actually have access to that area (verified via RBAC). Plan & 
   - `core/notify.php` — `usersWithPermission()`, `createNotification()`, `notifClaimDedupe()`, `notifLog()`, `resolveRecipients()` (permission-based), `dispatchEvent()` (in-app + audit, fail-safe)
   - Verified: mailer 9/9; engine 6/6 (RBAC resolve, dispatch creates in-app+log, idempotent re-dispatch, unknown-event safe-skip)
 - **Phase 3 — Recipient resolution:** `resolveRecipients()` now intersects RBAC with **project-scope** (`user_projects`) and subtracts **per-user mutes** (`notifUserMuted` → `notifications_enabled`/`muted_events`/`muted_categories`); `usersWithPermission()` returns an `is_admin` flag. Verified 12/12 (scope drops non-assigned non-admins 4→1; mute excludes a user 4→3, prefs restored).
+- **Phase 4 — Channels & delivery:** migration `2026_06_28_notification_outbox.php` (email queue); `dispatchEvent()` enqueues an email per recipient (gated by `enable_email_notifications`) alongside the in-app notification; `enqueueEmail()` + `processNotificationOutbox()` worker (retry/backoff, give-up at max_attempts, logged) + `cron/process_notifications.php`. Email links use a configurable `app_url` (cron-safe). Verified 7/7 (4 queued, dedupe, worker requeues on SMTP failure).
 
 ## 2026-06-28 (fix) — Lock posted/finalized documents from in-place edit (ledger integrity)
 

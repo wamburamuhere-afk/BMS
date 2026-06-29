@@ -251,6 +251,110 @@ if (!function_exists('resolveRecipients')) {
     }
 }
 
+if (!function_exists('enqueueEmail')) {
+    /**
+     * Queue one email into notification_outbox. Deduped by dedupe_key (UNIQUE),
+     * so calling twice for the same recipient/event/period enqueues once.
+     * Returns true only when a NEW row was queued.
+     */
+    function enqueueEmail(PDO $pdo, array $r): bool
+    {
+        if (empty($r['to_email'])) return false;
+        try {
+            $stmt = $pdo->prepare("
+                INSERT IGNORE INTO notification_outbox
+                    (event_key, recipient_user_id, to_email, channel, subject, body, status,
+                     dedupe_key, entity_type, entity_id, scheduled_for)
+                VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $r['event_key'] ?? null,
+                isset($r['recipient_user_id']) ? (int)$r['recipient_user_id'] : null,
+                (string)$r['to_email'],
+                $r['channel'] ?? 'email',
+                substr((string)($r['subject'] ?? 'Notification'), 0, 255),
+                (string)($r['body'] ?? ''),
+                isset($r['dedupe_key']) ? substr((string)$r['dedupe_key'], 0, 191) : null,
+                $r['entity_type'] ?? null,
+                isset($r['entity_id']) ? (int)$r['entity_id'] : null,
+                $r['scheduled_for'] ?? null,
+            ]);
+            return $stmt->rowCount() > 0;
+        } catch (Throwable $e) {
+            error_log('enqueueEmail: ' . $e->getMessage());
+            return false;
+        }
+    }
+}
+
+if (!function_exists('processNotificationOutbox')) {
+    /**
+     * Send up to $limit due emails from the queue. Idempotent and safe to run
+     * from cron AND from the header.php throttle. Retries failed sends up to
+     * max_attempts; gives up (status='failed') after that. Never throws.
+     *
+     * @return array ['processed'=>int,'sent'=>int,'failed'=>int,'retry'=>int]
+     */
+    function processNotificationOutbox(PDO $pdo, int $limit = 25): array
+    {
+        require_once __DIR__ . '/mailer.php';
+        $sum = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'retry' => 0];
+
+        try {
+            $rows = $pdo->prepare("
+                SELECT * FROM notification_outbox
+                WHERE status IN ('queued', 'failed')
+                  AND attempts < max_attempts
+                  AND (scheduled_for IS NULL OR scheduled_for <= NOW())
+                ORDER BY id ASC
+                LIMIT " . (int)$limit
+            );
+            $rows->execute();
+            $items = $rows->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            error_log('processNotificationOutbox fetch: ' . $e->getMessage());
+            return $sum;
+        }
+
+        $upd = $pdo->prepare("
+            UPDATE notification_outbox
+               SET status = ?, attempts = ?, last_error = ?, sent_at = ?
+             WHERE id = ?
+        ");
+
+        foreach ($items as $row) {
+            $sum['processed']++;
+            $attempts = (int)$row['attempts'] + 1;
+            $ok = false;
+            $err = null;
+
+            if (($row['channel'] ?? 'email') === 'email') {
+                $ok = sendEmail($row['to_email'], (string)$row['subject'], (string)$row['body'], ['wrap' => true]);
+                if (!$ok) $err = mailer_last_error();
+            } else {
+                $err = 'unsupported channel: ' . $row['channel']; // WhatsApp/SMS land here later
+            }
+
+            if ($ok) {
+                $upd->execute(['sent', $attempts, null, date('Y-m-d H:i:s'), $row['id']]);
+                $sum['sent']++;
+                notifLog($pdo, ['event_key' => $row['event_key'], 'recipient_user_id' => $row['recipient_user_id'],
+                                'channel' => $row['channel'], 'status' => 'sent',
+                                'entity_type' => $row['entity_type'], 'entity_id' => $row['entity_id']]);
+            } else {
+                $giveUp = $attempts >= (int)$row['max_attempts'];
+                $upd->execute([$giveUp ? 'failed' : 'queued', $attempts, substr((string)$err, 0, 255), null, $row['id']]);
+                $giveUp ? $sum['failed']++ : $sum['retry']++;
+                notifLog($pdo, ['event_key' => $row['event_key'], 'recipient_user_id' => $row['recipient_user_id'],
+                                'channel' => $row['channel'], 'status' => $giveUp ? 'failed' : 'retry',
+                                'entity_type' => $row['entity_type'], 'entity_id' => $row['entity_id'],
+                                'detail' => $err]);
+            }
+        }
+        return $sum;
+    }
+}
+
 if (!function_exists('dispatchEvent')) {
     /**
      * The bus. Resolve recipients for $eventKey and create in-app notifications
@@ -262,7 +366,7 @@ if (!function_exists('dispatchEvent')) {
      */
     function dispatchEvent(PDO $pdo, string $eventKey, array $ctx = []): array
     {
-        $summary = ['dispatched' => false, 'reason' => '', 'recipients' => 0, 'created' => 0, 'skipped' => 0];
+        $summary = ['dispatched' => false, 'reason' => '', 'recipients' => 0, 'created' => 0, 'skipped' => 0, 'emailed' => 0];
         try {
             // Master kill-switch (default ON when unset).
             if (function_exists('get_setting') && (string)get_setting('notif_master_enabled', '1') === '0') {
@@ -305,19 +409,59 @@ if (!function_exists('dispatchEvent')) {
                 'loan_id'     => $ctx['loan_id']     ?? null,
             ];
 
+            // Email channel is opt-in: only when the global toggle is on. Per-event /
+            // per-recipient rule narrowing arrives in Phase 5; until then "on" means
+            // every resolved recipient (who already passed RBAC + scope + mute).
+            $emailOn = function_exists('get_setting') && (string)get_setting('enable_email_notifications', '0') === '1';
+
             foreach ($recipients as $uid => $u) {
-                $dk = ($ctx['dedupe_key'] ?? $base) . '|u' . $uid . '|inapp';
-                if (!notifClaimDedupe($pdo, $dk)) {
-                    $summary['skipped']++;
-                    continue; // already notified for this milestone/period
+                // ── In-app channel (own dedupe) ──
+                $dkIn = ($ctx['dedupe_key'] ?? $base) . '|u' . $uid . '|inapp';
+                if (notifClaimDedupe($pdo, $dkIn)) {
+                    $nid = createNotification($pdo, (int)$uid, $payload);
+                    if ($nid > 0) {
+                        $summary['created']++;
+                        notifLog($pdo, [
+                            'event_key' => $eventKey, 'recipient_user_id' => $uid, 'channel' => 'inapp',
+                            'status' => 'created', 'entity_type' => $entityType, 'entity_id' => $entityId,
+                        ]);
+                    }
+                } else {
+                    $summary['skipped']++; // already in-app notified this period
                 }
-                $nid = createNotification($pdo, (int)$uid, $payload);
-                if ($nid > 0) {
-                    $summary['created']++;
-                    notifLog($pdo, [
-                        'event_key' => $eventKey, 'recipient_user_id' => $uid, 'channel' => 'inapp',
-                        'status' => 'created', 'entity_type' => $entityType, 'entity_id' => $entityId,
-                    ]);
+
+                // ── Email channel (own dedupe via the outbox unique key) ──
+                if ($emailOn && !empty($u['email'])) {
+                    $dkEm = ($ctx['dedupe_key'] ?? $base) . '|u' . $uid . '|email';
+                    $link = (string)($payload['action_url'] ?? '');
+                    if ($link !== '' && stripos($link, 'http') !== 0) {
+                        // Prefer a configured absolute base (works in cron/CLI where there is
+                        // no HTTP_HOST); fall back to buildUrl() in a web request; else relative.
+                        $base = function_exists('get_setting') ? rtrim((string)get_setting('app_url', ''), '/') : '';
+                        if ($base !== '') {
+                            $link = $base . '/' . ltrim($link, '/');
+                        } elseif (!empty($_SERVER['HTTP_HOST']) && function_exists('buildUrl')) {
+                            $link = buildUrl(ltrim($link, '/'));
+                        }
+                    }
+                    $body = '<p>' . htmlspecialchars((string)$payload['message'], ENT_QUOTES, 'UTF-8') . '</p>';
+                    if ($link !== '') {
+                        $body .= '<p><a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8')
+                              . '" style="display:inline-block;padding:8px 16px;background:#0d6efd;color:#fff;'
+                              . 'text-decoration:none;border-radius:6px;">Open in BMS</a></p>';
+                    }
+                    if (enqueueEmail($pdo, [
+                        'event_key'        => $eventKey,
+                        'recipient_user_id'=> $uid,
+                        'to_email'         => $u['email'],
+                        'subject'          => (string)$payload['title'],
+                        'body'             => $body,
+                        'dedupe_key'       => $dkEm,
+                        'entity_type'      => $entityType,
+                        'entity_id'        => $entityId,
+                    ])) {
+                        $summary['emailed']++;
+                    }
                 }
             }
 
