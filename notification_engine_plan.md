@@ -82,10 +82,23 @@ kill-switch + idempotent • fully logged • backward-compatible.
   - [x] Tested 7/7: dispatch enqueued 4 emails, dedupe (1st/2nd), worker processed queue + requeued on SMTP failure (attempts=1, error captured), setting restored
   - [ ] Digest batching (group many items into one email) → deferred (immediate per-event for v1; revisit with Phase 9 AI digest)
   - [ ] WhatsApp/SMS channels → deferred (worker has the `channel` switch ready)
-- [ ] **Phase 5 — Admin config UI**: `notification_rules.php` (event → role/user → channels; live access check; test send)
-- [ ] **Phase 6 — Scheduler**: `cron/run_notification_checks.php` + header.php throttle line (reuse existing pattern)
-- [ ] **Phase 7 — Emit at source actions**: one `dispatchEvent()` after each approval/posting/finance/HR/stock action (behind kill-switch)
-- [ ] **Phase 8 — Dashboard + bell unification**: read from the engine, per-user permission/scope filtered; deep action_url
+- [x] **Phase 5 — Routing rules + Admin UI (DONE)**
+  - [x] 5a Engine: migration `2026_06_28_notification_rules.php` (`notification_rules` + `notification_rules` page_key); `resolveRecipients()` applies rules (target = permission|role|user) and sets per-recipient channels; `dispatchEvent()` uses per-recipient channels; `previewRecipients()` added; fixed a `$base`/URL-base variable collision in the dispatch loop
+  - [x] 5a Tested 12/12: rule narrowing (role/user/permission), **safety: rule to no-access user → nobody**, per-rule channels, cross-entity no-collision regression, idempotent, preview (saved + override rules)
+  - [x] 5b Admin page `app/constant/settings/notification_rules.php` (accordion by module; per-event rule chips; Add Target modal with role/user Select2; event on/off; global master/email switches) + `api/notifications/rules_api.php` (list/save/delete/toggle_event/set_global/preview/test_send); route in `roots.php` + menu link in `header.php`; UI standard applied
+  - [x] 5b Tested: lint clean (API+page+roots+header); save→preview→delete data-flow 5/5 (user-rule narrows preview to 1, delete restores all)
+- [x] **Phase 6 — Scheduler (DONE)**
+  - [x] `cron/run_notification_checks.php` — time-based checks (invoice.overdue implemented; extensible per-check) emitting via `dispatchEvent`, deduped once/day per record
+  - [x] `header.php` wiring: run checks once/day + drain the email outbox (throttled ~2 min, fail-silent); both also runnable via server cron
+  - [x] Tested 3/3: scanned 5 overdue invoices → 11 in-app (per-invoice scope filtering proven), 2nd run idempotent (0 new), cleaned up
+- [~] **Phase 7 — Emit at source actions (mechanism done; representative emits wired)**
+  - [x] Pattern established: one fail-safe `dispatchEvent()` after the successful write, behind the kill-switch
+  - [x] `save_purchase_order.php` (create) → `po.needs_approval`; `save_invoice.php` (create) → `invoice.needs_review`. Lint clean; both events resolve recipients (4) + dispatch.
+  - [ ] Remaining emit points (same one-liner): GRN approved, quotation/SO submitted, returns/notes pending, voucher needs-approval, expense needs-review, low-stock — add per endpoint as desired
+- [x] **Phase 8 — Dashboard + bell unification (DONE)**
+  - [x] Bell already unified — engine writes to the `notifications` table that `api/get_notifications.php` reads per user
+  - [x] `dashboard.php` "System requires your attention" now also surfaces the engine's per-user unread **action** notifications (via `get_system_alerts`), excluding event types the inline alerts already compute (no double-count); title+message render branches added
+  - [x] Tested 2/2: lint clean; engine query includes action items, excludes `invoice.overdue` (dedup)
 - [ ] **Phase 9 — AI smart layer (optional, after core)**: digest, priority scoring, anomaly events, drafted text; setting + fallback
 - [ ] **Phase 10 — Hardening, tests, rollout**: no-leak/integration/idempotency/perf/security; master switch default-off; changelog; staged rollout
 
