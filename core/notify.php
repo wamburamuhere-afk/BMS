@@ -38,7 +38,9 @@ if (!function_exists('usersWithPermission')) {
 
         $sql = "
             SELECT DISTINCT u.user_id, u.email, u.first_name, u.last_name, u.username,
-                            u.role_id, u.notification_preferences
+                            u.role_id, u.notification_preferences,
+                            (CASE WHEN COALESCE(r.is_admin,0) = 1 OR COALESCE(u.is_admin,0) = 1 OR u.role_id = 1
+                                  THEN 1 ELSE 0 END) AS is_admin
             FROM users u
             JOIN roles r ON u.role_id = r.role_id
             WHERE u.is_active = 1
@@ -62,11 +64,12 @@ if (!function_exists('usersWithPermission')) {
             $name = trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''));
             if ($name === '') $name = $r['username'] ?? ('User #' . $r['user_id']);
             $out[(int)$r['user_id']] = [
-                'user_id' => (int)$r['user_id'],
-                'email'   => trim((string)$r['email']),
-                'name'    => $name,
-                'role_id' => (int)$r['role_id'],
-                'prefs'   => $r['notification_preferences'] ?? null,
+                'user_id'  => (int)$r['user_id'],
+                'email'    => trim((string)$r['email']),
+                'name'     => $name,
+                'role_id'  => (int)$r['role_id'],
+                'is_admin' => ((int)($r['is_admin'] ?? 0) === 1),
+                'prefs'    => $r['notification_preferences'] ?? null,
             ];
         }
         return $out;
@@ -163,12 +166,45 @@ if (!function_exists('notifLog')) {
     }
 }
 
+if (!function_exists('notifUserMuted')) {
+    /**
+     * Has the user muted this event/category in their notification_preferences?
+     * Backward-compatible: prefs is whatever JSON the settings form saved; if the
+     * mute keys aren't present, the user is NOT muted (so existing arbitrary prefs
+     * never accidentally suppress notifications).
+     *
+     * Recognised keys:
+     *   notifications_enabled : false/'0'/'off' => mute everything
+     *   muted_events          : string[] of event_keys
+     *   muted_categories      : string[] of categories/modules
+     */
+    function notifUserMuted($prefs, string $eventKey, string $category): bool
+    {
+        if ($prefs === null || $prefs === '') return false;
+        $p = is_array($prefs) ? $prefs : json_decode((string)$prefs, true);
+        if (!is_array($p)) return false;
+
+        if (array_key_exists('notifications_enabled', $p)) {
+            $v = $p['notifications_enabled'];
+            if ($v === false || $v === 0 || $v === '0' || $v === 'false' || $v === 'off') return true;
+        }
+        $me = $p['muted_events'] ?? [];
+        if (is_array($me) && $eventKey !== '' && in_array($eventKey, $me, true)) return true;
+        $mc = $p['muted_categories'] ?? [];
+        if (is_array($mc) && $category !== '' && in_array($category, $mc, true)) return true;
+
+        return false;
+    }
+}
+
 if (!function_exists('resolveRecipients')) {
     /**
-     * WHO should receive this event.
-     * Phase 2: everyone with the required permission on the event's page_key.
-     * (Phase 3 will intersect with project-scope + per-user mute preferences;
-     *  Phase 5 will intersect with admin-configured rules.)
+     * WHO should receive this event =
+     *   users with the required permission on the event's page_key   (RBAC)
+     *   ∩ (if scope-aware & a project is given) admins + users assigned to that project
+     *   − users who muted this event/category in their preferences.
+     *
+     * (Phase 5 will additionally intersect with admin-configured rules.)
      *
      * @param array $event row from notification_events
      */
@@ -177,7 +213,41 @@ if (!function_exists('resolveRecipients')) {
         $pageKey = (string)($event['page_key'] ?? '');
         $verb    = (string)($event['required_verb'] ?? 'view');
         if ($pageKey === '') return [];
-        return usersWithPermission($pdo, $pageKey, $verb);
+
+        $recipients = usersWithPermission($pdo, $pageKey, $verb);
+        if (!$recipients) return [];
+
+        // ── Project-scope filter ──────────────────────────────────────────
+        // A scope-aware event tied to a specific project goes only to admins
+        // plus users assigned to that project (user_projects). A scope-aware
+        // event with no project (company-wide instance) is NOT narrowed.
+        $scopeAware = ((int)($event['scope_aware'] ?? 0) === 1);
+        $projectId  = isset($ctx['project_id']) ? (int)$ctx['project_id'] : 0;
+        if ($scopeAware && $projectId > 0) {
+            $assignedSet = [];
+            try {
+                $st = $pdo->prepare("SELECT user_id FROM user_projects WHERE project_id = ?");
+                $st->execute([$projectId]);
+                foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $aid) $assignedSet[(int)$aid] = true;
+            } catch (Throwable $e) {
+                error_log('resolveRecipients scope lookup: ' . $e->getMessage());
+            }
+            foreach ($recipients as $uid => $u) {
+                if (!empty($u['is_admin'])) continue;          // admins always in scope
+                if (!isset($assignedSet[$uid])) unset($recipients[$uid]);
+            }
+        }
+
+        // ── Per-user mute preferences ─────────────────────────────────────
+        $eventKey = (string)($event['event_key'] ?? '');
+        $category = (string)($ctx['category'] ?? ($event['module'] ?? ''));
+        foreach ($recipients as $uid => $u) {
+            if (notifUserMuted($u['prefs'] ?? null, $eventKey, $category)) {
+                unset($recipients[$uid]);
+            }
+        }
+
+        return $recipients;
     }
 }
 

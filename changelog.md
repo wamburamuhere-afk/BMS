@@ -14,6 +14,7 @@ to the people who actually have access to that area (verified via RBAC). Plan & 
   - Migration `2026_06_28_notification_engine_foundation.php`: `notifications.event_key/category`; tables `notification_events` (13 seeded), `notification_dedupe`, `notification_log`; `notif_master_enabled` setting
   - `core/notify.php` — `usersWithPermission()`, `createNotification()`, `notifClaimDedupe()`, `notifLog()`, `resolveRecipients()` (permission-based), `dispatchEvent()` (in-app + audit, fail-safe)
   - Verified: mailer 9/9; engine 6/6 (RBAC resolve, dispatch creates in-app+log, idempotent re-dispatch, unknown-event safe-skip)
+- **Phase 3 — Recipient resolution:** `resolveRecipients()` now intersects RBAC with **project-scope** (`user_projects`) and subtracts **per-user mutes** (`notifUserMuted` → `notifications_enabled`/`muted_events`/`muted_categories`); `usersWithPermission()` returns an `is_admin` flag. Verified 12/12 (scope drops non-assigned non-admins 4→1; mute excludes a user 4→3, prefs restored).
 
 ## 2026-06-28 (fix) — Lock posted/finalized documents from in-place edit (ledger integrity)
 

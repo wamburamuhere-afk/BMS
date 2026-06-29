@@ -69,7 +69,11 @@ kill-switch + idempotent • fully logged • backward-compatible.
   - [x] Migration `migrations/2026_06_28_notification_engine_foundation.php`: `notifications.event_key/category` + tables `notification_events` (13 seeded), `notification_dedupe`, `notification_log` + `notif_master_enabled` setting
   - [x] `core/notify.php`: `usersWithPermission()`, `createNotification()`, `notifClaimDedupe()`, `notifLog()`, `resolveRecipients()` (permission-only for now), `dispatchEvent()` (in-app + audit, fail-safe)
   - [x] Tested 6/6: RBAC resolve (4 users), dispatch creates in-app + log, idempotent re-dispatch (0 created), unknown event safe-skips. Migration idempotent.
-- [ ] **Phase 3 — Recipient resolution**: rule ∩ permission ∩ project-scope; honor per-user prefs; `previewRecipients()`; no-leak tests
+- [x] **Phase 3 — Recipient resolution (DONE)**
+  - [x] `usersWithPermission()` now returns an `is_admin` flag per user
+  - [x] `resolveRecipients()` adds **project-scope filtering** (scope-aware event + `project_id` → admins + `user_projects` members only) and **per-user mute** (`notifUserMuted()` honoring `notifications_enabled`/`muted_events`/`muted_categories`, backward-compatible)
+  - [x] Tested 12/12: mute logic (5), is_admin flag, no-scope == all, scope filter actually drops non-assigned non-admins (4→1), mute excludes a real user (4→3) with prefs backed-up/restored
+  - [ ] `previewRecipients()` for the admin UI → deferred to Phase 5 (where it's consumed)
 - [ ] **Phase 4 — Channels & delivery**: InApp + Email channels (+ WhatsApp/SMS stubs); `notification_outbox` + `cron/process_notifications.php`; digest batching
 - [ ] **Phase 5 — Admin config UI**: `notification_rules.php` (event → role/user → channels; live access check; test send)
 - [ ] **Phase 6 — Scheduler**: `cron/run_notification_checks.php` + header.php throttle line (reuse existing pattern)
