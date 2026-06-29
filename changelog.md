@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-29 (feat) — Smart Notification Engine: remaining emit points wired
+
+Wired the rest of the seeded events into their source actions/scheduler, completing
+event coverage (same fail-safe, kill-switched `dispatchEvent()` pattern as Phase 7).
+
+- Action-based emits (after the successful create): `api/purchase/create_debit_note.php` → `debit_note.pending`; `api/sales/create_credit_note.php` → `credit_note.pending`; `api/sales/create_return.php` → `sales_return.pending`; `api/create_purchase_return.php` → `purchase_return.pending`; `api/account/add_expense.php` → `expense.needs_review`; `api/create_grn.php` → `grn.pending`; `api/account/save_voucher.php` (create) → `voucher.needs_approval`
+- Time-based checks added to `cron/run_notification_checks.php`: `quotation.expiring` (quotations.quote_valid_until within 7 days, still open) and `tender.deadline` (tenders.submission_deadline within 7 days, not awarded/closed)
+- Verified: lint clean (8 files); all 9 events resolve recipients + dispatch (9/9); scheduler runs all three checks cleanly; test artifacts cleaned up
+
 ## 2026-06-28 (feat) — Smart Notification Engine: Phases 1–2 (mailer + role-aware core)
 
 Foundation for an internal, role-aware notification engine that routes each business event
