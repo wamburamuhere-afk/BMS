@@ -22093,12 +22093,26 @@ function loadProjectStaffDropdown(selector, selectedId) {
     }
 }
 
-// Change "This document was" → "This report was" — walks text nodes only so <strong>Printed</strong>
-// and <strong>Name - Role</strong> bold tags in footer.php are never touched
-document.addEventListener('DOMContentLoaded', function () {
+// Footer text: "This report was" only when the Reports tab (#performance) is active.
+// All other tabs keep "This document was". Restored after every print/export.
+function _bmsSetFooterContext() {
+    var tab = document.getElementById('performance');
     var line1 = document.querySelector('.bms-print-footer .bpf-line1');
-    if (line1) line1.childNodes.forEach(function (n) {
-        if (n.nodeType === 3) n.textContent = n.textContent.replace('This document was', 'This report was');
+    if (!line1) return;
+    var isReports = tab && (tab.classList.contains('show') || tab.classList.contains('active'));
+    var want = isReports ? 'This report was' : 'This document was';
+    line1.childNodes.forEach(function (n) {
+        if (n.nodeType === 3) {
+            n.textContent = n.textContent.replace('This report was', 'This document was').replace('This document was', want);
+        }
+    });
+}
+window.addEventListener('beforeprint', _bmsSetFooterContext);
+window.addEventListener('afterprint', function () {
+    var line1 = document.querySelector('.bms-print-footer .bpf-line1');
+    if (!line1) return;
+    line1.childNodes.forEach(function (n) {
+        if (n.nodeType === 3) n.textContent = n.textContent.replace('This report was', 'This document was');
     });
 });
 
