@@ -19,8 +19,9 @@ $c_logo = getSetting('company_logo', '');
 $c_name = getSetting('company_name', 'BMS');
 
 // Check permissions using centralized system
-$can_view_budget = canView('budget');
-$can_edit_budget = canEdit('budget');
+$can_view_budget    = canView('budget');
+$can_create_budget  = canCreate('budget');
+$can_edit_budget    = canEdit('budget');
 $can_approve_budget = canEdit('budget'); // Using edit permission for approval actions in UI for now
 
 if (!$can_view_budget) {
@@ -373,7 +374,7 @@ for ($year = $current_year - 2; $year <= $current_year + 3; $year++) {
                     <p class="text-muted mb-0">Plan, track, and optimize your financial resources</p>
                 </div>
                 <div>
-                    <?php if ($can_edit_budget): ?>
+                    <?php if ($can_create_budget): ?>
                     <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addBudgetModal">
                         <i class="bi bi-plus-circle"></i> Add Budget
                     </button>
@@ -770,7 +771,7 @@ for ($year = $current_year - 2; $year <= $current_year + 3; $year++) {
                     <i class="bi bi-pie-chart" style="font-size: 4rem; color: #6c757d;"></i>
                     <h4 class="mt-3 text-muted">No Budget Data Found</h4>
                     <p class="text-muted">No budget has been created for <?= ($selected_month !== 'all' ? $months[$selected_month] : 'All Months') ?> <?= ($selected_year !== 'all' ? $selected_year : 'All Years') ?>.</p>
-                    <?php if ($can_edit_budget): ?>
+                    <?php if ($can_create_budget): ?>
                     <button type="button" class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#addBudgetModal">
                         <i class="bi bi-plus-circle"></i> Create Budget
                     </button>
