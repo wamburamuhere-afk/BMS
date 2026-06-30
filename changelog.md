@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-06-30 — fix: procurement DataTable correctness — pagination, card toggle, Materials rewrite
+
+- `app/bms/operations/project_view.php`: fixed DN (`#dtDNs`), DO (`#dtDOs`), Inventory (`#dtWarehouses`) — all had `dom: '<"top d-print-none"f>rt<"clear">'` which stripped length/info/pagination; changed to `'<"d-print-none"lf>rtip'` to restore all controls while still hiding them on print
+- `app/bms/operations/project_view.php`: fixed card/table toggle broken on Return Notes, Debit Notes, Suppliers, NIP — `renderForTable` (bmsMobileCards) was called BEFORE DataTable init so the toggle latched onto `.table-responsive` as wrapper; after DataTable created `.dataTables_wrapper` inside it, switching back to table view only unhid the inner wrapper while `.table-responsive` stayed hidden; fixed by moving DataTable init BEFORE `renderForTable` so both initial and subsequent toggles use `.dataTables_wrapper` consistently
+- `app/bms/operations/project_view.php`: converted Materials from custom AJAX row-injection + manual pagination to a real DataTable — removed custom filter bar HTML (search input, per-page select, count label) and custom pagination div; rewrote `loadProcMaterials()` to build all rows then init `$('#procMatTable').DataTable(...)` after AJAX; removed `procFilterMatTable` and `procGoToMatPage` functions
+- All five fixes verified in browser at project ID=16: table view is default on web, card view on mobile, toggle works both ways, pagination/info visible on all tables
+
+## 2026-06-30 — feat: DataTable for all procurement sub-modules in Project Details
+
+- `app/bms/operations/project_view.php`: added DataTable (destroy+init, responsive, pageLength 25) to 5 render functions that were missing it:
+  - `renderReturns` → `#procReturnsInnerTable` (Return Notes, 9 cols, targets [0,8])
+  - `renderProjectDebitNotes` → `#procDebitNotesInnerTable` (Debit Notes, 9 cols, targets [0,8])
+  - `renderProjectSuppliers` → `#projSuppliersTable` (Suppliers, 7 cols, targets [0,6])
+  - `projNipRenderTable` → `#projNipInnerTable` (Non-inventory Products, 6 cols, targets [0,5])
+- Already had DataTable before this session: Purchase Orders (`#procPOInnerTable`, `#procPOFullInnerTable`), GRN (`#procGRNInnerTable`, `#procGRNDNInnerTable`), Delivery Notes (`#dtDNs`), Delivery Orders (`#dtDOs`), RFQ (`#dtRFQs`), Inventory (`#dtWarehouses`), Sub-Contractors (`#proj-sc-table`)
+- Materials tab uses custom AJAX pagination (`procFilterMatTable`) — DataTable would conflict; left as-is (already provides search + pagination)
+- All 12 procurement sub-modules verified in browser at project ID=16 — no JS errors, S/NO column present on all tables
+
 ## 2026-06-29 — fix: POS Dashboard period button double-selection + redundant dashboard reload
 
 - `app/bms/pos/pos_dashboard.php`: removed redundant Bootstrap `active` class from yearly period button — with `btn-outline-primary.active`, Bootstrap renders it as filled blue so clicking Daily made both Daily and Yearly look selected simultaneously; `btn-primary` alone correctly shows the selected state
