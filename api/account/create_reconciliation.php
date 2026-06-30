@@ -37,12 +37,11 @@ try {
     require_once __DIR__ . '/../../core/code_generator.php';
     $reconciliation_number = nextCode($pdo, 'REC');   // company-prefixed sequential (BFS-REC-0001)
 
-    // Always derive the book balance from the ledger for this account; keep the
-    // submitted value only if the account lookup somehow returns nothing.
-    $bb = $pdo->prepare("SELECT current_balance FROM accounts WHERE account_id = ?");
-    $bb->execute([$bank_account_id]);
-    $bbVal = $bb->fetchColumn();
-    if ($bbVal !== false) { $book_balance = (float)$bbVal; }
+    // Derive book balance from the posted GL as-of period_end — the only correct
+    // basis for reconciliation. current_balance is a live "now" snapshot and must
+    // never be used here.
+    require_once __DIR__ . '/../../core/account_balance.php';
+    $book_balance = accountLedgerBalanceAsOf($pdo, (int)$bank_account_id, $period_end);
 
     $difference = (float)$statement_balance - (float)$book_balance;
     // Status logic: if difference is 0, it might be reconciled, but usually starts as pending until approved? 
