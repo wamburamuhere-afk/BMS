@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-06-30 (fix) — IS and Cash Flow default to Year-to-Date instead of current month
+
+Income Statement and Cash Flow both defaulted to the current calendar month, making
+them inconsistent with Balance Sheet / Trial Balance which are cumulative. Changed
+both to default to financial-year start (1 Jan of current year) through today — giving
+Year-to-Date figures that are meaningful for management and closer in scope to the BS/TB.
+
+- `api/account/get_income_statement.php` — default start_date: `Y-m-01` → `Y-01-01`; end_date: `Y-m-t` → `Y-m-d`
+- `api/account/get_cash_flow.php` — default start_date: `Y-m-01` → `Y-01-01`; end_date: `Y-m-t` → `Y-m-d`
+
+---
+
+## 2026-06-30 (fix) — Trial Balance: include inactive accounts with posted history
+
+The TB query used `WHERE a.status = 'active'` which silently excluded deactivated
+legacy accounts that still carry posted journal_entry_items rows. This made the
+`Σ Dr = Σ Cr` balanced check unreliable — the TB was only verifying a subset of
+the ledger. Fixed by adding the same OR EXISTS / OR opening_balance guard that
+`_gl_account_activity()` (the IS/BS engine) already uses, so the TB now sees the
+same universe of accounts as the Income Statement and Balance Sheet.
+
+- `api/account/get_trial_balance.php` — expanded `WHERE a.status = 'active'`
+  to also include accounts with a non-zero opening_balance or any posted journal
+  entry items (matching the logic in `core/financial_reports.php::_gl_account_activity`)
+
+---
+
 ## 2026-06-27 (feat) — Company-prefixed sequential document codes (Group B — edit side / re-code-on-edit)
 
 Editable documents now upgrade a legacy code to `PREFIX-TYPE-NNNN` when edited & saved —

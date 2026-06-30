@@ -68,8 +68,8 @@ if (!$fc_ready) {
     exit;
 }
 
-$start_date = $_GET['start_date'] ?? date('Y-m-01');
-$end_date   = $_GET['end_date']   ?? date('Y-m-t');
+$start_date = $_GET['start_date'] ?? date('Y-01-01');
+$end_date   = $_GET['end_date']   ?? date('Y-m-d');
 $project_id = isset($_GET['project_id']) && $_GET['project_id'] !== '' && (int)$_GET['project_id'] > 0
     ? (int)$_GET['project_id']
     : null;

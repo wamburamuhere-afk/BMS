@@ -158,7 +158,16 @@ try {
                                             AND je.status    = 'posted'
                                             AND je.entry_date <= ?
                                             {$scope['sql']}
-             WHERE a.status = 'active'
+             WHERE (
+                 a.status = 'active'
+                 OR COALESCE(a.opening_balance, 0) <> 0
+                 OR EXISTS (
+                     SELECT 1 FROM journal_entry_items jx
+                     JOIN journal_entries jy ON jy.entry_id = jx.entry_id
+                     WHERE jx.account_id = a.account_id
+                       AND jy.status = 'posted'
+                 )
+             )
           GROUP BY a.account_id, a.account_code, a.account_name,
                    a.opening_balance, at.statement, at.category, at.normal_side
           ORDER BY
