@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../helpers/transaction_helper.php';
 require_once __DIR__ . '/../../core/ledger_post.php';   // assertJournalNotPosted (posted journals are immutable)
+require_once __DIR__ . '/../../core/recon_period_lock.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -42,6 +43,9 @@ try {
     if (abs($total_debits - $total_credits) > 0.01) {
         throw new Exception('Journal entry is not balanced');
     }
+
+    // Period lock: block edit if the entry falls in a finalized reconciliation period
+    assertNotInFinalizedReconPeriod($pdo, (int)$entry_id);
 
     // IMMUTABILITY GUARD (account_financial.md #15): a POSTED journal entry is in the
     // reports — it must never be edited in place (that silently rewrites history).

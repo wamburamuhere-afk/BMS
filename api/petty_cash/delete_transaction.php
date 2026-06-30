@@ -9,6 +9,7 @@
 // reacted to the delete).
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/payment_source.php';   // reversePettyCashLedger
+require_once __DIR__ . '/../../core/bank_register.php';    // reverseBankTransaction
 
 header('Content-Type: application/json');
 
@@ -51,6 +52,22 @@ try {
     $pdo->prepare("DELETE FROM petty_cash_transactions WHERE id = ?")->execute([$id]);
 
     $pdo->commit();
+
+    // Remove the bank register lines that were written on save.
+    $regRef = 'PC-' . $id;
+    $txType = (string)($tx['type'] ?? '');
+    if ($txType === 'expense') {
+        // We need the fund account to delete the right register row.
+        // The fund_account_id was on the deleted row; fetch it from pct before delete already
+        // happened above, so we need a snapshot. We stored it in $tx — re-query won't work
+        // (deleted). Instead: reverseBankTransaction will delete by reference+type regardless of account,
+        // so we pass account_id=0 sentinel and match by reference only via direct SQL.
+        $pdo->prepare("DELETE FROM bank_transactions WHERE reference_number = ? AND transaction_type = 'withdrawal'")
+            ->execute([$regRef]);
+    } elseif ($txType === 'deposit') {
+        $pdo->prepare("DELETE FROM bank_transactions WHERE reference_number IN (?, ?)")
+            ->execute([$regRef . '-out', $regRef . '-in']);
+    }
 
     // Remove the receipt file once the row is gone.
     if (!empty($tx['receipt_file'])) {

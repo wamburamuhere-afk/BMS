@@ -1,5 +1,40 @@
 # BMS Changelog
 
+## 2026-06-29 (feat) — Bank Reconciliation Upgrade: All 4 Phases (53/53 tests green)
+
+Full professional-grade bank reconciliation replacing the skeleton implementation.
+Branch: `feat/bank-reconciliation-upgrade`. 53 CLI tests — all passing.
+
+**Phase 1 — Correct Book Balance + Petty Cash Register:**
+- `core/account_balance.php`: new `accountLedgerBalanceAsOf()` — period-end GL balance (not live `current_balance`)
+- `api/account/create_reconciliation.php`: book_balance from ledger-as-of period_end
+- `api/account/get_bank_balance.php`: GL-derived balance; accepts `as_of` param
+- `app/constant/accounts/bank_reconciliation.php`: modal re-fetches book balance on period_end change
+- `api/petty_cash/save_transaction.php`: registers bank_transactions lines (expense=withdrawal, top-up=withdrawal+deposit)
+- `api/petty_cash/delete_transaction.php`: removes bank register lines on delete
+- Migration `2026_06_29_bank_recon_opening_balance.php`: adds `opening_balance` column
+
+**Phase 2 — Adjusting Journal Entries:**
+- Migration `2026_06_29_bank_recon_adjustments_table.php`: `bank_reconciliation_adjustments` table
+- `api/account/add_reconciliation_adjustment.php`: posts balanced JE + auto-matched register line for bank_charge, interest_earned, nsf, standing_order, other_out, other_in
+- `api/account/create_entry_from_statement_line.php`: creates GL entry for unrecorded lines, auto-matches original
+- `api/account/get_reconciliation_adjustments.php`: returns adjustments list
+- `app/constant/accounts/reconciliation_details.php`: Add Adjustment button + modal; Create-from-line button on unmatched rows; Adjustments panel
+
+**Phase 3 — Beginning-Balance Chain + Two-Column Report:**
+- `api/account/create_reconciliation.php`: period overlap guard; auto-fills opening_balance from prior finalized rec
+- `api/account/get_reconciliation_lines.php`: excludes lines already cleared in prior reconciliations
+- `reconciliation_details.php`: opening_balance on screen; two-column bank/book statement (print-only)
+
+**Phase 4 — Period Lock + Unreconcile:**
+- `core/recon_period_lock.php`: `assertNotInFinalizedReconPeriod()` — guards JE edit/void/reverse
+- `api/account/void_journal.php`, `reverse_journal.php`, `update_journal.php`: period lock wired in
+- `api/account/unreconcile.php`: unlocks finalized reconciliation; requires reason; logAudit trail
+- `reconciliation_details.php`: Unreconcile button (canApprove gate) with reason modal
+
+**Tests:** `tests/test_bank_recon_phase1_cli.php` (15), `phase2` (15), `phase3` (11), `phase4` (12)
+
+---
 ## 2026-06-30 — fix: procurement DataTable correctness — pagination, card toggle, Materials rewrite
 
 - `app/bms/operations/project_view.php`: fixed DN (`#dtDNs`), DO (`#dtDOs`), Inventory (`#dtWarehouses`) — all had `dom: '<"top d-print-none"f>rt<"clear">'` which stripped length/info/pagination; changed to `'<"d-print-none"lf>rtip'` to restore all controls while still hiding them on print
