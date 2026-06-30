@@ -3,6 +3,7 @@ ob_start();
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/payment_source.php';   // postPettyCashLedger / reversePettyCashLedger
 require_once __DIR__ . '/../../core/money_guard.php';      // accountFundsWarning (I3 warn-but-allow)
+require_once __DIR__ . '/../../core/bank_register.php';    // recordBankTransaction / reverseBankTransaction
 
 ini_set('display_errors', 0);
 error_reporting(0);
@@ -234,9 +235,27 @@ try {
 
     $pdo->commit();
 
-    // Phase 3b — petty cash writes are high-sensitivity financial events.
+    // Bank register — write statement lines so the worksheet sees petty cash movements.
+    // Uses the petty_cash transaction id as the reference for idempotency.
     $isUpdate = ($transaction_id > 0);
     $logId    = $isUpdate ? $transaction_id : ($new_id ?? 0);
+    $regRef   = 'PC-' . $logId;
+    if ($type === 'expense') {
+        // Fund is drawn down — withdrawal from the petty cash fund account.
+        reverseBankTransaction($pdo, (int)$resolvedFund, $regRef, 'withdrawal');   // remove old on edit
+        recordBankTransaction($pdo, (int)$resolvedFund, $amount, 'withdrawal', $date, $regRef,
+            'Petty cash expense: ' . ($description ?: 'expense'), $user_id);
+    } elseif ($type === 'deposit' && $source_account_id) {
+        // Top-up: source bank loses cash, fund gains cash.
+        reverseBankTransaction($pdo, (int)$source_account_id, $regRef . '-out', 'withdrawal');
+        reverseBankTransaction($pdo, (int)$resolvedFund,      $regRef . '-in',  'deposit');
+        recordBankTransaction($pdo, (int)$source_account_id, $amount, 'withdrawal', $date,
+            $regRef . '-out', 'Petty cash top-up (source): ' . ($description ?: 'top-up'), $user_id);
+        recordBankTransaction($pdo, (int)$resolvedFund, $amount, 'deposit', $date,
+            $regRef . '-in', 'Petty cash top-up (fund): ' . ($description ?: 'top-up'), $user_id);
+    }
+
+    // Phase 3b — petty cash writes are high-sensitivity financial events.
     logActivity(
         $pdo,
         $user_id,

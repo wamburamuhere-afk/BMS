@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../helpers/transaction_helper.php';
+require_once __DIR__ . '/../../core/recon_period_lock.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -18,11 +19,14 @@ if (!canEdit('journals')) {
 }
 
 try {
-    $entry_id = $_POST['entry_id'] ?? 0;
-    
+    $entry_id = (int)($_POST['entry_id'] ?? 0);
+
     if ($entry_id <= 0) {
         throw new Exception('Invalid journal entry ID');
     }
+
+    // Period lock: block void if the entry falls in a finalized reconciliation period
+    assertNotInFinalizedReconPeriod($pdo, $entry_id);
 
     $stmt = $pdo->prepare("UPDATE journal_entries SET status = 'void', updated_at = NOW(), updated_by = ? WHERE entry_id = ?");
     $result = $stmt->execute([$_SESSION['user_id'], $entry_id]);

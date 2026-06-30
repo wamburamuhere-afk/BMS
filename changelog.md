@@ -24,6 +24,184 @@ same universe of accounts as the Income Statement and Balance Sheet.
 - `api/account/get_trial_balance.php` — expanded `WHERE a.status = 'active'`
   to also include accounts with a non-zero opening_balance or any posted journal
   entry items (matching the logic in `core/financial_reports.php::_gl_account_activity`)
+## 2026-06-29 (feat) — Bank Reconciliation Upgrade: All 4 Phases (53/53 tests green)
+
+Full professional-grade bank reconciliation replacing the skeleton implementation.
+Branch: `feat/bank-reconciliation-upgrade`. 53 CLI tests — all passing.
+
+**Phase 1 — Correct Book Balance + Petty Cash Register:**
+- `core/account_balance.php`: new `accountLedgerBalanceAsOf()` — period-end GL balance (not live `current_balance`)
+- `api/account/create_reconciliation.php`: book_balance from ledger-as-of period_end
+- `api/account/get_bank_balance.php`: GL-derived balance; accepts `as_of` param
+- `app/constant/accounts/bank_reconciliation.php`: modal re-fetches book balance on period_end change
+- `api/petty_cash/save_transaction.php`: registers bank_transactions lines (expense=withdrawal, top-up=withdrawal+deposit)
+- `api/petty_cash/delete_transaction.php`: removes bank register lines on delete
+- Migration `2026_06_29_bank_recon_opening_balance.php`: adds `opening_balance` column
+
+**Phase 2 — Adjusting Journal Entries:**
+- Migration `2026_06_29_bank_recon_adjustments_table.php`: `bank_reconciliation_adjustments` table
+- `api/account/add_reconciliation_adjustment.php`: posts balanced JE + auto-matched register line for bank_charge, interest_earned, nsf, standing_order, other_out, other_in
+- `api/account/create_entry_from_statement_line.php`: creates GL entry for unrecorded lines, auto-matches original
+- `api/account/get_reconciliation_adjustments.php`: returns adjustments list
+- `app/constant/accounts/reconciliation_details.php`: Add Adjustment button + modal; Create-from-line button on unmatched rows; Adjustments panel
+
+**Phase 3 — Beginning-Balance Chain + Two-Column Report:**
+- `api/account/create_reconciliation.php`: period overlap guard; auto-fills opening_balance from prior finalized rec
+- `api/account/get_reconciliation_lines.php`: excludes lines already cleared in prior reconciliations
+- `reconciliation_details.php`: opening_balance on screen; two-column bank/book statement (print-only)
+
+**Phase 4 — Period Lock + Unreconcile:**
+- `core/recon_period_lock.php`: `assertNotInFinalizedReconPeriod()` — guards JE edit/void/reverse
+- `api/account/void_journal.php`, `reverse_journal.php`, `update_journal.php`: period lock wired in
+- `api/account/unreconcile.php`: unlocks finalized reconciliation; requires reason; logAudit trail
+- `reconciliation_details.php`: Unreconcile button (canApprove gate) with reason modal
+
+**Tests:** `tests/test_bank_recon_phase1_cli.php` (15), `phase2` (15), `phase3` (11), `phase4` (12)
+
+---
+## 2026-06-30 — fix: procurement DataTable correctness — pagination, card toggle, Materials rewrite
+
+- `app/bms/operations/project_view.php`: fixed DN (`#dtDNs`), DO (`#dtDOs`), Inventory (`#dtWarehouses`) — all had `dom: '<"top d-print-none"f>rt<"clear">'` which stripped length/info/pagination; changed to `'<"d-print-none"lf>rtip'` to restore all controls while still hiding them on print
+- `app/bms/operations/project_view.php`: fixed card/table toggle broken on Return Notes, Debit Notes, Suppliers, NIP — `renderForTable` (bmsMobileCards) was called BEFORE DataTable init so the toggle latched onto `.table-responsive` as wrapper; after DataTable created `.dataTables_wrapper` inside it, switching back to table view only unhid the inner wrapper while `.table-responsive` stayed hidden; fixed by moving DataTable init BEFORE `renderForTable` so both initial and subsequent toggles use `.dataTables_wrapper` consistently
+- `app/bms/operations/project_view.php`: converted Materials from custom AJAX row-injection + manual pagination to a real DataTable — removed custom filter bar HTML (search input, per-page select, count label) and custom pagination div; rewrote `loadProcMaterials()` to build all rows then init `$('#procMatTable').DataTable(...)` after AJAX; removed `procFilterMatTable` and `procGoToMatPage` functions
+- All five fixes verified in browser at project ID=16: table view is default on web, card view on mobile, toggle works both ways, pagination/info visible on all tables
+
+## 2026-06-30 — feat: DataTable for all procurement sub-modules in Project Details
+
+- `app/bms/operations/project_view.php`: added DataTable (destroy+init, responsive, pageLength 25) to 5 render functions that were missing it:
+  - `renderReturns` → `#procReturnsInnerTable` (Return Notes, 9 cols, targets [0,8])
+  - `renderProjectDebitNotes` → `#procDebitNotesInnerTable` (Debit Notes, 9 cols, targets [0,8])
+  - `renderProjectSuppliers` → `#projSuppliersTable` (Suppliers, 7 cols, targets [0,6])
+  - `projNipRenderTable` → `#projNipInnerTable` (Non-inventory Products, 6 cols, targets [0,5])
+- Already had DataTable before this session: Purchase Orders (`#procPOInnerTable`, `#procPOFullInnerTable`), GRN (`#procGRNInnerTable`, `#procGRNDNInnerTable`), Delivery Notes (`#dtDNs`), Delivery Orders (`#dtDOs`), RFQ (`#dtRFQs`), Inventory (`#dtWarehouses`), Sub-Contractors (`#proj-sc-table`)
+- Materials tab uses custom AJAX pagination (`procFilterMatTable`) — DataTable would conflict; left as-is (already provides search + pagination)
+- All 12 procurement sub-modules verified in browser at project ID=16 — no JS errors, S/NO column present on all tables
+
+## 2026-06-29 — fix: POS Dashboard period button double-selection + redundant dashboard reload
+
+- `app/bms/pos/pos_dashboard.php`: removed redundant Bootstrap `active` class from yearly period button — with `btn-outline-primary.active`, Bootstrap renders it as filled blue so clicking Daily made both Daily and Yearly look selected simultaneously; `btn-primary` alone correctly shows the selected state
+- `app/bms/pos/pos_dashboard.php`: `voidSale()` and `openReturn()` now only call `loadDashboard()` if the dashboard panel is currently visible; previously they fired a redundant AJAX request every time regardless of panel state
+
+## 2026-06-29 — fix: POS Dashboard print footer injected into DataTables print window
+
+- `app/bms/pos/pos_dashboard.php`: added `PRINT_ROLE` and `PRINT_YEAR` JS constants; `PRINT_USER` now correctly reads from session before footer.php runs
+- `app/bms/pos/pos_dashboard.php`: DataTables print `customize` callback now appends the standard BMS print footer (name, role, datetime, BJP Technologies copyright) to the print window — matching what footer.php renders via `@media print` on other pages
+- `tests/test_pos_dashboard_cli.php`: 3 new checks (BJP Technologies line, PRINT_ROLE, PRINT_YEAR); 98 total, all passing
+
+## 2026-06-29 — fix: POS Dashboard stat cards + DataTables + toggle behaviour
+
+- `app/bms/pos/pos_dashboard.php`: fixed stat cards not updating on period change — `getActivePeriod()` was reading `.active` CSS class but click handler only swapped `btn-primary`; now reads `.btn-primary` correctly
+- `app/bms/pos/pos_dashboard.php`: Sales Dashboard hidden by default; "Sales Dashboard" toggle button added to header row (top-right, next to "Open POS"); turns blue when dashboard is active
+- `app/bms/pos/pos_dashboard.php`: Recent Sales and Low Stock now use DataTables with S/NO column (`#recentSalesTable`, `#lowStockTable`, `initDashboardTables()`); Top Products table also gains S/NO column
+- `app/bms/pos/pos_dashboard.php`: Dashboard only loads when user opens it (toggle), not on every page load
+- `tests/test_pos_dashboard_cli.php`: updated to 95 checks (all passing)
+
+## 2026-06-29 — fix: POS Dashboard filter UI and safeOutput bug
+
+- `app/bms/pos/pos_dashboard.php`: defined `safeOutput()` locally (was undefined causing DataTable/dashboard JS errors)
+- `app/bms/pos/pos_dashboard.php`: changed default period from Monthly to Yearly
+- `app/bms/pos/pos_dashboard.php`: replaced From/To date range with period-specific pickers — Daily (single date), Weekly (any day → Mon–Sun computed), Monthly (month+year selects), Quarterly (Q1–Q4 + year), Yearly (year select)
+- `app/bms/pos/pos_dashboard.php`: `getDateRange()` / `showFilterPanel()` replace `setPeriodDates()`; all Apply buttons use class-based delegation
+- `tests/test_pos_dashboard_cli.php`: updated to 88 checks (all passing)
+
+## 2026-06-29 — feat: rewrite POS Dashboard (sales history first + period filter + toolbar)
+
+- `app/bms/pos/pos_dashboard.php`: complete rewrite — Sales History section shown at top (always visible), Dashboard section below (always visible); removed old toggle buttons (#btnViewDashboard / #btnViewHistory)
+- `app/bms/pos/pos_dashboard.php`: added period filter (Daily/Weekly/Monthly/Quarterly/Yearly) with smart date defaults; Monthly is the default; Apply button triggers table reload
+- `app/bms/pos/pos_dashboard.php`: Copy/CSV/Print toolbar matching suppliers.php style (white bordered box with icons); Show: page-length selector
+- `app/bms/pos/pos_dashboard.php`: fixed dashboard "Loading…" stuck bug — `.fail()` error handler updates all widget divs with user-friendly error + Refresh button
+- `app/bms/pos/pos_dashboard.php`: full ui-constants.md compliance (stat card bg:#e7f0ff + border:#b6ccfe, modal headers bg-primary, gear-fill action dropdown, no raw alert())
+- `tests/test_pos_dashboard_cli.php`: updated regression suite (74 checks, all passing)
+
+## 2026-06-29 — fix: budget permission key mismatch and activity log
+
+- `api/account/add_budget.php`: fixed `canCreate('budgets')` → `canCreate('budget')` (key mismatch was blocking all non-admins even when granted permission)
+- `api/account/add_budget.php`: improved activity log from raw IDs to human-readable message e.g. "Created budget: 'Office Supplies' — TZS 500,000.00 for January 2026"
+- `app/constant/accounts/budget.php`: added `$can_create_budget = canCreate('budget')` and switched both Add/Create Budget buttons to use it (previously incorrectly gated on `$can_edit_budget`)
+
+## 2026-06-29 — fix: project_view.php scope footer text to Reports tab only
+
+- `app/bms/operations/project_view.php`: replaced DOMContentLoaded blanket text swap with beforeprint/afterprint listeners; "This report was" now appears only when the #performance (Reports) tab is active — all other tabs keep "This document was"; afterprint always restores to "document"
+
+## 2026-06-29 — fix: project_view.php print footer text and page margins
+
+- `app/bms/operations/project_view.php`: added JS on DOMContentLoaded to replace "This document was" with "This report was" in the `.bms-print-footer` (only on this page; footer.php untouched)
+- `app/bms/operations/project_view.php`: changed `@page { size: A3 landscape; margin: 10mm !important; }` to `@page { margin: 10mm 8mm 16mm 8mm; }` to match the `i_e_print.md` standard and remove the incorrect A3 landscape override
+
+## 2026-06-29 — fix: projects.php edit form contract sum
+
+- `app/bms/operations/projects.php`: use `d.form_contract_sum` instead of `d.contract_sum` in `editProject()` so the Contract Sum field shows the original stored value, not the milestone-calculated total
+
+## 2026-06-29 (feat) — Smart Notification Engine: remaining emit points wired
+
+Wired the rest of the seeded events into their source actions/scheduler, completing
+event coverage (same fail-safe, kill-switched `dispatchEvent()` pattern as Phase 7).
+
+- Action-based emits (after the successful create): `api/purchase/create_debit_note.php` → `debit_note.pending`; `api/sales/create_credit_note.php` → `credit_note.pending`; `api/sales/create_return.php` → `sales_return.pending`; `api/create_purchase_return.php` → `purchase_return.pending`; `api/account/add_expense.php` → `expense.needs_review`; `api/create_grn.php` → `grn.pending`; `api/account/save_voucher.php` (create) → `voucher.needs_approval`
+- Time-based checks added to `cron/run_notification_checks.php`: `quotation.expiring` (quotations.quote_valid_until within 7 days, still open) and `tender.deadline` (tenders.submission_deadline within 7 days, not awarded/closed)
+- Verified: lint clean (8 files); all 9 events resolve recipients + dispatch (9/9); scheduler runs all three checks cleanly; test artifacts cleaned up
+- Added permanent regression suite `tests/test_notification_engine_cli.php` (gated by the pre-push hook + CI): files/lint, schema, seeded catalog, helpers, dispatch pipeline + idempotency, enqueue dedupe, mute logic, rule narrowing + no-access safety, mailer fail-silent, digest fallback, and a static check that every wired source file emits its event. 77/0, idempotent, self-cleaning. (It caught that `core/notify.php` doesn't auto-load `core/mailer.php` — fine in prod since the outbox worker loads it on demand; the test loads it explicitly.)
+
+## 2026-06-28 (feat) — Smart Notification Engine: Phases 1–2 (mailer + role-aware core)
+
+Foundation for an internal, role-aware notification engine that routes each business event
+to the people who actually have access to that area (verified via RBAC). Plan & tracker in
+`notification_engine_plan.md`. Email-only target; in-app working now.
+
+- **Phase 1 — Mailer (was missing entirely; `test_email_config.php` only simulated):**
+  - Vendored PHPMailer v6.9.1 into `includes/PHPMailer/` (no composer)
+  - `core/mailer.php` — `sendEmail()` + `bms_email_wrap()` + `mailer_last_error()`; SMTP from `system_settings` (per-call override supported); TLS via `includes/cacert.pem`; fail-silent
+  - `api/test_email_config.php` now actually sends (override + saved-password fallback)
+- **Phase 2 — Engine core:**
+  - Migration `2026_06_28_notification_engine_foundation.php`: `notifications.event_key/category`; tables `notification_events` (13 seeded), `notification_dedupe`, `notification_log`; `notif_master_enabled` setting
+  - `core/notify.php` — `usersWithPermission()`, `createNotification()`, `notifClaimDedupe()`, `notifLog()`, `resolveRecipients()` (permission-based), `dispatchEvent()` (in-app + audit, fail-safe)
+  - Verified: mailer 9/9; engine 6/6 (RBAC resolve, dispatch creates in-app+log, idempotent re-dispatch, unknown-event safe-skip)
+- **Phase 3 — Recipient resolution:** `resolveRecipients()` now intersects RBAC with **project-scope** (`user_projects`) and subtracts **per-user mutes** (`notifUserMuted` → `notifications_enabled`/`muted_events`/`muted_categories`); `usersWithPermission()` returns an `is_admin` flag. Verified 12/12 (scope drops non-assigned non-admins 4→1; mute excludes a user 4→3, prefs restored).
+- **Phase 4 — Channels & delivery:** migration `2026_06_28_notification_outbox.php` (email queue); `dispatchEvent()` enqueues an email per recipient (gated by `enable_email_notifications`) alongside the in-app notification; `enqueueEmail()` + `processNotificationOutbox()` worker (retry/backoff, give-up at max_attempts, logged) + `cron/process_notifications.php`. Email links use a configurable `app_url` (cron-safe). Verified 7/7 (4 queued, dedupe, worker requeues on SMTP failure).
+- **Phase 5 — Routing rules + Admin UI:** migration `2026_06_28_notification_rules.php` (`notification_rules` + `notification_rules` page_key). `resolveRecipients()` now applies admin rules (target = everyone-with-access / role / specific user) and sets per-recipient channels — a rule can only narrow within those who have access (cannot grant it); `previewRecipients()` added; fixed a `$base`/URL-base var collision in the dispatch loop. Admin screen `app/constant/settings/notification_rules.php` + `api/notifications/rules_api.php` (list/save/delete/toggle/preview/test-send), route in `roots.php`, menu link in `header.php`. Verified: engine 12/12 (incl. rule-to-no-access-user → nobody), save→preview→delete 5/5.
+- **Phase 6 — Scheduler:** `cron/run_notification_checks.php` (time-based checks; `invoice.overdue` implemented, extensible) emitting via `dispatchEvent`, deduped once/day per record; `header.php` runs the daily checks once/day + drains the email outbox (throttled ~2 min, fail-silent) — both also runnable via server cron. Verified 3/3 (5 overdue invoices → 11 in-app via per-invoice scope filtering; 2nd run idempotent).
+- **Phase 7 — Emit at source actions:** representative fail-safe, kill-switched emits after the successful write — `save_purchase_order.php` (create) → `po.needs_approval`; `save_invoice.php` (create) → `invoice.needs_review`. Pattern documented for the remaining endpoints. Verified: both events resolve recipients (4) + dispatch; lint clean.
+- **Phase 8 — Dashboard + bell unification:** the bell already reflects engine notifications (same `notifications` table). `app/dashboard.php` "System requires your attention" now also surfaces each user's unread **action** notifications from the engine (via `get_system_alerts`), excluding event types the inline alerts already compute (no double-count). Verified 2/2 (lint; query includes action items, excludes `invoice.overdue`).
+- **Phase 9 — AI daily digest:** `aiSummarizeNotifications()` reuses the provider-agnostic `aiComplete()` (`core/ai_service.php`) for a prioritized HTML briefing with a deterministic fallback when AI is off; `sendNotificationDigests()` queues one digest email/user/day (opt-in `notif_digest_enabled`, gated by master + global email, deduped) via the outbox; `cron/send_notification_digests.php` + header once/day throttle; admin "AI daily digest" toggle on the rules page. Verified: fallback summary + fresh-process cron queued 1 digest/user.
+- **Phase 10 — Hardening & rollout:** verified security gates (rules API admin-only + CSRF; page `autoEnforcePermission`), engine fail-safe + kill-switch + idempotent + permission/scope no-leak; final lint clean across all touched files; engine regression 4/4. Operations & Rollout guide added to `notification_engine_plan.md`. **Smart Notification Engine complete (Phases 1–10).**
+
+## 2026-06-28 (fix) — Lock posted/finalized documents from in-place edit (ledger integrity)
+
+Once a document is posted to the ledger (`journal_entries`) it must not be edited in place —
+corrections go through void/reverse. Audit showed **Invoice, GRN, and Payment Voucher** edit
+endpoints still accepted edits after posting (the others — Debit/Credit Note, Purchase/Sales
+Return, Expense, Manual Journal — were already locked to `pending`/`draft`/non-`paid`). Added a
+server-side **409 lock** on the three open edit endpoints, keyed off the authoritative
+`documentGlPosted()` (links by integer `entity_id`, never the display code):
+
+- `api/account/save_invoice.php` — edit branch refuses if `documentGlPosted('invoice', id)`
+- `api/update_grn.php` — refuses if `documentGlPosted('grn', id)` OR status `approved`
+- `api/account/save_voucher.php` — edit branch refuses if posted OR status `paid`/`approved`/`cancelled`
+
+Guards run before any write and only on the edit path (create flows untouched); approval/posting
+transitions live in other endpoints, so the workflow is unaffected. Verified: `php -l` clean on
+all three; runtime test 8/8 — posted/approved/paid rows blocked, pending/draft rows still editable.
+
+## 2026-06-28 (fix) — Edit/Save no longer force-jumps into the project when opened externally
+
+Editing a project-linked **Purchase Order, GRN, Delivery/Received Note, or Sales Order** from the
+general (external) area used to redirect to the project page after Save, because the redirect read
+the project stored **on the record**. The post-save redirect now follows the **origin** only — a
+project flag in the URL means "I came from inside the project":
+- came from a project → return to the project
+- opened externally → stay external (the document's own view / its list)
+
+The record keeps its own project link and still appears inside its project (unchanged). Create-new
+flows were already correct and left alone.
+
+- `app/bms/purchase/purchase_order_create.php` — added `$origin_project_id` (URL-only); PO edit redirect uses it instead of the record's `$project_id`
+- `app/bms/sales/sales_order_create.php` — redirect uses `$origin_project_id`, not the record/quote-derived `$back_project_id`
+- `app/bms/grn/dn_create.php` — DN edit `return_url` keys off `$origin_project_id`, not record/PO-derived
+- `app/bms/grn/grn_edit.php` — added `$origin_return_url` (URL-only) feeding the `return_url` hidden field; saved project link (`projectIdHidden`) unchanged
+- `app/bms/grn/grn_view.php` — reads `project_id` origin; Edit link forwards it; "Back to Project" button shows only when present (so in-project GRN editing still returns to the project)
+- `app/bms/operations/project_view.php` — GRN view links now carry `&project_id` so the in-project chain (project → GRN view → edit) keeps its origin
+- Verified: `php -l` clean on all 6; redirect render-check shows EXTERNAL → list/own-view and IN-PROJECT → project_view for all four documents (record project deliberately ignored)
+- Untouched (already correct): Debit Note, Purchase Return, Quotation, Sales Return, Credit Note
 
 ---
 

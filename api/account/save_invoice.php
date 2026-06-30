@@ -51,6 +51,17 @@ try {
         exit;
     }
 
+    // Ledger lock — a posted invoice is immutable. Corrections go through
+    // void/reverse, never an in-place edit (keeps the GL + audit trail intact).
+    if ($is_update) {
+        require_once __DIR__ . '/../../core/code_generator.php';
+        if (documentGlPosted($pdo, 'invoice', $invoice_id)) {
+            http_response_code(409);
+            echo json_encode(['success' => false, 'message' => 'This invoice is posted to the ledger and locked. Void or reverse it to make changes.']);
+            exit;
+        }
+    }
+
     $pdo->beginTransaction();
 
     $customer_id = $_POST['customer_id'] ?? 0;
@@ -224,6 +235,20 @@ try {
         logActivity($pdo, $_SESSION['user_id'], 'Edit invoice', "User edited invoice: $invoice_num (ID $invoice_id)");
     } else {
         logActivity($pdo, $_SESSION['user_id'], 'Create invoice', "User created a new invoice: $invoice_num (ID $invoice_id)");
+    }
+
+    // Smart-notification: a new invoice needs review. Fail-safe + kill-switched.
+    if (!$is_update) {
+        require_once __DIR__ . '/../../core/notify.php';
+        dispatchEvent($pdo, 'invoice.needs_review', [
+            'entity_type' => 'invoice',
+            'entity_id'   => (int)$invoice_id,
+            'project_id'  => !empty($_POST['project_id']) ? (int)$_POST['project_id'] : null,
+            'customer_id' => !empty($customer_id) ? (int)$customer_id : null,
+            'title'       => 'Invoice awaiting review: ' . $invoice_num,
+            'message'     => 'A new invoice ' . $invoice_num . ' has been created and needs review.',
+            'action_url'  => 'invoice_view?id=' . (int)$invoice_id,
+        ]);
     }
 
     echo json_encode(['success' => true, 'message' => 'Invoice saved successfully', 'invoice_id' => $invoice_id]);

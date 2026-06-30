@@ -12,6 +12,10 @@ includeHeader();
 $supplier_id = isset($_GET['supplier']) ? intval($_GET['supplier']) : 0;
 // Handle both 'project' and 'project_id' for better compatibility
 $project_id = isset($_GET['project']) ? intval($_GET['project']) : (isset($_GET['project_id']) ? intval($_GET['project_id']) : 0);
+// Origin context (URL only): where the user came FROM. Drives the post-save redirect so
+// editing a project-linked PO from the general area does NOT jump into the project.
+// The PO still keeps its own project link (the dropdown below uses $project_id) — unchanged.
+$origin_project_id = $project_id;
 
 // Dependencies from PDO
 global $pdo;
@@ -1250,7 +1254,7 @@ function saveOrder(status) {
                     confirmButtonText: 'OK',
                     timer: 3000
                 }).then(() => {
-                    const projectId = <?= (int)($project_id ?? 0) ?>;
+                    const projectId = <?= (int)($origin_project_id ?? 0) ?>;
                     if (projectId > 0) {
                         window.location.href = '<?= getUrl('project_view') ?>?id=' + projectId;
                     } else {
