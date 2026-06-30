@@ -833,7 +833,7 @@ function editProject(id) {
 
             $('input[name="project_manager"]').val(d.project_manager);
             $('input[name="contract_number"]').val(d.contract_number);
-            $('input[name="contract_sum"]').val(d.contract_sum);
+            $('input[name="contract_sum"]').val(d.form_contract_sum);
             $('select[name="priority"]').val(d.priority);
             $('input[name="start_date"]').val(d.start_date);
             // In manual edit, we still calculate the hidden deadline for safety

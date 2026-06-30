@@ -180,6 +180,16 @@ try {
 
     logActivity($pdo, $userId, "Created Purchase Return", "Return: $returnNumber (ID: $returnId), Supplier ID: $supplierId, Total: $totalAmount");
 
+    // Smart-notification: a new purchase return needs attention. Fail-safe + kill-switched.
+    require_once __DIR__ . '/../core/notify.php';
+    dispatchEvent($pdo, 'purchase_return.pending', [
+        'entity_type' => 'purchase_return',
+        'entity_id'   => (int)$returnId,
+        'title'       => 'Purchase return pending: ' . $returnNumber,
+        'message'     => 'A new purchase return ' . $returnNumber . ' has been created and needs attention.',
+        'action_url'  => 'purchase_return_view?id=' . (int)$returnId,
+    ]);
+
     echo json_encode(['success' => true, 'message' => 'Purchase return created successfully']);
 
 } catch (Exception $e) {

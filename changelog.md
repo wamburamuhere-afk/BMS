@@ -35,6 +35,88 @@ Branch: `feat/bank-reconciliation-upgrade`. 53 CLI tests — all passing.
 **Tests:** `tests/test_bank_recon_phase1_cli.php` (15), `phase2` (15), `phase3` (11), `phase4` (12)
 
 ---
+## 2026-06-30 — fix: procurement DataTable correctness — pagination, card toggle, Materials rewrite
+
+- `app/bms/operations/project_view.php`: fixed DN (`#dtDNs`), DO (`#dtDOs`), Inventory (`#dtWarehouses`) — all had `dom: '<"top d-print-none"f>rt<"clear">'` which stripped length/info/pagination; changed to `'<"d-print-none"lf>rtip'` to restore all controls while still hiding them on print
+- `app/bms/operations/project_view.php`: fixed card/table toggle broken on Return Notes, Debit Notes, Suppliers, NIP — `renderForTable` (bmsMobileCards) was called BEFORE DataTable init so the toggle latched onto `.table-responsive` as wrapper; after DataTable created `.dataTables_wrapper` inside it, switching back to table view only unhid the inner wrapper while `.table-responsive` stayed hidden; fixed by moving DataTable init BEFORE `renderForTable` so both initial and subsequent toggles use `.dataTables_wrapper` consistently
+- `app/bms/operations/project_view.php`: converted Materials from custom AJAX row-injection + manual pagination to a real DataTable — removed custom filter bar HTML (search input, per-page select, count label) and custom pagination div; rewrote `loadProcMaterials()` to build all rows then init `$('#procMatTable').DataTable(...)` after AJAX; removed `procFilterMatTable` and `procGoToMatPage` functions
+- All five fixes verified in browser at project ID=16: table view is default on web, card view on mobile, toggle works both ways, pagination/info visible on all tables
+
+## 2026-06-30 — feat: DataTable for all procurement sub-modules in Project Details
+
+- `app/bms/operations/project_view.php`: added DataTable (destroy+init, responsive, pageLength 25) to 5 render functions that were missing it:
+  - `renderReturns` → `#procReturnsInnerTable` (Return Notes, 9 cols, targets [0,8])
+  - `renderProjectDebitNotes` → `#procDebitNotesInnerTable` (Debit Notes, 9 cols, targets [0,8])
+  - `renderProjectSuppliers` → `#projSuppliersTable` (Suppliers, 7 cols, targets [0,6])
+  - `projNipRenderTable` → `#projNipInnerTable` (Non-inventory Products, 6 cols, targets [0,5])
+- Already had DataTable before this session: Purchase Orders (`#procPOInnerTable`, `#procPOFullInnerTable`), GRN (`#procGRNInnerTable`, `#procGRNDNInnerTable`), Delivery Notes (`#dtDNs`), Delivery Orders (`#dtDOs`), RFQ (`#dtRFQs`), Inventory (`#dtWarehouses`), Sub-Contractors (`#proj-sc-table`)
+- Materials tab uses custom AJAX pagination (`procFilterMatTable`) — DataTable would conflict; left as-is (already provides search + pagination)
+- All 12 procurement sub-modules verified in browser at project ID=16 — no JS errors, S/NO column present on all tables
+
+## 2026-06-29 — fix: POS Dashboard period button double-selection + redundant dashboard reload
+
+- `app/bms/pos/pos_dashboard.php`: removed redundant Bootstrap `active` class from yearly period button — with `btn-outline-primary.active`, Bootstrap renders it as filled blue so clicking Daily made both Daily and Yearly look selected simultaneously; `btn-primary` alone correctly shows the selected state
+- `app/bms/pos/pos_dashboard.php`: `voidSale()` and `openReturn()` now only call `loadDashboard()` if the dashboard panel is currently visible; previously they fired a redundant AJAX request every time regardless of panel state
+
+## 2026-06-29 — fix: POS Dashboard print footer injected into DataTables print window
+
+- `app/bms/pos/pos_dashboard.php`: added `PRINT_ROLE` and `PRINT_YEAR` JS constants; `PRINT_USER` now correctly reads from session before footer.php runs
+- `app/bms/pos/pos_dashboard.php`: DataTables print `customize` callback now appends the standard BMS print footer (name, role, datetime, BJP Technologies copyright) to the print window — matching what footer.php renders via `@media print` on other pages
+- `tests/test_pos_dashboard_cli.php`: 3 new checks (BJP Technologies line, PRINT_ROLE, PRINT_YEAR); 98 total, all passing
+
+## 2026-06-29 — fix: POS Dashboard stat cards + DataTables + toggle behaviour
+
+- `app/bms/pos/pos_dashboard.php`: fixed stat cards not updating on period change — `getActivePeriod()` was reading `.active` CSS class but click handler only swapped `btn-primary`; now reads `.btn-primary` correctly
+- `app/bms/pos/pos_dashboard.php`: Sales Dashboard hidden by default; "Sales Dashboard" toggle button added to header row (top-right, next to "Open POS"); turns blue when dashboard is active
+- `app/bms/pos/pos_dashboard.php`: Recent Sales and Low Stock now use DataTables with S/NO column (`#recentSalesTable`, `#lowStockTable`, `initDashboardTables()`); Top Products table also gains S/NO column
+- `app/bms/pos/pos_dashboard.php`: Dashboard only loads when user opens it (toggle), not on every page load
+- `tests/test_pos_dashboard_cli.php`: updated to 95 checks (all passing)
+
+## 2026-06-29 — fix: POS Dashboard filter UI and safeOutput bug
+
+- `app/bms/pos/pos_dashboard.php`: defined `safeOutput()` locally (was undefined causing DataTable/dashboard JS errors)
+- `app/bms/pos/pos_dashboard.php`: changed default period from Monthly to Yearly
+- `app/bms/pos/pos_dashboard.php`: replaced From/To date range with period-specific pickers — Daily (single date), Weekly (any day → Mon–Sun computed), Monthly (month+year selects), Quarterly (Q1–Q4 + year), Yearly (year select)
+- `app/bms/pos/pos_dashboard.php`: `getDateRange()` / `showFilterPanel()` replace `setPeriodDates()`; all Apply buttons use class-based delegation
+- `tests/test_pos_dashboard_cli.php`: updated to 88 checks (all passing)
+
+## 2026-06-29 — feat: rewrite POS Dashboard (sales history first + period filter + toolbar)
+
+- `app/bms/pos/pos_dashboard.php`: complete rewrite — Sales History section shown at top (always visible), Dashboard section below (always visible); removed old toggle buttons (#btnViewDashboard / #btnViewHistory)
+- `app/bms/pos/pos_dashboard.php`: added period filter (Daily/Weekly/Monthly/Quarterly/Yearly) with smart date defaults; Monthly is the default; Apply button triggers table reload
+- `app/bms/pos/pos_dashboard.php`: Copy/CSV/Print toolbar matching suppliers.php style (white bordered box with icons); Show: page-length selector
+- `app/bms/pos/pos_dashboard.php`: fixed dashboard "Loading…" stuck bug — `.fail()` error handler updates all widget divs with user-friendly error + Refresh button
+- `app/bms/pos/pos_dashboard.php`: full ui-constants.md compliance (stat card bg:#e7f0ff + border:#b6ccfe, modal headers bg-primary, gear-fill action dropdown, no raw alert())
+- `tests/test_pos_dashboard_cli.php`: updated regression suite (74 checks, all passing)
+
+## 2026-06-29 — fix: budget permission key mismatch and activity log
+
+- `api/account/add_budget.php`: fixed `canCreate('budgets')` → `canCreate('budget')` (key mismatch was blocking all non-admins even when granted permission)
+- `api/account/add_budget.php`: improved activity log from raw IDs to human-readable message e.g. "Created budget: 'Office Supplies' — TZS 500,000.00 for January 2026"
+- `app/constant/accounts/budget.php`: added `$can_create_budget = canCreate('budget')` and switched both Add/Create Budget buttons to use it (previously incorrectly gated on `$can_edit_budget`)
+
+## 2026-06-29 — fix: project_view.php scope footer text to Reports tab only
+
+- `app/bms/operations/project_view.php`: replaced DOMContentLoaded blanket text swap with beforeprint/afterprint listeners; "This report was" now appears only when the #performance (Reports) tab is active — all other tabs keep "This document was"; afterprint always restores to "document"
+
+## 2026-06-29 — fix: project_view.php print footer text and page margins
+
+- `app/bms/operations/project_view.php`: added JS on DOMContentLoaded to replace "This document was" with "This report was" in the `.bms-print-footer` (only on this page; footer.php untouched)
+- `app/bms/operations/project_view.php`: changed `@page { size: A3 landscape; margin: 10mm !important; }` to `@page { margin: 10mm 8mm 16mm 8mm; }` to match the `i_e_print.md` standard and remove the incorrect A3 landscape override
+
+## 2026-06-29 — fix: projects.php edit form contract sum
+
+- `app/bms/operations/projects.php`: use `d.form_contract_sum` instead of `d.contract_sum` in `editProject()` so the Contract Sum field shows the original stored value, not the milestone-calculated total
+
+## 2026-06-29 (feat) — Smart Notification Engine: remaining emit points wired
+
+Wired the rest of the seeded events into their source actions/scheduler, completing
+event coverage (same fail-safe, kill-switched `dispatchEvent()` pattern as Phase 7).
+
+- Action-based emits (after the successful create): `api/purchase/create_debit_note.php` → `debit_note.pending`; `api/sales/create_credit_note.php` → `credit_note.pending`; `api/sales/create_return.php` → `sales_return.pending`; `api/create_purchase_return.php` → `purchase_return.pending`; `api/account/add_expense.php` → `expense.needs_review`; `api/create_grn.php` → `grn.pending`; `api/account/save_voucher.php` (create) → `voucher.needs_approval`
+- Time-based checks added to `cron/run_notification_checks.php`: `quotation.expiring` (quotations.quote_valid_until within 7 days, still open) and `tender.deadline` (tenders.submission_deadline within 7 days, not awarded/closed)
+- Verified: lint clean (8 files); all 9 events resolve recipients + dispatch (9/9); scheduler runs all three checks cleanly; test artifacts cleaned up
+- Added permanent regression suite `tests/test_notification_engine_cli.php` (gated by the pre-push hook + CI): files/lint, schema, seeded catalog, helpers, dispatch pipeline + idempotency, enqueue dedupe, mute logic, rule narrowing + no-access safety, mailer fail-silent, digest fallback, and a static check that every wired source file emits its event. 77/0, idempotent, self-cleaning. (It caught that `core/notify.php` doesn't auto-load `core/mailer.php` — fine in prod since the outbox worker loads it on demand; the test loads it explicitly.)
 
 ## 2026-06-28 (feat) — Smart Notification Engine: Phases 1–2 (mailer + role-aware core)
 
