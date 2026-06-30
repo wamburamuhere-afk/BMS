@@ -155,6 +155,11 @@ try {
     ok(strpos($p, 'dtRecent')     !== false, 'dtRecent DataTable variable present');
     ok(strpos($p, 'dtLowStock')   !== false, 'dtLowStock DataTable variable present');
 
+    // Print footer injected in DataTables customize callback
+    ok(strpos($p, 'BJP Technologies') !== false, 'Print footer: BJP Technologies copyright line present');
+    ok(strpos($p, 'PRINT_ROLE')       !== false, 'Print footer: PRINT_ROLE constant used in customize');
+    ok(strpos($p, 'PRINT_YEAR')       !== false, 'Print footer: PRINT_YEAR constant present');
+
     // Modals
     ok(strpos($p, 'id="returnModal"')  !== false, 'Return/Refund modal present');
     ok(strpos($p, 'id="receiveModal"') !== false, 'Receive Payment modal present');

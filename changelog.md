@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-06-30 — fix: procurement DataTable correctness — pagination, card toggle, Materials rewrite
+
+- `app/bms/operations/project_view.php`: fixed DN (`#dtDNs`), DO (`#dtDOs`), Inventory (`#dtWarehouses`) — all had `dom: '<"top d-print-none"f>rt<"clear">'` which stripped length/info/pagination; changed to `'<"d-print-none"lf>rtip'` to restore all controls while still hiding them on print
+- `app/bms/operations/project_view.php`: fixed card/table toggle broken on Return Notes, Debit Notes, Suppliers, NIP — `renderForTable` (bmsMobileCards) was called BEFORE DataTable init so the toggle latched onto `.table-responsive` as wrapper; after DataTable created `.dataTables_wrapper` inside it, switching back to table view only unhid the inner wrapper while `.table-responsive` stayed hidden; fixed by moving DataTable init BEFORE `renderForTable` so both initial and subsequent toggles use `.dataTables_wrapper` consistently
+- `app/bms/operations/project_view.php`: converted Materials from custom AJAX row-injection + manual pagination to a real DataTable — removed custom filter bar HTML (search input, per-page select, count label) and custom pagination div; rewrote `loadProcMaterials()` to build all rows then init `$('#procMatTable').DataTable(...)` after AJAX; removed `procFilterMatTable` and `procGoToMatPage` functions
+- All five fixes verified in browser at project ID=16: table view is default on web, card view on mobile, toggle works both ways, pagination/info visible on all tables
+
+## 2026-06-30 — feat: DataTable for all procurement sub-modules in Project Details
+
+- `app/bms/operations/project_view.php`: added DataTable (destroy+init, responsive, pageLength 25) to 5 render functions that were missing it:
+  - `renderReturns` → `#procReturnsInnerTable` (Return Notes, 9 cols, targets [0,8])
+  - `renderProjectDebitNotes` → `#procDebitNotesInnerTable` (Debit Notes, 9 cols, targets [0,8])
+  - `renderProjectSuppliers` → `#projSuppliersTable` (Suppliers, 7 cols, targets [0,6])
+  - `projNipRenderTable` → `#projNipInnerTable` (Non-inventory Products, 6 cols, targets [0,5])
+- Already had DataTable before this session: Purchase Orders (`#procPOInnerTable`, `#procPOFullInnerTable`), GRN (`#procGRNInnerTable`, `#procGRNDNInnerTable`), Delivery Notes (`#dtDNs`), Delivery Orders (`#dtDOs`), RFQ (`#dtRFQs`), Inventory (`#dtWarehouses`), Sub-Contractors (`#proj-sc-table`)
+- Materials tab uses custom AJAX pagination (`procFilterMatTable`) — DataTable would conflict; left as-is (already provides search + pagination)
+- All 12 procurement sub-modules verified in browser at project ID=16 — no JS errors, S/NO column present on all tables
+
+## 2026-06-29 — fix: POS Dashboard period button double-selection + redundant dashboard reload
+
+- `app/bms/pos/pos_dashboard.php`: removed redundant Bootstrap `active` class from yearly period button — with `btn-outline-primary.active`, Bootstrap renders it as filled blue so clicking Daily made both Daily and Yearly look selected simultaneously; `btn-primary` alone correctly shows the selected state
+- `app/bms/pos/pos_dashboard.php`: `voidSale()` and `openReturn()` now only call `loadDashboard()` if the dashboard panel is currently visible; previously they fired a redundant AJAX request every time regardless of panel state
+
+## 2026-06-29 — fix: POS Dashboard print footer injected into DataTables print window
+
+- `app/bms/pos/pos_dashboard.php`: added `PRINT_ROLE` and `PRINT_YEAR` JS constants; `PRINT_USER` now correctly reads from session before footer.php runs
+- `app/bms/pos/pos_dashboard.php`: DataTables print `customize` callback now appends the standard BMS print footer (name, role, datetime, BJP Technologies copyright) to the print window — matching what footer.php renders via `@media print` on other pages
+- `tests/test_pos_dashboard_cli.php`: 3 new checks (BJP Technologies line, PRINT_ROLE, PRINT_YEAR); 98 total, all passing
+
 ## 2026-06-29 — fix: POS Dashboard stat cards + DataTables + toggle behaviour
 
 - `app/bms/pos/pos_dashboard.php`: fixed stat cards not updating on period change — `getActivePeriod()` was reading `.active` CSS class but click handler only swapped `btn-primary`; now reads `.btn-primary` correctly
