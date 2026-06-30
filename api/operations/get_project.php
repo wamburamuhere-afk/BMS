@@ -66,7 +66,7 @@ try {
     // Get RFQs linked to this project
     $stmt = $pdo->prepare("
         SELECT r.rfq_id, r.rfq_number, r.rfq_date, r.deadline_date, r.status,
-               s.supplier_name, w.warehouse_name
+               r.supplier_id, s.supplier_name, w.warehouse_name
         FROM rfq r
         LEFT JOIN suppliers s ON r.supplier_id = s.supplier_id
         LEFT JOIN warehouses w ON r.warehouse_id = w.warehouse_id

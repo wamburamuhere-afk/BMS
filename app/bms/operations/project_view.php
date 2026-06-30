@@ -1454,13 +1454,17 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <h5 class="fw-bold mb-1"><i class="bi bi-file-earmark-ruled me-2 text-primary"></i>Request for Quotation (RFQ)</h5>
                                 <p class="text-muted small mb-0">Manage RFQs linked to this project.</p>
                             </div>
-                            <div>
-                                <button class="btn btn-outline-primary btn-sm me-2" onclick="loadProjectDetails()">
+                            <div class="d-flex gap-2 align-items-center flex-wrap">
+                                <button class="btn btn-outline-primary btn-sm" onclick="loadProjectDetails()">
                                     <i class="bi bi-arrow-clockwise"></i> Refresh
                                 </button>
                                 <a href="<?= getUrl('rfq_create') ?>?project=<?= $project_id ?>" class="btn btn-primary btn-sm">
                                     <i class="bi bi-plus-circle me-1"></i> Create RFQ
                                 </a>
+                                <div class="btn-group shadow-sm" role="group">
+                                    <button type="button" class="btn btn-primary btn-sm text-white" id="dtRFQs-btn-tbl" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('dtRFQs','table')" title="Table View"><i class="bi bi-table"></i></button>
+                                    <button type="button" class="btn btn-light btn-sm border" id="dtRFQs-btn-crd" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('dtRFQs','card')" title="Card View"><i class="bi bi-grid-3x3-gap"></i></button>
+                                </div>
                             </div>
                         </div>
                         <div class="text-center mb-4 report-header d-none d-print-block">
@@ -9638,38 +9642,48 @@ function renderRFQs(rfqs) {
         $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-file-earmark-ruled fs-1 mb-3 d-block"></i><p>No RFQs found for this project.</p><a href="<?= getUrl('rfq_create') ?>?project=<?= $project_id ?>" class="btn btn-primary btn-sm mt-2"><i class="bi bi-plus-circle me-1"></i> Create RFQ</a></div>');
         return;
     }
-    const statusColors = { draft:'secondary', sent:'primary', received:'info', approved:'success', cancelled:'danger' };
     if ($.fn.DataTable && $.fn.DataTable.isDataTable('#dtRFQs')) $('#dtRFQs').DataTable().destroy();
-    let html = '<div class="table-responsive"><table id="dtRFQs" class="table table-hover align-middle mb-0" style="width:100%">'
-             + '<thead class="table-light text-uppercase small fw-bold"><tr>'
-             + '<th class="ps-3" style="width:50px;">S/NO</th>'
+    let html = '<div class="table-responsive"><table id="dtRFQs" class="table table-hover align-middle border" style="width:100%">'
+             + '<thead class="table-light text-nowrap"><tr>'
+             + '<th style="width:50px;">S/NO</th>'
              + '<th>RFQ Number</th>'
-             + '<th>Product / Item</th>'
+             + '<th>Date</th>'
              + '<th>Supplier</th>'
              + '<th>Warehouse</th>'
-             + '<th>RFQ Date</th>'
-             + '<th>Deadline</th>'
-             + '<th style="width:100px;">Status</th>'
-             + '<th class="text-end d-print-none" style="width:80px;">Actions</th>'
+             + '<th>Status</th>'
+             + '<th class="text-end d-print-none">Actions</th>'
              + '</tr></thead><tbody>';
 
     rfqs.forEach((r, idx) => {
-        const sc = statusColors[r.status] || 'secondary';
+        const sc = getStatusBadgeColor(r.status);
+        const isApproved  = r.status === 'approved';
+        const isDraft     = r.status === 'draft';
+        const isReview    = r.status === 'review';
+        const createPOOpt = isApproved && r.supplier_id
+            ? `<li><hr class="dropdown-divider opacity-50"></li>
+               <li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('purchase_order_create') ?>?supplier=${r.supplier_id}&rfq_ref=${r.rfq_id}">
+                   <i class="bi bi-cart-plus me-2"></i>Create Purchase Order</a></li>` : '';
         html += `<tr>
-            <td class="ps-3 text-muted fw-bold">${idx + 1}</td>
-            <td><div class="fw-bold text-primary">${r.rfq_number}</div></td>
-            <td><div class="fw-bold">${r.product_name || 'N/A'}</div><small class="text-muted">${r.description || ''}</small></td>
-            <td><small>${r.supplier_name || 'N/A'}</small></td>
-            <td><small>${r.warehouse_name || 'N/A'}</small></td>
+            <td class="text-center fw-bold text-muted">${idx + 1}</td>
+            <td><span class="fw-bold text-primary">${safeOutput(r.rfq_number)}</span></td>
             <td><small>${formatDate(r.rfq_date)}</small></td>
-            <td><small class="${r.deadline_date && new Date(r.deadline_date) < new Date() && r.status !== 'approved' ? 'text-danger fw-bold' : ''}">${formatDate(r.deadline_date)}</small></td>
+            <td><small>${safeOutput(r.supplier_name) || 'N/A'}</small></td>
+            <td><small>${safeOutput(r.warehouse_name) || 'N/A'}</small></td>
             <td><span class="badge bg-${sc} text-uppercase">${r.status}</span></td>
             <td class="text-end d-print-none">
                 <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                        <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_view') ?>?id=${r.rfq_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
-                        <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_create') ?>?edit=${r.rfq_id}&project=<?= $project_id ?>"><i class="bi bi-pencil text-info me-2"></i>Edit RFQ</a></li>
+                    <button class="btn btn-sm btn-white border dropdown-toggle" style="background:#fff;" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_view') ?>?id=${r.rfq_id}"><i class="bi bi-eye text-primary me-2"></i>View</a></li>
+                        ${isDraft ? `<li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('rfq_view') ?>?id=${r.rfq_id}"><i class="bi bi-eye-fill me-2"></i>Review</a></li>` : ''}
+                        ${isReview ? `<li><a class="dropdown-item py-2 text-success fw-semibold" href="#" onclick="approveRFQ(${r.rfq_id},'${r.rfq_number}');return false;"><i class="bi bi-check-circle me-2"></i>Approve</a></li>` : ''}
+                        <li><a class="dropdown-item py-2" href="#" onclick="printRFQ(${r.rfq_id});return false;"><i class="bi bi-printer text-dark me-2"></i>Print</a></li>
+                        ${isDraft ? `<li><a class="dropdown-item py-2" href="<?= getUrl('rfq_create') ?>?edit=${r.rfq_id}&project=<?= $project_id ?>"><i class="bi bi-pencil text-info me-2"></i>Edit</a></li>` : ''}
+                        ${createPOOpt}
+                        <li><hr class="dropdown-divider opacity-50"></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="#" onclick="deleteRFQ(${r.rfq_id},'${r.rfq_number}');return false;"><i class="bi bi-trash me-2"></i>Delete</a></li>
                     </ul>
                 </div>
             </td>
@@ -9678,8 +9692,51 @@ function renderRFQs(rfqs) {
     html += '</tbody></table></div>';
     $list.html(html);
     if ($.fn.DataTable) {
-        $('#dtRFQs').DataTable({ pageLength: 25, order: [[5,'desc']], autoWidth: false, responsive: true });
+        $('#dtRFQs').DataTable({ pageLength: 25, order: [[2,'desc']], autoWidth: false, responsive: false, dom: 'rtip' });
     }
+    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('dtRFQs');
+}
+
+function printRFQ(id) {
+    window.open('<?= getUrl('print_rfq') ?>?id=' + id, '_blank');
+}
+
+function approveRFQ(id, number) {
+    Swal.fire({
+        title: 'Approve RFQ?',
+        text: `RFQ #${number} will be marked as approved.`,
+        icon: 'question', showCancelButton: true,
+        confirmButtonColor: '#198754', confirmButtonText: 'Yes, Approve It', cancelButtonText: 'Cancel'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/approve_rfq') ?>', { rfq_id: id }, function (res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Approved!', text: res.message, timer: 2000, showConfirmButton: false })
+                    .then(() => loadProjectDetails());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not approve RFQ.' });
+            }
+        }, 'json').fail(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' }));
+    });
+}
+
+function deleteRFQ(id, number) {
+    Swal.fire({
+        title: 'Delete RFQ?',
+        text: `RFQ #${number} will be permanently deleted and cannot be recovered.`,
+        icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, Delete It', cancelButtonText: 'Cancel'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/delete_rfq') ?>', { rfq_id: id }, function (res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 2000, showConfirmButton: false })
+                    .then(() => loadProjectDetails());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not delete RFQ.' });
+            }
+        }, 'json').fail(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' }));
+    });
 }
 
 function renderExpenses(expenses) {
