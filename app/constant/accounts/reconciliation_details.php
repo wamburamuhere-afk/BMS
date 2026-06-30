@@ -127,19 +127,25 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
 
                         <div class="col-12"><hr class="my-0 opacity-10"></div>
 
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <label class="text-muted small text-uppercase fw-bold mb-2 d-block">Opening Balance</label>
+                            <p class="fs-5 fw-bold text-secondary mb-0">
+                                <?= number_format($reconciliation['opening_balance'] ?? 0, 2) ?>
+                            </p>
+                        </div>
+                        <div class="col-md-3">
                             <label class="text-muted small text-uppercase fw-bold mb-2 d-block">Statement Balance</label>
                             <p class="fs-5 fw-bold text-dark mb-0">
                                 <?= number_format($reconciliation['statement_balance'], 2) ?>
                             </p>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="text-muted small text-uppercase fw-bold mb-2 d-block">Book Balance</label>
                             <p class="fs-5 fw-bold text-primary mb-0">
                                 <?= number_format($reconciliation['book_balance'], 2) ?>
                             </p>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="text-muted small text-uppercase fw-bold mb-2 d-block">Difference</label>
                             <p class="fs-5 fw-bold text-<?= $diffClass ?> mb-0">
                                 <?= number_format($diff, 2) ?>
@@ -203,6 +209,89 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
                 </div>
             </div>
             <?php endif; ?>
+
+            <?php
+            // ── Two-column reconciliation statement (print view) ───────────────
+            // Query uncleared lines for the bank-side column
+            $unclearedLines = $pdo->prepare(
+                "SELECT transaction_type, SUM(amount) AS total
+                   FROM bank_transactions
+                  WHERE bank_account_id = ?
+                    AND transaction_date BETWEEN ? AND ?
+                    AND COALESCE(matching_status,'unmatched') NOT IN ('matched','manual','reconciled','ignored')
+                  GROUP BY transaction_type"
+            );
+            $unclearedLines->execute([
+                $reconciliation['bank_account_id'],
+                $reconciliation['period_start'],
+                $reconciliation['period_end'],
+            ]);
+            $unclearedDeposits = 0.0; $unclearedWithdrawals = 0.0;
+            foreach ($unclearedLines->fetchAll(PDO::FETCH_ASSOC) as $ul) {
+                if ($ul['transaction_type'] === 'deposit')    $unclearedDeposits    = (float)$ul['total'];
+                else                                          $unclearedWithdrawals = (float)$ul['total'];
+            }
+            $adjBankBalance = round((float)$reconciliation['statement_balance'] + $unclearedDeposits - $unclearedWithdrawals, 2);
+
+            // Query adjustments for the book-side column
+            $adjRows = $pdo->prepare(
+                "SELECT type, SUM(amount) AS total FROM bank_reconciliation_adjustments
+                  WHERE reconciliation_id = ? GROUP BY type"
+            );
+            $adjRows->execute([$reconciliation_id]);
+            $adjAdds = 0.0; $adjDeducts = 0.0;
+            $addTypes = ['interest_earned','other_in'];
+            foreach ($adjRows->fetchAll(PDO::FETCH_ASSOC) as $ar) {
+                if (in_array($ar['type'], $addTypes, true)) $adjAdds    += (float)$ar['total'];
+                else                                        $adjDeducts += (float)$ar['total'];
+            }
+            $adjBookBalance = round((float)$reconciliation['book_balance'] + $adjAdds - $adjDeducts, 2);
+            ?>
+            <!-- Two-column Reconciliation Statement (print-only) -->
+            <div class="card border-0 mb-4 d-none d-print-block">
+                <div class="card-header bg-white border-bottom py-2">
+                    <h5 class="mb-0 fw-bold text-dark text-uppercase" style="font-size:11pt;letter-spacing:1px;">Reconciliation Statement</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="row g-0">
+                        <!-- Bank Side -->
+                        <div class="col-6 border-end p-3">
+                            <p class="fw-bold text-uppercase mb-2" style="font-size:9pt;letter-spacing:.5px;color:#052c65;">Bank Statement Side</p>
+                            <table class="table table-sm mb-0 small">
+                                <tr><td>Statement Balance</td><td class="text-end fw-semibold"><?= number_format($reconciliation['statement_balance'], 2) ?></td></tr>
+                                <?php if ($unclearedDeposits > 0): ?>
+                                <tr><td class="text-muted ps-3">Add: Deposits in Transit</td><td class="text-end text-success">+<?= number_format($unclearedDeposits, 2) ?></td></tr>
+                                <?php endif; ?>
+                                <?php if ($unclearedWithdrawals > 0): ?>
+                                <tr><td class="text-muted ps-3">Less: Outstanding Cheques</td><td class="text-end text-danger">(<?= number_format($unclearedWithdrawals, 2) ?>)</td></tr>
+                                <?php endif; ?>
+                                <tr class="border-top"><td class="fw-bold">Adjusted Bank Balance</td><td class="text-end fw-bold"><?= number_format($adjBankBalance, 2) ?></td></tr>
+                            </table>
+                        </div>
+                        <!-- Book Side -->
+                        <div class="col-6 p-3">
+                            <p class="fw-bold text-uppercase mb-2" style="font-size:9pt;letter-spacing:.5px;color:#052c65;">Book (GL) Side</p>
+                            <table class="table table-sm mb-0 small">
+                                <tr><td>Book Balance (GL)</td><td class="text-end fw-semibold"><?= number_format($reconciliation['book_balance'], 2) ?></td></tr>
+                                <?php if ($adjAdds > 0): ?>
+                                <tr><td class="text-muted ps-3">Add: Interest / Credits</td><td class="text-end text-success">+<?= number_format($adjAdds, 2) ?></td></tr>
+                                <?php endif; ?>
+                                <?php if ($adjDeducts > 0): ?>
+                                <tr><td class="text-muted ps-3">Less: Charges / Debits</td><td class="text-end text-danger">(<?= number_format($adjDeducts, 2) ?>)</td></tr>
+                                <?php endif; ?>
+                                <tr class="border-top"><td class="fw-bold">Adjusted Book Balance</td><td class="text-end fw-bold"><?= number_format($adjBookBalance, 2) ?></td></tr>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="p-2 text-center border-top <?= abs($adjBankBalance - $adjBookBalance) < 0.01 ? 'bg-success' : 'bg-danger' ?> text-white small fw-bold">
+                        <?php if (abs($adjBankBalance - $adjBookBalance) < 0.01): ?>
+                            <i class="bi bi-check-circle me-1"></i> BALANCED — Adjusted Bank Balance equals Adjusted Book Balance (<?= number_format($adjBookBalance, 2) ?>)
+                        <?php else: ?>
+                            <i class="bi bi-exclamation-triangle me-1"></i> UNBALANCED — Difference: <?= number_format($adjBankBalance - $adjBookBalance, 2) ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
 
             <!-- Matching Worksheet (Bank Statement line matching) -->
             <div class="card shadow-sm border-0 mb-4 d-print-none" id="matchCard" style="border-radius:12px;">

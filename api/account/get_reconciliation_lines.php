@@ -49,7 +49,9 @@ try {
 
     $bank = (int)$rec['bank_account_id'];
 
-    // Lines in this account+period, OR already linked to this reconciliation.
+    // Lines for this worksheet:
+    //   • Linked to this reconciliation (matched/manual regardless of date), OR
+    //   • Fall within the period AND are NOT already cleared in a DIFFERENT reconciliation
     $stmt = $pdo->prepare("
         SELECT transaction_id, transaction_date, value_date, description, reference_number,
                transaction_type, amount, balance_after,
@@ -57,10 +59,20 @@ try {
                reconciliation_id
           FROM bank_transactions
          WHERE bank_account_id = ?
-           AND ( (transaction_date BETWEEN ? AND ?) OR reconciliation_id = ? )
+           AND (
+               reconciliation_id = ?
+               OR (
+                   transaction_date BETWEEN ? AND ?
+                   AND (
+                       reconciliation_id IS NULL
+                       OR reconciliation_id = ?
+                       OR COALESCE(matching_status,'unmatched') NOT IN ('matched','manual','reconciled')
+                   )
+               )
+           )
          ORDER BY transaction_date ASC, transaction_id ASC
     ");
-    $stmt->execute([$bank, $rec['period_start'], $rec['period_end'], $rec_id]);
+    $stmt->execute([$bank, $rec_id, $rec['period_start'], $rec['period_end'], $rec_id]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // A line is "cleared" for this worksheet when it is matched/manual AND tied to

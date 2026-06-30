@@ -43,31 +43,55 @@ try {
     require_once __DIR__ . '/../../core/account_balance.php';
     $book_balance = accountLedgerBalanceAsOf($pdo, (int)$bank_account_id, $period_end);
 
+    // Period overlap guard: reject if another non-cancelled reconciliation exists
+    // for this account whose period overlaps the requested window.
+    $overlap = $pdo->prepare(
+        "SELECT reconciliation_id FROM bank_reconciliations
+          WHERE bank_account_id = ?
+            AND status NOT IN ('cancelled')
+            AND period_start <= ? AND period_end >= ?
+          LIMIT 1"
+    );
+    $overlap->execute([$bank_account_id, $period_end, $period_start]);
+    if ($overlap->fetchColumn()) {
+        throw new Exception('A reconciliation for this account already covers part of this period. Cancel or adjust the existing one first.');
+    }
+
+    // Beginning-balance chain: opening_balance = adjusted_balance of the most
+    // recently finalized reconciliation for this account (period_end < new period_start).
+    $priorStmt = $pdo->prepare(
+        "SELECT adjusted_balance FROM bank_reconciliations
+          WHERE bank_account_id = ?
+            AND status = 'reconciled'
+            AND period_end < ?
+          ORDER BY period_end DESC, reconciliation_id DESC
+          LIMIT 1"
+    );
+    $priorStmt->execute([$bank_account_id, $period_start]);
+    $opening_balance = (float)($priorStmt->fetchColumn() ?: 0.00);
+
     $difference = (float)$statement_balance - (float)$book_balance;
-    // Status logic: if difference is 0, it might be reconciled, but usually starts as pending until approved? 
-    // Schema default is pending. Let's keep it pending or calculate based on difference.
-    // User prompt schema default is 'pending'. Let's stick to that unless 0 difference implies auto-reconciled.
-    // However, usually 'reconciled' means approved. 'pending' is safer.
-    $status = 'pending'; 
+    $status = 'pending';
 
     $stmt = $pdo->prepare("
         INSERT INTO bank_reconciliations (
             reconciliation_number,
-            bank_account_id, 
+            bank_account_id,
             reconciliation_date,
             period_start,
             period_end,
-            statement_balance, 
-            book_balance, 
-            difference, 
-            status, 
-            notes, 
-            prepared_by, 
+            statement_balance,
+            book_balance,
+            opening_balance,
+            difference,
+            status,
+            notes,
+            prepared_by,
             created_at,
             updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     ");
-    
+
     $stmt->execute([
         $reconciliation_number,
         $bank_account_id,
@@ -76,6 +100,7 @@ try {
         $period_end,
         $statement_balance,
         $book_balance,
+        $opening_balance,
         $difference,
         $status,
         $notes,
