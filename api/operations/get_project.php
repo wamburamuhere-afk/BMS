@@ -63,6 +63,19 @@ try {
     $stmt->execute([$id]);
     $payment_vouchers = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    // Get RFQs linked to this project
+    $stmt = $pdo->prepare("
+        SELECT r.rfq_id, r.rfq_number, r.rfq_date, r.deadline_date, r.status,
+               r.supplier_id, s.supplier_name, w.warehouse_name
+        FROM rfq r
+        LEFT JOIN suppliers s ON r.supplier_id = s.supplier_id
+        LEFT JOIN warehouses w ON r.warehouse_id = w.warehouse_id
+        WHERE r.project_id = ?
+        ORDER BY r.rfq_id DESC
+    ");
+    $stmt->execute([$id]);
+    $rfqs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
     // Get Purchase Orders
     $stmt = $pdo->prepare("
         SELECT po.*, s.supplier_name
@@ -485,6 +498,7 @@ try {
         "sales_orders" => $sales_orders,
         "invoices" => $invoices,
         "payment_vouchers" => $payment_vouchers,
+        "rfqs" => $rfqs,
         "purchase_orders" => $purchase_orders,
         "grns" => $grns,
             "dns"  => $dns,

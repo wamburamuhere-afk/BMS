@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-30 (fix) — Project view: RFQs now appear in Procurements > RFQ tab
+
+- `api/operations/get_project.php` — added RFQ query (with `supplier_id` for Create PO link);
+  returned under `rfqs` key. Root cause: API never queried `rfq` table so tab was always empty.
+- `app/bms/operations/project_view.php` — rewrote `renderRFQs()`: columns now match external
+  rfq.php (S/No, RFQ Number, Date, Supplier, Warehouse, Status, Actions); removed Product/Item
+  column; actions identical to external page (View, Review, Approve, Print, Edit, Create PO,
+  Delete); added `printRFQ`, `approveRFQ`, `deleteRFQ` functions that call `loadProjectDetails()`
+  on success; added table/card toggle buttons; wired `bmsMobileCards.renderForTable('dtRFQs')`
+  for automatic mobile card view.
+
 ## 2026-06-30 (fix) — IS and Cash Flow default to Year-to-Date instead of current month
 
 Income Statement and Cash Flow both defaulted to the current calendar month, making
