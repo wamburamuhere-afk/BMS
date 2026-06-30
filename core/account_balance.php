@@ -147,6 +147,61 @@ if (!function_exists('accountLedgerBalance')) {
     }
 }
 
+if (!function_exists('accountLedgerBalanceAsOf')) {
+    /**
+     * Ledger-true balance for a single account as-of a specific date.
+     * Only counts posted entries with entry_date <= $asOf — identical logic to
+     * accountLedgerBalance() but date-bounded. Never changes the existing no-arg
+     * function; other readers continue to work unchanged.
+     */
+    function accountLedgerBalanceAsOf(PDO $pdo, int $accountId, string $asOf): float
+    {
+        $sql = "
+            SELECT ROUND(
+                     a.opening_balance + (
+                       CASE WHEN COALESCE(a.normal_balance, at.normal_side, 'debit') = 'credit'
+                            THEN COALESCE(m.cr, 0) - COALESCE(m.dr, 0)
+                            ELSE COALESCE(m.dr, 0) - COALESCE(m.cr, 0)
+                       END
+                     ), 2) AS ledger_balance
+              FROM accounts a
+              LEFT JOIN account_types at ON a.account_type_id = at.type_id
+              LEFT JOIN (
+                SELECT mv.account_id,
+                       SUM(CASE WHEN mv.type = 'debit'  THEN mv.amount ELSE 0 END) AS dr,
+                       SUM(CASE WHEN mv.type = 'credit' THEN mv.amount ELSE 0 END) AS cr
+                  FROM (
+                        SELECT ji.account_id, ji.type, ji.amount
+                          FROM journal_entry_items ji
+                          JOIN journal_entries je ON ji.entry_id = je.entry_id
+                         WHERE je.status = 'posted'
+                           AND je.entry_date <= ?
+                        UNION ALL
+                        SELECT je.debit_account_id, 'debit', je.amount
+                          FROM journal_entries je
+                         WHERE je.status = 'posted'
+                           AND je.debit_account_id IS NOT NULL
+                           AND je.entry_date <= ?
+                           AND NOT EXISTS (SELECT 1 FROM journal_entry_items ji2 WHERE ji2.entry_id = je.entry_id)
+                        UNION ALL
+                        SELECT je.credit_account_id, 'credit', je.amount
+                          FROM journal_entries je
+                         WHERE je.status = 'posted'
+                           AND je.credit_account_id IS NOT NULL
+                           AND je.entry_date <= ?
+                           AND NOT EXISTS (SELECT 1 FROM journal_entry_items ji3 WHERE ji3.entry_id = je.entry_id)
+                  ) mv
+                 GROUP BY mv.account_id
+              ) m ON m.account_id = a.account_id
+             WHERE a.account_id = ?
+        ";
+        $st = $pdo->prepare($sql);
+        $st->execute([$asOf, $asOf, $asOf, $accountId]);
+        $v = $st->fetchColumn();
+        return $v === false ? 0.0 : (float)$v;
+    }
+}
+
 if (!function_exists('reconcileAccountBalances')) {
     /**
      * Recompute and persist accounts.current_balance = ledger-true balance for
