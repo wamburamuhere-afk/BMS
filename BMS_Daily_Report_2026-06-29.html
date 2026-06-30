@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMS Daily Development Report — 29 June 2026</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a2e; background: #f8f9fa; }
+  @media print {
+    body { background: white; }
+    .no-print { display: none; }
+    .page-break { page-break-before: always; }
+    .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+  }
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  .report-header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%); color: white; padding: 36px 40px; border-radius: 12px; margin-bottom: 28px; display: flex; justify-content: space-between; align-items: center; }
+  .report-header .title { font-size: 26px; font-weight: 700; letter-spacing: 0.5px; }
+  .report-header .subtitle { font-size: 13px; opacity: 0.75; margin-top: 4px; }
+  .report-header .meta { text-align: right; font-size: 12px; opacity: 0.8; line-height: 1.8; }
+  .report-header .meta strong { font-size: 18px; display: block; opacity: 1; }
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .sum-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); border-left: 4px solid; }
+  .sum-card.blue { border-left-color: #0d6efd; }
+  .sum-card.green { border-left-color: #198754; }
+  .sum-card.orange { border-left-color: #fd7e14; }
+  .sum-card.purple { border-left-color: #6f42c1; }
+  .sum-card .num { font-size: 32px; font-weight: 700; line-height: 1; }
+  .sum-card .label { font-size: 11px; color: #6c757d; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .sum-card.blue .num { color: #0d6efd; }
+  .sum-card.green .num { color: #198754; }
+  .sum-card.orange .num { color: #fd7e14; }
+  .sum-card.purple .num { color: #6f42c1; }
+  .section { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); margin-bottom: 24px; overflow: hidden; }
+  .section-header { padding: 16px 22px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 10px; }
+  .section-header .icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .section-header h2 { font-size: 15px; font-weight: 700; }
+  .section-header .badge-count { background: #e9ecef; color: #495057; border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 600; margin-left: auto; }
+  .section-body { padding: 20px 22px; }
+  .module { margin-bottom: 22px; border-left: 3px solid #dee2e6; padding-left: 16px; }
+  .module:last-child { margin-bottom: 0; }
+  .module-title { font-weight: 700; font-size: 13px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .module-title .tag { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+  .tag.feat { background: #d1e7dd; color: #0f5132; }
+  .tag.fix { background: #fff3cd; color: #664d03; }
+  .tag.critical { background: #f8d7da; color: #842029; }
+  .module ul { list-style: none; }
+  .module ul li { padding: 4px 0; color: #444; font-size: 12.5px; display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
+  .module ul li::before { content: "▸"; color: #adb5bd; flex-shrink: 0; margin-top: 1px; }
+  .file-chip { background: #f0f0f0; border-radius: 4px; padding: 1px 6px; font-size: 10.5px; font-family: 'Consolas', monospace; color: #495057; }
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .tl-item { display: flex; gap: 16px; position: relative; }
+  .tl-item::before { content: ''; position: absolute; left: 38px; top: 32px; bottom: 0; width: 1px; background: #dee2e6; }
+  .tl-item:last-child::before { display: none; }
+  .tl-time { font-size: 10.5px; color: #6c757d; font-family: monospace; width: 40px; padding-top: 12px; flex-shrink: 0; text-align: right; }
+  .tl-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; flex-shrink: 0; margin-top: 11px; box-shadow: 0 0 0 2px #dee2e6; }
+  .tl-dot.feat { background: #198754; box-shadow: 0 0 0 2px #d1e7dd; }
+  .tl-dot.fix { background: #ffc107; box-shadow: 0 0 0 2px #fff3cd; }
+  .tl-dot.chore { background: #6c757d; box-shadow: 0 0 0 2px #e2e3e5; }
+  .tl-content { flex: 1; padding: 8px 0 16px 0; }
+  .tl-content .tl-title { font-weight: 600; font-size: 12px; }
+  .tl-content .tl-sub { font-size: 11px; color: #6c757d; margin-top: 2px; }
+  .tl-hash { font-family: monospace; font-size: 10px; background: #f0f0f0; padding: 1px 5px; border-radius: 3px; color: #495057; }
+  .bug-table { width: 100%; border-collapse: collapse; }
+  .bug-table th { background: #f8f9fa; padding: 9px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: #6c757d; border-bottom: 2px solid #dee2e6; }
+  .bug-table td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; font-size: 12px; vertical-align: top; }
+  .bug-table tr:last-child td { border-bottom: none; }
+  .sev { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
+  .sev.high { background: #f8d7da; color: #842029; }
+  .sev.med { background: #fff3cd; color: #664d03; }
+  .sev.crit { background: #6f42c1; color: white; }
+  .files-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .file-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: #f8f9fa; border-radius: 6px; }
+  .file-row .ftype { font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 3px; min-width: 26px; text-align: center; }
+  .ftype.php { background: #6f42c1; color: white; }
+  .ftype.sql { background: #198754; color: white; }
+  .ftype.test { background: #dc3545; color: white; }
+  .ftype.core { background: #fd7e14; color: white; }
+  .file-row .fname { font-family: monospace; font-size: 11px; color: #1a1a2e; flex: 1; }
+  .file-row .fchange { font-size: 10px; color: #198754; font-weight: 600; }
+  .phase-row { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid #f0f0f0; }
+  .phase-row:last-child { border-bottom: none; }
+  .phase-badge { color: white; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+  .phase-badge.done { background: #198754; }
+  .phase-badge.fix { background: #fd7e14; }
+  .phase-content { flex: 1; }
+  .phase-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+  .phase-items { font-size: 12px; color: #555; line-height: 1.8; }
+  .phase-items code { background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+  .test-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px; }
+  .test-name { font-family: monospace; font-size: 11px; flex: 1; color: #1a1a2e; }
+  .test-result.pass { color: #198754; font-size:11px; font-weight:700; }
+  .total-bar { background: #d1e7dd; border-radius: 8px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+  .total-bar .total-label { font-weight: 700; color: #0f5132; font-size: 13px; }
+  .total-bar .total-num { font-size: 22px; font-weight: 700; color: #0f5132; }
+  .insight-box { border-left: 4px solid; border-radius: 6px; padding: 13px 16px; margin-bottom: 13px; }
+  .insight-box.danger { background: #f8d7da; border-left-color: #dc3545; }
+  .insight-box.info { background: #cff4fc; border-left-color: #0dcaf0; }
+  .insight-box.success { background: #d1e7dd; border-left-color: #198754; }
+  .insight-box.warning { background: #fff3cd; border-left-color: #ffc107; }
+  .insight-title { font-weight: 700; font-size: 12px; margin-bottom: 4px; }
+  .insight-body { font-size: 12px; color: #444; line-height: 1.6; }
+  .insight-body code { background: rgba(0,0,0,0.07); padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+  .next-item { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+  .next-item:last-child { border-bottom: none; }
+  .next-num { background: #0f3460; color: white; font-size: 11px; font-weight: 700; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .next-body { flex: 1; font-size: 12.5px; line-height: 1.6; }
+  .next-body strong { display: block; margin-bottom: 2px; }
+  .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .analysis-card { background: #f8f9fa; border-radius: 8px; padding: 14px 16px; }
+  .analysis-card h4 { font-size: 12px; font-weight: 700; margin-bottom: 8px; color: #0f3460; }
+  .analysis-card ul { list-style: none; }
+  .analysis-card ul li { font-size: 12px; color: #444; padding: 3px 0; display: flex; gap: 8px; }
+  .analysis-card ul li::before { content: "•"; color: #adb5bd; }
+  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+  .dot-done { background: #198754; }
+  .dot-partial { background: #ffc107; }
+  .dot-pending { background: #dee2e6; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="report-header">
+    <div>
+      <div class="title">BMS Development Report</div>
+      <div class="subtitle">BJP Technologies Co. Ltd &middot; Daily Progress Report</div>
+      <div style="margin-top:14px;font-size:11px;opacity:0.7;">
+        Period covered: After 27 June 2026 report &rarr; 29 June 2026<br>
+        Previous report: BMS Daily Report &mdash; 27 June 2026
+      </div>
+    </div>
+    <div class="meta">
+      <strong>29 June 2026</strong>
+      Report for 29 June 2026<br>
+      19 new commits<br>
+      PRs: #1024, #1027, #1029 &middot; MERGED<br>
+      Main files: pos_dashboard, project_view, bank_recon
+    </div>
+  </div>
+
+  <!-- SUMMARY CARDS -->
+  <div class="summary-grid">
+    <div class="sum-card blue">
+      <div class="num">4</div>
+      <div class="label">Major Areas Updated</div>
+    </div>
+    <div class="sum-card green">
+      <div class="num">98 / 98</div>
+      <div class="label">POS Tests Passing</div>
+    </div>
+    <div class="sum-card orange">
+      <div class="num">53 / 53</div>
+      <div class="label">Bank Recon Tests Passing</div>
+    </div>
+    <div class="sum-card purple">
+      <div class="num">8</div>
+      <div class="label">Bugs Fixed</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 1. POS DASHBOARD                           -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#d1e7dd;">&#128717;</div>
+      <h2>POS Dashboard &mdash; Full Rewrite + 4 Bug Fixes</h2>
+      <span class="badge-count">PR #1024 &middot; MERGED &middot; 5 commits</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12.5px;color:#555;margin-bottom:18px;line-height:1.7;">
+        The POS Dashboard was completely rewritten. The old design toggled between a "Dashboard" view and a "Sales History" view using buttons &mdash; confusing and the source of multiple JS bugs. The new design shows Sales History always at the top and the Dashboard always below, no toggle needed. A proper period filter was added with smart date pickers specific to each period type.
+      </p>
+
+      <div class="phase-row">
+        <span class="phase-badge done">FEAT</span>
+        <div class="phase-content">
+          <div class="phase-title">POS Dashboard Rewrite &mdash; Sales History First, Period Filter, Toolbar</div>
+          <div class="phase-items">
+            <b>Sales History section</b> always visible at top of page &mdash; no longer hidden behind a toggle.<br>
+            <b>Dashboard section</b> always visible below it &mdash; toggle buttons removed entirely.<br>
+            <b>Period filter</b> with 5 modes and smart date pickers per mode:<br>
+            &nbsp;&nbsp;&bull; Daily &rarr; single date (defaults to today)<br>
+            &nbsp;&nbsp;&bull; Weekly &rarr; pick any date; Mon&ndash;Sun range computed automatically and labelled<br>
+            &nbsp;&nbsp;&bull; Monthly &rarr; month + year dropdowns (default: current month)<br>
+            &nbsp;&nbsp;&bull; Quarterly &rarr; Q1&ndash;Q4 + year dropdowns<br>
+            &nbsp;&nbsp;&bull; Yearly &rarr; year dropdown (default: current year, last 5 years listed)<br>
+            <b>Default period changed from Monthly to Yearly.</b><br>
+            <b>Copy / CSV / Print toolbar</b> added above the sales table, matching suppliers.php style.<br>
+            <b>Error handling:</b> <code>loadDashboard()</code> now has a <code>.fail()</code> handler &mdash; previously the page could show "Loading&hellip;" forever if the API failed.<br>
+            <b>ui-constants.md compliance:</b> stat cards, modal headers, gear dropdown all follow the standard.<br>
+            File: <span class="file-chip">app/bms/pos/pos_dashboard.php</span> &nbsp; Test: 74 checks, all passing.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">FIX 1</span>
+        <div class="phase-content">
+          <div class="phase-title">safeOutput Undefined + Period Filter Panel Fix</div>
+          <div class="phase-items">
+            <b>Bug:</b> <code>safeOutput()</code> was called in JS but is not a global in this codebase &mdash; caused DataTable and dashboard widget JS errors on every page load.<br>
+            <b>Fix:</b> Defined <code>safeOutput()</code> locally in <code>pos_dashboard.php</code>.<br>
+            <b>Also:</b> <code>getDateRange()</code> and <code>showFilterPanel()</code> replaced the old <code>setPeriodDates()</code> which did not handle the new period-specific pickers. All Apply buttons unified via <code>.apply-btn</code> class delegation.<br>
+            Tests: 88 checks, all passing.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">FIX 2</span>
+        <div class="phase-content">
+          <div class="phase-title">Stat Cards Not Updating When Period Changed</div>
+          <div class="phase-items">
+            <b>Bug:</b> <code>getActivePeriod()</code> read <code>.active</code> CSS class but the click handler only swapped <code>btn-primary</code> &harr; <code>btn-outline-primary</code> &mdash; <code>.active</code> was never set. So stat cards always used the initial Yearly range regardless of which period button was clicked.<br>
+            <b>Fix:</b> Changed <code>getActivePeriod()</code> to read <code>.btn-primary</code> class instead of <code>.active</code>.<br>
+            <b>Also:</b> Recent Sales and Low Stock converted to proper DataTables (S/NO column, pagination, sort). <code>initDashboardTables()</code> initialises once; <code>loadDashboard()</code> uses <code>.clear().rows.add().draw()</code> to refresh data without destroying and recreating the table.<br>
+            Tests: 95 checks, all passing.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">FIX 3</span>
+        <div class="phase-content">
+          <div class="phase-title">BMS Print Footer Missing in DataTables Print Window</div>
+          <div class="phase-items">
+            <b>Bug:</b> DataTables Print opens a new browser window containing only the table &mdash; <code>footer.php</code>'s <code>.bms-print-footer</code> div is never cloned there. Printed POS reports had no footer (no company name, no user name, no date).<br>
+            <b>Fix:</b> Added a DataTables <code>customize</code> callback that appends the full BMS footer structure (user name, role, datetime, BJP Technologies copyright) with inline styles matching the <code>@media print</code> rules.<br>
+            <b>Also added</b> <code>PRINT_ROLE</code> and <code>PRINT_YEAR</code> JS constants; corrected <code>PRINT_USER</code> to read from session at page-render time (it previously referenced <code>$_print_username</code> which is set in <code>footer.php</code>, after the JS block).<br>
+            Tests: 98 checks, all passing (3 new checks).
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">FIX 4</span>
+        <div class="phase-content">
+          <div class="phase-title">Period Button Shows Double-Selection + Redundant Dashboard Reload</div>
+          <div class="phase-items">
+            <b>Bug 1:</b> The "Yearly" period button had a hardcoded Bootstrap <code>active</code> class. The click handler never removed it, so after selecting any other period, both that period AND Yearly appeared selected (both filled blue) simultaneously.<br>
+            <b>Fix:</b> Removed hardcoded <code>active</code> class from Yearly button &mdash; <code>btn-primary</code> alone provides the visual selection state.<br>
+            <b>Bug 2:</b> <code>voidSale()</code> and <code>openReturn()</code> called <code>loadDashboard()</code> unconditionally on success, firing an extra AJAX request even when the Dashboard panel was hidden.<br>
+            <b>Fix:</b> Guarded with <code>if (!$('#paneDashboard').hasClass('d-none'))</code>.<br>
+            Tests: 98 checks, all passing.
+          </div>
+        </div>
+      </div>
+
+      <div class="test-bar">
+        <span class="test-name">tests/test_pos_dashboard_cli.php</span>
+        <span class="test-result pass">ALL PASS</span>
+        <span style="font-size:11px;color:#6c757d;min-width:60px;text-align:right;">98 / 98</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 2. PROJECT VIEW + PROJECTS + BUDGET        -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#fff3cd;">&#128193;</div>
+      <h2>Project View, Projects &amp; Budget &mdash; 4 Fixes</h2>
+      <span class="badge-count">6 commits &middot; 2 files</span>
+    </div>
+    <div class="section-body">
+
+      <div class="module">
+        <div class="module-title">Project Edit &mdash; Contract Sum Shows Milestone Total Instead of Stored Value <span class="tag fix">FIX</span></div>
+        <ul>
+          <li><b>Bug:</b> The Edit Project modal pre-filled the "Contract Sum" field with the milestone-calculated total, not the stored value. <code>get_project.php</code> overwrites <code>contract_sum</code> with the milestone sum before returning data; the JS was reading that overwritten field.</li>
+          <li><b>Fix:</b> Switched the modal to read <code>form_contract_sum</code> which carries the raw stored database value.</li>
+          <li>File: <span class="file-chip">app/bms/operations/projects.php</span></li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-title">Project View Print &mdash; Footer Says "Document" Instead of "Report" on Performance Tab <span class="tag fix">FIX</span></div>
+        <ul>
+          <li><b>Bug:</b> The shared <code>footer.php</code> always writes <i>"This document was printed&hellip;"</i> but when printing the Project Performance Report tab, it should say <i>"This report was printed&hellip;"</i></li>
+          <li><b>Fix (final):</b> <code>beforeprint</code> event checks if the <code>#performance</code> tab has <code>.show</code>/<code>.active</code> &mdash; only then swaps the text using a <code>nodeType===3</code> text-node walk (preserving the <code>&lt;strong&gt;</code> bold tags inside the footer). <code>afterprint</code> always restores to "document" so the next print starts clean.</li>
+          <li>All other tabs (Overview, Budget, Expenses, Invoices, Procurements) correctly retain "document".</li>
+          <li>PDF exports already handled in their own jsPDF functions &mdash; not affected.</li>
+          <li><b>Also fixed:</b> Removed an erroneous A3 landscape <code>@page</code> margin override. Replaced with standard BMS print margins (10mm top / 8mm right / 16mm bottom / 8mm left).</li>
+          <li>File: <span class="file-chip">app/bms/operations/project_view.php</span></li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-title">Budget &mdash; Non-Admin Users Blocked From Creating Budgets <span class="tag critical">CRITICAL FIX</span></div>
+        <ul>
+          <li><b>Bug:</b> Budget API checked <code>canCreate('budgets')</code> (plural) but the permission key is <code>'budget'</code> (singular). These are different entries in the permissions table &mdash; they never matched. Non-admin users got "Access Denied" even with full budget permissions granted. Admins were unaffected because their bypass skips the check entirely.</li>
+          <li><b>Fix:</b> Changed API to <code>canCreate('budget')</code>. Also corrected the Add/Create Budget button permission gate from <code>canEdit</code> to <code>canCreate</code>.</li>
+          <li><b>Also:</b> Improved activity log message from raw database IDs to human-readable format: "Budget 'Q1 Operations' for Jan&ndash;Mar 2026 (TZS 5,000,000) created".</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 3. PROCUREMENT 12 SUB-MODULES              -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#e0cffc;">&#128230;</div>
+      <h2>Project &gt; Procurements &mdash; DataTable Fix Across All 12 Sub-Modules</h2>
+      <span class="badge-count">PR #1027 &middot; MERGED &middot; project_view.php</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12.5px;color:#555;margin-bottom:18px;line-height:1.7;">
+        Inside Project Details &rarr; Procurements tab there are 12 sub-tabs: Delivery Notes, Purchase Orders, Delivery Orders, Return Notes, Debit Notes, Suppliers, NIP Products, Materials, GRNs, Purchases, Purchase Full, and Invoices. All had DataTable problems &mdash; missing pagination controls, invisible tables after toggle, or no DataTable at all. All 12 verified in browser at project ID=16: table on web, card-toggle where applicable, print column widths stable, S/NO column present.
+      </p>
+
+      <div class="module">
+        <div class="module-title">DN, Delivery Orders, Inventory &mdash; Pagination and Info Strips Missing <span class="tag fix">FIX</span></div>
+        <ul>
+          <li>These three used a custom DataTable <code>dom</code> value <code>'&lt;"top d-print-none"f&gt;rt&lt;"clear"&gt;'</code> which stripped the length control (<code>l</code>), info bar (<code>i</code>), and pagination (<code>p</code>) &mdash; leaving a table with no page controls and no row count shown.</li>
+          <li>Fixed to <code>'&lt;"d-print-none"lf&gt;rtip'</code> &mdash; restores all controls while keeping search hidden on print.</li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-title">Return Notes, Debit Notes, Suppliers, NIP &mdash; Card/Table Toggle Made Table Invisible <span class="tag fix">FIX</span></div>
+        <ul>
+          <li><b>Bug:</b> The toggle called <code>renderForTable()</code> before DataTable was initialised. The toggle handler looked for <code>.dataTables_wrapper</code> inside <code>.table-responsive</code>, but DataTable had not yet wrapped the element &mdash; so nothing was found, the table became invisible, and could not be restored.</li>
+          <li><b>Fix:</b> Initialise DataTable first on tab load, then wire the toggle. The wrapper now exists when the toggle needs to find it.</li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-title">Materials &mdash; Converted from Custom Manual Pagination to Real DataTable <span class="tag fix">FIX</span></div>
+        <ul>
+          <li>Materials was the most divergent: completely custom AJAX row-injection with manual pagination functions (<code>procFilterMatTable()</code>, <code>procGoToMatPage()</code>), a custom filter bar HTML block, and a custom pagination div. No DataTable at all.</li>
+          <li>Replaced entirely: <code>loadProcMaterials()</code> now fills the <code>&lt;tbody&gt;</code> then calls <code>DataTable()</code>. Custom filter bar, pagination div, and both custom JS functions removed.</li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-title">Remaining 8 Tabs (Purchases, GRNs, Invoices, etc.) &mdash; Destroy+Reinit Pattern <span class="tag fix">FIX</span></div>
+        <ul>
+          <li>renderReturns, renderProjectDebitNotes, renderProjectSuppliers, projNipRenderTable, renderPurchases, renderPurchasesFull, renderGRNs &mdash; all already had an S/NO column.</li>
+          <li>Added DataTable destroy+reinit pattern so switching tabs and back does not throw "Cannot reinitialise DataTable" errors.</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 4. BANK RECONCILIATION                     -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section page-break">
+    <div class="section-header">
+      <div class="icon" style="background:#cff4fc;">&#127970;</div>
+      <h2>Bank Reconciliation &mdash; Complete 4-Phase Upgrade</h2>
+      <span class="badge-count">PR #1029 &middot; MERGED &middot; 52 files &middot; +10,959 / &minus;82</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12.5px;color:#555;margin-bottom:18px;line-height:1.7;">
+        The bank reconciliation system had two core problems: (1) book balance was read from <code>accounts.current_balance</code> which can drift from the actual GL, and (2) petty cash transactions never appeared in the bank register. Both fixed, plus adjusting-entry workflow, period overlap guard, beginning-balance chain, two-column print report, period lock, and unreconcile with audit trail.
+      </p>
+
+      <div class="phase-row">
+        <span class="phase-badge done">Phase 1</span>
+        <div class="phase-content">
+          <div class="phase-title">Period-Aware Book Balance + Petty Cash in Bank Register</div>
+          <div class="phase-items">
+            New function <code>accountLedgerBalanceAsOf(PDO, $accountId, $asOf)</code> in <code>core/account_balance.php</code> &mdash; computes true GL balance as of any date from <code>journal_entry_items</code> (posted only), replacing the stale <code>accounts.current_balance</code>.<br>
+            <code>create_reconciliation.php</code> book_balance now calls this function with the period-end date.<br>
+            <code>get_bank_balance.php</code> rewritten to return ledger-as-of balance when <code>as_of</code> param provided.<br>
+            Petty cash: <code>api/petty_cash/save_transaction.php</code> calls <code>recordBankTransaction()</code> after each post; edit path calls <code>reverseBankTransaction()</code> first; delete path clears register rows by reference number.<br>
+            Migration: <code>migrations/2026_06_29_bank_recon_opening_balance.php</code> &mdash; adds <code>opening_balance</code> column to <code>bank_reconciliations</code>.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge done">Phase 2</span>
+        <div class="phase-content">
+          <div class="phase-title">Adjusting Journal Entries + Create-from-Statement-Line</div>
+          <div class="phase-items">
+            New table <code>bank_reconciliation_adjustments</code> (migration <code>2026_06_29_bank_recon_adjustments_table.php</code>, InnoDB, no FK to <code>bank_reconciliations</code> which is MyISAM).<br>
+            New API <code>api/account/add_reconciliation_adjustment.php</code>: 6 types (bank_charge, interest_earned, NSF, standing_order, other_out, other_in). Posts balanced GL entry, writes bank register row, auto-matches, stores in adjustments table.<br>
+            New API <code>api/account/create_entry_from_statement_line.php</code>: for transactions on bank statement not yet in books &mdash; creates GL entry and auto-matches the original line.<br>
+            UI: "Add Adjustment" button + modal, "Create Entry" button on unmatched lines, Adjustments panel listing all adjustments with type/amount/memo.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge done">Phase 3</span>
+        <div class="phase-content">
+          <div class="phase-title">Beginning-Balance Chain + Two-Column Print Report + Overlap Guard</div>
+          <div class="phase-items">
+            <b>Overlap guard:</b> <code>create_reconciliation.php</code> rejects new reconciliations whose period overlaps an existing non-cancelled one for the same bank account.<br>
+            <b>Beginning-balance chain:</b> <code>opening_balance</code> auto-populated from the prior finalized reconciliation's <code>adjusted_balance</code> &mdash; unbroken chain. If no prior, opening_balance = 0.<br>
+            <b>Worksheet exclusion:</b> lines already cleared in a different reconciliation excluded from current worksheet.<br>
+            <b>Two-column print report:</b> Bank Statement side (statement balance &plusmn; uncleared items = adjusted bank balance) vs Book side (book balance &plusmn; adjustments = adjusted book balance). "BALANCED" in green or "UNBALANCED" in red.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge done">Phase 4</span>
+        <div class="phase-content">
+          <div class="phase-title">Period Lock + Unreconcile With Audit Trail</div>
+          <div class="phase-items">
+            New core <code>core/recon_period_lock.php</code> &mdash; <code>assertNotInFinalizedReconPeriod(PDO, $entryId)</code>: checks if any account touched by a journal entry has a finalized reconciliation covering that date; throws descriptive Exception if so.<br>
+            <b>Wired into 3 journal mutation endpoints:</b> <code>void_journal.php</code>, <code>reverse_journal.php</code>, <code>update_journal.php</code> &mdash; all block if entry date falls in a locked period.<br>
+            New API <code>api/account/unreconcile.php</code> (requires <code>canApprove</code>): reverts reconciliation &rarr; pending, reverts bank_transactions &rarr; cleared, logs full audit trail with mandatory reason (&ge;10 chars).<br>
+            UI: "Unreconcile" button (canApprove only), SweetAlert2 confirmation, reason textarea.
+          </div>
+        </div>
+      </div>
+
+      <div class="test-bar">
+        <span class="test-name">tests/test_bank_recon_phase1_cli.php</span>
+        <span class="test-result pass">ALL PASS</span>
+        <span style="font-size:11px;color:#6c757d;min-width:60px;text-align:right;">15 / 15</span>
+      </div>
+      <div class="test-bar">
+        <span class="test-name">tests/test_bank_recon_phase2_cli.php</span>
+        <span class="test-result pass">ALL PASS</span>
+        <span style="font-size:11px;color:#6c757d;min-width:60px;text-align:right;">15 / 15</span>
+      </div>
+      <div class="test-bar">
+        <span class="test-name">tests/test_bank_recon_phase3_cli.php</span>
+        <span class="test-result pass">ALL PASS</span>
+        <span style="font-size:11px;color:#6c757d;min-width:60px;text-align:right;">11 / 11</span>
+      </div>
+      <div class="test-bar">
+        <span class="test-name">tests/test_bank_recon_phase4_cli.php</span>
+        <span class="test-result pass">ALL PASS</span>
+        <span style="font-size:11px;color:#6c757d;min-width:60px;text-align:right;">12 / 12</span>
+      </div>
+      <div class="total-bar">
+        <span class="total-label">Total bank reconciliation tests</span>
+        <span class="total-num">53 / 53 &#10003;</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- ALL BUGS FIXED                             -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#fff3cd;">&#128027;</div>
+      <h2>All Bugs Fixed Today</h2>
+      <span class="badge-count">8 bugs</span>
+    </div>
+    <div class="section-body">
+      <table class="bug-table">
+        <thead>
+          <tr><th style="width:80px">Severity</th><th>Bug</th><th>Root Cause</th><th>Fix</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="sev crit">CRITICAL</span></td>
+            <td>Non-admin users blocked from creating budgets</td>
+            <td>API checked <code>canCreate('budgets')</code> (plural); key is <code>'budget'</code> (singular) &mdash; never matched</td>
+            <td>Changed to <code>canCreate('budget')</code>; fixed button gate from canEdit &rarr; canCreate</td>
+          </tr>
+          <tr>
+            <td><span class="sev high">HIGH</span></td>
+            <td>POS stat cards always showed Yearly data regardless of selected period</td>
+            <td><code>getActivePeriod()</code> read <code>.active</code> class; handler only toggled <code>btn-primary</code> &mdash; <code>.active</code> never set</td>
+            <td>Changed to read <code>.btn-primary</code> which the handler does toggle</td>
+          </tr>
+          <tr>
+            <td><span class="sev high">HIGH</span></td>
+            <td>Procurement Materials tab: broken custom pagination, not a DataTable</td>
+            <td>Custom AJAX row-injection with manual pager functions &mdash; no DataTable at all</td>
+            <td>Removed custom functions; rewritten as real DataTable with destroy+reinit</td>
+          </tr>
+          <tr>
+            <td><span class="sev high">HIGH</span></td>
+            <td>Return Notes / Debit Notes / Suppliers / NIP card toggle made table invisible</td>
+            <td><code>renderForTable()</code> ran before DataTable init; toggle sought <code>.dataTables_wrapper</code> which did not exist yet</td>
+            <td>Initialise DataTable first; wire toggle after; wrapper now exists when needed</td>
+          </tr>
+          <tr>
+            <td><span class="sev med">MEDIUM</span></td>
+            <td>Project edit modal shows milestone total in Contract Sum field</td>
+            <td><code>get_project.php</code> overwrites <code>contract_sum</code> before returning; JS read that overwritten value</td>
+            <td>Read <code>form_contract_sum</code> (raw stored value) instead</td>
+          </tr>
+          <tr>
+            <td><span class="sev med">MEDIUM</span></td>
+            <td>POS period button: Yearly and selected period both highlighted simultaneously</td>
+            <td>Yearly button had hardcoded Bootstrap <code>active</code> class; click handler never removed it</td>
+            <td>Removed hardcoded <code>active</code> class; <code>btn-primary</code> alone provides selection state</td>
+          </tr>
+          <tr>
+            <td><span class="sev med">MEDIUM</span></td>
+            <td>BMS footer absent from DataTables Print window in POS</td>
+            <td>DataTables Print opens a new window &mdash; <code>footer.php</code> markup is never cloned into it</td>
+            <td>Added <code>customize</code> callback that appends full BMS footer with inline print styles</td>
+          </tr>
+          <tr>
+            <td><span class="sev med">MEDIUM</span></td>
+            <td>Project View prints "This document was…" even on the Performance Report tab</td>
+            <td>Shared <code>footer.php</code> always uses "document"; no tab-aware swap existed</td>
+            <td><code>beforeprint</code> swaps to "report" only when Performance tab is active; <code>afterprint</code> restores</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- GL ANALYSIS                                -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#d1e7dd;">&#128300;</div>
+      <h2>GL / Financial Report Analysis &mdash; Why IS Shows Loss While BS Is Balanced</h2>
+      <span class="badge-count">Research &amp; Diagnosis</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12.5px;color:#555;margin-bottom:16px;line-height:1.7;">
+        Full diagnostic investigation performed today. Both Income Statement and Balance Sheet read only <code>journal_entries</code> &mdash; the report code is correct. The problem is what gets posted there.
+      </p>
+      <div class="insight-box danger">
+        <div class="insight-title">Root Cause &mdash; Revenue Almost Completely Missing from the GL</div>
+        <div class="insight-body">
+          Only ~550M TZS of revenue has ever reached a revenue-category account in <code>journal_entries</code> (7 invoice approvals + 32 POS sales). All other revenue flows through <code>recordGlobalTransaction()</code> which mirrors to the GL as <code>entity_type='books_transaction'</code> &mdash; but the credit leg lands on account 2 (<i>Opening Balance Equity</i>, inactive, equity) NOT on any revenue account.
+        </div>
+      </div>
+      <div class="insight-box warning">
+        <div class="insight-title">Why Balance Sheet Looks Positive While IS Shows a Loss</div>
+        <div class="insight-body">
+          The mirror posts Dr account 13 (<i>Marketing</i>, inactive, expense) / Cr account 2 (<i>Opening Balance Equity</i>, inactive, equity). IS sees 12.5B expenses with zero revenue &rarr; loss. BS sees 12.5B equity credits &rarr; looks positive. Meanwhile 552 payroll accruals correctly post 151B salary expenses &rarr; IS shows massive loss, BS shows 151B in liabilities offset by equity.
+        </div>
+      </div>
+      <div class="insight-box info">
+        <div class="insight-title">Where Old Data Is Stored</div>
+        <div class="insight-body">
+          <code>recordGlobalTransaction()</code> writes to: (1) <code>transactions</code> table (header); (2) <code>books_transactions</code> table (Dr/Cr legs with OLD pre-2024 account IDs); (3) <code>journal_entries</code> mirror using those same old IDs; (4) <code>accounts.current_balance</code> via <code>applyAccountBalanceDelta()</code>. The GL mirror exists but the account classifications are wrong.
+        </div>
+      </div>
+      <div class="insight-box success">
+        <div class="insight-title">Fix Path &mdash; F1 Legacy Dual-Write Cleanup (Next Phase)</div>
+        <div class="insight-body">
+          Replace <code>postInflow()</code> / <code>recordGlobalTransaction()</code> in 8 remaining flows (IN-1/2/4, OUT-5/6/9/10/11) with direct <code>postLedgerEntry()</code> calls using correct new account codes (1-1200 AR, 4-1000 Sales Revenue, etc.). Revenue will finally land in a revenue account and the IS will show the real picture.
+        </div>
+      </div>
+      <div class="analysis-grid">
+        <div class="analysis-card">
+          <h4>Double-Entry Coherence &mdash; Done</h4>
+          <ul>
+            <li><span class="status-dot dot-done"></span>All 4 statements read one GL</li>
+            <li><span class="status-dot dot-done"></span>Invoice revenue (postInvoiceRevenue)</li>
+            <li><span class="status-dot dot-done"></span>POS sale + COGS (postPosSale)</li>
+            <li><span class="status-dot dot-done"></span>POS return (postPosReturn)</li>
+            <li><span class="status-dot dot-done"></span>All expense flows OUT-1..4</li>
+            <li><span class="status-dot dot-done"></span>Payroll, statutory OUT-7..8</li>
+            <li><span class="status-dot dot-done"></span>GRN, Assets, IPC OUT-12..16</li>
+          </ul>
+        </div>
+        <div class="analysis-card">
+          <h4>Double-Entry Coherence &mdash; Remaining</h4>
+          <ul>
+            <li><span class="status-dot dot-partial"></span>F1: 25 callsites still use recordGlobalTransaction</li>
+            <li><span class="status-dot dot-partial"></span>F2: journal_mappings all is_active=0 (dead)</li>
+            <li><span class="status-dot dot-pending"></span>12 POS sales missing COGS GL entries (backfill)</li>
+            <li><span class="status-dot dot-pending"></span>IN-1/2/4, OUT-5/6/9/10/11 need direct posting</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- COMMIT TIMELINE                            -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#e0cffc;">&#128203;</div>
+      <h2>Commit Timeline &mdash; 29 June 2026</h2>
+      <span class="badge-count">19 commits</span>
+    </div>
+    <div class="section-body">
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-time">00:10</div>
+          <div class="tl-dot chore"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">b0b444a</span> docs: 27 June 2026 report created &mdash; <em style="color:#6c757d;font-size:10px;">start of today's window</em></div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">02:33</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">ec8e14b</span> fix(projects): show original contract sum in edit form</div>
+            <div class="tl-sub">projects.php &mdash; read form_contract_sum not milestone-overwritten contract_sum</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">03:11</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">3d826dc</span> fix(project_view): print footer says 'report' + correct page margins</div>
+            <div class="tl-sub">project_view.php &mdash; footer text swap + removed A3 landscape @page override</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">03:44&ndash;03:48</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">f5beb3e / 9552549 / 07317fc</span> fix(project_view): text-node walk to preserve bold tags in footer</div>
+            <div class="tl-sub">Revert + final approach using nodeType===3 childNodes walk</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">04:41</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">0873f3b</span> fix(budget): correct permission key mismatch blocking non-admin create</div>
+            <div class="tl-sub">canCreate('budgets') &rarr; canCreate('budget'); Add button: canEdit &rarr; canCreate; better activity log</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">05:15</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">ed2e7bd</span> fix(project_view): scope 'This report was' footer to Performance tab only</div>
+            <div class="tl-sub">beforeprint checks #performance .show/.active; afterprint always restores 'document'</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">05:48</div>
+          <div class="tl-dot feat"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">bcfda35</span> feat(pos): rewrite POS Dashboard &mdash; sales history first, period filter, toolbar</div>
+            <div class="tl-sub">No more toggle; 5-mode period filter; Copy/CSV/Print toolbar; .fail() handler; 74 tests</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">06:16</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">487a43c</span> fix(pos): safeOutput undefined + redesign period filter (Yearly default)</div>
+            <div class="tl-sub">Define safeOutput() locally; getDateRange()/showFilterPanel() replace setPeriodDates(); 88 tests</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">06:31</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">7ab60e2</span> fix(pos): stat cards, DataTables for dashboard widgets, Sales Dashboard toggle</div>
+            <div class="tl-sub">getActivePeriod() reads .btn-primary; Recent Sales + Low Stock &rarr; real DataTables; 95 tests</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">06:44</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">037b84d</span> fix(pos): inject BMS print footer into DataTables print window</div>
+            <div class="tl-sub">customize callback appends footer; PRINT_ROLE + PRINT_YEAR constants; PRINT_USER from session; 98 tests</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">06:50</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">102e464</span> fix(pos): period button double-selection + redundant dashboard reload</div>
+            <div class="tl-sub">Remove hardcoded active class from Yearly; guard loadDashboard() on panel visibility; 98 tests</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">18:06</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">0e96add</span> fix(project): DataTable correctness across all 12 procurement sub-modules</div>
+            <div class="tl-sub">project_view.php &mdash; dom fix; toggle fix; Materials &rarr; real DataTable; all 12 verified in browser</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">18:48</div>
+          <div class="tl-dot feat"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">9ba719a</span> feat(bank-recon): Phase 1 &mdash; period-aware book balance + petty cash register</div>
+            <div class="tl-sub">accountLedgerBalanceAsOf() in core/account_balance.php; petty cash &rarr; bank register; migration</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">21:13</div>
+          <div class="tl-dot feat"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">33e002e</span> feat(bank-recon): Phase 2 &mdash; adjusting journal entries + create-from-line</div>
+            <div class="tl-sub">add_reconciliation_adjustment.php + create_entry_from_statement_line.php + adjustments table + UI</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">21:15</div>
+          <div class="tl-dot feat"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">c602709</span> feat(bank-recon): Phase 3 &mdash; beginning-balance chain + two-column report</div>
+            <div class="tl-sub">Overlap guard + opening_balance chain + two-column print statement + worksheet exclusion</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">21:20</div>
+          <div class="tl-dot feat"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">4dfb544</span> feat(bank-recon): Phase 4 &mdash; period lock + unreconcile with audit trail</div>
+            <div class="tl-sub">core/recon_period_lock.php + unreconcile.php + void/reverse/update journal lock + UI</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">21:43&ndash;21:55</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">0ed77c2 / d3f26b8</span> fix(test): Phase 4 idempotency + stale expense posting assertion</div>
+            <div class="tl-sub">Pre-cleanup T4-* rows; update current_balance assertion to accountLedgerBalanceAsOf</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- FILES CHANGED                              -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#f8f9fa;">&#128193;</div>
+      <h2>Key Files Changed / Added Today</h2>
+    </div>
+    <div class="section-body">
+      <div class="files-grid">
+        <div class="file-row"><span class="ftype php">UI</span><span class="fname">app/bms/pos/pos_dashboard.php</span><span class="fchange">rewrite</span></div>
+        <div class="file-row"><span class="ftype php">UI</span><span class="fname">app/bms/operations/project_view.php</span><span class="fchange">major +</span></div>
+        <div class="file-row"><span class="ftype php">UI</span><span class="fname">app/bms/operations/projects.php</span><span class="fchange">+2</span></div>
+        <div class="file-row"><span class="ftype core">CORE</span><span class="fname">core/account_balance.php</span><span class="fchange">NEW +55</span></div>
+        <div class="file-row"><span class="ftype core">CORE</span><span class="fname">core/recon_period_lock.php</span><span class="fchange">NEW +68</span></div>
+        <div class="file-row"><span class="ftype php">API</span><span class="fname">api/account/add_reconciliation_adjustment.php</span><span class="fchange">NEW +139</span></div>
+        <div class="file-row"><span class="ftype php">API</span><span class="fname">api/account/create_entry_from_statement_line.php</span><span class="fchange">NEW +133</span></div>
+        <div class="file-row"><span class="ftype php">API</span><span class="fname">api/account/unreconcile.php</span><span class="fchange">NEW +92</span></div>
+        <div class="file-row"><span class="ftype php">API</span><span class="fname">api/account/create_reconciliation.php</span><span class="fchange">+64</span></div>
+        <div class="file-row"><span class="ftype php">API</span><span class="fname">api/account/void_journal.php</span><span class="fchange">+8</span></div>
+        <div class="file-row"><span class="ftype php">API</span><span class="fname">api/account/reverse_journal.php</span><span class="fchange">+4</span></div>
+        <div class="file-row"><span class="ftype php">API</span><span class="fname">api/account/update_journal.php</span><span class="fchange">+4</span></div>
+        <div class="file-row"><span class="ftype php">API</span><span class="fname">api/petty_cash/save_transaction.php</span><span class="fchange">+21</span></div>
+        <div class="file-row"><span class="ftype php">API</span><span class="fname">api/petty_cash/delete_transaction.php</span><span class="fchange">+17</span></div>
+        <div class="file-row"><span class="ftype sql">MIG</span><span class="fname">migrations/2026_06_29_bank_recon_opening_balance.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype sql">MIG</span><span class="fname">migrations/2026_06_29_bank_recon_adjustments_table.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_pos_dashboard_cli.php</span><span class="fchange">updated 98</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_bank_recon_phase1_cli.php</span><span class="fchange">NEW +256</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_bank_recon_phase2_cli.php</span><span class="fchange">NEW +250</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_bank_recon_phase3_cli.php</span><span class="fchange">NEW +193</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_bank_recon_phase4_cli.php</span><span class="fchange">NEW +174</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- NEXT STEPS                                 -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#cff4fc;">&#128640;</div>
+      <h2>Next Steps</h2>
+    </div>
+    <div class="section-body">
+      <div class="next-item">
+        <div class="next-num">1</div>
+        <div class="next-body">
+          <strong>F1 Legacy Dual-Write Cleanup (PRIORITY &mdash; fixes the Income Statement)</strong>
+          Replace <code>postInflow()</code> / <code>recordGlobalTransaction()</code> in 8 remaining flows with direct <code>postLedgerEntry()</code> using correct account codes. Revenue will finally land in a revenue account.
+        </div>
+      </div>
+      <div class="next-item">
+        <div class="next-num">2</div>
+        <div class="next-body">
+          <strong>Bank Reconciliation &mdash; Production Deployment</strong>
+          Run 2 new migrations on live server. Confirm <code>canApprove('bank_reconciliation')</code> assigned to Accountant and Manager roles in live permissions.
+        </div>
+      </div>
+      <div class="next-item">
+        <div class="next-num">3</div>
+        <div class="next-body">
+          <strong>POS Returns End-to-End Verification</strong>
+          <code>postPosReturn()</code> is coded and called but 0 returns exist in DB yet. Verify the full return flow including COGS reversal and Output VAT reversal. Backfill 12 POS sales missing COGS GL entries.
+        </div>
+      </div>
+      <div class="next-item">
+        <div class="next-num">4</div>
+        <div class="next-body">
+          <strong>F2 Dead Code &mdash; journal_mappings + autoPostEvent()</strong>
+          All journal_mappings rows are <code>is_active=0</code>; <code>autoPostEvent()</code> in 3 files is a no-op. Remove dead calls to eliminate confusion.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:24px 0;color:#adb5bd;font-size:11px;border-top:1px solid #dee2e6;margin-top:8px;">
+    BMS Daily Development Report &middot; 29 June 2026 &middot; BJP Technologies Co. Ltd &middot; Prepared by Claude Code (AI Development Assistant)
+  </div>
+
+</div>
+</body>
+</html>
