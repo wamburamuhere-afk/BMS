@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-06-30 (fix) — PO create: RFQ auto-fill, warehouse always shows, clean URLs
+
+- `app/bms/purchase/purchase_order_create.php` — fixed 3 issues:
+  (1) RFQ Reference now auto-fills: warehouse pre-selected from RFQ in PHP so
+      `fetchProducts()` loads prices before `loadRFQs()` triggers item population;
+      `const rfqRefId` moved to top-level (removed duplicate `const isEdit`);
+      blank row skipped when RFQ items will auto-fill;
+      chain is now `fetchProducts → loadRFQs(cb) → select RFQ → trigger change`.
+  (2) Warehouse always appears: removed PHP project-filter on warehouses (too
+      strict); `filterWarehousesByProject` now falls back to all accessible
+      warehouses when no project-linked ones are found.
+  (3) URLs are clean: replaced `return_url=<encoded_path>` with short `back=<tab>`
+      param; PHP derives full back URL from `project_id` + `back` tab name.
+- `app/bms/purchase/rfq_view.php` — same `back=` approach; back_url computed after
+  rfq record is loaded (uses rfq.project_id).
+- `app/bms/purchase/rfq_create.php` — same `back=` approach.
+- `app/bms/operations/project_view.php` — all links updated to `back=rfq` or
+  `back=procurement`; removed all `retUrl`/`poRetUrl` encoded-URL variables.
+
 ## 2026-06-30 (feat) — PO create/edit context-awareness + project_context_pattern.md
 
 - `app/bms/purchase/purchase_order_create.php` — reads `return_url` (relative-path guard);

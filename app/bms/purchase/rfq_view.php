@@ -11,11 +11,10 @@ $rfq_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if (!$rfq_id) { header('Location: ' . getUrl('rfq')); exit; }
 assertScopeForRecordHtml('rfq', 'rfq_id', $rfq_id);
 
-// Context-aware back URL — only accept relative paths (open-redirect guard)
-$_raw_return = $_GET['return_url'] ?? '';
-$return_url  = (!empty($_raw_return) && $_raw_return[0] === '/') ? $_raw_return : '';
-$back_url    = $return_url ?: getUrl('rfq');
-$from_project = !empty($return_url) && strpos($return_url, 'project_view') !== false;
+// Context-aware back navigation — short ?back=<tab> keeps URLs clean
+$back_tab    = $_GET['back'] ?? '';
+$from_project = !empty($back_tab);
+$back_url    = getUrl('rfq'); // updated below once rfq record is loaded
 
 $stmt = $pdo->prepare("
     SELECT r.*,
@@ -31,6 +30,11 @@ $stmt = $pdo->prepare("
 $stmt->execute([$rfq_id]);
 $rfq = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$rfq) { header('Location: ' . getUrl('rfq')); exit; }
+
+// Compute back URL now that we have the rfq's project_id
+if ($from_project && !empty($rfq['project_id'])) {
+    $back_url = getUrl('project_view') . '?id=' . (int)$rfq['project_id'] . '&tab=' . $back_tab;
+}
 
 $stmt2 = $pdo->prepare("SELECT * FROM rfq_items WHERE rfq_id = ? ORDER BY item_order");
 $stmt2->execute([$rfq_id]);
@@ -129,15 +133,11 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
 
             <?php if ($status === 'approved' && !empty($rfq['supplier_id'])): ?>
             <?php
-                // When coming from a project RFQ tab, land back on the project's PO tab after saving
-                $po_return = $from_project
-                    ? str_replace('tab=rfq', 'tab=procurement', $back_url)
-                    : getUrl('purchase_orders');
                 $po_create_url = getUrl('purchase_order_create')
                     . '?supplier=' . (int)$rfq['supplier_id']
                     . '&rfq_ref='  . $rfq_id
                     . (!empty($rfq['project_id']) ? '&project=' . (int)$rfq['project_id'] : '')
-                    . '&return_url=' . urlencode($po_return);
+                    . ($from_project ? '&back=procurement' : '');
             ?>
             <a href="<?= htmlspecialchars($po_create_url) ?>"
                class="btn btn-outline-primary btn-sm px-3">

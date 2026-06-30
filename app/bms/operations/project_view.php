@@ -1458,7 +1458,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <button class="btn btn-outline-primary btn-sm" onclick="loadProjectDetails()">
                                     <i class="bi bi-arrow-clockwise"></i> Refresh
                                 </button>
-                                <a href="<?= getUrl('rfq_create') ?>?project=<?= $project_id ?>" class="btn btn-primary btn-sm">
+                                <a href="<?= getUrl('rfq_create') ?>?project=<?= $project_id ?>&back=rfq" class="btn btn-primary btn-sm">
                                     <i class="bi bi-plus-circle me-1"></i> Create RFQ
                                 </a>
                                 <div class="btn-group shadow-sm" role="group">
@@ -1493,7 +1493,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <button class="btn btn-outline-primary btn-sm me-2" onclick="loadProjectDetails()">
                                     <i class="bi bi-arrow-clockwise"></i> Refresh
                                 </button>
-                                <button class="btn btn-primary btn-sm" onclick="window.location.href='<?= getUrl('purchase_order_create') ?>?project=<?= $project_id ?>&type=supply_order&return_url=<?= urlencode(getUrl('project_view') . '?id=' . $project_id . '&tab=procurement') ?>'">
+                                <button class="btn btn-primary btn-sm" onclick="window.location.href='<?= getUrl('purchase_order_create') ?>?project=<?= $project_id ?>&type=supply_order&back=procurement'">
                                     <i class="bi bi-plus-circle me-1"></i> Create Order
                                 </button>
                             </div>
@@ -9191,7 +9191,6 @@ function renderPurchases(purchases) {
         $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-file-earmark-text fs-1 mb-3"></i><p>No supply orders linked to this project.</p></div>');
         return;
     }
-    const poRetUrl = encodeURIComponent('<?= getUrl('project_view') ?>?id=<?= $project_id ?>&tab=procurement');
     let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Supplier</th><th>Date</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
     purchases.forEach((p, idx) => {
         html += `<tr>
@@ -9209,7 +9208,7 @@ function renderPurchases(purchases) {
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                         <li><a class="dropdown-item py-2" href="purchase_order_details?id=${p.purchase_order_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
-                        <li><a class="dropdown-item py-2" href="purchase_order_create?edit=${p.purchase_order_id}&project=<?= $project_id ?>&type=supply_order&return_url=${poRetUrl}"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
+                        <li><a class="dropdown-item py-2" href="purchase_order_create?edit=${p.purchase_order_id}&project=<?= $project_id ?>&type=supply_order&back=procurement"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printPurchaseOrder(${p.purchase_order_id})"><i class="bi bi-printer text-dark me-2"></i>Print Order</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deletePurchase(${p.purchase_order_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
@@ -9231,7 +9230,6 @@ function renderPurchasesFull(purchases) {
         $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-bag fs-1 mb-3"></i><p>No purchase orders linked to this project.</p></div>');
         return;
     }
-    const poRetUrl = encodeURIComponent('<?= getUrl('project_view') ?>?id=<?= $project_id ?>&tab=procurement');
     let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Supplier</th><th>Date</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
     purchases.forEach((p, idx) => {
         html += `<tr>
@@ -9249,7 +9247,7 @@ function renderPurchasesFull(purchases) {
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                         <li><a class="dropdown-item py-2" href="purchase_order_details?id=${p.purchase_order_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
-                        <li><a class="dropdown-item py-2" href="purchase_order_create?edit=${p.purchase_order_id}&project=<?= $project_id ?>&return_url=${poRetUrl}"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
+                        <li><a class="dropdown-item py-2" href="purchase_order_create?edit=${p.purchase_order_id}&project=<?= $project_id ?>&back=procurement"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printPurchaseOrder(${p.purchase_order_id})"><i class="bi bi-printer text-dark me-2"></i>Print Order</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deletePurchase(${p.purchase_order_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
@@ -9639,7 +9637,7 @@ function deleteProjectDebitNote(id) {
 function renderRFQs(rfqs) {
     const $list = $('#procRFQTable');
     if (!rfqs || rfqs.length === 0) {
-        $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-file-earmark-ruled fs-1 mb-3 d-block"></i><p>No RFQs found for this project.</p><a href="<?= getUrl('rfq_create') ?>?project=<?= $project_id ?>" class="btn btn-primary btn-sm mt-2"><i class="bi bi-plus-circle me-1"></i> Create RFQ</a></div>');
+        $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-file-earmark-ruled fs-1 mb-3 d-block"></i><p>No RFQs found for this project.</p><a href="<?= getUrl('rfq_create') ?>?project=<?= $project_id ?>&back=rfq" class="btn btn-primary btn-sm mt-2"><i class="bi bi-plus-circle me-1"></i> Create RFQ</a></div>');
         return;
     }
     if ($.fn.DataTable && $.fn.DataTable.isDataTable('#dtRFQs')) $('#dtRFQs').DataTable().destroy();
@@ -9659,12 +9657,10 @@ function renderRFQs(rfqs) {
         const isApproved  = r.status === 'approved';
         const isDraft     = r.status === 'draft';
         const isReview    = r.status === 'review';
-        const poRetUrl = encodeURIComponent('<?= getUrl('project_view') ?>?id=<?= $project_id ?>&tab=procurement');
         const createPOOpt = isApproved && r.supplier_id
             ? `<li><hr class="dropdown-divider opacity-50"></li>
-               <li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('purchase_order_create') ?>?supplier=${r.supplier_id}&rfq_ref=${r.rfq_id}&project=<?= $project_id ?>&return_url=${poRetUrl}">
+               <li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('purchase_order_create') ?>?supplier=${r.supplier_id}&rfq_ref=${r.rfq_id}&project=<?= $project_id ?>&back=procurement">
                    <i class="bi bi-cart-plus me-2"></i>Create Purchase Order</a></li>` : '';
-        const retUrl = encodeURIComponent('<?= getUrl('project_view') ?>?id=<?= $project_id ?>&tab=rfq');
         html += `<tr>
             <td class="text-center fw-bold text-muted">${idx + 1}</td>
             <td><span class="fw-bold text-primary">${safeOutput(r.rfq_number)}</span></td>
@@ -9678,11 +9674,11 @@ function renderRFQs(rfqs) {
                         <i class="bi bi-gear"></i>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                        <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_view') ?>?id=${r.rfq_id}&return_url=${retUrl}"><i class="bi bi-eye text-primary me-2"></i>View</a></li>
-                        ${isDraft ? `<li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('rfq_view') ?>?id=${r.rfq_id}&return_url=${retUrl}"><i class="bi bi-eye-fill me-2"></i>Review</a></li>` : ''}
+                        <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_view') ?>?id=${r.rfq_id}&back=rfq"><i class="bi bi-eye text-primary me-2"></i>View</a></li>
+                        ${isDraft ? `<li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('rfq_view') ?>?id=${r.rfq_id}&back=rfq"><i class="bi bi-eye-fill me-2"></i>Review</a></li>` : ''}
                         ${isReview ? `<li><a class="dropdown-item py-2 text-success fw-semibold" href="#" onclick="approveRFQ(${r.rfq_id},'${r.rfq_number}');return false;"><i class="bi bi-check-circle me-2"></i>Approve</a></li>` : ''}
                         <li><a class="dropdown-item py-2" href="#" onclick="printRFQ(${r.rfq_id});return false;"><i class="bi bi-printer text-dark me-2"></i>Print</a></li>
-                        ${isDraft ? `<li><a class="dropdown-item py-2" href="<?= getUrl('rfq_create') ?>?edit=${r.rfq_id}&project=<?= $project_id ?>&return_url=${retUrl}"><i class="bi bi-pencil text-info me-2"></i>Edit</a></li>` : ''}
+                        ${isDraft ? `<li><a class="dropdown-item py-2" href="<?= getUrl('rfq_create') ?>?edit=${r.rfq_id}&project=<?= $project_id ?>&back=rfq"><i class="bi bi-pencil text-info me-2"></i>Edit</a></li>` : ''}
                         ${createPOOpt}
                         <li><hr class="dropdown-divider opacity-50"></li>
                         <li><a class="dropdown-item py-2 text-danger" href="#" onclick="deleteRFQ(${r.rfq_id},'${r.rfq_number}');return false;"><i class="bi bi-trash me-2"></i>Delete</a></li>

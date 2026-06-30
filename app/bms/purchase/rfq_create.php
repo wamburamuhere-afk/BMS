@@ -83,11 +83,12 @@ $selected_project   = $is_edit ? ($rfq_data['project_id'] ?? 0) : (isset($_GET['
 $selected_warehouse = $is_edit ? ($rfq_data['warehouse_id'] ?? 0) : 0;
 $selected_supplier  = $is_edit ? ($rfq_data['supplier_id']  ?? 0) : 0;
 
-// Context-aware back URL — only accept relative paths (open-redirect guard)
-$_raw_return  = $_GET['return_url'] ?? '';
-$return_url   = (!empty($_raw_return) && $_raw_return[0] === '/') ? $_raw_return : '';
-$back_url     = $return_url ?: getUrl('rfq');
-$from_project = !empty($return_url) && strpos($return_url, 'project_view') !== false;
+// Context-aware back navigation — short ?back=<tab> keeps URLs clean
+$back_tab     = $_GET['back'] ?? '';
+$from_project = $selected_project > 0 && !empty($back_tab);
+$back_url     = $from_project
+    ? getUrl('project_view') . '?id=' . $selected_project . '&tab=' . $back_tab
+    : getUrl('rfq');
 
 // When a specific project is selected, narrow suppliers to that project only
 if ($selected_project > 0) {

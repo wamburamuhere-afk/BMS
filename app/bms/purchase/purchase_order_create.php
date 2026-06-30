@@ -82,26 +82,24 @@ if ($enable_projects) {
     } catch (Exception $e) {}
 }
 
-// Context-aware return URL — only accept relative paths (open-redirect guard)
-$_raw_return = $_GET['return_url'] ?? '';
-$return_url  = (!empty($_raw_return) && $_raw_return[0] === '/') ? $_raw_return : '';
-$back_url    = $return_url ?: getUrl('purchase_orders');
-$from_project = !empty($return_url) && strpos($return_url, 'project_view') !== false;
+// Context-aware back navigation — short ?back=<tab> keeps URLs clean
+$back_tab     = $_GET['back'] ?? '';
+$from_project = $project_id > 0 && !empty($back_tab);
+$back_url     = $from_project
+    ? getUrl('project_view') . '?id=' . $project_id . '&tab=' . $back_tab
+    : getUrl('purchase_orders');
 
 // Pre-selected RFQ to auto-fill items on page load
 $rfq_ref_id = isset($_GET['rfq_ref']) ? intval($_GET['rfq_ref']) : 0;
 
-// When a specific project is selected, narrow suppliers + warehouses to that project only
+// When a specific project is selected, narrow suppliers to that project only
+// (Warehouses are not filtered server-side — many setups share warehouses across projects;
+//  the JS filterWarehousesByProject handles display with a graceful fallback.)
 if ($project_id > 0) {
     $stmt_pf = $pdo->prepare("SELECT supplier_id, supplier_name, company_name, currency, payment_terms FROM suppliers WHERE status='active' AND project_id = ? ORDER BY supplier_name");
     $stmt_pf->execute([$project_id]);
     $proj_sup = $stmt_pf->fetchAll(PDO::FETCH_ASSOC);
     if (!empty($proj_sup)) $suppliers = $proj_sup;
-
-    $stmt_pfw = $pdo->prepare("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status='active' AND project_id = ? ORDER BY warehouse_name");
-    $stmt_pfw->execute([$project_id]);
-    $proj_wh = $stmt_pfw->fetchAll(PDO::FETCH_ASSOC);
-    if (!empty($proj_wh)) $warehouses = $proj_wh;
 
     // Lock projects list to this one so the dropdown shows only the current project
     $stmt_pfp = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE project_id = ?");
@@ -112,6 +110,15 @@ if ($project_id > 0) {
 // Check for edit mode
 $edit_id = isset($_GET['edit']) ? intval($_GET['edit']) : (isset($_GET['id']) ? intval($_GET['id']) : 0);
 $is_edit = $edit_id > 0;
+
+// Pre-select warehouse from the RFQ so products load and prices auto-fill
+$rfq_warehouse_id = 0;
+if ($rfq_ref_id > 0 && !$is_edit) {
+    $stmt_rw = $pdo->prepare("SELECT warehouse_id FROM rfq WHERE rfq_id = ? LIMIT 1");
+    $stmt_rw->execute([$rfq_ref_id]);
+    $rfq_warehouse_id = (int)($stmt_rw->fetchColumn() ?: 0);
+}
+
 $po_data = null;
 $po_items = [];
 $po_attachments = [];
@@ -248,9 +255,11 @@ if ($is_edit) {
                                 <select class="form-select select2-static" id="warehouse_id" name="warehouse_id" required>
                                     <option value="">Select Warehouse</option>
                                     <?php foreach ($warehouses as $w): ?>
-                                        <option value="<?= $w['warehouse_id'] ?>" 
+                                        <option value="<?= $w['warehouse_id'] ?>"
                                             data-project="<?= $w['project_id'] ?>"
-                                            <?= ($is_edit && $po_data['warehouse_id'] == $w['warehouse_id']) ? 'selected' : '' ?>>
+                                            <?= ($is_edit && $po_data && $po_data['warehouse_id'] == $w['warehouse_id'])
+                                                || (!$is_edit && $rfq_warehouse_id && $rfq_warehouse_id == $w['warehouse_id'])
+                                                ? 'selected' : '' ?>>
                                             <?= htmlspecialchars($w['warehouse_name']) ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -563,7 +572,8 @@ if ($is_edit) {
 <script>
 let productsList = [];
 const editId = <?= json_encode($edit_id) ?>;
-const isEdit = <?= json_encode($is_edit) ?>;
+const isEdit    = <?= json_encode($is_edit) ?>;
+const rfqRefId  = <?= (int)$rfq_ref_id ?>;
 
 // ── Global Functions ──────────────────────────────────────────────
 
@@ -672,7 +682,7 @@ $(document).ready(function() {
     fetchProducts().then(() => {
         if (!isEdit) {
             logReportAction('Viewed Purchase Order Create Page', 'User opened the create purchase order page');
-            addItemRow();
+            if (!rfqRefId) addItemRow(); // skip blank row when RFQ items will auto-fill
         } else {
             calculateGrandTotal();
         }
@@ -892,8 +902,10 @@ function filterWarehousesByProject(projectId) {
     let filtered;
     if (!projectId || projectId === '') {
         filtered = allWarehouses.filter(w => !w.project_id || w.project_id === 0);
+        if (filtered.length === 0) filtered = allWarehouses; // fallback when no general warehouses
     } else {
         filtered = allWarehouses.filter(w => w.project_id == projectId);
+        if (filtered.length === 0) filtered = allWarehouses; // fallback when no project-linked warehouses
     }
     filtered.forEach(w => {
         const opt = document.createElement('option');
@@ -912,7 +924,7 @@ function filterWarehousesByProject(projectId) {
     });
 }
 
-// Run on page load - filter warehouses + auto-select RFQ when rfq_ref is in URL
+// Filter warehouses on page load + auto-select RFQ when rfq_ref is in URL
 $(document).ready(function(){
     <?php if ($enable_projects): ?>
     filterWarehousesByProject($('#project_id').val());
@@ -920,14 +932,15 @@ $(document).ready(function(){
     filterWarehousesByProject('');
     <?php endif; ?>
 
-    // Auto-fill items from RFQ when opened via ?rfq_ref=ID (e.g. from Create PO button)
-    const rfqRefId = <?= (int)$rfq_ref_id ?>;
-    const isEdit = <?= $is_edit ? 'true' : 'false' ?>;
     if (rfqRefId && !isEdit) {
-        loadRFQs(function() {
-            if ($('#rfq_reference option[value="' + rfqRefId + '"]').length) {
-                $('#rfq_reference').val(rfqRefId).trigger('change');
-            }
+        // Chain: ensure products are loaded (prices populate) → load RFQ list → select & trigger
+        fetchProducts().then(function() {
+            loadRFQs(function() {
+                const $rfqSel = $('#rfq_reference');
+                if ($rfqSel.find('option[value="' + rfqRefId + '"]').length) {
+                    $rfqSel.val(rfqRefId).trigger('change');
+                }
+            });
         });
     }
 });
