@@ -1717,30 +1717,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                         </div>
 
-                        <!-- Filter Bar -->
-                        <div class="card shadow-sm mb-3 border-0 d-print-none">
-                            <div class="card-body py-2">
-                                <div class="row g-2 align-items-center">
-                                    <div class="col-md-7">
-                                        <input type="text" class="form-control form-control-sm" id="procMatSearch"
-                                            placeholder="Search name or list number…" oninput="procFilterMatTable()">
-                                    </div>
-                                    <div class="col-md-3">
-                                        <select class="form-select form-select-sm" id="procMatPerPage" onchange="procFilterMatTable(true)">
-                                            <option value="10">Show 10</option>
-                                            <option value="25" selected>Show 25</option>
-                                            <option value="50">Show 50</option>
-                                            <option value="100">Show 100</option>
-                                            <option value="all">Show All</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-2 text-end">
-                                        <span class="text-muted small" id="procMatCountLabel"></span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
                         <!-- Export / Print -->
                         <div class="d-flex gap-2 mb-3 d-print-none">
                             <button onclick="procExportMatPDF()" style="background:#fff;border:1px solid #dee2e6;border-radius:3px;font-size:.78rem;padding:.22rem .55rem;cursor:pointer;">
@@ -1778,10 +1754,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </thead>
                                     <tbody id="procMatTableBody"></tbody>
                                 </table>
-                            </div>
-                            <div class="bg-white py-3 d-flex justify-content-between align-items-center d-print-none">
-                                <div id="procMatPaginationInfo" class="text-muted small fw-bold"></div>
-                                <div id="procMatPageControls" class="d-flex gap-1"></div>
                             </div>
                         </div>
 
@@ -9188,7 +9160,7 @@ function renderPurchases(purchases) {
         return;
     }
     
-    let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Supplier</th><th>Date</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    let html = '<div class="table-responsive"><table id="procPOInnerTable" class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Supplier</th><th>Date</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
     purchases.forEach((p, idx) => {
         html += `<tr>
             <td class="text-center fw-bold text-muted">${idx + 1}</td>
@@ -9216,6 +9188,8 @@ function renderPurchases(purchases) {
     });
     html += '</tbody></table></div>';
     $list.html(html);
+    if ($.fn.DataTable.isDataTable('#procPOInnerTable')) $('#procPOInnerTable').DataTable().destroy();
+    $('#procPOInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 7] }] });
 }
 
 function renderPurchasesFull(purchases) {
@@ -9227,8 +9201,8 @@ function renderPurchasesFull(purchases) {
         $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-bag fs-1 mb-3"></i><p>No purchase orders linked to this project.</p></div>');
         return;
     }
-    
-    let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Supplier</th><th>Date</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+
+    let html = '<div class="table-responsive"><table id="procPOFullInnerTable" class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Supplier</th><th>Date</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
     purchases.forEach((p, idx) => {
         html += `<tr>
             <td class="text-center fw-bold text-muted">${idx + 1}</td>
@@ -9256,6 +9230,8 @@ function renderPurchasesFull(purchases) {
     });
     html += '</tbody></table></div>';
     $list.html(html);
+    if ($.fn.DataTable.isDataTable('#procPOFullInnerTable')) $('#procPOFullInnerTable').DataTable().destroy();
+    $('#procPOFullInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 7] }] });
 }
 
 function renderDNs(dns) {
@@ -9328,7 +9304,7 @@ function renderDNs(dns) {
         responsive: true,
         pageLength: 25,
         order: [[4,'desc']],
-        dom: '<"top d-print-none"f>rt<"clear">',
+        dom: '<"d-print-none"lf>rtip',
         columnDefs: [
             {responsivePriority:1, targets:0},
             {responsivePriority:1, targets:1},
@@ -9437,7 +9413,7 @@ function renderDOs(dos) {
         pageLength: 25,
         order: [[3, 'desc']],
         autoWidth: false,
-        dom: '<"top d-print-none"f>rt<"clear">',
+        dom: '<"d-print-none"lf>rtip',
         columnDefs: [
             { targets: [0,1,6], responsivePriority: 1 },
             { targets: [2,4,5], responsivePriority: 2 },
@@ -9458,7 +9434,7 @@ function renderGRNs(grns) {
     }
     
     let grnHtml = '<div class="table-responsive"><table id="procGRNInnerTable" class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>GRN Number</th><th>Supplier</th><th>Date</th><th>PO #</th><th>DN Ref</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
-    let dnHtml = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>DN Reference</th><th>Supplier</th><th>Date</th><th>PO #</th><th>GRN Ref</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    let dnHtml = '<div class="table-responsive"><table id="procGRNDNInnerTable" class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>DN Reference</th><th>Supplier</th><th>Date</th><th>PO #</th><th>GRN Ref</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
     
     let dnsCount = 0;
     let grnCount = 0;
@@ -9508,12 +9484,15 @@ function renderGRNs(grns) {
     dnHtml += '</tbody></table></div>';
     
     $grnList.html(grnHtml);
-    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procGRNInnerTable');
+    if ($.fn.DataTable.isDataTable('#procGRNInnerTable')) $('#procGRNInnerTable').DataTable().destroy();
+    $('#procGRNInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 7] }] });
 
     if (dnsCount === 0) {
         $dnList.html('<div class="py-5 text-center text-muted"><i class="bi bi-truck-flatbed fs-1 mb-3"></i><p>No delivery notes (DN) found for this project.</p></div>');
     } else {
         $dnList.html(dnHtml);
+        if ($.fn.DataTable.isDataTable('#procGRNDNInnerTable')) $('#procGRNDNInnerTable').DataTable().destroy();
+        $('#procGRNDNInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 7] }] });
     }
 }
 
@@ -9554,6 +9533,8 @@ function renderReturns(returns) {
     });
     html += '</tbody></table></div>';
     $list.html(html);
+    if ($.fn.DataTable.isDataTable('#procReturnsInnerTable')) $('#procReturnsInnerTable').DataTable().destroy();
+    $('#procReturnsInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 8] }] });
     if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procReturnsInnerTable');
 }
 
@@ -9602,6 +9583,8 @@ function renderProjectDebitNotes(notes) {
     });
     html += '</tbody></table></div>';
     $list.html(html);
+    if ($.fn.DataTable.isDataTable('#procDebitNotesInnerTable')) $('#procDebitNotesInnerTable').DataTable().destroy();
+    $('#procDebitNotesInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 8] }] });
     if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procDebitNotesInnerTable');
 }
 
@@ -9995,7 +9978,7 @@ function renderInventory(inventory) {
         autoWidth: false,
         pageLength: 25,
         order: [[1, 'asc']],
-        dom: '<"top d-print-none"f>rt<"clear">',
+        dom: '<"d-print-none"lf>rtip',
         columnDefs: [
             { responsivePriority: 6, targets: 0 },
             { responsivePriority: 1, targets: 1 },
@@ -12346,15 +12329,13 @@ const PROC_PROJECT_NIPS  = <?= json_encode(array_values($proj_nip_products)) ?>;
 const PROC_VIEW_ML_URL   = '<?= getUrl('view_material_list') ?>';
 
 // ── Load / render ─────────────────────────────────────────────────────────
-var procMatAllData   = [];
-var procMatCurrPage  = 1;
+var procMatAllData = [];
 
 function loadProcMaterials() {
     $('#procMaterialsCard').hide();
     $('#procMaterialsEmpty').show();
+    if ($.fn.DataTable.isDataTable('#procMatTable')) { $('#procMatTable').DataTable().destroy(); }
     $('#procMatTableBody').empty();
-    $('#procMatPaginationInfo').text('');
-    $('#procMatPageControls').html('');
     $.getJSON(PROC_ML_BASE_URL + '/api/get_material_lists.php?project_id=' + PROC_PROJECT_ID, function(res) {
         if (!res.success || !res.lists || res.lists.length === 0) {
             procMatAllData = [];
@@ -12363,72 +12344,43 @@ function loadProcMaterials() {
             return;
         }
         procMatAllData = res.lists;
+        var tbody = '';
+        res.lists.forEach(function(r, i) {
+            var listNo   = r.list_no || ('ML-' + (r.created_at || '').slice(0,10).replace(/-/g,'') + '-' + String(r.id).padStart(4,'0'));
+            var warehouse = r.warehouse_name || '';
+            var safeName  = r.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            tbody += '<tr>'
+                + '<td class="text-center text-muted fw-bold">' + (i + 1) + '</td>'
+                + '<td><div class="fw-bold text-dark">' + r.name + '</div>'
+                + '<small class="text-muted">' + r.nip_count + ' NIP' + (r.nip_count != 1 ? 's' : '') + '</small></td>'
+                + '<td class="text-center"><span class="badge bg-primary" style="font-size:.8rem;letter-spacing:.5px;">' + listNo + '</span></td>'
+                + '<td class="text-center text-muted">' + warehouse + '</td>'
+                + '<td class="text-center pe-3 d-print-none">'
+                + '<div class="dropdown">'
+                + '<button class="btn btn-sm btn-light border dropdown-toggle px-2" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button>'
+                + '<ul class="dropdown-menu dropdown-menu-end shadow border-0">'
+                + '<li><a class="dropdown-item py-2" href="' + PROC_VIEW_ML_URL + '?id=' + r.id + '"><i class="bi bi-eye text-primary me-2"></i> View</a></li>'
+                + '<li><hr class="dropdown-divider"></li>'
+                + '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="procMlEditOpen(' + r.id + ', \'' + safeName + '\')"><i class="bi bi-pencil text-primary me-2"></i> Edit</a></li>'
+                + '<li><hr class="dropdown-divider"></li>'
+                + '<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="procMlDeleteList(' + r.id + ', \'' + safeName + '\')"><i class="bi bi-trash me-2"></i> Delete</a></li>'
+                + '</ul></div></td>'
+                + '</tr>';
+        });
+        $('#procMatTableBody').html(tbody);
         $('#procMaterialsEmpty').hide();
         $('#procMaterialsCard').show();
-        procMatCurrPage = 1;
-        procFilterMatTable(false);
+        $('#procMatTable').DataTable({
+            responsive: true,
+            pageLength: 25,
+            autoWidth: false,
+            columnDefs: [{ orderable: false, targets: [0, 4] }]
+        });
+        if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procMatTable');
     }).fail(function() {
         $('#procMaterialsEmpty').html('<div class="alert alert-danger">Failed to load materials. Please try again.</div>');
     });
 }
-
-function procFilterMatTable(resetPage) {
-    if (resetPage) procMatCurrPage = 1;
-    var q          = ($('#procMatSearch').val() || '').toLowerCase();
-    var perPageVal = $('#procMatPerPage').val();
-    var perPage    = (perPageVal === 'all') ? 999999 : parseInt(perPageVal);
-
-    var filtered = procMatAllData.filter(function(r) {
-        return !q || (r.name + ' ' + (r.list_no || '')).toLowerCase().includes(q);
-    });
-
-    var total      = filtered.length;
-    var totalPages = Math.ceil(total / perPage);
-    if (procMatCurrPage > totalPages) procMatCurrPage = totalPages || 1;
-    var startIdx   = (procMatCurrPage - 1) * perPage;
-    var endIdx     = startIdx + perPage;
-    var page       = filtered.slice(startIdx, endIdx);
-
-    var tbody = '';
-    page.forEach(function(r, i) {
-        var listNo    = r.list_no || ('ML-' + (r.created_at || '').slice(0,10).replace(/-/g,'') + '-' + String(r.id).padStart(4,'0'));
-        var warehouse = r.warehouse_name || '';
-        var safeName  = r.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-        tbody += '<tr>'
-            + '<td class="text-center text-muted fw-bold proc-mat-row-no">' + (startIdx + i + 1) + '</td>'
-            + '<td><div class="fw-bold text-dark">' + r.name + '</div>'
-            + '<small class="text-muted">' + r.nip_count + ' NIP' + (r.nip_count != 1 ? 's' : '') + '</small></td>'
-            + '<td class="text-center"><span class="badge bg-primary" style="font-size:.8rem;letter-spacing:.5px;">' + listNo + '</span></td>'
-            + '<td class="text-center text-muted">' + warehouse + '</td>'
-            + '<td class="text-center pe-3 d-print-none">'
-            + '<div class="dropdown">'
-            + '<button class="btn btn-sm btn-light border dropdown-toggle px-2" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button>'
-            + '<ul class="dropdown-menu dropdown-menu-end shadow border-0">'
-            + '<li><a class="dropdown-item py-2" href="' + PROC_VIEW_ML_URL + '?id=' + r.id + '">'
-            + '<i class="bi bi-eye text-primary me-2"></i> View</a></li>'
-            + '<li><hr class="dropdown-divider"></li>'
-            + '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="procMlEditOpen(' + r.id + ', \'' + safeName + '\')">'
-            + '<i class="bi bi-pencil text-primary me-2"></i> Edit</a></li>'
-            + '<li><hr class="dropdown-divider"></li>'
-            + '<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="procMlDeleteList(' + r.id + ', \'' + safeName + '\')">'
-            + '<i class="bi bi-trash me-2"></i> Delete</a></li>'
-            + '</ul></div></td>'
-            + '</tr>';
-    });
-    $('#procMatTableBody').html(tbody || '<tr><td colspan="5" class="text-center py-4 text-muted">No materials match the current filter.</td></tr>');
-    $('#procMatPaginationInfo').text('Showing ' + (total > 0 ? startIdx + 1 : 0) + ' to ' + Math.min(endIdx, total) + ' of ' + total + ' material lists');
-    $('#procMatCountLabel').text(total + ' matches');
-
-    var btns = '';
-    for (var p = 1; p <= totalPages; p++) {
-        var cls = p === procMatCurrPage ? 'btn-secondary shadow-sm' : 'btn-outline-secondary';
-        btns += '<button class="btn btn-sm ' + cls + ' fw-bold me-1" onclick="procGoToMatPage(' + p + ')" style="min-width:32px;border-radius:4px;">' + p + '</button>';
-    }
-    $('#procMatPageControls').html(btns ? '<span class="text-muted small me-2 align-self-center">Show</span>' + btns : '');
-    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procMatTable');
-}
-
-function procGoToMatPage(p) { procMatCurrPage = p; procFilterMatTable(false); }
 
 // ── Edit Materials (List) ─────────────────────────────────────────────────
 var procMlEditRowIdx = 0;
@@ -15527,6 +15479,8 @@ function renderProjectSuppliers(suppliers) {
             </table>
         </div>`;
     $list.html(html);
+    if ($.fn.DataTable.isDataTable('#projSuppliersTable')) $('#projSuppliersTable').DataTable().destroy();
+    $('#projSuppliersTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 6] }] });
     if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('projSuppliersTable');
 }
 
@@ -18979,6 +18933,8 @@ function projNipRenderTable(products) {
             <tbody>${rows}</tbody>
         </table>
     </div></div></div>`);
+    if ($.fn.DataTable.isDataTable('#projNipInnerTable')) $('#projNipInnerTable').DataTable().destroy();
+    $('#projNipInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 5] }] });
     if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('projNipInnerTable');
 }
 
