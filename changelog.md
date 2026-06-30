@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-06-30 (fix) — Project view: RFQs now appear in Procurements > RFQ tab
+
+- `api/operations/get_project.php` — added query to fetch RFQs from the `rfq` table
+  where `project_id` matches; returned under the `rfqs` key in the API response.
+- Root cause: `get_project.php` fetched POs, GRNs, DNs, etc. but never queried the
+  `rfq` table, so `renderRFQs(data.rfqs || [])` always received an empty array.
+
 ## 2026-06-30 (fix) — IS and Cash Flow default to Year-to-Date instead of current month
 
 Income Statement and Cash Flow both defaulted to the current calendar month, making
