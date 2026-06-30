@@ -124,6 +124,18 @@ try {
 
     $msg = 'Credit note created successfully.';
     if ($att['saved'] > 0) $msg .= " {$att['saved']} attachment(s) uploaded.";
+
+    // Smart-notification: a new credit note needs attention. Fail-safe + kill-switched.
+    require_once __DIR__ . '/../../core/notify.php';
+    dispatchEvent($pdo, 'credit_note.pending', [
+        'entity_type' => 'credit_note',
+        'entity_id'   => (int)$cn_id,
+        'customer_id' => $customer_id > 0 ? (int)$customer_id : null,
+        'title'       => 'Credit note pending: ' . $number,
+        'message'     => 'A new credit note ' . $number . ' has been created and needs attention.',
+        'action_url'  => 'credit_note_view?id=' . (int)$cn_id,
+    ]);
+
     echo json_encode(['success' => true, 'id' => $cn_id, 'message' => $msg, 'attachment_errors' => $att['errors']]);
 
 } catch (Exception $e) {

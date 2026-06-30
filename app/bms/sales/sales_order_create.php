@@ -22,6 +22,9 @@ $customer_id = isset($_GET['customer']) ? intval($_GET['customer']) : 0;
 $quote_id = isset($_GET['quote']) ? intval($_GET['quote']) : 0;
 $sales_order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $project_id = isset($_GET['project']) ? intval($_GET['project']) : 0;
+// Origin context (URL only): where the user came FROM. Drives the post-save redirect so
+// editing/converting a project-linked order from the general area does NOT jump into the project.
+$origin_project_id = $project_id;
 
 // Get current user info
 $user_id = $_SESSION['user_id'];
@@ -1526,7 +1529,7 @@ function createSalesOrder(status = 'pending') {
                         confirmButtonColor: '#28a745',
                         confirmButtonText: 'OK'
                     }).then(() => {
-                        const projectId = <?= $back_project_id ?>;
+                        const projectId = <?= (int)$origin_project_id ?>;
                         if (projectId > 0) {
                             window.location.href = '<?= getUrl('project_view') ?>?id=' + projectId;
                         } else {

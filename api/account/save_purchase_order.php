@@ -298,6 +298,19 @@ try {
         logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Create purchase order', "User created a new purchase order: $order_number (ID $purchase_order_id)");
     }
 
+    // Smart-notification: a new PO is awaiting approval. Fail-safe + kill-switched.
+    if (!$is_update) {
+        require_once __DIR__ . '/../../core/notify.php';
+        dispatchEvent($pdo, 'po.needs_approval', [
+            'entity_type' => 'purchase_order',
+            'entity_id'   => (int)$purchase_order_id,
+            'project_id'  => $project_id !== null ? (int)$project_id : null,
+            'title'       => 'Purchase order to approve: ' . ($order_number ?? ''),
+            'message'     => 'A new purchase order ' . ($order_number ?? '') . ' has been created and needs approval.',
+            'action_url'  => 'purchase_order_details?id=' . (int)$purchase_order_id,
+        ]);
+    }
+
     echo json_encode([
         'success' => true,
         'message' => 'Purchase Order saved successfully',

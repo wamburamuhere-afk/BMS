@@ -85,6 +85,79 @@ same universe of accounts as the Income Statement and Balance Sheet.
 
 ---
 
+## 2026-06-29 (feat) — Smart Notification Engine: remaining emit points wired
+
+Wired the rest of the seeded events into their source actions/scheduler, completing
+event coverage (same fail-safe, kill-switched `dispatchEvent()` pattern as Phase 7).
+
+- Action-based emits (after the successful create): `api/purchase/create_debit_note.php` → `debit_note.pending`; `api/sales/create_credit_note.php` → `credit_note.pending`; `api/sales/create_return.php` → `sales_return.pending`; `api/create_purchase_return.php` → `purchase_return.pending`; `api/account/add_expense.php` → `expense.needs_review`; `api/create_grn.php` → `grn.pending`; `api/account/save_voucher.php` (create) → `voucher.needs_approval`
+- Time-based checks added to `cron/run_notification_checks.php`: `quotation.expiring` (quotations.quote_valid_until within 7 days, still open) and `tender.deadline` (tenders.submission_deadline within 7 days, not awarded/closed)
+- Verified: lint clean (8 files); all 9 events resolve recipients + dispatch (9/9); scheduler runs all three checks cleanly; test artifacts cleaned up
+- Added permanent regression suite `tests/test_notification_engine_cli.php` (gated by the pre-push hook + CI): files/lint, schema, seeded catalog, helpers, dispatch pipeline + idempotency, enqueue dedupe, mute logic, rule narrowing + no-access safety, mailer fail-silent, digest fallback, and a static check that every wired source file emits its event. 77/0, idempotent, self-cleaning. (It caught that `core/notify.php` doesn't auto-load `core/mailer.php` — fine in prod since the outbox worker loads it on demand; the test loads it explicitly.)
+
+## 2026-06-28 (feat) — Smart Notification Engine: Phases 1–2 (mailer + role-aware core)
+
+Foundation for an internal, role-aware notification engine that routes each business event
+to the people who actually have access to that area (verified via RBAC). Plan & tracker in
+`notification_engine_plan.md`. Email-only target; in-app working now.
+
+- **Phase 1 — Mailer (was missing entirely; `test_email_config.php` only simulated):**
+  - Vendored PHPMailer v6.9.1 into `includes/PHPMailer/` (no composer)
+  - `core/mailer.php` — `sendEmail()` + `bms_email_wrap()` + `mailer_last_error()`; SMTP from `system_settings` (per-call override supported); TLS via `includes/cacert.pem`; fail-silent
+  - `api/test_email_config.php` now actually sends (override + saved-password fallback)
+- **Phase 2 — Engine core:**
+  - Migration `2026_06_28_notification_engine_foundation.php`: `notifications.event_key/category`; tables `notification_events` (13 seeded), `notification_dedupe`, `notification_log`; `notif_master_enabled` setting
+  - `core/notify.php` — `usersWithPermission()`, `createNotification()`, `notifClaimDedupe()`, `notifLog()`, `resolveRecipients()` (permission-based), `dispatchEvent()` (in-app + audit, fail-safe)
+  - Verified: mailer 9/9; engine 6/6 (RBAC resolve, dispatch creates in-app+log, idempotent re-dispatch, unknown-event safe-skip)
+- **Phase 3 — Recipient resolution:** `resolveRecipients()` now intersects RBAC with **project-scope** (`user_projects`) and subtracts **per-user mutes** (`notifUserMuted` → `notifications_enabled`/`muted_events`/`muted_categories`); `usersWithPermission()` returns an `is_admin` flag. Verified 12/12 (scope drops non-assigned non-admins 4→1; mute excludes a user 4→3, prefs restored).
+- **Phase 4 — Channels & delivery:** migration `2026_06_28_notification_outbox.php` (email queue); `dispatchEvent()` enqueues an email per recipient (gated by `enable_email_notifications`) alongside the in-app notification; `enqueueEmail()` + `processNotificationOutbox()` worker (retry/backoff, give-up at max_attempts, logged) + `cron/process_notifications.php`. Email links use a configurable `app_url` (cron-safe). Verified 7/7 (4 queued, dedupe, worker requeues on SMTP failure).
+- **Phase 5 — Routing rules + Admin UI:** migration `2026_06_28_notification_rules.php` (`notification_rules` + `notification_rules` page_key). `resolveRecipients()` now applies admin rules (target = everyone-with-access / role / specific user) and sets per-recipient channels — a rule can only narrow within those who have access (cannot grant it); `previewRecipients()` added; fixed a `$base`/URL-base var collision in the dispatch loop. Admin screen `app/constant/settings/notification_rules.php` + `api/notifications/rules_api.php` (list/save/delete/toggle/preview/test-send), route in `roots.php`, menu link in `header.php`. Verified: engine 12/12 (incl. rule-to-no-access-user → nobody), save→preview→delete 5/5.
+- **Phase 6 — Scheduler:** `cron/run_notification_checks.php` (time-based checks; `invoice.overdue` implemented, extensible) emitting via `dispatchEvent`, deduped once/day per record; `header.php` runs the daily checks once/day + drains the email outbox (throttled ~2 min, fail-silent) — both also runnable via server cron. Verified 3/3 (5 overdue invoices → 11 in-app via per-invoice scope filtering; 2nd run idempotent).
+- **Phase 7 — Emit at source actions:** representative fail-safe, kill-switched emits after the successful write — `save_purchase_order.php` (create) → `po.needs_approval`; `save_invoice.php` (create) → `invoice.needs_review`. Pattern documented for the remaining endpoints. Verified: both events resolve recipients (4) + dispatch; lint clean.
+- **Phase 8 — Dashboard + bell unification:** the bell already reflects engine notifications (same `notifications` table). `app/dashboard.php` "System requires your attention" now also surfaces each user's unread **action** notifications from the engine (via `get_system_alerts`), excluding event types the inline alerts already compute (no double-count). Verified 2/2 (lint; query includes action items, excludes `invoice.overdue`).
+- **Phase 9 — AI daily digest:** `aiSummarizeNotifications()` reuses the provider-agnostic `aiComplete()` (`core/ai_service.php`) for a prioritized HTML briefing with a deterministic fallback when AI is off; `sendNotificationDigests()` queues one digest email/user/day (opt-in `notif_digest_enabled`, gated by master + global email, deduped) via the outbox; `cron/send_notification_digests.php` + header once/day throttle; admin "AI daily digest" toggle on the rules page. Verified: fallback summary + fresh-process cron queued 1 digest/user.
+- **Phase 10 — Hardening & rollout:** verified security gates (rules API admin-only + CSRF; page `autoEnforcePermission`), engine fail-safe + kill-switch + idempotent + permission/scope no-leak; final lint clean across all touched files; engine regression 4/4. Operations & Rollout guide added to `notification_engine_plan.md`. **Smart Notification Engine complete (Phases 1–10).**
+
+## 2026-06-28 (fix) — Lock posted/finalized documents from in-place edit (ledger integrity)
+
+Once a document is posted to the ledger (`journal_entries`) it must not be edited in place —
+corrections go through void/reverse. Audit showed **Invoice, GRN, and Payment Voucher** edit
+endpoints still accepted edits after posting (the others — Debit/Credit Note, Purchase/Sales
+Return, Expense, Manual Journal — were already locked to `pending`/`draft`/non-`paid`). Added a
+server-side **409 lock** on the three open edit endpoints, keyed off the authoritative
+`documentGlPosted()` (links by integer `entity_id`, never the display code):
+
+- `api/account/save_invoice.php` — edit branch refuses if `documentGlPosted('invoice', id)`
+- `api/update_grn.php` — refuses if `documentGlPosted('grn', id)` OR status `approved`
+- `api/account/save_voucher.php` — edit branch refuses if posted OR status `paid`/`approved`/`cancelled`
+
+Guards run before any write and only on the edit path (create flows untouched); approval/posting
+transitions live in other endpoints, so the workflow is unaffected. Verified: `php -l` clean on
+all three; runtime test 8/8 — posted/approved/paid rows blocked, pending/draft rows still editable.
+
+## 2026-06-28 (fix) — Edit/Save no longer force-jumps into the project when opened externally
+
+Editing a project-linked **Purchase Order, GRN, Delivery/Received Note, or Sales Order** from the
+general (external) area used to redirect to the project page after Save, because the redirect read
+the project stored **on the record**. The post-save redirect now follows the **origin** only — a
+project flag in the URL means "I came from inside the project":
+- came from a project → return to the project
+- opened externally → stay external (the document's own view / its list)
+
+The record keeps its own project link and still appears inside its project (unchanged). Create-new
+flows were already correct and left alone.
+
+- `app/bms/purchase/purchase_order_create.php` — added `$origin_project_id` (URL-only); PO edit redirect uses it instead of the record's `$project_id`
+- `app/bms/sales/sales_order_create.php` — redirect uses `$origin_project_id`, not the record/quote-derived `$back_project_id`
+- `app/bms/grn/dn_create.php` — DN edit `return_url` keys off `$origin_project_id`, not record/PO-derived
+- `app/bms/grn/grn_edit.php` — added `$origin_return_url` (URL-only) feeding the `return_url` hidden field; saved project link (`projectIdHidden`) unchanged
+- `app/bms/grn/grn_view.php` — reads `project_id` origin; Edit link forwards it; "Back to Project" button shows only when present (so in-project GRN editing still returns to the project)
+- `app/bms/operations/project_view.php` — GRN view links now carry `&project_id` so the in-project chain (project → GRN view → edit) keeps its origin
+- Verified: `php -l` clean on all 6; redirect render-check shows EXTERNAL → list/own-view and IN-PROJECT → project_view for all four documents (record project deliberately ignored)
+- Untouched (already correct): Debit Note, Purchase Return, Quotation, Sales Return, Credit Note
+
+---
+
 ## 2026-06-27 (feat) — Company-prefixed sequential document codes (Group B — edit side / re-code-on-edit)
 
 Editable documents now upgrade a legacy code to `PREFIX-TYPE-NNNN` when edited & saved —
