@@ -78,7 +78,7 @@ has($reg, "balance_after", 'register carries a running balance');
 $stm = src($root, 'api/account/get_bank_statement.php');
 has($stm, "FROM bank_transactions", 'statement API reads the register');
 $rec = src($root, 'api/account/create_reconciliation.php');
-has($rec, "SELECT current_balance FROM accounts WHERE account_id = ?", 'reconciliation book-balance is from the ledger');
+has($rec, "accountLedgerBalanceAsOf", 'reconciliation book-balance is from the ledger (ledger as-of)');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('4. Runtime — full create → paid → void cycle (rolled back)');

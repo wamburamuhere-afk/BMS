@@ -9,6 +9,7 @@
  */
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../helpers/transaction_helper.php';
+require_once __DIR__ . '/../../core/recon_period_lock.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -26,6 +27,9 @@ try {
     $entry = $e->fetch(PDO::FETCH_ASSOC);
     if (!$entry) { echo json_encode(['success' => false, 'message' => 'Journal entry not found']); exit; }
     if ($entry['status'] !== 'posted') { echo json_encode(['success' => false, 'message' => 'Only a posted journal can be reversed.']); exit; }
+
+    // Period lock: block reversal if the entry falls in a finalized reconciliation period
+    assertNotInFinalizedReconPeriod($pdo, $id);
 
     // Already reversed?
     $dup = $pdo->prepare("SELECT entry_id FROM journal_entries WHERE reverses_entry_id = ? LIMIT 1");
