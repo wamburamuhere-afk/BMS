@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-06-30 (feat) — PO create/edit context-awareness + project_context_pattern.md
+
+- `app/bms/purchase/purchase_order_create.php` — reads `return_url` (relative-path guard);
+  breadcrumb, Back button and Cancel link all use `$back_url`; post-save redirect uses
+  `$back_url` instead of hard-coded project_view; when `$project_id > 0` the supplier
+  and warehouse dropdowns are narrowed to project-only rows; the project field is locked
+  (hidden input + read-only display) in create mode; `loadRFQs()` now accepts an optional
+  callback; when `?rfq_ref=ID` is in the URL the RFQ is auto-selected on page load and its
+  items are loaded immediately.
+- `app/bms/purchase/rfq_view.php` — Create PO button now passes `?project=`, `?rfq_ref=`,
+  and `?return_url=` (pointing at the project POs tab when opened from a project).
+- `app/bms/operations/project_view.php` — renderRFQs Create PO link now includes `project`
+  and `return_url`; renderPurchases and renderPurchasesFull Edit Order links include
+  `return_url` pointing at the project procurement tab.
+- `docs/project_context_pattern.md` — new document: full pattern (return_url guard,
+  supplier/warehouse/project-lock, auto-fill from parent doc, tab name map, module checklist).
+
 ## 2026-06-30 (feat) — RFQ context-awareness: project stays in project, external stays external
 
 - `app/bms/operations/project_view.php` — View, Review, Edit links in renderRFQs now carry

@@ -9191,7 +9191,7 @@ function renderPurchases(purchases) {
         $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-file-earmark-text fs-1 mb-3"></i><p>No supply orders linked to this project.</p></div>');
         return;
     }
-    
+    const poRetUrl = encodeURIComponent('<?= getUrl('project_view') ?>?id=<?= $project_id ?>&tab=procurement');
     let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Supplier</th><th>Date</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
     purchases.forEach((p, idx) => {
         html += `<tr>
@@ -9209,7 +9209,7 @@ function renderPurchases(purchases) {
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                         <li><a class="dropdown-item py-2" href="purchase_order_details?id=${p.purchase_order_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
-                        <li><a class="dropdown-item py-2" href="purchase_order_create?edit=${p.purchase_order_id}&project=<?= $project_id ?>&type=supply_order"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
+                        <li><a class="dropdown-item py-2" href="purchase_order_create?edit=${p.purchase_order_id}&project=<?= $project_id ?>&type=supply_order&return_url=${poRetUrl}"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printPurchaseOrder(${p.purchase_order_id})"><i class="bi bi-printer text-dark me-2"></i>Print Order</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deletePurchase(${p.purchase_order_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
@@ -9231,7 +9231,7 @@ function renderPurchasesFull(purchases) {
         $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-bag fs-1 mb-3"></i><p>No purchase orders linked to this project.</p></div>');
         return;
     }
-    
+    const poRetUrl = encodeURIComponent('<?= getUrl('project_view') ?>?id=<?= $project_id ?>&tab=procurement');
     let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Supplier</th><th>Date</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
     purchases.forEach((p, idx) => {
         html += `<tr>
@@ -9249,7 +9249,7 @@ function renderPurchasesFull(purchases) {
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                         <li><a class="dropdown-item py-2" href="purchase_order_details?id=${p.purchase_order_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
-                        <li><a class="dropdown-item py-2" href="purchase_order_create?edit=${p.purchase_order_id}&project=<?= $project_id ?>"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
+                        <li><a class="dropdown-item py-2" href="purchase_order_create?edit=${p.purchase_order_id}&project=<?= $project_id ?>&return_url=${poRetUrl}"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printPurchaseOrder(${p.purchase_order_id})"><i class="bi bi-printer text-dark me-2"></i>Print Order</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deletePurchase(${p.purchase_order_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
@@ -9659,9 +9659,10 @@ function renderRFQs(rfqs) {
         const isApproved  = r.status === 'approved';
         const isDraft     = r.status === 'draft';
         const isReview    = r.status === 'review';
+        const poRetUrl = encodeURIComponent('<?= getUrl('project_view') ?>?id=<?= $project_id ?>&tab=procurement');
         const createPOOpt = isApproved && r.supplier_id
             ? `<li><hr class="dropdown-divider opacity-50"></li>
-               <li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('purchase_order_create') ?>?supplier=${r.supplier_id}&rfq_ref=${r.rfq_id}">
+               <li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('purchase_order_create') ?>?supplier=${r.supplier_id}&rfq_ref=${r.rfq_id}&project=<?= $project_id ?>&return_url=${poRetUrl}">
                    <i class="bi bi-cart-plus me-2"></i>Create Purchase Order</a></li>` : '';
         const retUrl = encodeURIComponent('<?= getUrl('project_view') ?>?id=<?= $project_id ?>&tab=rfq');
         html += `<tr>

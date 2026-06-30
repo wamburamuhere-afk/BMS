@@ -128,7 +128,18 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
             <!-- ── END WORKFLOW ── -->
 
             <?php if ($status === 'approved' && !empty($rfq['supplier_id'])): ?>
-            <a href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $rfq['supplier_id'] ?>&rfq_ref=<?= $rfq_id ?>"
+            <?php
+                // When coming from a project RFQ tab, land back on the project's PO tab after saving
+                $po_return = $from_project
+                    ? str_replace('tab=rfq', 'tab=procurement', $back_url)
+                    : getUrl('purchase_orders');
+                $po_create_url = getUrl('purchase_order_create')
+                    . '?supplier=' . (int)$rfq['supplier_id']
+                    . '&rfq_ref='  . $rfq_id
+                    . (!empty($rfq['project_id']) ? '&project=' . (int)$rfq['project_id'] : '')
+                    . '&return_url=' . urlencode($po_return);
+            ?>
+            <a href="<?= htmlspecialchars($po_create_url) ?>"
                class="btn btn-outline-primary btn-sm px-3">
                 <i class="bi bi-cart-plus me-1"></i> Create PO
             </a>
