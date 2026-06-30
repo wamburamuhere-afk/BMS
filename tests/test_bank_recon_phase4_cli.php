@@ -52,6 +52,9 @@ $expId = (int)$pdo->query(
 
 if (!$bankId || !$expId) { echo "  SKIP: Fixture accounts not found.\n"; exit(0); }
 
+// ── Pre-cleanup: remove any leftover T4-* rows from aborted prior runs ─────────
+$pdo->exec("DELETE FROM bank_reconciliations WHERE reconciliation_number LIKE 'T4-%'");
+
 // ── Post a test journal entry dated in Jan 2026 ───────────────────────────────
 $pdo->beginTransaction();
 $entryId = postLedgerEntry($pdo, 'Phase4 test entry Jan', [
