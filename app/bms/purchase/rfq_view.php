@@ -11,6 +11,12 @@ $rfq_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if (!$rfq_id) { header('Location: ' . getUrl('rfq')); exit; }
 assertScopeForRecordHtml('rfq', 'rfq_id', $rfq_id);
 
+// Context-aware back URL — only accept relative paths (open-redirect guard)
+$_raw_return = $_GET['return_url'] ?? '';
+$return_url  = (!empty($_raw_return) && $_raw_return[0] === '/') ? $_raw_return : '';
+$back_url    = $return_url ?: getUrl('rfq');
+$from_project = !empty($return_url) && strpos($return_url, 'project_view') !== false;
+
 $stmt = $pdo->prepare("
     SELECT r.*,
         s.supplier_name, s.phone as s_phone, s.email as s_email,
@@ -83,7 +89,11 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
     <nav aria-label="breadcrumb" class="mb-3 d-print-none">
         <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
+            <?php if ($from_project): ?>
+            <li class="breadcrumb-item"><a href="<?= htmlspecialchars($back_url) ?>">Project RFQs</a></li>
+            <?php else: ?>
             <li class="breadcrumb-item"><a href="<?= getUrl('rfq') ?>">RFQ</a></li>
+            <?php endif; ?>
             <li class="breadcrumb-item active"><?= safe_output($rfq['rfq_number']) ?></li>
         </ol>
     </nav>
@@ -99,8 +109,8 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
             <span class="badge bg-<?= $badge['class'] ?> fs-6 px-3 py-2"><?= $badge['label'] ?></span>
 
             <!-- Back Button -->
-            <a href="<?= getUrl('rfq') ?>" class="btn btn-blue-touch btn-sm px-3 shadow-sm">
-                <i class="bi bi-arrow-left me-1"></i> Back
+            <a href="<?= htmlspecialchars($back_url) ?>" class="btn btn-blue-touch btn-sm px-3 shadow-sm">
+                <i class="bi bi-arrow-left me-1"></i> Back<?= $from_project ? ' to Project' : '' ?>
             </a>
 
             <!-- ── WORKFLOW ACTION BUTTONS ── -->
@@ -128,7 +138,7 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                 <i class="bi bi-printer me-1"></i> Print
             </button>
             <?php if ($status === 'draft'): ?>
-            <a href="<?= getUrl('rfq_create') ?>?edit=<?= $rfq_id ?>" class="btn btn-outline-info btn-sm">
+            <a href="<?= getUrl('rfq_create') ?>?edit=<?= $rfq_id ?><?= $return_url ? '&return_url=' . urlencode($back_url) : '' ?>" class="btn btn-outline-info btn-sm">
                 <i class="bi bi-pencil me-1"></i> Edit
             </a>
             <?php endif; ?>

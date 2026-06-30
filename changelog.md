@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-06-30 (feat) — RFQ context-awareness: project stays in project, external stays external
+
+- `app/bms/operations/project_view.php` — View, Review, Edit links in renderRFQs now carry
+  `return_url` encoding the project view URL (?tab=rfq) so users return to the project tab.
+- `app/bms/purchase/rfq_view.php` — reads `return_url` (relative-path guard); Back button and
+  breadcrumb switch to "Back to Project / Project RFQs" when opened from a project; Edit link
+  forwards the same `return_url` so the edit→save chain stays inside the project.
+- `app/bms/purchase/rfq_create.php` — reads `return_url`; Back button and breadcrumb reflect
+  project context; post-save redirect goes to project RFQ tab instead of external list; when a
+  project is pre-selected the supplier dropdown narrows to suppliers linked to that project only.
+
 ## 2026-06-30 (fix) — Project view: RFQs now appear in Procurements > RFQ tab
 
 - `api/operations/get_project.php` — added RFQ query (with `supplier_id` for Create PO link);

@@ -9663,6 +9663,7 @@ function renderRFQs(rfqs) {
             ? `<li><hr class="dropdown-divider opacity-50"></li>
                <li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('purchase_order_create') ?>?supplier=${r.supplier_id}&rfq_ref=${r.rfq_id}">
                    <i class="bi bi-cart-plus me-2"></i>Create Purchase Order</a></li>` : '';
+        const retUrl = encodeURIComponent('<?= getUrl('project_view') ?>?id=<?= $project_id ?>&tab=rfq');
         html += `<tr>
             <td class="text-center fw-bold text-muted">${idx + 1}</td>
             <td><span class="fw-bold text-primary">${safeOutput(r.rfq_number)}</span></td>
@@ -9676,11 +9677,11 @@ function renderRFQs(rfqs) {
                         <i class="bi bi-gear"></i>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                        <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_view') ?>?id=${r.rfq_id}"><i class="bi bi-eye text-primary me-2"></i>View</a></li>
-                        ${isDraft ? `<li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('rfq_view') ?>?id=${r.rfq_id}"><i class="bi bi-eye-fill me-2"></i>Review</a></li>` : ''}
+                        <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_view') ?>?id=${r.rfq_id}&return_url=${retUrl}"><i class="bi bi-eye text-primary me-2"></i>View</a></li>
+                        ${isDraft ? `<li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('rfq_view') ?>?id=${r.rfq_id}&return_url=${retUrl}"><i class="bi bi-eye-fill me-2"></i>Review</a></li>` : ''}
                         ${isReview ? `<li><a class="dropdown-item py-2 text-success fw-semibold" href="#" onclick="approveRFQ(${r.rfq_id},'${r.rfq_number}');return false;"><i class="bi bi-check-circle me-2"></i>Approve</a></li>` : ''}
                         <li><a class="dropdown-item py-2" href="#" onclick="printRFQ(${r.rfq_id});return false;"><i class="bi bi-printer text-dark me-2"></i>Print</a></li>
-                        ${isDraft ? `<li><a class="dropdown-item py-2" href="<?= getUrl('rfq_create') ?>?edit=${r.rfq_id}&project=<?= $project_id ?>"><i class="bi bi-pencil text-info me-2"></i>Edit</a></li>` : ''}
+                        ${isDraft ? `<li><a class="dropdown-item py-2" href="<?= getUrl('rfq_create') ?>?edit=${r.rfq_id}&project=<?= $project_id ?>&return_url=${retUrl}"><i class="bi bi-pencil text-info me-2"></i>Edit</a></li>` : ''}
                         ${createPOOpt}
                         <li><hr class="dropdown-divider opacity-50"></li>
                         <li><a class="dropdown-item py-2 text-danger" href="#" onclick="deleteRFQ(${r.rfq_id},'${r.rfq_number}');return false;"><i class="bi bi-trash me-2"></i>Delete</a></li>

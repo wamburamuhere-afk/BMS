@@ -82,6 +82,19 @@ if ($enable_projects) {
 $selected_project   = $is_edit ? ($rfq_data['project_id'] ?? 0) : (isset($_GET['project']) ? intval($_GET['project']) : 0);
 $selected_warehouse = $is_edit ? ($rfq_data['warehouse_id'] ?? 0) : 0;
 $selected_supplier  = $is_edit ? ($rfq_data['supplier_id']  ?? 0) : 0;
+
+// Context-aware back URL — only accept relative paths (open-redirect guard)
+$_raw_return  = $_GET['return_url'] ?? '';
+$return_url   = (!empty($_raw_return) && $_raw_return[0] === '/') ? $_raw_return : '';
+$back_url     = $return_url ?: getUrl('rfq');
+$from_project = !empty($return_url) && strpos($return_url, 'project_view') !== false;
+
+// When a specific project is selected, narrow suppliers to that project only
+if ($selected_project > 0) {
+    $stmt_sup = $pdo->prepare("SELECT supplier_id, supplier_name FROM suppliers WHERE status='active' AND project_id = ? ORDER BY supplier_name");
+    $stmt_sup->execute([$selected_project]);
+    $suppliers = $stmt_sup->fetchAll(PDO::FETCH_ASSOC);
+}
 ?>
 
 <div class="rfq-create-page p-2 p-md-3" style="background:#fff;min-height:100vh;">
@@ -90,7 +103,11 @@ $selected_supplier  = $is_edit ? ($rfq_data['supplier_id']  ?? 0) : 0;
     <nav aria-label="breadcrumb" class="mb-3">
         <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
+            <?php if ($from_project): ?>
+            <li class="breadcrumb-item"><a href="<?= htmlspecialchars($back_url) ?>">Project RFQs</a></li>
+            <?php else: ?>
             <li class="breadcrumb-item"><a href="<?= getUrl('rfq') ?>">Request for Quotation</a></li>
+            <?php endif; ?>
             <li class="breadcrumb-item active"><?= $is_edit ? 'Edit RFQ' : 'Create RFQ' ?></li>
         </ol>
     </nav>
@@ -105,8 +122,8 @@ $selected_supplier  = $is_edit ? ($rfq_data['supplier_id']  ?? 0) : 0;
                 <?= $is_edit ? 'Update the request for quotation details' : 'Create a new request for quotation to a supplier' ?>
             </p>
         </div>
-        <a href="<?= getUrl('rfq') ?>" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-arrow-left me-1"></i> Back
+        <a href="<?= htmlspecialchars($back_url) ?>" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> Back<?= $from_project ? ' to Project' : '' ?>
         </a>
     </div>
 
@@ -655,7 +672,7 @@ document.getElementById('rfqForm').addEventListener('submit', async function(e) 
                 text: res.message || 'RFQ saved successfully.',
                 confirmButtonColor:'#198754',
                 confirmButtonText:'OK'
-            }).then(() => window.location.href = '<?= getUrl('rfq') ?>');
+            }).then(() => window.location.href = '<?= $back_url ?>');
         } else {
             Swal.fire({icon:'error',title:'Failed',text:res.message||'An error occurred.',confirmButtonColor:'#0d6efd',confirmButtonText:'OK'});
         }
