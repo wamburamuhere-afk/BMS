@@ -340,7 +340,14 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
                         </button>
                     </div>
                     <?php elseif ($reconciliation['status'] === 'reconciled'): ?>
-                    <div class="alert alert-success mt-3 mb-0 d-flex align-items-center"><i class="bi bi-check-all me-2"></i> This reconciliation is finalized — the matched lines are locked.</div>
+                    <div class="alert alert-success mt-3 mb-0 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <span><i class="bi bi-check-all me-2"></i> This reconciliation is finalized — the matched lines are locked.</span>
+                        <?php if (canApprove('bank_reconciliation')): ?>
+                        <button class="btn btn-sm btn-outline-danger" onclick="openUnreconcile()">
+                            <i class="bi bi-unlock me-1"></i> Unreconcile
+                        </button>
+                        <?php endif; ?>
+                    </div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -604,6 +611,12 @@ function deleteReconciliation() {
     });
 }
 
+// ── Unreconcile (Phase 4) ────────────────────────────────────────────────────
+function openUnreconcile() {
+    $('#unreconcile_reason').val('');
+    new bootstrap.Modal(document.getElementById('unreconcileModal')).show();
+}
+
 // ── Bank Adjustments (Phase 2) ────────────────────────────────────────────────
 function loadAdjustments() {
     $.getJSON('<?= buildUrl('api/account/get_reconciliation_adjustments.php') ?>', { reconciliation_id: REC_ID })
@@ -677,6 +690,38 @@ $(document).ready(function () {
             },
             error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); },
             complete: function () { btn.prop('disabled', false).html(orig); }
+        });
+    });
+
+    // ── Unreconcile form submit ───────────────────────────────────────────────
+    $('#unreconcileForm').on('submit', function (e) {
+        e.preventDefault();
+        const reason = $('#unreconcile_reason').val().trim();
+        if (reason.length < 10) { Swal.fire({ icon:'warning', title:'Reason required', text:'Please provide at least 10 characters.' }); return; }
+        Swal.fire({
+            title: 'Unreconcile this period?',
+            text: 'This will unlock the reconciliation. Reason: ' + reason,
+            icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, unlock'
+        }).then(r => {
+            if (!r.isConfirmed) return;
+            const btn = $(this).find('[type="submit"]');
+            const orig = btn.html();
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+            $.ajax({
+                url: '<?= buildUrl('api/account/unreconcile.php') ?>',
+                type: 'POST', dataType: 'json',
+                data: new FormData(this), contentType: false, processData: false,
+                success: function (res) {
+                    if (res.success) {
+                        bootstrap.Modal.getInstance(document.getElementById('unreconcileModal'))?.hide();
+                        Swal.fire({ icon:'success', title:'Unlocked', text: res.message, timer:1800, showConfirmButton:false }).then(() => location.reload());
+                    } else {
+                        Swal.fire({ icon:'error', title:'Error', text: res.message });
+                    }
+                },
+                error: function () { Swal.fire({ icon:'error', title:'Error', text:'Server error.' }); },
+                complete: function () { btn.prop('disabled', false).html(orig); }
+            });
         });
     });
 
@@ -805,6 +850,41 @@ $(document).ready(function () {
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-warning"><i class="bi bi-check-circle me-1"></i> Post &amp; Match</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- Unreconcile Modal (Phase 4) -->
+<?php if ($reconciliation['status'] === 'reconciled' && canApprove('bank_reconciliation')): ?>
+<div class="modal fade" id="unreconcileModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-unlock me-2"></i>Unreconcile Period</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="unreconcileForm" autocomplete="off">
+                <div class="modal-body">
+                    <input type="hidden" name="_csrf"             value="<?= csrf_token() ?>">
+                    <input type="hidden" name="reconciliation_id" value="<?= (int)$reconciliation_id ?>">
+                    <div class="alert alert-danger small">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        <strong>Warning:</strong> Unreconciling will unlock this period. Journal entries dated
+                        <?= date('M d, Y', strtotime($reconciliation['period_start'])) ?>–<?= date('M d, Y', strtotime($reconciliation['period_end'])) ?>
+                        that touch this bank account can then be edited or voided.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Reason for unreconciling <span class="text-danger">*</span></label>
+                        <textarea class="form-control" name="reason" id="unreconcile_reason" rows="3"
+                            placeholder="Provide a detailed reason (min 10 characters)" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-unlock me-1"></i> Unreconcile</button>
                 </div>
             </form>
         </div>
