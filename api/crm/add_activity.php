@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/recalculate_lead_score.php';
 header('Content-Type: application/json');
 
 if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
@@ -47,10 +48,17 @@ try {
     ]);
     $aid = (int)$pdo->lastInsertId();
 
+    // Update last_activity timestamp on the lead
+    $pdo->prepare("UPDATE crm_leads SET last_activity = NOW() WHERE lead_id = ?")->execute([$lead_id]);
+
+    // Recalculate lead score
+    $score = computeLeadScore($pdo, $lead_id);
+    $pdo->prepare("UPDATE crm_leads SET lead_score = ? WHERE lead_id = ?")->execute([$score, $lead_id]);
+
     $full_name = trim($lead['first_name'].' '.$lead['last_name']);
     logActivity($pdo, $_SESSION['user_id'], "Logged $type on lead {$lead['lead_code']} ($full_name): $subject");
 
-    echo json_encode(['success'=>true,'message'=>'Activity logged.','activity_id'=>$aid]);
+    echo json_encode(['success'=>true,'message'=>'Activity logged.','activity_id'=>$aid,'score'=>$score]);
 } catch (PDOException $e) {
     error_log('add_activity error: '.$e->getMessage());
     http_response_code(500);

@@ -90,7 +90,16 @@ $stages = $pdo->query("SELECT stage_id, stage_name, color, is_won, is_lost FROM 
     </div>
 </div>
 
-<!-- Lead view quick-open placeholder (navigation) handled inline -->
+<!-- Quick-view offcanvas -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="quickViewCanvas" style="width:360px">
+    <div class="offcanvas-header bg-primary text-white">
+        <h6 class="offcanvas-title mb-0"><i class="bi bi-eye me-2"></i>Lead Quick View</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body p-0" id="quickViewBody">
+        <div class="text-center py-5 text-muted"><div class="spinner-border spinner-border-sm"></div></div>
+    </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
@@ -209,7 +218,66 @@ function updateColCounts() {
     });
 }
 
-function goLead(id) { window.location.href = LEAD_VIEW + '?id=' + id; }
+const LEAD_DATA_URL = '<?= buildUrl('api/crm/get_lead.php') ?>';
+const ACT_LIST_URL  = '<?= buildUrl('api/crm/get_activities.php') ?>';
+
+function goLead(id) {
+    // On small screens navigate directly; on desktop show quick-view
+    if (window.innerWidth < 768) {
+        window.location.href = LEAD_VIEW + '?id=' + id;
+        return;
+    }
+    openQuickView(id);
+}
+
+function openQuickView(id) {
+    $('#quickViewBody').html('<div class="text-center py-5 text-muted"><div class="spinner-border spinner-border-sm"></div></div>');
+    new bootstrap.Offcanvas(document.getElementById('quickViewCanvas')).show();
+    $.getJSON(LEAD_DATA_URL, { id: id }, function (res) {
+        if (!res.success) { $('#quickViewBody').html('<div class="alert alert-danger m-3">Failed to load lead.</div>'); return; }
+        const d = res.data;
+        const fmt = n => Number(n||0).toLocaleString(undefined,{minimumFractionDigits:0});
+        const fmtD = s => s ? new Date(s).toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'}) : '—';
+        const scoreCol = d.lead_score >= 70 ? '#198754' : (d.lead_score >= 40 ? '#ffc107' : '#dc3545');
+        let html = `<div class="p-3">
+            <div class="fw-bold mb-1" style="font-size:1rem">${esc(d.first_name||'')} ${esc(d.last_name||'')}</div>
+            ${d.company_name ? `<div class="text-muted small mb-2"><i class="bi bi-building me-1"></i>${esc(d.company_name)}</div>` : ''}
+            <div class="d-flex gap-2 flex-wrap mb-3">
+                <span class="badge" style="background:${esc(d.stage_color||'#6c757d')};color:#fff">${esc(d.stage_name||'—')}</span>
+                <span class="badge" style="background:${scoreCol}22;color:${scoreCol};border:1px solid ${scoreCol}">Score: ${d.lead_score||0}</span>
+            </div>
+            <table class="table table-sm table-borderless mb-3" style="font-size:.84rem">
+                <tr><td class="text-muted">Value</td><td class="fw-bold text-primary">TZS ${fmt(d.lead_value)}</td></tr>
+                <tr><td class="text-muted">Probability</td><td>${d.probability}%</td></tr>
+                <tr><td class="text-muted">Source</td><td>${esc(d.lead_source||'—')}</td></tr>
+                ${d.assigned_name ? `<tr><td class="text-muted">Assigned</td><td>${esc(d.assigned_name)}</td></tr>` : ''}
+                ${d.expected_close_date ? `<tr><td class="text-muted">Close Date</td><td>${fmtD(d.expected_close_date)}</td></tr>` : ''}
+                ${d.last_activity ? `<tr><td class="text-muted">Last Activity</td><td>${fmtD(d.last_activity)}</td></tr>` : ''}
+            </table>
+            <div id="qv-activities" class="mb-3"><div class="text-muted small"><div class="spinner-border spinner-border-sm me-1"></div> Loading activities…</div></div>
+            <div class="d-grid gap-2">
+                <a href="${LEAD_VIEW}?id=${id}" class="btn btn-primary btn-sm"><i class="bi bi-box-arrow-up-right me-1"></i>Open Full View</a>
+            </div>
+        </div>`;
+        $('#quickViewBody').html(html);
+
+        // Load last 3 activities
+        $.getJSON(ACT_LIST_URL, { lead_id: id }, function (ar) {
+            if (!ar.success || !ar.data.length) { $('#qv-activities').html('<div class="small text-muted">No activities yet.</div>'); return; }
+            const recent = ar.data.slice(0, 3);
+            const icons = { call:'bi-telephone', email:'bi-envelope', meeting:'bi-people', note:'bi-sticky', task:'bi-check2-square', site_visit:'bi-geo-alt' };
+            let ahtml = recent.map(a => `
+                <div class="d-flex align-items-start gap-2 mb-2">
+                    <i class="bi ${icons[a.activity_type]||'bi-dot'} text-primary mt-1" style="flex-shrink:0"></i>
+                    <div style="font-size:.81rem">
+                        <div class="fw-semibold">${esc(a.subject)}</div>
+                        <div class="text-muted">${fmtD(a.activity_date)}</div>
+                    </div>
+                </div>`).join('');
+            $('#qv-activities').html(`<div class="fw-semibold mb-1" style="font-size:.78rem;text-transform:uppercase;color:#6c757d">Recent Activities</div>${ahtml}`);
+        });
+    });
+}
 
 function openAddLeadModal(stageId) {
     // Redirect to leads page with stage pre-selected (the leads page owns the add modal)
