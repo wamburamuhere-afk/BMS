@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-06-30 (fix) — DN create: PO dropdown shows approved-only, project-scoped
+
+- `app/bms/grn/dn_create.php` — PO list now filters `status = 'approved'` only
+  (was `IN ('approved','ordered','partially_received','received','completed')`)
+- When `project_id` is in URL, only POs belonging to that project are loaded
+  (applies to all three branches: admin, scoped non-admin, no-project non-admin)
+
 ## 2026-06-30 (feat) — GRN context-aware navigation in project details
 
 - `api/operations/get_project.php` — GRN query now uses `pr.project_id` directly
