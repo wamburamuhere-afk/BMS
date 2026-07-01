@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-07-01 (fix) — POS barcode scanner: category-filter bug + search-by-barcode + expanded tests
+
+- `app/bms/pos/pos_scripts_new.php` — added `allProducts[]` global that holds the full
+  product catalog; populated on any unfiltered load; scanner's `handleBarcodeScanned()`
+  searches `allProducts` first so it finds a product even when the grid is filtered to
+  one category (previously would return "not found" for products outside the active category)
+- `api/pos/simple_products.php` — added `p.barcode LIKE :search` to the search WHERE
+  clause; typing or pasting a barcode into the search box now finds the product (placeholder
+  already said "name, SKU or barcode" but barcode was not actually searched)
+- `tests/test_pos_barcode_cli.php` — rewritten from 25 to 73 assertions across 14 sections:
+  schema, full API payload, API search-by-barcode (bug-fix verification), lookup (exact /
+  case-insensitive / whitespace-trim), SKU fallback, not-found cases (random / empty /
+  2-char / 50-char), cart increment (×3), two-product multi-line cart, category-filter bug
+  fix verification, HTML structure (hiddenScanInput / posHeaderBar / scannerReadyBadge),
+  JS implementation (22 code-presence checks), allProducts population, scannability
+  coverage, duplicate-barcode guard, PHP lint on 5 files
+
 ## 2026-06-30 (feat) — POS barcode scanner hardware support
 
 - `app/bms/pos/pos.php` — added `id="posHeaderBar"` for visual scan feedback; added

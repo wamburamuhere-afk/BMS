@@ -7,7 +7,8 @@ let saleVatRate = 0; // POS VAT: cashier-selected per sale — 0 = No Tax, 18 = 
 let currentProduct = null;
 let categories = [];
 let currentReceiptNumber = '<?= generate_receipt_number() ?>';
-let products = [];
+let products    = [];
+let allProducts = [];  // full catalog, never filtered — scanner always searches here
 let currentDiscountPercentage = 0;
 let currentShiftId = '<?= $shift_id ?>';
 let currentShiftActive = <?= $shift_active ? 'true' : 'false' ?>;
@@ -199,6 +200,11 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
             
             if (response.success && response.data && response.data.length > 0) {
                 products = response.data;
+                // Keep a full-catalog copy for the barcode scanner so it can find
+                // any product even when the grid is filtered to one category.
+                if (categoryId === 'all' || categoryId === '' || categoryId === undefined) {
+                    allProducts = response.data;
+                }
                 const grid = $('#productGrid');
                 grid.empty();
                 
@@ -1490,14 +1496,17 @@ function updateCashBalanceUI() {
     function handleBarcodeScanned(code) {
         if (!code || code.length < 3) return;
 
-        // products[] is the module-level array populated by loadProducts()
-        if (!products || products.length === 0) {
+        // Search allProducts first (full catalog, unaffected by category filter).
+        // Fall back to products[] if allProducts hasn't been populated yet.
+        var catalog = (allProducts && allProducts.length > 0) ? allProducts : products;
+
+        if (!catalog || catalog.length === 0) {
             console.warn('[Scanner] Products not yet loaded — scan ignored:', code);
             return;
         }
 
         const needle = code.toLowerCase();
-        const found  = products.find(function (p) {
+        const found  = catalog.find(function (p) {
             return (p.barcode && p.barcode.toLowerCase() === needle) ||
                    (p.sku     && p.sku.toLowerCase()     === needle);
         });
