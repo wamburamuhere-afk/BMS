@@ -65,12 +65,23 @@ if (isAdmin()) {
     $all_projects   = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
     $all_warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
     $all_suppliers  = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
-    $po_list = $pdo->query("
-        SELECT po.purchase_order_id, po.order_number, po.supplier_id, IFNULL(po.warehouse_id,0) AS warehouse_id, IFNULL(po.project_id,0) AS project_id, s.supplier_name
-        FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.supplier_id
-        WHERE po.status IN ('approved','ordered','partially_received','received','completed')
-        ORDER BY po.order_date DESC
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    if ($project_id > 0) {
+        $_dnc_admpstmt = $pdo->prepare("
+            SELECT po.purchase_order_id, po.order_number, po.supplier_id, IFNULL(po.warehouse_id,0) AS warehouse_id, IFNULL(po.project_id,0) AS project_id, s.supplier_name
+            FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.supplier_id
+            WHERE po.status = 'approved' AND po.project_id = ?
+            ORDER BY po.order_date DESC
+        ");
+        $_dnc_admpstmt->execute([$project_id]);
+        $po_list = $_dnc_admpstmt->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $po_list = $pdo->query("
+            SELECT po.purchase_order_id, po.order_number, po.supplier_id, IFNULL(po.warehouse_id,0) AS warehouse_id, IFNULL(po.project_id,0) AS project_id, s.supplier_name
+            FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.supplier_id
+            WHERE po.status = 'approved'
+            ORDER BY po.order_date DESC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+    }
 } elseif (!empty($_dnc_assigned)) {
     $_dnc_ph = implode(',', array_fill(0, count($_dnc_assigned), '?'));
     $_dnc_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($_dnc_ph) ORDER BY project_name");
@@ -82,25 +93,46 @@ if (isAdmin()) {
     $_dnc_sstmt = $pdo->prepare("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_dnc_ph)) ORDER BY supplier_name");
     $_dnc_sstmt->execute($_dnc_assigned);
     $all_suppliers = $_dnc_sstmt->fetchAll(PDO::FETCH_ASSOC);
-    $_dnc_postmt = $pdo->prepare("
-        SELECT po.purchase_order_id, po.order_number, po.supplier_id, IFNULL(po.warehouse_id,0) AS warehouse_id, IFNULL(po.project_id,0) AS project_id, s.supplier_name
-        FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.supplier_id
-        WHERE po.status IN ('approved','ordered','partially_received','received','completed')
-        AND (po.project_id IS NULL OR po.project_id IN ($_dnc_ph))
-        ORDER BY po.order_date DESC
-    ");
-    $_dnc_postmt->execute($_dnc_assigned);
+    if ($project_id > 0) {
+        $_dnc_postmt = $pdo->prepare("
+            SELECT po.purchase_order_id, po.order_number, po.supplier_id, IFNULL(po.warehouse_id,0) AS warehouse_id, IFNULL(po.project_id,0) AS project_id, s.supplier_name
+            FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.supplier_id
+            WHERE po.status = 'approved' AND po.project_id = ?
+            ORDER BY po.order_date DESC
+        ");
+        $_dnc_postmt->execute([$project_id]);
+    } else {
+        $_dnc_postmt = $pdo->prepare("
+            SELECT po.purchase_order_id, po.order_number, po.supplier_id, IFNULL(po.warehouse_id,0) AS warehouse_id, IFNULL(po.project_id,0) AS project_id, s.supplier_name
+            FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.supplier_id
+            WHERE po.status = 'approved'
+            AND (po.project_id IS NULL OR po.project_id IN ($_dnc_ph))
+            ORDER BY po.order_date DESC
+        ");
+        $_dnc_postmt->execute($_dnc_assigned);
+    }
     $po_list = $_dnc_postmt->fetchAll(PDO::FETCH_ASSOC);
 } else {
     $all_projects   = [];
     $all_warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
     $all_suppliers  = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' AND project_id IS NULL ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
-    $po_list = $pdo->query("
-        SELECT po.purchase_order_id, po.order_number, po.supplier_id, IFNULL(po.warehouse_id,0) AS warehouse_id, IFNULL(po.project_id,0) AS project_id, s.supplier_name
-        FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.supplier_id
-        WHERE po.status IN ('approved','ordered','partially_received','received','completed') AND po.project_id IS NULL
-        ORDER BY po.order_date DESC
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    if ($project_id > 0) {
+        $_dnc_nppstmt = $pdo->prepare("
+            SELECT po.purchase_order_id, po.order_number, po.supplier_id, IFNULL(po.warehouse_id,0) AS warehouse_id, IFNULL(po.project_id,0) AS project_id, s.supplier_name
+            FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.supplier_id
+            WHERE po.status = 'approved' AND po.project_id = ?
+            ORDER BY po.order_date DESC
+        ");
+        $_dnc_nppstmt->execute([$project_id]);
+        $po_list = $_dnc_nppstmt->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $po_list = $pdo->query("
+            SELECT po.purchase_order_id, po.order_number, po.supplier_id, IFNULL(po.warehouse_id,0) AS warehouse_id, IFNULL(po.project_id,0) AS project_id, s.supplier_name
+            FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.supplier_id
+            WHERE po.status = 'approved' AND po.project_id IS NULL
+            ORDER BY po.order_date DESC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 $all_subs = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM sub_contractors WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
 
