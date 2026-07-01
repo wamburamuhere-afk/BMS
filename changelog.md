@@ -651,24 +651,27 @@ Reference-data dropdowns are now flexible: pick an option, or choose **"Other"**
 
 ## 2026-06-25 (fix) — void orphan payroll_accrual test entries (Salaries Payable cleanup)
 
-- `migrations/2026_06_25_payroll_accrual_orphan_cleanup.php` — soft-voids posted `payroll_accrual` journal entries whose `entity_id` has no matching `payroll` row (test-script accruals: future-dated 2031, fake payroll ids, incl. a 2-billion fake salary). 154 voided on local dev DB. Criteria-based + idempotent (re-run finds 0); each orphan is internally balanced so the ledger stays balanced (Dr−Cr 0.00 → 0.00). Removes ~44.3B bogus **Salaries Payable** (all-dates) + matching **Wages & Salaries** expense. **No-op on a clean DB** (production never runs the offending test, so this heals nothing harmful there). Root cause is a local-only test-teardown gap.
+- `migrations/2026_06_25_payroll_accrual_orphan_cleanup.php` — soft-voids posted `payroll_accrual` journal entries whose `entity_id` has **no matching `payroll` row** (test-script accruals: future-dated 2031, fake payroll ids `9000xxxx`, incl. a 2-billion fake salary, 22 reruns). **154 voided locally.** Criteria-based + idempotent (re-run finds 0). Each orphan is an internally-balanced entry, so the ledger stays balanced (Dr−Cr diff 0.00 → 0.00). Removes ~44.3B of bogus **Salaries Payable** (all-dates 44,357,073,837.63 → 56,770,999.63) and the matching **Wages & Salaries** expense.
+- Diagnosis confirmed the posting engine is sound: across 247 real posted txns (payroll/bills/invoices/receipts) **0 one-sided, 0 unbalanced**. The 44B was balanced-but-bogus test data, not a posting bug.
+- Note: today's reports already excluded these (future-dated), so this is all-time/future-period hygiene. Root cause to address separately: payroll tests writing into the real ledger.
 
 ## 2026-06-25 (refactor) — actors as subsidiary ledger, Phase 2-3 (hide + drill)
 
-- Hid the flagged actor sub-accounts (`is_subledger=1`) from every "account" surface (control accounts kept):
+- Hid the flagged actor sub-accounts (`is_subledger=1`) from every "account" surface (chart top 399→103 visible; control accounts kept):
   - `api/account/get_chart_of_accounts.php` — chart tree (`baseQuery` + `AND a.is_subledger = 0`)
   - `api/account/get_accounts.php` — generic account dropdown feed
   - `api/account/search_accounts.php` — journal account search (generic + both bank branches)
   - `app/constant/accounts/edit_journal.php` — Dr/Cr account dropdowns
   - `app/constant/accounts/chart_of_accounts.php` — parent cascade picker (`ACCOUNTS_LIST`)
-- `app/constant/accounts/account_details.php` — excluded `is_subledger` children from the Account Composition panel, so a control account no longer lists the dormant zero-balance sub-accounts. The existing per-vendor (AP) and per-customer (AR) sub-ledger cards (sourced from `supplier_invoices` / `invoices`+`payments`, already with a S/No column) remain the drill-in view.
-- Employee/Salaries sub-ledger deferred (pre-existing payroll-posting integrity issue). No posting change.
+- `app/constant/accounts/account_details.php` — excluded `is_subledger` children from the Account Composition panel, so a control account no longer lists the 296 dormant zero-balance sub-accounts. The existing **per-vendor (AP)** and **per-customer (AR)** sub-ledger cards — sourced from `supplier_invoices` / `invoices`+`payments`, already with a S/No (`#`) column — remain the drill-in view (suppliers, sub-contractors, customers covered).
+- **Employee/Salaries sub-ledger DEFERRED (honest):** GL Salaries Payable balance (≈42.34B) does not reconcile with payroll Σ(net−paid) (≈2.25B) — a pre-existing payroll-posting integrity issue (incl. a negative-net payroll row). A per-employee sub-ledger must not be shipped until that reconciles.
+- No posting change (actor accounts remain dormant).
 
 ## 2026-06-25 (refactor) — actors as subsidiary ledger, Phase 1 (classify)
 
-- `migrations/2026_06_25_accounts_is_subledger.php` — adds `accounts.is_subledger TINYINT(1) NOT NULL DEFAULT 0` (idempotent `SHOW COLUMNS` guard); backfills `is_subledger=1` for the per-actor GL sub-accounts created by `actor_account.php` (`account_code REGEXP '-(CUST|SUP|SUB|EMP)-'`). Control accounts (Trade Debtors/Creditors/Salaries Payable) untouched. No hard-coded ids.
+- `migrations/2026_06_25_accounts_is_subledger.php` — adds `accounts.is_subledger TINYINT(1) NOT NULL DEFAULT 0` (idempotent `SHOW COLUMNS` guard); backfills `is_subledger=1` for the per-actor GL sub-accounts created by `actor_account.php` (`account_code REGEXP '-(CUST|SUP|SUB|EMP)-'`) — flagged 296 locally. Control accounts (Trade Debtors/Creditors/Salaries Payable) untouched. No hard-coded ids.
 - `core/actor_account.php` — `ensureActorLedgerAccount()` INSERT now sets `is_subledger=1`, so every new customer/supplier/sub-contractor/employee sub-account is born flagged.
-- No posting change: these per-actor accounts are dormant (verified 0 lines in `journal_entries`); money posts to the control accounts.
+- No posting change: these per-actor accounts are dormant (verified 0 lines in `journal_entries`); money posts to the control accounts. Phase 2 (hide from chart-top + account pickers) and Phase 3 (S/No subsidiary-ledger view) to follow.
 
 ## 2026-06-25 (ui) — header date/location smaller on mobile (match vikundi)
 
