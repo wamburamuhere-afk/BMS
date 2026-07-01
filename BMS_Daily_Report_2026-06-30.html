@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMS Daily Development Report — 30 June 2026</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a2e; background: #f8f9fa; }
+  @media print {
+    body { background: white; }
+    .no-print { display: none; }
+    .page-break { page-break-before: always; }
+    .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+  }
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  .report-header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%); color: white; padding: 36px 40px; border-radius: 12px; margin-bottom: 28px; display: flex; justify-content: space-between; align-items: center; }
+  .report-header .title { font-size: 26px; font-weight: 700; letter-spacing: 0.5px; }
+  .report-header .subtitle { font-size: 13px; opacity: 0.75; margin-top: 4px; }
+  .report-header .meta { text-align: right; font-size: 12px; opacity: 0.8; line-height: 1.8; }
+  .report-header .meta strong { font-size: 18px; display: block; opacity: 1; }
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .sum-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); border-left: 4px solid; }
+  .sum-card.blue { border-left-color: #0d6efd; }
+  .sum-card.green { border-left-color: #198754; }
+  .sum-card.orange { border-left-color: #fd7e14; }
+  .sum-card.purple { border-left-color: #6f42c1; }
+  .sum-card .num { font-size: 32px; font-weight: 700; line-height: 1; }
+  .sum-card .label { font-size: 11px; color: #6c757d; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .sum-card.blue .num { color: #0d6efd; }
+  .sum-card.green .num { color: #198754; }
+  .sum-card.orange .num { color: #fd7e14; }
+  .sum-card.purple .num { color: #6f42c1; }
+  .section { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); margin-bottom: 24px; overflow: hidden; }
+  .section-header { padding: 16px 22px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 10px; }
+  .section-header .icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .section-header h2 { font-size: 15px; font-weight: 700; }
+  .section-header .badge-count { background: #e9ecef; color: #495057; border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 600; margin-left: auto; }
+  .section-body { padding: 20px 22px; }
+  .module { margin-bottom: 22px; border-left: 3px solid #dee2e6; padding-left: 16px; }
+  .module:last-child { margin-bottom: 0; }
+  .module-title { font-weight: 700; font-size: 13px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .module-title .tag { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+  .tag.feat { background: #d1e7dd; color: #0f5132; }
+  .tag.fix { background: #fff3cd; color: #664d03; }
+  .tag.critical { background: #f8d7da; color: #842029; }
+  .tag.refactor { background: #cff4fc; color: #055160; }
+  .module ul { list-style: none; }
+  .module ul li { padding: 4px 0; color: #444; font-size: 12.5px; display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
+  .module ul li::before { content: "▸"; color: #adb5bd; flex-shrink: 0; margin-top: 1px; }
+  .file-chip { background: #f0f0f0; border-radius: 4px; padding: 1px 6px; font-size: 10.5px; font-family: 'Consolas', monospace; color: #495057; }
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .tl-item { display: flex; gap: 16px; position: relative; }
+  .tl-item::before { content: ''; position: absolute; left: 38px; top: 32px; bottom: 0; width: 1px; background: #dee2e6; }
+  .tl-item:last-child::before { display: none; }
+  .tl-time { font-size: 10.5px; color: #6c757d; font-family: monospace; width: 40px; padding-top: 12px; flex-shrink: 0; text-align: right; }
+  .tl-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; flex-shrink: 0; margin-top: 11px; box-shadow: 0 0 0 2px #dee2e6; }
+  .tl-dot.feat { background: #198754; box-shadow: 0 0 0 2px #d1e7dd; }
+  .tl-dot.fix { background: #ffc107; box-shadow: 0 0 0 2px #fff3cd; }
+  .tl-dot.chore { background: #6c757d; box-shadow: 0 0 0 2px #e2e3e5; }
+  .tl-content { flex: 1; padding: 8px 0 16px 0; }
+  .tl-content .tl-title { font-weight: 600; font-size: 12px; }
+  .tl-content .tl-sub { font-size: 11px; color: #6c757d; margin-top: 2px; }
+  .tl-hash { font-family: monospace; font-size: 10px; background: #f0f0f0; padding: 1px 5px; border-radius: 3px; color: #495057; }
+  .bug-table { width: 100%; border-collapse: collapse; }
+  .bug-table th { background: #f8f9fa; padding: 9px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: #6c757d; border-bottom: 2px solid #dee2e6; }
+  .bug-table td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; font-size: 12px; vertical-align: top; }
+  .bug-table tr:last-child td { border-bottom: none; }
+  .sev { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
+  .sev.high { background: #f8d7da; color: #842029; }
+  .sev.med { background: #fff3cd; color: #664d03; }
+  .sev.crit { background: #6f42c1; color: white; }
+  .files-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .file-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: #f8f9fa; border-radius: 6px; }
+  .file-row .ftype { font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 3px; min-width: 26px; text-align: center; }
+  .ftype.php { background: #6f42c1; color: white; }
+  .ftype.sql { background: #198754; color: white; }
+  .ftype.test { background: #dc3545; color: white; }
+  .ftype.core { background: #fd7e14; color: white; }
+  .file-row .fname { font-family: monospace; font-size: 11px; color: #1a1a2e; flex: 1; }
+  .file-row .fchange { font-size: 10px; color: #198754; font-weight: 600; }
+  .phase-row { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid #f0f0f0; }
+  .phase-row:last-child { border-bottom: none; }
+  .phase-badge { color: white; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+  .phase-badge.done { background: #198754; }
+  .phase-badge.fix { background: #fd7e14; }
+  .phase-badge.sec { background: #dc3545; }
+  .phase-content { flex: 1; }
+  .phase-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+  .phase-items { font-size: 12px; color: #555; line-height: 1.8; }
+  .phase-items code { background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+  .test-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px; }
+  .test-name { font-family: monospace; font-size: 11px; flex: 1; color: #1a1a2e; }
+  .test-result.pass { color: #198754; font-size:11px; font-weight:700; }
+  .total-bar { background: #d1e7dd; border-radius: 8px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+  .total-bar .total-label { font-weight: 700; color: #0f5132; font-size: 13px; }
+  .total-bar .total-num { font-size: 22px; font-weight: 700; color: #0f5132; }
+  .insight-box { border-left: 4px solid; border-radius: 6px; padding: 13px 16px; margin-bottom: 13px; }
+  .insight-box.danger { background: #f8d7da; border-left-color: #dc3545; }
+  .insight-box.info { background: #cff4fc; border-left-color: #0dcaf0; }
+  .insight-box.success { background: #d1e7dd; border-left-color: #198754; }
+  .insight-box.warning { background: #fff3cd; border-left-color: #ffc107; }
+  .insight-title { font-weight: 700; font-size: 12px; margin-bottom: 4px; }
+  .insight-body { font-size: 12px; color: #444; line-height: 1.6; }
+  .insight-body code { background: rgba(0,0,0,0.07); padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+  .next-item { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+  .next-item:last-child { border-bottom: none; }
+  .next-num { background: #0f3460; color: white; font-size: 11px; font-weight: 700; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .next-body { flex: 1; font-size: 12.5px; line-height: 1.6; }
+  .next-body strong { display: block; margin-bottom: 2px; }
+  .crm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
+  .crm-phase { background: #f8f9fa; border-radius: 8px; padding: 12px 14px; border-left: 3px solid #0d6efd; }
+  .crm-phase .cp-title { font-size: 11px; font-weight: 700; color: #0f3460; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .crm-phase .cp-body { font-size: 11.5px; color: #444; line-height: 1.7; }
+  .crm-phase .cp-body code { background: #e9ecef; padding: 1px 4px; border-radius: 3px; font-size: 10.5px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="report-header">
+    <div>
+      <div class="title">BMS Development Report</div>
+      <div class="subtitle">BJP Technologies Co. Ltd &middot; Daily Progress Report</div>
+      <div style="margin-top:14px;font-size:11px;opacity:0.7;">
+        Period covered: After 29 June 2026 report &rarr; 30 June 2026<br>
+        Previous report: BMS Daily Report &mdash; 29 June 2026
+      </div>
+    </div>
+    <div class="meta">
+      <strong>30 June 2026</strong>
+      Report for 30 June 2026<br>
+      30+ new commits &middot; 4 PRs merged<br>
+      PRs: #1034, #1036, #1045, #1047 &middot; MERGED<br>
+      Main areas: Financial Reports, Procurement Nav, CRM, POS Scanner
+    </div>
+  </div>
+
+  <!-- SUMMARY CARDS -->
+  <div class="summary-grid">
+    <div class="sum-card blue">
+      <div class="num">5</div>
+      <div class="label">Major Areas Updated</div>
+    </div>
+    <div class="sum-card green">
+      <div class="num">177 / 177</div>
+      <div class="label">Tests Passing (CRM+POS)</div>
+    </div>
+    <div class="sum-card orange">
+      <div class="num">9+1</div>
+      <div class="label">CRM Phases + POS Feature</div>
+    </div>
+    <div class="sum-card purple">
+      <div class="num">13</div>
+      <div class="label">Bug Fixes (incl. 1 prod crash)</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 1. FINANCIAL REPORTS DEFAULTS              -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#d1e7dd;">&#128202;</div>
+      <h2>Financial Reports &mdash; Trial Balance + IS/CF Defaults Fixed</h2>
+      <span class="badge-count">PR #1034 &middot; MERGED &middot; 1 commit</span>
+    </div>
+    <div class="section-body">
+
+      <div class="module">
+        <div class="module-title">Trial Balance &mdash; Inactive Accounts Were Excluded <span class="tag fix">FIX</span></div>
+        <ul>
+          <li><b>Bug:</b> <code>glTrialBalance()</code> in <code>core/financial_reports.php</code> joined <code>accounts</code> with an implicit <code>status = 'active'</code> filter. Accounts deactivated mid-year still had posted journal lines, but those lines disappeared from the Trial Balance completely, causing the report to appear unbalanced even though the ledger itself was sound.</li>
+          <li><b>Fix:</b> Removed the status filter from the TB query. All accounts with journal activity appear, regardless of whether they are currently active or inactive. This matches standard accounting practice — a closed account's history must still be visible.</li>
+          <li>File: <span class="file-chip">core/financial_reports.php</span></li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-title">Income Statement &amp; Cash Flow &mdash; Defaulted to Month-to-Date Instead of Year-to-Date <span class="tag fix">FIX</span></div>
+        <ul>
+          <li><b>Bug:</b> The <code>app/constant/reports/income_statement.php</code> and <code>cash_flow.php</code> pages defaulted their date range to the current month (1st of this month &rarr; today). For most review sessions this showed too little data and confused managers who expected full-year figures.</li>
+          <li><b>Fix:</b> Changed the default <code>from</code> date to <code>01 January [current year]</code> so the report opens showing Year-to-Date figures. Users can still narrow the range manually.</li>
+          <li>Files: <span class="file-chip">app/constant/reports/income_statement.php</span> &nbsp; <span class="file-chip">app/constant/reports/cash_flow.php</span></li>
+        </ul>
+      </div>
+
+      <div class="insight-box success">
+        <div class="insight-title">&#10003; All three canonical financial reports now open showing meaningful data by default</div>
+        <div class="insight-body">
+          Trial Balance: all-time (as-of today, including inactive accounts) &middot;
+          Income Statement: YTD (Jan 1 &rarr; today) &middot;
+          Cash Flow: YTD (Jan 1 &rarr; today)
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 2. PROJECT PROCUREMENT CONTEXT NAV         -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#e0cffc;">&#128230;</div>
+      <h2>Project Procurement &mdash; Context-Aware Navigation (RFQ &rarr; PO &rarr; GRN)</h2>
+      <span class="badge-count">PR #1036 &middot; MERGED &middot; 8 commits &middot; 5 files</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12.5px;color:#555;margin-bottom:20px;line-height:1.7;">
+        A full procurement workflow lives inside each Project &mdash; RFQ &rarr; Purchase Order &rarr; GRN &rarr; Delivery Note. Previously, clicking into any of these from the project opened the external list and lost the project context. Back buttons navigated to the wrong pages. Dropdowns ignored project scope. All of these were fixed in this batch.
+      </p>
+
+      <div class="phase-row">
+        <span class="phase-badge done">FEAT</span>
+        <div class="phase-content">
+          <div class="phase-title">RFQ &mdash; Context-Aware Navigation From Project</div>
+          <div class="phase-items">
+            RFQ tab inside Project &gt; Procurements now loads records scoped to the project.<br>
+            "Create RFQ" button pre-fills the project; "View" / "Edit" links carry <code>back=project&amp;project_id=X</code> in the URL.<br>
+            Inside <code>rfq.php</code> (single RFQ view): "Back" returns to the project's Procurements tab instead of the global RFQ list.<br>
+            Tab columns, action buttons, and mobile cards were made identical to the external <code>rfq.php</code> list — no missing columns, no stale action menu.<br>
+            Files: <span class="file-chip">app/bms/operations/project_view.php</span> &nbsp; <span class="file-chip">app/bms/purchase/rfq.php</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge done">FEAT</span>
+        <div class="phase-content">
+          <div class="phase-title">Purchase Order &mdash; Context-Aware Create / Edit From Project</div>
+          <div class="phase-items">
+            "Create PO" from within a project now opens <code>purchase_order_create.php?project_id=X&amp;back=project</code>.<br>
+            The PO create/edit page detects the <code>back=project</code> flag and shows "Back to Project" instead of "Back to Purchase Orders".<br>
+            RFQ auto-fill: when a PO is opened from an RFQ, the supplier, items, and quantities are pre-populated automatically.<br>
+            Warehouse fallback: if no warehouse is stored on the PO, the system defaults to the first active warehouse rather than showing an empty dropdown.<br>
+            Files: <span class="file-chip">app/bms/purchase/purchase_order_create.php</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge done">FEAT</span>
+        <div class="phase-content">
+          <div class="phase-title">GRN &mdash; Context-Aware Navigation in Project Details</div>
+          <div class="phase-items">
+            "Create GRN" from the project's GRN tab now opens with <code>project_id</code> pre-set and a "Back to Project" link visible alongside "Back to GRNs".<br>
+            GRN list row actions (View, Edit) carry the project context so navigation stays within the project.<br>
+            File: <span class="file-chip">app/bms/operations/project_view.php</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">FIX 1</span>
+        <div class="phase-content">
+          <div class="phase-title">GRN Supplier Dropdown Required a DN to Exist</div>
+          <div class="phase-items">
+            <b>Bug:</b> <code>grn_create.php</code> built the supplier dropdown from the DN list — if no DNs existed for the project the dropdown was empty and the form could not be submitted.<br>
+            <b>Fix:</b> Supplier dropdown now queries <code>suppliers</code> directly (scoped to project-assigned suppliers). DN remains an optional link, not a gate.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">FIX 2</span>
+        <div class="phase-content">
+          <div class="phase-title">DN Items Showed Inflated Received Quantities</div>
+          <div class="phase-items">
+            <b>Bug:</b> The pre-fill query for GRN line items summed <code>received_qty</code> across ALL GRNs that touched a delivery item, not just GRNs for the current DN. This caused items to appear "fully received" even when the current DN still had outstanding stock, hiding them from the GRN form via the <code>HAVING pending_qty &gt; 0</code> filter.<br>
+            <b>Fix:</b> <code>received_qty</code> is now a correlated subquery scoped to the specific DN being received against. Each item's pending quantity is calculated correctly.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">FIX 3</span>
+        <div class="phase-content">
+          <div class="phase-title">PO Dropdown Inside GRN Required an Approved DN</div>
+          <div class="phase-items">
+            <b>Bug:</b> The PO dropdown in <code>grn_create.php</code> was only populated if a DN was already selected and approved — a circular dependency that prevented GRNs from being created without first going through a DN workflow.<br>
+            <b>Fix:</b> PO dropdown now populates independently. DN selection remains optional; if chosen, it scopes the PO dropdown to that DN's purchase order.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">FIX 4</span>
+        <div class="phase-content">
+          <div class="phase-title">DN PO Dropdown Showed All POs, Not Just Approved Ones</div>
+          <div class="phase-items">
+            <b>Bug:</b> Inside the Delivery Note create/edit form, the "Link to PO" dropdown listed POs of any status (draft, rejected, etc.), allowing a DN to be linked to an unapproved order.<br>
+            <b>Fix:</b> PO dropdown now filters <code>status IN ('approved','ordered','partially_received')</code> and, when inside a project, further scopes to that project's POs only.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 3. CRM PROFESSIONAL UPGRADE                -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#cff4fc;">&#128101;</div>
+      <h2>CRM Module &mdash; Professional Upgrade (All 9 Phases)</h2>
+      <span class="badge-count">PR #1045 &middot; MERGED &middot; 2 commits &middot; 104/104 tests</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12.5px;color:#555;margin-bottom:20px;line-height:1.7;">
+        The CRM module was upgraded from a basic leads list to a full professional pipeline. Nine phases were shipped in a single branch, each building on the previous. All functionality is covered by a 104-assertion CLI test suite using database transaction rollback (zero data leak). The upgrade adds campaign management, lead scoring, follow-up tracking, labels, bulk operations, enhanced conversion, reports, CSV import, and UX polish.
+      </p>
+
+      <div class="crm-grid">
+        <div class="crm-phase">
+          <div class="cp-title">Phase 1 &mdash; Campaign Management</div>
+          <div class="cp-body">
+            Full campaign list page with DataTable, stats cards, add/edit/delete modals.<br>
+            <code>marketing_campaigns</code> table &mdash; each lead can now be linked to a campaign.<br>
+            Select2 AJAX endpoint for campaign dropdowns in forms.<br>
+            Files: <code>crm_campaigns.php</code>, <code>save_campaign.php</code>, <code>get_campaigns_select.php</code>
+          </div>
+        </div>
+        <div class="crm-phase">
+          <div class="cp-title">Phase 2 &mdash; Stage History &amp; Lead Scoring</div>
+          <div class="cp-body">
+            New <code>crm_lead_stage_history</code> table tracks every stage change with timestamp.<br>
+            <code>lead_score</code> (0&ndash;100), <code>won_date</code>, <code>lost_date</code>, <code>last_activity</code>, <code>stage_entered</code> added to <code>crm_leads</code>.<br>
+            <code>computeLeadScore()</code> recalculates on every stage change and activity log.<br>
+            Files: <code>recalculate_lead_score.php</code>, <code>move_lead_stage.php</code>, <code>add_activity.php</code>
+          </div>
+        </div>
+        <div class="crm-phase">
+          <div class="cp-title">Phase 3 &mdash; Follow-up &amp; Overdue</div>
+          <div class="cp-body">
+            <code>mark_overdue_activities.php</code> marks pending activities past their <code>due_date</code> as overdue on page load.<br>
+            After logging a call, meeting, or site visit, a follow-up scheduling prompt appears automatically.
+          </div>
+        </div>
+        <div class="crm-phase">
+          <div class="cp-title">Phase 4 &mdash; Labels</div>
+          <div class="cp-body">
+            Labels can be created, edited, soft-deleted, and assigned/removed per lead.<br>
+            Lead view shows pill badges; a Swal+Select2 picker allows assigning multiple labels at once.<br>
+            Stage history (last 10), stage progress bar, lead score display (colour-coded &ge;70 / 40 / &lt;40), and days-in-stage badge with stalled warning also added to the lead view.
+          </div>
+        </div>
+        <div class="crm-phase">
+          <div class="cp-title">Phase 5 &mdash; Bulk Operations</div>
+          <div class="cp-body">
+            Select-all checkbox column on the leads list.<br>
+            Bulk action bar: assign agent, change stage, apply label, or delete — up to 500 leads at once.<br>
+            Bulk delete blocked for converted leads; scope validation enforced on all bulk ops.
+          </div>
+        </div>
+        <div class="crm-phase">
+          <div class="cp-title">Phase 6 &mdash; Enhanced Conversion</div>
+          <div class="cp-body">
+            Moving a lead to "Won" sets <code>won_date</code>; moving to "Lost" sets <code>lost_date</code>.<br>
+            Conversion dates feed the Reports and Win/Loss analysis correctly.
+          </div>
+        </div>
+        <div class="crm-phase">
+          <div class="cp-title">Phase 7 &mdash; Reports</div>
+          <div class="cp-body">
+            7 report types: Funnel, Agent Performance, Activity, Forecast, Win/Loss, Campaign, Source.<br>
+            Date range + project scope on all reports.<br>
+            Chart.js funnel chart for pipeline visualisation.<br>
+            Files: <code>get_reports_data.php</code>, <code>crm_reports.php</code>
+          </div>
+        </div>
+        <div class="crm-phase">
+          <div class="cp-title">Phase 8 &mdash; CSV Import</div>
+          <div class="cp-body">
+            3-step import wizard: Upload &rarr; Map columns &rarr; Preview &amp; Import.<br>
+            Duplicate detection, <code>nextCode()</code> for lead codes, lead scoring on import, max 5 MB.<br>
+            Files: <code>import_leads.php</code>, <code>crm_import_leads.php</code>
+          </div>
+        </div>
+        <div class="crm-phase">
+          <div class="cp-title">Phase 9 &mdash; UX Polish</div>
+          <div class="cp-body">
+            Pipeline page: offcanvas quick-view panel on lead card click (desktop) showing lead summary, last 3 activities, and open-full-view link.<br>
+            Mobile navigates directly to the lead view (no offcanvas — better on small screens).
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:18px;">
+        <div class="insight-box danger">
+          <div class="insight-title">Security Fix Applied (separate commit)</div>
+          <div class="insight-body">
+            Two CRM APIs (<code>mark_overdue_activities.php</code> and <code>recalculate_lead_score.php</code>) were initially missing <code>logActivity()</code> calls and permission gates. Fixed in a follow-up commit: both now require <code>canEdit('crm')</code> and log to the activity trail. Also added <code>logActivity</code> to <code>move_lead_stage.php</code> for every stage transition.
+          </div>
+        </div>
+
+        <div class="test-bar">
+          <span class="test-name">tests/test_crm_upgrade_cli.php</span>
+          <span class="test-result pass">ALL PASS</span>
+          <span style="font-size:11px;color:#6c757d;min-width:60px;text-align:right;">104 / 104</span>
+        </div>
+        <div style="font-size:11.5px;color:#555;padding:8px 14px;background:#f8f9fa;border-radius:6px;">
+          Test suite covers all 9 phases: schema checks, API payload validation, stage transitions, label CRUD, bulk operations, CSV import dry-run, report data shapes, and a full end-to-end create-lead &rarr; score &rarr; win flow. Uses database transaction rollback — zero data written to production tables.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 4. POS BARCODE SCANNER                     -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#d1e7dd;">&#128505;</div>
+      <h2>POS &mdash; Hardware Barcode Scanner Support + 2 Bug Fixes</h2>
+      <span class="badge-count">PR #1047 &middot; MERGED &middot; 4 commits &middot; 73/73 tests</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12.5px;color:#555;margin-bottom:20px;line-height:1.7;">
+        The POS terminal now supports USB and Bluetooth barcode scanners out of the box — no driver or plugin required. Scanners act as keyboards, firing all characters within &lt;80ms followed by Enter. The implementation distinguishes scanner bursts from human typing using a timing window, and handles audio feedback, visual flash, cart increment, and focus recovery automatically.
+      </p>
+
+      <div class="phase-row">
+        <span class="phase-badge done">FEAT</span>
+        <div class="phase-content">
+          <div class="phase-title">Hardware Barcode Scanner Interceptor &mdash; Timing-Based Detection</div>
+          <div class="phase-items">
+            <b>Hidden scan input</b> (<code>#hiddenScanInput</code>) is always focused off-screen — scanner always has a target regardless of what the cashier clicked last.<br>
+            <b>80ms timing window</b> (<code>SCAN_MAX_MS = 80</code>): characters arriving faster than human typing trigger a scan; slow keystrokes pass through to the user.<br>
+            <b>Modifier keys ignored</b> (Ctrl/Alt/Meta); F-keys pass through to existing keyboard shortcuts (F1 search, F2 clear, F3 pay).<br>
+            <b>Focus recovery</b>: hidden input regains focus after any modal closes and after clicking non-interactive areas — scanner is always ready.<br>
+            <b><code>window._posHandleScan</code></b> exposed for browser console and CLI testing.<br>
+            File: <span class="file-chip">app/bms/pos/pos_scripts_new.php</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge done">FEAT</span>
+        <div class="phase-content">
+          <div class="phase-title">Audio + Visual Feedback on Every Scan</div>
+          <div class="phase-items">
+            <b>Web Audio API beep</b> — no external library. Success: 880Hz square wave (80ms). Error: 200Hz sawtooth (300ms).<br>
+            <b>Header flash</b>: POS header bar flashes green (#198754, 400ms) on a successful scan; red (#dc3545, 600ms) when the barcode is not found.<br>
+            <b>Non-blocking Bootstrap toast</b> in the top-right corner: shows product name + price on success, or "Barcode not found" on error. Auto-dismisses after 3 seconds.<br>
+            <b><code>#scannerReadyBadge</code></b> chip in the POS title bar confirms the scanner is active.<br>
+            Files: <span class="file-chip">app/bms/pos/pos.php</span> &nbsp; <span class="file-chip">app/bms/pos/pos_scripts_new.php</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge done">FEAT</span>
+        <div class="phase-content">
+          <div class="phase-title">Cart Logic &mdash; Add or Increment, Never Duplicate</div>
+          <div class="phase-items">
+            Scanning a barcode the first time adds a new cart line.<br>
+            Re-scanning the same barcode increments the quantity on the existing line &mdash; no duplicate rows, no modal needed.<br>
+            Lookup is case-insensitive and whitespace-trimmed so slightly dirty scanner reads still match.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">BUG 1</span>
+        <div class="phase-content">
+          <div class="phase-title">Category Filter Broke Scanner &mdash; Products Outside Active Category Returned "Not Found"</div>
+          <div class="phase-items">
+            <b>Bug:</b> When a cashier clicked a category button (e.g. "Beverages"), <code>products[]</code> was replaced with only that category's items. Scanning a product from any other category returned "not found" even though it existed in the system.<br>
+            <b>Fix:</b> Added <code>allProducts[]</code> — a separate global that holds the full catalog and is only updated on unfiltered loads. <code>handleBarcodeScanned()</code> searches <code>allProducts</code> first so it always finds any product, regardless of the active category filter on the grid.<br>
+            File: <span class="file-chip">app/bms/pos/pos_scripts_new.php</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">BUG 2</span>
+        <div class="phase-content">
+          <div class="phase-title">Search Box Did Not Match Barcodes Despite Placeholder Saying It Would</div>
+          <div class="phase-items">
+            <b>Bug:</b> The product search input had placeholder text "Search by name, SKU or barcode" but the API WHERE clause only checked <code>product_name</code> and <code>sku</code>. Typing or pasting a barcode into the search box returned no results.<br>
+            <b>Fix:</b> Added <code>OR p.barcode LIKE :search</code> to the WHERE clause in <code>simple_products.php</code>.<br>
+            File: <span class="file-chip">api/pos/simple_products.php</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">PROD CRASH</span>
+        <div class="phase-content">
+          <div class="phase-title">GRN Create &mdash; ONLY_FULL_GROUP_BY Fatal Error on Production</div>
+          <div class="phase-items">
+            <b>Bug:</b> <code>grn_create.php</code> line 144 grouped by <code>di.delivery_item_id</code> but referenced <code>recv.received_qty</code> (from a LEFT JOIN subquery) without an aggregate function. Local WAMP has <code>ONLY_FULL_GROUP_BY</code> disabled so it passed locally; production MySQL 5.7.5+ has it enabled by default and threw a fatal <code>SQLSTATE[42000]</code> error whenever a cashier clicked "Create GRN" from an approved Delivery Note.<br>
+            <b>Fix:</b> Wrapped both uses in <code>MAX()</code> — <code>COALESCE(MAX(recv.received_qty), 0)</code> — in both the SELECT column and the GREATEST() expression. Result is mathematically identical since each group has exactly one recv row.<br>
+            File: <span class="file-chip">app/bms/grn/grn_create.php</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <div class="test-bar">
+          <span class="test-name">tests/test_pos_barcode_cli.php</span>
+          <span class="test-result pass">ALL PASS</span>
+          <span style="font-size:11px;color:#6c757d;min-width:60px;text-align:right;">73 / 73</span>
+        </div>
+        <div style="font-size:11.5px;color:#555;padding:8px 14px;background:#f8f9fa;border-radius:6px;">
+          14 test sections: schema check (<code>products.barcode</code> column exists), full API payload, API search-by-barcode (bug fix verification), exact match, case-insensitive, whitespace-trim, SKU fallback, not-found (random/empty/2-char/50-char), cart increment ×3, two-product multi-line cart, category-filter bug fix verification, HTML structure (<code>#hiddenScanInput</code>, <code>#posHeaderBar</code>, <code>#scannerReadyBadge</code>), JS implementation (22 code-presence checks), <code>allProducts</code> population, scannability coverage, PHP lint on 5 files.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 6. BUG FIXES SUMMARY                       -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#f8d7da;">&#128027;</div>
+      <h2>Bug Fixes Summary</h2>
+      <span class="badge-count">13 bugs fixed (incl. 1 prod crash)</span>
+    </div>
+    <div class="section-body">
+      <table class="bug-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Module</th>
+            <th>Bug</th>
+            <th>Severity</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>Financial Reports</td>
+            <td>Trial Balance excluded inactive accounts — ledger appeared unbalanced</td>
+            <td><span class="sev high">HIGH</span></td>
+            <td>&#10003; Fixed</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>Financial Reports</td>
+            <td>IS &amp; Cash Flow defaulted to current month, showing minimal data on first open</td>
+            <td><span class="sev med">MED</span></td>
+            <td>&#10003; Fixed</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>Project &gt; RFQ Tab</td>
+            <td>RFQ tab inside Project loaded external list, ignoring project scope</td>
+            <td><span class="sev high">HIGH</span></td>
+            <td>&#10003; Fixed</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>Project &gt; RFQ Tab</td>
+            <td>Tab columns, mobile cards, and action buttons did not match external rfq.php</td>
+            <td><span class="sev med">MED</span></td>
+            <td>&#10003; Fixed</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>GRN Create</td>
+            <td>Supplier dropdown empty if no Delivery Notes existed for the project</td>
+            <td><span class="sev high">HIGH</span></td>
+            <td>&#10003; Fixed</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td>GRN Create</td>
+            <td>DN items showed inflated received_qty, hiding items via pending_qty &gt; 0 filter</td>
+            <td><span class="sev high">HIGH</span></td>
+            <td>&#10003; Fixed</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td>GRN Create</td>
+            <td>PO dropdown only populated after selecting an approved DN — circular dependency</td>
+            <td><span class="sev high">HIGH</span></td>
+            <td>&#10003; Fixed</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td>DN Create/Edit</td>
+            <td>PO dropdown showed all statuses including draft/rejected; not scoped to project</td>
+            <td><span class="sev med">MED</span></td>
+            <td>&#10003; Fixed</td>
+          </tr>
+          <tr>
+            <td>9</td>
+            <td>CRM APIs</td>
+            <td>overdue/score APIs missing permission gates — any authenticated user could call them</td>
+            <td><span class="sev crit">SECURITY</span></td>
+            <td>&#10003; Fixed</td>
+          </tr>
+          <tr>
+            <td>10</td>
+            <td>Test Suite</td>
+            <td>Bill guard test failed on re-runs due to orphaned SIP rows; TB status check too strict</td>
+            <td><span class="sev med">MED</span></td>
+            <td>&#10003; Fixed</td>
+          </tr>
+          <tr>
+            <td>11</td>
+            <td>POS Barcode Scanner</td>
+            <td>Category filter broke scanner — products outside active category returned "not found"</td>
+            <td><span class="sev high">HIGH</span></td>
+            <td>&#10003; Fixed</td>
+          </tr>
+          <tr>
+            <td>12</td>
+            <td>POS Search</td>
+            <td>Search box did not match barcodes despite placeholder saying "name, SKU or barcode"</td>
+            <td><span class="sev med">MED</span></td>
+            <td>&#10003; Fixed</td>
+          </tr>
+          <tr>
+            <td>13</td>
+            <td>GRN Create (PROD)</td>
+            <td>Fatal SQLSTATE[42000] ONLY_FULL_GROUP_BY crash when opening Create GRN from approved DN</td>
+            <td><span class="sev crit">PROD CRASH</span></td>
+            <td>&#10003; Fixed</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 7. COMMIT TIMELINE                         -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#f0f0f0;">&#128337;</div>
+      <h2>Commit Timeline &mdash; 30 June – 1 July 2026</h2>
+      <span class="badge-count">30+ commits</span>
+    </div>
+    <div class="section-body">
+      <div class="timeline">
+
+        <div class="tl-item">
+          <div class="tl-time">30 Jun</div>
+          <div class="tl-dot feat"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">08fbc74</span> &nbsp; feat(crm): professional upgrade — all 9 phases</div>
+            <div class="tl-sub">Campaigns, scoring, labels, bulk ops, reports, CSV import, pipeline UX &middot; PR #1045</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">30 Jun</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">fb62f14</span> &nbsp; fix(crm): add logActivity + permission gates to overdue/score APIs</div>
+            <div class="tl-sub">Security hardening — overdue + recalculate_score now require canEdit('crm')</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">30 Jun</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">3feb05e</span> &nbsp; fix(grn): DN items use scoped received_qty; PO dropdown no longer requires approved DN</div>
+            <div class="tl-sub">Correlated subquery for per-DN received amounts; decoupled PO dropdown</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">30 Jun</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">81a4d7e</span> &nbsp; fix(dn): PO dropdown shows approved-only, scoped to project when in project context</div>
+            <div class="tl-sub">DN form no longer allows linking to draft/rejected purchase orders</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">30 Jun</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">886868d</span> &nbsp; fix(grn): supplier dropdown no longer requires a DN to exist</div>
+            <div class="tl-sub">Supplier list queries suppliers table directly; DN remains optional</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">30 Jun</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">dc595d8</span> &nbsp; fix(grn): restore Back to GRNs button alongside Back to Project</div>
+            <div class="tl-sub">Both back-navigation options now shown; user can choose context</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">30 Jun</div>
+          <div class="tl-dot feat"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">c6de7ca</span> &nbsp; feat(projects): GRN context-aware navigation in project details</div>
+            <div class="tl-sub">GRN create/view/edit from project keeps project_id context throughout</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">30 Jun</div>
+          <div class="tl-dot feat"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">f2c28cf</span> &nbsp; fix(purchase): RFQ auto-fill, warehouse fallback, clean back= URLs</div>
+            <div class="tl-sub">PO creation from RFQ pre-fills supplier + items; fallback warehouse on empty</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">30 Jun</div>
+          <div class="tl-dot feat"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">83c87c9</span> &nbsp; feat(purchase): PO create/edit context-aware from project + pattern doc</div>
+            <div class="tl-sub">PO detects back=project flag; shows correct back-navigation; pattern documented</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">30 Jun</div>
+          <div class="tl-dot feat"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">e9475ae</span> &nbsp; feat(rfq): context-aware navigation — project stays in project</div>
+            <div class="tl-sub">RFQ create/view from project carries back=project; back button returns to project tab</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">30 Jun</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">79a102b</span> &nbsp; fix(projects): RFQ tab columns, actions and mobile cards match external rfq.php</div>
+            <div class="tl-sub">Tab brought to parity with the full RFQ list — columns, status badges, mobile cards</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">30 Jun</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">f219ee4</span> &nbsp; fix(projects): RFQs now load in Project &gt; Procurements &gt; RFQ tab</div>
+            <div class="tl-sub">Tab was rendering empty — AJAX endpoint now filters by project_id correctly</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">30 Jun</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">a320f4e</span> &nbsp; fix(reports): TB includes inactive accounts; IS+CF default to YTD</div>
+            <div class="tl-sub">Trial Balance no longer drops inactive accounts; IS and Cash Flow open YTD</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">30 Jun</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">910503f</span> &nbsp; fix(tests): clear orphaned SIP rows before bill guard test; relax TB status check pattern</div>
+            <div class="tl-sub">Test suite idempotency fix — pre-cleanup stale rows; TB regex made less brittle</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">30 Jun</div>
+          <div class="tl-dot feat"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">6045cbb</span> &nbsp; feat(pos): hardware barcode scanner support with audio/visual feedback</div>
+            <div class="tl-sub">80ms timing window, Web Audio beep, header flash, Bootstrap toast, allProducts[], #hiddenScanInput &middot; PR #1047</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">c4f4dcf</span> &nbsp; fix(pos): category-filter bug + search-by-barcode + 73-assertion test suite</div>
+            <div class="tl-sub">allProducts[] fixes scanner when grid is filtered; API WHERE clause now includes barcode; 25 &rarr; 73 assertions</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">0b518f3</span> &nbsp; fix(grn): wrap recv.received_qty in MAX() for ONLY_FULL_GROUP_BY compat</div>
+            <div class="tl-sub">Production crash fix — fatal SQL error on Create GRN from approved DN; local WAMP masked the bug</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 8. FILES CHANGED                           -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#fff3cd;">&#128196;</div>
+      <h2>Files Changed</h2>
+      <span class="badge-count">~35 files</span>
+    </div>
+    <div class="section-body">
+      <div class="files-grid">
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">core/financial_reports.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/constant/reports/income_statement.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/constant/reports/cash_flow.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/operations/project_view.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/purchase/rfq.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/purchase/purchase_order_create.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/grn/grn_create.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/grn/grn_view.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/crm/crm_campaigns.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/crm/crm_leads.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/crm/crm_lead_view.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/crm/crm_pipeline.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/crm/crm_reports.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/crm/crm_import_leads.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/crm/save_campaign.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/crm/get_campaigns_select.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/crm/recalculate_lead_score.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/crm/move_lead_stage.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/crm/add_activity.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/crm/mark_overdue_activities.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/crm/bulk_update_leads.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/crm/get_reports_data.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/crm/import_leads.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype sql">SQL</span><span class="fname">migrations/2026_07_01_crm_stage_history.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_crm_upgrade_cli.php</span><span class="fchange">NEW &middot; 104 assertions</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/pos/pos.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/pos/pos_scripts_new.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/pos/simple_products.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_pos_barcode_cli.php</span><span class="fchange">NEW &middot; 73 assertions</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 9. NEXT SESSION PRIORITIES                 -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#e0cffc;">&#128640;</div>
+      <h2>Next Session Priorities</h2>
+    </div>
+    <div class="section-body">
+      <div class="next-item">
+        <div class="next-num">1</div>
+        <div class="next-body">
+          <strong>Merge develop &rarr; main (Production Deploy)</strong>
+          All feature branches merged into develop: Financial Reports (#1034), Procurement Nav (#1036), CRM (#1045), POS Barcode Scanner (#1047), Ledger Sub-accounts (#1048). PR develop &rarr; main to push everything live.
+        </div>
+      </div>
+      <div class="next-item">
+        <div class="next-num">2</div>
+        <div class="next-body">
+          <strong>Balance Sheet &mdash; Verify It Balances on Production</strong>
+          Run <code>assertLedgerBalanced()</code> against live data. Confirm Assets = Liabilities + Equity. If a gap appears, trace to the money.md checklist — bank reconciliation differences or unposted WHT are the most likely causes.
+        </div>
+      </div>
+      <div class="next-item">
+        <div class="next-num">3</div>
+        <div class="next-body">
+          <strong>Expenses by Category &mdash; Tree + Rollup View</strong>
+          Build the approved Type &rarr; Category &rarr; Sub-category expenses tree with rollup totals. Mockups already approved; plan in <code>expenses_by_category_plan.md</code>. Not yet started.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="text-align:center;padding:24px 0 12px;font-size:11px;color:#adb5bd;">
+    BJP Technologies Co. Ltd &mdash; BMS Internal Development Report &middot; 30 June 2026<br>
+    Generated by Claude Code &middot; Confidential
+  </div>
+
+</div>
+</body>
+</html>
