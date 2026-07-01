@@ -668,16 +668,7 @@ function addItemRow(product = null) {
                        min="0.001" step="0.001" value="${product && product.quantity != null ? product.quantity : 1}" required>
             </td>
             <td class="inv-col">
-                <select class="form-select item-unit" name="items[${index}][unit]">
-                    <option value="pcs">pcs</option>
-                    <option value="kg">kg</option>
-                    <option value="g">g</option>
-                    <option value="l">l</option>
-                    <option value="ml">ml</option>
-                    <option value="m">m</option>
-                    <option value="box">box</option>
-                    <option value="carton">carton</option>
-                </select>
+                <input type="text" class="form-control item-unit" name="items[${index}][unit]" value="pcs" readonly>
             </td>
             <td>
                 <div class="input-group">
@@ -714,11 +705,7 @@ function addItemRow(product = null) {
     $('#itemsBody').append($row);
 
     if (product) {
-        const unitVal = product.unit || 'pcs';
-        if (!$row.find(`.item-unit option[value="${unitVal}"]`).length) {
-            $row.find('.item-unit').append(`<option value="${unitVal}">${unitVal}</option>`);
-        }
-        $row.find('.item-unit').val(unitVal);
+        $row.find('.item-unit').val(product.unit || 'pcs');
         if (product.tax_rate != null) { $row.find('.item-tax').val(product.tax_rate); }
     }
 

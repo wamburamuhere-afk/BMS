@@ -991,16 +991,8 @@ function addItemRow(product = null) {
                        min="0.001" step="0.001" value="${product ? (product.quantity || 1) : 1}" required>
             </td>
             <td class="inv-col">
-                <select class="form-select item-unit" name="items[${index}][unit]">
-                    <option value="pcs" ${product && product.unit == 'pcs' ? 'selected' : ''}>pcs</option>
-                    <option value="kg" ${product && product.unit == 'kg' ? 'selected' : ''}>kg</option>
-                    <option value="g" ${product && product.unit == 'g' ? 'selected' : ''}>g</option>
-                    <option value="l" ${product && product.unit == 'l' ? 'selected' : ''}>l</option>
-                    <option value="ml" ${product && product.unit == 'ml' ? 'selected' : ''}>ml</option>
-                    <option value="m" ${product && product.unit == 'm' ? 'selected' : ''}>m</option>
-                    <option value="box" ${product && product.unit == 'box' ? 'selected' : ''}>box</option>
-                    <option value="carton" ${product && product.unit == 'carton' ? 'selected' : ''}>carton</option>
-                </select>
+                <input type="text" class="form-control item-unit" name="items[${index}][unit]"
+                       value="${product ? (product.unit || 'pcs') : 'pcs'}" readonly>
             </td>
             <td>
                 <div class="input-group">
