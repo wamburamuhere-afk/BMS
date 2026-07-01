@@ -193,6 +193,7 @@ $can_pipeline = canView('crm_pipeline');
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 const DASH_URL = '<?= buildUrl('api/crm/get_dashboard_data.php') ?>';
 const LEAD_URL = '<?= getUrl('crm/lead_view') ?>';
