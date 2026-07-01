@@ -122,8 +122,8 @@ if ($dn_id_param > 0) {
                    COALESCE(p.sku, di.sku)                   AS sku,
                    COALESCE(p.unit, di.unit, 'pcs')          AS unit,
                    di.quantity_delivered                      AS dn_qty,
-                   COALESCE(recv.received_qty, 0)             AS received_qty,
-                   GREATEST(di.quantity_delivered - COALESCE(recv.received_qty, 0), 0) AS pending_qty,
+                   COALESCE(MAX(recv.received_qty), 0)             AS received_qty,
+                   GREATEST(di.quantity_delivered - COALESCE(MAX(recv.received_qty), 0), 0) AS pending_qty,
                    COALESCE(MAX(poi.unit_price), MAX(p.cost_price), 0) AS unit_price,
                    COALESCE(MAX(poi.tax_rate), 0)                      AS tax_rate
             FROM delivery_items di
