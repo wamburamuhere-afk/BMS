@@ -125,7 +125,7 @@ $can_pipeline = canView('crm_pipeline');
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0 align-middle w-100" id="tblRecent">
-                            <thead class="table-dark">
+                            <thead class="table-primary">
                                 <tr>
                                     <th style="width:40px">S/No</th>
                                     <th>Lead</th>
@@ -151,7 +151,7 @@ $can_pipeline = canView('crm_pipeline');
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0 align-middle w-100" id="tblDue">
-                            <thead class="table-dark">
+                            <thead class="table-primary">
                                 <tr>
                                     <th style="width:40px">S/No</th>
                                     <th>Lead</th>
@@ -175,7 +175,7 @@ $can_pipeline = canView('crm_pipeline');
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0 align-middle w-100" id="tblTop">
-                            <thead class="table-dark">
+                            <thead class="table-primary">
                                 <tr>
                                     <th style="width:40px">S/No</th>
                                     <th>User</th>
