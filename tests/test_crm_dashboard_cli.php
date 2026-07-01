@@ -208,6 +208,15 @@ foreach ($crmPages as $f) {
     }
 }
 
+// ── 11. Chart.js is loaded before the script block ───────────────────────────
+echo "\n\033[1m── 11. Chart.js dependency ──\033[0m\n";
+ok(strpos($dashboard, 'chart.js') !== false || strpos($dashboard, 'Chart.js') !== false,
+   'Chart.js <script> tag present in crm_dashboard.php');
+$chartJsPos  = strpos($dashboard, 'chart.js');
+$scriptStart = strpos($dashboard, '<script>');
+ok($chartJsPos !== false && $scriptStart !== false && $chartJsPos < $scriptStart,
+   'Chart.js loaded BEFORE the inline <script> block');
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 echo "\n";
 echo "Passes:   \033[32m$pass\033[0m\n";
