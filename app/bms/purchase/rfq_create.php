@@ -253,7 +253,7 @@ if ($selected_project > 0) {
                                 </td>
                                 <td><input type="text" class="form-control" name="unit[]"
                                     value="<?= htmlspecialchars($item['unit'] ?? '') ?>"
-                                    placeholder="e.g. pcs, kg, m"></td>
+                                    placeholder="e.g. pcs, kg, m" <?= !empty($item['product_id']) ? 'readonly' : '' ?>></td>
                                 <td><input type="number" class="form-control" name="qty[]"
                                     value="<?= htmlspecialchars($item['qty']) ?>"
                                     min="0.01" step="any" required></td>
@@ -421,7 +421,10 @@ function rfqSelectProduct(productId) {
     row.querySelector('.product-selector').value  = p.product_name;
     row.querySelector('.item-product-id').value   = p.product_id;
     const unitInput = row.querySelector('input[name="unit[]"]');
-    if (unitInput && !unitInput.value && p.unit) unitInput.value = p.unit;
+    // A real catalog product carries its own registered unit — lock it so the
+    // user can't independently re-pick something inconsistent with the
+    // product's registration. Free-text (no product) items stay editable.
+    if (unitInput && p.unit) { unitInput.value = p.unit; unitInput.readOnly = true; }
     document.getElementById('rfqProductSearchPanel').style.display = 'none';
     row.querySelector('input[name="qty[]"]').focus();
 }
