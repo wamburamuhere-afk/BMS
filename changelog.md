@@ -15,6 +15,11 @@ untouched.
   the "Create DN (Outbound)" button in that condition. Everything else
   (JS tab switching, `autoEnforcePermission('grn')`, stat cards, filters)
   left exactly as-is so the Sales deep link renders identically to before.
+- `app/bms/grn/delivery_notes.php` (follow-up) — the "Record DN (Inbound)"
+  button also rendered unconditionally, so it still showed on the Sales
+  (`?type=outbound`) view. Wrapped it in `!$is_outbound_view` so it only
+  shows on the Purchases view. Inbound tab itself left untouched per request
+  (no other changes).
 
 ## 2026-07-01 (fix) — deploy CI "critical files" allowlist blocked production deploy after LPO module merge
 
