@@ -72,7 +72,7 @@ $checks = [
     "LEFT JOIN journal_entries"                      => 'reads journal_entries',
     "je.status    = 'posted'"                        => "filters posted entries only",
     "je.entry_date <= ?"                             => 'cumulative-as-of cutoff',
-    "WHERE a.status = 'active'"                      => 'only active accounts',
+    "a.status = 'active'"                             => 'active accounts filter present',
     "GROUP BY a.account_id"                          => 'aggregates per account',
     "normal_side"                                    => 'reads normal_side from account_types',
     "opening_balance"                                => 'incorporates opening_balance',

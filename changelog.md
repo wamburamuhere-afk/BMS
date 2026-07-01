@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-06-30 (fix) — GRN create: DN items pre-fill and PO dropdown fixes
+
+- `app/bms/grn/grn_create.php` — DN items received_qty now uses a correlated
+  subquery scoped to the specific DN, preventing other GRNs' receipts from
+  inflating the count and hiding items via HAVING pending_qty > 0
+- `app/bms/grn/grn_create.php` — PO dropdown now shows approved/ordered/partially_received
+  POs without requiring an approved DN to exist first (AND EXISTS clause removed)
+- `app/bms/grn/grn_create.php` — supplier dropdown also updated to include `ordered` PO status
+
 ## 2026-06-30 (fix) — DN create: PO dropdown shows approved-only, project-scoped
 
 - `app/bms/grn/dn_create.php` — PO list now filters `status = 'approved'` only

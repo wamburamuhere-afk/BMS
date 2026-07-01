@@ -122,17 +122,21 @@ if ($dn_id_param > 0) {
                    COALESCE(p.sku, di.sku)                   AS sku,
                    COALESCE(p.unit, di.unit, 'pcs')          AS unit,
                    di.quantity_delivered                      AS dn_qty,
-                   COALESCE(SUM(ri.quantity_received), 0)    AS received_qty,
-                   GREATEST(di.quantity_delivered - COALESCE(SUM(ri.quantity_received),0), 0) AS pending_qty,
+                   COALESCE(recv.received_qty, 0)             AS received_qty,
+                   GREATEST(di.quantity_delivered - COALESCE(recv.received_qty, 0), 0) AS pending_qty,
                    COALESCE(MAX(poi.unit_price), MAX(p.cost_price), 0) AS unit_price,
                    COALESCE(MAX(poi.tax_rate), 0)                      AS tax_rate
             FROM delivery_items di
             LEFT JOIN products p           ON di.product_id = p.product_id
             LEFT JOIN purchase_order_items poi
                 ON poi.purchase_order_id = ? AND poi.product_id = di.product_id
-            LEFT JOIN receipt_items ri      ON ri.product_id = di.product_id
-            LEFT JOIN purchase_receipts pr  ON ri.receipt_id = pr.receipt_id
-                AND pr.delivery_id = ? AND pr.status = 'approved'
+            LEFT JOIN (
+                SELECT ri2.product_id, SUM(ri2.quantity_received) AS received_qty
+                FROM receipt_items ri2
+                JOIN purchase_receipts pr2 ON ri2.receipt_id = pr2.receipt_id
+                WHERE pr2.delivery_id = ? AND pr2.status = 'approved'
+                GROUP BY ri2.product_id
+            ) recv ON recv.product_id = di.product_id
             WHERE di.delivery_id = ?
             GROUP BY di.delivery_item_id
             HAVING pending_qty > 0
@@ -160,7 +164,7 @@ $suppliers_query = "
     FROM suppliers s
     JOIN purchase_orders po ON s.supplier_id = po.supplier_id
     WHERE s.status = 'active'
-    AND po.status IN ('approved','partially_received')
+    AND po.status IN ('approved','ordered','partially_received')
     {$proj_cond}
     ORDER BY s.supplier_name
 ";
@@ -221,13 +225,7 @@ $po_query = "
         FROM receipt_items
         GROUP BY purchase_order_item_id
     ) pri ON poi.order_item_id = pri.purchase_order_item_id
-    WHERE po.status IN ('approved','partially_received')
-    AND EXISTS (
-        SELECT 1 FROM deliveries d
-        WHERE d.purchase_order_id = po.purchase_order_id
-        AND d.dn_type = 'inbound'
-        AND d.status IN ('approved','partially_delivered')
-    )
+    WHERE po.status IN ('approved','ordered','partially_received')
 ";
 
 $po_params = [];
