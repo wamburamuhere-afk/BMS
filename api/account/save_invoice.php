@@ -73,6 +73,8 @@ try {
     $discount = $_POST['discount_amount'] ?? 0;
     $shipping = $_POST['shipping_cost'] ?? 0;
     $order_id = $_POST['order_id'] ?? null;
+    $delivery_id = !empty($_POST['delivery_id']) ? intval($_POST['delivery_id']) : null;
+    $customer_lpo_id = !empty($_POST['customer_lpo_id']) ? intval($_POST['customer_lpo_id']) : null;
 
     // Three-approval rule: every new invoice starts at 'pending'. On update,
     // preserve the existing row's status (status transitions happen via
@@ -124,13 +126,13 @@ try {
         // Update existing
         $stmt = $pdo->prepare("
             UPDATE invoices SET
-                invoice_number = ?, customer_id = ?, order_id = ?, project_id = ?, invoice_date = ?, due_date = ?,
+                invoice_number = ?, customer_id = ?, order_id = ?, delivery_id = ?, customer_lpo_id = ?, project_id = ?, invoice_date = ?, due_date = ?,
                 subtotal = ?, tax_amount = ?, discount_amount = ?, shipping_cost = ?, grand_total = ?,
                 currency = ?, notes = ?, terms_conditions = ?, status = ?, updated_by = ?, updated_at = NOW()
             WHERE invoice_id = ?
         ");
         $stmt->execute([
-            $invoice_number, $customer_id, $order_id ?: null, $project_id, $invoice_date, $due_date,
+            $invoice_number, $customer_id, $order_id ?: null, $delivery_id, $customer_lpo_id, $project_id, $invoice_date, $due_date,
             $subtotal, $tax_total, $discount, $shipping, $grand_total,
             $currency, $notes, $terms, $status, $_SESSION['user_id'], $invoice_id
         ]);
@@ -165,14 +167,14 @@ try {
 
         $stmt = $pdo->prepare("
             INSERT INTO invoices (
-                invoice_number, customer_id, order_id, project_id, invoice_date, due_date,
+                invoice_number, customer_id, order_id, delivery_id, customer_lpo_id, project_id, invoice_date, due_date,
                 subtotal, tax_amount, discount_amount, shipping_cost, grand_total,
                 paid_amount, balance_due,
                 currency, notes, terms_conditions, status, created_by, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, NOW())
         ");
         $stmt->execute([
-            $invoice_number, $customer_id, $order_id ?: null, $project_id, $invoice_date, $due_date,
+            $invoice_number, $customer_id, $order_id ?: null, $delivery_id, $customer_lpo_id, $project_id, $invoice_date, $due_date,
             $subtotal, $tax_total, $discount, $shipping, $grand_total,
             $grand_total,
             $currency, $notes, $terms, $status, $_SESSION['user_id']

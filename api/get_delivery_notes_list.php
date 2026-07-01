@@ -52,7 +52,8 @@ try {
         $params[] = $date_to;
     }
     if (!empty($search)) {
-        $where[] = '(d.delivery_number LIKE ? OR d.dn_number LIKE ? OR s.supplier_name LIKE ? OR sc.supplier_name LIKE ?)';
+        $where[] = '(d.delivery_number LIKE ? OR d.dn_number LIKE ? OR s.supplier_name LIKE ? OR sc.supplier_name LIKE ? OR cu.customer_name LIKE ?)';
+        $params[] = "%$search%";
         $params[] = "%$search%";
         $params[] = "%$search%";
         $params[] = "%$search%";
@@ -75,6 +76,7 @@ try {
         FROM deliveries d
         LEFT JOIN suppliers s        ON d.supplier_id     = s.supplier_id
         LEFT JOIN sub_contractors sc ON d.subcontractor_id = sc.supplier_id
+        LEFT JOIN customers cu       ON d.customer_id     = cu.customer_id
         LEFT JOIN warehouses w       ON d.warehouse_id    = w.warehouse_id
         LEFT JOIN projects   p       ON d.project_id      = p.project_id
     ";
@@ -115,9 +117,9 @@ try {
             d.status,
             d.notes,
             d.contact_person,
-            COALESCE(s.supplier_name, sc.supplier_name) AS supplier_name,
-            COALESCE(s.supplier_name, sc.supplier_name) AS party_name,
-            COALESCE(s.company_name, sc.company_name)   AS company_name,
+            COALESCE(s.supplier_name, sc.supplier_name, cu.customer_name) AS supplier_name,
+            COALESCE(s.supplier_name, sc.supplier_name, cu.customer_name) AS party_name,
+            COALESCE(s.company_name, sc.company_name, cu.company_name)   AS company_name,
             w.warehouse_name,
             p.project_name,
             (SELECT COUNT(*) FROM delivery_items di WHERE di.delivery_id = d.delivery_id) AS total_items

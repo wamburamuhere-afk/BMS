@@ -476,6 +476,20 @@ $wf = [
             <?php if (!empty($invoice['payment_terms'])): ?>
             <p><strong>Payment Terms:</strong> <?= htmlspecialchars(ucwords(str_replace('_', ' ', $invoice['payment_terms']))) ?></p>
             <?php endif; ?>
+            <?php if (!empty($invoice['delivery_id'])):
+                $dnNumStmt = $pdo->prepare("SELECT delivery_number FROM deliveries WHERE delivery_id = ?");
+                $dnNumStmt->execute([$invoice['delivery_id']]);
+                $dn_ref = $dnNumStmt->fetchColumn();
+            ?>
+            <p><strong>DN Ref:</strong> <?= htmlspecialchars($dn_ref ?: ('#' . $invoice['delivery_id'])) ?></p>
+            <?php endif; ?>
+            <?php if (!empty($invoice['customer_lpo_id'])):
+                $lpoNumStmt = $pdo->prepare("SELECT lpo_number FROM customer_lpos WHERE lpo_id = ?");
+                $lpoNumStmt->execute([$invoice['customer_lpo_id']]);
+                $lpo_ref = $lpoNumStmt->fetchColumn();
+            ?>
+            <p><strong>LPO Ref:</strong> <?= htmlspecialchars($lpo_ref ?: ('#' . $invoice['customer_lpo_id'])) ?></p>
+            <?php endif; ?>
             <p><strong>Created By:</strong> <?= htmlspecialchars($creator_label) ?></p>
             <?php
             $paid = floatval($invoice['paid_amount'] ?? 0);

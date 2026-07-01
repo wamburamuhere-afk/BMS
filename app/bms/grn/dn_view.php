@@ -19,17 +19,20 @@ if ($delivery_id <= 0) { echo '<div class="alert alert-danger m-4">Invalid DN ID
 
 $stmt = $pdo->prepare("
     SELECT d.*,
-           COALESCE(s.supplier_name, sc.supplier_name) AS party_name,
-           COALESCE(s.company_name, sc.company_name)   AS party_company,
-           COALESCE(s.phone, sc.phone)                 AS party_phone,
-           COALESCE(s.address, sc.address)             AS party_address,
+           COALESCE(s.supplier_name, sc.supplier_name, cu.customer_name) AS party_name,
+           COALESCE(s.company_name, sc.company_name, cu.company_name)    AS party_company,
+           COALESCE(s.phone, sc.phone, cu.phone)                        AS party_phone,
+           COALESCE(s.address, sc.address, cu.address)                  AS party_address,
            w.warehouse_name, w.location AS warehouse_location,
            p.project_name, p.contract_number AS contract_no,
            u.username  AS created_by_name,
-           ab.username AS approved_by_name
+           ab.username AS approved_by_name,
+           cl.lpo_number AS lpo_number
     FROM deliveries d
     LEFT JOIN suppliers s        ON d.supplier_id      = s.supplier_id
     LEFT JOIN sub_contractors sc ON d.subcontractor_id = sc.supplier_id
+    LEFT JOIN customers cu       ON d.customer_id      = cu.customer_id
+    LEFT JOIN customer_lpos cl  ON d.customer_lpo_id  = cl.lpo_id
     LEFT JOIN warehouses w       ON d.warehouse_id     = w.warehouse_id
     LEFT JOIN projects p         ON d.project_id       = p.project_id
     LEFT JOIN users u            ON d.created_by       = u.user_id
@@ -56,7 +59,8 @@ $attachments = $att_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $is_inbound  = ($dn['dn_type'] ?? 'inbound') !== 'outbound';
 $is_subcon   = ($dn['party_type'] ?? 'supplier') === 'subcontractor';
-$party_label = $is_subcon ? 'Sub-Contractor' : 'Supplier';
+$is_customer = ($dn['party_type'] ?? 'supplier') === 'customer';
+$party_label = $is_customer ? 'Customer' : ($is_subcon ? 'Sub-Contractor' : 'Supplier');
 $edit_route  = $is_inbound ? 'dn_create' : 'dn_outbound';
 $dn_display  = $is_inbound ? ($dn['dn_number'] ?: $dn['delivery_number']) : $dn['delivery_number'];
 
@@ -158,6 +162,13 @@ $wf = [
             </a>
             <?php endif; ?>
 
+            <?php if (!$is_inbound && $is_customer && $dn['status'] === 'approved' && canCreate('invoices')): ?>
+            <a href="<?= getUrl('invoice_create') ?>?delivery=<?= $delivery_id ?>"
+               class="btn btn-success btn-sm shadow-sm fw-bold">
+                <i class="bi bi-receipt me-1"></i> Create Invoice
+            </a>
+            <?php endif; ?>
+
             <?php if ($can_create_return): ?>
             <button class="btn btn-warning btn-sm shadow-sm fw-bold" onclick="createReturnDN(<?= $delivery_id ?>)">
                 <i class="bi bi-arrow-return-left me-1"></i> Return Items
@@ -228,6 +239,16 @@ $wf = [
                             <div class="border rounded p-3 bg-light h-100">
                                 <div class="text-muted small text-uppercase fw-bold mb-1">Project</div>
                                 <div class="fw-bold"><?= safe_output($dn['project_name']) ?></div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($dn['customer_lpo_id'])): ?>
+                        <div class="col-sm-6">
+                            <div class="border rounded p-3 bg-light h-100">
+                                <div class="text-muted small text-uppercase fw-bold mb-1">Customer LPO Reference</div>
+                                <a href="<?= getUrl('lpo_view') ?>?id=<?= (int)$dn['customer_lpo_id'] ?>" class="fw-bold text-decoration-none">
+                                    <i class="bi bi-file-earmark-text me-1"></i><?= safe_output($dn['lpo_number']) ?>
+                                </a>
                             </div>
                         </div>
                         <?php endif; ?>

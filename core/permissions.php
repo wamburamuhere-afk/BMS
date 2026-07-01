@@ -378,6 +378,10 @@ function getPagePermissionMapping()
         'pos.php' => 'pos',
         'quotations.php' => 'quotations',
         'sales_returns.php' => 'sales_returns',
+        'lpos.php' => 'lpo',
+        'lpo_create.php' => 'lpo',
+        'lpo_view.php' => 'lpo',
+        'print_lpo.php' => 'lpo',
 
         // Finance
         'invoices.php' => 'invoices',

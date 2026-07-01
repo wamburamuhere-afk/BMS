@@ -4,7 +4,7 @@ require_once __DIR__ . '/../../roots.php';
 header('Content-Type: application/json');
 
 if (!isAuthenticated()) { echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
-if (!canEdit('customers')) { echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
+if (!canEdit('lpo')) { echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
 
 csrf_check();

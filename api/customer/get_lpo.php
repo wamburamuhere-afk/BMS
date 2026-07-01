@@ -9,7 +9,7 @@ if (!isAuthenticated()) {
     exit;
 }
 
-if (!canView('customers')) {
+if (!canView('lpo')) {
     echo json_encode(['success' => false, 'message' => 'Permission denied']);
     exit;
 }
@@ -20,13 +20,21 @@ if (!$lpo_id) {
     exit;
 }
 
+require_once __DIR__ . '/../../core/project_scope.php';
+assertScopeForRecord('customer_lpos', 'lpo_id', $lpo_id);
+
 try {
     $stmt = $pdo->prepare("
         SELECT l.*,
                CASE WHEN c.customer_type = 'business' AND c.company_name != '' AND c.company_name IS NOT NULL
-                    THEN c.company_name ELSE c.customer_name END AS customer_display_name
+                    THEN c.company_name ELSE c.customer_name END AS customer_display_name,
+               c.email AS customer_email, c.phone AS customer_phone, c.address AS customer_address,
+               p.project_name,
+               u.username AS created_by_name
         FROM customer_lpos l
         LEFT JOIN customers c ON l.customer_id = c.customer_id
+        LEFT JOIN projects p ON l.project_id = p.project_id
+        LEFT JOIN users u ON l.created_by = u.user_id
         WHERE l.lpo_id = ? AND l.status != 'deleted'
     ");
     $stmt->execute([$lpo_id]);
