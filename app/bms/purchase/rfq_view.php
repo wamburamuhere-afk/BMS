@@ -11,6 +11,11 @@ $rfq_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if (!$rfq_id) { header('Location: ' . getUrl('rfq')); exit; }
 assertScopeForRecordHtml('rfq', 'rfq_id', $rfq_id);
 
+// Context-aware back navigation — short ?back=<tab> keeps URLs clean
+$back_tab    = $_GET['back'] ?? '';
+$from_project = !empty($back_tab);
+$back_url    = getUrl('rfq'); // updated below once rfq record is loaded
+
 $stmt = $pdo->prepare("
     SELECT r.*,
         s.supplier_name, s.phone as s_phone, s.email as s_email,
@@ -25,6 +30,11 @@ $stmt = $pdo->prepare("
 $stmt->execute([$rfq_id]);
 $rfq = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$rfq) { header('Location: ' . getUrl('rfq')); exit; }
+
+// Compute back URL now that we have the rfq's project_id
+if ($from_project && !empty($rfq['project_id'])) {
+    $back_url = getUrl('project_view') . '?id=' . (int)$rfq['project_id'] . '&tab=' . $back_tab;
+}
 
 $stmt2 = $pdo->prepare("SELECT * FROM rfq_items WHERE rfq_id = ? ORDER BY item_order");
 $stmt2->execute([$rfq_id]);
@@ -83,7 +93,11 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
     <nav aria-label="breadcrumb" class="mb-3 d-print-none">
         <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
+            <?php if ($from_project): ?>
+            <li class="breadcrumb-item"><a href="<?= htmlspecialchars($back_url) ?>">Project RFQs</a></li>
+            <?php else: ?>
             <li class="breadcrumb-item"><a href="<?= getUrl('rfq') ?>">RFQ</a></li>
+            <?php endif; ?>
             <li class="breadcrumb-item active"><?= safe_output($rfq['rfq_number']) ?></li>
         </ol>
     </nav>
@@ -99,8 +113,8 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
             <span class="badge bg-<?= $badge['class'] ?> fs-6 px-3 py-2"><?= $badge['label'] ?></span>
 
             <!-- Back Button -->
-            <a href="<?= getUrl('rfq') ?>" class="btn btn-blue-touch btn-sm px-3 shadow-sm">
-                <i class="bi bi-arrow-left me-1"></i> Back
+            <a href="<?= htmlspecialchars($back_url) ?>" class="btn btn-blue-touch btn-sm px-3 shadow-sm">
+                <i class="bi bi-arrow-left me-1"></i> Back<?= $from_project ? ' to Project' : '' ?>
             </a>
 
             <!-- ── WORKFLOW ACTION BUTTONS ── -->
@@ -118,7 +132,14 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
             <!-- ── END WORKFLOW ── -->
 
             <?php if ($status === 'approved' && !empty($rfq['supplier_id'])): ?>
-            <a href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $rfq['supplier_id'] ?>&rfq_ref=<?= $rfq_id ?>"
+            <?php
+                $po_create_url = getUrl('purchase_order_create')
+                    . '?supplier=' . (int)$rfq['supplier_id']
+                    . '&rfq_ref='  . $rfq_id
+                    . (!empty($rfq['project_id']) ? '&project=' . (int)$rfq['project_id'] : '')
+                    . ($from_project ? '&back=procurement' : '');
+            ?>
+            <a href="<?= htmlspecialchars($po_create_url) ?>"
                class="btn btn-outline-primary btn-sm px-3">
                 <i class="bi bi-cart-plus me-1"></i> Create PO
             </a>
@@ -128,7 +149,7 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                 <i class="bi bi-printer me-1"></i> Print
             </button>
             <?php if ($status === 'draft'): ?>
-            <a href="<?= getUrl('rfq_create') ?>?edit=<?= $rfq_id ?>" class="btn btn-outline-info btn-sm">
+            <a href="<?= getUrl('rfq_create') ?>?edit=<?= $rfq_id ?><?= $return_url ? '&return_url=' . urlencode($back_url) : '' ?>" class="btn btn-outline-info btn-sm">
                 <i class="bi bi-pencil me-1"></i> Edit
             </a>
             <?php endif; ?>
