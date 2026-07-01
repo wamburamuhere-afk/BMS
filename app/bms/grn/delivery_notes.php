@@ -510,6 +510,14 @@ $(document).ready(function() {
     checkResponsiveView();
     $(window).resize(checkResponsiveView);
 
+    // Deep link from the Sales menu (?type=outbound) — preselect the Outbound tab
+    if (new URLSearchParams(location.search).get('type') === 'outbound') {
+        currentDnType = 'outbound';
+        $('#dnTypeTabs .nav-link').removeClass('active');
+        $('#dnTypeTabs .nav-link[data-dntype="outbound"]').addClass('active');
+        $('#dnListHeading').text('Outbound Delivery Notes — Sent');
+    }
+
     dnTable = $('#dnTable').DataTable({
         processing: true,
         serverSide: true,
@@ -573,9 +581,8 @@ $(document).ready(function() {
             {
                 data: 'supplier_name',
                 render: function(data, type, row) {
-                    const kind = row.party_type === 'subcontractor'
-                        ? '<small class="badge bg-light text-dark border">Sub-Contractor</small>'
-                        : '<small class="badge bg-light text-dark border">Supplier</small>';
+                    const kindLabels = { subcontractor: 'Sub-Contractor', customer: 'Customer' };
+                    const kind = `<small class="badge bg-light text-dark border">${kindLabels[row.party_type] || 'Supplier'}</small>`;
                     return `<span class="fw-bold">${safe_output(data)}</span> ${kind}${row.company_name ? `<br><small class="text-muted">${safe_output(row.company_name)}</small>` : ''}`;
                 }
             },

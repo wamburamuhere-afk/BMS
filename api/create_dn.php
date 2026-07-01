@@ -16,7 +16,8 @@ if (!canCreate('dn')) {
 
 try {
     $dn_type      = (($_POST['dn_type'] ?? 'inbound') === 'outbound') ? 'outbound' : 'inbound';
-    $party_type   = (($_POST['party_type'] ?? 'supplier') === 'subcontractor') ? 'subcontractor' : 'supplier';
+    $party_type_raw = $_POST['party_type'] ?? 'supplier';
+    $party_type   = in_array($party_type_raw, ['subcontractor', 'customer'], true) ? $party_type_raw : 'supplier';
     $party_id     = intval($_POST['party_id'] ?? 0);
     $project_id   = intval($_POST['project_id'] ?? 0);
     $warehouse_id = intval($_POST['warehouse_id'] ?? 0);
@@ -31,6 +32,7 @@ try {
     $manual_dn        = trim($_POST['dn_number']        ?? '');
     $items            = json_decode($_POST['items'] ?? '[]', true);
     $purchase_order_id = intval($_POST['purchase_order_id'] ?? 0) ?: null;
+    $customer_lpo_id  = intval($_POST['customer_lpo_id'] ?? 0) ?: null;
     $user_id          = $_SESSION['user_id'];
 
     if ($warehouse_id <= 0) throw new Exception('Warehouse is required.');
@@ -41,10 +43,26 @@ try {
         throw new Exception('Access denied: this project is not in your scope.');
     }
 
+    $party_label = $party_type === 'subcontractor' ? 'Sub-contractor' : ($party_type === 'customer' ? 'Customer' : 'Supplier');
     if ($party_id <= 0) {
-        throw new Exception(($party_type === 'subcontractor' ? 'Sub-contractor' : 'Supplier') . ' is required.');
+        throw new Exception($party_label . ' is required.');
     }
     if (empty($items)) throw new Exception('At least one item is required.');
+
+    // A customer-party outbound DN must be linked to an approved/partially-fulfilled LPO.
+    if ($party_type === 'customer') {
+        if (!$customer_lpo_id) throw new Exception('A Customer LPO reference is required for customer delivery notes.');
+        $lpoChk = $pdo->prepare("SELECT customer_id, status FROM customer_lpos WHERE lpo_id = ? AND status != 'deleted'");
+        $lpoChk->execute([$customer_lpo_id]);
+        $lpoRow = $lpoChk->fetch(PDO::FETCH_ASSOC);
+        if (!$lpoRow) throw new Exception('Linked LPO not found.');
+        if (!in_array($lpoRow['status'], ['approved', 'partially_fulfilled'], true)) {
+            throw new Exception('The linked LPO must be approved or partially fulfilled.');
+        }
+        if ((int)$lpoRow['customer_id'] !== $party_id) {
+            throw new Exception('Customer does not match the linked LPO.');
+        }
+    }
 
     // Three-approval rule: every new Delivery Note starts at 'pending'.
     // Status transitions happen via dedicated review_dn / approve_dn APIs.
@@ -60,12 +78,14 @@ try {
     // Validate the counterparty against the correct table
     if ($party_type === 'subcontractor') {
         $chk = $pdo->prepare("SELECT supplier_id FROM sub_contractors WHERE supplier_id = ? AND status = 'active'");
+    } elseif ($party_type === 'customer') {
+        $chk = $pdo->prepare("SELECT customer_id FROM customers WHERE customer_id = ? AND status = 'active'");
     } else {
         $chk = $pdo->prepare("SELECT supplier_id FROM suppliers WHERE supplier_id = ? AND status = 'active'");
     }
     $chk->execute([$party_id]);
     if (!$chk->fetch()) {
-        throw new Exception('Invalid or inactive ' . ($party_type === 'subcontractor' ? 'sub-contractor' : 'supplier') . '.');
+        throw new Exception('Invalid or inactive ' . strtolower($party_label) . '.');
     }
 
     // Validate warehouse
@@ -110,18 +130,19 @@ try {
 
     $supplier_id      = ($party_type === 'supplier')      ? $party_id : null;
     $subcontractor_id = ($party_type === 'subcontractor') ? $party_id : null;
+    $customer_id      = ($party_type === 'customer')      ? $party_id : null;
 
     $pdo->prepare("
         INSERT INTO deliveries
-            (delivery_number, dn_number, dn_type, party_type, supplier_id, subcontractor_id,
-             delivery_date, status, created_by, project_id, warehouse_id, purchase_order_id,
+            (delivery_number, dn_number, dn_type, party_type, supplier_id, subcontractor_id, customer_id,
+             delivery_date, status, created_by, project_id, warehouse_id, purchase_order_id, customer_lpo_id,
              contact_person, contact_phone, delivery_address, notes,
              vehicle_number, driver_name, shipping_method,
              prepared_by_name, prepared_by_role, prepared_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     ")->execute([
-        $delivery_number, $dn_number, $dn_type, $party_type, $supplier_id, $subcontractor_id,
-        $delivery_date, $status, $user_id, $project_id ?: null, $warehouse_id, $purchase_order_id,
+        $delivery_number, $dn_number, $dn_type, $party_type, $supplier_id, $subcontractor_id, $customer_id,
+        $delivery_date, $status, $user_id, $project_id ?: null, $warehouse_id, $purchase_order_id, $customer_lpo_id,
         $contact_person ?: null, $contact_phone ?: null, $delivery_address ?: null, $notes ?: null,
         $vehicle_number ?: null, $driver_name ?: null, $shipping_method ?: null,
         $user_name, $user_role,

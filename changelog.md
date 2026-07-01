@@ -1,5 +1,78 @@
 # BMS Changelog
 
+## 2026-07-01 (feat) — standalone Customer LPO module + LPO → DN(Outbound) → Invoice chain + Sales menu reorder
+
+Sales menu was reordered to the natural document flow (Quotations → Sales Orders
+→ LPO → DN(Outbound) → Invoices → POS → POS Dashboard & Sales → Sales Returns →
+Credit Notes). LPO previously only existed as a modal-based tab inside a
+customer's detail page with no real approval workflow; it's now a full
+standalone module built to Purchase-Order parity, plus a working document
+chain from LPO through to invoicing.
+
+### Phase 1 — LPO foundation
+- `migrations/2026_07_01_lpo_standalone_foundation.php` — adds three-approval
+  workflow columns (`prepared/reviewed/approved_by_name/role/at`) + `project_id`
+  to `customer_lpos`; adds `product_id` to `customer_lpo_items`; adds
+  `customer_lpo_id` to `deliveries`; adds `delivery_id` + `customer_lpo_id` to
+  `invoices`; seeds permission `page_key='lpo'` (view/create/edit/delete
+  granted to existing `customers` create/edit roles; review/approve to
+  Admin + Managing Director only)
+- `roots.php` — new routes: `lpos`, `lpo_create`, `lpo_view`, `print_lpo`,
+  `api/review_lpo`, `api/approve_lpo`, `api/get_lpos_list`
+- `core/permissions.php` — `lpo` page_key added to `getPagePermissionMapping()`
+
+### Phase 2 — Standalone LPO pages + APIs
+- `app/bms/sales/lpo/{lpos.php, lpo_create.php, lpo_view.php, print_lpo.php}` —
+  new list/create/view/print pages mirroring the Purchase Order module (live
+  product search, three-approval workflow trail, matching print letterhead)
+- `api/customer/{save_lpo.php, review_lpo.php, approve_lpo.php}` — new unified
+  save endpoint (no longer accepts an arbitrary status field) + dedicated
+  review/approve endpoints with `canReview`/`canApprove` gating and signature
+  capture; replaces `api/customer/add_lpo.php` / `update_lpo.php` (deleted)
+- `api/customer/change_lpo_status.php` — trimmed to cancellation-only;
+  `partially_fulfilled`/`fulfilled` are now derived automatically (see Phase 3)
+- `api/customer/{get_lpo.php, get_lpos_list.php, delete_lpo.php,
+  delete_lpo_attachment.php}` — repointed from `canX('customers')` to
+  `canX('lpo')`
+- `app/bms/customer/customer_details.php` — LPOs tab keeps its mini-list but
+  Add/Edit/View/Print now navigate to the new standalone pages; removed the
+  old Add/Edit/View LPO modals and ~570 lines of their JS
+
+### Phase 3 — LPO → DN(Outbound) linkage
+- `migrations/2026_07_01_dn_customer_party_type.php` — widens
+  `deliveries.party_type` ENUM to add `'customer'`; starts using the
+  previously-dead `deliveries.customer_id` column
+- `app/bms/grn/dn_outbound.php` — accepts `?lpo_id=` to prefill a
+  customer-party outbound DN with remaining-to-deliver quantities; locks the
+  "Send To" field to the LPO's customer
+- `api/create_dn.php` / `api/update_dn.php` — accept `party_type='customer'`
+  (validated against `customers`), persist `customer_lpo_id`
+- `api/approve_dn.php` — auto-advances the linked LPO's status to
+  `partially_fulfilled`/`fulfilled` based on delivered-vs-ordered quantities
+  (status only ever advances, never regresses)
+- `app/bms/grn/dn_view.php`, `app/bms/grn/delivery_notes.php`,
+  `api/get_delivery_notes_list.php` — resolve/display the customer party name
+  and LPO reference for customer-linked DNs
+
+### Phase 4 — DN(Outbound) → Invoice linkage
+- `app/bms/invoice/invoice_create.php` — accepts `?delivery=` to prefill from
+  an approved outbound DN (item prices sourced from the matching
+  `customer_lpo_items` line, falling back to `products.selling_price`); adds
+  optional "Delivery Note" / "Customer LPO" reference selects
+- `api/account/save_invoice.php` — persists `delivery_id` / `customer_lpo_id`
+- `app/bms/invoice/invoice_view.php`, `invoice_print.php` — show "DN Ref:" /
+  "LPO Ref:" lines when present
+
+### Phase 5 — Sales menu reorder
+- `header.php` — Sales dropdown reordered; added LPO and DN (Outbound) links
+- `app/bms/grn/delivery_notes.php` — preselects the Outbound tab when opened
+  with `?type=outbound`
+
+### Phase 6 — Tests
+- `tests/test_lpo_module_cli.php` — 105 checks (lint, migration content,
+  three-approval gating, LPO↔DN↔Invoice wiring, menu order, live DB state, and
+  a transaction-wrapped live create/review/approve round trip)
+
 ## 2026-07-01 (fix) — warehouse dropdown now strictly follows selected project
 
 Rule enforced consistently: project selected → only that project's warehouses; no
