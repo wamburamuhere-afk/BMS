@@ -139,9 +139,9 @@ $currency = 'TZS';
                             <select class="form-select" id="posWarehouseId" onchange="loadProducts()" required>
                                 <option value="" selected disabled>— Select Warehouse —</option>
                                 <?php
-                                $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+                                $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
                                 foreach ($warehouses as $w) {
-                                    echo "<option value='{$w['warehouse_id']}'>{$w['warehouse_name']}</option>";
+                                    echo "<option value='{$w['warehouse_id']}' data-project-id='{$w['project_id']}'>{$w['warehouse_name']}</option>";
                                 }
                                 ?>
                             </select>
@@ -150,7 +150,7 @@ $currency = 'TZS';
                     <div class="col-md-6">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-white"><i class="bi bi-briefcase text-info"></i></span>
-                            <select class="form-select" id="posProjectId" onchange="loadProducts()">
+                            <select class="form-select" id="posProjectId" onchange="filterPosWarehousesByProject(); loadProducts();">
                                 <option value="">General (No Project)</option>
                                 <?php
                                 $_pos_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
