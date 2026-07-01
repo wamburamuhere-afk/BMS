@@ -490,6 +490,11 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
 const CAN_EDIT       = <?= json_encode((bool)$can_edit) ?>;
 const CAN_DELETE     = <?= json_encode((bool)$can_delete) ?>;
 const CAN_BULK       = <?= json_encode((bool)$can_bulk) ?>;
+
+function safeOutput(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
 const LEAD_VIEW_READY = <?= json_encode((bool)$lead_view_ready) ?>;
 const LEAD_VIEW_URL  = '<?= getUrl('crm/lead_view') ?>';
 const CSRF = '<?= csrf_token() ?>';

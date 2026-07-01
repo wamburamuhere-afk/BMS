@@ -240,6 +240,11 @@ const SAVE_URL   = '<?= buildUrl('api/crm/save_campaign.php') ?>';
 const DELETE_URL = '<?= buildUrl('api/crm/delete_campaign.php') ?>';
 const CSRF       = '<?= csrf_token() ?>';
 
+function safeOutput(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#campaignsTable')) {
         const tbl = $('#campaignsTable').DataTable({

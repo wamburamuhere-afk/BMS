@@ -201,6 +201,11 @@ $can_pipeline = canView('crm_pipeline');
 const DASH_URL = '<?= buildUrl('api/crm/get_dashboard_data.php') ?>';
 const LEAD_URL = '<?= getUrl('crm/lead_view') ?>';
 
+function safeOutput(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+
 const SOURCE_LABELS = {
     website:'Website', referral:'Referral', walk_in:'Walk-in',
     phone_call:'Phone Call', social_media:'Social Media', exhibition:'Exhibition',
