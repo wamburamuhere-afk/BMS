@@ -42,6 +42,9 @@ $pdo->beginTransaction();
 try {
     section('1. Clean unpaid Bill — deletable (no payments)');
     $b = mkBill($pdo, $sid, $uid, 'approved', 0.0);
+    // Purge any orphaned supplier_invoice_payments rows that share this auto-increment ID
+    // (orphaned rows from deleted invoices can cause false positives).
+    $pdo->prepare("DELETE FROM supplier_invoice_payments WHERE invoice_id = ?")->execute([$b]);
     (supplierInvoiceHasPayments($pdo, $b) === false) ? pass('unpaid approved Bill → hasPayments=false (deletable)') : fail('false positive on a clean Bill');
 
     section('2. amount_paid > 0 → blocked');
