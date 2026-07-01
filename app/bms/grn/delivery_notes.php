@@ -7,6 +7,10 @@ require_once __DIR__ . '/../../../core/workflow.php';
 // Enforce permission (using GRN permissions as base)
 autoEnforcePermission('grn');
 
+// Outbound (Sales) is only reachable via the Sales menu's ?type=outbound deep
+// link — the Purchases entry point (no type param) must not offer it at all.
+$is_outbound_view = (($_GET['type'] ?? '') === 'outbound');
+
 // Include the header
 includeHeader();
 
@@ -95,10 +99,12 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <p class="text-muted mb-0">Track and manage supplier delivery notes and goods received</p>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
-                    <?php if ($can_create_grn): ?>
+                    <?php if ($can_create_grn && !$is_outbound_view): ?>
                     <a href="<?= getUrl('dn_create') ?>" class="btn btn-success px-3 shadow-sm">
                         <i class="bi bi-box-arrow-in-down me-1"></i> Record DN <span class="d-none d-sm-inline">(Inbound)</span>
                     </a>
+                    <?php endif; ?>
+                    <?php if ($can_create_grn && $is_outbound_view): ?>
                     <a href="<?= getUrl('dn_outbound') ?>" class="btn btn-primary px-3 shadow-sm">
                         <i class="bi bi-box-arrow-up-right me-1"></i> Create DN <span class="d-none d-sm-inline">(Outbound)</span>
                     </a>
@@ -325,12 +331,14 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                 <span class="badge bg-primary ms-1" id="tabCountInbound">0</span>
             </button>
         </li>
+        <?php if ($is_outbound_view): ?>
         <li class="nav-item">
             <button class="nav-link" type="button" data-dntype="outbound">
                 <i class="bi bi-box-arrow-up-right me-1"></i> Outbound — Sent
                 <span class="badge bg-info ms-1" id="tabCountOutbound">0</span>
             </button>
         </li>
+        <?php endif; ?>
     </ul>
 
     <!-- Table Card -->
