@@ -70,6 +70,8 @@ function computeLeadScore(PDO $pdo, int $lead_id): int
 // Skip endpoint logic when loaded as a library (require_once from another script)
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') !== __FILE__) return;
 
+if (!isAuthenticated()) { echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
+
 // Allow direct call (admin only) to bulk-recalculate
 if (isset($_GET['bulk']) && isAdmin()) {
     $ids = $pdo->query("SELECT lead_id FROM crm_leads WHERE status != 'deleted'")->fetchAll(PDO::FETCH_COLUMN);
@@ -77,14 +79,17 @@ if (isset($_GET['bulk']) && isAdmin()) {
     foreach ($ids as $lid) {
         $upd->execute([computeLeadScore($pdo, (int)$lid), $lid]);
     }
+    logActivity($pdo, $_SESSION['user_id'], 'Bulk-recalculated lead scores for ' . count($ids) . ' leads');
     echo json_encode(['success' => true, 'message' => count($ids) . ' leads re-scored.']);
     exit;
 }
 
 // Single lead recalculation
+if (!canEdit('crm_leads')) { echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
 $lead_id = intval($_GET['lead_id'] ?? $_POST['lead_id'] ?? 0);
 if (!$lead_id) { echo json_encode(['success' => false, 'message' => 'lead_id required']); exit; }
 
 $score = computeLeadScore($pdo, $lead_id);
 $pdo->prepare("UPDATE crm_leads SET lead_score = ? WHERE lead_id = ?")->execute([$score, $lead_id]);
+logActivity($pdo, $_SESSION['user_id'], "Recalculated lead score for lead #$lead_id → $score");
 echo json_encode(['success' => true, 'score' => $score]);
