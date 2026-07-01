@@ -411,6 +411,7 @@ $routes = [
     'crm/lead_view'        => CRM_DIR . '/crm_lead_view.php',
     'crm/pipeline'         => CRM_DIR . '/crm_pipeline.php',
     'crm/pipeline_stages'  => CRM_DIR . '/crm_pipeline_stages.php',
+    'crm/import_leads'     => CRM_DIR . '/crm_import_leads.php',
 
     // CRM APIs
     'api/crm/add_lead'           => API_DIR . '/crm/add_lead.php',
@@ -427,6 +428,7 @@ $routes = [
     'api/crm/get_dashboard_data' => API_DIR . '/crm/get_dashboard_data.php',
     'api/crm/manage_stage'       => API_DIR . '/crm/manage_stage.php',
     'api/crm/export_leads'       => API_DIR . '/crm/export_leads.php',
+    'api/crm/import_leads'       => API_DIR . '/crm/import_leads.php',
 
     // ========================================================================
     // SALES MODULE
