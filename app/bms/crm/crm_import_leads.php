@@ -48,11 +48,11 @@ $users     = $pdo->query("SELECT user_id, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', fi
     <div id="stepUpload">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
-                <div class="import-zone" id="dropZone" onclick="$('#csvFile').click()">
+                <input type="file" id="csvFile" accept=".csv" class="d-none">
+                <div class="import-zone" id="dropZone">
                     <i class="bi bi-filetype-csv display-4 text-primary mb-3 d-block"></i>
                     <div class="fw-bold mb-1">Click to upload a CSV file</div>
                     <div class="text-muted small">Max 5 MB. First row must be the header.</div>
-                    <input type="file" id="csvFile" accept=".csv" class="d-none">
                 </div>
                 <div class="mt-4 row g-3">
                     <div class="col-md-6">
@@ -113,22 +113,32 @@ let csvFile      = null;
 $(function () {
     $('.select2-static').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: '— Select —' });
 
-    // File input change
+    // dropZone click opens file picker via JS — NOT inline onclick — to avoid
+    // the bubbling recursion (click → programmatic click on child → bubbles to parent → loop)
+    $('#dropZone').on('click', function () { $('#csvFile').click(); });
+
+    function showFileChosen(file) {
+        $('#uploadBtn').prop('disabled', false);
+        // Update visual WITHOUT recreating the input inside dropZone (would reintroduce the bug)
+        $('#dropZone').html(
+            '<i class="bi bi-file-earmark-check display-4 text-primary mb-3 d-block"></i>' +
+            '<div class="fw-bold mb-1">' + file.name + '</div>' +
+            '<div class="text-muted small">' + (file.size / 1024).toFixed(1) + ' KB &middot; Click to change</div>'
+        );
+    }
+
     $('#csvFile').on('change', function () {
-        csvFile = this.files[0];
-        if (csvFile) {
-            $('#uploadBtn').prop('disabled', false);
-            $('#dropZone').html(`<i class="bi bi-file-earmark-check display-4 text-primary mb-3 d-block"></i>
-                <div class="fw-bold mb-1">${csvFile.name}</div>
-                <div class="text-muted small">${(csvFile.size / 1024).toFixed(1)} KB · Click to change</div>
-                <input type="file" id="csvFile" accept=".csv" class="d-none">`);
-        }
+        const file = this.files[0];
+        if (file) { csvFile = file; showFileChosen(file); }
     });
-    $('#dropZone').on('dragover', e => { e.preventDefault(); $('#dropZone').css('background','#f0f5ff'); });
-    $('#dropZone').on('drop', function(e) {
+
+    $('#dropZone').on('dragover', e => { e.preventDefault(); $('#dropZone').css('background', '#f0f5ff'); });
+    $('#dropZone').on('dragleave', () => { $('#dropZone').css('background', ''); });
+    $('#dropZone').on('drop', function (e) {
         e.preventDefault();
-        csvFile = e.originalEvent.dataTransfer.files[0];
-        if (csvFile) { $('#uploadBtn').prop('disabled', false); }
+        $('#dropZone').css('background', '');
+        const file = e.originalEvent.dataTransfer.files[0];
+        if (file) { csvFile = file; showFileChosen(file); }
     });
 });
 
@@ -157,10 +167,15 @@ function loadHeaders() {
     $('#uploadBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Reading...');
     $.ajax({ url: IMPORT_URL, type: 'POST', data: fd, contentType: false, processData: false, dataType: 'json',
         success: res => {
-            if (!res.success) { Swal.fire({ icon:'error', title:'Error', text: res.message }); return; }
-            csvHeaders = res.headers;
-            buildMapping();
-            goStep(2);
+            try {
+                if (!res.success) { Swal.fire({ icon:'error', title:'Error', text: res.message }); return; }
+                csvHeaders = res.headers;
+                buildMapping();
+                goStep(2);
+            } catch(e) {
+                console.error('Import mapping error:', e);
+                Swal.fire({ icon:'error', title:'Error', text: 'Failed to read CSV headers. Ensure the first row is a header row with no empty columns.' });
+            }
         },
         error: () => Swal.fire({ icon:'error', title:'Error', text:'Server error.' }),
         complete: () => $('#uploadBtn').prop('disabled', false).html('<i class="bi bi-arrow-right me-1"></i>Next: Map Columns')
@@ -194,7 +209,7 @@ function buildMapping() {
         col_close_date:['close_date','expected_close','close'], col_notes:['notes','note','remarks'] };
     Object.entries(autoMatch).forEach(([field, keywords]) => {
         csvHeaders.forEach((h, i) => {
-            if (keywords.some(k => h.toLowerCase().includes(k)))
+            if (h != null && keywords.some(k => h.toLowerCase().includes(k)))
                 $(`#${field}`).val(i);
         });
     });
