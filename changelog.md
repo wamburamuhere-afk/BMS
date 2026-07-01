@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-07-01 (fix) — Outbound Delivery Note tab/button showed on the Purchases DN list
+
+`app/bms/grn/delivery_notes.php` is shared by both menus: Purchases links to
+it plain, Sales links to it with `?type=outbound`. The Outbound — Sent tab
+and its "Create DN (Outbound)" button rendered unconditionally, so a
+Purchases user could switch to/create outbound (sales) delivery notes from
+the Purchases screen. Outbound should only be reachable from the Sales
+entry point; Sales-side rendering (tabs, buttons, permission gate) must stay
+untouched.
+
+- `app/bms/grn/delivery_notes.php` — added `$is_outbound_view` (true only
+  when `?type=outbound` is present) and wrapped the Outbound tab `<li>` and
+  the "Create DN (Outbound)" button in that condition. Everything else
+  (JS tab switching, `autoEnforcePermission('grn')`, stat cards, filters)
+  left exactly as-is so the Sales deep link renders identically to before.
+
 ## 2026-07-01 (fix) — deploy CI "critical files" allowlist blocked production deploy after LPO module merge
 
 `.github/workflows/deploy.yml`'s "Check critical API files exist" step still
