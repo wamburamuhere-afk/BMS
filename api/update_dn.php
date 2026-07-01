@@ -27,7 +27,8 @@ try {
         exit;
     }
 
-    $party_type   = (($_POST['party_type'] ?? 'supplier') === 'subcontractor') ? 'subcontractor' : 'supplier';
+    $party_type_raw = $_POST['party_type'] ?? 'supplier';
+    $party_type   = in_array($party_type_raw, ['subcontractor', 'customer'], true) ? $party_type_raw : 'supplier';
     $party_id     = intval($_POST['party_id'] ?? 0);
     $project_id   = intval($_POST['project_id'] ?? 0);
     $warehouse_id = intval($_POST['warehouse_id'] ?? 0);
@@ -42,12 +43,14 @@ try {
     $manual_dn        = trim($_POST['dn_number']        ?? '');
     $items            = json_decode($_POST['items'] ?? '[]', true);
     $purchase_order_id = intval($_POST['purchase_order_id'] ?? 0) ?: null;
+    $customer_lpo_id  = intval($_POST['customer_lpo_id'] ?? 0) ?: null;
     $user_id          = $_SESSION['user_id'];
 
+    $party_label = $party_type === 'subcontractor' ? 'Sub-contractor' : ($party_type === 'customer' ? 'Customer' : 'Supplier');
     if ($delivery_id <= 0)  throw new Exception('DN ID is required.');
     if ($warehouse_id <= 0) throw new Exception('Warehouse is required.');
     if ($party_id <= 0) {
-        throw new Exception(($party_type === 'subcontractor' ? 'Sub-contractor' : 'Supplier') . ' is required.');
+        throw new Exception($party_label . ' is required.');
     }
     if (empty($items)) throw new Exception('At least one item is required.');
 
@@ -68,12 +71,14 @@ try {
     // Validate the counterparty
     if ($party_type === 'subcontractor') {
         $chk = $pdo->prepare("SELECT supplier_id FROM sub_contractors WHERE supplier_id = ? AND status = 'active'");
+    } elseif ($party_type === 'customer') {
+        $chk = $pdo->prepare("SELECT customer_id FROM customers WHERE customer_id = ? AND status = 'active'");
     } else {
         $chk = $pdo->prepare("SELECT supplier_id FROM suppliers WHERE supplier_id = ? AND status = 'active'");
     }
     $chk->execute([$party_id]);
     if (!$chk->fetch()) {
-        throw new Exception('Invalid or inactive ' . ($party_type === 'subcontractor' ? 'sub-contractor' : 'supplier') . '.');
+        throw new Exception('Invalid or inactive ' . strtolower($party_label) . '.');
     }
 
     // Validate items
@@ -90,6 +95,7 @@ try {
 
     $supplier_id      = ($party_type === 'supplier')      ? $party_id : null;
     $subcontractor_id = ($party_type === 'subcontractor') ? $party_id : null;
+    $customer_id      = ($party_type === 'customer')      ? $party_id : null;
     // Inbound keeps the supplier's own hand-written number untouched; outbound
     // re-codes its system number to the company format on edit (DN doesn't post to GL).
     if ($dn_type === 'inbound') {
@@ -104,16 +110,16 @@ try {
     // 1. Update DN header
     $pdo->prepare("
         UPDATE deliveries
-        SET dn_number=?, party_type=?, supplier_id=?, subcontractor_id=?,
+        SET dn_number=?, party_type=?, supplier_id=?, subcontractor_id=?, customer_id=?,
             delivery_date=?, contact_person=?, contact_phone=?, delivery_address=?, notes=?,
             vehicle_number=?, driver_name=?, shipping_method=?,
-            warehouse_id=?, project_id=?, purchase_order_id=?, updated_by=?
+            warehouse_id=?, project_id=?, purchase_order_id=?, customer_lpo_id=?, updated_by=?
         WHERE delivery_id=?
     ")->execute([
-        $dn_number, $party_type, $supplier_id, $subcontractor_id,
+        $dn_number, $party_type, $supplier_id, $subcontractor_id, $customer_id,
         $delivery_date, $contact_person ?: null, $contact_phone ?: null, $delivery_address ?: null, $notes ?: null,
         $vehicle_number ?: null, $driver_name ?: null, $shipping_method ?: null,
-        $warehouse_id, $project_id ?: null, $purchase_order_id, $user_id, $delivery_id,
+        $warehouse_id, $project_id ?: null, $purchase_order_id, $customer_lpo_id, $user_id, $delivery_id,
     ]);
 
     // 2. Replace items

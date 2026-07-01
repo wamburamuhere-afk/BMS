@@ -12,6 +12,7 @@ $customer_id = isset($_GET['customer']) ? intval($_GET['customer']) : 0;
 $order_id    = isset($_GET['order'])    ? intval($_GET['order'])    : 0;
 $project_id  = isset($_GET['project']) ? intval($_GET['project'])  : 0;
 $ipc_id      = isset($_GET['ipc_id'])  ? intval($_GET['ipc_id'])   : 0;
+$delivery_id = isset($_GET['delivery']) ? intval($_GET['delivery']) : 0;
 
 // Fetch IPC prefill data if coming from an approved IPC
 $ipc_prefill = null;
@@ -81,6 +82,64 @@ if ($order_id > 0) {
         }
     }
 }
+
+// Get outbound Delivery Note details if provided (DN(Outbound) -> Invoice chain)
+$delivery = null;
+$delivery_items_prefill = [];
+$delivery_lpo_id = 0;
+if ($delivery_id > 0) {
+    $stmt = $pdo->prepare("SELECT * FROM deliveries WHERE delivery_id = ? AND dn_type = 'outbound' AND status = 'approved'");
+    $stmt->execute([$delivery_id]);
+    $delivery = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($delivery) {
+        $delivery_lpo_id = (int)($delivery['customer_lpo_id'] ?? 0);
+
+        if (!$customer) {
+            $resolved_customer_id = 0;
+            if (!empty($delivery['customer_id'])) {
+                $resolved_customer_id = (int)$delivery['customer_id'];
+            } elseif ($delivery_lpo_id) {
+                $lstmt = $pdo->prepare("SELECT customer_id FROM customer_lpos WHERE lpo_id = ?");
+                $lstmt->execute([$delivery_lpo_id]);
+                $resolved_customer_id = (int)$lstmt->fetchColumn();
+            }
+            if ($resolved_customer_id) {
+                $stmt = $pdo->prepare("SELECT * FROM customers WHERE customer_id = ?");
+                $stmt->execute([$resolved_customer_id]);
+                $customer = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($customer) $customer_id = $customer['customer_id'];
+            }
+        }
+
+        // Items: delivery_items has no price — source unit_price/tax_rate from
+        // the matching customer_lpo_items line (if linked), falling back to
+        // products.selling_price.
+        $distmt = $pdo->prepare("
+            SELECT di.product_id, di.product_name, di.sku, di.quantity_delivered AS quantity, di.unit,
+                   COALESCE(loi.unit_price, p.selling_price, 0) AS unit_price,
+                   COALESCE(loi.tax_rate, 0) AS tax_rate
+            FROM delivery_items di
+            LEFT JOIN products p ON di.product_id = p.product_id
+            LEFT JOIN customer_lpo_items loi ON loi.lpo_id = ? AND loi.product_id = di.product_id
+            WHERE di.delivery_id = ?
+        ");
+        $distmt->execute([$delivery_lpo_id ?: 0, $delivery_id]);
+        $delivery_items_prefill = $distmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+// Customer LPOs for the optional "Customer LPO" reference dropdown
+$customer_lpos_for_select = [];
+try {
+    $customer_lpos_for_select = $pdo->query("SELECT lpo_id, lpo_number, customer_id FROM customer_lpos WHERE status != 'deleted' ORDER BY issue_date DESC LIMIT 500")->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {}
+
+// Outbound Delivery Notes for the optional "Delivery Note" reference dropdown
+$delivery_notes_for_select = [];
+try {
+    $delivery_notes_for_select = $pdo->query("SELECT delivery_id, delivery_number FROM deliveries WHERE dn_type = 'outbound' AND status = 'approved' ORDER BY delivery_date DESC LIMIT 500")->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {}
 
 // Scope: assigned project IDs for current user
 $_ic_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
@@ -212,6 +271,24 @@ function generate_invoice_number() {
     </div>
     <?php endif; ?>
 
+    <?php if ($delivery): ?>
+    <div class="alert alert-info border-0 shadow-sm d-flex align-items-center gap-2 mb-3 py-2">
+        <i class="bi bi-link-45deg fs-5"></i>
+        <div>
+            Pre-filling from <strong>Delivery Note <?= safe_output($delivery['delivery_number']) ?></strong>
+            &mdash; <?= safe_output($customer['customer_name'] ?? '') ?>
+            <?php if (!empty($delivery_items_prefill)): ?>
+            &mdash; <span class="badge bg-primary"><?= count($delivery_items_prefill) ?> item(s) loaded</span>
+            <?php else: ?>
+            &mdash; <span class="badge bg-warning text-dark">No items on this delivery note</span>
+            <?php endif; ?>
+        </div>
+        <a href="<?= getUrl('dn_view') ?>?id=<?= $delivery['delivery_id'] ?>" class="ms-auto btn btn-sm btn-outline-secondary py-0">
+            <i class="bi bi-arrow-left me-1"></i>Back to DN
+        </a>
+    </div>
+    <?php endif; ?>
+
     <!-- Main Form -->
     <div class="card shadow-sm border-0">
         <div class="card-header custom-header text-white d-flex justify-content-between align-items-center">
@@ -298,6 +375,30 @@ function generate_invoice_number() {
                         </select>
                     </div>
                     <?php endif; ?>
+
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label small fw-bold">Delivery Note <span class="text-muted fw-normal">(Optional reference)</span></label>
+                        <select class="form-select select2" id="delivery_id" name="delivery_id">
+                            <option value="">-- None --</option>
+                            <?php foreach ($delivery_notes_for_select as $d): ?>
+                                <option value="<?= $d['delivery_id'] ?>" <?= ($delivery && $delivery['delivery_id'] == $d['delivery_id']) ? 'selected' : '' ?>>
+                                    <?= safe_output($d['delivery_number']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label small fw-bold">Customer LPO <span class="text-muted fw-normal">(Optional reference)</span></label>
+                        <select class="form-select select2" id="customer_lpo_id" name="customer_lpo_id">
+                            <option value="">-- None --</option>
+                            <?php foreach ($customer_lpos_for_select as $l): ?>
+                                <option value="<?= $l['lpo_id'] ?>" <?= ($delivery_lpo_id == $l['lpo_id']) ? 'selected' : '' ?>>
+                                    <?= safe_output($l['lpo_number']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                 </div>
                 
                 <!-- Invoice Items -->
@@ -790,6 +891,39 @@ $(document).ready(function() {
         showConfirmButton: false, timer: 5000,
         title: 'No uninvoiced items',
         text: 'All items on SO <?= safe_output($order['order_number']) ?> have already been fully invoiced.'
+    });
+});
+<?php endif; ?>
+
+<?php if ($delivery && !empty($delivery_items_prefill)): ?>
+// Auto-prefill from Delivery Note (outbound) passed via URL
+$(document).ready(function() {
+    $('#itemsBody').empty();
+    itemCount = 0;
+    const dnItems = <?= json_encode(array_map(fn($i) => [
+        'product_id'   => intval($i['product_id'] ?? 0),
+        'product_name' => $i['product_name'] ?? '',
+        'quantity'     => floatval($i['quantity'] ?? 0),
+        'unit'         => $i['unit'] ?? 'pcs',
+        'unit_price'   => floatval($i['unit_price'] ?? 0),
+        'tax_rate'     => floatval($i['tax_rate'] ?? 0),
+    ], $delivery_items_prefill)) ?>;
+    dnItems.forEach(function(item) { addItemRow(item); });
+
+    Swal.fire({
+        icon: 'success', toast: true, position: 'top-end',
+        showConfirmButton: false, timer: 3000,
+        title: 'DN <?= safe_output($delivery['delivery_number']) ?> loaded',
+        text: '<?= count($delivery_items_prefill) ?> item(s) pre-filled — review and save'
+    });
+});
+<?php elseif ($delivery && empty($delivery_items_prefill)): ?>
+$(document).ready(function() {
+    Swal.fire({
+        icon: 'warning', toast: true, position: 'top-end',
+        showConfirmButton: false, timer: 5000,
+        title: 'No items found',
+        text: 'Delivery Note <?= safe_output($delivery['delivery_number']) ?> has no recorded items.'
     });
 });
 <?php endif; ?>

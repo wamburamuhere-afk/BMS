@@ -8,7 +8,7 @@ if (!isAuthenticated()) {
     exit;
 }
 
-if (!canDelete('customers')) {
+if (!canDelete('lpo')) {
     echo json_encode(['success' => false, 'message' => 'Permission denied']);
     exit;
 }

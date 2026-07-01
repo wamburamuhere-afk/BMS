@@ -796,8 +796,17 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="salesDropdown">
                                 <li><h6 class="dropdown-header">Sales Operations</h6></li>
+                                <?php if(canView('quotations')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('quotations') ?>"><i class="bi bi-file-text"></i> Quotations</a></li>
+                                <?php endif; ?>
                                 <?php if(canView('sales_orders')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('sales_orders') ?>"><i class="bi bi-bag"></i>Sales Orders</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('lpo')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('lpos') ?>"><i class="bi bi-file-earmark-text"></i> LPO</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('dn')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('delivery_notes') ?>?type=outbound"><i class="bi bi-box-arrow-up-right"></i> DN (Outbound)</a></li>
                                 <?php endif; ?>
                                 <?php if(canView('invoices')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('invoices') ?>"><i class="bi bi-receipt"></i> Invoices</a></li>
@@ -805,9 +814,6 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('pos')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> POS</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('pos/dashboard') ?>"><i class="bi bi-speedometer2"></i> POS Dashboard &amp; Sales</a></li>
-                                <?php endif; ?>
-                                <?php if(canView('quotations')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('quotations') ?>"><i class="bi bi-file-text"></i> Quotations</a></li>
                                 <?php endif; ?>
                                 <li><h6 class="dropdown-header">Returns</h6></li>
                                 <?php if(canView('sales_returns')): ?>

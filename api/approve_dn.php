@@ -29,7 +29,7 @@ try {
 
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare("SELECT delivery_number, status, warehouse_id, dn_type, supplier_id, subcontractor_id, party_type, purchase_order_id, project_id FROM deliveries WHERE delivery_id = ? FOR UPDATE");
+    $stmt = $pdo->prepare("SELECT delivery_number, status, warehouse_id, dn_type, supplier_id, subcontractor_id, party_type, purchase_order_id, project_id, customer_lpo_id FROM deliveries WHERE delivery_id = ? FOR UPDATE");
     $stmt->execute([$delivery_id]);
     $dn = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$dn) throw new Exception("Delivery Note not found");
@@ -128,6 +128,51 @@ try {
                     'created_by'       => $_SESSION['user_id'],
                     'notes'            => "DN Approved (outbound): " . $dn['delivery_number'],
                 ]);
+            }
+        }
+    }
+
+    // Auto-advance the linked Customer LPO's fulfillment status. Status only
+    // ever moves forward (approved -> partially_fulfilled -> fulfilled),
+    // never regresses, and is derived purely from delivered vs. ordered
+    // quantities — never set manually (see api/customer/change_lpo_status.php).
+    if (!empty($dn['customer_lpo_id']) && (($dn['dn_type'] ?? 'outbound') === 'outbound')) {
+        $lpoId = (int)$dn['customer_lpo_id'];
+
+        $orderedStmt = $pdo->prepare("SELECT product_id, quantity FROM customer_lpo_items WHERE lpo_id = ? AND product_id IS NOT NULL");
+        $orderedStmt->execute([$lpoId]);
+        $ordered = $orderedStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!empty($ordered)) {
+            $deliveredStmt = $pdo->prepare("
+                SELECT di.product_id, SUM(di.quantity_delivered) AS delivered
+                FROM delivery_items di
+                JOIN deliveries d ON di.delivery_id = d.delivery_id
+                WHERE d.customer_lpo_id = ? AND d.status = 'approved'
+                GROUP BY di.product_id
+            ");
+            $deliveredStmt->execute([$lpoId]);
+            $deliveredByProduct = [];
+            foreach ($deliveredStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $deliveredByProduct[$r['product_id']] = (float)$r['delivered'];
+            }
+
+            $allComplete  = true;
+            $anyDelivered = false;
+            foreach ($ordered as $o) {
+                $delivered = $deliveredByProduct[$o['product_id']] ?? 0;
+                if ($delivered > 0) $anyDelivered = true;
+                if ($delivered < (float)$o['quantity']) $allComplete = false;
+            }
+            $newLpoStatus = $allComplete ? 'fulfilled' : ($anyDelivered ? 'partially_fulfilled' : null);
+
+            if ($newLpoStatus) {
+                // Never regress: fulfilled stays fulfilled even if this branch is re-entered.
+                $pdo->prepare("
+                    UPDATE customer_lpos
+                    SET status = ?
+                    WHERE lpo_id = ? AND status IN ('approved', 'partially_fulfilled')
+                ")->execute([$newLpoStatus, $lpoId]);
             }
         }
     }

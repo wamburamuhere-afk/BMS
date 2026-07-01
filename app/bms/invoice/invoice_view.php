@@ -117,6 +117,20 @@ if (!empty($invoice['order_id'])) {
     $so_order_number = $soNumStmt->fetchColumn() ?: null;
 }
 
+// Fetch linked outbound DN / Customer LPO reference numbers (optional traceability)
+$dn_reference_number = null;
+if (!empty($invoice['delivery_id'])) {
+    $dnNumStmt = $pdo->prepare("SELECT delivery_number FROM deliveries WHERE delivery_id = ?");
+    $dnNumStmt->execute([$invoice['delivery_id']]);
+    $dn_reference_number = $dnNumStmt->fetchColumn() ?: null;
+}
+$lpo_reference_number = null;
+if (!empty($invoice['customer_lpo_id'])) {
+    $lpoNumStmt = $pdo->prepare("SELECT lpo_number FROM customer_lpos WHERE lpo_id = ?");
+    $lpoNumStmt->execute([$invoice['customer_lpo_id']]);
+    $lpo_reference_number = $lpoNumStmt->fetchColumn() ?: null;
+}
+
 // Check projects setting
 $enable_projects = 0;
 try {
@@ -512,7 +526,25 @@ includeHeader();
                         </a>
                     </div>
                     <?php endif; ?>
-                    
+
+                    <?php if (!empty($invoice['delivery_id'])): ?>
+                    <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
+                        <span class="text-muted">DN Ref:</span>
+                        <a href="<?= getUrl('dn_view') ?>?id=<?= $invoice['delivery_id'] ?>" class="text-decoration-none fw-medium">
+                            <?= safe_output($dn_reference_number ?: 'View DN') ?> <i class="bi bi-box-arrow-up-right small"></i>
+                        </a>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($invoice['customer_lpo_id'])): ?>
+                    <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
+                        <span class="text-muted">LPO Ref:</span>
+                        <a href="<?= getUrl('lpo_view') ?>?id=<?= $invoice['customer_lpo_id'] ?>" class="text-decoration-none fw-medium">
+                            <?= safe_output($lpo_reference_number ?: 'View LPO') ?> <i class="bi bi-box-arrow-up-right small"></i>
+                        </a>
+                    </div>
+                    <?php endif; ?>
+
                     <?php if (!empty($invoice['project_name'])): ?>
                     <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
                         <span class="text-muted">Project:</span>

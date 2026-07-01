@@ -38,6 +38,59 @@ if ($is_edit) {
     }
 }
 
+// ── LPO LINK (create mode only) — customer-party outbound DN, prefilled with
+// remaining-to-deliver quantities from the LPO's items ─────────────────────
+$lpo = null; $lpo_items = []; $lpo_customer = null;
+$lpo_id = (!$is_edit && isset($_GET['lpo_id'])) ? intval($_GET['lpo_id']) : 0;
+if ($lpo_id > 0) {
+    $lstmt = $pdo->prepare("SELECT * FROM customer_lpos WHERE lpo_id = ? AND status != 'deleted'");
+    $lstmt->execute([$lpo_id]);
+    $lpo = $lstmt->fetch(PDO::FETCH_ASSOC);
+    if ($lpo && in_array($lpo['status'], ['approved', 'partially_fulfilled'], true)) {
+        $cstmt = $pdo->prepare("SELECT customer_id, customer_name, company_name, customer_type FROM customers WHERE customer_id = ? AND status = 'active'");
+        $cstmt->execute([$lpo['customer_id']]);
+        $lpo_customer = $cstmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($lpo_customer) {
+            $project_id = intval($lpo['project_id'] ?? 0);
+            // Ordered qty per product on the LPO, minus already-delivered qty on
+            // prior non-cancelled outbound DNs linked to this LPO (remaining-to-deliver).
+            $iistmt = $pdo->prepare("
+                SELECT loi.product_id, loi.product_name, loi.quantity, p.unit
+                FROM customer_lpo_items loi
+                LEFT JOIN products p ON loi.product_id = p.product_id
+                WHERE loi.lpo_id = ? AND loi.product_id IS NOT NULL
+            ");
+            $iistmt->execute([$lpo_id]);
+            $ordered = $iistmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $dstmt = $pdo->prepare("
+                SELECT di.product_id, SUM(di.quantity_delivered) AS delivered
+                FROM delivery_items di
+                JOIN deliveries d ON di.delivery_id = d.delivery_id
+                WHERE d.customer_lpo_id = ? AND d.status != 'cancelled'
+                GROUP BY di.product_id
+            ");
+            $dstmt->execute([$lpo_id]);
+            $delivered_by_product = [];
+            foreach ($dstmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $delivered_by_product[$r['product_id']] = (float)$r['delivered'];
+            }
+
+            foreach ($ordered as $o) {
+                $remaining = (float)$o['quantity'] - ($delivered_by_product[$o['product_id']] ?? 0);
+                if ($remaining > 0.0001) {
+                    $lpo_items[] = ['product_id' => $o['product_id'], 'product_name' => $o['product_name'], 'remaining' => $remaining, 'unit' => $o['unit'] ?: 'pcs'];
+                }
+            }
+        } else {
+            $lpo = null; // customer inactive/missing — treat as no LPO link
+        }
+    } else {
+        $lpo = null; // not in an eligible status
+    }
+}
+
 $has_project = $project_id > 0;
 
 // ── LISTS — scoped by project for non-admins ─────────────────
@@ -69,8 +122,30 @@ $all_subs = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM su
 $cur_party_type = 'supplier';
 $cur_party_id   = 0;
 if ($dn) {
-    $cur_party_type = ($dn['party_type'] === 'subcontractor') ? 'subcontractor' : 'supplier';
-    $cur_party_id   = ($cur_party_type === 'subcontractor') ? intval($dn['subcontractor_id'] ?? 0) : intval($dn['supplier_id'] ?? 0);
+    $cur_party_type = in_array($dn['party_type'], ['subcontractor', 'customer'], true) ? $dn['party_type'] : 'supplier';
+    if ($cur_party_type === 'subcontractor')  $cur_party_id = intval($dn['subcontractor_id'] ?? 0);
+    elseif ($cur_party_type === 'customer')   $cur_party_id = intval($dn['customer_id'] ?? 0);
+    else                                       $cur_party_id = intval($dn['supplier_id'] ?? 0);
+} elseif ($lpo && $lpo_customer) {
+    $cur_party_type = 'customer';
+    $cur_party_id   = (int)$lpo_customer['customer_id'];
+}
+
+// Locked customer display name — either the LPO's customer (create flow) or
+// the existing DN's linked customer (edit flow, party_type='customer').
+$locked_customer_name = null;
+if ($cur_party_type === 'customer') {
+    if ($lpo_customer) {
+        $locked_customer_name = ($lpo_customer['customer_type'] === 'business' && !empty($lpo_customer['company_name']))
+            ? $lpo_customer['company_name'] : $lpo_customer['customer_name'];
+    } elseif ($cur_party_id > 0) {
+        $ccstmt = $pdo->prepare("SELECT customer_name, company_name, customer_type FROM customers WHERE customer_id = ?");
+        $ccstmt->execute([$cur_party_id]);
+        $cc = $ccstmt->fetch(PDO::FETCH_ASSOC);
+        if ($cc) {
+            $locked_customer_name = ($cc['customer_type'] === 'business' && !empty($cc['company_name'])) ? $cc['company_name'] : $cc['customer_name'];
+        }
+    }
 }
 
 $return_url = getUrl('delivery_notes');
@@ -96,15 +171,28 @@ $return_url = getUrl('delivery_notes');
                 <?= $is_edit ? 'Edit Outbound Delivery Note' : 'Create Delivery Note' ?>
                 <span class="badge bg-primary-subtle text-primary border border-primary ms-1" style="font-size:.65rem;">OUTBOUND</span>
             </h4>
-            <p class="text-muted small mb-0">Goods <strong>sent to</strong> a supplier or sub-contractor — the DN number is generated automatically.</p>
+            <p class="text-muted small mb-0">Goods <strong>sent to</strong> a supplier, sub-contractor, or customer (LPO fulfillment) — the DN number is generated automatically.</p>
         </div>
         <a href="<?= $return_url ?>" class="btn btn-outline-secondary btn-sm flex-shrink-0">
             <i class="bi bi-arrow-left me-1"></i> Back
         </a>
     </div>
 
+    <?php if ($lpo && $lpo_customer): ?>
+    <div class="alert alert-info d-flex align-items-center gap-2 d-print-none">
+        <i class="bi bi-info-circle fs-5"></i>
+        <div>
+            Pre-filling from Customer LPO <strong><?= safe_output($lpo['lpo_number']) ?></strong>
+            — <strong><?= safe_output($locked_customer_name) ?></strong>
+            — <?= count($lpo_items) ?> item(s) with remaining quantity loaded.
+            <a href="<?= getUrl('lpo_view') ?>?id=<?= $lpo_id ?>" class="ms-2">Back to LPO</a>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <form id="dnForm">
         <?php if ($is_edit): ?><input type="hidden" name="delivery_id" value="<?= $edit_id ?>"><?php endif; ?>
+        <?php if ($lpo): ?><input type="hidden" name="customer_lpo_id" value="<?= $lpo_id ?>"><?php elseif ($is_edit && !empty($dn['customer_lpo_id'])): ?><input type="hidden" name="customer_lpo_id" value="<?= (int)$dn['customer_lpo_id'] ?>"><?php endif; ?>
 
         <div class="row g-4">
             <div class="col-lg-8">
@@ -126,6 +214,16 @@ $return_url = getUrl('delivery_notes');
 
                             <hr class="my-1">
 
+                            <?php if ($cur_party_type === 'customer'): ?>
+                            <!-- LOCKED CUSTOMER PARTY (from Customer LPO) -->
+                            <input type="hidden" name="party_type" id="dn_party_type" value="customer">
+                            <input type="hidden" name="party_id" id="dn_party_id" value="<?= $cur_party_id ?>">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Send To</label>
+                                <div class="form-control bg-light fw-bold"><i class="bi bi-person-check me-1"></i> <?= safe_output($locked_customer_name) ?></div>
+                                <small class="text-muted">Customer — locked from the linked LPO.</small>
+                            </div>
+                            <?php else: ?>
                             <!-- PARTY TYPE (dropdown) -->
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Send To <span class="text-danger">*</span></label>
@@ -140,6 +238,7 @@ $return_url = getUrl('delivery_notes');
                                 <label class="form-label fw-semibold" id="partyLabel">Select Supplier <span class="text-danger">*</span></label>
                                 <select class="form-select" name="party_id" id="dn_party_id" required></select>
                             </div>
+                            <?php endif; ?>
 
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Project <span class="text-muted small">(Optional)</span></label>
@@ -278,6 +377,7 @@ const CUR_PARTY_TYPE = '<?= $cur_party_type ?>';
 const CUR_PARTY_ID   = <?= (int)$cur_party_id ?>;
 const IS_EDIT        = <?= $is_edit ? 'true' : 'false' ?>;
 const PRESET_WH      = <?= (int)($dn['warehouse_id'] ?? 0) ?>;
+const LPO_ITEMS      = <?= json_encode(array_values($lpo_items)) ?>;
 
 function initS2($el, placeholder) {
     if ($el.data('select2')) $el.select2('destroy');
@@ -298,6 +398,7 @@ function rebuildWarehouses() {
 
 function rebuildParty(preserve) {
     const type = $('#dn_party_type').val();
+    if (type === 'customer') return; // locked customer field — no dropdown to rebuild
     const list = type === 'subcontractor' ? ALL_SUBCONTRACTORS : ALL_SUPPLIERS;
     $('#partyLabel').html((type === 'subcontractor' ? 'Select Sub-Contractor' : 'Select Supplier') + ' <span class="text-danger">*</span>');
     const $sel = $('#dn_party_id');
@@ -327,6 +428,12 @@ $(document).ready(function () {
             <?php foreach ($dn_items as $item): ?>
             addDNItem('<?= $item['product_id'] ?>', '<?= addslashes($item['product_name']) ?>', '<?= $item['quantity_delivered'] ?>', '<?= $item['unit'] ?>', 0);
             <?php endforeach; ?>
+        }, 800);
+    } else if (LPO_ITEMS.length > 0) {
+        setTimeout(function () {
+            LPO_ITEMS.forEach(function (it) {
+                addDNItem(it.product_id, it.product_name, it.remaining, it.unit, 0);
+            });
         }, 800);
     } else {
         addDNItem();
@@ -508,7 +615,8 @@ function submitDN(status) {
     const warehouse = $('#dn_warehouse_id').val();
     const date      = $('[name="delivery_date"]').val();
 
-    if (!partyId)   { Swal.fire({ icon: 'warning', title: 'Required', text: 'Select the ' + (partyType === 'subcontractor' ? 'sub-contractor' : 'supplier') + '.' }); return; }
+    const partyNoun = partyType === 'subcontractor' ? 'sub-contractor' : (partyType === 'customer' ? 'customer' : 'supplier');
+    if (!partyId)   { Swal.fire({ icon: 'warning', title: 'Required', text: 'Select the ' + partyNoun + '.' }); return; }
     if (!warehouse) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Select a warehouse.' }); return; }
     if (!date)      { Swal.fire({ icon: 'warning', title: 'Required', text: 'Enter the DN date.' }); return; }
 
@@ -535,6 +643,7 @@ function submitDN(status) {
     fd.append('items', JSON.stringify(items));
     fd.append('status', status);
     <?php if ($is_edit): ?>fd.append('delivery_id', '<?= $edit_id ?>');<?php endif; ?>
+    <?php if ($lpo): ?>fd.append('customer_lpo_id', '<?= $lpo_id ?>');<?php elseif ($is_edit && !empty($dn['customer_lpo_id'])): ?>fd.append('customer_lpo_id', '<?= (int)$dn['customer_lpo_id'] ?>');<?php endif; ?>
 
     Swal.fire({ title: 'Saving...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     $.ajax({
