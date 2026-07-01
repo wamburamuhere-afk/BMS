@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-07-01 (fix) — payroll processing failed for every employee: "Data truncated for column 'item_type'"
+
+The 2026-06-24 NSSF-employer feature made `api/process_payroll.php` write an
+`'employer_cost'` breakdown line into `payroll_items` for every employee
+(via `core/salary_structure.php`'s `writePayrollItems()`), but the migration
+that shipped with it (`2026_06_24_nssf_employer.php`) only added the
+`payroll.nssf_employer` column — it never added `'employer_cost'` to
+`payroll_items.item_type`'s ENUM (`enum('allowance','deduction','bonus',
+'advance','loan','other')`). Every employee has `nssf_employer > 0`, so
+every "Process Payroll" run hit MySQL warning 1265 "Data truncated for
+column 'item_type'" and failed the whole batch (reported live: "Processing
+failed for all selected employees. Employee MANENO SISEMI: SQLSTATE[01000]
+...").  Checked the `payroll`/`payroll_items` tables for orphaned rows from
+prior failed attempts — none found (the header insert never got far enough
+to be reached before the batch-level failure was reported).
+
+- `migrations/2026_07_01_payroll_items_employer_cost.php` (new) — adds
+  `'employer_cost'` to `payroll_items.item_type`'s ENUM. Additive,
+  idempotent (guarded by `SHOW COLUMNS`).
+- `tests/test_payroll_items_employer_cost_cli.php` (new) — schema guard +
+  live proof that `writePayrollItems()` now persists an `employer_cost`
+  line without truncation; cleans up its own test rows.
+
 ## 2026-07-01 (fix) — Outbound Delivery Note tab/button showed on the Purchases DN list
 
 `app/bms/grn/delivery_notes.php` is shared by both menus: Purchases links to
