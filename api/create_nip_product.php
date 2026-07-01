@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/code_generator.php';
 global $pdo;
 
 try {
@@ -94,6 +95,13 @@ try {
         }
     }
 
+    // Auto-generate the company-prefixed Item Code, e.g. BFS-NIP-0001.
+    // Sequential & gap-free via core/code_generator.php; the allocation shares
+    // this open transaction, so a rolled-back insert releases the number (no gaps).
+    $item_code = nextCode($pdo, 'NIP');
+    $pdo->prepare("UPDATE products SET contract_item_no = ? WHERE product_id = ?")
+        ->execute([$item_code, $product_id]);
+
     $pdo->commit();
 
     // Log Activity
@@ -103,7 +111,8 @@ try {
     echo json_encode([
         'success' => true,
         'message' => 'Non-Inventory product created successfully!',
-        'product_id' => $product_id
+        'product_id' => $product_id,
+        'item_code' => $item_code
     ]);
 
 } catch (Exception $e) {

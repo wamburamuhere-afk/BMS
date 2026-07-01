@@ -171,6 +171,16 @@ try {
     }
 
     if ($sales_order_id > 0) {
+        // Re-code a legacy SO/QT number on edit (sales orders don't post to the GL).
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $curSo = $pdo->prepare("SELECT order_number FROM sales_orders WHERE sales_order_id = ?");
+        $curSo->execute([$sales_order_id]);
+        $oldSo = (string)$curSo->fetchColumn();
+        $newSo = codeForEdit($pdo, $is_quote ? 'QT' : 'SO', $oldSo, '(SO|QT)-[0-9].*', 'sales_orders', (int)$sales_order_id);
+        if ($newSo !== $oldSo) {
+            $pdo->prepare("UPDATE sales_orders SET order_number = ? WHERE sales_order_id = ?")->execute([$newSo, $sales_order_id]);
+        }
+
         // Update
         if ($hasPoNoColumn) {
             $stmt = $pdo->prepare("
@@ -214,11 +224,9 @@ try {
         
         $pdo->prepare("DELETE FROM sales_order_items WHERE order_id = ?")->execute([$sales_order_id]);
     } else {
-        // Insert
-        $stmt = $pdo->query("SELECT MAX(sales_order_id) FROM sales_orders");
-        $max_id = $stmt->fetchColumn();
-        $prefix = $is_quote ? 'QT' : 'SO';
-        $order_number = $prefix . '-' . date('Ymd') . '-' . str_pad(($max_id + 1), 4, '0', STR_PAD_LEFT);
+        // Insert — company-prefixed sequential number (BFS-SO-0001 / BFS-QT-0001).
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $order_number = nextCode($pdo, $is_quote ? 'QT' : 'SO');
 
         if ($hasPoNoColumn) {
             $stmt = $pdo->prepare("
@@ -296,21 +304,20 @@ try {
     $pdo->commit();
     
     // Log Activity
-    $type_label = ($is_quote) ? 'Quotation' : 'Sales Order';
-    $action = ($is_update) ? "Edit $type_label" : "Create $type_label";
-    
+    $type_label = ($is_quote) ? 'quotation' : 'sales order';
+
     $log_order_num = $order_number ?? '';
     if ($is_update && empty($log_order_num)) {
         $stmt_num = $pdo->prepare("SELECT order_number FROM sales_orders WHERE sales_order_id = ?");
         $stmt_num->execute([$sales_order_id]);
         $log_order_num = $stmt_num->fetchColumn();
     }
-    
-    $user_name = $_SESSION['username'] ?? 'User';
-    $verb = ($is_update) ? "updated" : "created";
-    $description = "$user_name $verb $type_label #$log_order_num";
-    
-    logActivity($pdo, $_SESSION['user_id'], $action, $description);
+
+    if ($is_update) {
+        logActivity($pdo, $_SESSION['user_id'], "Edit $type_label", "User edited $type_label: $log_order_num (ID $sales_order_id)");
+    } else {
+        logActivity($pdo, $_SESSION['user_id'], "Create $type_label", "User created a new $type_label: $log_order_num (ID $sales_order_id)");
+    }
 
     echo json_encode([
         'success' => true, 

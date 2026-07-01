@@ -23,7 +23,7 @@ try {
     $stmt->execute([$id]);
 
     // Phase 3c — maintenance log deletes destroy audit history.
-    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Maintenance Log", "Log ID: $id");
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Delete maintenance log", "deleted maintenance log with id $id");
 
     echo json_encode(["success" => true, "message" => "Log deleted"]);
 } catch (Exception $e) {

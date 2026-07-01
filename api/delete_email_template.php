@@ -23,7 +23,7 @@ try {
     $stmt = $pdo->prepare("DELETE FROM email_templates WHERE id = ?");
     $stmt->execute([$id]);
 
-    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Email Template", "Template ID: $id");
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Delete email template", "deleted email template with id $id");
 
     echo json_encode(['success' => true, 'message' => "Template deleted successfully"]);
 

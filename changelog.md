@@ -1,5 +1,610 @@
 # BMS Changelog
 
+## 2026-07-01 (feat) — CRM professional upgrade (all 9 phases)
+
+### Phase 1 — Campaign Management
+- `app/bms/crm/crm_campaigns.php` — full campaign list page (DataTable + stats + add/edit/delete modals)
+- `api/crm/save_campaign.php` — create/update campaigns in `marketing_campaigns`
+- `api/crm/get_campaigns.php` — updated to support `campaign_id` filter for edit modal
+- `api/crm/get_campaigns_select.php` — Select2 AJAX endpoint for campaign dropdowns
+- `api/crm/delete_campaign.php` — soft-delete campaign
+
+### Phase 2 — Stage History + Lead Scoring
+- `migrations/2026_07_01_crm_stage_history.php` — adds `crm_lead_stage_history` table + `lead_score`, `won_date`, `lost_date`, `last_activity`, `stage_entered` columns to `crm_leads` + seeds `crm_reports`, `crm_import`, `crm_labels`, `crm_bulk` permissions
+- `api/crm/recalculate_lead_score.php` — `computeLeadScore()` function (0–100 scoring) + standalone recalculate endpoint; library-safe (no endpoint code when `require_once`'d)
+- `api/crm/move_lead_stage.php` — now inserts into `crm_lead_stage_history`, sets `stage_entered`, sets `won_date`/`lost_date` on terminal stages, calls `computeLeadScore()`
+- `api/crm/add_activity.php` — now updates `last_activity` on lead, calls `computeLeadScore()`
+
+### Phase 3 — Follow-up & Overdue
+- `api/crm/mark_overdue_activities.php` — marks `pending` activities overdue when `due_date < NOW()`
+- `app/bms/crm/crm_lead_view.php` — calls `mark_overdue_activities` on page load; shows follow-up scheduling prompt after logging a call/meeting/site_visit
+
+### Phase 4 — Labels
+- `api/crm/save_label.php` — create/update labels with duplicate-name guard
+- `api/crm/delete_label.php` — soft-delete label + remove from all leads
+- `api/crm/update_lead_labels.php` — replace all labels for a lead (DELETE + INSERT IGNORE)
+- `app/bms/crm/crm_lead_view.php` — labels section: pill badges, + add button (Swal+Select2 picker), × remove per label; stage history section (last 10 changes); stage progress bar; lead score display (color-coded ≥70/40/<40); days-in-stage badge with stalled warning
+
+### Phase 5 — Bulk Operations
+- `api/crm/bulk_update_leads.php` — assign/stage/label/delete on up to 500 leads; scope-validated; blocks bulk delete of converted leads
+- `app/bms/crm/crm_leads.php` — checkbox column, bulk action bar with stage/user/label sub-selects, selectAll, `runBulk()`, Import CSV button
+
+### Phase 6 — Enhanced Conversion
+- `api/crm/move_lead_stage.php` — sets `won_date`/`lost_date` on conversion to terminal stages
+
+### Phase 7 — Reports
+- `api/crm/get_reports_data.php` — 7 report types: funnel, agent, activity, forecast, winloss, campaign, source; date-range + project scope
+- `app/bms/crm/crm_reports.php` — tabbed reports page with Chart.js funnel chart
+
+### Phase 8 — CSV Import
+- `api/crm/import_leads.php` — 3-mode (headers/preview/import); duplicate detection; `nextCode()`; scoring on import; max 5 MB
+- `app/bms/crm/crm_import_leads.php` — 3-step wizard (upload → map → preview & import)
+
+### Phase 9 — UX Polish
+- `app/bms/crm/crm_pipeline.php` — offcanvas quick-view panel on lead card click (desktop); shows lead summary + last 3 activities + open-full-view link; mobile navigates directly
+
+### Tests
+- `tests/test_crm_upgrade_cli.php` — 104-assertion CLI test covering all 9 phases; uses DB transaction rollback (zero data leak)
+
+## 2026-06-30 (fix) — GRN create: DN items pre-fill and PO dropdown fixes
+
+- `app/bms/grn/grn_create.php` — DN items received_qty now uses a correlated
+  subquery scoped to the specific DN, preventing other GRNs' receipts from
+  inflating the count and hiding items via HAVING pending_qty > 0
+- `app/bms/grn/grn_create.php` — PO dropdown now shows approved/ordered/partially_received
+  POs without requiring an approved DN to exist first (AND EXISTS clause removed)
+- `app/bms/grn/grn_create.php` — supplier dropdown also updated to include `ordered` PO status
+
+## 2026-06-30 (fix) — DN create: PO dropdown shows approved-only, project-scoped
+
+- `app/bms/grn/dn_create.php` — PO list now filters `status = 'approved'` only
+  (was `IN ('approved','ordered','partially_received','received','completed')`)
+- When `project_id` is in URL, only POs belonging to that project are loaded
+  (applies to all three branches: admin, scoped non-admin, no-project non-admin)
+
+## 2026-06-30 (feat) — GRN context-aware navigation in project details
+
+- `api/operations/get_project.php` — GRN query now uses `pr.project_id` directly
+  (was `po.project_id` via PO join — missed GRNs without a linked PO)
+- `app/bms/grn/grn_create.php` — back/save returns to `tab=grn` (was `tab=procurement`);
+  show only "Back to Project" when opened from project (removed duplicate "Back to GRNs")
+- `app/bms/grn/grn_edit.php` — both `project_return_url` and `origin_return_url` corrected
+  to `tab=grn`
+- `app/bms/grn/grn_view.php` — "Back to Project" goes to `tab=grn`; shown exclusively
+  when in project context (no duplicate "Back to List")
+- `app/bms/operations/project_view.php` — Edit GRN action added to renderGRNs dropdown
+  with `project_id` so edit form returns to project GRN tab after save
+
+## 2026-06-30 (fix) — PO create: RFQ auto-fill, warehouse always shows, clean URLs
+
+- `app/bms/purchase/purchase_order_create.php` — fixed 3 issues:
+  (1) RFQ Reference now auto-fills: warehouse pre-selected from RFQ in PHP so
+      `fetchProducts()` loads prices before `loadRFQs()` triggers item population;
+      `const rfqRefId` moved to top-level (removed duplicate `const isEdit`);
+      blank row skipped when RFQ items will auto-fill;
+      chain is now `fetchProducts → loadRFQs(cb) → select RFQ → trigger change`.
+  (2) Warehouse always appears: removed PHP project-filter on warehouses (too
+      strict); `filterWarehousesByProject` now falls back to all accessible
+      warehouses when no project-linked ones are found.
+  (3) URLs are clean: replaced `return_url=<encoded_path>` with short `back=<tab>`
+      param; PHP derives full back URL from `project_id` + `back` tab name.
+- `app/bms/purchase/rfq_view.php` — same `back=` approach; back_url computed after
+  rfq record is loaded (uses rfq.project_id).
+- `app/bms/purchase/rfq_create.php` — same `back=` approach.
+- `app/bms/operations/project_view.php` — all links updated to `back=rfq` or
+  `back=procurement`; removed all `retUrl`/`poRetUrl` encoded-URL variables.
+
+## 2026-06-30 (feat) — PO create/edit context-awareness + project_context_pattern.md
+
+- `app/bms/purchase/purchase_order_create.php` — reads `return_url` (relative-path guard);
+  breadcrumb, Back button and Cancel link all use `$back_url`; post-save redirect uses
+  `$back_url` instead of hard-coded project_view; when `$project_id > 0` the supplier
+  and warehouse dropdowns are narrowed to project-only rows; the project field is locked
+  (hidden input + read-only display) in create mode; `loadRFQs()` now accepts an optional
+  callback; when `?rfq_ref=ID` is in the URL the RFQ is auto-selected on page load and its
+  items are loaded immediately.
+- `app/bms/purchase/rfq_view.php` — Create PO button now passes `?project=`, `?rfq_ref=`,
+  and `?return_url=` (pointing at the project POs tab when opened from a project).
+- `app/bms/operations/project_view.php` — renderRFQs Create PO link now includes `project`
+  and `return_url`; renderPurchases and renderPurchasesFull Edit Order links include
+  `return_url` pointing at the project procurement tab.
+- `docs/project_context_pattern.md` — new document: full pattern (return_url guard,
+  supplier/warehouse/project-lock, auto-fill from parent doc, tab name map, module checklist).
+
+## 2026-06-30 (feat) — RFQ context-awareness: project stays in project, external stays external
+
+- `app/bms/operations/project_view.php` — View, Review, Edit links in renderRFQs now carry
+  `return_url` encoding the project view URL (?tab=rfq) so users return to the project tab.
+- `app/bms/purchase/rfq_view.php` — reads `return_url` (relative-path guard); Back button and
+  breadcrumb switch to "Back to Project / Project RFQs" when opened from a project; Edit link
+  forwards the same `return_url` so the edit→save chain stays inside the project.
+- `app/bms/purchase/rfq_create.php` — reads `return_url`; Back button and breadcrumb reflect
+  project context; post-save redirect goes to project RFQ tab instead of external list; when a
+  project is pre-selected the supplier dropdown narrows to suppliers linked to that project only.
+
+## 2026-06-30 (fix) — Project view: RFQs now appear in Procurements > RFQ tab
+
+- `api/operations/get_project.php` — added RFQ query (with `supplier_id` for Create PO link);
+  returned under `rfqs` key. Root cause: API never queried `rfq` table so tab was always empty.
+- `app/bms/operations/project_view.php` — rewrote `renderRFQs()`: columns now match external
+  rfq.php (S/No, RFQ Number, Date, Supplier, Warehouse, Status, Actions); removed Product/Item
+  column; actions identical to external page (View, Review, Approve, Print, Edit, Create PO,
+  Delete); added `printRFQ`, `approveRFQ`, `deleteRFQ` functions that call `loadProjectDetails()`
+  on success; added table/card toggle buttons; wired `bmsMobileCards.renderForTable('dtRFQs')`
+  for automatic mobile card view.
+
+## 2026-06-30 (fix) — IS and Cash Flow default to Year-to-Date instead of current month
+
+Income Statement and Cash Flow both defaulted to the current calendar month, making
+them inconsistent with Balance Sheet / Trial Balance which are cumulative. Changed
+both to default to financial-year start (1 Jan of current year) through today — giving
+Year-to-Date figures that are meaningful for management and closer in scope to the BS/TB.
+
+- `api/account/get_income_statement.php` — default start_date: `Y-m-01` → `Y-01-01`; end_date: `Y-m-t` → `Y-m-d`
+- `api/account/get_cash_flow.php` — default start_date: `Y-m-01` → `Y-01-01`; end_date: `Y-m-t` → `Y-m-d`
+
+---
+
+## 2026-06-30 (fix) — Trial Balance: include inactive accounts with posted history
+
+The TB query used `WHERE a.status = 'active'` which silently excluded deactivated
+legacy accounts that still carry posted journal_entry_items rows. This made the
+`Σ Dr = Σ Cr` balanced check unreliable — the TB was only verifying a subset of
+the ledger. Fixed by adding the same OR EXISTS / OR opening_balance guard that
+`_gl_account_activity()` (the IS/BS engine) already uses, so the TB now sees the
+same universe of accounts as the Income Statement and Balance Sheet.
+
+- `api/account/get_trial_balance.php` — expanded `WHERE a.status = 'active'`
+  to also include accounts with a non-zero opening_balance or any posted journal
+  entry items (matching the logic in `core/financial_reports.php::_gl_account_activity`)
+## 2026-06-29 (feat) — Bank Reconciliation Upgrade: All 4 Phases (53/53 tests green)
+
+Full professional-grade bank reconciliation replacing the skeleton implementation.
+Branch: `feat/bank-reconciliation-upgrade`. 53 CLI tests — all passing.
+
+**Phase 1 — Correct Book Balance + Petty Cash Register:**
+- `core/account_balance.php`: new `accountLedgerBalanceAsOf()` — period-end GL balance (not live `current_balance`)
+- `api/account/create_reconciliation.php`: book_balance from ledger-as-of period_end
+- `api/account/get_bank_balance.php`: GL-derived balance; accepts `as_of` param
+- `app/constant/accounts/bank_reconciliation.php`: modal re-fetches book balance on period_end change
+- `api/petty_cash/save_transaction.php`: registers bank_transactions lines (expense=withdrawal, top-up=withdrawal+deposit)
+- `api/petty_cash/delete_transaction.php`: removes bank register lines on delete
+- Migration `2026_06_29_bank_recon_opening_balance.php`: adds `opening_balance` column
+
+**Phase 2 — Adjusting Journal Entries:**
+- Migration `2026_06_29_bank_recon_adjustments_table.php`: `bank_reconciliation_adjustments` table
+- `api/account/add_reconciliation_adjustment.php`: posts balanced JE + auto-matched register line for bank_charge, interest_earned, nsf, standing_order, other_out, other_in
+- `api/account/create_entry_from_statement_line.php`: creates GL entry for unrecorded lines, auto-matches original
+- `api/account/get_reconciliation_adjustments.php`: returns adjustments list
+- `app/constant/accounts/reconciliation_details.php`: Add Adjustment button + modal; Create-from-line button on unmatched rows; Adjustments panel
+
+**Phase 3 — Beginning-Balance Chain + Two-Column Report:**
+- `api/account/create_reconciliation.php`: period overlap guard; auto-fills opening_balance from prior finalized rec
+- `api/account/get_reconciliation_lines.php`: excludes lines already cleared in prior reconciliations
+- `reconciliation_details.php`: opening_balance on screen; two-column bank/book statement (print-only)
+
+**Phase 4 — Period Lock + Unreconcile:**
+- `core/recon_period_lock.php`: `assertNotInFinalizedReconPeriod()` — guards JE edit/void/reverse
+- `api/account/void_journal.php`, `reverse_journal.php`, `update_journal.php`: period lock wired in
+- `api/account/unreconcile.php`: unlocks finalized reconciliation; requires reason; logAudit trail
+- `reconciliation_details.php`: Unreconcile button (canApprove gate) with reason modal
+
+**Tests:** `tests/test_bank_recon_phase1_cli.php` (15), `phase2` (15), `phase3` (11), `phase4` (12)
+
+---
+## 2026-06-30 — fix: procurement DataTable correctness — pagination, card toggle, Materials rewrite
+
+- `app/bms/operations/project_view.php`: fixed DN (`#dtDNs`), DO (`#dtDOs`), Inventory (`#dtWarehouses`) — all had `dom: '<"top d-print-none"f>rt<"clear">'` which stripped length/info/pagination; changed to `'<"d-print-none"lf>rtip'` to restore all controls while still hiding them on print
+- `app/bms/operations/project_view.php`: fixed card/table toggle broken on Return Notes, Debit Notes, Suppliers, NIP — `renderForTable` (bmsMobileCards) was called BEFORE DataTable init so the toggle latched onto `.table-responsive` as wrapper; after DataTable created `.dataTables_wrapper` inside it, switching back to table view only unhid the inner wrapper while `.table-responsive` stayed hidden; fixed by moving DataTable init BEFORE `renderForTable` so both initial and subsequent toggles use `.dataTables_wrapper` consistently
+- `app/bms/operations/project_view.php`: converted Materials from custom AJAX row-injection + manual pagination to a real DataTable — removed custom filter bar HTML (search input, per-page select, count label) and custom pagination div; rewrote `loadProcMaterials()` to build all rows then init `$('#procMatTable').DataTable(...)` after AJAX; removed `procFilterMatTable` and `procGoToMatPage` functions
+- All five fixes verified in browser at project ID=16: table view is default on web, card view on mobile, toggle works both ways, pagination/info visible on all tables
+
+## 2026-06-30 — feat: DataTable for all procurement sub-modules in Project Details
+
+- `app/bms/operations/project_view.php`: added DataTable (destroy+init, responsive, pageLength 25) to 5 render functions that were missing it:
+  - `renderReturns` → `#procReturnsInnerTable` (Return Notes, 9 cols, targets [0,8])
+  - `renderProjectDebitNotes` → `#procDebitNotesInnerTable` (Debit Notes, 9 cols, targets [0,8])
+  - `renderProjectSuppliers` → `#projSuppliersTable` (Suppliers, 7 cols, targets [0,6])
+  - `projNipRenderTable` → `#projNipInnerTable` (Non-inventory Products, 6 cols, targets [0,5])
+- Already had DataTable before this session: Purchase Orders (`#procPOInnerTable`, `#procPOFullInnerTable`), GRN (`#procGRNInnerTable`, `#procGRNDNInnerTable`), Delivery Notes (`#dtDNs`), Delivery Orders (`#dtDOs`), RFQ (`#dtRFQs`), Inventory (`#dtWarehouses`), Sub-Contractors (`#proj-sc-table`)
+- Materials tab uses custom AJAX pagination (`procFilterMatTable`) — DataTable would conflict; left as-is (already provides search + pagination)
+- All 12 procurement sub-modules verified in browser at project ID=16 — no JS errors, S/NO column present on all tables
+
+## 2026-06-29 — fix: POS Dashboard period button double-selection + redundant dashboard reload
+
+- `app/bms/pos/pos_dashboard.php`: removed redundant Bootstrap `active` class from yearly period button — with `btn-outline-primary.active`, Bootstrap renders it as filled blue so clicking Daily made both Daily and Yearly look selected simultaneously; `btn-primary` alone correctly shows the selected state
+- `app/bms/pos/pos_dashboard.php`: `voidSale()` and `openReturn()` now only call `loadDashboard()` if the dashboard panel is currently visible; previously they fired a redundant AJAX request every time regardless of panel state
+
+## 2026-06-29 — fix: POS Dashboard print footer injected into DataTables print window
+
+- `app/bms/pos/pos_dashboard.php`: added `PRINT_ROLE` and `PRINT_YEAR` JS constants; `PRINT_USER` now correctly reads from session before footer.php runs
+- `app/bms/pos/pos_dashboard.php`: DataTables print `customize` callback now appends the standard BMS print footer (name, role, datetime, BJP Technologies copyright) to the print window — matching what footer.php renders via `@media print` on other pages
+- `tests/test_pos_dashboard_cli.php`: 3 new checks (BJP Technologies line, PRINT_ROLE, PRINT_YEAR); 98 total, all passing
+
+## 2026-06-29 — fix: POS Dashboard stat cards + DataTables + toggle behaviour
+
+- `app/bms/pos/pos_dashboard.php`: fixed stat cards not updating on period change — `getActivePeriod()` was reading `.active` CSS class but click handler only swapped `btn-primary`; now reads `.btn-primary` correctly
+- `app/bms/pos/pos_dashboard.php`: Sales Dashboard hidden by default; "Sales Dashboard" toggle button added to header row (top-right, next to "Open POS"); turns blue when dashboard is active
+- `app/bms/pos/pos_dashboard.php`: Recent Sales and Low Stock now use DataTables with S/NO column (`#recentSalesTable`, `#lowStockTable`, `initDashboardTables()`); Top Products table also gains S/NO column
+- `app/bms/pos/pos_dashboard.php`: Dashboard only loads when user opens it (toggle), not on every page load
+- `tests/test_pos_dashboard_cli.php`: updated to 95 checks (all passing)
+
+## 2026-06-29 — fix: POS Dashboard filter UI and safeOutput bug
+
+- `app/bms/pos/pos_dashboard.php`: defined `safeOutput()` locally (was undefined causing DataTable/dashboard JS errors)
+- `app/bms/pos/pos_dashboard.php`: changed default period from Monthly to Yearly
+- `app/bms/pos/pos_dashboard.php`: replaced From/To date range with period-specific pickers — Daily (single date), Weekly (any day → Mon–Sun computed), Monthly (month+year selects), Quarterly (Q1–Q4 + year), Yearly (year select)
+- `app/bms/pos/pos_dashboard.php`: `getDateRange()` / `showFilterPanel()` replace `setPeriodDates()`; all Apply buttons use class-based delegation
+- `tests/test_pos_dashboard_cli.php`: updated to 88 checks (all passing)
+
+## 2026-06-29 — feat: rewrite POS Dashboard (sales history first + period filter + toolbar)
+
+- `app/bms/pos/pos_dashboard.php`: complete rewrite — Sales History section shown at top (always visible), Dashboard section below (always visible); removed old toggle buttons (#btnViewDashboard / #btnViewHistory)
+- `app/bms/pos/pos_dashboard.php`: added period filter (Daily/Weekly/Monthly/Quarterly/Yearly) with smart date defaults; Monthly is the default; Apply button triggers table reload
+- `app/bms/pos/pos_dashboard.php`: Copy/CSV/Print toolbar matching suppliers.php style (white bordered box with icons); Show: page-length selector
+- `app/bms/pos/pos_dashboard.php`: fixed dashboard "Loading…" stuck bug — `.fail()` error handler updates all widget divs with user-friendly error + Refresh button
+- `app/bms/pos/pos_dashboard.php`: full ui-constants.md compliance (stat card bg:#e7f0ff + border:#b6ccfe, modal headers bg-primary, gear-fill action dropdown, no raw alert())
+- `tests/test_pos_dashboard_cli.php`: updated regression suite (74 checks, all passing)
+
+## 2026-06-29 — fix: budget permission key mismatch and activity log
+
+- `api/account/add_budget.php`: fixed `canCreate('budgets')` → `canCreate('budget')` (key mismatch was blocking all non-admins even when granted permission)
+- `api/account/add_budget.php`: improved activity log from raw IDs to human-readable message e.g. "Created budget: 'Office Supplies' — TZS 500,000.00 for January 2026"
+- `app/constant/accounts/budget.php`: added `$can_create_budget = canCreate('budget')` and switched both Add/Create Budget buttons to use it (previously incorrectly gated on `$can_edit_budget`)
+
+## 2026-06-29 — fix: project_view.php scope footer text to Reports tab only
+
+- `app/bms/operations/project_view.php`: replaced DOMContentLoaded blanket text swap with beforeprint/afterprint listeners; "This report was" now appears only when the #performance (Reports) tab is active — all other tabs keep "This document was"; afterprint always restores to "document"
+
+## 2026-06-29 — fix: project_view.php print footer text and page margins
+
+- `app/bms/operations/project_view.php`: added JS on DOMContentLoaded to replace "This document was" with "This report was" in the `.bms-print-footer` (only on this page; footer.php untouched)
+- `app/bms/operations/project_view.php`: changed `@page { size: A3 landscape; margin: 10mm !important; }` to `@page { margin: 10mm 8mm 16mm 8mm; }` to match the `i_e_print.md` standard and remove the incorrect A3 landscape override
+
+## 2026-06-29 — fix: projects.php edit form contract sum
+
+- `app/bms/operations/projects.php`: use `d.form_contract_sum` instead of `d.contract_sum` in `editProject()` so the Contract Sum field shows the original stored value, not the milestone-calculated total
+
+## 2026-06-29 (feat) — Smart Notification Engine: remaining emit points wired
+
+Wired the rest of the seeded events into their source actions/scheduler, completing
+event coverage (same fail-safe, kill-switched `dispatchEvent()` pattern as Phase 7).
+
+- Action-based emits (after the successful create): `api/purchase/create_debit_note.php` → `debit_note.pending`; `api/sales/create_credit_note.php` → `credit_note.pending`; `api/sales/create_return.php` → `sales_return.pending`; `api/create_purchase_return.php` → `purchase_return.pending`; `api/account/add_expense.php` → `expense.needs_review`; `api/create_grn.php` → `grn.pending`; `api/account/save_voucher.php` (create) → `voucher.needs_approval`
+- Time-based checks added to `cron/run_notification_checks.php`: `quotation.expiring` (quotations.quote_valid_until within 7 days, still open) and `tender.deadline` (tenders.submission_deadline within 7 days, not awarded/closed)
+- Verified: lint clean (8 files); all 9 events resolve recipients + dispatch (9/9); scheduler runs all three checks cleanly; test artifacts cleaned up
+- Added permanent regression suite `tests/test_notification_engine_cli.php` (gated by the pre-push hook + CI): files/lint, schema, seeded catalog, helpers, dispatch pipeline + idempotency, enqueue dedupe, mute logic, rule narrowing + no-access safety, mailer fail-silent, digest fallback, and a static check that every wired source file emits its event. 77/0, idempotent, self-cleaning. (It caught that `core/notify.php` doesn't auto-load `core/mailer.php` — fine in prod since the outbox worker loads it on demand; the test loads it explicitly.)
+
+## 2026-06-28 (feat) — Smart Notification Engine: Phases 1–2 (mailer + role-aware core)
+
+Foundation for an internal, role-aware notification engine that routes each business event
+to the people who actually have access to that area (verified via RBAC). Plan & tracker in
+`notification_engine_plan.md`. Email-only target; in-app working now.
+
+- **Phase 1 — Mailer (was missing entirely; `test_email_config.php` only simulated):**
+  - Vendored PHPMailer v6.9.1 into `includes/PHPMailer/` (no composer)
+  - `core/mailer.php` — `sendEmail()` + `bms_email_wrap()` + `mailer_last_error()`; SMTP from `system_settings` (per-call override supported); TLS via `includes/cacert.pem`; fail-silent
+  - `api/test_email_config.php` now actually sends (override + saved-password fallback)
+- **Phase 2 — Engine core:**
+  - Migration `2026_06_28_notification_engine_foundation.php`: `notifications.event_key/category`; tables `notification_events` (13 seeded), `notification_dedupe`, `notification_log`; `notif_master_enabled` setting
+  - `core/notify.php` — `usersWithPermission()`, `createNotification()`, `notifClaimDedupe()`, `notifLog()`, `resolveRecipients()` (permission-based), `dispatchEvent()` (in-app + audit, fail-safe)
+  - Verified: mailer 9/9; engine 6/6 (RBAC resolve, dispatch creates in-app+log, idempotent re-dispatch, unknown-event safe-skip)
+- **Phase 3 — Recipient resolution:** `resolveRecipients()` now intersects RBAC with **project-scope** (`user_projects`) and subtracts **per-user mutes** (`notifUserMuted` → `notifications_enabled`/`muted_events`/`muted_categories`); `usersWithPermission()` returns an `is_admin` flag. Verified 12/12 (scope drops non-assigned non-admins 4→1; mute excludes a user 4→3, prefs restored).
+- **Phase 4 — Channels & delivery:** migration `2026_06_28_notification_outbox.php` (email queue); `dispatchEvent()` enqueues an email per recipient (gated by `enable_email_notifications`) alongside the in-app notification; `enqueueEmail()` + `processNotificationOutbox()` worker (retry/backoff, give-up at max_attempts, logged) + `cron/process_notifications.php`. Email links use a configurable `app_url` (cron-safe). Verified 7/7 (4 queued, dedupe, worker requeues on SMTP failure).
+- **Phase 5 — Routing rules + Admin UI:** migration `2026_06_28_notification_rules.php` (`notification_rules` + `notification_rules` page_key). `resolveRecipients()` now applies admin rules (target = everyone-with-access / role / specific user) and sets per-recipient channels — a rule can only narrow within those who have access (cannot grant it); `previewRecipients()` added; fixed a `$base`/URL-base var collision in the dispatch loop. Admin screen `app/constant/settings/notification_rules.php` + `api/notifications/rules_api.php` (list/save/delete/toggle/preview/test-send), route in `roots.php`, menu link in `header.php`. Verified: engine 12/12 (incl. rule-to-no-access-user → nobody), save→preview→delete 5/5.
+- **Phase 6 — Scheduler:** `cron/run_notification_checks.php` (time-based checks; `invoice.overdue` implemented, extensible) emitting via `dispatchEvent`, deduped once/day per record; `header.php` runs the daily checks once/day + drains the email outbox (throttled ~2 min, fail-silent) — both also runnable via server cron. Verified 3/3 (5 overdue invoices → 11 in-app via per-invoice scope filtering; 2nd run idempotent).
+- **Phase 7 — Emit at source actions:** representative fail-safe, kill-switched emits after the successful write — `save_purchase_order.php` (create) → `po.needs_approval`; `save_invoice.php` (create) → `invoice.needs_review`. Pattern documented for the remaining endpoints. Verified: both events resolve recipients (4) + dispatch; lint clean.
+- **Phase 8 — Dashboard + bell unification:** the bell already reflects engine notifications (same `notifications` table). `app/dashboard.php` "System requires your attention" now also surfaces each user's unread **action** notifications from the engine (via `get_system_alerts`), excluding event types the inline alerts already compute (no double-count). Verified 2/2 (lint; query includes action items, excludes `invoice.overdue`).
+- **Phase 9 — AI daily digest:** `aiSummarizeNotifications()` reuses the provider-agnostic `aiComplete()` (`core/ai_service.php`) for a prioritized HTML briefing with a deterministic fallback when AI is off; `sendNotificationDigests()` queues one digest email/user/day (opt-in `notif_digest_enabled`, gated by master + global email, deduped) via the outbox; `cron/send_notification_digests.php` + header once/day throttle; admin "AI daily digest" toggle on the rules page. Verified: fallback summary + fresh-process cron queued 1 digest/user.
+- **Phase 10 — Hardening & rollout:** verified security gates (rules API admin-only + CSRF; page `autoEnforcePermission`), engine fail-safe + kill-switch + idempotent + permission/scope no-leak; final lint clean across all touched files; engine regression 4/4. Operations & Rollout guide added to `notification_engine_plan.md`. **Smart Notification Engine complete (Phases 1–10).**
+
+## 2026-06-28 (fix) — Lock posted/finalized documents from in-place edit (ledger integrity)
+
+Once a document is posted to the ledger (`journal_entries`) it must not be edited in place —
+corrections go through void/reverse. Audit showed **Invoice, GRN, and Payment Voucher** edit
+endpoints still accepted edits after posting (the others — Debit/Credit Note, Purchase/Sales
+Return, Expense, Manual Journal — were already locked to `pending`/`draft`/non-`paid`). Added a
+server-side **409 lock** on the three open edit endpoints, keyed off the authoritative
+`documentGlPosted()` (links by integer `entity_id`, never the display code):
+
+- `api/account/save_invoice.php` — edit branch refuses if `documentGlPosted('invoice', id)`
+- `api/update_grn.php` — refuses if `documentGlPosted('grn', id)` OR status `approved`
+- `api/account/save_voucher.php` — edit branch refuses if posted OR status `paid`/`approved`/`cancelled`
+
+Guards run before any write and only on the edit path (create flows untouched); approval/posting
+transitions live in other endpoints, so the workflow is unaffected. Verified: `php -l` clean on
+all three; runtime test 8/8 — posted/approved/paid rows blocked, pending/draft rows still editable.
+
+## 2026-06-28 (fix) — Edit/Save no longer force-jumps into the project when opened externally
+
+Editing a project-linked **Purchase Order, GRN, Delivery/Received Note, or Sales Order** from the
+general (external) area used to redirect to the project page after Save, because the redirect read
+the project stored **on the record**. The post-save redirect now follows the **origin** only — a
+project flag in the URL means "I came from inside the project":
+- came from a project → return to the project
+- opened externally → stay external (the document's own view / its list)
+
+The record keeps its own project link and still appears inside its project (unchanged). Create-new
+flows were already correct and left alone.
+
+- `app/bms/purchase/purchase_order_create.php` — added `$origin_project_id` (URL-only); PO edit redirect uses it instead of the record's `$project_id`
+- `app/bms/sales/sales_order_create.php` — redirect uses `$origin_project_id`, not the record/quote-derived `$back_project_id`
+- `app/bms/grn/dn_create.php` — DN edit `return_url` keys off `$origin_project_id`, not record/PO-derived
+- `app/bms/grn/grn_edit.php` — added `$origin_return_url` (URL-only) feeding the `return_url` hidden field; saved project link (`projectIdHidden`) unchanged
+- `app/bms/grn/grn_view.php` — reads `project_id` origin; Edit link forwards it; "Back to Project" button shows only when present (so in-project GRN editing still returns to the project)
+- `app/bms/operations/project_view.php` — GRN view links now carry `&project_id` so the in-project chain (project → GRN view → edit) keeps its origin
+- Verified: `php -l` clean on all 6; redirect render-check shows EXTERNAL → list/own-view and IN-PROJECT → project_view for all four documents (record project deliberately ignored)
+- Untouched (already correct): Debit Note, Purchase Return, Quotation, Sales Return, Credit Note
+
+---
+
+## 2026-06-27 (feat) — Company-prefixed sequential document codes (Group B — edit side / re-code-on-edit)
+
+Editable documents now upgrade a legacy code to `PREFIX-TYPE-NNNN` when edited & saved —
+**but only while the document is not yet posted to the GL** (a posted invoice/GRN keeps the
+number already shown on statements & printed PDFs). Decision confirmed with owner.
+
+- `core/code_generator.php` — added `documentGlPosted()` (true if a posted `journal_entries` row exists for the doc) and `codeForEditUnlessPosted()` (re-code only when not GL-posted; else return the code unchanged)
+- GL-posting docs (freeze once posted): `api/account/save_invoice.php` (INV, entity 'invoice'), `api/update_grn.php` (GRN, entity 'grn')
+- Non-GL docs (re-code whenever the form allows the edit, after any existing status-lock guard): `save_purchase_order.php` (PO), `save_quotation.php` (QT, after approved-lock), `save_sales_order.php` (SO/QT), `save_purchase_return.php` (PR), `save_voucher.php` (PV), `update_dn.php` (DN outbound only — inbound keeps the supplier's own number), `update_material_list.php` (ML), `update_rfq.php` (RFQ, draft-only), `customer/update_lpo.php` (LPO — preserves a manually-typed number)
+- Skipped (correct by the rule): Stock Adjustments (always GL-posted on create → code frozen), Delivery Orders (no doc-edit handler, only status change)
+- Runtime-verified: quotation edit re-codes legacy `QT-20260101-0001` → `BFS-QT-0002`, and a second edit does not re-burn; posted invoice #46 stays frozen while an unposted one re-codes
+- `company_code_prefix_plan.md` — Group B edit side marked done
+
+---
+
+## 2026-06-27 (feat) — Company-prefixed sequential document codes (Group B — create side)
+
+All remaining auto-generated document codes now use `nextCode()` → `PREFIX-TYPE-NNNN`
+(gap-free, sequential, inside the insert's transaction so a rollback releases the number).
+Replaces the old `MAX(id)+1` / `mt_rand()` / `COUNT(*)+1` patterns (which gapped and
+jumped). Runtime-verified against the real endpoints (BFS-ML-0001, BFS-QT-0001).
+
+- Sales/AR: `api/account/save_invoice.php` (INV, honors a manually-entered number), `save_quotation.php` (QT), `save_sales_order.php` (QT/SO), `save_receipt.php` (RCP), `record_payment.php` (PAY), `record_customer_advance.php` (ADV), `customer/add_lpo.php` (LPO)
+- Purchase/AP: `save_purchase_order.php` (PO), `save_purchase_return.php` (PR), `po_to_supplier_invoice.php` (SINV), `save_voucher.php` (PV), `add_supplier_payment.php` + `suppliers/add_project_payment.php` (SPY), `create_rfq.php` (RFQ)
+- Inventory/Ops: `approve_dn.php` (GRN), `create_dn.php` + `create_return_dn.php` (DN), `create_do.php` (DO), `create_material_list.php` (ML), `create_stock_adjustment.php` (ADJ, keeps manual override), `process_bulk_adjustment.php` (BULK), `operations/save_inspection.php` (INS), `operations/save_ipc.php` (IPC) — INS/IPC changed from per-project to company-wide sequence
+- Banking: `account/add_bank_transfer.php` (TRF), `add_revenue.php` (REV), `create_reconciliation.php` (REC)
+- Alternate create paths unified: `crm/convert_lead.php` (CUST+QT), `account/convert_quote_to_order.php` (SO), `import_customers.php` + `quick_add_customer.php` (CUST), `operations/create_invoice_from_ipc.php` (INV)
+- Left intentionally unchanged: payroll period codes, POS receipt generator (POS scope deferred), `received_invoices.php` invoice_ref (the supplier's own number), journal entries
+- `company_code_prefix_plan.md` — Group B create side marked done; edit-side re-code hooks still pending
+
+---
+
+## 2026-06-27 (feat) — Company-prefixed sequential document codes (foundation + Group A)
+
+- `core/code_generator.php` — NEW central generator: `nextCode()` (atomic, gap-free, shares caller's txn so a rolled-back insert releases the number), `codeForEdit()` (re-code a still-editable legacy code to `PREFIX-TYPE-NNNN`; keeps already-converted/manual codes), `peekNextCode()` (non-incrementing preview), `deriveCompanyPrefix()` (e.g. "BJP Technologies (T) Ltd" → BTL), `companyCodePrefix()`, `logCodeChange()`
+- `migrations/2026_06_27_company_code_sequences.php` — NEW: creates `code_sequences` (counter per type; column `last_no` — `last_value` is reserved in MySQL 8.4) + `code_change_log` (old→new audit); seeds `system_settings.company_code_prefix` (auto-derived, INSERT IGNORE) and 29 sequence types at 0. Idempotent
+- `app/constant/settings/company_profile.php` — added editable "Document Code Prefix" field (uppercase, letters-only, 2–5 chars) with live auto-suggest from company name + `PREFIX-INV-0001` preview
+- `.claude/security.md` — §18 updated: codes are now `PREFIX-TYPE-NNNN` via `nextCode()`/`codeForEdit()`; never `MAX(id)+1`/`rand()`
+- `api/create_nip_product.php`, `api/update_nip_product.php` — NIP item code via `nextCode`/`codeForEdit` (legacy `NIP-#####`)
+- `api/add_customer.php`, `api/process_edit_customer.php` — Customer code (CUST), create + re-code-on-edit
+- `api/add_supplier.php`, `api/update_supplier.php` — Supplier code (SUP), generated inside txn + re-code-on-edit
+- `api/add_sub_contractor.php`, `api/update_sub_contractor.php` — Sub-contractor code (SBC), same pattern
+- `api/crm/add_lead.php`, `api/crm/edit_lead.php` — Lead code (LEAD), create + re-code-on-edit
+- `api/add_employee.php`, `api/update_employee.php`, `app/bms/pos/employees.php` — Employee number (EMP): generate at save when blank/auto pattern, honor custom; page-load preview uses `peekNextCode()`; edit syncs `employee_code`
+- `company_code_prefix_plan.md` — NEW rollout tracker (foundation + Group A done; Group B pending). Existing/posted codes untouched; GL traces by integer `entity_id`, never the display code
+
+---
+
+## 2026-06-27 (fix) — activity_log.php: AI print — remove duplicate header, fix footer overlap
+
+- `app/activity_log.php` — Removed `bms-print-header` div from `#aiPrintSection`; global `renderPrintHeader()` in header.php already outputs the company logo + name on every print (no duplication needed); added `padding-bottom: 12mm` to `#aiPrintBody` so the fixed `.bms-print-footer` cannot overlap the last line of AI content
+
+---
+
+## 2026-06-27 (feat) — activity_log.php: AI Audit Intelligence print header/footer
+
+- `app/activity_log.php` — Print button in AI Audit Intelligence panel now uses `window.print()` on the main page instead of a popup window; added hidden `#aiPrintSection` div (revealed by `body.ai-printing` CSS class) using `renderPrintHeader()` pattern: company logo via `getSetting('company_logo')` + `getUrl()`, company name via `getSetting('company_name')`, both styled by the global `.bms-print-header`/`.bph-company` classes from `responsive.css`; print footer is the existing `.bms-print-footer` from `footer.php` — no custom footer code written; `@page` margin updated from `1cm` to canonical `10mm 8mm 16mm 8mm`; `body.ai-printing` CSS rules added in `@media print` to hide all main-content siblings and show only `#aiPrintSection`; `afterprint` event cleans up the class after print completes
+
+---
+
+## 2026-06-27 (feat) — services.php: convert table to DataTable + wider Product Name column + print fix
+
+- `app/bms/product/services.php` — DataTable initialized on #servicesTable; Product Name column set to 35% width (wider than all others); default per_page changed to 'all' so all records load client-side; PHP pagination block removed; custom search input wired to DataTable client-side search; server-side "Show:" selector hidden; DataTable controls (.dataTables_length/.filter/.info/.paginate) hidden in @media print so printing always shows clean table view only
+
+---
+
+## 2026-06-27 (fix) — Non-Inventory Product: remove product_name length limit + auto-generate Item Code
+
+- `migrations/2026_06_27_product_name_text.php` — alters `products.product_name` from `VARCHAR(255)` to `TEXT` (drops and recreates prefix index); fixes SQLSTATE[22001] truncation error on long names
+- `api/create_nip_product.php` — after INSERT, auto-generates `contract_item_no` as `NIP-XXXXX` (zero-padded product_id) and updates the row; returned in response JSON as `item_code`
+- `app/bms/product/services.php` — Item Code field in Add and Edit modals set to `readonly` with "Auto-generated on save" placeholder
+
+---
+
+## 2026-06-27 (feat) — AI Audit Intelligence panel in Activity Log (admin-only)
+
+- `api/ai_audit_analysis.php` — new admin-only POST endpoint; aggregates activity_logs into a ~600-token context block (totals by type, per-user breakdown with 30-day baseline comparison, off-hours access, sensitive module access, recent significant events) and calls aiComplete() for four modes
+- `app/activity_log.php` — added collapsible AI Audit Intelligence card (admin-only, purple left border) with 4 switchable modes: Daily Briefing (plain-English narrative + risk level), Anomaly Scanner (severity-rated findings vs baseline), Ask the Log (free-form Q&A with quick-question chips), Audit Report (formal management/compliance narrative with custom user+date scope); includes Print and Copy actions on AI output
+
+---
+
+## 2026-06-27 (feat) — Smart Activity Log: human-readable page-view labels + consecutive-View deduplication
+
+- `header.php` — replaced raw `page_view` + URL logging with URL-to-name conversion; now logs `"View Dashboard"` / `"User viewed Dashboard page"` instead of raw paths like `/bms/dashboard`
+- `app/activity_log.php` — removed duplicate manual `logActivity` view call (header.php handles it); rewrote DataTables endpoint to use a LAG-based dedup subquery that collapses consecutive View rows per user; fixed `acFormatActivity` and legacy processor to ucwords entity names so Type shows "View Activity Log" not "view activity log"
+
+---
+
+## 2026-06-26 (feat) — User Login History with GeoIP + Device detection
+
+**New feature inspired by WorkDo ERPGo — professional login audit trail.**
+
+- `migrations/2026_06_26_user_sessions_geo_device.php` — added 9 columns to `user_sessions`: `city`, `country`, `country_code`, `isp`, `org`, `timezone`, `browser`, `os`, `device_type`
+- `core/session_tracker.php` — added `parseUserAgent()` (browser/OS/device type from raw UA string) and `lookupGeoIP()` (ip-api.com call returning city/country/ISP/org/timezone); updated `startUserSession()` to enrich every login row with this data
+- `api/get_login_history.php` — new DataTables-compatible API returning paginated, filterable login history
+- `app/constant/settings/login_history.php` — new Admin-only Login History page: stats cards (Total/Today/Unique Users/Active Now), user+date filters, table with columns: User, IP, Location & Device, ISP/Org, Role badge, Login Time, Duration
+- `roots.php` — added `login_history` route
+- `header.php` — added "Login History" link under Admin → User Management
+
+---
+
+## 2026-06-26 (feat) — Audit log View/Create/Edit standardisation (all 5 phases)
+
+Standardised `logActivity()` calls across every module to the canonical 4-arg format:
+Type = `'View customers'` / `'Create warehouse'` / `'Edit customer'`; Description = `'User viewed …'` / `'User created a new …: Name (ID X)'` / `'User edited …: Name (ID X)'`.
+
+**Phase 1** — Customers, Suppliers, Invoices, Products  
+`app/bms/customer/customers.php`, `app/bms/Suppliers/suppliers.php`, `app/bms/invoice/invoices.php`, `app/bms/product/products.php`; `api/add_customer.php`, `api/process_edit_customer.php`, `api/add_supplier.php`, `api/update_supplier.php`, `api/account/save_invoice.php`, `api/create_product.php`, `api/update_product.php`
+
+**Phase 2** — Finance (POs, Sales Orders, Quotations, Expenses, Revenue, Vouchers, Journals, Bank Reconciliation)  
+`app/bms/purchase/purchase_orders.php`, `app/bms/sales/sales_orders.php`, `app/bms/sales/quotations/quotations.php`, `app/constant/accounts/expenses.php`, `app/constant/accounts/revenue.php`, `app/constant/accounts/payment_vouchers.php`, `app/constant/accounts/journals.php`, `app/constant/accounts/bank_reconciliation.php`; `api/account/add_expense.php`, `api/account/update_expense.php`, `api/account/add_revenue.php`, `api/account/save_purchase_order.php`, `api/account/save_sales_order.php`, `api/account/save_quotation.php`, `api/account/save_voucher.php`, `api/account/save_journal.php`, `api/account/update_journal.php`, `api/account/create_reconciliation.php`, `api/account/update_reconciliation.php`
+
+**Phase 3** — HR (Employees, Leave, Payroll)  
+`app/bms/pos/employees.php`, `app/bms/pos/leaves.php`, `app/bms/pos/payroll.php`; `api/add_employee.php`, `api/update_employee.php`, `api/apply_leave.php`, `api/update_leave.php` (also fixed undefined \$reference_number bug), `api/update_payroll.php`
+
+**Phase 4** — Operations & CRM (Delivery Notes, LPO, RFQ, Warehouses, Tenders, Assets, Leads, Campaigns)  
+`app/bms/grn/delivery_notes.php`, `app/bms/operations/assets.php`, `app/bms/purchase/rfq.php`, `app/bms/stock/warehouses.php`, `app/bms/tenders/tenders.php`, `app/bms/crm/crm_leads.php`; `api/create_dn.php`, `api/update_dn.php`, `api/create_rfq.php`, `api/update_rfq.php`, `api/operations/save_asset.php`, `api/customer/add_lpo.php`, `api/customer/update_lpo.php`, `api/crm/add_lead.php`, `api/crm/edit_lead.php`, `api/crm/save_campaign.php`
+
+**Phase 5** — Settings & COA (Users, Chart of Accounts, Activity Log, Roles, Tenders detail pages)  
+`app/activity_log.php`, `app/constant/accounts/chart_of_accounts.php`, `app/constant/settings/add_user.php`, `app/constant/settings/edit_user.php`, `app/constant/settings/user_roles.php`, `app/bms/tenders/tender_create.php`, `app/bms/tenders/tender_edit.php`, `app/bms/tenders/tender_view.php`; `api/account/save_account.php`
+
+## 2026-06-26 (fix) — Delete sweep batches 6-7: Parties/HR + Ops/Docs/Settings delete logs
+
+Standardized the remaining delete endpoints to `audit_log.md` (Type `Delete
+<entity>`, Description `deleted <entity> <number/name> with id …`). Delete
+behaviour unchanged.
+
+- **Parties/HR:** `delete_supplier.php` (both paths), `delete_sub_contractor.php`, `delete_leave.php`, `pos/delete_salary_component.php`, `payroll/delete_tax_bracket.php`, `suppliers/delete_project_payment.php`.
+- **Ops/Docs/Settings:** `operations/delete_project.php`, `delete_ipc.php`, `delete_inspection.php`, `delete_scope_document.php`, `delete_scope_addendum.php`, `delete_project_doc.php`, `delete_project_planning.php`; `delete_document_template.php`, `delete_email_template.php`, `delete_sms_template.php`, `delete_brand.php`, `delete_category.php`, `delete_compliance.php`, `delete_notification.php`; `document/delete_signature.php`, `document/delete_collateral_document.php`, `assets/delete_asset_category.php`, `account/delete_account.php`, `account/delete_account_category.php`, `cash_register/delete_shift.php`, `pos/delete_held_sale.php`.
+
+This completes the delete sweep: every delete endpoint/handler with a real delete now logs to the Activity Log in the standard format; the only deletes left unlogged are non-deletes (edit re-inserts, rate-limit cleanup) which were deliberately skipped per audit_log.md §8.
+
+## 2026-06-26 (fix) — Delete sweep batch 5: standardize Sales/CRM delete logs
+
+Standardized to `audit_log.md` (Type `Delete <entity>`, Description `deleted
+<entity> <number/name> with id …`). Delete behaviour unchanged.
+
+- `api/delete_customer.php`, `api/account/delete_sales_order.php`, `api/account/delete_quotation.php`
+- `api/sales/delete_return.php` (sales return), `api/customer/delete_lpo.php`
+- `api/crm/delete_lead.php`, `api/delete_lead.php`, `api/crm/delete_campaign.php`, `api/delete_campaign.php`, `api/crm/delete_activity.php`
+
+## 2026-06-26 (fix) — Delete sweep batch 4: standardize Procurement/Stock delete logs
+
+Standardized to `audit_log.md` (Type `Delete <entity>`, Description `deleted
+<entity> <number/name> with id …`). Delete behaviour unchanged.
+
+- `api/delete_purchase_order.php`, `api/account/delete_purchase_order.php`
+- `api/delete_purchase_return.php`, `api/account/delete_purchase_return.php`
+- `api/delete_dn.php` (delivery note), `api/delete_rfq.php`, `api/delete_product.php`
+- `api/delete_adjustment.php` (stock adjustment), `api/operations/delete_warehouse.php`
+- `api/operations/delete_asset.php`, `api/operations/delete_maintenance_log.php`
+
+## 2026-06-26 (fix) — Delete sweep batch 3: standardize Finance-group delete logs + smarter Type
+
+Standardized the `logActivity` format of Finance delete endpoints to `audit_log.md`
+(Type `Delete <entity>`, Description `deleted <entity> … with id …`). Delete
+behaviour unchanged.
+
+- `api/account/delete_invoice.php`, `delete_expense.php`, `delete_voucher.php`, `delete_journal.php`, `delete_budget.php`, `delete_reconciliation.php`
+- `api/delete_supplier_payment.php`, `api/sc/delete_payment.php`
+- `api/sales/delete_credit_note.php`, `api/purchase/delete_debit_note.php`
+
+Also improved the Type-column parser in `app/activity_log.php`: when an action is
+already a short clean "`<verb> <entity>`" (our standard) it renders the **full**
+multi-word entity (e.g. "Delete sub-contractor payment", "Delete payment voucher"),
+falling back to keyword detection only for messy legacy strings. Verified.
+
+## 2026-06-26 (fix) — Delete sweep batch 2: silent IN-PAGE deletes now logged
+
+Per `audit_log.md` §8, in-page delete handlers (delete logic inside `app/**`
+pages, not `api/` endpoints) that were silent on the Activity Log now write a
+`logActivity('Delete <entity>', 'deleted <entity> … with id …')`. No delete
+behaviour changed.
+
+- `app/bms/customer/customer_documents.php` — `deleteCustomerDocument()` now logs `Delete document` ("deleted customer document with id N"). *(This is the silent path the user hit.)*
+- `app/constant/document/customer_documents.php` — logs `Delete document` for each real source (customer_attachments / additional_attachments / profile-doc clear).
+- `app/constant/document/loan_documents.php` — logs `Delete document` ("deleted loan document with id N (loan id L)") **before** the redirect (which exits).
+- `app/bms/pos/api/pos_controller.php` `handleDeleteHeldSale()` — logs `Delete held sale` alongside its existing `logAudit`.
+
+Deliberately SKIPPED (not user-facing deletes, per the rule): `edit_journal.php` (its `DELETE journal_entry_items` is part of an edit re-insert) and `pos/includes/security.php` (`DELETE rate_limits` is internal cleanup). Avoided depending on unverifiable columns (table `customer_documents` not present locally) — log uses the id.
+
+## 2026-06-26 (feat) — Activity Logs: server-side DataTables (sort / search / paginate over 65k+ rows)
+
+- `app/activity_log.php` — replaced the custom AJAX pagination with a **server-side jQuery DataTable** (`serverSide: true`) on the activity table. New `?draw=` endpoint (reuses the filter conditions) returns DataTables JSON with each row rendered to the 6 columns (S/NO, Time, **Type**, **Description**, Reference, User). Adds column **sorting**, a **search box**, and proper paging across all 65k+ rows (not just the current page).
+  - Extracted the row formatter into reusable top-level functions `acFormatActivity()` / `acBadgeClass()` (one source of truth for Type/Description/Reference).
+  - **All 6 columns kept**; **Description stays the widest** (35% vs 15%).
+  - The activity **filters** (Type / User / Period / Custom range) drive a **full page reload** so the period-aware summary cards + the Time-in-System panel re-render correctly; the table sends the current filter values with every DataTables request. The "Limit" dropdown maps to DataTables page length.
+  - Verified end-to-end: draw endpoint returns recordsTotal 66,529, server-side ordering/paging, `type=delete` → 1,322, search "deleted document" → 16, "login" → 3.
+
+## 2026-06-26 (fix) — Delete sweep batch 1: silent deletes now appear on Activity Log
+
+Per `audit_log.md`, deletes that were invisible on the Activity Log (they wrote
+only to `audit_logs` via `logAudit`, or nothing at all) now also write a clear
+`logActivity` entry — Type `Delete <entity>`, Description `deleted <entity> <name>
+with id …`. No delete behaviour changed; existing `logAudit` calls kept.
+
+- `api/delete_attendance.php` — + `Delete attendance` ("deleted attendance record for employee <name> (id N) on <date>"); fetches employee name.
+- `api/delete_employee.php` — + `Delete employee` ("deleted (terminated) employee \"<name>\" with id N").
+- `api/delete_grn.php` — + `Delete grn` ("deleted GRN #<no> with id N (was <status>)").
+- `api/document/delete_document.php` — + `Delete document` ("deleted document \"<name>\" with id N"); SELECT now pulls document_name/original_filename.
+- `api/document/delete_document_template.php` — + `Delete document template`; captures template_name before delete; moved logging before output.
+- `api/delete_payroll.php` — + `Delete payroll` ("deleted (voided) payroll #<no> with id N — <reason>") (a void = Delete in audit terms).
+- `api/delete_backup.php` — was fully silent (no logging); + `Delete backup` ("deleted backup file \"<name>\""). NOTE: this endpoint still has its permission check commented out — flagged, not changed (out of scope for this logging task).
+
+Verified end-to-end (a real delete writes the expected activity_logs row) and that all seven render as smart Type `Delete <entity>` and are caught by the Delete filter. Shims (`api/delete_account.php`, `delete_budget.php`, `delete_expense.php`, `delete_account_category.php`) just include the `account/` versions which already log — untouched.
+
+## 2026-06-26 (feat) — Activity Logs: Period-driven cards + Custom (specify) date range
+
+- `app/activity_log.php` — **Period** is now the authoritative date filter (server-side), driving both the table and the summary cards. Default **Today**; options Today / This Week / This Month / This Year / All Time / Custom. The card label follows it: **"Created Today" → "Created This Month" / This Week / This Year / All Time** (verified: Today 177 created → This Month 4,436 → All Time 5,078). Range computed server-side so client/server can't drift.
+- **Custom (specify)** — the From/To date inputs are now hidden and only revealed when Period = "➕ Custom (specify)…" (the same "Other → specify" pattern used on the supplier form); a custom date reload fires when a date is picked. Removed the old client-side date-preset JS (replaced by the server-authoritative logic).
+
+## 2026-06-26 (feat) — Activity Logs: summary cards now follow the active filters (live)
+
+- `app/activity_log.php` — the Created/Viewed/Updated/Deleted cards were fixed to "today, all users". They now reflect the **active user + date-range filters** (the Type filter is excluded — the cards ARE the per-type breakdown). When no date is set they default to today; the label switches **"Today" → "In range"** accordingly. Cards update **live** on AJAX filter change (stats added to the AJAX JSON; card values + label refreshed in JS). Verified scoping (today/all = 162 created vs user#4/all-dates = 4,893).
+- (Session "time in system" was already implemented: filter by one user → the Time-in-System panel shows total/sessions/avg/last-login + a recent-sessions table with login→logout→duration→how-it-ended→IP.)
+
+## 2026-06-26 (feat) — Activity Logs: audit standard (audit_log.md) + smart Type + accurate cards
+
+- `audit_log.md` (new) — the audit/activity-log standard: the six core activities (View/Create/Edit/Delete/Review/Approve), the **Type** format (`<Verb> <entity>`, e.g. "Delete invoice"), the **Description** format (starts with the past-tense action + entity + id, e.g. "deleted invoice with id 7"), the `logActivity()` calling convention, legacy-verb normalisation, session "time in system", and the roll-out order (Delete→Edit→View→Create→Review→Approve).
+- `app/activity_log.php`:
+  - **One shared canonical verb map** now drives the filter, the summary cards AND the Type column, so they always agree (audit_log.md §6). Map absorbs legacy variants (page_view→View, update_*→Edit, Recorded→Create, Void→Delete).
+  - **Summary cards fixed** — they were undercounting badly (e.g. "Viewed Today" 55 while 572 `page_view` rows existed). Now Viewed≈627, Created 68→147, using the same mapping as the filter. Underscore-escaped so `page_view`/`update_` match literally.
+  - **Type column** is now the smart short `<Verb> <entity>` (verb from the action's first word normalised to canonical; entity = first recognised business entity). Description column shows the full logged detail.
+- Note: legacy inconsistent log strings still render best-effort until each action type is standardised to audit_log.md (the next phase: Delete→…→Approve).
+
+## 2026-06-26 (feat) — Activity Logs: 6-type filter, role-delete logging, session/time-in-system tracking
+
+**Activity Type filter (`app/activity_log.php`)** — replaced the messy auto-built distinct-action dropdown with the six canonical types **View / Create / Edit / Delete / Review / Approve**. Each maps to the real verb variants in the data (Edit→Updated/Edited, Create→Created/Added, Delete→Deleted/Removed, …) and matches at the START of action OR description, so filtering returns exactly that kind. Verified against live data (e.g. delete→1,301 rows).
+
+**Role delete logging (`app/constant/settings/user_roles.php`)** — the existing delete (kept as-is: real delete, shown only when role has 0 users and isn't Administrator) now captures the role **name** + permission count BEFORE deleting, so the activity entry reads clearly, e.g. `Deleted role "Secretary" (ID 5) and its 23 permission setting(s)`. Renders correctly across activity_log.php's columns (Type/Description/Reference #5/User/Time). Who + when are captured automatically by logActivity.
+
+**Login/logout session tracking + "Time in System":**
+- `migrations/2026_06_26_user_sessions.php` — new `user_sessions` ledger (user_id, login_at, logout_at, duration_seconds, logout_type, ip, user_agent). Idempotent.
+- `core/session_tracker.php` — `startUserSession` / `endUserSession` (idempotent, computes duration) / `formatDuration` ("2h 15m") / `userSessionSummary`. All best-effort (never block auth).
+- `actions/login.php` — opens a session row + writes a `Login` activity event (who/when/IP).
+- `logout.php` — before destroying the session, closes the row (stamps logout + duration) + writes a `Logout` event: *"Logged out — session lasted 2h 15m"*. Bootstraps the DB; fully wrapped so sign-out never breaks.
+- `app/activity_log.php` — when filtered by a single user, shows a **Time in System** panel: total time, # sessions (+ open badge), avg/session, last login, and a recent-sessions table (login, logout, duration, how-it-ended, IP). Open/timed-out sessions are shown honestly (no faked end time).
+
+## 2026-06-26 (fix) — supplier/sub-contractor: action button + "Projects Involved" primary project
+
+- `app/bms/Suppliers/suppliers.php`, `app/bms/operations/sub_contractors.php` — removed the "Actions" text from the per-row action button (gear icon only).
+- `app/bms/Suppliers/supplier_details.php`, `app/bms/operations/sub_contractor_details.php` — "Projects Involved" now UNIONs the `*_projects` junction with the **primary project chosen at registration** (`*.project_id`), which was previously missing ("No projects involved" even though a project was selected on creation). The primary row shows a "Primary" badge, no "Remove from Project" (it's the registration link, not a junction row), and — per request — its **Assigned on / Assigned by** are populated from the supplier/sub-contractor's `created_at` / `created_by` (who registered it and when).
+
+## 2026-06-26 (feat) — self-growing "Other → type → saved" dropdowns (customers)
+
+Extends the supplier/sub-contractor pattern to the Customer form (Add + Edit).
+
+- `migrations/2026_06_26_form_lookups_customer.php` — seeds `customer_type` (individual/business/government/ngo, its own list) + adds `cash` to the shared `payment_terms`; **widens `customers.customer_type` from a restrictive ENUM to VARCHAR(100)** so a typed value can actually be stored (matches suppliers/sub-contractors). Idempotent.
+- `app/bms/customer/customers.php` — Add+Edit modals: customer_type, year (1950→next yr searchable), category (`customer_categories`), payment_terms, currency → `renderOtherSelect()`; generic Other→input JS; edit-populate injects typed values. (No project column in the customer list, so no project-display fix needed.)
+- `api/add_customer.php`, `api/process_edit_customer.php` — resolve "Other", create-new-category against `customer_categories`, persist new values via `upsertFormLookup()`.
+- `tests/test_form_lookups_customer_cli.php` — 17 checks incl. a real end-to-end create+save through `add_customer.php` (self-cleaning). Green.
+
+## 2026-06-26 (feat) — self-growing "Other → type → saved" dropdowns (suppliers + sub-contractors)
+
+Reference-data dropdowns are now flexible: pick an option, or choose **"Other"** to swap the dropdown for a text input, type a new value, and it is **saved for next time** — no code/DB edits ever needed. Applied to **both Add and Edit** forms.
+
+- `migrations/2026_06_26_form_lookups.php` — new `form_lookups` table `(lookup_key,value,label,sort_order,status,…)` + seeds `supplier_type`, `payment_terms`, `currency`. Idempotent.
+- `migrations/2026_06_26_form_lookups_subcontractor.php` — seeds `sub_contractor_type` (separate list); payment_terms + currency shared with suppliers.
+- `core/form_lookups.php` — `formLookupOptions()`, `renderOtherSelect()` (the reusable dropdown+Other-input widget), `upsertFormLookup()` (persists a typed value).
+- `api/lookups/get_lookups.php` — Select2-AJAX source for these lists.
+- `app/bms/Suppliers/suppliers.php` — Add+Edit modals: supplier_type, year (1950→next yr, searchable), category, payment_terms, currency → `renderOtherSelect()`; generic Other→input JS; project-list now shows the **primary project name** (was "—").
+- `api/add_supplier.php`, `api/update_supplier.php` — resolve "Other", persist new values via `upsertFormLookup()`.
+- `app/bms/operations/sub_contractors.php` — same 10 widgets (own `sub_contractor_type` list) + generic JS + edit-populate injects typed values + project-list fix.
+- `api/add_sub_contractor.php`, `api/update_sub_contractor.php` — resolve "Other", create-new-category, persist new values.
+- `header.php` + `footer.php` — global Select2-in-modal fix: disable Bootstrap modal focus-trap (`Modal.Default.focus=false`) + Select2 dropdown z-index/independent scroll, so dropdowns don't close on click. System-wide; future modals inherit it.
+- `tests/test_form_lookups_subcontractor_cli.php` — 19 checks incl. a real end-to-end create+save through `add_sub_contractor.php` (self-cleaning). Green.
+
 ## 2026-06-25 (fix) — void orphan payroll_accrual test entries (Salaries Payable cleanup)
 
 - `migrations/2026_06_25_payroll_accrual_orphan_cleanup.php` — soft-voids posted `payroll_accrual` journal entries whose `entity_id` has **no matching `payroll` row** (test-script accruals: future-dated 2031, fake payroll ids `9000xxxx`, incl. a 2-billion fake salary, 22 reruns). **154 voided locally.** Criteria-based + idempotent (re-run finds 0). Each orphan is an internally-balanced entry, so the ledger stays balanced (Dr−Cr diff 0.00 → 0.00). Removes ~44.3B of bogus **Salaries Payable** (all-dates 44,357,073,837.63 → 56,770,999.63) and the matching **Wages & Salaries** expense.

@@ -1454,13 +1454,17 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <h5 class="fw-bold mb-1"><i class="bi bi-file-earmark-ruled me-2 text-primary"></i>Request for Quotation (RFQ)</h5>
                                 <p class="text-muted small mb-0">Manage RFQs linked to this project.</p>
                             </div>
-                            <div>
-                                <button class="btn btn-outline-primary btn-sm me-2" onclick="loadProjectDetails()">
+                            <div class="d-flex gap-2 align-items-center flex-wrap">
+                                <button class="btn btn-outline-primary btn-sm" onclick="loadProjectDetails()">
                                     <i class="bi bi-arrow-clockwise"></i> Refresh
                                 </button>
-                                <a href="<?= getUrl('rfq_create') ?>?project=<?= $project_id ?>" class="btn btn-primary btn-sm">
+                                <a href="<?= getUrl('rfq_create') ?>?project=<?= $project_id ?>&back=rfq" class="btn btn-primary btn-sm">
                                     <i class="bi bi-plus-circle me-1"></i> Create RFQ
                                 </a>
+                                <div class="btn-group shadow-sm" role="group">
+                                    <button type="button" class="btn btn-primary btn-sm text-white" id="dtRFQs-btn-tbl" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('dtRFQs','table')" title="Table View"><i class="bi bi-table"></i></button>
+                                    <button type="button" class="btn btn-light btn-sm border" id="dtRFQs-btn-crd" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('dtRFQs','card')" title="Card View"><i class="bi bi-grid-3x3-gap"></i></button>
+                                </div>
                             </div>
                         </div>
                         <div class="text-center mb-4 report-header d-none d-print-block">
@@ -1489,7 +1493,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <button class="btn btn-outline-primary btn-sm me-2" onclick="loadProjectDetails()">
                                     <i class="bi bi-arrow-clockwise"></i> Refresh
                                 </button>
-                                <button class="btn btn-primary btn-sm" onclick="window.location.href='<?= getUrl('purchase_order_create') ?>?project=<?= $project_id ?>&type=supply_order&return_url=<?= urlencode(getUrl('project_view') . '?id=' . $project_id . '&tab=procurement') ?>'">
+                                <button class="btn btn-primary btn-sm" onclick="window.location.href='<?= getUrl('purchase_order_create') ?>?project=<?= $project_id ?>&type=supply_order&back=procurement'">
                                     <i class="bi bi-plus-circle me-1"></i> Create Order
                                 </button>
                             </div>
@@ -1717,30 +1721,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                         </div>
 
-                        <!-- Filter Bar -->
-                        <div class="card shadow-sm mb-3 border-0 d-print-none">
-                            <div class="card-body py-2">
-                                <div class="row g-2 align-items-center">
-                                    <div class="col-md-7">
-                                        <input type="text" class="form-control form-control-sm" id="procMatSearch"
-                                            placeholder="Search name or list number…" oninput="procFilterMatTable()">
-                                    </div>
-                                    <div class="col-md-3">
-                                        <select class="form-select form-select-sm" id="procMatPerPage" onchange="procFilterMatTable(true)">
-                                            <option value="10">Show 10</option>
-                                            <option value="25" selected>Show 25</option>
-                                            <option value="50">Show 50</option>
-                                            <option value="100">Show 100</option>
-                                            <option value="all">Show All</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-2 text-end">
-                                        <span class="text-muted small" id="procMatCountLabel"></span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
                         <!-- Export / Print -->
                         <div class="d-flex gap-2 mb-3 d-print-none">
                             <button onclick="procExportMatPDF()" style="background:#fff;border:1px solid #dee2e6;border-radius:3px;font-size:.78rem;padding:.22rem .55rem;cursor:pointer;">
@@ -1778,10 +1758,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </thead>
                                     <tbody id="procMatTableBody"></tbody>
                                 </table>
-                            </div>
-                            <div class="bg-white py-3 d-flex justify-content-between align-items-center d-print-none">
-                                <div id="procMatPaginationInfo" class="text-muted small fw-bold"></div>
-                                <div id="procMatPageControls" class="d-flex gap-1"></div>
                             </div>
                         </div>
 
@@ -7806,8 +7782,8 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
         body.overview-print .print-header-overview { display: block !important; }
         body.overview-print .workspace-card-main { display: none !important; }
         
-        /* Force Landscape for the whole page */
-        @page { size: A3 landscape; margin: 10mm !important; }
+        /* Standard page margins for all prints from this page */
+        @page { margin: 10mm 8mm 16mm 8mm; }
 
         /* Overview Financial Cards — Force single row with 6 equal columns in print */
         body.overview-print #overviewFinancialCards {
@@ -9187,8 +9163,7 @@ function renderPurchases(purchases) {
         $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-file-earmark-text fs-1 mb-3"></i><p>No supply orders linked to this project.</p></div>');
         return;
     }
-    
-    let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Supplier</th><th>Date</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    let html = '<div class="table-responsive"><table id="procPOInnerTable" class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Supplier</th><th>Date</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
     purchases.forEach((p, idx) => {
         html += `<tr>
             <td class="text-center fw-bold text-muted">${idx + 1}</td>
@@ -9205,7 +9180,7 @@ function renderPurchases(purchases) {
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                         <li><a class="dropdown-item py-2" href="purchase_order_details?id=${p.purchase_order_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
-                        <li><a class="dropdown-item py-2" href="purchase_order_create?edit=${p.purchase_order_id}&project=<?= $project_id ?>&type=supply_order"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
+                        <li><a class="dropdown-item py-2" href="purchase_order_create?edit=${p.purchase_order_id}&project=<?= $project_id ?>&type=supply_order&back=procurement"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printPurchaseOrder(${p.purchase_order_id})"><i class="bi bi-printer text-dark me-2"></i>Print Order</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deletePurchase(${p.purchase_order_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
@@ -9216,6 +9191,8 @@ function renderPurchases(purchases) {
     });
     html += '</tbody></table></div>';
     $list.html(html);
+    if ($.fn.DataTable.isDataTable('#procPOInnerTable')) $('#procPOInnerTable').DataTable().destroy();
+    $('#procPOInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 7] }] });
 }
 
 function renderPurchasesFull(purchases) {
@@ -9227,8 +9204,7 @@ function renderPurchasesFull(purchases) {
         $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-bag fs-1 mb-3"></i><p>No purchase orders linked to this project.</p></div>');
         return;
     }
-    
-    let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Supplier</th><th>Date</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    let html = '<div class="table-responsive"><table id="procPOFullInnerTable" class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Supplier</th><th>Date</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
     purchases.forEach((p, idx) => {
         html += `<tr>
             <td class="text-center fw-bold text-muted">${idx + 1}</td>
@@ -9245,7 +9221,7 @@ function renderPurchasesFull(purchases) {
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                         <li><a class="dropdown-item py-2" href="purchase_order_details?id=${p.purchase_order_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
-                        <li><a class="dropdown-item py-2" href="purchase_order_create?edit=${p.purchase_order_id}&project=<?= $project_id ?>"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
+                        <li><a class="dropdown-item py-2" href="purchase_order_create?edit=${p.purchase_order_id}&project=<?= $project_id ?>&back=procurement"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printPurchaseOrder(${p.purchase_order_id})"><i class="bi bi-printer text-dark me-2"></i>Print Order</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deletePurchase(${p.purchase_order_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
@@ -9256,6 +9232,8 @@ function renderPurchasesFull(purchases) {
     });
     html += '</tbody></table></div>';
     $list.html(html);
+    if ($.fn.DataTable.isDataTable('#procPOFullInnerTable')) $('#procPOFullInnerTable').DataTable().destroy();
+    $('#procPOFullInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 7] }] });
 }
 
 function renderDNs(dns) {
@@ -9328,7 +9306,7 @@ function renderDNs(dns) {
         responsive: true,
         pageLength: 25,
         order: [[4,'desc']],
-        dom: '<"top d-print-none"f>rt<"clear">',
+        dom: '<"d-print-none"lf>rtip',
         columnDefs: [
             {responsivePriority:1, targets:0},
             {responsivePriority:1, targets:1},
@@ -9437,7 +9415,7 @@ function renderDOs(dos) {
         pageLength: 25,
         order: [[3, 'desc']],
         autoWidth: false,
-        dom: '<"top d-print-none"f>rt<"clear">',
+        dom: '<"d-print-none"lf>rtip',
         columnDefs: [
             { targets: [0,1,6], responsivePriority: 1 },
             { targets: [2,4,5], responsivePriority: 2 },
@@ -9458,7 +9436,7 @@ function renderGRNs(grns) {
     }
     
     let grnHtml = '<div class="table-responsive"><table id="procGRNInnerTable" class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>GRN Number</th><th>Supplier</th><th>Date</th><th>PO #</th><th>DN Ref</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
-    let dnHtml = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>DN Reference</th><th>Supplier</th><th>Date</th><th>PO #</th><th>GRN Ref</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    let dnHtml = '<div class="table-responsive"><table id="procGRNDNInnerTable" class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>DN Reference</th><th>Supplier</th><th>Date</th><th>PO #</th><th>GRN Ref</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
     
     let dnsCount = 0;
     let grnCount = 0;
@@ -9479,7 +9457,8 @@ function renderGRNs(grns) {
                         <i class="bi bi-gear"></i>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                        <li><a class="dropdown-item py-2" href="grn_view?id=${g.receipt_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                        <li><a class="dropdown-item py-2" href="grn_view?id=${g.receipt_id}&project_id=<?= $project_id ?>"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                        <li><a class="dropdown-item py-2" href="grn_edit?id=${g.receipt_id}&project_id=<?= $project_id ?>"><i class="bi bi-pencil text-info me-2"></i>Edit GRN</a></li>
                         <li><a class="dropdown-item py-2" href="grn_print?id=${g.receipt_id}" target="_blank"><i class="bi bi-printer text-dark me-2"></i>Print GRN</a></li>
                     </ul>
                 </div>
@@ -9498,7 +9477,7 @@ function renderGRNs(grns) {
                 <td><small class="text-muted">${g.receipt_number}</small></td>
                 <td><span class="badge bg-${getStatusBadgeColor(g.status)}">${g.status}</span></td>
                 <td class="text-end d-print-none">
-                    <a href="grn_view?id=${g.receipt_id}" class="btn btn-sm btn-outline-info"><i class="bi bi-eye"></i></a>
+                    <a href="grn_view?id=${g.receipt_id}&project_id=<?= $project_id ?>" class="btn btn-sm btn-outline-info"><i class="bi bi-eye"></i></a>
                 </td>
             </tr>`;
         }
@@ -9508,12 +9487,15 @@ function renderGRNs(grns) {
     dnHtml += '</tbody></table></div>';
     
     $grnList.html(grnHtml);
-    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procGRNInnerTable');
+    if ($.fn.DataTable.isDataTable('#procGRNInnerTable')) $('#procGRNInnerTable').DataTable().destroy();
+    $('#procGRNInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 7] }] });
 
     if (dnsCount === 0) {
         $dnList.html('<div class="py-5 text-center text-muted"><i class="bi bi-truck-flatbed fs-1 mb-3"></i><p>No delivery notes (DN) found for this project.</p></div>');
     } else {
         $dnList.html(dnHtml);
+        if ($.fn.DataTable.isDataTable('#procGRNDNInnerTable')) $('#procGRNDNInnerTable').DataTable().destroy();
+        $('#procGRNDNInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 7] }] });
     }
 }
 
@@ -9554,6 +9536,8 @@ function renderReturns(returns) {
     });
     html += '</tbody></table></div>';
     $list.html(html);
+    if ($.fn.DataTable.isDataTable('#procReturnsInnerTable')) $('#procReturnsInnerTable').DataTable().destroy();
+    $('#procReturnsInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 8] }] });
     if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procReturnsInnerTable');
 }
 
@@ -9602,6 +9586,8 @@ function renderProjectDebitNotes(notes) {
     });
     html += '</tbody></table></div>';
     $list.html(html);
+    if ($.fn.DataTable.isDataTable('#procDebitNotesInnerTable')) $('#procDebitNotesInnerTable').DataTable().destroy();
+    $('#procDebitNotesInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 8] }] });
     if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procDebitNotesInnerTable');
 }
 
@@ -9635,41 +9621,51 @@ function deleteProjectDebitNote(id) {
 function renderRFQs(rfqs) {
     const $list = $('#procRFQTable');
     if (!rfqs || rfqs.length === 0) {
-        $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-file-earmark-ruled fs-1 mb-3 d-block"></i><p>No RFQs found for this project.</p><a href="<?= getUrl('rfq_create') ?>?project=<?= $project_id ?>" class="btn btn-primary btn-sm mt-2"><i class="bi bi-plus-circle me-1"></i> Create RFQ</a></div>');
+        $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-file-earmark-ruled fs-1 mb-3 d-block"></i><p>No RFQs found for this project.</p><a href="<?= getUrl('rfq_create') ?>?project=<?= $project_id ?>&back=rfq" class="btn btn-primary btn-sm mt-2"><i class="bi bi-plus-circle me-1"></i> Create RFQ</a></div>');
         return;
     }
-    const statusColors = { draft:'secondary', sent:'primary', received:'info', approved:'success', cancelled:'danger' };
     if ($.fn.DataTable && $.fn.DataTable.isDataTable('#dtRFQs')) $('#dtRFQs').DataTable().destroy();
-    let html = '<div class="table-responsive"><table id="dtRFQs" class="table table-hover align-middle mb-0" style="width:100%">'
-             + '<thead class="table-light text-uppercase small fw-bold"><tr>'
-             + '<th class="ps-3" style="width:50px;">S/NO</th>'
+    let html = '<div class="table-responsive"><table id="dtRFQs" class="table table-hover align-middle border" style="width:100%">'
+             + '<thead class="table-light text-nowrap"><tr>'
+             + '<th style="width:50px;">S/NO</th>'
              + '<th>RFQ Number</th>'
-             + '<th>Product / Item</th>'
+             + '<th>Date</th>'
              + '<th>Supplier</th>'
              + '<th>Warehouse</th>'
-             + '<th>RFQ Date</th>'
-             + '<th>Deadline</th>'
-             + '<th style="width:100px;">Status</th>'
-             + '<th class="text-end d-print-none" style="width:80px;">Actions</th>'
+             + '<th>Status</th>'
+             + '<th class="text-end d-print-none">Actions</th>'
              + '</tr></thead><tbody>';
 
     rfqs.forEach((r, idx) => {
-        const sc = statusColors[r.status] || 'secondary';
+        const sc = getStatusBadgeColor(r.status);
+        const isApproved  = r.status === 'approved';
+        const isDraft     = r.status === 'draft';
+        const isReview    = r.status === 'review';
+        const createPOOpt = isApproved && r.supplier_id
+            ? `<li><hr class="dropdown-divider opacity-50"></li>
+               <li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('purchase_order_create') ?>?supplier=${r.supplier_id}&rfq_ref=${r.rfq_id}&project=<?= $project_id ?>&back=procurement">
+                   <i class="bi bi-cart-plus me-2"></i>Create Purchase Order</a></li>` : '';
         html += `<tr>
-            <td class="ps-3 text-muted fw-bold">${idx + 1}</td>
-            <td><div class="fw-bold text-primary">${r.rfq_number}</div></td>
-            <td><div class="fw-bold">${r.product_name || 'N/A'}</div><small class="text-muted">${r.description || ''}</small></td>
-            <td><small>${r.supplier_name || 'N/A'}</small></td>
-            <td><small>${r.warehouse_name || 'N/A'}</small></td>
+            <td class="text-center fw-bold text-muted">${idx + 1}</td>
+            <td><span class="fw-bold text-primary">${safeOutput(r.rfq_number)}</span></td>
             <td><small>${formatDate(r.rfq_date)}</small></td>
-            <td><small class="${r.deadline_date && new Date(r.deadline_date) < new Date() && r.status !== 'approved' ? 'text-danger fw-bold' : ''}">${formatDate(r.deadline_date)}</small></td>
+            <td><small>${safeOutput(r.supplier_name) || 'N/A'}</small></td>
+            <td><small>${safeOutput(r.warehouse_name) || 'N/A'}</small></td>
             <td><span class="badge bg-${sc} text-uppercase">${r.status}</span></td>
             <td class="text-end d-print-none">
                 <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                        <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_view') ?>?id=${r.rfq_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
-                        <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_create') ?>?edit=${r.rfq_id}&project=<?= $project_id ?>"><i class="bi bi-pencil text-info me-2"></i>Edit RFQ</a></li>
+                    <button class="btn btn-sm btn-white border dropdown-toggle" style="background:#fff;" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_view') ?>?id=${r.rfq_id}&back=rfq"><i class="bi bi-eye text-primary me-2"></i>View</a></li>
+                        ${isDraft ? `<li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('rfq_view') ?>?id=${r.rfq_id}&back=rfq"><i class="bi bi-eye-fill me-2"></i>Review</a></li>` : ''}
+                        ${isReview ? `<li><a class="dropdown-item py-2 text-success fw-semibold" href="#" onclick="approveRFQ(${r.rfq_id},'${r.rfq_number}');return false;"><i class="bi bi-check-circle me-2"></i>Approve</a></li>` : ''}
+                        <li><a class="dropdown-item py-2" href="#" onclick="printRFQ(${r.rfq_id});return false;"><i class="bi bi-printer text-dark me-2"></i>Print</a></li>
+                        ${isDraft ? `<li><a class="dropdown-item py-2" href="<?= getUrl('rfq_create') ?>?edit=${r.rfq_id}&project=<?= $project_id ?>&back=rfq"><i class="bi bi-pencil text-info me-2"></i>Edit</a></li>` : ''}
+                        ${createPOOpt}
+                        <li><hr class="dropdown-divider opacity-50"></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="#" onclick="deleteRFQ(${r.rfq_id},'${r.rfq_number}');return false;"><i class="bi bi-trash me-2"></i>Delete</a></li>
                     </ul>
                 </div>
             </td>
@@ -9678,8 +9674,51 @@ function renderRFQs(rfqs) {
     html += '</tbody></table></div>';
     $list.html(html);
     if ($.fn.DataTable) {
-        $('#dtRFQs').DataTable({ pageLength: 25, order: [[5,'desc']], autoWidth: false, responsive: true });
+        $('#dtRFQs').DataTable({ pageLength: 25, order: [[2,'desc']], autoWidth: false, responsive: false, dom: 'rtip' });
     }
+    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('dtRFQs');
+}
+
+function printRFQ(id) {
+    window.open('<?= getUrl('print_rfq') ?>?id=' + id, '_blank');
+}
+
+function approveRFQ(id, number) {
+    Swal.fire({
+        title: 'Approve RFQ?',
+        text: `RFQ #${number} will be marked as approved.`,
+        icon: 'question', showCancelButton: true,
+        confirmButtonColor: '#198754', confirmButtonText: 'Yes, Approve It', cancelButtonText: 'Cancel'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/approve_rfq') ?>', { rfq_id: id }, function (res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Approved!', text: res.message, timer: 2000, showConfirmButton: false })
+                    .then(() => loadProjectDetails());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not approve RFQ.' });
+            }
+        }, 'json').fail(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' }));
+    });
+}
+
+function deleteRFQ(id, number) {
+    Swal.fire({
+        title: 'Delete RFQ?',
+        text: `RFQ #${number} will be permanently deleted and cannot be recovered.`,
+        icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, Delete It', cancelButtonText: 'Cancel'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/delete_rfq') ?>', { rfq_id: id }, function (res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 2000, showConfirmButton: false })
+                    .then(() => loadProjectDetails());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not delete RFQ.' });
+            }
+        }, 'json').fail(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' }));
+    });
 }
 
 function renderExpenses(expenses) {
@@ -9995,7 +10034,7 @@ function renderInventory(inventory) {
         autoWidth: false,
         pageLength: 25,
         order: [[1, 'asc']],
-        dom: '<"top d-print-none"f>rt<"clear">',
+        dom: '<"d-print-none"lf>rtip',
         columnDefs: [
             { responsivePriority: 6, targets: 0 },
             { responsivePriority: 1, targets: 1 },
@@ -12346,15 +12385,13 @@ const PROC_PROJECT_NIPS  = <?= json_encode(array_values($proj_nip_products)) ?>;
 const PROC_VIEW_ML_URL   = '<?= getUrl('view_material_list') ?>';
 
 // ── Load / render ─────────────────────────────────────────────────────────
-var procMatAllData   = [];
-var procMatCurrPage  = 1;
+var procMatAllData = [];
 
 function loadProcMaterials() {
     $('#procMaterialsCard').hide();
     $('#procMaterialsEmpty').show();
+    if ($.fn.DataTable.isDataTable('#procMatTable')) { $('#procMatTable').DataTable().destroy(); }
     $('#procMatTableBody').empty();
-    $('#procMatPaginationInfo').text('');
-    $('#procMatPageControls').html('');
     $.getJSON(PROC_ML_BASE_URL + '/api/get_material_lists.php?project_id=' + PROC_PROJECT_ID, function(res) {
         if (!res.success || !res.lists || res.lists.length === 0) {
             procMatAllData = [];
@@ -12363,72 +12400,43 @@ function loadProcMaterials() {
             return;
         }
         procMatAllData = res.lists;
+        var tbody = '';
+        res.lists.forEach(function(r, i) {
+            var listNo   = r.list_no || ('ML-' + (r.created_at || '').slice(0,10).replace(/-/g,'') + '-' + String(r.id).padStart(4,'0'));
+            var warehouse = r.warehouse_name || '';
+            var safeName  = r.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            tbody += '<tr>'
+                + '<td class="text-center text-muted fw-bold">' + (i + 1) + '</td>'
+                + '<td><div class="fw-bold text-dark">' + r.name + '</div>'
+                + '<small class="text-muted">' + r.nip_count + ' NIP' + (r.nip_count != 1 ? 's' : '') + '</small></td>'
+                + '<td class="text-center"><span class="badge bg-primary" style="font-size:.8rem;letter-spacing:.5px;">' + listNo + '</span></td>'
+                + '<td class="text-center text-muted">' + warehouse + '</td>'
+                + '<td class="text-center pe-3 d-print-none">'
+                + '<div class="dropdown">'
+                + '<button class="btn btn-sm btn-light border dropdown-toggle px-2" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button>'
+                + '<ul class="dropdown-menu dropdown-menu-end shadow border-0">'
+                + '<li><a class="dropdown-item py-2" href="' + PROC_VIEW_ML_URL + '?id=' + r.id + '"><i class="bi bi-eye text-primary me-2"></i> View</a></li>'
+                + '<li><hr class="dropdown-divider"></li>'
+                + '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="procMlEditOpen(' + r.id + ', \'' + safeName + '\')"><i class="bi bi-pencil text-primary me-2"></i> Edit</a></li>'
+                + '<li><hr class="dropdown-divider"></li>'
+                + '<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="procMlDeleteList(' + r.id + ', \'' + safeName + '\')"><i class="bi bi-trash me-2"></i> Delete</a></li>'
+                + '</ul></div></td>'
+                + '</tr>';
+        });
+        $('#procMatTableBody').html(tbody);
         $('#procMaterialsEmpty').hide();
         $('#procMaterialsCard').show();
-        procMatCurrPage = 1;
-        procFilterMatTable(false);
+        $('#procMatTable').DataTable({
+            responsive: true,
+            pageLength: 25,
+            autoWidth: false,
+            columnDefs: [{ orderable: false, targets: [0, 4] }]
+        });
+        if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procMatTable');
     }).fail(function() {
         $('#procMaterialsEmpty').html('<div class="alert alert-danger">Failed to load materials. Please try again.</div>');
     });
 }
-
-function procFilterMatTable(resetPage) {
-    if (resetPage) procMatCurrPage = 1;
-    var q          = ($('#procMatSearch').val() || '').toLowerCase();
-    var perPageVal = $('#procMatPerPage').val();
-    var perPage    = (perPageVal === 'all') ? 999999 : parseInt(perPageVal);
-
-    var filtered = procMatAllData.filter(function(r) {
-        return !q || (r.name + ' ' + (r.list_no || '')).toLowerCase().includes(q);
-    });
-
-    var total      = filtered.length;
-    var totalPages = Math.ceil(total / perPage);
-    if (procMatCurrPage > totalPages) procMatCurrPage = totalPages || 1;
-    var startIdx   = (procMatCurrPage - 1) * perPage;
-    var endIdx     = startIdx + perPage;
-    var page       = filtered.slice(startIdx, endIdx);
-
-    var tbody = '';
-    page.forEach(function(r, i) {
-        var listNo    = r.list_no || ('ML-' + (r.created_at || '').slice(0,10).replace(/-/g,'') + '-' + String(r.id).padStart(4,'0'));
-        var warehouse = r.warehouse_name || '';
-        var safeName  = r.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-        tbody += '<tr>'
-            + '<td class="text-center text-muted fw-bold proc-mat-row-no">' + (startIdx + i + 1) + '</td>'
-            + '<td><div class="fw-bold text-dark">' + r.name + '</div>'
-            + '<small class="text-muted">' + r.nip_count + ' NIP' + (r.nip_count != 1 ? 's' : '') + '</small></td>'
-            + '<td class="text-center"><span class="badge bg-primary" style="font-size:.8rem;letter-spacing:.5px;">' + listNo + '</span></td>'
-            + '<td class="text-center text-muted">' + warehouse + '</td>'
-            + '<td class="text-center pe-3 d-print-none">'
-            + '<div class="dropdown">'
-            + '<button class="btn btn-sm btn-light border dropdown-toggle px-2" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button>'
-            + '<ul class="dropdown-menu dropdown-menu-end shadow border-0">'
-            + '<li><a class="dropdown-item py-2" href="' + PROC_VIEW_ML_URL + '?id=' + r.id + '">'
-            + '<i class="bi bi-eye text-primary me-2"></i> View</a></li>'
-            + '<li><hr class="dropdown-divider"></li>'
-            + '<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="procMlEditOpen(' + r.id + ', \'' + safeName + '\')">'
-            + '<i class="bi bi-pencil text-primary me-2"></i> Edit</a></li>'
-            + '<li><hr class="dropdown-divider"></li>'
-            + '<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="procMlDeleteList(' + r.id + ', \'' + safeName + '\')">'
-            + '<i class="bi bi-trash me-2"></i> Delete</a></li>'
-            + '</ul></div></td>'
-            + '</tr>';
-    });
-    $('#procMatTableBody').html(tbody || '<tr><td colspan="5" class="text-center py-4 text-muted">No materials match the current filter.</td></tr>');
-    $('#procMatPaginationInfo').text('Showing ' + (total > 0 ? startIdx + 1 : 0) + ' to ' + Math.min(endIdx, total) + ' of ' + total + ' material lists');
-    $('#procMatCountLabel').text(total + ' matches');
-
-    var btns = '';
-    for (var p = 1; p <= totalPages; p++) {
-        var cls = p === procMatCurrPage ? 'btn-secondary shadow-sm' : 'btn-outline-secondary';
-        btns += '<button class="btn btn-sm ' + cls + ' fw-bold me-1" onclick="procGoToMatPage(' + p + ')" style="min-width:32px;border-radius:4px;">' + p + '</button>';
-    }
-    $('#procMatPageControls').html(btns ? '<span class="text-muted small me-2 align-self-center">Show</span>' + btns : '');
-    if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('procMatTable');
-}
-
-function procGoToMatPage(p) { procMatCurrPage = p; procFilterMatTable(false); }
 
 // ── Edit Materials (List) ─────────────────────────────────────────────────
 var procMlEditRowIdx = 0;
@@ -15527,6 +15535,8 @@ function renderProjectSuppliers(suppliers) {
             </table>
         </div>`;
     $list.html(html);
+    if ($.fn.DataTable.isDataTable('#projSuppliersTable')) $('#projSuppliersTable').DataTable().destroy();
+    $('#projSuppliersTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 6] }] });
     if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('projSuppliersTable');
 }
 
@@ -18979,6 +18989,8 @@ function projNipRenderTable(products) {
             <tbody>${rows}</tbody>
         </table>
     </div></div></div>`);
+    if ($.fn.DataTable.isDataTable('#projNipInnerTable')) $('#projNipInnerTable').DataTable().destroy();
+    $('#projNipInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 5] }] });
     if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('projNipInnerTable');
 }
 
@@ -22093,6 +22105,28 @@ function loadProjectStaffDropdown(selector, selectedId) {
     }
 }
 
+// Footer text: "This report was" only when the Reports tab (#performance) is active.
+// All other tabs keep "This document was". Restored after every print/export.
+function _bmsSetFooterContext() {
+    var tab = document.getElementById('performance');
+    var line1 = document.querySelector('.bms-print-footer .bpf-line1');
+    if (!line1) return;
+    var isReports = tab && (tab.classList.contains('show') || tab.classList.contains('active'));
+    var want = isReports ? 'This report was' : 'This document was';
+    line1.childNodes.forEach(function (n) {
+        if (n.nodeType === 3) {
+            n.textContent = n.textContent.replace('This report was', 'This document was').replace('This document was', want);
+        }
+    });
+}
+window.addEventListener('beforeprint', _bmsSetFooterContext);
+window.addEventListener('afterprint', function () {
+    var line1 = document.querySelector('.bms-print-footer .bpf-line1');
+    if (!line1) return;
+    line1.childNodes.forEach(function (n) {
+        if (n.nodeType === 3) n.textContent = n.textContent.replace('This report was', 'This document was');
+    });
+});
 
 </script>
 

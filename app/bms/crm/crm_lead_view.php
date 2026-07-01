@@ -43,8 +43,46 @@ if (!$lead) {
     includeFooter(); exit;
 }
 
-$stages = $pdo->query("SELECT stage_id, stage_name, color FROM crm_pipeline_stages WHERE status='active' ORDER BY stage_order ASC")->fetchAll(PDO::FETCH_ASSOC);
+$stages = $pdo->query("SELECT stage_id, stage_name, color, stage_order FROM crm_pipeline_stages WHERE status='active' ORDER BY stage_order ASC")->fetchAll(PDO::FETCH_ASSOC);
 $users  = $pdo->query("SELECT user_id, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', first_name, last_name)),''), username) AS name FROM users WHERE is_active=1 ORDER BY first_name")->fetchAll(PDO::FETCH_ASSOC);
+
+// Labels for this lead
+$lead_labels = $pdo->prepare("SELECT l.label_id, l.label_name, l.color FROM crm_labels l JOIN crm_lead_labels ll ON l.label_id = ll.label_id WHERE ll.lead_id = ? AND l.status = 'active'");
+$lead_labels->execute([$id]);
+$lead_labels = $lead_labels->fetchAll(PDO::FETCH_ASSOC);
+
+// All available labels (for management)
+$all_labels = $pdo->query("SELECT label_id, label_name, color FROM crm_labels WHERE status = 'active' ORDER BY label_name")->fetchAll(PDO::FETCH_ASSOC);
+
+// Stage history
+$history = $pdo->prepare("
+    SELECT h.changed_at, ps_from.stage_name AS from_stage, ps_to.stage_name AS to_stage,
+           COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)),''), u.username) AS changed_by_name
+    FROM crm_lead_stage_history h
+    LEFT JOIN crm_pipeline_stages ps_from ON h.from_stage_id = ps_from.stage_id
+    LEFT JOIN crm_pipeline_stages ps_to   ON h.to_stage_id   = ps_to.stage_id
+    LEFT JOIN users u ON h.changed_by = u.user_id
+    WHERE h.lead_id = ?
+    ORDER BY h.changed_at DESC
+    LIMIT 10
+");
+$history->execute([$id]);
+$stage_history = $history->fetchAll(PDO::FETCH_ASSOC);
+
+// Days in current stage
+$days_in_stage = null;
+if (!empty($lead['stage_entered'])) {
+    $days_in_stage = (int)floor((time() - strtotime($lead['stage_entered'])) / 86400);
+}
+
+// Stage progress index (for progress bar)
+$stage_index = 0; $stage_total = count($stages);
+foreach ($stages as $i => $s) {
+    if ($s['stage_id'] == $lead['pipeline_stage_id']) { $stage_index = $i + 1; break; }
+}
+$stage_progress_pct = $stage_total > 0 ? round($stage_index / $stage_total * 100) : 0;
+
+$can_label = canEdit('crm_leads');
 
 $lead_sources = [
     'website'=>'Website','referral'=>'Referral','walk_in'=>'Walk-in',
@@ -132,18 +170,61 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
                     </div>
                 </div>
 
-                <!-- Lead value + probability -->
+                <!-- Stage progress bar -->
+                <?php if ($stage_total > 0 && !$lead['is_lost']): ?>
+                <div class="mt-3">
+                    <div class="lv-label">Pipeline Progress — <?= safe_output($lead['stage_name'] ?? '—') ?> (<?= $stage_index ?>/<?= $stage_total ?>)</div>
+                    <div class="prob-bar" style="height:8px"><div class="prob-fill" style="width:<?= $stage_progress_pct ?>%;background:<?= htmlspecialchars($lead['stage_color'] ?? '#0d6efd') ?>"></div></div>
+                </div>
+                <?php endif; ?>
+
+                <!-- Lead value + probability + score -->
                 <div class="row g-2 mt-3">
-                    <div class="col-6">
+                    <div class="col-4">
                         <div class="lv-label">Lead Value</div>
-                        <div class="fw-bold text-primary" style="font-size:1.15rem">TZS <?= number_format((float)$lead['lead_value'], 0) ?></div>
+                        <div class="fw-bold text-primary" style="font-size:1.05rem">TZS <?= number_format((float)$lead['lead_value'], 0) ?></div>
                     </div>
-                    <div class="col-6">
+                    <div class="col-4">
                         <div class="lv-label">Probability</div>
                         <div class="fw-semibold"><?= (int)$lead['probability'] ?>%</div>
                         <div class="prob-bar"><div class="prob-fill" style="width:<?= (int)$lead['probability'] ?>%;background:<?= (int)$lead['probability'] >= 80 ? '#198754' : ((int)$lead['probability'] >= 50 ? '#ffc107' : '#dc3545') ?>"></div></div>
                     </div>
+                    <div class="col-4">
+                        <div class="lv-label">Lead Score</div>
+                        <?php $score = (int)($lead['lead_score'] ?? 0); $sc = $score >= 70 ? '#198754' : ($score >= 40 ? '#ffc107' : '#dc3545'); ?>
+                        <div class="fw-semibold" style="color:<?= $sc ?>"><?= $score ?>/100</div>
+                        <div class="prob-bar"><div class="prob-fill" style="width:<?= $score ?>%;background:<?= $sc ?>"></div></div>
+                    </div>
                 </div>
+
+                <?php if ($days_in_stage !== null): ?>
+                <div class="mt-2 small text-muted">
+                    <i class="bi bi-clock me-1"></i><?= $days_in_stage ?> day<?= $days_in_stage !== 1 ? 's' : '' ?> in current stage
+                    <?php if ($days_in_stage > 14): ?><span class="badge ms-1" style="background:#ffc107;color:#000;font-size:.65rem">Stalled</span><?php endif; ?>
+                </div>
+                <?php endif; ?>
+
+                <!-- Labels -->
+                <?php if ($lead_labels || ($can_label && $all_labels)): ?>
+                <div class="mt-3">
+                    <div class="lv-label mb-1">Labels</div>
+                    <div id="labelPills" class="d-flex flex-wrap gap-1">
+                        <?php foreach ($lead_labels as $lbl): ?>
+                        <span class="badge" style="background:<?= htmlspecialchars($lbl['color']) ?>;font-size:.72rem">
+                            <?= safe_output($lbl['label_name']) ?>
+                            <?php if ($can_label): ?>
+                            <span style="cursor:pointer;margin-left:4px" onclick="removeLabel(<?= $lbl['label_id'] ?>)">&times;</span>
+                            <?php endif; ?>
+                        </span>
+                        <?php endforeach; ?>
+                        <?php if ($can_label && $all_labels): ?>
+                        <button class="btn btn-outline-secondary btn-sm py-0 px-1" style="font-size:.72rem" onclick="showLabelPicker()">
+                            <i class="bi bi-plus"></i>
+                        </button>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
 
             <!-- Contact & details -->
@@ -230,6 +311,22 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
                 </div>
                 <?php endif; ?>
             </div>
+
+            <!-- Stage history -->
+            <?php if ($stage_history): ?>
+            <div class="lv-section">
+                <div class="lv-title"><i class="bi bi-shuffle me-1"></i>Stage History</div>
+                <?php foreach ($stage_history as $h): ?>
+                <div class="d-flex align-items-center gap-2 mb-2" style="font-size:.82rem">
+                    <span class="text-muted" style="min-width:130px"><?= date('d M Y H:i', strtotime($h['changed_at'])) ?></span>
+                    <span class="text-muted"><?= safe_output($h['from_stage'] ?? '—') ?></span>
+                    <i class="bi bi-arrow-right text-muted"></i>
+                    <span class="fw-semibold"><?= safe_output($h['to_stage'] ?? '—') ?></span>
+                    <span class="text-muted ms-auto">by <?= safe_output($h['changed_by_name'] ?? '—') ?></span>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
 
             <!-- Converted: links to Customer + Quotation -->
             <?php if ($lead['converted']): ?>
@@ -411,16 +508,21 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
 <?php endif; ?>
 
 <script>
-const ACT_LIST_URL = '<?= buildUrl('api/crm/get_activities.php') ?>';
-const ACT_ADD_URL  = '<?= buildUrl('api/crm/add_activity.php') ?>';
-const ACT_EDIT_URL = '<?= buildUrl('api/crm/edit_activity.php') ?>';
-const ACT_DEL_URL  = '<?= buildUrl('api/crm/delete_activity.php') ?>';
-const LEAD_ID      = <?= $id ?>;
-const CSRF         = '<?= csrf_token() ?>';
-const CAN_ACT_EDIT = <?= json_encode($can_act_edit) ?>;
-const CAN_ACT_DEL  = <?= json_encode($can_act_del) ?>;
-const CONVERT_URL  = '<?= buildUrl('api/crm/convert_lead.php') ?>';
-const DELETE_URL   = '<?= buildUrl('api/crm/delete_lead.php') ?>';
+const ACT_LIST_URL   = '<?= buildUrl('api/crm/get_activities.php') ?>';
+const ACT_ADD_URL    = '<?= buildUrl('api/crm/add_activity.php') ?>';
+const ACT_EDIT_URL   = '<?= buildUrl('api/crm/edit_activity.php') ?>';
+const ACT_DEL_URL    = '<?= buildUrl('api/crm/delete_activity.php') ?>';
+const OVERDUE_URL    = '<?= buildUrl('api/crm/mark_overdue_activities.php') ?>';
+const LABEL_UPD_URL  = '<?= buildUrl('api/crm/update_lead_labels.php') ?>';
+const LEAD_ID        = <?= $id ?>;
+const CSRF           = '<?= csrf_token() ?>';
+const CAN_ACT_EDIT   = <?= json_encode($can_act_edit) ?>;
+const CAN_ACT_DEL    = <?= json_encode($can_act_del) ?>;
+const CAN_LABEL      = <?= json_encode((bool)$can_label) ?>;
+const CONVERT_URL    = '<?= buildUrl('api/crm/convert_lead.php') ?>';
+const DELETE_URL     = '<?= buildUrl('api/crm/delete_lead.php') ?>';
+const ALL_LABELS     = <?= json_encode($all_labels) ?>;
+let currentLabelIds  = <?= json_encode(array_column($lead_labels, 'label_id')) ?>;
 const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fmtDt = s => s ? new Date(s).toLocaleString(undefined,{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
 
@@ -563,6 +665,8 @@ function openEditModal() {
 $('#addActivityForm').on('submit', function(e) {
     e.preventDefault();
     const btn = $(this).find('[type=submit]'), orig = btn.html();
+    const actType = $(this).find('[name=activity_type]').val();
+    const actSubject = $(this).find('[name=subject]').val();
     btn.prop('disabled',true).html('<span class="spinner-border spinner-border-sm"></span>');
     $.ajax({url:ACT_ADD_URL,type:'POST',data:new FormData(this),contentType:false,processData:false,dataType:'json',
         success: res => {
@@ -570,7 +674,33 @@ $('#addActivityForm').on('submit', function(e) {
                 bootstrap.Modal.getInstance(document.getElementById('addActivityModal')).hide();
                 this.reset();
                 loadActivities();
-                Swal.fire({icon:'success',title:'Logged',text:res.message,timer:1500,showConfirmButton:false});
+                // Offer follow-up for calls and meetings
+                if (['call','meeting','site_visit'].includes(actType)) {
+                    setTimeout(() => {
+                        Swal.fire({
+                            icon:'question', title:'Schedule Follow-up?',
+                            html:`<small class="text-muted">After "${esc(actSubject)}"</small>`,
+                            input:'date', inputLabel:'Follow-up date',
+                            inputValue: new Date(Date.now()+3*86400000).toISOString().split('T')[0],
+                            showCancelButton:true, confirmButtonText:'Schedule It',
+                            cancelButtonText:'No, skip',
+                        }).then(r2 => {
+                            if (!r2.isConfirmed || !r2.value) return;
+                            const fd2 = new FormData();
+                            fd2.append('_csrf', CSRF);
+                            fd2.append('lead_id', LEAD_ID);
+                            fd2.append('activity_type', 'task');
+                            fd2.append('subject', `Follow-up after ${actType} — ${actSubject}`);
+                            fd2.append('status', 'pending');
+                            fd2.append('due_date', r2.value + 'T09:00');
+                            $.ajax({url:ACT_ADD_URL,type:'POST',data:fd2,contentType:false,processData:false,
+                                success: () => loadActivities()
+                            });
+                        });
+                    }, 400);
+                } else {
+                    Swal.fire({icon:'success',title:'Logged',text:res.message,timer:1500,showConfirmButton:false});
+                }
             } else { $('#act-add-msg').html(`<div class="alert alert-danger py-1 px-2 small">${res.message}</div>`); }
         },
         error: () => { $('#act-add-msg').html('<div class="alert alert-danger py-1 px-2 small">Server error</div>'); },
@@ -595,7 +725,47 @@ $('#editActivityForm').on('submit', function(e) {
     });
 });
 
-$(function(){ loadActivities(); });
+// Label management
+function showLabelPicker() {
+    if (!CAN_LABEL || !ALL_LABELS.length) return;
+    const opts = ALL_LABELS.map(l =>
+        `<option value="${l.label_id}" ${currentLabelIds.includes(parseInt(l.label_id)) ? 'selected' : ''}
+            style="background:${l.color};color:#fff">${l.label_name}</option>`
+    ).join('');
+    Swal.fire({
+        title: 'Manage Labels', html:
+            `<select id="swal-labels" class="form-select" multiple size="${Math.min(ALL_LABELS.length, 6)}">${opts}</select>`,
+        showCancelButton: true, confirmButtonText: 'Save Labels',
+        didOpen: () => { $('#swal-labels').select2({ theme:'bootstrap-5', width:'100%', allowClear:true, placeholder:'Pick labels…' }); }
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        const selected = $('#swal-labels').val() || [];
+        const fd = new FormData();
+        fd.append('_csrf', CSRF);
+        fd.append('lead_id', LEAD_ID);
+        selected.forEach(id => fd.append('label_ids[]', id));
+        $.ajax({ url: LABEL_UPD_URL, type:'POST', data:fd, contentType:false, processData:false, dataType:'json',
+            success: res => { if (res.success) location.reload(); else Swal.fire({ icon:'error', text: res.message }); }
+        });
+    });
+}
+
+function removeLabel(label_id) {
+    currentLabelIds = currentLabelIds.filter(id => id !== label_id);
+    const fd = new FormData();
+    fd.append('_csrf', CSRF);
+    fd.append('lead_id', LEAD_ID);
+    currentLabelIds.forEach(id => fd.append('label_ids[]', id));
+    $.ajax({ url: LABEL_UPD_URL, type:'POST', data:fd, contentType:false, processData:false, dataType:'json',
+        success: res => { if (res.success) location.reload(); }
+    });
+}
+
+$(function(){
+    loadActivities();
+    // Silently mark overdue activities on page load
+    $.post(OVERDUE_URL, { _csrf: CSRF });
+});
 </script>
 
 <?php includeFooter(); ob_end_flush(); ?>

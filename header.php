@@ -87,6 +87,26 @@ if (function_exists('get_setting') && get_setting('leave_accrual_last_run') !== 
     @include_once __DIR__ . '/cron/run_leave_accrual.php';
 }
 
+// Smart notification engine — time-based event checks (overdue/expiring/due),
+// at most once per day. Self-contained + fail-silent (see cron/run_notification_checks.php).
+if (function_exists('get_setting') && get_setting('notif_checks_last_run') !== date('Y-m-d')) {
+    @include_once __DIR__ . '/cron/run_notification_checks.php';
+}
+
+// Notification email worker — drain a small batch from the outbox, throttled to
+// ~2 minutes so it never noticeably slows a page load. (Use a server cron for volume.)
+if (function_exists('get_setting') && (time() - (int)get_setting('notif_outbox_last_ts', '0')) >= 120) {
+    if (function_exists('save_setting')) save_setting('notif_outbox_last_ts', (string)time());
+    @include_once __DIR__ . '/cron/process_notifications.php';
+}
+
+// AI daily digest — one summary email per user with pending items, once per day.
+// Opt-in (notif_digest_enabled). Self-contained + fail-silent.
+if (function_exists('get_setting') && get_setting('notif_digest_enabled', '0') === '1'
+    && get_setting('notif_digest_last_run') !== date('Y-m-d')) {
+    @include_once __DIR__ . '/cron/send_notification_digests.php';
+}
+
 // Get company type + location from settings
 $settings_stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'company_type'");
 $settings_stmt->execute();
@@ -108,12 +128,26 @@ $GLOBALS['DISPLAY_COMPANY_NAME'] = $company_name;
 // Company Logo
 $company_logo = get_setting('company_logo');
 
-// Page-visit logging (Vikundi-style) — record every authenticated page load.
-// Uses existing logActivity() infrastructure; fails silently so it never breaks a load.
+// Page-visit logging — record every authenticated page load with a human-readable name.
 if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     try {
-        $page_url = $_SERVER['REQUEST_URI'] ?? 'unknown';
-        logActivity($pdo, (int)$_SESSION['user_id'], 'page_view', $page_url);
+        $req_path  = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
+        $base      = function_exists('getBasePath') ? trim(getBasePath(), '/') : '';
+        $clean     = trim($base !== '' ? ltrim(substr($req_path, strlen('/' . $base)), '/') : ltrim($req_path, '/'), '/');
+        $parts     = array_values(array_filter(explode('/', $clean)));
+        $last      = array_pop($parts) ?? 'page';
+        $parent    = $parts ? array_pop($parts) : '';
+        // If last segment is a generic action word, prepend the parent segment for context.
+        if (in_array(strtolower($last), ['view', 'details', 'edit', 'add', 'create', 'list', 'index', ''], true) && $parent !== '') {
+            $page_seg = $parent . ' ' . $last;
+        } else {
+            $page_seg = $last;
+        }
+        $page_name = ucwords(str_replace(['_', '-'], ' ', trim($page_seg)));
+        if ($page_name === '') $page_name = 'Page';
+        logActivity($pdo, (int)$_SESSION['user_id'],
+            'View ' . $page_name,
+            'User viewed ' . $page_name . ' page');
     } catch (Throwable $e) { /* never break page load */ }
 }
 ?>
@@ -213,6 +247,19 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     <!-- Select2 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <style>
+        /* Global Select2-in-modal behaviour: float above the modal and let the
+           results list scroll on its own (fixes the "hard to scroll" feel). The
+           "closes on click" part is fixed by disabling the modal focus-trap in footer.php. */
+        .select2-container--open { z-index: 1060 !important; }
+        .select2-dropdown { z-index: 1060 !important; }
+        .select2-results__options {
+            max-height: 240px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+        }
+    </style>
     
     <link rel="stylesheet" href="<?= getUrl('style.css') ?>">
     <link rel="stylesheet" href="<?= getUrl('assets/css/responsive.css') ?>">
@@ -1017,6 +1064,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('users') ?>"><i class="bi bi-people"></i> Users</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('user_roles') ?>"><i class="bi bi-shield-check"></i> Roles & Permissions</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('user_projects') ?>"><i class="bi bi-diagram-3"></i> Project Assignments</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('login_history') ?>"><i class="bi bi-clock-history"></i> Login History</a></li>
                                 <li><h6 class="dropdown-header">System Configuration</h6></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i> Settings</a></li>
                                 <?php if (isAdmin()): ?>
@@ -1028,6 +1076,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('tax_settings') ?>"><i class="bi bi-percent"></i> Tax</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('payment_settings') ?>"><i class="bi bi-credit-card"></i> Payments</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('notification_settings') ?>"><i class="bi bi-bell"></i> Notifications</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('notification_rules') ?>"><i class="bi bi-bell-fill"></i> Notification Rules</a></li>
                             </ul>
                         </li>
                         <?php endif; ?>

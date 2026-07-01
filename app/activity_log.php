@@ -14,12 +14,99 @@ if (!in_array($limit, [10, 25, 50, 100, -1])) $limit = 10; // Validate limit
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $offset = ($limit === -1) ? 0 : ($page - 1) * $limit;
 
+// ── Row formatter (audit_log.md §2/§3): turn a raw activity_logs row into the
+//    smart Type + clear Description + Reference used by both the table and the
+//    server-side DataTables endpoint. Single source of truth.
+if (!function_exists('acFormatActivity')) {
+    function acFormatActivity(array $activity): array {
+        $canon = function (string $v): string {
+            $v = strtolower(trim($v));
+            if (strpos($v, 'update') === 0) return 'Edit';
+            if (strpos($v, 'page_view') === 0) return 'View';
+            static $m = [
+                'view'=>'View','viewed'=>'View',
+                'create'=>'Create','created'=>'Create','add'=>'Create','added'=>'Create','recorded'=>'Create',
+                'edit'=>'Edit','edited'=>'Edit','update'=>'Edit','updated'=>'Edit','changed'=>'Edit',
+                'delete'=>'Delete','deleted'=>'Delete','remove'=>'Delete','removed'=>'Delete','void'=>'Delete','voided'=>'Delete',
+                'review'=>'Review','reviewed'=>'Review',
+                'approve'=>'Approve','approved'=>'Approve',
+            ];
+            return $m[$v] ?? ucfirst($v);
+        };
+        $raw_action = trim($activity['raw_action'] ?? '');
+        $raw_desc   = !empty($activity['raw_description']) ? trim($activity['raw_description']) : $raw_action;
+
+        $verbSource = $raw_action !== '' ? $raw_action : $raw_desc;
+        $awords     = preg_split('/\s+/', trim($verbSource));
+        $firstWord  = $awords[0] ?? $verbSource;
+        $verb       = $canon($firstWord);
+        $isCanonical = in_array($verb, ['View','Create','Edit','Delete','Review','Approve'], true);
+
+        $entity = '';
+        // If the action is already a SHORT, clean "<verb> <entity>" (our standard,
+        // e.g. "Delete sub-contractor payment"), take the entity straight from it so
+        // multi-word entities show in full. Otherwise detect the entity by keyword.
+        if ($isCanonical && count($awords) >= 2 && count($awords) <= 4) {
+            $entity = ucwords(strtolower(trim(implode(' ', array_slice($awords, 1)))));
+        } elseif (preg_match('/\b(sub-?contractor|purchase order|sales order|sales return|purchase return|credit note|debit note|bank transfer|payment voucher|customer|supplier|product|expense|invoice|payment|employee|payroll|loan|quotation|voucher|asset|budget|project|warehouse|stock|document template|document|user|role|report|category|tax|transaction|journal|grn|attendance|backup|held sale)\b/i', $raw_action . ' ' . $raw_desc, $em)) {
+            $entity = strtolower($em[1]);
+        }
+        $type = trim($verb . ($entity !== '' ? ' ' . $entity : '')); if ($type === '') $type = 'Activity';
+        $description = $raw_desc !== '' ? $raw_desc : '-';
+
+        $reference = '-';
+        if (preg_match('/([A-Z]{2,}-?[A-Z0-9-]*\d[A-Z0-9-]*)/i', $raw_desc, $rm) && preg_match('/\d/', strtoupper($rm[1]))) {
+            $reference = strtoupper($rm[1]);
+        }
+        if ($reference === '-' && preg_match('/(?:#|ID:?\s*)(\d+)/i', $raw_desc, $rm)) $reference = '#' . $rm[1];
+        if ($reference === '-') $reference = 'REF-' . str_pad((string)($activity['id'] ?? 0), 5, '0', STR_PAD_LEFT);
+
+        return [
+            'id' => $activity['id'] ?? 0, 'type' => $type, 'description' => $description,
+            'timestamp' => $activity['timestamp'] ?? null, 'reference' => $reference,
+            'user_name' => $activity['user_name'] ?? 'System',
+        ];
+    }
+}
+// Bootstrap class for a Type badge.
+if (!function_exists('acBadgeClass')) {
+    function acBadgeClass(string $type): string {
+        $t = strtolower($type);
+        if (strpos($t, 'delete') !== false) return 'danger';
+        if (strpos($t, 'payment') !== false) return 'success';
+        if (strpos($t, 'sale') !== false || strpos($t, 'pos') !== false) return 'info';
+        if (strpos($t, 'customer') !== false) return 'warning';
+        return 'primary';
+    }
+}
+
 try {
 // Get filter parameters
 $type_filter = $_GET['type'] ?? '';
 $user_id_filter = $_GET['user_id'] ?? '';
 $date_from = $_GET['date_from'] ?? '';
 $date_to = $_GET['date_to'] ?? '';
+
+// ── Period is the authoritative date filter. It drives BOTH the activity table
+//    and the summary-card scope + label. Default = today. 'custom' uses the
+//    From/To inputs; everything else is computed server-side so client/server
+//    can never drift. (audit_log.md §6)
+$period = $_GET['period'] ?? 'today';
+$period_labels = [
+    'today' => 'Today', 'week' => 'This Week', 'month' => 'This Month',
+    'year'  => 'This Year', 'all' => 'All Time', 'custom' => 'Selected Range',
+];
+if (!isset($period_labels[$period])) $period = 'today';
+$today = date('Y-m-d');
+switch ($period) {
+    case 'today':  $date_from = $today; $date_to = $today; break;
+    case 'week':   $date_from = date('Y-m-d', strtotime('monday this week')); $date_to = $today; break;
+    case 'month':  $date_from = date('Y-m-01'); $date_to = $today; break;
+    case 'year':   $date_from = date('Y-01-01'); $date_to = $today; break;
+    case 'all':    $date_from = ''; $date_to = ''; break;
+    case 'custom': /* keep the From/To inputs as submitted */ break;
+}
+$period_label = $period_labels[$period];
 
 // Get users for filter dropdown
 $users = $pdo->query("SELECT user_id, username FROM users ORDER BY username")->fetchAll(PDO::FETCH_ASSOC);
@@ -37,21 +124,37 @@ $company_vrn = get_setting('company_vrn', '');
     $conditions = [];
     $params = [];
 
-    // Get today's stats for cards
-    $stats_stmt = $pdo->query("
-        SELECT 
-            COUNT(CASE WHEN (action LIKE 'Created%' OR action LIKE 'Added%' OR description LIKE 'Created%' OR description LIKE 'Added%') THEN 1 END) as created,
-            COUNT(CASE WHEN (action LIKE 'Viewed%' OR description LIKE 'Viewed%' OR action LIKE 'View %' OR description LIKE 'View %') THEN 1 END) as viewed,
-            COUNT(CASE WHEN (action LIKE 'Updated%' OR description LIKE 'Updated%' OR action LIKE 'Edited%' OR description LIKE 'Edited%') THEN 1 END) as updated,
-            COUNT(CASE WHEN (action LIKE 'Deleted%' OR description LIKE 'Deleted%' OR action LIKE 'Removed%' OR description LIKE 'Removed%') THEN 1 END) as deleted
-        FROM activity_logs 
-        WHERE DATE(created_at) = CURDATE()
-    ");
-    $today_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
+    // ── Canonical audit activities (see audit_log.md). ONE shared map drives the
+    //    filter, the summary cards AND the Type column, so they always agree.
+    //    Each canonical verb absorbs the legacy/inconsistent variants in the data
+    //    (e.g. page_view → View, update_* → Edit, Recorded → Create).
+    $activity_type_map = [
+        'view'    => ['View', 'Viewed', 'page_view'],
+        'create'  => ['Create', 'Created', 'Add', 'Added', 'Recorded'],
+        'edit'    => ['Edit', 'Edited', 'Update', 'Updated', 'update_', 'Changed'],
+        'delete'  => ['Delete', 'Deleted', 'Remove', 'Removed', 'Void', 'Voided'],
+        'review'  => ['Review', 'Reviewed'],
+        'approve' => ['Approve', 'Approved'],
+    ];
 
-    if ($type_filter) {
-        $conditions[] = "action LIKE :type";
-        $params[':type'] = "%$type_filter%";
+    // Build a "(action LIKE … OR description LIKE …)" fragment that matches any of a
+    // canonical type's verbs at the START of action OR description. '_' is escaped
+    // so 'page_view' / 'update_' match literally (LIKE treats '_' as a wildcard).
+    $buildTypeSql = function (string $type, string $tag) use ($activity_type_map) {
+        $ors = []; $p = [];
+        foreach (($activity_type_map[$type] ?? []) as $i => $verb) {
+            $k = ":{$tag}{$i}";
+            $ors[] = "action LIKE $k OR description LIKE $k";
+            $p[$k] = str_replace('_', '\\_', $verb) . '%';
+        }
+        return [$ors ? '(' . implode(' OR ', $ors) . ')' : '1=0', $p];
+    };
+
+    // Apply the Activity Type filter via the same map.
+    if ($type_filter && isset($activity_type_map[$type_filter])) {
+        [$frag, $fp] = $buildTypeSql($type_filter, 'ft_');
+        $conditions[] = $frag;
+        $params = array_merge($params, $fp);
     }
     if ($user_id_filter) {
         $conditions[] = "activity_logs.user_id = :user_id";
@@ -65,6 +168,143 @@ $company_vrn = get_setting('company_vrn', '');
         $conditions[] = "activity_logs.created_at <= :date_to";
         $params[':date_to'] = $date_to . ' 23:59:59';
     }
+
+    // ══ Server-side DataTables endpoint ═══════════════════════════════════════
+    // Uses a LAG-based dedup subquery so consecutive View events (same user) are
+    // collapsed: only the first of a back-to-back run appears. Both the count and
+    // the data query run over the same deduped subquery so pagination is accurate.
+    if (isset($_GET['draw'])) {
+        // ── Inner scope: user + date filters go INSIDE the subquery so LAG()
+        //    sees prev_action correctly within the filtered window.
+        $innerConds = []; $innerP = [];
+        if ($user_id_filter) {
+            $innerConds[] = 'al.user_id = :iuid';
+            $innerP[':iuid'] = $user_id_filter;
+        }
+        if ($date_from) {
+            $innerConds[] = 'al.created_at >= :idf';
+            $innerP[':idf'] = $date_from . ' 00:00:00';
+        }
+        if ($date_to) {
+            $innerConds[] = 'al.created_at <= :idt';
+            $innerP[':idt'] = $date_to . ' 23:59:59';
+        }
+        $innerWhere = $innerConds ? 'WHERE ' . implode(' AND ', $innerConds) : '';
+
+        // Dedup subquery — LAG gives each row the previous action for that user.
+        // Handles both old-style 'page_view' entries and new 'View X' entries.
+        $dt_base = "FROM (
+            SELECT al.id, al.action, al.description, al.created_at,
+                   al.ip_address, u.username,
+                   LAG(al.action) OVER (PARTITION BY al.user_id ORDER BY al.created_at, al.id) AS prev_action
+            FROM activity_logs al
+            LEFT JOIN users u ON al.user_id = u.user_id
+            $innerWhere
+        ) _log";
+
+        $dedup_cond = "NOT (
+            (action LIKE 'View %' OR action LIKE 'Viewed %' OR action = 'page_view')
+            AND (prev_action LIKE 'View %' OR prev_action LIKE 'Viewed %' OR prev_action = 'page_view')
+        )";
+
+        // ── Outer conditions: dedup + type filter (type goes outside so LAG is
+        //    still computed over ALL types, not just the filtered one).
+        $outerConds = [$dedup_cond]; $outerP = $innerP;
+        if ($type_filter && isset($activity_type_map[$type_filter])) {
+            [$frag, $fp] = $buildTypeSql($type_filter, 'dt_ft_');
+            $outerConds[] = $frag;
+            $outerP = array_merge($outerP, $fp);
+        }
+        $whereOuter = 'WHERE ' . implode(' AND ', $outerConds);
+
+        // recordsTotal — deduped + type filter, no DT search.
+        $rt = $pdo->prepare("SELECT COUNT(*) $dt_base $whereOuter");
+        foreach ($outerP as $k => $v) $rt->bindValue($k, $v);
+        $rt->execute();
+        $recordsTotal = (int) $rt->fetchColumn();
+
+        // recordsFiltered — add the DataTables search-box term.
+        $searchVal = trim($_GET['search']['value'] ?? '');
+        $dtConds = $outerConds; $dtP = $outerP;
+        if ($searchVal !== '') {
+            $dtConds[] = "(action LIKE :dts OR description LIKE :dts OR username LIKE :dts)";
+            $dtP[':dts'] = '%' . $searchVal . '%';
+        }
+        $whereDt = 'WHERE ' . implode(' AND ', $dtConds);
+        $rf = $pdo->prepare("SELECT COUNT(*) $dt_base $whereDt");
+        foreach ($dtP as $k => $v) $rf->bindValue($k, $v);
+        $rf->execute();
+        $recordsFiltered = (int) $rf->fetchColumn();
+
+        // Ordering — plain column names from the subquery (no table prefix).
+        $dt_cols = [0 => 'id', 1 => 'created_at', 2 => 'action',
+                    3 => 'description', 4 => 'ip_address', 5 => 'username'];
+        $ocol = isset($_GET['order'][0]['column']) ? (int) $_GET['order'][0]['column'] : 1;
+        $odir = (strtolower($_GET['order'][0]['dir'] ?? '') === 'asc') ? 'ASC' : 'DESC';
+        $orderBy = ($dt_cols[$ocol] ?? 'created_at') . ' ' . $odir;
+
+        $dstart  = max(0, (int) ($_GET['start'] ?? 0));
+        $dlength = (int) ($_GET['length'] ?? 10);
+        if ($dlength < 0) $dlength = 100000000;
+
+        $dsql = "SELECT id, action AS raw_action, description AS raw_description,
+                        created_at AS timestamp, ip_address AS reference, username AS user_name
+                 $dt_base $whereDt ORDER BY $orderBy LIMIT :dlen OFFSET :dstart";
+        $ds = $pdo->prepare($dsql);
+        foreach ($dtP as $k => $v) $ds->bindValue($k, $v);
+        $ds->bindValue(':dlen', $dlength, PDO::PARAM_INT);
+        $ds->bindValue(':dstart', $dstart, PDO::PARAM_INT);
+        $ds->execute();
+
+        $data = []; $sn = $dstart + 1;
+        foreach ($ds->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $f = acFormatActivity($r);
+            $badge = acBadgeClass($f['type']);
+            $ref = (string) $f['reference'];
+            $refHtml = ($ref !== '' && strpos($ref, '.') === false && strpos($ref, ':') === false)
+                ? '<code class="text-dark bg-light px-2 py-1 rounded">' . htmlspecialchars($ref) . '</code>'
+                : '<span class="text-muted">-</span>';
+            $data[] = [
+                '<span class="text-muted">' . ($sn++) . '</span>',
+                '<small class="text-muted text-nowrap">' . date('d/m/y, H:i', strtotime($f['timestamp'])) . '</small>',
+                '<span class="badge bg-' . $badge . ' rounded-pill">' . htmlspecialchars($f['type']) . '</span>',
+                htmlspecialchars($f['description']),
+                $refHtml,
+                htmlspecialchars($f['user_name']),
+            ];
+        }
+        header('Content-Type: application/json');
+        echo json_encode([
+            'draw'            => (int) $_GET['draw'],
+            'recordsTotal'    => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'data'            => $data,
+        ]);
+        exit;
+    }
+
+    // ── Summary cards — now reflect the ACTIVE filters (user + date range), NOT a
+    //    fixed "today". The Type filter is intentionally excluded: the cards ARE
+    //    the per-type breakdown. When no date is chosen, default to today.
+    $scope_where = []; $scope_params = [];
+    if ($user_id_filter) { $scope_where[] = "user_id = :su"; $scope_params[':su'] = $user_id_filter; }
+    if ($date_from)      { $scope_where[] = "created_at >= :sdf"; $scope_params[':sdf'] = $date_from . ' 00:00:00'; }
+    if ($date_to)        { $scope_where[] = "created_at <= :sdt"; $scope_params[':sdt'] = $date_to . ' 23:59:59'; }
+
+    $stat_cols = ['created' => 'create', 'viewed' => 'view', 'updated' => 'edit', 'deleted' => 'delete'];
+    $statSelects = []; $statParams = $scope_params;
+    foreach ($stat_cols as $col => $type) {
+        [$frag, $fp] = $buildTypeSql($type, "s_{$col}_");
+        $statSelects[] = "COUNT(CASE WHEN $frag THEN 1 END) AS $col";
+        $statParams = array_merge($statParams, $fp);
+    }
+    $stats_sql = "SELECT " . implode(", ", $statSelects) . " FROM activity_logs"
+               . (!empty($scope_where) ? " WHERE " . implode(" AND ", $scope_where) : "");
+    $stats_stmt = $pdo->prepare($stats_sql);
+    $stats_stmt->execute($statParams);
+    $today_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
+    // Card label follows the chosen Period (Today / This Week / This Month / …).
+    $stats_scope_label = $period_label;
 
     $where_clause = !empty($conditions) ? "WHERE " . implode(" AND ", $conditions) : "";
 
@@ -103,45 +343,54 @@ $company_vrn = get_setting('company_vrn', '');
     $stmt->execute();
     $raw_activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Normalise any legacy/inconsistent verb to one of the six canonical audit
+    // verbs (audit_log.md §1/§4) so the Type column reads short & smart, e.g.
+    // "Delete invoice", "View customers". Non-core verbs (Login, Logout, …) pass
+    // through unchanged so nothing is mislabelled.
+    $canonVerb = function (string $v): string {
+        $v = strtolower(trim($v));
+        if (strpos($v, 'update') === 0) return 'Edit';
+        if (strpos($v, 'page_view') === 0) return 'View';
+        static $m = [
+            'view'=>'View','viewed'=>'View',
+            'create'=>'Create','created'=>'Create','add'=>'Create','added'=>'Create','recorded'=>'Create',
+            'edit'=>'Edit','edited'=>'Edit','update'=>'Edit','updated'=>'Edit','changed'=>'Edit',
+            'delete'=>'Delete','deleted'=>'Delete','remove'=>'Delete','removed'=>'Delete','void'=>'Delete','voided'=>'Delete',
+            'review'=>'Review','reviewed'=>'Review',
+            'approve'=>'Approve','approved'=>'Approve',
+        ];
+        return $m[$v] ?? ucfirst($v);
+    };
+
     // Process activities to separate type and description properly
     $activities = [];
     foreach ($raw_activities as $activity) {
         $type = '';
         $description = '';
-        
+
         // Get raw data - prefer description field, fallback to action if description is empty or null
-        $raw_desc = !empty($activity['raw_description']) ? trim($activity['raw_description']) : trim($activity['raw_action'] ?? '');
-        
-        // Parse to extract action and entity, put details in description
-        // Enhanced pattern to catch "Added new customer", "Created new expense", "Printed Customers list", etc.
-        if (preg_match('/^(Created|Added|Updated|Deleted|Suspended|Activated|Deactivated|Approved|Rejected|Sent|Received|Paid|Cancelled|Imported|Voided|Restored|Marked|Applied|Active|Inactive|Blacklisted|Printed|Copied|Exported|Downloaded)\s+(?:new\s+|a\s+)?(customer|supplier|product|expense|invoice|payment|employee|loan|sale|order|stock|document|user|report|category|tax|asset|budget|project|task|leave|shift|attendance|payroll|transaction|items|list|template)(.*)$/i', $raw_desc, $matches)) {
-            // Pattern: "Action [new/a] Entity: Details"
-            $action = ucfirst(strtolower($matches[1]));
-            $entity = ucfirst(strtolower($matches[2]));
-            $details = trim($matches[3], ': ');
-            
-            $type = "$action $entity";
-            $description = $details ?: '-';
+        $raw_action = trim($activity['raw_action'] ?? '');
+        $raw_desc   = !empty($activity['raw_description']) ? trim($activity['raw_description']) : $raw_action;
+
+        // ── Smart short Type = "<Canonical verb> <entity>" (audit_log.md §2). ────
+        $verbSource = $raw_action !== '' ? $raw_action : $raw_desc;
+        $awords     = preg_split('/\s+/', trim($verbSource));
+        $firstWord  = $awords[0] ?? $verbSource;
+        $verb       = $canonVerb($firstWord);
+        $isCanon    = in_array($verb, ['View','Create','Edit','Delete','Review','Approve'], true);
+
+        $entity = '';
+        // If the action is already a short "Verb Entity" phrase, use it directly.
+        if ($isCanon && count($awords) >= 2 && count($awords) <= 4) {
+            $entity = ucwords(strtolower(trim(implode(' ', array_slice($awords, 1)))));
+        } elseif (preg_match('/\b(sub-?contractor|purchase order|sales order|sales return|purchase return|credit note|debit note|bank transfer|payment voucher|customer|supplier|product|expense|invoice|payment|employee|payroll|loan|quotation|voucher|asset|budget|project|warehouse|stock|document|user|role|report|category|tax|transaction|journal)\b/i', $raw_action . ' ' . $raw_desc, $em)) {
+            $entity = ucwords(strtolower($em[1]));
         }
-        elseif (preg_match('/^(customer|supplier|product|expense|invoice|payment|employee|loan|sale|order|stock|document|user|report|category|tax|asset|budget|project|task|leave|shift|attendance|payroll|transaction|items|list|template)\s+(created|added|updated|deleted|suspended|activated|deactivated|approved|rejected|sent|received|paid|cancelled|imported|voided|restored|marked|applied|active|inactive|blacklisted|printed|copied|exported|downloaded)(.*)$/i', $raw_desc, $matches)) {
-            // Pattern: "Entity Action: Details"
-            $entity = ucfirst(strtolower($matches[1]));
-            $action = ucfirst(strtolower($matches[2]));
-            $details = trim($matches[3], ': ');
-            
-            $type = "$action $entity";
-            $description = $details ?: '-';
-        }
-        elseif (preg_match('/^(.+?):\s*(.+)$/i', $raw_desc, $matches)) {
-            // Pattern: "Type: Description" - keep as is
-            $type = ucfirst(trim($matches[1]));
-            $description = trim($matches[2]);
-        }
-        else {
-            // Default: Use raw_action as type, full desc as description
-            $type = ucfirst($activity['raw_action'] ?? 'Activity');
-            $description = $raw_desc ?: '-';
-        }
+
+        $type = trim($verb . ($entity !== '' ? ' ' . $entity : ''));
+        if ($type === '') $type = 'Activity';
+        // Description column shows the full, human detail exactly as logged.
+        $description = $raw_desc !== '' ? $raw_desc : '-';
 
         // --- STRICT REFERENCE LOGIC ---
         $reference = '-';
@@ -177,9 +426,37 @@ $company_vrn = get_setting('company_vrn', '');
         ];
     }
 
-    // Get unique activity types for filter
-    $types_stmt = $pdo->query("SELECT DISTINCT action FROM activity_logs ORDER BY action");
-    $activity_types = $types_stmt->fetchAll(PDO::FETCH_COLUMN);
+    // The filter exposes only the six canonical activity types (keys of the map
+    // defined above). value = key the WHERE understands; label = display text.
+    $activity_types = [
+        'view'    => 'View',
+        'create'  => 'Create',
+        'edit'    => 'Edit',
+        'delete'  => 'Delete',
+        'review'  => 'Review',
+        'approve' => 'Approve',
+    ];
+
+    // ── "Time in system" summary — only when a single user is filtered. Honours
+    //    the same date range as the feed. Powers the session panel below. ──────
+    $session_summary = null;
+    $session_rows = [];
+    if ($user_id_filter && function_exists('userSessionSummary')) {
+        require_once __DIR__ . '/../core/session_tracker.php';
+        $sumFrom = $date_from ? $date_from . ' 00:00:00' : null;
+        $sumTo   = $date_to   ? $date_to   . ' 23:59:59' : null;
+        $session_summary = userSessionSummary($pdo, (int)$user_id_filter, $sumFrom, $sumTo);
+        // Recent sessions for this user (newest first) for the audit detail list.
+        try {
+            $srWhere = "user_id = ?"; $srParams = [(int)$user_id_filter];
+            if ($sumFrom) { $srWhere .= " AND login_at >= ?"; $srParams[] = $sumFrom; }
+            if ($sumTo)   { $srWhere .= " AND login_at <= ?"; $srParams[] = $sumTo; }
+            $srStmt = $pdo->prepare("SELECT login_at, logout_at, duration_seconds, logout_type, ip_address
+                                       FROM user_sessions WHERE $srWhere ORDER BY login_at DESC LIMIT 15");
+            $srStmt->execute($srParams);
+            $session_rows = $srStmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) { $session_rows = []; }
+    }
 
 
 
@@ -287,7 +564,15 @@ if (isset($_GET['ajax'])) {
         'pagination' => $pagination,
         'info' => "Showing " . ($total_items > 0 ? $offset + 1 : 0) . " to " . ($limit === -1 ? $total_items : min($offset + $limit, $total_items)) . " of $total_items entries",
         'page' => $page,
-        'total_pages' => $total_pages
+        'total_pages' => $total_pages,
+        // Summary cards reflect the active filter scope (audit_log.md §6).
+        'stats' => [
+            'created' => (int)($today_stats['created'] ?? 0),
+            'viewed'  => (int)($today_stats['viewed'] ?? 0),
+            'updated' => (int)($today_stats['updated'] ?? 0),
+            'deleted' => (int)($today_stats['deleted'] ?? 0),
+            'label'   => $stats_scope_label,
+        ],
     ]);
     exit;
 }
@@ -304,8 +589,13 @@ $page_title = "Activity Log";
 
 @media print {
     @page {
-        margin: 1cm;
+        margin: 10mm 8mm 16mm 8mm; /* canonical: top right bottom left */
     }
+
+    /* AI print mode: show only the AI section, hide everything else in main-content */
+    body.ai-printing .main-content > *:not(#aiPrintSection) { display: none !important; }
+    body.ai-printing #aiPrintSection { display: block !important; }
+    body.ai-printing #aiPrintSection .bms-print-header { display: block !important; }
     
     html, body {
         margin: 0 !important;
@@ -419,6 +709,9 @@ $page_title = "Activity Log";
     padding: 1rem;
     color: #1e293b;
     border-bottom: 1px solid #f1f5f9;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 .pagination {
@@ -536,36 +829,287 @@ $page_title = "Activity Log";
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm" style="background-color: #d1e7dd; border-radius: 15px;">
                 <div class="card-body p-3 text-center">
-                    <h6 class="text-success text-uppercase small fw-bold mb-1" style="font-size: 0.65rem;">Created Today</h6>
-                    <h3 class="fw-bold mb-0 text-success"><?= number_format($today_stats['created'] ?? 0) ?></h3>
+                    <h6 class="text-success text-uppercase small fw-bold mb-1" style="font-size: 0.65rem;">Created <span class="stat-scope-label"><?= htmlspecialchars($stats_scope_label) ?></span></h6>
+                    <h3 class="fw-bold mb-0 text-success" id="stat-created"><?= number_format($today_stats['created'] ?? 0) ?></h3>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm" style="background-color: #d1e7dd; border-radius: 15px;">
                 <div class="card-body p-3 text-center">
-                    <h6 class="text-success text-uppercase small fw-bold mb-1" style="font-size: 0.65rem;">Viewed Today</h6>
-                    <h3 class="fw-bold mb-0 text-success"><?= number_format($today_stats['viewed'] ?? 0) ?></h3>
+                    <h6 class="text-success text-uppercase small fw-bold mb-1" style="font-size: 0.65rem;">Viewed <span class="stat-scope-label"><?= htmlspecialchars($stats_scope_label) ?></span></h6>
+                    <h3 class="fw-bold mb-0 text-success" id="stat-viewed"><?= number_format($today_stats['viewed'] ?? 0) ?></h3>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm" style="background-color: #d1e7dd; border-radius: 15px;">
                 <div class="card-body p-3 text-center">
-                    <h6 class="text-success text-uppercase small fw-bold mb-1" style="font-size: 0.65rem;">Updated Today</h6>
-                    <h3 class="fw-bold mb-0 text-success"><?= number_format($today_stats['updated'] ?? 0) ?></h3>
+                    <h6 class="text-success text-uppercase small fw-bold mb-1" style="font-size: 0.65rem;">Updated <span class="stat-scope-label"><?= htmlspecialchars($stats_scope_label) ?></span></h6>
+                    <h3 class="fw-bold mb-0 text-success" id="stat-updated"><?= number_format($today_stats['updated'] ?? 0) ?></h3>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm" style="background-color: #d1e7dd; border-radius: 15px;">
                 <div class="card-body p-3 text-center">
-                    <h6 class="text-success text-uppercase small fw-bold mb-1" style="font-size: 0.65rem;">Deleted Today</h6>
-                    <h3 class="fw-bold mb-0 text-success"><?= number_format($today_stats['deleted'] ?? 0) ?></h3>
+                    <h6 class="text-success text-uppercase small fw-bold mb-1" style="font-size: 0.65rem;">Deleted <span class="stat-scope-label"><?= htmlspecialchars($stats_scope_label) ?></span></h6>
+                    <h3 class="fw-bold mb-0 text-success" id="stat-deleted"><?= number_format($today_stats['deleted'] ?? 0) ?></h3>
                 </div>
             </div>
         </div>
     </div>
+
+    <?php if ($is_admin): require_once ROOT_DIR . '/core/ai_service.php'; ?>
+    <!-- ══ AI Audit Intelligence — admin-only ══════════════════════════════════ -->
+    <div class="card mb-4 shadow-sm border-0 no-print" id="aiAuditCard"
+         style="border-radius: 15px; border-left: 5px solid #7c3aed !important;">
+        <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center px-4 py-3"
+             style="border-radius: 15px 15px 0 0; cursor:pointer;" onclick="toggleAiPanel()">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span style="font-size:1.3rem;">🤖</span>
+                <span class="fw-bold text-dark fs-6">AI Audit Intelligence</span>
+                <span class="badge rounded-pill text-white ms-1" style="background:#7c3aed; font-size:0.6rem; letter-spacing:.05em;">ADMIN ONLY</span>
+                <?php if (!aiConfigured()): ?>
+                <span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem;">Not configured —
+                    <a href="<?= getUrl('ai_settings') ?>" class="text-dark" onclick="event.stopPropagation()">Set up AI</a>
+                </span>
+                <?php endif; ?>
+            </div>
+            <i class="bi bi-chevron-down text-muted" id="aiPanelChevron" style="transition:transform .25s;"></i>
+        </div>
+
+        <div id="aiPanelBody" class="d-none">
+            <?php if (aiConfigured()): ?>
+            <!-- Mode selector tabs -->
+            <div class="d-flex border-bottom flex-wrap gap-0 px-3 pt-2" style="background:#f8fafc; border-radius:0;">
+                <?php
+                $modes = [
+                    'briefing'  => ['icon' => 'bi-file-text',            'label' => 'Daily Briefing',    'color' => '#7c3aed'],
+                    'anomalies' => ['icon' => 'bi-exclamation-triangle',  'label' => 'Anomaly Scanner',   'color' => '#dc2626'],
+                    'ask'       => ['icon' => 'bi-chat-dots',             'label' => 'Ask the Log',       'color' => '#0d6efd'],
+                    'report'    => ['icon' => 'bi-journal-bookmark-fill', 'label' => 'Audit Report',      'color' => '#059669'],
+                ];
+                foreach ($modes as $mk => $mv): ?>
+                <button type="button"
+                        class="btn btn-sm ai-mode-tab px-4 py-2 border-0 border-bottom border-3 rounded-0 fw-semibold"
+                        style="font-size:.82rem; color:#64748b; border-color:transparent !important;"
+                        data-mode="<?= $mk ?>"
+                        data-color="<?= $mv['color'] ?>"
+                        onclick="selectAiMode('<?= $mk ?>', this)">
+                    <i class="bi <?= $mv['icon'] ?> me-1"></i><?= $mv['label'] ?>
+                </button>
+                <?php endforeach; ?>
+            </div>
+
+            <!-- Mode content panes -->
+            <div class="px-4 py-3">
+
+                <!-- BRIEFING -->
+                <div class="ai-pane" id="ai-pane-briefing">
+                    <p class="text-muted small mb-3">
+                        AI reads the current period's activity and writes a plain-English narrative — who did what, what modules were used, and what deserves attention. Risk level included.
+                    </p>
+                    <button class="btn btn-sm fw-semibold text-white" style="background:#7c3aed; border-radius:8px;"
+                            onclick="runAiAnalysis('briefing')">
+                        <i class="bi bi-stars me-1"></i> Generate Briefing
+                    </button>
+                </div>
+
+                <!-- ANOMALIES -->
+                <div class="ai-pane d-none" id="ai-pane-anomalies">
+                    <p class="text-muted small mb-3">
+                        AI compares each user's activity against their 30-day baseline, checks for off-hours access, bulk deletions, and sensitive module access by unexpected users. Returns a structured findings list with severity ratings.
+                    </p>
+                    <button class="btn btn-sm fw-semibold text-white" style="background:#dc2626; border-radius:8px;"
+                            onclick="runAiAnalysis('anomalies')">
+                        <i class="bi bi-shield-exclamation me-1"></i> Scan for Anomalies
+                    </button>
+                </div>
+
+                <!-- ASK -->
+                <div class="ai-pane d-none" id="ai-pane-ask">
+                    <p class="text-muted small mb-3">
+                        Ask any question about the activity log in plain language. AI answers from aggregated data within the current period filter.
+                    </p>
+                    <div class="d-flex gap-2 mb-2" style="max-width:620px;">
+                        <input type="text" id="aiAskInput" class="form-control form-control-sm"
+                               placeholder="e.g. Who made deletions this week?  |  Did anyone access payroll?"
+                               onkeydown="if(event.key==='Enter') runAiAnalysis('ask')">
+                        <button class="btn btn-sm fw-semibold text-white px-3" style="background:#0d6efd; border-radius:8px; white-space:nowrap;"
+                                onclick="runAiAnalysis('ask')">
+                            <i class="bi bi-send"></i>
+                        </button>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mt-1">
+                        <button class="btn btn-xs btn-outline-secondary" style="font-size:.75rem;"
+                                onclick="aiQuick('Who made the most deletions this period?')">Most deletions</button>
+                        <button class="btn btn-xs btn-outline-secondary" style="font-size:.75rem;"
+                                onclick="aiQuick('Were there any off-hours logins or access?')">Off-hours access</button>
+                        <button class="btn btn-xs btn-outline-secondary" style="font-size:.75rem;"
+                                onclick="aiQuick('Who accessed payroll or financial modules?')">Financial access</button>
+                        <button class="btn btn-xs btn-outline-secondary" style="font-size:.75rem;"
+                                onclick="aiQuick('Summarise what each user did and how busy they were')">User summary</button>
+                        <button class="btn btn-xs btn-outline-secondary" style="font-size:.75rem;"
+                                onclick="aiQuick('Are there any suspicious patterns I should investigate?')">Suspicious patterns</button>
+                    </div>
+                </div>
+
+                <!-- REPORT -->
+                <div class="ai-pane d-none" id="ai-pane-report">
+                    <p class="text-muted small mb-3">
+                        Generate a formal audit narrative for management or compliance. Optionally scope to one user and a custom date range independent of the page filter.
+                    </p>
+                    <div class="row g-2 mb-3" style="max-width:600px;">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted text-uppercase" style="font-size:.68rem;">User (optional)</label>
+                            <select class="form-select form-select-sm" id="rptUser">
+                                <option value="">All Users</option>
+                                <?php foreach ($users as $u): ?>
+                                <option value="<?= $u['user_id'] ?>"><?= htmlspecialchars($u['username']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted text-uppercase" style="font-size:.68rem;">From</label>
+                            <input type="date" class="form-control form-control-sm" id="rptFrom"
+                                   value="<?= htmlspecialchars($date_from ?: date('Y-m-01')) ?>">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted text-uppercase" style="font-size:.68rem;">To</label>
+                            <input type="date" class="form-control form-control-sm" id="rptTo"
+                                   value="<?= htmlspecialchars($date_to ?: date('Y-m-d')) ?>">
+                        </div>
+                    </div>
+                    <button class="btn btn-sm fw-semibold text-white" style="background:#059669; border-radius:8px;"
+                            onclick="runAiAnalysis('report')">
+                        <i class="bi bi-journal-bookmark-fill me-1"></i> Generate Audit Report
+                    </button>
+                </div>
+
+                <!-- Result area — shared across all modes -->
+                <div id="aiResultArea" class="mt-4 d-none">
+                    <!-- Loading -->
+                    <div id="aiLoading" class="text-center py-4 d-none">
+                        <div class="spinner-border" style="width:1.8rem;height:1.8rem;color:#7c3aed;"></div>
+                        <p class="text-muted small mt-2 mb-0">AI is analysing the activity log…</p>
+                    </div>
+                    <!-- Output -->
+                    <div id="aiOutput" class="d-none">
+                        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                            <span class="text-muted small" id="aiResultMeta"></span>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-secondary" style="font-size:.75rem;" onclick="printAiResult()">
+                                    <i class="bi bi-printer me-1"></i>Print
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" style="font-size:.75rem;" onclick="copyAiResult()">
+                                    <i class="bi bi-clipboard me-1"></i>Copy
+                                </button>
+                            </div>
+                        </div>
+                        <div id="aiText"
+                             style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:1.2rem; font-size:.88rem; line-height:1.8; color:#1e293b;">
+                        </div>
+                    </div>
+                    <!-- Error -->
+                    <div id="aiError" class="d-none">
+                        <div class="alert alert-danger mb-0">
+                            <i class="bi bi-exclamation-circle me-1"></i>
+                            <span id="aiErrorMsg"></span>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /px-4 py-3 -->
+            <?php else: ?>
+            <div class="px-4 py-3 text-muted small">
+                AI is not configured yet. Go to
+                <a href="<?= getUrl('ai_settings') ?>">AI Settings</a> to connect a provider (OpenAI, Claude, Gemini, or any OpenAI-compatible API).
+            </div>
+            <?php endif; ?>
+        </div><!-- /aiPanelBody -->
+    </div>
+    <!-- ══ end AI Audit Intelligence ══════════════════════════════════════════ -->
+    <?php endif; // $is_admin ?>
+
+    <?php if ($session_summary !== null):
+        // Resolve the filtered user's display name for the panel header.
+        $sel_user_name = '';
+        foreach ($users as $_u) { if ((int)$_u['user_id'] === (int)$user_id_filter) { $sel_user_name = $_u['username']; break; } }
+    ?>
+    <!-- Time-in-System panel — shows only when a single user is filtered -->
+    <div class="card mb-4 shadow-sm border-0" style="border-radius: 15px; border-left: 4px solid #0d6efd !important;">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-clock-history text-primary me-2"></i>Time in System — <?= htmlspecialchars($sel_user_name ?: ('User #' . (int)$user_id_filter)) ?></h5>
+                <span class="text-muted small"><?= $date_from || $date_to ? 'For selected date range' : 'All time' ?></span>
+            </div>
+            <div class="row g-3">
+                <div class="col-6 col-md-3">
+                    <div class="border rounded p-3 text-center h-100">
+                        <div class="text-muted text-uppercase fw-bold mb-1" style="font-size:0.62rem;">Total Time in System</div>
+                        <div class="fs-5 fw-bold text-primary"><?= formatDuration($session_summary['total_seconds']) ?></div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="border rounded p-3 text-center h-100">
+                        <div class="text-muted text-uppercase fw-bold mb-1" style="font-size:0.62rem;">Sessions</div>
+                        <div class="fs-5 fw-bold"><?= (int)$session_summary['sessions'] ?>
+                            <?php if ($session_summary['open'] > 0): ?><span class="badge bg-warning text-dark ms-1" style="font-size:0.55rem;" title="Sessions with no recorded logout (browser closed / timed out)"><?= (int)$session_summary['open'] ?> open</span><?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="border rounded p-3 text-center h-100">
+                        <div class="text-muted text-uppercase fw-bold mb-1" style="font-size:0.62rem;">Avg / Session</div>
+                        <div class="fs-5 fw-bold"><?= formatDuration($session_summary['avg_seconds']) ?></div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="border rounded p-3 text-center h-100">
+                        <div class="text-muted text-uppercase fw-bold mb-1" style="font-size:0.62rem;">Last Login</div>
+                        <div class="fw-bold small"><?= $session_summary['last_login'] ? date('d M Y, H:i', strtotime($session_summary['last_login'])) : '—' ?></div>
+                    </div>
+                </div>
+            </div>
+
+            <?php if (!empty($session_rows)): ?>
+            <div class="table-responsive mt-3">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-3">Login</th>
+                            <th>Logout</th>
+                            <th>Duration</th>
+                            <th>How it ended</th>
+                            <th class="pe-3">IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($session_rows as $sr): ?>
+                        <tr>
+                            <td class="ps-3"><?= date('d M Y, H:i:s', strtotime($sr['login_at'])) ?></td>
+                            <td><?= $sr['logout_at'] ? date('d M Y, H:i:s', strtotime($sr['logout_at'])) : '<span class="text-muted">—</span>' ?></td>
+                            <td class="fw-semibold"><?= formatDuration($sr['duration_seconds'] !== null ? (int)$sr['duration_seconds'] : null) ?></td>
+                            <td>
+                                <?php if ($sr['logout_type'] === 'manual'): ?>
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">Logged out</span>
+                                <?php else: ?>
+                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle" title="No logout recorded — browser closed or session timed out">Open / timed out</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="pe-3 text-muted small"><?= htmlspecialchars($sr['ip_address'] ?? '—') ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+            <p class="text-muted small mb-0 mt-2">No login sessions recorded for this user in the selected range. (Sessions are tracked from the time this feature went live.)</p>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- Filter Card -->
     <div class="card mb-4 shadow-sm border-0 no-print" style="border-radius: 15px;">
@@ -575,13 +1119,11 @@ $page_title = "Activity Log";
                     <label class="form-label small fw-bold text-muted text-uppercase">Activity Type</label>
                     <select class="form-select border-0 bg-light" name="type" id="filterType">
                         <option value="">All Types</option>
-                        <?php if (!empty($activity_types)): ?>
-                            <?php foreach ($activity_types as $activity_type): ?>
-                                <option value="<?= htmlspecialchars($activity_type) ?>" <?= $type_filter == $activity_type ? 'selected' : '' ?>>
-                                    <?= ucfirst(str_replace('_', ' ', $activity_type)) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                        <?php foreach ($activity_types as $type_key => $type_label): ?>
+                            <option value="<?= htmlspecialchars($type_key) ?>" <?= $type_filter === $type_key ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($type_label) ?>
+                            </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -598,21 +1140,23 @@ $page_title = "Activity Log";
                 <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase">Period</label>
                     <select class="form-select border-0 bg-light" id="filterPeriod">
-                        <option value="">All Time</option>
-                        <option value="today">Today</option>
-                        <option value="week">This Week</option>
-                        <option value="month">This Month</option>
-                        <option value="year">This Year</option>
-                        <option value="custom">Custom Range</option>
+                        <option value="today"  <?= $period === 'today'  ? 'selected' : '' ?>>Today</option>
+                        <option value="week"   <?= $period === 'week'   ? 'selected' : '' ?>>This Week</option>
+                        <option value="month"  <?= $period === 'month'  ? 'selected' : '' ?>>This Month</option>
+                        <option value="year"   <?= $period === 'year'   ? 'selected' : '' ?>>This Year</option>
+                        <option value="all"    <?= $period === 'all'    ? 'selected' : '' ?>>All Time</option>
+                        <option value="custom" <?= $period === 'custom' ? 'selected' : '' ?>>➕ Custom (specify)…</option>
                     </select>
                 </div>
-                <div class="col-md-2">
+                <!-- Custom date range — revealed only when Period = Custom (like the
+                     "Other → specify" pattern). Hidden otherwise. -->
+                <div class="col-md-2 custom-date-field" id="customDateFrom" style="<?= $period === 'custom' ? '' : 'display:none;' ?>">
                     <label class="form-label small fw-bold text-muted text-uppercase">From</label>
-                    <input type="date" class="form-control border-0 bg-light" name="date_from" id="filterDateFrom" value="<?= $date_from ?>">
+                    <input type="date" class="form-control border-0 bg-light" name="date_from" id="filterDateFrom" value="<?= htmlspecialchars($date_from) ?>">
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-2 custom-date-field" id="customDateTo" style="<?= $period === 'custom' ? '' : 'display:none;' ?>">
                     <label class="form-label small fw-bold text-muted text-uppercase">To</label>
-                    <input type="date" class="form-control border-0 bg-light" name="date_to" id="filterDateTo" value="<?= $date_to ?>">
+                    <input type="date" class="form-control border-0 bg-light" name="date_to" id="filterDateTo" value="<?= htmlspecialchars($date_to) ?>">
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase">Limit</label>
@@ -657,7 +1201,7 @@ $page_title = "Activity Log";
 
     <div class="card mb-4 shadow-sm border-0 report-card">
         <div class="card-body p-0">
-            <div class="table-responsive" style="overflow: visible !important;">
+            <div style="overflow-x: hidden;">
                 <table class="table table-hover align-middle mb-0" id="activityTable">
                     <thead class="bg-light">
                         <tr>
@@ -669,121 +1213,108 @@ $page_title = "Activity Log";
                             <th class="pe-3" style="width: 15%;">User</th>
                         </tr>
                     </thead>
-                    <tbody id="activityRows">
-                        <?php if (!empty($activities)): ?>
-                            <?php $si = $offset + 1; foreach ($activities as $activity): ?>
-                            <tr>
-                                <td class="text-center" data-label="S/NO"><?= $si++ ?></td>
-                                <td class="ps-3 text-muted" data-label="Time">
-                                    <small><?= date('d/m/y, H:i', strtotime($activity['timestamp'])) ?></small>
-                                </td>
-                                <td class="col-type" data-label="Type">
-                                    <?php 
-                                    $badge_class = 'primary';
-                                    $t = strtolower($activity['type']);
-                                    if (strpos($t, 'payment') !== false) { $badge_class = 'success'; }
-                                    elseif (strpos($t, 'sale') !== false || strpos($t, 'pos') !== false) { $badge_class = 'info'; }
-                                    elseif (strpos($t, 'delete') !== false) { $badge_class = 'danger'; }
-                                    elseif (strpos($t, 'customer') !== false) { $badge_class = 'warning'; }
-                                    ?>
-                                    <span class="badge bg-<?= $badge_class ?> rounded-pill">
-                                        <?= ucfirst(str_replace('_', ' ', $activity['type'] ?? 'Unknown')) ?>
-                                    </span>
-                                </td>
-                                <td data-label="Description"><?= htmlspecialchars($activity['description'] ?? '-') ?></td>
-                                <td data-label="Reference">
-                                    <?php 
-                                    $ref = (string)$activity['reference'];
-                                    // Show reference if it's not an IP address
-                                    if (!empty($ref) && strpos($ref, '.') === false && strpos($ref, ':') === false) {
-                                        echo '<code class="text-dark bg-light px-2 py-1 rounded">' . htmlspecialchars($ref) . '</code>';
-                                    } else {
-                                        echo '<span class="text-muted">-</span>';
-                                    }
-                                    ?>
-                                </td>
-                                <td class="pe-3" data-label="User"><?= htmlspecialchars($activity['user_name'] ?? 'System') ?></td>
-                            </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="5" class="text-center py-5 text-muted">
-                                    No activities found for this period.
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
+                    <!-- Rows are loaded server-side by DataTables (sort / search /
+                         paginate over 65k+ rows). Filters drive a full reload. -->
+                    <tbody id="activityRows"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <div id="paginationContainer" class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 no-print">
-        <div id="paginationInfo" class="small text-muted fw-bold">
-            Showing <span class="text-dark"><?= ($total_items > 0 ? $offset + 1 : 0) ?></span> to
-            <span class="text-dark"><?= ($limit === -1 ? $total_items : min($offset + $limit, $total_items)) ?></span> of
-            <span class="text-dark"><?= number_format($total_items) ?></span> entries
+    <?php if ($is_admin): ?>
+    <!-- AI Audit Intelligence — print-only section (revealed by body.ai-printing CSS class) -->
+    <!-- Company header comes from the global renderPrintHeader() in header.php — no duplication needed -->
+    <div id="aiPrintSection" style="display:none;">
+        <div class="text-center pb-3 mb-3" style="border-bottom: 2px solid #0d6efd; margin-top: 8px;">
+            <h5 id="aiPrintDocLabel" style="text-transform:uppercase; letter-spacing:1px; color:#333; margin:6px 0 2px; font-size:13pt;"></h5>
+            <p id="aiPrintMetaLine" style="color:#64748b; font-size:10pt; margin:0;"></p>
         </div>
-        <nav id="paginationNav">
-            <?php if ($total_pages > 1): ?>
-            <ul class="pagination mb-0">
-                <?php echo renderSmartPagination($page, $total_pages); ?>
-            </ul>
-            <?php endif; ?>
-        </nav>
+        <div id="aiPrintBody" style="font-size:12pt; line-height:1.7; color:#1e293b; padding-bottom:12mm;"></div>
     </div>
+    <?php endif; ?>
+
 </div>
 
 <script>
-function loadPage(page) {
-    if (page < 1) return;
-    
-    $('#activityRows').css('opacity', '0.5');
-    
-    const formData = $('#filterForm').serializeArray();
-    let params = { ajax: 1, page: page };
-    formData.forEach(item => {
-        params[item.name] = item.value;
-    });
-    
-    $.ajax({
-        url: '<?= getUrl('activity_log') ?>',
-        type: 'GET',
-        data: params,
-        dataType: 'json',
-        cache: false,
-        success: function(response) {
-            if (response.success) {
-                $('#activityRows').html(response.rows).css('opacity', '1');
-                $('#paginationNav').html(response.pagination);
-                $('#paginationInfo').text(response.info);
-                $('html, body').animate({
-                    scrollTop: $("#activityTable").offset().top - 100
-                }, 100);
-            } else {
-                Swal.fire('Error', response.error || 'Failed to load data', 'error');
-                $('#activityRows').css('opacity', '1');
+let acTable = null;
+$(function () {
+    // ── Server-side DataTables: sort / search / paginate over 65k+ rows. The
+    //    activity FILTERS (Type / User / Period / Custom range) drive a full page
+    //    reload so the summary cards + Time-in-System panel re-render correctly;
+    //    DataTables sends the current filter values with every request. ──────────
+    acTable = $('#activityTable').DataTable({
+        serverSide: true,
+        processing: true,
+        ordering: true,
+        autoWidth: false,
+        order: [[1, 'desc']],                 // Time, newest first
+        pageLength: <?= $limit === -1 ? -1 : (int)$limit ?>,
+        lengthChange: false,                  // page size is the existing "Limit" dropdown
+        dom: '<"d-flex justify-content-end mb-2"f>rt<"d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 no-print"ip>',
+        ajax: {
+            url: '<?= getUrl('activity_log') ?>',
+            type: 'GET',
+            data: function (d) {
+                d.type      = $('#filterType').val();
+                d.user_id   = $('#filterUser').val();
+                d.period    = $('#filterPeriod').val();
+                d.date_from = $('#filterDateFrom').val();
+                d.date_to   = $('#filterDateTo').val();
+            },
+            error: function (xhr) {
+                console.error('Activity DataTables error:', xhr.status, xhr.statusText);
             }
         },
-        error: function(xhr) {
-            console.error('AJAX Error:', xhr.status, xhr.statusText);
-            Swal.fire('Error', 'Connection failed (Code: ' + xhr.status + '). Please try again.', 'error');
-            $('#activityRows').css('opacity', '1');
+        columns: [
+            { orderable: false, className: 'text-center', width: '5%'  }, // S/NO
+            { width: '15%' },                                            // Time
+            { width: '15%' },                                            // Type
+            { width: '35%' },                                            // Description (widest)
+            { orderable: false, width: '15%' },                          // Reference
+            { width: '15%' }                                             // User
+        ],
+        language: {
+            search: 'Search:',
+            processing: 'Loading…',
+            emptyTable: 'No activities found for this filter.',
+            zeroRecords: 'No matching activities found.',
+            info: 'Showing _START_ to _END_ of _TOTAL_ entries',
+            infoEmpty: 'Showing 0 entries',
+            infoFiltered: '(filtered from _MAX_ total)'
         }
     });
-}
 
-// Handle real-time filtering if preferred, or just the submit button
-$('#filterForm').on('submit', function(e) {
-    e.preventDefault();
-    loadPage(1);
-});
+    // Filters → full reload (so cards + session panel stay correct server-side).
+    function acApplyFilters() {
+        const p = new URLSearchParams();
+        const t = $('#filterType').val();   if (t) p.set('type', t);
+        const u = $('#filterUser').val();   if (u) p.set('user_id', u);
+        p.set('period', $('#filterPeriod').val() || 'today');
+        const df = $('#filterDateFrom').val(); if (df) p.set('date_from', df);
+        const dt = $('#filterDateTo').val();   if (dt) p.set('date_to', dt);
+        const lim = $('#filterLimit').val();   if (lim) p.set('limit', lim);
+        window.location = '<?= getUrl('activity_log') ?>?' + p.toString();
+    }
 
-// Optional: Auto-load on change
-$('#filterType, #filterUser, #filterDateFrom, #filterDateTo, #filterLimit').on('change', function() {
-    loadPage(1);
+    $('#filterForm').on('submit', function (e) { e.preventDefault(); acApplyFilters(); });
+    $('#filterType, #filterUser').on('change', acApplyFilters);
+
+    // Limit = DataTables page length (no reload needed).
+    $('#filterLimit').on('change', function () {
+        acTable.page.len(this.value === 'all' ? -1 : parseInt(this.value, 10)).draw();
+    });
+
+    // Period: reveal Custom From/To only for "Custom (specify)"; non-custom reloads
+    // immediately, custom waits for a date to be picked.
+    $('#filterPeriod').on('change', function () {
+        const isCustom = $(this).val() === 'custom';
+        $('.custom-date-field').toggle(isCustom);
+        if (isCustom) { $('#filterDateFrom').focus(); } else { acApplyFilters(); }
+    });
+    $('#filterDateFrom, #filterDateTo').on('change', function () {
+        if ($('#filterPeriod').val() === 'custom') acApplyFilters();
+    });
 });
-// Helper to log actions
 
 function printLog() {
     logReportAction('Printed Activity Log', 'Generated a printed report of the system activity logs');
@@ -833,66 +1364,8 @@ function exportCSV() {
     logReportAction('Exported Activity Log', 'Exported activity log records to CSV file');
 }
 
-// ── Period preset ────────────────────────────────────────────────────────────
-function applyPeriodPreset(period) {
-    const today = new Date();
-    const fmt   = d => d.toISOString().slice(0, 10);
-
-    if (period === '') {
-        $('#filterDateFrom').val('');
-        $('#filterDateTo').val('');
-        loadPage(1);
-    } else if (period === 'today') {
-        $('#filterDateFrom').val(fmt(today));
-        $('#filterDateTo').val(fmt(today));
-        loadPage(1);
-    } else if (period === 'week') {
-        const mon = new Date(today);
-        const day = mon.getDay() || 7; // treat Sunday as 7 so Monday = start
-        mon.setDate(mon.getDate() - day + 1);
-        $('#filterDateFrom').val(fmt(mon));
-        $('#filterDateTo').val(fmt(today));
-        loadPage(1);
-    } else if (period === 'month') {
-        $('#filterDateFrom').val(fmt(new Date(today.getFullYear(), today.getMonth(), 1)));
-        $('#filterDateTo').val(fmt(today));
-        loadPage(1);
-    } else if (period === 'year') {
-        $('#filterDateFrom').val(fmt(new Date(today.getFullYear(), 0, 1)));
-        $('#filterDateTo').val(fmt(today));
-        loadPage(1);
-    }
-    // 'custom': leave From/To for manual input — existing change handler fires on user edit
-}
-
-// Detect period preset on page load when URL already has dates
-(function initPeriodDropdown() {
-    const from = $('#filterDateFrom').val();
-    const to   = $('#filterDateTo').val();
-    if (!from && !to) return;
-
-    const today = new Date();
-    const fmt   = d => d.toISOString().slice(0, 10);
-    const mon   = new Date(today);
-    const day   = mon.getDay() || 7;
-    mon.setDate(mon.getDate() - day + 1);
-
-    if (from === fmt(today) && to === fmt(today)) {
-        $('#filterPeriod').val('today');
-    } else if (from === fmt(mon) && to === fmt(today)) {
-        $('#filterPeriod').val('week');
-    } else if (from === fmt(new Date(today.getFullYear(), today.getMonth(), 1)) && to === fmt(today)) {
-        $('#filterPeriod').val('month');
-    } else if (from === fmt(new Date(today.getFullYear(), 0, 1)) && to === fmt(today)) {
-        $('#filterPeriod').val('year');
-    } else {
-        $('#filterPeriod').val('custom');
-    }
-})();
-
-$('#filterPeriod').on('change', function () {
-    applyPeriodPreset($(this).val());
-});
+// (Period is now server-authoritative — see the #filterPeriod change handler
+//  above. The old client-side date-preset logic was removed.)
 
 // ── Purge matching logs ──────────────────────────────────────────────────────
 async function initiatePurge() {
@@ -987,10 +1460,188 @@ async function initiatePurge() {
             html : `<strong>${purgeData.count.toLocaleString()}</strong> log entries have been permanently deleted.`,
             confirmButtonColor: '#28a745'
         });
-        loadPage(1);
+        if (acTable) acTable.ajax.reload(null, false);
+        location.reload();
     } else {
         Swal.fire('Error', purgeData.error || 'Purge failed', 'error');
     }
+}
+
+// ── AI Audit Intelligence ─────────────────────────────────────────────────────
+let _aiCurrentMode = 'briefing';
+
+function toggleAiPanel() {
+    const body    = document.getElementById('aiPanelBody');
+    const chevron = document.getElementById('aiPanelChevron');
+    if (!body) return;
+    const opening = body.classList.contains('d-none');
+    body.classList.toggle('d-none', !opening);
+    chevron.style.transform = opening ? 'rotate(180deg)' : '';
+    // Auto-select first tab on first open
+    if (opening && !body.dataset.initialized) {
+        body.dataset.initialized = '1';
+        const firstTab = body.querySelector('.ai-mode-tab');
+        if (firstTab) selectAiMode(firstTab.dataset.mode, firstTab);
+    }
+}
+
+function selectAiMode(mode, btn) {
+    _aiCurrentMode = mode;
+    // Update tab styles
+    document.querySelectorAll('.ai-mode-tab').forEach(b => {
+        b.style.color       = '#64748b';
+        b.style.borderColor = 'transparent';
+        b.style.fontWeight  = '500';
+    });
+    if (btn) {
+        btn.style.color       = btn.dataset.color || '#7c3aed';
+        btn.style.borderColor = btn.dataset.color || '#7c3aed';
+        btn.style.fontWeight  = '700';
+    }
+    // Show the right pane
+    document.querySelectorAll('.ai-pane').forEach(p => p.classList.add('d-none'));
+    const pane = document.getElementById('ai-pane-' + mode);
+    if (pane) pane.classList.remove('d-none');
+    // Clear previous result
+    document.getElementById('aiResultArea').classList.add('d-none');
+    document.getElementById('aiOutput').classList.add('d-none');
+    document.getElementById('aiError').classList.add('d-none');
+    document.getElementById('aiLoading').classList.add('d-none');
+}
+
+function aiQuick(question) {
+    const inp = document.getElementById('aiAskInput');
+    if (inp) { inp.value = question; inp.focus(); }
+    runAiAnalysis('ask');
+}
+
+async function runAiAnalysis(mode) {
+    // Build payload from current page filter + mode-specific inputs
+    const dateFrom = $('#filterDateFrom').val() || '<?= $date_from ?>';
+    const dateTo   = $('#filterDateTo').val()   || '<?= $date_to ?>';
+    const userId   = $('#filterUser').val()     || '';
+
+    const payload = {
+        _csrf    : CSRF_TOKEN,
+        mode     : mode,
+        date_from: dateFrom,
+        date_to  : dateTo,
+        user_id  : userId,
+    };
+
+    if (mode === 'ask') {
+        const q = (document.getElementById('aiAskInput')?.value || '').trim();
+        if (!q) { Swal.fire({ icon:'warning', title:'Please enter a question first.' }); return; }
+        payload.query = q;
+    }
+    if (mode === 'report') {
+        payload.report_user_id = document.getElementById('rptUser')?.value  || '';
+        payload.report_from    = document.getElementById('rptFrom')?.value  || dateFrom;
+        payload.report_to      = document.getElementById('rptTo')?.value    || dateTo;
+    }
+
+    // Show loading
+    const area = document.getElementById('aiResultArea');
+    area.classList.remove('d-none');
+    document.getElementById('aiLoading').classList.remove('d-none');
+    document.getElementById('aiOutput').classList.add('d-none');
+    document.getElementById('aiError').classList.add('d-none');
+
+    try {
+        const res = await $.ajax({
+            url     : '<?= buildUrl('api/ai_audit_analysis.php') ?>',
+            type    : 'POST',
+            data    : payload,
+            dataType: 'json',
+        });
+        document.getElementById('aiLoading').classList.add('d-none');
+
+        if (res.success) {
+            const modeLabels = {
+                briefing : '📋 Daily Briefing',
+                anomalies: '🔍 Anomaly Scan',
+                ask      : '💬 Ask the Log',
+                report   : '📄 Audit Report',
+            };
+            const usage  = res.usage || {};
+            const tokens = (usage.prompt || 0) + (usage.completion || 0);
+            document.getElementById('aiResultMeta').textContent =
+                (modeLabels[res.mode] || res.mode) +
+                (tokens ? '  ·  ' + tokens.toLocaleString() + ' tokens' : '') +
+                '  ·  ' + new Date().toLocaleTimeString();
+            document.getElementById('aiText').innerHTML = renderAiMarkdown(res.text || '');
+            document.getElementById('aiOutput').classList.remove('d-none');
+        } else {
+            document.getElementById('aiErrorMsg').textContent = res.message || 'Unknown error.';
+            document.getElementById('aiError').classList.remove('d-none');
+        }
+    } catch (e) {
+        document.getElementById('aiLoading').classList.add('d-none');
+        document.getElementById('aiErrorMsg').textContent = 'Request failed. Check your connection.';
+        document.getElementById('aiError').classList.remove('d-none');
+    }
+}
+
+function renderAiMarkdown(text) {
+    if (!text) return '';
+    return text
+        // Severity badges
+        .replace(/🔴\s*(High|CRITICAL)/gi,  '<span class="badge text-white me-1" style="background:#dc2626;">🔴 High</span>')
+        .replace(/🟡\s*(Medium|MODERATE)/gi, '<span class="badge text-dark me-1" style="background:#fbbf24;">🟡 Medium</span>')
+        .replace(/🟢\s*(Low|CLEAN)/gi,       '<span class="badge text-white me-1" style="background:#16a34a;">🟢 Low</span>')
+        // Risk level lines
+        .replace(/RISK LEVEL\s*:\s*/gi, '<strong class="text-danger">RISK LEVEL: </strong>')
+        // Bold
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        // Section headers (## or ALL CAPS line followed by ---)
+        .replace(/^#{1,3}\s+(.+)$/gm, '<div class="fw-bold text-primary mt-3 mb-1" style="font-size:.9rem;border-bottom:1px solid #e2e8f0;padding-bottom:3px;">$1</div>')
+        .replace(/^([A-Z][A-Z\s\/&]{4,}):?\s*$/gm, '<div class="fw-bold text-uppercase mt-3 mb-1" style="font-size:.78rem;color:#7c3aed;letter-spacing:.07em;">$1</div>')
+        // Bullet lines starting with - or •
+        .replace(/^[\-•]\s+(.+)$/gm, '<div class="ms-3 mb-1">• $1</div>')
+        // FINDING / DETAIL / ACTION / SEVERITY labels
+        .replace(/\b(SEVERITY|FINDING|DETAIL|ACTION|RECOMMENDATION[S]?|SCOPE|METHODOLOGY)\s*:/g,
+                 '<span class="fw-bold text-dark" style="font-size:.8rem;">$1:</span>')
+        // Checkmark
+        .replace(/✅/g, '<span class="text-success">✅</span>')
+        .replace(/⚠️/g, '<span class="text-warning">⚠️</span>')
+        // Double newline → paragraph break
+        .replace(/\n\n+/g, '<br><br>')
+        .replace(/\n/g, '<br>');
+}
+
+function printAiResult() {
+    const content = document.getElementById('aiText')?.innerHTML || '';
+    const meta    = document.getElementById('aiResultMeta')?.textContent || '';
+    const modeLabels = {
+        briefing : 'Daily Briefing',
+        anomalies: 'Anomaly Scanner',
+        ask      : 'Ask the Log',
+        report   : 'Audit Report',
+    };
+
+    document.getElementById('aiPrintDocLabel').textContent =
+        'AI Audit Intelligence — ' + (modeLabels[_aiCurrentMode] || _aiCurrentMode);
+    document.getElementById('aiPrintMetaLine').textContent = meta;
+    document.getElementById('aiPrintBody').innerHTML = content;
+
+    document.body.classList.add('ai-printing');
+
+    const cleanup = () => {
+        document.body.classList.remove('ai-printing');
+        window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+
+    window.print();
+}
+
+function copyAiResult() {
+    const text = document.getElementById('aiText')?.innerText || '';
+    navigator.clipboard.writeText(text).then(() => {
+        Swal.fire({ icon:'success', title:'Copied!', text:'AI analysis copied to clipboard.', timer:1500, showConfirmButton:false });
+    }).catch(() => {
+        Swal.fire({ icon:'error', title:'Copy failed', text:'Please select and copy manually.' });
+    });
 }
 </script>
 

@@ -100,10 +100,16 @@ try {
     $grand_total = $subtotal + $tax_total + $shipping_cost;
 
     if ($purchase_order_id > 0) {
+        // Re-code a legacy PO number on edit (POs don't post to the GL, so always eligible).
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $curPo = $pdo->prepare("SELECT order_number FROM purchase_orders WHERE purchase_order_id = ?");
+        $curPo->execute([$purchase_order_id]);
+        $order_number = codeForEdit($pdo, 'PO', (string)$curPo->fetchColumn(), 'PO-[0-9].*', 'purchase_orders', (int)$purchase_order_id);
+
         // Update existing
         $stmt = $pdo->prepare("
             UPDATE purchase_orders SET
-                supplier_id = ?, project_id = ?, warehouse_id = ?, order_date = ?, expected_date = ?,
+                order_number = ?, supplier_id = ?, project_id = ?, warehouse_id = ?, order_date = ?, expected_date = ?,
                 total_amount = ?, tax_amount = ?, grand_total = ?, shipping_cost = ?,
                 currency = ?, payment_terms = ?, shipping_method = ?, notes = ?,
                 terms_conditions = ?, rfq_id = ?, proforma_invoice_ref = ?, supplier_quote_ref = ?,
@@ -111,7 +117,7 @@ try {
             WHERE purchase_order_id = ?
         ");
         $stmt->execute([
-            $supplier_id, $project_id, $warehouse_id, $order_date, $expected_date,
+            $order_number, $supplier_id, $project_id, $warehouse_id, $order_date, $expected_date,
             $subtotal, $tax_total, $grand_total, $shipping_cost,
             $currency, $payment_terms, $shipping_method, $notes,
             $terms_conditions, $rfq_id, $proforma_invoice_ref, $supplier_quote_ref,
@@ -122,10 +128,9 @@ try {
         $pdo->prepare("DELETE FROM purchase_order_items WHERE purchase_order_id = ?")->execute([$purchase_order_id]);
         
     } else {
-        // Generate order number
-        $stmt = $pdo->query("SELECT MAX(purchase_order_id) FROM purchase_orders");
-        $max_id = $stmt->fetchColumn();
-        $order_number = 'PO-' . date('Ymd') . '-' . str_pad(($max_id + 1), 4, '0', STR_PAD_LEFT);
+        // Company-prefixed sequential order number (BFS-PO-0001), gap-free.
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $order_number = nextCode($pdo, 'PO');
 
         // Snapshot creator info
         $creator_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
@@ -287,12 +292,24 @@ try {
     $pdo->commit();
 
     // Phase 3a — financial-write audit trail.
-    logActivity(
-        $pdo,
-        $_SESSION['user_id'] ?? 0,
-        $is_update ? "Updated Purchase Order" : "Created Purchase Order",
-        "PO ID: $purchase_order_id" . (!empty($order_number) ? ", number: $order_number" : '')
-    );
+    if ($is_update) {
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Edit purchase order', "User edited purchase order: $order_number (ID $purchase_order_id)");
+    } else {
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Create purchase order', "User created a new purchase order: $order_number (ID $purchase_order_id)");
+    }
+
+    // Smart-notification: a new PO is awaiting approval. Fail-safe + kill-switched.
+    if (!$is_update) {
+        require_once __DIR__ . '/../../core/notify.php';
+        dispatchEvent($pdo, 'po.needs_approval', [
+            'entity_type' => 'purchase_order',
+            'entity_id'   => (int)$purchase_order_id,
+            'project_id'  => $project_id !== null ? (int)$project_id : null,
+            'title'       => 'Purchase order to approve: ' . ($order_number ?? ''),
+            'message'     => 'A new purchase order ' . ($order_number ?? '') . ' has been created and needs approval.',
+            'action_url'  => 'purchase_order_details?id=' . (int)$purchase_order_id,
+        ]);
+    }
 
     echo json_encode([
         'success' => true,

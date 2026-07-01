@@ -242,6 +242,7 @@ try {
         // so child.level stays parent.level + 1 throughout the moved subtree.
         recomputeSubtreeLevels($pdo, (int)$account_id);
 
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Edit account', "User edited account: $account_name ($account_code, ID $account_id)");
         logAudit($pdo, $_SESSION['user_id'] ?? 0, 'Updated Account', [
             'activity_type' => 'Account Update',
             'entity_type' => 'accounts',
@@ -301,6 +302,7 @@ try {
         ]);
         $new_id = $pdo->lastInsertId();
         
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Create account', "User created a new account: $account_name ($account_code)");
         logAudit($pdo, $_SESSION['user_id'] ?? 0, 'Created Account', [
             'activity_type' => 'Account Creation',
             'entity_type' => 'accounts',

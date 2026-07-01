@@ -67,14 +67,9 @@ try {
         exit;
     }
 
-    // Generate unique outbound DN number
-    $delivery_number = 'DN-' . date('Ymd') . '-' . mt_rand(100, 999);
-    $cn = $pdo->prepare("SELECT COUNT(*) FROM deliveries WHERE delivery_number = ?");
-    $cn->execute([$delivery_number]);
-    while ((int)$cn->fetchColumn() > 0) {
-        $delivery_number = 'DN-' . date('Ymd') . '-' . mt_rand(1000, 9999);
-        $cn->execute([$delivery_number]);
-    }
+    // Company-prefixed sequential outbound DN number (BFS-DN-0001).
+    require_once __DIR__ . '/../core/code_generator.php';
+    $delivery_number = nextCode($pdo, 'DN');
 
     $user_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
     $user_role = $_SESSION['user_role'] ?? 'Staff';

@@ -58,7 +58,7 @@ if ($order_count > 0 || $payment_count > 0) {
     try {
         $delete_stmt->execute([$_SESSION['user_id'], $supplier_id]);
 
-        logActivity($pdo, $_SESSION['user_id'], "Soft Deleted Supplier", "Supplier: " . $supplier['supplier_name'] . " (ID: $supplier_id) — had associated records");
+        logActivity($pdo, $_SESSION['user_id'], "Delete supplier", "deleted supplier \"" . $supplier['supplier_name'] . "\" with id $supplier_id (soft-deleted — had associated records)");
 
         header('Content-Type: application/json');
         echo json_encode([
@@ -77,7 +77,7 @@ if ($order_count > 0 || $payment_count > 0) {
     try {
         $delete_stmt->execute([$supplier_id]);
 
-        logActivity($pdo, $_SESSION['user_id'], "Deleted Supplier", "Supplier: " . $supplier['supplier_name'] . " (ID: $supplier_id)");
+        logActivity($pdo, $_SESSION['user_id'], "Delete supplier", "deleted supplier \"" . $supplier['supplier_name'] . "\" with id $supplier_id");
 
         header('Content-Type: application/json');
         echo json_encode([

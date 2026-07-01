@@ -32,7 +32,7 @@ $display_council  = $tender['council_name']  ?: ($tender['council_id']  ?: 'N/A'
 $display_ward     = $tender['ward_name']     ?: ($tender['ward_id']     ?: 'N/A');
 
 // Log View
-logActivity($pdo, $_SESSION['user_id'], 'VIEW', "[Tender View] Viewed details for tender: " . $tender['tender_no'] . " (ID: $id)");
+logActivity($pdo, $_SESSION['user_id'], 'View tender', "User viewed tender details: " . $tender['tender_no'] . " (ID $id)");
 
 // Fetch Audit Trail (Searching for tender ID in description)
 $logs_stmt = $pdo->prepare("SELECT a.*, CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) as full_name FROM activity_logs a 

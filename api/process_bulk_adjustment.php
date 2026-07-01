@@ -117,7 +117,8 @@ try {
             }
 
             $unit_cost = $unit_cost_input > 0 ? $unit_cost_input : floatval($product['cost_price']);
-            $reference_number = 'BULK-' . date('Ymd') . '-' . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT);
+            require_once __DIR__ . '/../core/code_generator.php';
+            $reference_number = nextCode($pdo, 'BULK');
 
             // Insert stock movement
             $stmt = $pdo->prepare("

@@ -12,6 +12,10 @@ includeHeader();
 $supplier_id = isset($_GET['supplier']) ? intval($_GET['supplier']) : 0;
 // Handle both 'project' and 'project_id' for better compatibility
 $project_id = isset($_GET['project']) ? intval($_GET['project']) : (isset($_GET['project_id']) ? intval($_GET['project_id']) : 0);
+// Origin context (URL only): where the user came FROM. Drives the post-save redirect so
+// editing a project-linked PO from the general area does NOT jump into the project.
+// The PO still keeps its own project link (the dropdown below uses $project_id) — unchanged.
+$origin_project_id = $project_id;
 
 // Dependencies from PDO
 global $pdo;
@@ -82,9 +86,43 @@ if ($enable_projects) {
     } catch (Exception $e) {}
 }
 
+// Context-aware back navigation — short ?back=<tab> keeps URLs clean
+$back_tab     = $_GET['back'] ?? '';
+$from_project = $project_id > 0 && !empty($back_tab);
+$back_url     = $from_project
+    ? getUrl('project_view') . '?id=' . $project_id . '&tab=' . $back_tab
+    : getUrl('purchase_orders');
+
+// Pre-selected RFQ to auto-fill items on page load
+$rfq_ref_id = isset($_GET['rfq_ref']) ? intval($_GET['rfq_ref']) : 0;
+
+// When a specific project is selected, narrow suppliers to that project only
+// (Warehouses are not filtered server-side — many setups share warehouses across projects;
+//  the JS filterWarehousesByProject handles display with a graceful fallback.)
+if ($project_id > 0) {
+    $stmt_pf = $pdo->prepare("SELECT supplier_id, supplier_name, company_name, currency, payment_terms FROM suppliers WHERE status='active' AND project_id = ? ORDER BY supplier_name");
+    $stmt_pf->execute([$project_id]);
+    $proj_sup = $stmt_pf->fetchAll(PDO::FETCH_ASSOC);
+    if (!empty($proj_sup)) $suppliers = $proj_sup;
+
+    // Lock projects list to this one so the dropdown shows only the current project
+    $stmt_pfp = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE project_id = ?");
+    $stmt_pfp->execute([$project_id]);
+    $projects = $stmt_pfp->fetchAll(PDO::FETCH_ASSOC);
+}
+
 // Check for edit mode
 $edit_id = isset($_GET['edit']) ? intval($_GET['edit']) : (isset($_GET['id']) ? intval($_GET['id']) : 0);
 $is_edit = $edit_id > 0;
+
+// Pre-select warehouse from the RFQ so products load and prices auto-fill
+$rfq_warehouse_id = 0;
+if ($rfq_ref_id > 0 && !$is_edit) {
+    $stmt_rw = $pdo->prepare("SELECT warehouse_id FROM rfq WHERE rfq_id = ? LIMIT 1");
+    $stmt_rw->execute([$rfq_ref_id]);
+    $rfq_warehouse_id = (int)($stmt_rw->fetchColumn() ?: 0);
+}
+
 $po_data = null;
 $po_items = [];
 $po_attachments = [];
@@ -127,7 +165,11 @@ if ($is_edit) {
     <nav aria-label="breadcrumb" class="mb-3 po-create-sticky-nav">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
+            <?php if ($from_project): ?>
+            <li class="breadcrumb-item"><a href="<?= htmlspecialchars($back_url) ?>">Project POs</a></li>
+            <?php else: ?>
             <li class="breadcrumb-item"><a href="<?= getUrl('purchase_orders') ?>">Purchase Orders</a></li>
+            <?php endif; ?>
             <li class="breadcrumb-item active"><?= $is_edit ? 'Edit Order' : 'New Order' ?></li>
         </ol>
     </nav>
@@ -143,14 +185,19 @@ if ($is_edit) {
                     <p class="text-muted mb-0"><?= $is_edit ? 'Update existing purchase order details' : 'Issue a new purchase request to a supplier' ?></p>
                 </div>
                 <div class="d-flex flex-wrap gap-2 align-items-center">
-                    <?php if ($project_id > 0 && $enable_projects): ?>
-                    <a href="<?= getUrl('project_view') ?>?id=<?= $project_id ?>" class="btn btn-outline-primary">
+                    <?php if ($from_project): ?>
+                    <a href="<?= htmlspecialchars($back_url) ?>" class="btn btn-outline-primary">
                         <i class="bi bi-arrow-left"></i> Back to Project
                     </a>
-                    <?php endif; ?>
+                    <?php elseif ($project_id > 0 && $enable_projects): ?>
+                    <a href="<?= getUrl('project_view') ?>?id=<?= $project_id ?>&tab=procurement" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-left"></i> Back to Project
+                    </a>
+                    <?php else: ?>
                     <a href="<?= getUrl('purchase_orders') ?>" class="btn btn-outline-secondary">
                         <i class="bi bi-arrow-left"></i> Back to List
                     </a>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -183,9 +230,15 @@ if ($is_edit) {
                                 </select>
                             </div>
 
-                            <!-- 2. Project (Optional) -->
+                            <!-- 2. Project (Optional / Locked when opened from project context) -->
                             <?php if ($enable_projects): ?>
                             <div class="col-md-4">
+                                <?php if ($project_id > 0 && !$is_edit): ?>
+                                <label class="form-label fw-semibold">Project</label>
+                                <input type="hidden" name="project_id" id="project_id" value="<?= $project_id ?>">
+                                <input type="text" class="form-control bg-light text-muted" value="<?= htmlspecialchars($projects[0]['project_name'] ?? '') ?>" readonly tabindex="-1">
+                                <div class="form-text"><i class="bi bi-lock-fill me-1"></i>Locked to this project</div>
+                                <?php else: ?>
                                 <label class="form-label fw-semibold">Project <span class="text-muted small fw-normal">(Optional)</span></label>
                                 <select class="form-select select2-static" id="project_id" name="project_id">
                                     <option value="">No Project</option>
@@ -196,6 +249,7 @@ if ($is_edit) {
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
+                                <?php endif; ?>
                             </div>
                             <?php endif; ?>
 
@@ -205,9 +259,11 @@ if ($is_edit) {
                                 <select class="form-select select2-static" id="warehouse_id" name="warehouse_id" required>
                                     <option value="">Select Warehouse</option>
                                     <?php foreach ($warehouses as $w): ?>
-                                        <option value="<?= $w['warehouse_id'] ?>" 
+                                        <option value="<?= $w['warehouse_id'] ?>"
                                             data-project="<?= $w['project_id'] ?>"
-                                            <?= ($is_edit && $po_data['warehouse_id'] == $w['warehouse_id']) ? 'selected' : '' ?>>
+                                            <?= ($is_edit && $po_data && $po_data['warehouse_id'] == $w['warehouse_id'])
+                                                || (!$is_edit && $rfq_warehouse_id && $rfq_warehouse_id == $w['warehouse_id'])
+                                                ? 'selected' : '' ?>>
                                             <?= htmlspecialchars($w['warehouse_name']) ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -482,7 +538,7 @@ if ($is_edit) {
                             <button type="button" class="btn btn-outline-primary" onclick="window.saveDraft()">
                                 <i class="bi bi-save me-2"></i> Save as Draft
                             </button>
-                            <a href="<?= getUrl('purchase_orders') ?>" class="btn btn-link text-decoration-none text-muted">
+                            <a href="<?= htmlspecialchars($back_url) ?>" class="btn btn-link text-decoration-none text-muted">
                                 Cancel and return
                             </a>
                         </div>
@@ -520,7 +576,8 @@ if ($is_edit) {
 <script>
 let productsList = [];
 const editId = <?= json_encode($edit_id) ?>;
-const isEdit = <?= json_encode($is_edit) ?>;
+const isEdit    = <?= json_encode($is_edit) ?>;
+const rfqRefId  = <?= (int)$rfq_ref_id ?>;
 
 // ── Global Functions ──────────────────────────────────────────────
 
@@ -629,7 +686,7 @@ $(document).ready(function() {
     fetchProducts().then(() => {
         if (!isEdit) {
             logReportAction('Viewed Purchase Order Create Page', 'User opened the create purchase order page');
-            addItemRow();
+            if (!rfqRefId) addItemRow(); // skip blank row when RFQ items will auto-fill
         } else {
             calculateGrandTotal();
         }
@@ -689,7 +746,7 @@ $(document).ready(function() {
 });
 
 // ── RFQ Reference helpers ──────────────────────────────────────────────
-function loadRFQs() {
+function loadRFQs(callback) {
     const supplierId  = $('#supplier_id').val()  || '';
     const warehouseId = $('#warehouse_id').val()  || '';
     const projectId   = $('#project_id').val()    || '';
@@ -698,6 +755,7 @@ function loadRFQs() {
     if (!supplierId && !warehouseId && !projectId) {
         $('#rfq_reference').html('<option value="">Select RFQ (Optional)</option>');
         reinitRfqSelect2();
+        if (callback) callback();
         return;
     }
 
@@ -711,6 +769,7 @@ function loadRFQs() {
         if (!data.length) {
             $('#rfq_reference').html('<option value="">Select RFQ (Optional)</option>');
             reinitRfqSelect2();
+            if (callback) callback();
             return;
         }
         let opts = '<option value="">Select RFQ (Optional)</option>';
@@ -728,9 +787,11 @@ function loadRFQs() {
         });
         $('#rfq_reference').html(opts);
         reinitRfqSelect2();
+        if (callback) callback();
     }).fail(function() {
         $('#rfq_reference').html('<option value="">Select RFQ (Optional)</option>');
         reinitRfqSelect2();
+        if (callback) callback();
     });
 }
 
@@ -845,8 +906,10 @@ function filterWarehousesByProject(projectId) {
     let filtered;
     if (!projectId || projectId === '') {
         filtered = allWarehouses.filter(w => !w.project_id || w.project_id === 0);
+        if (filtered.length === 0) filtered = allWarehouses; // fallback when no general warehouses
     } else {
         filtered = allWarehouses.filter(w => w.project_id == projectId);
+        if (filtered.length === 0) filtered = allWarehouses; // fallback when no project-linked warehouses
     }
     filtered.forEach(w => {
         const opt = document.createElement('option');
@@ -865,13 +928,25 @@ function filterWarehousesByProject(projectId) {
     });
 }
 
-// Run on page load - filter warehouses based on pre-selected project
+// Filter warehouses on page load + auto-select RFQ when rfq_ref is in URL
 $(document).ready(function(){
     <?php if ($enable_projects): ?>
     filterWarehousesByProject($('#project_id').val());
     <?php else: ?>
     filterWarehousesByProject('');
     <?php endif; ?>
+
+    if (rfqRefId && !isEdit) {
+        // Chain: ensure products are loaded (prices populate) → load RFQ list → select & trigger
+        fetchProducts().then(function() {
+            loadRFQs(function() {
+                const $rfqSel = $('#rfq_reference');
+                if ($rfqSel.find('option[value="' + rfqRefId + '"]').length) {
+                    $rfqSel.val(rfqRefId).trigger('change');
+                }
+            });
+        });
+    }
 });
 
 
@@ -1250,12 +1325,7 @@ function saveOrder(status) {
                     confirmButtonText: 'OK',
                     timer: 3000
                 }).then(() => {
-                    const projectId = <?= (int)($project_id ?? 0) ?>;
-                    if (projectId > 0) {
-                        window.location.href = '<?= getUrl('project_view') ?>?id=' + projectId;
-                    } else {
-                        window.location.href = '<?= getUrl('purchase_orders') ?>';
-                    }
+                    window.location.href = '<?= htmlspecialchars($back_url) ?>';
                 });
             } else {
                 Swal.fire({

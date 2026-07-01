@@ -272,6 +272,12 @@ function deleteCustomerDocument($pdo, $doc_id) {
         $stmt = $pdo->prepare("DELETE FROM customer_documents WHERE id = ?");
         $stmt->execute([$doc_id]);
 
+        // Activity Log feed (audit_log.md): never silent.
+        if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
+            logActivity($pdo, (int)$_SESSION['user_id'], 'Delete document',
+                "deleted customer document with id {$doc_id}");
+        }
+
         return ['success' => true, 'message' => 'Document deleted successfully'];
 
     } catch (Exception $e) {

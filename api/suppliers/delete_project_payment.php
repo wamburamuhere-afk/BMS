@@ -40,7 +40,7 @@ try {
         ->execute([$id]);
 
     $pdo->commit();
-    logActivity($pdo, $_SESSION['user_id'], "Deleted supplier payment #$id");
+    logActivity($pdo, $_SESSION['user_id'], "Delete supplier payment", "deleted supplier project payment with id $id");
     echo json_encode(['success' => true, 'message' => 'Payment deleted.']);
 
 } catch (PDOException $e) {

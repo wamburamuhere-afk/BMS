@@ -134,6 +134,26 @@ try {
 // ─────────────────────────────────────────────────────────────────────────
 section('6. Runtime: ?report=general_ledger&account_id=2 renders balance cards');
 // ─────────────────────────────────────────────────────────────────────────
+// Seed two test entries for account_id=2 in a rolled-back transaction so the
+// GL renders with known figures: opening=12,000.00, closing=13,000.00.
+$pdo->beginTransaction();
+try {
+    $rd6_e = $pdo->prepare("INSERT INTO journal_entries (entry_date,reference_number,description,status,created_by,created_at) VALUES (?,?,?,'posted',4,NOW())");
+    $rd6_i = $pdo->prepare("INSERT INTO journal_entry_items (entry_id,account_id,type,amount,description,created_at) VALUES (?,?,?,?,?,NOW())");
+    $rd6_e->execute(['2025-12-15','RD-TEST-PRE','GL route test seed pre-period']);
+    $rd6_pre = (int)$pdo->lastInsertId();
+    $rd6_i->execute([$rd6_pre, 3, 'debit',  12000, 'GL route test']);
+    $rd6_i->execute([$rd6_pre, 2, 'credit', 12000, 'GL route test']);
+    $rd6_e->execute(['2026-01-17','RD-TEST-IN','GL route test seed in-period']);
+    $rd6_in = (int)$pdo->lastInsertId();
+    $rd6_i->execute([$rd6_in, 3, 'debit',  1000, 'GL route test']);
+    $rd6_i->execute([$rd6_in, 2, 'credit', 1000, 'GL route test']);
+} catch (Throwable $e) {
+    $pdo->rollBack();
+    fail('section 6 seed threw: ' . $e->getMessage());
+    goto rd_section7;
+}
+
 $_GET = ['report' => 'general_ledger', 'account_id' => 2,
          'start_date' => '2026-01-01', 'end_date' => '2026-05-31'];
 $prevErr = error_reporting(error_reporting() & ~E_WARNING);
@@ -157,7 +177,10 @@ try {
     error_reporting($prevErr);
     ob_get_clean();
     fail('reports.php?report=general_ledger&account_id=2 threw: ' . $e->getMessage());
+} finally {
+    if ($pdo->inTransaction()) $pdo->rollBack();
 }
+rd_section7:
 
 // ─────────────────────────────────────────────────────────────────────────
 section('7. Rendered TB HTML contains a real GL drill-down anchor');

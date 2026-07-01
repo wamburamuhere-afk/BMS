@@ -7,6 +7,8 @@ autoEnforcePermission('tenders'); // Now using proper tender permission
 
 includeHeader();
 
+logActivity($pdo, $_SESSION['user_id'], 'View tenders', 'User viewed the tenders management list');
+
 $can_create = isAdmin() || canCreate('tenders');
 
 // Fetch Stats

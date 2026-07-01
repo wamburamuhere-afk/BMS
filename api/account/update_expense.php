@@ -199,7 +199,7 @@ try {
             }
         }
 
-        logActivity($pdo, $updated_by, "Updated expense ID: " . $expense_id . " - " . $description);
+        logActivity($pdo, $updated_by, 'Edit expense', "User edited expense: $description (ID $expense_id)");
 
         $pdo->commit();
         echo json_encode(['success' => true, 'message' => 'Expense updated successfully']);

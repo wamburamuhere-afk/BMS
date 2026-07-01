@@ -91,10 +91,9 @@ try {
         echo json_encode(['success'=>true,'message'=>'Inspection updated successfully']);
 
     } else {
-        // Insert new inspection
-        $count = $pdo->prepare("SELECT COUNT(*) FROM project_inspections WHERE project_id=?");
-        $count->execute([$project_id]);
-        $no = 'INS-' . str_pad($count->fetchColumn() + 1, 3, '0', STR_PAD_LEFT);
+        // Insert new inspection — company-wide sequential number (BFS-INS-0001).
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $no = nextCode($pdo, 'INS');
 
         $stmt = $pdo->prepare("INSERT INTO project_inspections
             (project_id, milestone_id, sub_milestone_id, inspected_scope, inspection_no,

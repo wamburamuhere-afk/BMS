@@ -13,6 +13,8 @@ $c_logo = getSetting('company_logo', '');
 // Include the header
 includeHeader();
 
+logActivity($pdo, $_SESSION['user_id'], 'View leave requests', 'User viewed the leave requests management list');
+
 // Permission flags for UI elements
 $can_edit_leaves = isAdmin() || canEdit('leaves');
 $can_approve_leaves = isAdmin() || canEdit('leaves'); // Usually Edit permission covers Approval in this system

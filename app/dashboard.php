@@ -806,6 +806,24 @@ function get_system_alerts($pdo, $user_id) {
         } catch (PDOException $e) {}
     }
 
+    // ── Smart notification engine: this user's unread, action-driven items ──
+    // Reads the same per-user, RBAC+scope-filtered notifications the bell shows.
+    // Excludes time-based events the inline alerts above already compute, so the
+    // dashboard never double-counts (the bell still shows the full set).
+    $engine_alerts = [];
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 'engine_action' AS type, notification_id AS id, title, message, action_url, created_at
+            FROM notifications
+            WHERE user_id = ? AND is_read = 0 AND event_key IS NOT NULL
+              AND event_key NOT IN ('invoice.overdue','document.expiring','quotation.expiring','tender.deadline')
+            ORDER BY created_at DESC
+            LIMIT 8
+        ");
+        $stmt->execute([$user_id]);
+        $engine_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {}
+
     $alerts = array_merge(
         $stock_alerts,
         $overdue_alerts,
@@ -819,7 +837,8 @@ function get_system_alerts($pdo, $user_id) {
         $quote_alerts,
         $tender_alerts,
         $grn_pending_alerts,
-        $credit_over_alerts
+        $credit_over_alerts,
+        $engine_alerts
     );
 
     // Sort by urgency
@@ -1110,6 +1129,8 @@ function get_progress_color($percentage) {
                                                                 <i class="bi bi-truck me-1"></i>PO: <?= htmlspecialchars((string)$item['reference']) ?>
                                                             <?php elseif ($item['type'] == 'credit_over'): ?>
                                                                 <i class="bi bi-exclamation-octagon me-1"></i><?= htmlspecialchars((string)$item['reference']) ?>
+                                                            <?php elseif ($item['type'] == 'engine_action'): ?>
+                                                                <i class="bi bi-bell-fill me-1"></i><?= htmlspecialchars((string)$item['title']) ?>
                                                             <?php endif; ?>
                                                         </h6>
                                                         <small class="text-muted d-block" style="font-size: 0.7rem;">
@@ -1139,6 +1160,8 @@ function get_progress_color($percentage) {
                                                                 <?= htmlspecialchars((string)$item['supplier_name']) ?> · <?= (int)$item['days_overdue'] ?>d overdue
                                                             <?php elseif ($item['type'] == 'credit_over'): ?>
                                                                 Owes <span class="text-danger fw-bold"><?= format_currency($item['outstanding']) ?></span> · Limit <?= format_currency($item['credit_limit']) ?>
+                                                            <?php elseif ($item['type'] == 'engine_action'): ?>
+                                                                <?= htmlspecialchars((string)$item['message']) ?>
                                                             <?php endif; ?>
                                                         </small>
                                                     <?php endif; ?>
@@ -1534,8 +1557,8 @@ function get_progress_color($percentage) {
                         <?php if (!empty($recent_activities)): ?>
                             <?php foreach ($recent_activities as $activity): ?>
                             <div class="list-group-item list-group-item-action">
-                                <div class="d-flex w-100 justify-content-between">
-                                    <h6 class="mb-1">
+                                <div class="d-flex w-100 justify-content-between gap-2">
+                                    <h6 class="mb-1" style="min-width:0; flex:1;">
                                         <?php 
                                         $icon = 'bi-activity'; $color = 'text-secondary';
                                         $t = isset($activity['type']) ? strtolower((string)$activity['type']) : '';
@@ -1984,6 +2007,14 @@ $(document).keydown(function(e) {
 .list-group-item {
     border-left: none;
     border-right: none;
+}
+
+/* Recent Activities — long descriptions must wrap, not overflow */
+.list-group-item h6 {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    min-width: 0;
+    white-space: normal;
 }
 
 .list-group-item:first-child {

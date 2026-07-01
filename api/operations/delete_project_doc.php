@@ -89,7 +89,7 @@ try {
         @unlink($file_path);
     }
 
-    logActivity($pdo, $_SESSION['user_id'], "Deleted project document [{$origin}] ID: {$id}");
+    logActivity($pdo, $_SESSION['user_id'], "Delete project document", "deleted project document [{$origin}] with id $id");
 
     echo json_encode(['success' => true, 'message' => 'Document deleted successfully.']);
 

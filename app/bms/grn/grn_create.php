@@ -27,8 +27,8 @@ $doc_short = $is_dn ? 'DN' : 'GRN';
 $doc_icon = $is_dn ? 'bi-file-earmark-check' : 'bi-clipboard-plus';
 
 // Build return URL for project context
-$project_return_url = $project_id_param > 0 
-    ? getUrl('project_view') . '?id=' . $project_id_param . '&tab=procurement'
+$project_return_url = $project_id_param > 0
+    ? getUrl('project_view') . '?id=' . $project_id_param . '&tab=grn'
     : null;
 
 // Get current user info
@@ -122,17 +122,21 @@ if ($dn_id_param > 0) {
                    COALESCE(p.sku, di.sku)                   AS sku,
                    COALESCE(p.unit, di.unit, 'pcs')          AS unit,
                    di.quantity_delivered                      AS dn_qty,
-                   COALESCE(SUM(ri.quantity_received), 0)    AS received_qty,
-                   GREATEST(di.quantity_delivered - COALESCE(SUM(ri.quantity_received),0), 0) AS pending_qty,
+                   COALESCE(recv.received_qty, 0)             AS received_qty,
+                   GREATEST(di.quantity_delivered - COALESCE(recv.received_qty, 0), 0) AS pending_qty,
                    COALESCE(MAX(poi.unit_price), MAX(p.cost_price), 0) AS unit_price,
                    COALESCE(MAX(poi.tax_rate), 0)                      AS tax_rate
             FROM delivery_items di
             LEFT JOIN products p           ON di.product_id = p.product_id
             LEFT JOIN purchase_order_items poi
                 ON poi.purchase_order_id = ? AND poi.product_id = di.product_id
-            LEFT JOIN receipt_items ri      ON ri.product_id = di.product_id
-            LEFT JOIN purchase_receipts pr  ON ri.receipt_id = pr.receipt_id
-                AND pr.delivery_id = ? AND pr.status = 'approved'
+            LEFT JOIN (
+                SELECT ri2.product_id, SUM(ri2.quantity_received) AS received_qty
+                FROM receipt_items ri2
+                JOIN purchase_receipts pr2 ON ri2.receipt_id = pr2.receipt_id
+                WHERE pr2.delivery_id = ? AND pr2.status = 'approved'
+                GROUP BY ri2.product_id
+            ) recv ON recv.product_id = di.product_id
             WHERE di.delivery_id = ?
             GROUP BY di.delivery_item_id
             HAVING pending_qty > 0
@@ -151,22 +155,17 @@ if ($project_id_param > 0) {
     $supp_params = [$project_id_param];
 }
 
+// Suppliers: any active supplier with at least one approved/partially_received PO
+// (scoped to project when $project_id_param is set).
+// DN is NOT required here — users may create a GRN directly against a PO without
+// a DN, or the DN is pre-filled from the URL when arriving from the DN view.
 $suppliers_query = "
     SELECT DISTINCT s.supplier_id, s.supplier_name, s.company_name
     FROM suppliers s
     JOIN purchase_orders po ON s.supplier_id = po.supplier_id
     WHERE s.status = 'active'
-    AND po.status IN ('approved','partially_received')
+    AND po.status IN ('approved','ordered','partially_received')
     {$proj_cond}
-    AND (
-        /* PO has at least one approved/partially_delivered inbound DN */
-        EXISTS (
-            SELECT 1 FROM deliveries d
-            WHERE d.purchase_order_id = po.purchase_order_id
-            AND d.dn_type = 'inbound'
-            AND d.status IN ('approved','partially_delivered')
-        )
-    )
     ORDER BY s.supplier_name
 ";
 
@@ -174,8 +173,8 @@ $stmt = $pdo->prepare($suppliers_query);
 $stmt->execute($supp_params);
 $suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// When arriving from ?dn=, guarantee the DN's supplier is in the list
-// even if the PO's current status doesn't match the filter.
+// When arriving from ?dn= and the DN's supplier still isn't in the list
+// (edge case: PO completed/voided after DN was approved), force-add them.
 if ($dn_id_param > 0 && $supplier_id > 0) {
     $inList = array_filter($suppliers, fn($s) => (int)$s['supplier_id'] === $supplier_id);
     if (empty($inList)) {
@@ -226,13 +225,7 @@ $po_query = "
         FROM receipt_items
         GROUP BY purchase_order_item_id
     ) pri ON poi.order_item_id = pri.purchase_order_item_id
-    WHERE po.status IN ('approved','partially_received')
-    AND EXISTS (
-        SELECT 1 FROM deliveries d
-        WHERE d.purchase_order_id = po.purchase_order_id
-        AND d.dn_type = 'inbound'
-        AND d.status IN ('approved','partially_delivered')
-    )
+    WHERE po.status IN ('approved','ordered','partially_received')
 ";
 
 $po_params = [];
@@ -307,12 +300,13 @@ function generate_grn_number() {
                     <p class="text-muted mb-0">Record receipt of goods from suppliers</p>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
-                    <a href="<?= getUrl($is_dn ? 'delivery_notes' : 'grn') ?>" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-left"></i> Back to <?= $doc_short ?>s
-                    </a>
                     <?php if ($project_id_param > 0): ?>
                     <a href="<?= $project_return_url ?>" class="btn btn-outline-primary">
                         <i class="bi bi-kanban"></i> Back to Project
+                    </a>
+                    <?php else: ?>
+                    <a href="<?= getUrl($is_dn ? 'delivery_notes' : 'grn') ?>" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to <?= $doc_short ?>s
                     </a>
                     <?php endif; ?>
                 </div>

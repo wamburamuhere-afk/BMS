@@ -37,7 +37,7 @@ try {
         $stmt = $pdo->prepare("DELETE FROM collateral_attachments WHERE id = ?");
         $stmt->execute([$id]);
 
-        logActivity($pdo, $_SESSION['user_id'], "Deleted Collateral Document", "Attachment ID: $id");
+        logActivity($pdo, $_SESSION['user_id'], "Delete document", "deleted collateral document with id $id");
 
         echo json_encode(['success' => true, 'message' => 'Document deleted successfully']);
     } else {

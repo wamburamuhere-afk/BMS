@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/code_generator.php';
 global $pdo;
 
 try {
@@ -30,6 +31,14 @@ try {
 
     $pdo->beginTransaction();
 
+    // Re-code on edit: upgrade a legacy "NIP-#####" Item Code to the company
+    // format (e.g. BFS-NIP-0001). Decision is based on the CURRENTLY STORED code
+    // — not the (readonly) form field — so an omitted/blank submission can never
+    // burn a sequence number. Already-converted or manual codes are left as-is.
+    $exist = $pdo->prepare("SELECT contract_item_no FROM products WHERE product_id = ?");
+    $exist->execute([$product_id]);
+    $item_code = codeForEdit($pdo, 'NIP', (string)$exist->fetchColumn(), 'NIP-\\d+', 'products', $product_id);
+
     // 1. Update Product Data
     $selling_price = floatval($_POST['selling_price'] ?? 0);
     $discount_rate = !empty($_POST['discount_rate']) ? floatval($_POST['discount_rate']) : 0.00;
@@ -46,7 +55,7 @@ try {
         'cost_price'        => floatval($_POST['cost_price'] ?? 0),
         'selling_price'     => $selling_price,
         'min_selling_price' => !empty($_POST['min_selling_price']) ? floatval($_POST['min_selling_price']) : $calculated_min_price,
-        'contract_item_no'  => !empty($_POST['contract_item_no']) ? trim($_POST['contract_item_no']) : null,
+        'contract_item_no'  => $item_code,
         'assembly_quantity' => !empty($_POST['assembly_quantity']) ? floatval($_POST['assembly_quantity']) : 1.00,
         'warehouse_id'      => !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null,
         'project_id'        => !empty($_POST['project_id'])   ? intval($_POST['project_id'])   : null,

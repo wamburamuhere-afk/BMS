@@ -97,14 +97,9 @@ try {
         throw new Exception("Please attach at least one scan of the supplier's Delivery Note.");
     }
 
-    // Internal reference number — always auto-generated, always unique
-    $delivery_number = 'DN-' . date('Ymd') . '-' . mt_rand(100, 999);
-    $cn = $pdo->prepare("SELECT COUNT(*) FROM deliveries WHERE delivery_number = ?");
-    $cn->execute([$delivery_number]);
-    while ($cn->fetchColumn() > 0) {
-        $delivery_number = 'DN-' . date('Ymd') . '-' . mt_rand(1000, 9999);
-        $cn->execute([$delivery_number]);
-    }
+    // Internal reference number — company-prefixed sequential (BFS-DN-0001).
+    require_once __DIR__ . '/../core/code_generator.php';
+    $delivery_number = nextCode($pdo, 'DN');
     // dn_number: inbound = supplier's hand-written number; outbound = system number.
     $dn_number = ($dn_type === 'inbound') ? $manual_dn : $delivery_number;
 
@@ -163,8 +158,7 @@ try {
         dn_save_attachments($pdo, $delivery_id, $att_pairs, $user_id, $project_id ?: null);
     }
 
-    $label = ($dn_type === 'inbound') ? 'Record (inbound)' : 'Create (outbound)';
-    logActivity($pdo, $user_id, "Created $label Delivery Note #$dn_number with status $status");
+    logActivity($pdo, $user_id, 'Create delivery note', "User created a new delivery note: $dn_number (ID $delivery_id)");
 
     $pdo->commit();
 

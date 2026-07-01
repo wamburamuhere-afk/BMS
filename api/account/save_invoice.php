@@ -51,6 +51,17 @@ try {
         exit;
     }
 
+    // Ledger lock — a posted invoice is immutable. Corrections go through
+    // void/reverse, never an in-place edit (keeps the GL + audit trail intact).
+    if ($is_update) {
+        require_once __DIR__ . '/../../core/code_generator.php';
+        if (documentGlPosted($pdo, 'invoice', $invoice_id)) {
+            http_response_code(409);
+            echo json_encode(['success' => false, 'message' => 'This invoice is posted to the ledger and locked. Void or reverse it to make changes.']);
+            exit;
+        }
+    }
+
     $pdo->beginTransaction();
 
     $customer_id = $_POST['customer_id'] ?? 0;
@@ -100,16 +111,26 @@ try {
     $grand_total = $subtotal + $tax_total - $discount + $shipping;
 
     if ($invoice_id > 0) {
+        // Re-code on edit, but only while the invoice is NOT yet posted to the GL
+        // (a posted invoice keeps the number already shown on statements/PDFs).
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $curNo = $pdo->prepare("SELECT invoice_number FROM invoices WHERE invoice_id = ?");
+        $curNo->execute([$invoice_id]);
+        $invoice_number = codeForEditUnlessPosted(
+            $pdo, 'INV', (string)$curNo->fetchColumn(), 'INV-[0-9].*',
+            'invoice', (int)$invoice_id, 'invoices'
+        );
+
         // Update existing
         $stmt = $pdo->prepare("
-            UPDATE invoices SET 
-                customer_id = ?, order_id = ?, project_id = ?, invoice_date = ?, due_date = ?,
+            UPDATE invoices SET
+                invoice_number = ?, customer_id = ?, order_id = ?, project_id = ?, invoice_date = ?, due_date = ?,
                 subtotal = ?, tax_amount = ?, discount_amount = ?, shipping_cost = ?, grand_total = ?,
                 currency = ?, notes = ?, terms_conditions = ?, status = ?, updated_by = ?, updated_at = NOW()
             WHERE invoice_id = ?
         ");
         $stmt->execute([
-            $customer_id, $order_id ?: null, $project_id, $invoice_date, $due_date,
+            $invoice_number, $customer_id, $order_id ?: null, $project_id, $invoice_date, $due_date,
             $subtotal, $tax_total, $discount, $shipping, $grand_total,
             $currency, $notes, $terms, $status, $_SESSION['user_id'], $invoice_id
         ]);
@@ -128,14 +149,18 @@ try {
         $pdo->prepare("DELETE FROM invoice_items WHERE invoice_id = ?")->execute([$invoice_id]);
         
     } else {
-        // Create new
-        $invoice_number = $_POST['invoice_number'] ?? ('INV-' . time()); // Fallback
-        
-        // Verify unique invoice number
-        $stmt = $pdo->prepare("SELECT count(*) FROM invoices WHERE invoice_number = ?");
-        $stmt->execute([$invoice_number]);
-        if ($stmt->fetchColumn() > 0) {
-            $invoice_number = 'INV-' . date('Ymd') . '-' . mt_rand(1000, 9999);
+        // Create new — auto-generate the company invoice number (BFS-INV-0001)
+        // unless one was explicitly supplied; on a clash, allocate a fresh one.
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $invoice_number = trim($_POST['invoice_number'] ?? '');
+        if ($invoice_number === '') {
+            $invoice_number = nextCode($pdo, 'INV');
+        } else {
+            $stmt = $pdo->prepare("SELECT count(*) FROM invoices WHERE invoice_number = ?");
+            $stmt->execute([$invoice_number]);
+            if ($stmt->fetchColumn() > 0) {
+                $invoice_number = nextCode($pdo, 'INV');
+            }
         }
 
         $stmt = $pdo->prepare("
@@ -205,9 +230,26 @@ try {
 
     // Log activity
     require_once __DIR__ . '/../../helpers.php';
-    $action_verb = $is_update ? "Updated" : "Created";
     $invoice_num = $invoice_number ?? ($_POST['invoice_number'] ?? "ID: $invoice_id");
-    logActivity($pdo, $_SESSION['user_id'], "$action_verb Invoice: $invoice_num (Amount: " . number_format($grand_total, 2) . ")");
+    if ($is_update) {
+        logActivity($pdo, $_SESSION['user_id'], 'Edit invoice', "User edited invoice: $invoice_num (ID $invoice_id)");
+    } else {
+        logActivity($pdo, $_SESSION['user_id'], 'Create invoice', "User created a new invoice: $invoice_num (ID $invoice_id)");
+    }
+
+    // Smart-notification: a new invoice needs review. Fail-safe + kill-switched.
+    if (!$is_update) {
+        require_once __DIR__ . '/../../core/notify.php';
+        dispatchEvent($pdo, 'invoice.needs_review', [
+            'entity_type' => 'invoice',
+            'entity_id'   => (int)$invoice_id,
+            'project_id'  => !empty($_POST['project_id']) ? (int)$_POST['project_id'] : null,
+            'customer_id' => !empty($customer_id) ? (int)$customer_id : null,
+            'title'       => 'Invoice awaiting review: ' . $invoice_num,
+            'message'     => 'A new invoice ' . $invoice_num . ' has been created and needs review.',
+            'action_url'  => 'invoice_view?id=' . (int)$invoice_id,
+        ]);
+    }
 
     echo json_encode(['success' => true, 'message' => 'Invoice saved successfully', 'invoice_id' => $invoice_id]);
 

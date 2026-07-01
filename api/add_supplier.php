@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
 require_once __DIR__ . '/../core/actor_account.php';
+require_once __DIR__ . '/../core/form_lookups.php';
+require_once __DIR__ . '/../core/code_generator.php';
 global $pdo;
 
 // Check if user is logged in
@@ -64,6 +66,16 @@ if (empty($payment_terms) || $payment_terms === 'other') {
 if (empty($currency) || $currency === 'other') {
     $currency = trim($_POST['currency_other'] ?? 'TZS');
 }
+if ($supplier_type === 'other') {
+    $supplier_type = trim($_POST['supplier_type_other'] ?? '');
+}
+
+// Self-growing dropdowns: persist any newly-typed value so it appears next time.
+$lk_uid = getCurrentUserId();
+upsertFormLookup($pdo, 'supplier_type', $supplier_type, $lk_uid);
+upsertFormLookup($pdo, 'payment_terms', $payment_terms, $lk_uid);
+upsertFormLookup($pdo, 'currency',      $currency,      $lk_uid);
+
 // Category "Other" – create new category on the fly if needed
 if ($category_id === 'other' || empty($category_id)) {
     $cat_other = trim($_POST['category_other'] ?? '');
@@ -185,8 +197,7 @@ if (!function_exists('clean_phone')) {
 $phone = clean_phone($phone);
 $mobile = clean_phone($mobile);
 
-// Generate supplier code
-$supplier_code = 'SUP' . str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT) . date('ym');
+// Supplier code is generated inside the transaction below (gap-free, sequential).
 
 // Insert new supplier
 $insert_stmt = $pdo->prepare("
@@ -201,6 +212,8 @@ $insert_stmt = $pdo->prepare("
 
 try {
     $pdo->beginTransaction();
+    // Company-prefixed sequential code, e.g. BFS-SUP-0001 (shares this txn → no gaps).
+    $supplier_code = nextCode($pdo, 'SUP');
     $insert_stmt->execute([
         $supplier_name, $company_name, $acronym, $supplier_type, $year, $contact_person, $contact_title,
         $email, $company_email, $phone, $mobile, $fax, $website, $address, $postal_address, $council, $ward,
@@ -230,7 +243,7 @@ try {
     }
     
     // Log the action using standard helper
-    logActivity($pdo, $_SESSION['user_id'], "Created supplier: $supplier_name" . ($company_name ? " ($company_name)" : ""));
+    logActivity($pdo, $_SESSION['user_id'], 'Create supplier', "User created a new supplier: $supplier_name (ID $supplier_id)");
     
     header('Content-Type: application/json');
     echo json_encode([

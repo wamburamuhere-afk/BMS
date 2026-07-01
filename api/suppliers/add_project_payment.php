@@ -68,10 +68,9 @@ try {
 
     $pdo->beginTransaction();
 
-    // Generate payment number
-    $maxStmt = $pdo->query("SELECT MAX(payment_id) FROM supplier_payments");
-    $nextId  = (int)$maxStmt->fetchColumn() + 1;
-    $payment_number = 'SPY-' . str_pad($nextId, 6, '0', STR_PAD_LEFT);
+    // Company-prefixed sequential payment number (BFS-SPY-0001), gap-free.
+    require_once __DIR__ . '/../../core/code_generator.php';
+    $payment_number = nextCode($pdo, 'SPY');
 
     // Insert payment
     $pdo->prepare("

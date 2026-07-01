@@ -64,7 +64,7 @@ try {
     ]);
 
     // Phase 3a — financial-write audit trail.
-    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Updated Bank Reconciliation", "Reconciliation ID: $reconciliation_id");
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Edit bank reconciliation', "User edited bank reconciliation (ID $reconciliation_id)");
 
     echo json_encode(['success' => true, 'message' => 'Reconciliation updated successfully']);
 

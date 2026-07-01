@@ -123,7 +123,7 @@ try {
 
     $pdo->commit();
 
-    logActivity($pdo, $_SESSION['user_id'], "Applied Leave", "Leave ID: $leave_id, Employee ID: $employee_id, Type: $leave_type, Reference: $reference_number");
+    logActivity($pdo, $_SESSION['user_id'], 'Create leave request', "User created a new leave request: $reference_number (ID $leave_id)");
 
     echo json_encode([
         'success' => true,

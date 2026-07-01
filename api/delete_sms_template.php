@@ -23,7 +23,7 @@ try {
     $stmt = $pdo->prepare("DELETE FROM sms_templates WHERE template_id = ?");
     $stmt->execute([$id]);
 
-    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted SMS Template", "Template ID: $id");
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Delete sms template", "deleted SMS template with id $id");
 
     echo json_encode(['success' => true, 'message' => "SMS Template deleted successfully"]);
 

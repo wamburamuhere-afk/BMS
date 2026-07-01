@@ -156,9 +156,20 @@ try {
             );
         }
 
-        logActivity($pdo, $created_by, "Added new expense: " . $description . " (Amount: " . $amount . ")");
+        logActivity($pdo, $created_by, 'Create expense', "User created a new expense: $description (ID $expense_id)");
 
         $pdo->commit();
+
+        // Smart-notification: a new expense needs review. Fail-safe + kill-switched.
+        require_once __DIR__ . '/../../core/notify.php';
+        dispatchEvent($pdo, 'expense.needs_review', [
+            'entity_type' => 'expense',
+            'entity_id'   => (int)$expense_id,
+            'project_id'  => $project_id !== null ? (int)$project_id : null,
+            'title'       => 'Expense awaiting review: ' . substr((string)$description, 0, 80),
+            'message'     => 'A new expense (' . number_format((float)$amount, 2) . ') has been created and needs review.',
+            'action_url'  => 'expenses/view?id=' . (int)$expense_id,
+        ]);
 
         // Build ledger summary for the success notification.
         // Fetch both account labels (code — name) in one query.

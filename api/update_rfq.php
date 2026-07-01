@@ -44,11 +44,15 @@ try {
 
     $pdo->beginTransaction();
 
+    // Re-code a legacy RFQ number on edit (reachable only for draft RFQs; no GL post).
+    require_once __DIR__ . '/../core/code_generator.php';
+    $rfq_number = codeForEdit($pdo, 'RFQ', (string)$rfq['rfq_number'], 'RFQ-[0-9].*', 'rfq', (int)$rfq_id);
+
     $pdo->prepare("UPDATE rfq
-        SET supplier_id = ?, warehouse_id = ?, project_id = ?,
+        SET rfq_number = ?, supplier_id = ?, warehouse_id = ?, project_id = ?,
             rfq_date = ?, deadline_date = ?
         WHERE rfq_id = ? AND status = 'draft'")
-        ->execute([$supplier_id, $warehouse_id, $project_id, $rfq_date, $deadline, $rfq_id]);
+        ->execute([$rfq_number, $supplier_id, $warehouse_id, $project_id, $rfq_date, $deadline, $rfq_id]);
 
     // Replace items
     $pdo->prepare("DELETE FROM rfq_items WHERE rfq_id = ?")->execute([$rfq_id]);
@@ -105,7 +109,7 @@ try {
         }
     }
 
-    logActivity($pdo, $_SESSION['user_id'], "Updated RFQ #{$rfq['rfq_number']}");
+    logActivity($pdo, $_SESSION['user_id'], 'Edit RFQ', "User edited RFQ: {$rfq['rfq_number']} (ID $rfq_id)");
     echo json_encode(['success' => true, 'message' => "RFQ #{$rfq['rfq_number']} updated successfully."]);
 
 } catch (Exception $e) {

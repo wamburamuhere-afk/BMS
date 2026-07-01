@@ -90,7 +90,14 @@ try {
 
     $supplier_id      = ($party_type === 'supplier')      ? $party_id : null;
     $subcontractor_id = ($party_type === 'subcontractor') ? $party_id : null;
-    $dn_number        = ($dn_type === 'inbound') ? $manual_dn : ($dn['dn_number'] ?: $dn['delivery_number']);
+    // Inbound keeps the supplier's own hand-written number untouched; outbound
+    // re-codes its system number to the company format on edit (DN doesn't post to GL).
+    if ($dn_type === 'inbound') {
+        $dn_number = $manual_dn;
+    } else {
+        require_once __DIR__ . '/../core/code_generator.php';
+        $dn_number = codeForEdit($pdo, 'DN', (string)($dn['dn_number'] ?: $dn['delivery_number']), 'DN-[0-9].*', 'deliveries', (int)$delivery_id);
+    }
 
     $pdo->beginTransaction();
 
@@ -126,7 +133,7 @@ try {
         dn_save_attachments($pdo, $delivery_id, $att_pairs, $user_id, $project_id ?: null);
     }
 
-    logActivity($pdo, $user_id, "Updated Delivery Note #" . ($dn['dn_number'] ?: $dn['delivery_number']));
+    logActivity($pdo, $user_id, 'Edit delivery note', "User edited delivery note: " . ($dn['dn_number'] ?: $dn['delivery_number']) . " (ID $delivery_id)");
     $pdo->commit();
 
     echo json_encode(['success' => true, 'message' => 'Delivery Note updated successfully.', 'delivery_id' => $delivery_id]);

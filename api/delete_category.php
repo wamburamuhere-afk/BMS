@@ -26,7 +26,7 @@ try {
     $stmt = $pdo->prepare("DELETE FROM categories WHERE category_id = ?");
     $stmt->execute([$category_id]);
 
-    logActivity($pdo, $_SESSION['user_id'], "Deleted Product Category", "Category ID: $category_id");
+    logActivity($pdo, $_SESSION['user_id'], "Delete product category", "deleted product category with id $category_id");
 
     echo json_encode([
         'success' => true,

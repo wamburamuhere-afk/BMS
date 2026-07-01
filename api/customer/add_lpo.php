@@ -43,9 +43,9 @@ if ($amount <= 0) {
     exit;
 }
 
-// Auto-generate LPO number: LPO-YYYY-NNNNN
-$next_id = (int)$pdo->query("SELECT COALESCE(MAX(lpo_id), 0) FROM customer_lpos")->fetchColumn() + 1;
-$lpo_number = 'LPO-' . date('Y') . '-' . str_pad($next_id, 5, '0', STR_PAD_LEFT);
+// Auto-generate company-prefixed sequential LPO number (BFS-LPO-0001).
+require_once __DIR__ . '/../../core/code_generator.php';
+$lpo_number = nextCode($pdo, 'LPO');
 
 $document_path = null;
 if (!empty($_FILES['document']['name'])) {
@@ -133,7 +133,7 @@ try {
         }
     }
 
-    logActivity($pdo, $_SESSION['user_id'], "Added LPO #{$lpo_number} for customer ID {$customer_id}");
+    logActivity($pdo, $_SESSION['user_id'], 'Create LPO', "User created a new LPO: $lpo_number (ID $lpo_id)");
 
     echo json_encode(['success' => true, 'message' => 'LPO added successfully.', 'lpo_id' => $lpo_id]);
 } catch (PDOException $e) {

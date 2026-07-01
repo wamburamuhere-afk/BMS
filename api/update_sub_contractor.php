@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/form_lookups.php';
+require_once __DIR__ . '/../core/code_generator.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -63,6 +65,29 @@ if (empty($payment_terms) || $payment_terms === 'other') {
 if (empty($currency) || $currency === 'other') {
     $currency = trim($_POST['currency_other'] ?? 'TZS');
 }
+if ($supplier_type === 'other') {
+    $supplier_type = trim($_POST['supplier_type_other'] ?? '');
+}
+// Category "Other" — create the category on the fly if a new name was typed.
+if ($category_id === 'other' || (empty($category_id) && !empty(trim($_POST['category_other'] ?? '')))) {
+    $cat_other = trim($_POST['category_other'] ?? '');
+    if ($cat_other !== '') {
+        $cc = $pdo->prepare("SELECT category_id FROM supplier_categories WHERE LOWER(category_name)=LOWER(?) AND status='active'");
+        $cc->execute([$cat_other]);
+        $cid = $cc->fetchColumn();
+        if ($cid) { $category_id = $cid; }
+        else {
+            $pdo->prepare("INSERT INTO supplier_categories (category_name, status, created_at) VALUES (?, 'active', NOW())")->execute([$cat_other]);
+            $category_id = $pdo->lastInsertId();
+        }
+    } else { $category_id = null; }
+}
+
+// Self-growing dropdowns: persist any newly-typed value so it appears next time.
+$lk_uid = (int)($_SESSION['user_id'] ?? 0) ?: null;
+upsertFormLookup($pdo, 'sub_contractor_type', $supplier_type, $lk_uid);
+upsertFormLookup($pdo, 'payment_terms',       $payment_terms, $lk_uid);
+upsertFormLookup($pdo, 'currency',            $currency,      $lk_uid);
 
 // Handle unlinking (empty string means set to NULL)
 if ($project_id === '') $project_id = null;
@@ -176,7 +201,17 @@ $params = array_merge($params, [
 
 try {
     $update_stmt->execute($params);
-    
+
+    // Re-code on edit (sub-contractors are always editable): upgrade a legacy
+    // "SBCxxxxYYMM" code to the company format. No-op if already converted/manual.
+    $sccur = $pdo->prepare("SELECT supplier_code FROM sub_contractors WHERE supplier_id = ?");
+    $sccur->execute([$supplier_id]);
+    $oldSbcCode = (string)$sccur->fetchColumn();
+    $newSbcCode = codeForEdit($pdo, 'SBC', $oldSbcCode, 'SBC\\d+', 'sub_contractors', (int)$supplier_id);
+    if ($newSbcCode !== $oldSbcCode) {
+        $pdo->prepare("UPDATE sub_contractors SET supplier_code = ? WHERE supplier_id = ?")->execute([$newSbcCode, $supplier_id]);
+    }
+
     require_once __DIR__ . '/../helpers.php';
     logActivity($pdo, $_SESSION['user_id'], "Updated sub-contractor: $supplier_name");
     

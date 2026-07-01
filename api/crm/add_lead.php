@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/code_generator.php';
 
 header('Content-Type: application/json');
 
@@ -77,9 +78,8 @@ try {
         }
     }
 
-    // Generate LEAD-xxxxx code
-    $nextId = (int) $pdo->query("SELECT COALESCE(MAX(lead_id), 0) + 1 FROM crm_leads")->fetchColumn();
-    $lead_code = 'LEAD-' . str_pad($nextId, 5, '0', STR_PAD_LEFT);
+    // Company-prefixed sequential Lead code, e.g. BFS-LEAD-0001 (gap-free).
+    $lead_code = nextCode($pdo, 'LEAD');
 
     $stmt = $pdo->prepare("
         INSERT INTO crm_leads
@@ -124,7 +124,7 @@ try {
     }
 
     $full_name = trim($first_name . ' ' . ($_POST['last_name'] ?? ''));
-    logActivity($pdo, $_SESSION['user_id'], "Created lead: $full_name ($lead_code)");
+    logActivity($pdo, $_SESSION['user_id'], 'Create lead', "User created a new lead: $full_name ($lead_code)");
 
     echo json_encode(['success' => true, 'message' => "Lead $lead_code created successfully.", 'lead_id' => $lead_id, 'lead_code' => $lead_code]);
 

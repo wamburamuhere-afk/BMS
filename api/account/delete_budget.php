@@ -64,8 +64,8 @@ try {
         ? "Budget deleted and $reversed GL posting(s) reversed."
         : 'Budget deleted successfully.';
 
-    logActivity($pdo, $_SESSION['user_id'],
-        "Deleted budget #$budget_id (Category: {$budget['category_id']}, Allocated: {$budget['allocated_amount']}) — $reversed GL posting(s) reversed");
+    logActivity($pdo, $_SESSION['user_id'], "Delete budget",
+        "deleted budget with id $budget_id (Category: {$budget['category_id']}, Allocated: {$budget['allocated_amount']}) — $reversed GL posting(s) reversed");
 
     echo json_encode(['success' => true, 'message' => $msg]);
 

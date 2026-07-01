@@ -28,7 +28,7 @@ try {
     $stmt->execute([$brand_id]);
 
     // Phase 4a — product catalog mutation, track who/when.
-    logActivity($pdo, $_SESSION['user_id'], "Deleted Brand", "Brand ID: $brand_id");
+    logActivity($pdo, $_SESSION['user_id'], "Delete brand", "deleted brand with id $brand_id");
 
     echo json_encode([
         'success' => true,

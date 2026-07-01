@@ -151,6 +151,17 @@ try {
     logActivity($pdo, $_SESSION['user_id'], 'Create Sales Return', "$user_name created Sales Return #$return_number (Total: " . number_format($grand_total, 2) . ")");
 
     $pdo->commit();
+
+    // Smart-notification: a new sales return needs attention. Fail-safe + kill-switched.
+    require_once __DIR__ . '/../../core/notify.php';
+    dispatchEvent($pdo, 'sales_return.pending', [
+        'entity_type' => 'sales_return',
+        'entity_id'   => (int)$return_id,
+        'title'       => 'Sales return pending: ' . $return_number,
+        'message'     => 'A new sales return ' . $return_number . ' has been created and needs attention.',
+        'action_url'  => 'sales_return_view?id=' . (int)$return_id,
+    ]);
+
     echo json_encode(['success' => true, 'message' => 'Return created successfully', 'return_id' => $return_id]);
 
 } catch (Exception $e) {

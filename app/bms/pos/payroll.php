@@ -13,6 +13,7 @@ $c_logo = getSetting('company_logo', '');
 // Include the header
 includeHeader();
 
+logActivity($pdo, $_SESSION['user_id'], 'View payroll', 'User viewed the payroll management list');
 
 $page_title = 'Payroll Management';
 

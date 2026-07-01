@@ -39,7 +39,7 @@ try {
     $pdo->prepare("UPDATE customer_lpos SET status = 'deleted' WHERE lpo_id = ?")
         ->execute([$lpo_id]);
 
-    logActivity($pdo, $_SESSION['user_id'], "Deleted LPO #{$lpo['lpo_number']} (ID: {$lpo_id})");
+    logActivity($pdo, $_SESSION['user_id'], "Delete lpo", "deleted LPO #{$lpo['lpo_number']} with id {$lpo_id}");
 
     echo json_encode(['success' => true, 'message' => 'LPO deleted successfully.']);
 } catch (PDOException $e) {

@@ -40,7 +40,7 @@ try {
     $stmt = $pdo->prepare("DELETE FROM sales_returns WHERE sales_return_id = ?");
     $stmt->execute([$return_id]);
 
-    logActivity($pdo, $_SESSION['user_id'], 'Delete Sales Return', "$user_name deleted Sales Return #$return_num");
+    logActivity($pdo, $_SESSION['user_id'], 'Delete sales return', "deleted sales return #$return_num with id $return_id");
 
     echo json_encode(['success' => true, 'message' => 'Return deleted successfully']);
 } catch (Exception $e) {

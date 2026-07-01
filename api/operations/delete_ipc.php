@@ -29,7 +29,7 @@ try {
     if ($ipc['invoice_id']) { echo json_encode(['success'=>false,'message'=>'Cannot delete IPC linked to an invoice. Remove the invoice link first.']); exit(); }
 
     $pdo->prepare("DELETE FROM interim_payment_certificates WHERE ipc_id=?")->execute([$id]);
-    logActivity($pdo, $_SESSION['user_id'], "Deleted IPC ID: {$id}");
+    logActivity($pdo, $_SESSION['user_id'], "Delete ipc", "deleted IPC with id $id");
     echo json_encode(['success'=>true,'message'=>'IPC deleted successfully']);
 } catch (PDOException $e) {
     echo json_encode(['success'=>false,'message'=>'DB error: '.$e->getMessage()]);

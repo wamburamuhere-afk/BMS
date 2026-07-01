@@ -130,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
             $id
         ]);
 
-        logActivity($pdo, $_SESSION['user_id'], 'UPDATE', "[Tender Update] Updated tender: $tender_no (ID: $id)");
+        logActivity($pdo, $_SESSION['user_id'], 'Edit tender', "User edited tender: $tender_no (ID $id)");
 
         echo json_encode(['success' => true, 'message' => "Tender <b>$tender_no</b> updated successfully.", 'redirect' => getUrl('tender_view') . "?id=$id"]);
     } catch (Exception $e) {
@@ -189,7 +189,7 @@ if (is_numeric($res_ward) && $res_ward > 0) {
     $res_ward = $st->fetchColumn() ?: $res_ward;
 }
 
-logActivity($pdo, $_SESSION['user_id'], 'VIEW', "[Tender Edit View] Accessed edit form for: " . $tender['tender_no']);
+logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed the edit form for tender: " . $tender['tender_no']);
 ?>
 
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />

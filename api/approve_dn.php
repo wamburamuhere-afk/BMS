@@ -147,12 +147,9 @@ try {
     $dn_is_inbound = (($dn['dn_type'] ?? 'outbound') === 'inbound');
     if ($dn_is_inbound) {
         try {
-            // Generate GRN receipt_number (GRN-YYYY-NNNN)
-            $grn_year = date('Y');
-            $maxGrn   = $pdo->prepare("SELECT MAX(CAST(SUBSTRING_INDEX(receipt_number,'-',-1) AS UNSIGNED)) FROM purchase_receipts WHERE receipt_number LIKE ?");
-            $maxGrn->execute(["GRN-{$grn_year}-%"]);
-            $maxNum     = (int)$maxGrn->fetchColumn();
-            $grn_number = 'GRN-' . $grn_year . '-' . str_pad($maxNum + 1, 4, '0', STR_PAD_LEFT);
+            // Company-prefixed sequential GRN number (BFS-GRN-0001).
+            require_once __DIR__ . '/../core/code_generator.php';
+            $grn_number = nextCode($pdo, 'GRN');
 
             $grn_supplier_id = !empty($dn['supplier_id']) ? (int)$dn['supplier_id']
                              : (!empty($dn['subcontractor_id']) ? (int)$dn['subcontractor_id'] : null);

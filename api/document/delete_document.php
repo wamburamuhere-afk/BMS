@@ -20,8 +20,8 @@ try {
         throw new Exception('Invalid document ID');
     }
 
-    // Fetch document details
-    $stmt = $pdo->prepare("SELECT file_path, uploaded_by FROM documents WHERE id = ?");
+    // Fetch document details (name included so the log is human-readable)
+    $stmt = $pdo->prepare("SELECT file_path, document_name, original_filename, uploaded_by FROM documents WHERE id = ?");
     $stmt->execute([$document_id]);
     $document = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -50,13 +50,16 @@ try {
         // Commit transaction
         $pdo->commit();
 
-        // Log the deletion
+        // Log the deletion — audit trail + Activity Log feed.
+        $doc_name = $document['document_name'] ?: ($document['original_filename'] ?: ('document #' . $document_id));
         logAudit($pdo, $_SESSION['user_id'], 'delete_document', [
             'activity_type' => 'document_management',
             'description' => "Deleted document ID: $document_id",
             'entity_type' => 'document',
             'entity_id' => $document_id
         ]);
+        logActivity($pdo, $_SESSION['user_id'], 'Delete document',
+            "deleted document \"{$doc_name}\" with id {$document_id}");
 
         // Delete physical file after successful database deletion
         if (!empty($document['file_path']) && file_exists($document['file_path'])) {

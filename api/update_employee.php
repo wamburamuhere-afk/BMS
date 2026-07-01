@@ -2,6 +2,7 @@
 // API: Update Employee
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../core/code_generator.php';
 
 header('Content-Type: application/json');
 
@@ -42,6 +43,22 @@ try {
     
     if (!$old_values) {
         throw new Exception("Employee not found");
+    }
+
+    // Re-code on edit (employees are always editable): upgrade a legacy "EMP-###"
+    // number to the company format (BFS-EMP-0001). A custom (non-EMP) number the
+    // user typed is honored as-is; an already-converted number is left untouched.
+    if (isset($_POST['employee_number'])) {
+        $submittedNo = trim($_POST['employee_number']);
+        $newNo = codeForEdit($pdo, 'EMP', $submittedNo, 'EMP-\\d+', 'employees', (int)$employee_id);
+        if ($newNo !== $submittedNo) {
+            // Keep employee_code in sync when it mirrored the number.
+            $submittedCode = $_POST['employee_code'] ?? $old_values['employee_code'];
+            if ($submittedCode === $submittedNo || $submittedCode === $old_values['employee_number']) {
+                $_POST['employee_code'] = $newNo;
+            }
+            $_POST['employee_number'] = $newNo;
+        }
     }
 
     // Check for duplicate employee_code, employee_number, or email (excluding current employee)
@@ -183,6 +200,8 @@ try {
     $sql = "UPDATE employees SET " . implode(', ', $update_fields) . " WHERE employee_id = ?";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($update_params);
+
+    logActivity($pdo, $_SESSION['user_id'], 'Edit employee', "User edited employee: {$_POST['first_name']} {$_POST['last_name']} (ID $employee_id)");
 
     // Log Audit
     logAudit($pdo, $_SESSION['user_id'], 'update', [

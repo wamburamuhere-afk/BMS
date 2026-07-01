@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../core/actor_account.php';
+require_once __DIR__ . '/../core/code_generator.php';
 
 header('Content-Type: application/json');
 
@@ -35,12 +36,22 @@ try {
 
     $pdo->beginTransaction();
 
+    // Employee number follows the company format. If it's blank or the page's
+    // suggested "EMP-###" / already-prefixed default, allocate the next sequential
+    // company code (e.g. BFS-EMP-0001); a custom number the user typed is honored.
+    $prefix = companyCodePrefix($pdo);
+    $submittedNo = trim($_POST['employee_number'] ?? '');
+    $isAutoNo = ($submittedNo === '')
+        || preg_match('/^EMP-\d+$/', $submittedNo)
+        || preg_match('#^' . preg_quote($prefix, '#') . '-EMP-\d+$#', $submittedNo);
+    $employee_number = $isAutoNo ? nextCode($pdo, 'EMP') : $submittedNo;
+
     // Generate employee_code if not provided (use employee_number as fallback)
-    $employee_code = !empty($_POST['employee_code']) ? $_POST['employee_code'] : $_POST['employee_number'];
+    $employee_code = !empty($_POST['employee_code']) ? trim($_POST['employee_code']) : $employee_number;
 
     // Check if employee_code, employee_number or email already exists
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM employees WHERE employee_code = ? OR employee_number = ? OR email = ?");
-    $stmt->execute([$employee_code, $_POST['employee_number'], $_POST['email']]);
+    $stmt->execute([$employee_code, $employee_number, $_POST['email']]);
     if ($stmt->fetchColumn() > 0) {
         throw new Exception("Employee code, employee number, or email already exists. Please use unique values.");
     }
@@ -147,8 +158,8 @@ try {
 
     $stmt->execute([
         $employee_code,
-        $_POST['employee_number'], 
-        $_POST['first_name'], 
+        $employee_number,
+        $_POST['first_name'],
         $_POST['middle_name'] ?? null, 
         $_POST['last_name'], 
         $_POST['gender'] ?? null, 
@@ -205,6 +216,8 @@ try {
         $_POST['last_name']
     );
     ensureActorLedgerAccount($pdo, 'employee', (int) $employee_id, $empFullName);
+
+    logActivity($pdo, $_SESSION['user_id'], 'Create employee', "User created a new employee: $empFullName ({$_POST['employee_number']})");
 
     // Log Audit
     logAudit($pdo, $_SESSION['user_id'], 'create', [

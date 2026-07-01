@@ -16,6 +16,8 @@ if (!$can_view_customers) {
     exit();
 }
 
+logActivity($pdo, $_SESSION['user_id'], 'View customers', 'User viewed the customers management list');
+
 // Get company type for conditional features
 $settings_stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'company_type'");
 $settings_stmt->execute();
@@ -73,6 +75,17 @@ $blacklisted_customers = array_filter($customers, function($customer) {
 
 // Get customer categories
 $categories = $pdo->query("SELECT * FROM customer_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
+
+// Self-growing dropdown catalogues (Other → type new → saved). customer_type is
+// its own list; payment_terms + currency are shared with suppliers/sub-contractors.
+require_once __DIR__ . '/../../../core/form_lookups.php';
+$lk_customer_type = formLookupOptions($pdo, 'customer_type');
+$lk_payment_terms = formLookupOptions($pdo, 'payment_terms');
+$lk_currency      = formLookupOptions($pdo, 'currency');
+$lk_categories    = array_map(fn($c) => ['value' => (string)$c['category_id'], 'label' => $c['category_name']], $categories);
+$lk_years = [];
+for ($y = (int)date('Y') + 1; $y >= 1950; $y--) { $lk_years[] = ['value' => (string)$y, 'label' => (string)$y]; }
+
 // Active WHT rates for the customer "Default WHT" picker (auto-fills on their payments).
 $cust_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage FROM tax_rates WHERE tax_kind = 'wht' AND status = 'active' ORDER BY rate_percentage")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -441,21 +454,11 @@ if (isAdmin()) {
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="category_id" class="form-label">Category</label>
-                                    <select class="form-select select2-static" id="category_id" name="category_id">
-                                        <option value="">Select Category</option>
-                                        <?php foreach ($categories as $category): ?>
-                                        <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                    <?= renderOtherSelect('category_id', 'category_id', $lk_categories, '', 'category_other', 'Select Category') ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="customer_type" class="form-label">Customer Type</label>
-                                    <select class="form-select" id="customer_type" name="customer_type">
-                                        <option value="individual">Individual</option>
-                                        <option value="business" selected>Business</option>
-                                        <option value="government">Government</option>
-                                        <option value="ngo">NGO</option>
-                                    </select>
+                                    <?= renderOtherSelect('customer_type', 'customer_type', $lk_customer_type, 'business', 'customer_type_other', 'Select Type') ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="status" class="form-label">Status</label>
@@ -468,16 +471,7 @@ if (isAdmin()) {
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="year" class="form-label">Year <span class="text-danger">*</span></label>
-                                    <select class="form-select" id="year" name="year" required>
-                                        <option value="">Select Year</option>
-                                        <?php 
-                                        $current_year = date('Y');
-                                        for ($y = $current_year; $y >= $current_year - 10; $y--) {
-                                            echo "<option value=\"$y\">$y</option>";
-                                        }
-                                        ?>
-                                        <option value="other">Other...</option>
-                                    </select>
+                                    <?= renderOtherSelect('year', 'year', $lk_years, '', 'year_other', 'Select Year', true) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="project_id" class="form-label">Linked Project (Optional)</label>
@@ -598,25 +592,11 @@ if (isAdmin()) {
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="payment_terms" class="form-label">Payment Terms</label>
-                                    <select class="form-select" id="payment_terms" name="payment_terms">
-                                        <option value="">Select Terms</option>
-                                        <option value="cash">Cash</option>
-                                        <option value="7_days">7 Days</option>
-                                        <option value="15_days">15 Days</option>
-                                        <option value="30_days" selected>30 Days</option>
-                                        <option value="60_days">60 Days</option>
-                                        <option value="90_days">90 Days</option>
-                                    </select>
+                                    <?= renderOtherSelect('payment_terms', 'payment_terms', $lk_payment_terms, '30_days', 'payment_terms_other', 'Select Terms') ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="currency" class="form-label">Currency</label>
-                                    <select class="form-select" id="currency" name="currency">
-                                        <option value="TZS" selected>Tanzanian Shilling (TZS)</option>
-                                        <option value="USD">US Dollar (USD)</option>
-                                        <option value="EUR">Euro (EUR)</option>
-                                        <option value="GBP">British Pound (GBP)</option>
-                                        <option value="KES">Kenyan Shilling (KES)</option>
-                                    </select>
+                                    <?= renderOtherSelect('currency', 'currency', $lk_currency, 'TZS', 'currency_other', 'Select Currency') ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="bank_name" class="form-label">Bank Name</label>
@@ -763,21 +743,11 @@ if (isAdmin()) {
                                     </div>
                                     <div class="col-6 col-md-6 mb-3">
                                         <label for="edit_category_id" class="form-label">Category</label>
-                                        <select class="form-select select2-static" id="edit_category_id" name="category_id">
-                                            <option value="">Select Category</option>
-                                            <?php foreach ($categories as $category): ?>
-                                            <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
+                                        <?= renderOtherSelect('edit_category_id', 'category_id', $lk_categories, '', 'category_other', 'Select Category') ?>
                                     </div>
                                     <div class="col-6 col-md-6 mb-3">
                                         <label for="edit_customer_type" class="form-label">Customer Type</label>
-                                        <select class="form-select" id="edit_customer_type" name="customer_type">
-                                            <option value="individual">Individual</option>
-                                            <option value="business">Business</option>
-                                            <option value="government">Government</option>
-                                            <option value="ngo">NGO</option>
-                                        </select>
+                                        <?= renderOtherSelect('edit_customer_type', 'customer_type', $lk_customer_type, '', 'customer_type_other', 'Select Type') ?>
                                     </div>
                                     <div class="col-6 col-md-6 mb-3">
                                         <label for="edit_status" class="form-label">Status</label>
@@ -790,16 +760,7 @@ if (isAdmin()) {
                                     </div>
                                     <div class="col-6 col-md-6 mb-3">
                                         <label for="edit_year" class="form-label">Year <span class="text-danger">*</span></label>
-                                        <select class="form-select" id="edit_year" name="year" required>
-                                            <option value="">Select Year</option>
-                                            <?php 
-                                            $current_year = date('Y');
-                                            for ($y = $current_year; $y >= $current_year - 10; $y--) {
-                                                echo "<option value=\"$y\">$y</option>";
-                                            }
-                                            ?>
-                                            <option value="other">Other...</option>
-                                        </select>
+                                        <?= renderOtherSelect('edit_year', 'year', $lk_years, '', 'year_other', 'Select Year', true) ?>
                                     </div>
                                     <div class="col-6 col-md-6 mb-3">
                                         <label for="edit_project_id" class="form-label">Linked Project (Optional)</label>
@@ -920,25 +881,11 @@ if (isAdmin()) {
                                     </div>
                                     <div class="col-6 col-md-6 mb-3">
                                         <label for="edit_payment_terms" class="form-label">Payment Terms</label>
-                                        <select class="form-select" id="edit_payment_terms" name="payment_terms">
-                                            <option value="">Select Terms</option>
-                                            <option value="cash">Cash</option>
-                                            <option value="7_days">7 Days</option>
-                                            <option value="15_days">15 Days</option>
-                                            <option value="30_days">30 Days</option>
-                                            <option value="60_days">60 Days</option>
-                                            <option value="90_days">90 Days</option>
-                                        </select>
+                                        <?= renderOtherSelect('edit_payment_terms', 'payment_terms', $lk_payment_terms, '', 'payment_terms_other', 'Select Terms') ?>
                                     </div>
                                     <div class="col-6 col-md-6 mb-3">
                                         <label for="edit_currency" class="form-label">Currency</label>
-                                        <select class="form-select" id="edit_currency" name="currency">
-                                            <option value="TZS">Tanzanian Shilling (TZS)</option>
-                                            <option value="USD">US Dollar (USD)</option>
-                                            <option value="EUR">Euro (EUR)</option>
-                                            <option value="GBP">British Pound (GBP)</option>
-                                            <option value="KES">Kenyan Shilling (KES)</option>
-                                        </select>
+                                        <?= renderOtherSelect('edit_currency', 'currency', $lk_currency, '', 'currency_other', 'Select Currency') ?>
                                     </div>
                                     <div class="col-6 col-md-6 mb-3">
                                         <label for="edit_bank_name" class="form-label">Bank Name</label>
@@ -1200,8 +1147,48 @@ $(document).ready(function() {
     });
 
     // Select2 for Add modal
+    // "Other" dropdowns (renderOtherSelect): searchable Select2; choosing "Other"
+    // swaps the dropdown for a text input. Typed value is saved server-side and
+    // appears next time. Generic — every .other-trigger in the given scope.
+    function initOtherSelects(scopeSelector, $parent) {
+        $(scopeSelector).find('.other-trigger').each(function() {
+            const $el = $(this);
+            if ($el.hasClass('select2-hidden-accessible')) return;
+            $el.select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $parent,
+                width: '100%',
+                allowClear: true,
+                placeholder: $el.data('placeholder') || 'Select…'
+            });
+        });
+    }
+    $(document).off('change.otherSel').on('change.otherSel', 'select.other-trigger', function() {
+        const $sel = $(this), $wrap = $sel.closest('.other-field-wrap'), $box = $wrap.find('.other-input-box');
+        if ($sel.val() === 'other') {
+            $sel.addClass('d-none').next('.select2-container').addClass('d-none');
+            $box.removeClass('d-none').find('.other-input').val('').trigger('focus');
+        } else { $box.addClass('d-none'); }
+    });
+    $(document).off('click.otherBack').on('click.otherBack', '.other-back', function() {
+        const $wrap = $(this).closest('.other-field-wrap'), $sel = $wrap.find('select.other-trigger');
+        $wrap.find('.other-input-box').addClass('d-none').find('.other-input').val('');
+        $sel.removeClass('d-none').next('.select2-container').removeClass('d-none');
+        $sel.val('').trigger('change.select2');
+    });
+    // Reset the Other-widgets when a modal closes.
+    function resetOtherFields(scope) {
+        $(scope).find('.other-field-wrap').each(function() {
+            const $wrap = $(this);
+            $wrap.find('.other-input-box').addClass('d-none').find('.other-input').val('');
+            const $sel = $wrap.find('select.other-trigger');
+            $sel.removeClass('d-none');
+            $sel.next('.select2-container').removeClass('d-none');
+        });
+    }
+
     $('#addCustomerModal').on('shown.bs.modal', function() {
-        $('#category_id, #project_id').each(function() {
+        $('#project_id').each(function() {
             if (!$(this).hasClass('select2-hidden-accessible')) {
                 $(this).select2({
                     theme: 'bootstrap-5',
@@ -1212,11 +1199,12 @@ $(document).ready(function() {
                 });
             }
         });
+        initOtherSelects('#addCustomerModal', $('#addCustomerModal'));
     });
 
     // Select2 for Edit modal
     $('#editCustomerModal').on('shown.bs.modal', function() {
-        $('#edit_category_id, #edit_project_id').each(function() {
+        $('#edit_project_id').each(function() {
             if (!$(this).hasClass('select2-hidden-accessible')) {
                 $(this).select2({
                     theme: 'bootstrap-5',
@@ -1227,6 +1215,10 @@ $(document).ready(function() {
                 });
             }
         });
+        initOtherSelects('#editCustomerModal', $('#editCustomerModal'));
+    });
+    $('#addCustomerModal, #editCustomerModal').on('hidden.bs.modal', function() {
+        resetOtherFields('#' + this.id);
     });
 
     // Form Submissions
@@ -1450,8 +1442,15 @@ function editCustomer(customerId) {
                 }
 
                 for (const [key, selector] of Object.entries(mapping)) {
-                    const value = (c[key] !== null && c[key] !== undefined) ? c[key] : '';
-                    $(selector).val(value);
+                    const value = (c[key] !== null && c[key] !== undefined) ? String(c[key]) : '';
+                    const $el = $(selector);
+                    // For "Other" dropdowns, inject the stored value as an option first
+                    // (e.g. a previously-typed value) so it shows as selected.
+                    if ($el.hasClass('other-trigger') && value !== ''
+                        && $el.find('option').filter(function(){ return this.value === value; }).length === 0) {
+                        $el.append(new Option(value, value, true, true));
+                    }
+                    $el.val(value).trigger('change');
                 }
 
                 const modalEl = document.getElementById('editCustomerModal');

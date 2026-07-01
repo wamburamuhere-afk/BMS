@@ -22,6 +22,10 @@ $grn_is_admin    = isAdmin();
 
 // Get GRN ID
 $receipt_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+// Origin context (URL only): set when arriving from inside a project, so the Back button
+// and the Edit link return to the project instead of the general list.
+$origin_project_id = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
+$origin_qs = $origin_project_id > 0 ? ('&project_id=' . $origin_project_id) : '';
 
 if ($receipt_id <= 0) {
     header("Location: grn.php?error=Invalid GRN ID");
@@ -189,8 +193,13 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
         <div class="col-md-5 text-md-end mt-3 mt-md-0">
             <div class="d-flex flex-wrap justify-content-md-end gap-2">
                 <a href="<?= getUrl($is_dn ? 'delivery_notes' : 'grn') ?>" class="btn btn-outline-secondary px-3 shadow-sm">
-                    <i class="bi bi-arrow-left me-1"></i> Back to List
+                    <i class="bi bi-arrow-left me-1"></i> Back to <?= $doc_short ?>s
                 </a>
+                <?php if ($origin_project_id > 0): ?>
+                <a href="<?= getUrl('project_view') ?>?id=<?= $origin_project_id ?>&tab=grn" class="btn btn-outline-primary px-3 shadow-sm">
+                    <i class="bi bi-kanban me-1"></i> Back to Project
+                </a>
+                <?php endif; ?>
                 <a href="<?= getUrl('grn_print') ?>?id=<?= $receipt_id ?>" target="_blank" class="btn btn-primary px-3 shadow-sm">
                     <i class="bi bi-printer me-1"></i> Print <?= $doc_short ?>
                 </a>
@@ -198,7 +207,7 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                 $grn_can_edit_now = canEdit('grn') && canEditDocument($grn['status'], $grn_is_admin);
                 if ($grn_can_edit_now):
                 ?>
-                <a href="<?= getUrl('grn_edit') ?>?id=<?= $receipt_id ?>" class="btn btn-outline-primary px-3 shadow-sm">
+                <a href="<?= getUrl('grn_edit') ?>?id=<?= $receipt_id ?><?= $origin_qs ?>" class="btn btn-outline-primary px-3 shadow-sm">
                     <i class="bi bi-pencil me-1"></i> Edit
                 </a>
                 <?php endif; ?>

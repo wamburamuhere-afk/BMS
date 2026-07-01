@@ -43,30 +43,56 @@ try {
         $subject = "TEST: " . $template['subject'];
         $message = str_replace(['{{customer_name}}', '{{amount}}', '{{loan_id}}'], ['Test Customer', '1,000.00', 'LN-999'], $template['content']);
         $to = $recipient_email;
+        $bodyHtml = $message;   // template content is already HTML
+        $override = [];          // use saved SMTP settings
     } else {
         // SMTP Config test
-        $to = $from_email; // Test by sending to self
+        // If the password field was left blank, fall back to the saved one.
+        if ($smtp_password === '') {
+            $smtp_password = (string) get_setting('smtp_password');
+        }
+        $to = $from_email !== '' ? $from_email : $smtp_username; // Test by sending to self
         $subject = "System Settings: SMTP Configuration Test";
         $message = "This is a test email to verify your SMTP settings in the BMS System.\n\n" .
                   "If you received this, your email configuration is correct.\n\n" .
                   "Host: $smtp_host\n" .
                   "Port: $smtp_port\n" .
                   "Encryption: $smtp_encryption";
+        $bodyHtml = nl2br(htmlspecialchars($message));
+        $override = [
+            'host'       => $smtp_host,
+            'port'       => $smtp_port,
+            'username'   => $smtp_username,
+            'password'   => $smtp_password,
+            'encryption' => $smtp_encryption,
+            'from_email' => $from_email,
+            'from_name'  => $from_name,
+        ];
     }
 
-    // In a real system, you'd use PHPMailer or similar.
-    // For now, we will simulate the connection test.
-    
-    // Simulate connection lag
-    usleep(500000); 
+    if (empty($to)) {
+        throw new Exception("No recipient address. Provide a From Email (config test) or a recipient (template test).");
+    }
 
-    // Simulate sucess
-    // (In a real implementation, you'd try to connect and send here)
-    
-    echo json_encode([
-        'success' => true, 
-        'message' => "Test email triggered successfully. Please check your inbox ($to)."
-    ]);
+    // Send for real via the central mailer (core/mailer.php -> PHPMailer/SMTP).
+    require_once __DIR__ . '/../core/mailer.php';
+    $opts = ['wrap' => true];
+    if (!empty($override)) {
+        $opts['smtp'] = $override;
+    }
+    $ok = sendEmail($to, $subject, $bodyHtml, $opts);
+
+    if ($ok) {
+        echo json_encode([
+            'success' => true,
+            'message' => "Test email sent successfully to $to. Please check the inbox (and spam folder)."
+        ]);
+    } else {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Send failed: ' . mailer_last_error()
+        ]);
+    }
 
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

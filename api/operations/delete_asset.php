@@ -79,8 +79,8 @@ try {
 
     $pdo->commit();
 
-    logActivity($pdo, $user_id, "Deleted Asset",
-        "Asset ID: $asset_id ({$asset['asset_code']}) — soft-deleted; capitalisation entry reversed if present");
+    logActivity($pdo, $user_id, "Delete asset",
+        "deleted asset {$asset['asset_code']} with id $asset_id — soft-deleted; capitalisation entry reversed if present");
 
     echo json_encode(["success" => true, "message" => "Asset deleted successfully"]);
 } catch (Throwable $e) {

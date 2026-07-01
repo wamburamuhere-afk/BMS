@@ -400,7 +400,12 @@ function handleDeleteHeldSale() {
             'entity_type' => 'held_sale',
             'entity_id' => $holdId
         ]);
-        
+        // Activity Log feed (audit_log.md): never silent.
+        if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
+            logActivity($pdo, (int)$_SESSION['user_id'], 'Delete held sale',
+                "deleted held sale with id {$holdId}");
+        }
+
         echo json_encode([
             'success' => true,
             'message' => 'Held sale deleted'

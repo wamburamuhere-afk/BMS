@@ -37,7 +37,7 @@ try {
         ->execute([$warehouse_id, $project_id]);
 
     // Phase 3c — warehouse delete affects all linked stock/movements.
-    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Deleted Warehouse", "Warehouse ID: $warehouse_id ({$wh['warehouse_name']}), project: $project_id");
+    logActivity($pdo, $_SESSION['user_id'] ?? 0, "Delete warehouse", "deleted warehouse \"{$wh['warehouse_name']}\" with id $warehouse_id (project $project_id)");
 
     echo json_encode(['success' => true, 'message' => 'Warehouse deleted successfully.']);
 

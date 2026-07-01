@@ -9,6 +9,8 @@ autoEnforcePermission('bank_reconciliation');
 // Include the header
 includeHeader();
 
+logActivity($pdo, $_SESSION['user_id'], 'View bank reconciliation', 'User viewed the bank reconciliation management list');
+
 // Fetch company settings for print
 $c_logo = getSetting('company_logo', '');
 $c_name = getSetting('company_name', 'BMS');
@@ -671,23 +673,25 @@ $(document).ready(function() {
         });
     });
 
-    // Load book balance when bank account is selected
-    $('#modal_bank_account_id').on('change', function() {
-        const bankAccountId = $(this).val();
-        if (bankAccountId && $('#reconciliation_id').val() === '') {
-            $.ajax({
-                url: '/api/account/get_bank_balance.php',
-                type: 'GET',
-                data: { bank_account_id: bankAccountId },
-                dataType: 'json',
-                success: function(response) {
-                    if (response.success) {
-                        $('#modal_book_balance').val(response.book_balance);
-                    }
+    // Auto-fill book balance (ledger as-of period_end) when account or period_end changes.
+    function refreshBookBalance() {
+        const bankAccountId = $('#modal_bank_account_id').val();
+        const periodEnd     = $('#modal_period_end').val();
+        if (!bankAccountId || $('#reconciliation_id').val() !== '') return;
+        $.ajax({
+            url: '<?= buildUrl('api/account/get_bank_balance.php') ?>',
+            type: 'GET',
+            data: { bank_account_id: bankAccountId, as_of: periodEnd || '' },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    $('#modal_book_balance').val(response.book_balance);
                 }
-            });
-        }
-    });
+            }
+        });
+    }
+    $('#modal_bank_account_id').on('change', refreshBookBalance);
+    $('#modal_period_end').on('change', refreshBookBalance);
 
     // Reset forms when modals are closed
     $('#reconciliationModal').on('hidden.bs.modal', function() {

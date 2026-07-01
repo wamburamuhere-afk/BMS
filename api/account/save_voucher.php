@@ -72,6 +72,27 @@ try {
     }
 
     if ($voucher_id > 0) {
+        // Ledger lock — only a pending voucher may be edited; once approved/paid
+        // (posted) it is finalised. Corrections go through void/reverse.
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $pvStatusStmt = $pdo->prepare("SELECT status FROM payment_vouchers WHERE id = ?");
+        $pvStatusStmt->execute([$voucher_id]);
+        $pvCurStatus = (string)$pvStatusStmt->fetchColumn();
+        if (documentGlPosted($pdo, 'payment_voucher', $voucher_id) || in_array($pvCurStatus, ['paid', 'approved', 'cancelled'], true)) {
+            http_response_code(409);
+            echo json_encode(['success' => false, 'message' => 'This payment voucher is finalised/posted and locked. Void or reverse it to make changes.']);
+            exit();
+        }
+
+        // Re-code a legacy voucher number on edit.
+        $curPv = $pdo->prepare("SELECT voucher_number FROM payment_vouchers WHERE id = ?");
+        $curPv->execute([$voucher_id]);
+        $oldPv = (string)$curPv->fetchColumn();
+        $newPv = codeForEdit($pdo, 'PV', $oldPv, 'PV-[0-9].*', 'payment_vouchers', (int)$voucher_id);
+        if ($newPv !== $oldPv) {
+            $pdo->prepare("UPDATE payment_vouchers SET voucher_number = ? WHERE id = ?")->execute([$newPv, $voucher_id]);
+        }
+
         // Update
         $stmt = $pdo->prepare("
             UPDATE payment_vouchers
@@ -87,13 +108,9 @@ try {
         ]);
         $message = "Voucher updated successfully";
     } else {
-        // Generate Voucher Number
-        $last = $pdo->query("SELECT voucher_number FROM payment_vouchers ORDER BY id DESC LIMIT 1")->fetchColumn();
-        $nextNum = 1;
-        if ($last && preg_match('/PV-(\d+)/', $last, $matches)) {
-            $nextNum = intval($matches[1]) + 1;
-        }
-        $voucher_number = 'PV-' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+        // Company-prefixed sequential voucher number (BFS-PV-0001), gap-free.
+        require_once __DIR__ . '/../../core/code_generator.php';
+        $voucher_number = nextCode($pdo, 'PV');
 
         // Insert
         $stmt = $pdo->prepare("
@@ -130,12 +147,24 @@ try {
 
     // Phase 3a — payment-voucher writes are high-sensitivity financial events.
     $isUpdate = ($_POST['voucher_id'] ?? 0) > 0;
-    logActivity(
-        $pdo,
-        $_SESSION['user_id'] ?? 0,
-        $isUpdate ? "Updated Payment Voucher" : "Created Payment Voucher",
-        "Voucher ID: $voucher_id, payee: '$payee_name', amount: $amount"
-    );
+    if ($isUpdate) {
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Edit payment voucher', "User edited payment voucher: $payee_name (ID $voucher_id)");
+    } else {
+        logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Create payment voucher', "User created a new payment voucher: $payee_name (ID $voucher_id)");
+    }
+
+    // Smart-notification: a new payment voucher needs approval. Fail-safe + kill-switched.
+    if (!$isUpdate) {
+        require_once __DIR__ . '/../../core/notify.php';
+        dispatchEvent($pdo, 'voucher.needs_approval', [
+            'entity_type' => 'payment_voucher',
+            'entity_id'   => (int)$voucher_id,
+            'project_id'  => !empty($project_id) ? (int)$project_id : null,
+            'title'       => 'Payment voucher to approve: ' . ($voucher_number ?? ''),
+            'message'     => 'A new payment voucher for ' . safe_output($payee_name) . ' (' . number_format((float)$amount, 2) . ') needs approval.',
+            'action_url'  => 'payment_vouchers',
+        ]);
+    }
 
     echo json_encode(['success' => true, 'message' => $message, 'id' => $voucher_id]);
 

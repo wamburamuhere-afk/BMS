@@ -56,7 +56,7 @@ try {
     $pdo->commit();
 
     // Phase 3a — log every payment-voucher delete (financial audit trail)
-    logActivity($pdo, $_SESSION['user_id'], "Deleted Payment Voucher", "Voucher ID: $id (status was '$status')");
+    logActivity($pdo, $_SESSION['user_id'], "Delete payment voucher", "deleted payment voucher with id $id (status was '$status')");
 
     echo json_encode(['success' => true, 'message' => 'Voucher deleted successfully']);
 

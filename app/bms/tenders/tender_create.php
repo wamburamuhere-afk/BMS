@@ -135,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
 
         $tender_id = $pdo->lastInsertId();
 
-        logActivity($pdo, $_SESSION['user_id'], 'CREATE', "[Tender Registration] Registered new tender: $tender_no (ID: $tender_id)");
+        logActivity($pdo, $_SESSION['user_id'], 'Create tender', "User created a new tender: $tender_no (ID $tender_id)");
 
         echo json_encode(['success' => true, 'message' => "Tender <b>$tender_no</b> has been registered successfully.", 'redirect' => getUrl('tenders')]);
     } catch (Exception $e) {
@@ -158,7 +158,7 @@ foreach ($customers as $c) {
 }
 $customerMapJson = json_encode($customerMap, JSON_HEX_APOS | JSON_HEX_QUOT);
 
-logActivity($pdo, $_SESSION['user_id'], 'VIEW', "[Tender Registration View] Accessed tender registration form");
+logActivity($pdo, $_SESSION['user_id'], 'View tender create form', 'User accessed the tender registration form');
 ?>
 
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />

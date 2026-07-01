@@ -96,12 +96,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'permissions_count' => count($submitted_permissions)
                 ]
             ]);
-            logActivity(
-                $pdo,
-                $_SESSION['user_id'],
-                $role_id ? 'Updated role permissions' : 'Created role',
-                "$message: '$role_name' (" . count($submitted_permissions) . " permission row(s))"
-            );
+            if ($role_id) {
+                logActivity($pdo, $_SESSION['user_id'], 'Edit role', "User edited role permissions: $role_name (ID $role_id)");
+            } else {
+                logActivity($pdo, $_SESSION['user_id'], 'Create role', "User created a new role: $role_name");
+            }
         } catch (Exception $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             $error_messages[] = "Error saving role: " . $e->getMessage();
@@ -111,39 +110,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Delete Role
     if (isset($_POST['delete_role'])) {
         try {
-            $role_id = $_POST['role_id'];
-            
+            $role_id = (int) $_POST['role_id'];
+
+            // Capture the role's details BEFORE deleting, so the activity log can
+            // state clearly WHAT was removed (name + id), not just an opaque id.
+            $roleStmt = $pdo->prepare("SELECT role_name, description FROM roles WHERE role_id = ?");
+            $roleStmt->execute([$role_id]);
+            $role_row  = $roleStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$role_row) {
+                throw new Exception("Role not found (ID $role_id).");
+            }
+            $role_name = $role_row['role_name'];
+
+            // Count how many permission rows belonged to it (for a clear log).
+            $permStmt = $pdo->prepare("SELECT COUNT(*) FROM role_permissions WHERE role_id = ?");
+            $permStmt->execute([$role_id]);
+            $perm_count = (int) $permStmt->fetchColumn();
+
             // Check if role is in use
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE role_id = ?");
             $stmt->execute([$role_id]);
             $user_count = $stmt->fetchColumn();
-            
+
             if ($user_count > 0) {
                 throw new Exception("Cannot delete role. There are $user_count users assigned to this role.");
             }
-            
+
             // Delete role permissions
             $stmt = $pdo->prepare("DELETE FROM role_permissions WHERE role_id = ?");
             $stmt->execute([$role_id]);
-            
+
             // Delete role
             $stmt = $pdo->prepare("DELETE FROM roles WHERE role_id = ?");
             $stmt->execute([$role_id]);
-            
-            $success_messages[] = "Role deleted successfully";
 
-            // Log action — to both audit_logs AND activity_logs.
+            $success_messages[] = "Role \"" . htmlspecialchars($role_name) . "\" deleted successfully";
+
+            // Clear, human-readable record of WHAT was deleted. WHO + WHEN are
+            // captured automatically by logActivity/logAudit (user id + timestamp).
+            $log_detail = "Deleted role \"$role_name\" (ID $role_id)"
+                        . ($perm_count > 0 ? " and its $perm_count permission setting(s)" : "");
+
+            // Log action — to both audit_logs (rich) AND activity_logs (security feed).
             logAudit($pdo, $_SESSION['user_id'], 'delete_role', [
                 'entity_type' => 'role',
-                'entity_id' => $role_id,
-                'description' => "Deleted role ID: $role_id",
-                'old_values' => ['role_id' => $role_id]
+                'entity_id'   => $role_id,
+                'description' => $log_detail,
+                'old_values'  => [
+                    'role_id'          => $role_id,
+                    'role_name'        => $role_name,
+                    'description'      => $role_row['description'],
+                    'permission_count' => $perm_count,
+                ],
             ]);
             logActivity(
                 $pdo,
                 $_SESSION['user_id'],
                 'Deleted role',
-                "Deleted role ID $role_id"
+                $log_detail
             );
         } catch (Exception $e) {
             $error_messages[] = "Error deleting role: " . $e->getMessage();
@@ -168,12 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'description' => "Updated role for user ID: $user_id to role ID: $role_id",
                 'new_values' => ['role_id' => $role_id]
             ]);
-            logActivity(
-                $pdo,
-                $_SESSION['user_id'],
-                'Changed user role assignment',
-                "Set user ID $user_id to role ID $role_id"
-            );
+            logActivity($pdo, $_SESSION['user_id'], 'Edit user role', "User changed role assignment for user ID $user_id to role ID $role_id");
         } catch (Exception $e) {
             $error_messages[] = "Error updating user role: " . $e->getMessage();
         }

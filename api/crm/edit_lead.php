@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/code_generator.php';
 
 header('Content-Type: application/json');
 
@@ -123,6 +124,14 @@ try {
         $lead_id,
     ]);
 
+    // Re-code on edit (leads are always editable): upgrade a legacy "LEAD-#####"
+    // code to the company format. No-op if already converted or manually set.
+    $newLeadCode = codeForEdit($pdo, 'LEAD', (string)$lead['lead_code'], 'LEAD-\\d+', 'crm_leads', $lead_id);
+    if ($newLeadCode !== $lead['lead_code']) {
+        $pdo->prepare("UPDATE crm_leads SET lead_code = ? WHERE lead_id = ?")->execute([$newLeadCode, $lead_id]);
+        $lead['lead_code'] = $newLeadCode;
+    }
+
     // Replace labels (join table only — no status column, so hard replace is correct)
     $pdo->prepare("DELETE FROM crm_lead_labels WHERE lead_id = ?")->execute([$lead_id]);
     if (!empty($_POST['labels']) && is_array($_POST['labels'])) {
@@ -133,7 +142,7 @@ try {
         }
     }
 
-    logActivity($pdo, $_SESSION['user_id'], "Updated lead: {$lead['lead_code']}");
+    logActivity($pdo, $_SESSION['user_id'], 'Edit lead', "User edited lead: {$lead['lead_code']} (ID $lead_id)");
 
     echo json_encode(['success' => true, 'message' => "Lead {$lead['lead_code']} updated successfully."]);
 
