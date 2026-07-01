@@ -46,6 +46,50 @@
 ### Tests
 - `tests/test_crm_upgrade_cli.php` — 104-assertion CLI test covering all 9 phases; uses DB transaction rollback (zero data leak)
 
+## 2026-07-01 (fix) — GRN create: ONLY_FULL_GROUP_BY crash on production
+
+- `app/bms/grn/grn_create.php` — DN-items query grouped by `di.delivery_item_id`
+  but referenced `recv.received_qty` (from a LEFT JOIN subquery) without an
+  aggregate function; production MySQL has `sql_mode=only_full_group_by` (default
+  since 5.7.5) and rejects this even though each group has exactly one recv row.
+  Fix: wrapped both uses in `MAX()` — `COALESCE(MAX(recv.received_qty), 0)` —
+  in both the SELECT column and the GREATEST() expression. Result is identical.
+
+## 2026-07-01 (fix) — POS barcode scanner: category-filter bug + search-by-barcode + expanded tests
+
+- `app/bms/pos/pos_scripts_new.php` — added `allProducts[]` global that holds the full
+  product catalog; populated on any unfiltered load; scanner's `handleBarcodeScanned()`
+  searches `allProducts` first so it finds a product even when the grid is filtered to
+  one category (previously would return "not found" for products outside the active category)
+- `api/pos/simple_products.php` — added `p.barcode LIKE :search` to the search WHERE
+  clause; typing or pasting a barcode into the search box now finds the product (placeholder
+  already said "name, SKU or barcode" but barcode was not actually searched)
+- `tests/test_pos_barcode_cli.php` — rewritten from 25 to 73 assertions across 14 sections:
+  schema, full API payload, API search-by-barcode (bug-fix verification), lookup (exact /
+  case-insensitive / whitespace-trim), SKU fallback, not-found cases (random / empty /
+  2-char / 50-char), cart increment (×3), two-product multi-line cart, category-filter bug
+  fix verification, HTML structure (hiddenScanInput / posHeaderBar / scannerReadyBadge),
+  JS implementation (22 code-presence checks), allProducts population, scannability
+  coverage, duplicate-barcode guard, PHP lint on 5 files
+
+## 2026-06-30 (feat) — POS barcode scanner hardware support
+
+- `app/bms/pos/pos.php` — added `id="posHeaderBar"` for visual scan feedback; added
+  hidden `#hiddenScanInput` element so scanners always have a focused target;
+  added `#scannerReadyBadge` indicator in the POS header title
+- `app/bms/pos/pos_scripts_new.php` — added full barcode scanner interceptor IIFE:
+  global `keydown` listener with 80ms timing window that distinguishes scanner bursts
+  from human typing; `handleBarcodeScanned()` looks up scanned code by `barcode` then
+  `sku` (case-insensitive, whitespace-trimmed) in the loaded products array; cart
+  increment on rescan (no duplicate lines); Web Audio API beep (880Hz success,
+  200Hz error); green/red header flash (400/600ms); non-blocking toast notification;
+  focus recovery after modal close and non-interactive clicks; `window._posHandleScan`
+  exposed for browser/CLI testing
+- `tests/test_pos_barcode_cli.php` — 25-assertion CLI test suite: schema, API payload,
+  barcode exact-match, case-insensitivity, whitespace trim, SKU fallback, not-found,
+  cart increment, multi-line guard, duplicate barcode check, scannability coverage,
+  PHP lint for all touched files
+
 ## 2026-06-30 (fix) — GRN create: DN items pre-fill and PO dropdown fixes
 
 - `app/bms/grn/grn_create.php` — DN items received_qty now uses a correlated
