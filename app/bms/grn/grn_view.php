@@ -192,13 +192,12 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
         </div>
         <div class="col-md-5 text-md-end mt-3 mt-md-0">
             <div class="d-flex flex-wrap justify-content-md-end gap-2">
+                <a href="<?= getUrl($is_dn ? 'delivery_notes' : 'grn') ?>" class="btn btn-outline-secondary px-3 shadow-sm">
+                    <i class="bi bi-arrow-left me-1"></i> Back to <?= $doc_short ?>s
+                </a>
                 <?php if ($origin_project_id > 0): ?>
                 <a href="<?= getUrl('project_view') ?>?id=<?= $origin_project_id ?>&tab=grn" class="btn btn-outline-primary px-3 shadow-sm">
                     <i class="bi bi-kanban me-1"></i> Back to Project
-                </a>
-                <?php else: ?>
-                <a href="<?= getUrl($is_dn ? 'delivery_notes' : 'grn') ?>" class="btn btn-outline-secondary px-3 shadow-sm">
-                    <i class="bi bi-arrow-left me-1"></i> Back to List
                 </a>
                 <?php endif; ?>
                 <a href="<?= getUrl('grn_print') ?>?id=<?= $receipt_id ?>" target="_blank" class="btn btn-primary px-3 shadow-sm">
