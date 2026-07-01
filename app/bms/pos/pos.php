@@ -75,14 +75,26 @@ $currency = 'TZS';
 ?>
 
 <div class="container-fluid px-0" id="pos-container" style="height: auto; min-height: 100vh;">
+    <!-- Hidden input that captures barcode scanner keystrokes (scanner acts as keyboard) -->
+    <input id="hiddenScanInput" type="text" autocomplete="off" aria-hidden="true"
+           style="position:fixed;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;"
+           tabindex="-1">
+
     <!-- POS Header -->
-    <div class="bg-primary text-white py-2 px-3 d-flex justify-content-between align-items-center">
+    <div id="posHeaderBar" class="bg-primary text-white py-2 px-3 d-flex justify-content-between align-items-center">
         <div>
-            <h4 class="mb-0"><i class="bi bi-cash-register"></i> Point of Sale</h4>
+            <h4 class="mb-0">
+                <i class="bi bi-cash-register"></i> Point of Sale
+                <span id="scannerReadyBadge" class="badge bg-light text-success ms-2 small fw-normal"
+                      style="font-size:0.65rem;vertical-align:middle;display:none;"
+                      title="Barcode scanner active — scan a product to add it to the cart">
+                    <i class="bi bi-upc-scan"></i> SCANNER READY
+                </span>
+            </h4>
             <small class="opacity-75">
                 <?php if ($shift_active): ?>
-                Shift: <?= $shift_active['shift_code'] ?> | 
-                Started: <?= date('H:i', strtotime($shift_active['start_time'])) ?> | 
+                Shift: <?= $shift_active['shift_code'] ?> |
+                Started: <?= date('H:i', strtotime($shift_active['start_time'])) ?> |
                 Cashier: <?= htmlspecialchars($_SESSION['username'] ?? 'User') ?>
                 <?php else: ?>
                 No active shift

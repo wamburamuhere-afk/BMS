@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-06-30 (feat) — POS barcode scanner hardware support
+
+- `app/bms/pos/pos.php` — added `id="posHeaderBar"` for visual scan feedback; added
+  hidden `#hiddenScanInput` element so scanners always have a focused target;
+  added `#scannerReadyBadge` indicator in the POS header title
+- `app/bms/pos/pos_scripts_new.php` — added full barcode scanner interceptor IIFE:
+  global `keydown` listener with 80ms timing window that distinguishes scanner bursts
+  from human typing; `handleBarcodeScanned()` looks up scanned code by `barcode` then
+  `sku` (case-insensitive, whitespace-trimmed) in the loaded products array; cart
+  increment on rescan (no duplicate lines); Web Audio API beep (880Hz success,
+  200Hz error); green/red header flash (400/600ms); non-blocking toast notification;
+  focus recovery after modal close and non-interactive clicks; `window._posHandleScan`
+  exposed for browser/CLI testing
+- `tests/test_pos_barcode_cli.php` — 25-assertion CLI test suite: schema, API payload,
+  barcode exact-match, case-insensitivity, whitespace trim, SKU fallback, not-found,
+  cart increment, multi-line guard, duplicate barcode check, scannability coverage,
+  PHP lint for all touched files
+
 ## 2026-06-30 (fix) — GRN create: DN items pre-fill and PO dropdown fixes
 
 - `app/bms/grn/grn_create.php` — DN items received_qty now uses a correlated
