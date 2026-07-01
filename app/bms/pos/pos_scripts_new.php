@@ -16,9 +16,35 @@ let isSplitPayment = false;
 let splitAmounts = { cash: 0, mobile: 0, bank: 0, card: 0 };
 let posDiscountType = '<?= get_setting('pos_discount_type', 'percentage') ?>'; // 'percentage' or 'fixed'
 
+// Warehouse depends on Project: no project -> only warehouses not assigned
+// to any project; project selected -> only that project's warehouses.
+function filterPosWarehousesByProject() {
+    const projectId = $('#posProjectId').val();
+    const $sel = $('#posWarehouseId');
+
+    $sel.find('option').each(function() {
+        const optionProjectId = $(this).data('project-id');
+        if ($(this).val() === '') { $(this).show(); return; }
+        if (projectId) {
+            (String(optionProjectId) === String(projectId)) ? $(this).show() : $(this).hide();
+        } else {
+            (!optionProjectId) ? $(this).show() : $(this).hide();
+        }
+    });
+
+    const selected = $sel.find('option:selected');
+    if (selected.length && selected.css('display') === 'none') {
+        $sel.val('');
+    }
+}
+
 $(document).ready(function() {
     // Load cart from localStorage
     loadCartFromStorage();
+
+    // Warehouse depends on Project: no project -> only warehouses not assigned
+    // to any project; project selected -> only that project's warehouses.
+    filterPosWarehousesByProject();
 
     // VAT selector — two options only (No Tax / VAT 18%), cashier-chosen. Sync with
     // any restored cart, then apply the chosen rate to every line on change.

@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-07-01 (fix) — warehouse dropdown now strictly follows selected project
+
+Rule enforced consistently: project selected → only that project's warehouses; no
+project selected → only warehouses not linked to any project (never "all
+warehouses" as a fallback). RFQ create, GRN create, DN create, Sales Order
+create/edit, and Quotation form already did this correctly — three pages didn't:
+
+- `app/bms/purchase/purchase_order_create.php` — removed the "fallback to all
+  warehouses" that kicked in whenever the strict filter returned zero results
+- `app/bms/stock/stock_adjustments.php` — no-project case showed *all*
+  warehouses instead of unassigned-only; hint text updated to match
+- `app/bms/pos/pos.php` + `app/bms/pos/pos_scripts_new.php` — POS had a Project
+  selector completely disconnected from the Warehouse selector (warehouse
+  always showed every active warehouse); added `filterPosWarehousesByProject()`
+  wired to the project `onchange` and to initial page load
+- `tests/test_warehouse_project_filter_cli.php` — new regression guard (17
+  assertions: lint + source-level behavior checks + live warehouse data check)
+
 ## 2026-07-01 (feat) — CRM professional upgrade (all 9 phases)
 
 ### Phase 1 — Campaign Management

@@ -507,7 +507,7 @@ function get_pagination_url($page) {
                                 </option>
                                 <?php endforeach; ?>
                             </select>
-                            <small class="text-muted">Choose project to filter warehouses, or leave blank to see all</small>
+                            <small class="text-muted">Choose a project to see its warehouses, or leave blank for warehouses not linked to any project</small>
                         </div>
                         <?php endif; ?>
 
@@ -711,9 +711,11 @@ function filterAdjustmentWarehouses(projectId) {
 
     let filtered;
     if (pid === 0) {
-        // No project selected — show ALL warehouses
-        filtered = adjAllWarehouses;
-        if (hint) hint.textContent = adjAllWarehouses.length + ' warehouse(s) available.';
+        // No project selected — show only warehouses not linked to any project
+        filtered = adjAllWarehouses.filter(function(w) {
+            return w.project_id === 0;
+        });
+        if (hint) hint.textContent = 'Showing warehouses not linked to any project.';
     } else {
         // Project selected — show only warehouses of that project
         filtered = adjAllWarehouses.filter(function(w) {

@@ -97,8 +97,8 @@ $back_url     = $from_project
 $rfq_ref_id = isset($_GET['rfq_ref']) ? intval($_GET['rfq_ref']) : 0;
 
 // When a specific project is selected, narrow suppliers to that project only
-// (Warehouses are not filtered server-side — many setups share warehouses across projects;
-//  the JS filterWarehousesByProject handles display with a graceful fallback.)
+// (Warehouses are not filtered server-side; the JS filterWarehousesByProject
+//  handles strict display: project's warehouses only, or unassigned-only when none selected.)
 if ($project_id > 0) {
     $stmt_pf = $pdo->prepare("SELECT supplier_id, supplier_name, company_name, currency, payment_terms FROM suppliers WHERE status='active' AND project_id = ? ORDER BY supplier_name");
     $stmt_pf->execute([$project_id]);
@@ -906,10 +906,8 @@ function filterWarehousesByProject(projectId) {
     let filtered;
     if (!projectId || projectId === '') {
         filtered = allWarehouses.filter(w => !w.project_id || w.project_id === 0);
-        if (filtered.length === 0) filtered = allWarehouses; // fallback when no general warehouses
     } else {
         filtered = allWarehouses.filter(w => w.project_id == projectId);
-        if (filtered.length === 0) filtered = allWarehouses; // fallback when no project-linked warehouses
     }
     filtered.forEach(w => {
         const opt = document.createElement('option');
