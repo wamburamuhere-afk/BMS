@@ -220,9 +220,16 @@ if (!function_exists('codeForEdit')) {
      * records keep their code).
      *
      * Decision:
-     *   - already new company format ............ keep as-is (don't burn a number)
-     *   - blank, or matches the legacy auto regex  -> allocate a fresh company code
+     *   - already CURRENT company format ......... keep as-is (don't burn a number)
+     *   - blank, matches the legacy auto regex, OR
+     *     matches ANY-PREFIX-TYPE-NNNN (i.e. this type's auto shape but stamped
+     *     with a company_code_prefix that has since been changed in Settings)
+     *                                              -> allocate a fresh company code
      *   - anything else (a manual/custom code) ... keep as-is (respect manual input)
+     *
+     * The ANY-PREFIX case is what lets a prefix change in Company Profile ripple
+     * through to existing records the next time each is edited, instead of leaving
+     * them frozen on whatever prefix happened to be active when they were created.
      *
      * @param string|null $current      The code currently on the record / submitted.
      * @param string|null $legacyRegex   Regex (no delimiters) matching this type's OLD
@@ -239,14 +246,19 @@ if (!function_exists('codeForEdit')) {
         $prefix  = companyCodePrefix($pdo);
         $current = trim((string)$current);
 
-        // Already converted -> leave it, never re-burn a sequence number.
+        // Already in the CURRENT company format -> leave it, never re-burn a number.
         $newFmt = '#^' . preg_quote($prefix, '#') . '-' . preg_quote($type, '#') . '-\d+$#';
         if ($current !== '' && preg_match($newFmt, $current)) {
             return $current;
         }
 
+        // Same shape, but under a prefix that isn't the current one anymore — this is
+        // still an auto-generated code, just stamped before the prefix was changed.
+        $stalePrefixFmt = '#^[A-Z]{1,5}-' . preg_quote($type, '#') . '-\d+$#';
+
         $isAuto = ($current === '')
-            || ($legacyRegex !== null && preg_match('#^' . $legacyRegex . '$#', $current));
+            || ($legacyRegex !== null && preg_match('#^' . $legacyRegex . '$#', $current))
+            || preg_match($stalePrefixFmt, $current);
 
         if (!$isAuto) {
             return $current; // manual / custom value -> respect it
