@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-07-01 (fix) — changing Company Profile's Document Code Prefix never took effect on existing records
+
+`codeForEdit()` (`core/code_generator.php`) decides whether to re-generate a
+record's code when it's edited & saved. It only recognised a code as
+"auto-generated, eligible for re-coding" if it was blank or matched the
+entity's pre-company-prefix legacy pattern. A record already in
+`PREFIX-TYPE-NNNN` shape but stamped with a *previous* `company_code_prefix`
+(Settings → Company Profile → "Document Code Prefix") fell through to
+"manual/custom code, leave it alone" — so once an admin changed the prefix,
+every existing record stayed frozen on the old prefix forever, even on edit.
+This is shared by 16 edit endpoints (customers, suppliers, sub-contractors,
+employees, NIP products, quotations, sales orders, purchase orders/returns,
+vouchers, RFQ, DN, material lists, LPO, CRM leads).
+
+- `core/code_generator.php` (`codeForEdit()`) — added a second auto-generated
+  shape: `^[A-Z]{1,5}-TYPE-\d+$` (any prefix, not just the current one). A
+  code in that shape now gets re-coded to the current prefix on edit, same
+  as blank/legacy codes always did. Genuinely custom codes (that don't fit
+  `PREFIX-TYPE-NNNN` at all) are still left untouched.
+- `tests/test_code_for_edit_stale_prefix_cli.php` (new) — live proof: a
+  stale-prefix code gets re-coded to the current prefix and burns exactly
+  one sequence number; an already-current-prefix code and a genuinely
+  manual code are both left untouched with no number burned; legacy/blank
+  behaviour is unchanged.
+
 ## 2026-07-01 (fix) — payroll processing failed for every employee: "Data truncated for column 'item_type'"
 
 The 2026-06-24 NSSF-employer feature made `api/process_payroll.php` write an
