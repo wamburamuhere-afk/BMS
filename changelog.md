@@ -1,5 +1,51 @@
 # BMS Changelog
 
+## 2026-07-01 (feat) — CRM professional upgrade (all 9 phases)
+
+### Phase 1 — Campaign Management
+- `app/bms/crm/crm_campaigns.php` — full campaign list page (DataTable + stats + add/edit/delete modals)
+- `api/crm/save_campaign.php` — create/update campaigns in `marketing_campaigns`
+- `api/crm/get_campaigns.php` — updated to support `campaign_id` filter for edit modal
+- `api/crm/get_campaigns_select.php` — Select2 AJAX endpoint for campaign dropdowns
+- `api/crm/delete_campaign.php` — soft-delete campaign
+
+### Phase 2 — Stage History + Lead Scoring
+- `migrations/2026_07_01_crm_stage_history.php` — adds `crm_lead_stage_history` table + `lead_score`, `won_date`, `lost_date`, `last_activity`, `stage_entered` columns to `crm_leads` + seeds `crm_reports`, `crm_import`, `crm_labels`, `crm_bulk` permissions
+- `api/crm/recalculate_lead_score.php` — `computeLeadScore()` function (0–100 scoring) + standalone recalculate endpoint; library-safe (no endpoint code when `require_once`'d)
+- `api/crm/move_lead_stage.php` — now inserts into `crm_lead_stage_history`, sets `stage_entered`, sets `won_date`/`lost_date` on terminal stages, calls `computeLeadScore()`
+- `api/crm/add_activity.php` — now updates `last_activity` on lead, calls `computeLeadScore()`
+
+### Phase 3 — Follow-up & Overdue
+- `api/crm/mark_overdue_activities.php` — marks `pending` activities overdue when `due_date < NOW()`
+- `app/bms/crm/crm_lead_view.php` — calls `mark_overdue_activities` on page load; shows follow-up scheduling prompt after logging a call/meeting/site_visit
+
+### Phase 4 — Labels
+- `api/crm/save_label.php` — create/update labels with duplicate-name guard
+- `api/crm/delete_label.php` — soft-delete label + remove from all leads
+- `api/crm/update_lead_labels.php` — replace all labels for a lead (DELETE + INSERT IGNORE)
+- `app/bms/crm/crm_lead_view.php` — labels section: pill badges, + add button (Swal+Select2 picker), × remove per label; stage history section (last 10 changes); stage progress bar; lead score display (color-coded ≥70/40/<40); days-in-stage badge with stalled warning
+
+### Phase 5 — Bulk Operations
+- `api/crm/bulk_update_leads.php` — assign/stage/label/delete on up to 500 leads; scope-validated; blocks bulk delete of converted leads
+- `app/bms/crm/crm_leads.php` — checkbox column, bulk action bar with stage/user/label sub-selects, selectAll, `runBulk()`, Import CSV button
+
+### Phase 6 — Enhanced Conversion
+- `api/crm/move_lead_stage.php` — sets `won_date`/`lost_date` on conversion to terminal stages
+
+### Phase 7 — Reports
+- `api/crm/get_reports_data.php` — 7 report types: funnel, agent, activity, forecast, winloss, campaign, source; date-range + project scope
+- `app/bms/crm/crm_reports.php` — tabbed reports page with Chart.js funnel chart
+
+### Phase 8 — CSV Import
+- `api/crm/import_leads.php` — 3-mode (headers/preview/import); duplicate detection; `nextCode()`; scoring on import; max 5 MB
+- `app/bms/crm/crm_import_leads.php` — 3-step wizard (upload → map → preview & import)
+
+### Phase 9 — UX Polish
+- `app/bms/crm/crm_pipeline.php` — offcanvas quick-view panel on lead card click (desktop); shows lead summary + last 3 activities + open-full-view link; mobile navigates directly
+
+### Tests
+- `tests/test_crm_upgrade_cli.php` — 104-assertion CLI test covering all 9 phases; uses DB transaction rollback (zero data leak)
+
 ## 2026-06-30 (fix) — GRN create: DN items pre-fill and PO dropdown fixes
 
 - `app/bms/grn/grn_create.php` — DN items received_qty now uses a correlated

@@ -9,6 +9,8 @@ $can_view   = canView('crm_leads');
 $can_create = canCreate('crm_leads');
 $can_edit   = canEdit('crm_leads');
 $can_delete = canDelete('crm_leads');
+$can_bulk   = canEdit('crm_bulk');
+$can_import = canCreate('crm_import');
 
 if (!$can_view) {
     header("Location: " . getUrl('unauthorized'));
@@ -97,12 +99,17 @@ $export_qs = http_build_query(array_filter([
     <!-- Page header -->
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h4 class="mb-0"><i class="bi bi-person-plus me-2 text-primary"></i>CRM Leads</h4>
-        <div class="d-flex gap-2">
-            <a class="btn btn-outline-primary" href="<?= buildUrl('api/crm/export_leads.php') ?><?= $export_qs ? '?' . $export_qs : '' ?>">
+        <div class="d-flex gap-2 flex-wrap">
+            <a class="btn btn-outline-primary btn-sm" href="<?= buildUrl('api/crm/export_leads.php') ?><?= $export_qs ? '?' . $export_qs : '' ?>">
                 <i class="bi bi-download me-1"></i> Export
             </a>
+            <?php if ($can_import): ?>
+            <a class="btn btn-outline-secondary btn-sm" href="<?= getUrl('crm/import_leads') ?>">
+                <i class="bi bi-file-earmark-arrow-up me-1"></i> Import CSV
+            </a>
+            <?php endif; ?>
             <?php if ($can_create): ?>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLeadModal">
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addLeadModal">
                 <i class="bi bi-plus-circle me-1"></i> Add Lead
             </button>
             <?php endif; ?>
@@ -191,12 +198,43 @@ $export_qs = http_build_query(array_filter([
         </div>
     </div>
 
+    <!-- Bulk action bar (hidden until selections made) -->
+    <?php if ($can_bulk): ?>
+    <div id="bulkBar" class="card border-0 shadow-sm mb-2 d-none" style="background:#e7f0ff;border:1px solid #b6ccfe !important">
+        <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
+            <span class="fw-semibold text-primary"><span id="bulkCount">0</span> selected</span>
+            <select class="form-select form-select-sm" id="bulkAction" style="max-width:180px">
+                <option value="">Choose action…</option>
+                <option value="stage">Move to Stage</option>
+                <option value="assign">Assign To</option>
+                <option value="label">Add Label</option>
+                <option value="delete">Delete Selected</option>
+            </select>
+            <select class="form-select form-select-sm d-none" id="bulkStage" style="max-width:180px">
+                <option value="">Select stage…</option>
+                <?php foreach ($stages as $s): ?><option value="<?= $s['stage_id'] ?>"><?= safe_output($s['stage_name']) ?></option><?php endforeach; ?>
+            </select>
+            <select class="form-select form-select-sm d-none" id="bulkUser" style="max-width:180px">
+                <option value="">Select user…</option>
+                <?php foreach ($users as $u): ?><option value="<?= $u['user_id'] ?>"><?= safe_output($u['name']) ?></option><?php endforeach; ?>
+            </select>
+            <select class="form-select form-select-sm d-none" id="bulkLabel" style="max-width:180px">
+                <option value="">Select label…</option>
+                <?php foreach ($labels as $l): ?><option value="<?= $l['label_id'] ?>"><?= safe_output($l['label_name']) ?></option><?php endforeach; ?>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="runBulk()"><i class="bi bi-check2 me-1"></i>Apply</button>
+            <button class="btn btn-secondary btn-sm" onclick="clearSelection()">Cancel</button>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Desktop table -->
     <div id="tableView" class="card border-0 shadow-sm">
         <div class="card-body p-2">
             <table id="leadsTable" class="table table-hover align-middle w-100">
                 <thead class="table-dark">
                     <tr>
+                        <?php if ($can_bulk): ?><th style="width:36px"><input type="checkbox" id="selectAll" class="form-check-input" title="Select all"></th><?php endif; ?>
                         <th>Code</th>
                         <th>Name</th>
                         <th>Company</th>
@@ -211,7 +249,10 @@ $export_qs = http_build_query(array_filter([
                 </thead>
                 <tbody>
                     <?php foreach ($leads as $row): ?>
-                    <tr>
+                    <tr data-lead-id="<?= $row['lead_id'] ?>">
+                        <?php if ($can_bulk): ?>
+                        <td><input type="checkbox" class="form-check-input lead-check" value="<?= $row['lead_id'] ?>"></td>
+                        <?php endif; ?>
                         <td><span class="fw-semibold text-primary" data-lead-id="<?= $row['lead_id'] ?>"><?= safe_output($row['lead_code']) ?></span></td>
                         <td><?= safe_output(trim($row['first_name'] . ' ' . ($row['last_name'] ?? ''))) ?></td>
                         <td><?= safe_output($row['company_name'], '—') ?></td>
@@ -448,9 +489,11 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
 <script>
 const CAN_EDIT       = <?= json_encode((bool)$can_edit) ?>;
 const CAN_DELETE     = <?= json_encode((bool)$can_delete) ?>;
+const CAN_BULK       = <?= json_encode((bool)$can_bulk) ?>;
 const LEAD_VIEW_READY = <?= json_encode((bool)$lead_view_ready) ?>;
 const LEAD_VIEW_URL  = '<?= getUrl('crm/lead_view') ?>';
 const CSRF = '<?= csrf_token() ?>';
+const BULK_URL = '<?= buildUrl('api/crm/bulk_update_leads.php') ?>';
 
 $(document).ready(function () {
     // DataTable init
@@ -610,6 +653,81 @@ function confirmDelete(id) {
                 Swal.fire({ icon: 'error', title: 'Error', text: res.message });
             }
         }, 'json');
+    });
+}
+
+// ── Bulk selection logic ────────────────────────────────────────────────────
+if (CAN_BULK) {
+    $(document).on('change', '#selectAll', function () {
+        $('.lead-check').prop('checked', this.checked);
+        updateBulkBar();
+    });
+    $(document).on('change', '.lead-check', updateBulkBar);
+
+    $('#bulkAction').on('change', function () {
+        const val = $(this).val();
+        $('#bulkStage,#bulkUser,#bulkLabel').addClass('d-none');
+        if (val === 'stage')  $('#bulkStage').removeClass('d-none');
+        if (val === 'assign') $('#bulkUser').removeClass('d-none');
+        if (val === 'label')  $('#bulkLabel').removeClass('d-none');
+    });
+}
+
+function updateBulkBar() {
+    if (!CAN_BULK) return;
+    const checked = $('.lead-check:checked');
+    if (checked.length > 0) {
+        $('#bulkCount').text(checked.length);
+        $('#bulkBar').removeClass('d-none');
+    } else {
+        $('#bulkBar').addClass('d-none');
+    }
+}
+
+function clearSelection() {
+    $('.lead-check,#selectAll').prop('checked', false);
+    $('#bulkBar').addClass('d-none');
+    $('#bulkAction').val('');
+    $('#bulkStage,#bulkUser,#bulkLabel').addClass('d-none');
+}
+
+function runBulk() {
+    const action = $('#bulkAction').val();
+    const ids = $('.lead-check:checked').map((i, el) => el.value).get();
+    if (!action) { Swal.fire({ icon:'warning', text:'Please choose an action.' }); return; }
+    if (!ids.length) { Swal.fire({ icon:'warning', text:'No leads selected.' }); return; }
+
+    let value = '';
+    if (action === 'stage')  value = $('#bulkStage').val();
+    if (action === 'assign') value = $('#bulkUser').val();
+    if (action === 'label')  value = $('#bulkLabel').val();
+    if (['stage','assign','label'].includes(action) && !value) {
+        Swal.fire({ icon:'warning', text:'Please make a selection for this action.' }); return;
+    }
+
+    const confirmMsg = action === 'delete'
+        ? `Delete ${ids.length} lead(s)? This cannot be undone.`
+        : `Apply to ${ids.length} lead(s)?`;
+
+    Swal.fire({ icon:'question', title:'Confirm', text: confirmMsg,
+        showCancelButton: true, confirmButtonColor: action === 'delete' ? '#dc3545' : '#0d6efd',
+        confirmButtonText: action === 'delete' ? 'Yes, Delete' : 'Apply'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        const fd = new FormData();
+        fd.append('_csrf', CSRF);
+        fd.append('action', action);
+        fd.append('value', value);
+        ids.forEach(id => fd.append('lead_ids[]', id));
+        $.ajax({ url: BULK_URL, type: 'POST', data: fd, contentType: false, processData: false, dataType: 'json',
+            success: res => {
+                if (res.success) {
+                    Swal.fire({ icon:'success', title:'Done!', text: res.message, timer:2000, showConfirmButton:false })
+                        .then(() => location.reload());
+                } else { Swal.fire({ icon:'error', title:'Error', text: res.message }); }
+            },
+            error: () => Swal.fire({ icon:'error', title:'Error', text:'Server error.' })
+        });
     });
 }
 
