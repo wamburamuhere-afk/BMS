@@ -15,6 +15,28 @@ list, so it slipped through and failed the develop→main promotion deploy
   standalone pages and both new migrations from the LPO module work, so the
   gate actually reflects what the feature now depends on
 
+## 2026-07-01 (fix) — lock product Unit field to its registered value everywhere it's re-shown
+
+A product's `unit` (kg, lt, pcs, ...) is set once at registration, but several
+line-item forms showed it as an independently-editable dropdown/text field
+after product selection — letting a user re-pick a unit inconsistent with
+what was registered. Scouted every Procurement/Sales form with a live
+product search; the following showed the unit as editable (DN Create,
+DN Outbound, and Invoice Create were already correct and untouched):
+
+- `app/bms/sales/sales_order_create.php` — unit dropdown → locked readonly
+  text field, auto-filled from `product.unit`
+- `app/bms/sales/sales_order_edit.php` — same fix; removed the
+  dynamic-option-append fallback (no longer needed on a plain text field)
+- `app/bms/sales/quotations/quotation_form.php` — same fix
+- `app/bms/grn/grn_create.php` — same fix
+- `app/bms/purchase/rfq_create.php` — RFQ allows free-text (non-catalog)
+  requests with no registered unit, so the field stays editable by default;
+  now locks (readonly) only once a real catalog product is linked, both on
+  live product search (`rfqSelectProduct()`) and for pre-existing edit-mode
+  rows that already have a `product_id`
+- `tests/test_unit_autofill_lock_cli.php` — new regression guard (24 checks)
+
 ## 2026-07-01 (feat) — standalone Customer LPO module + LPO → DN(Outbound) → Invoice chain + Sales menu reorder
 
 Sales menu was reordered to the natural document flow (Quotations → Sales Orders
