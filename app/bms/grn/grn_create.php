@@ -27,8 +27,8 @@ $doc_short = $is_dn ? 'DN' : 'GRN';
 $doc_icon = $is_dn ? 'bi-file-earmark-check' : 'bi-clipboard-plus';
 
 // Build return URL for project context
-$project_return_url = $project_id_param > 0 
-    ? getUrl('project_view') . '?id=' . $project_id_param . '&tab=procurement'
+$project_return_url = $project_id_param > 0
+    ? getUrl('project_view') . '?id=' . $project_id_param . '&tab=grn'
     : null;
 
 // Get current user info
@@ -307,12 +307,13 @@ function generate_grn_number() {
                     <p class="text-muted mb-0">Record receipt of goods from suppliers</p>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
-                    <a href="<?= getUrl($is_dn ? 'delivery_notes' : 'grn') ?>" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-left"></i> Back to <?= $doc_short ?>s
-                    </a>
                     <?php if ($project_id_param > 0): ?>
                     <a href="<?= $project_return_url ?>" class="btn btn-outline-primary">
                         <i class="bi bi-kanban"></i> Back to Project
+                    </a>
+                    <?php else: ?>
+                    <a href="<?= getUrl($is_dn ? 'delivery_notes' : 'grn') ?>" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to <?= $doc_short ?>s
                     </a>
                     <?php endif; ?>
                 </div>

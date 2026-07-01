@@ -9458,6 +9458,7 @@ function renderGRNs(grns) {
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                         <li><a class="dropdown-item py-2" href="grn_view?id=${g.receipt_id}&project_id=<?= $project_id ?>"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                        <li><a class="dropdown-item py-2" href="grn_edit?id=${g.receipt_id}&project_id=<?= $project_id ?>"><i class="bi bi-pencil text-info me-2"></i>Edit GRN</a></li>
                         <li><a class="dropdown-item py-2" href="grn_print?id=${g.receipt_id}" target="_blank"><i class="bi bi-printer text-dark me-2"></i>Print GRN</a></li>
                     </ul>
                 </div>
