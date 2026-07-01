@@ -17,6 +17,12 @@ create/edit, and Quotation form already did this correctly — three pages didn'
   wired to the project `onchange` and to initial page load
 - `tests/test_warehouse_project_filter_cli.php` — new regression guard (17
   assertions: lint + source-level behavior checks + live warehouse data check)
+## 2026-07-01 (fix) — commit pending migrations left uncommitted locally
+
+- `migrations/2026_06_11_crm_campaign_link.php` — adds `campaign_id` to `crm_leads`, `is_deleted` to `marketing_campaigns`, migrates legacy `leads` rows into `crm_leads` (idempotent, skips if already run/no legacy table)
+- `migrations/2026_06_24_nssf_employer.php` — adds `payroll.nssf_employer` (employer-side 10% NSSF, additive, existing rows default 0), `nssf_employer_rate` payroll setting, `NSSF Employer Expense` account + system_settings mapping
+- `migrations/2026_06_24_payroll_void_status.php` — adds `voided` to `payroll.payment_status`/`status` ENUMs + `voided_by`/`voided_at`/`void_reason` audit columns (soft-void instead of hard delete)
+- `migrations/2026_06_24_sdl_reclassify_journal_entries.php` — reclassifies existing SDL `journal_entries` from `entity_type='books_transaction'` to `entity_type='sdl_accrual'` so the post-P-6 idempotency check recognizes them and doesn't double-post
 
 ## 2026-07-01 (feat) — CRM professional upgrade (all 9 phases)
 
