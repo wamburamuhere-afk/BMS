@@ -38,14 +38,17 @@ $renderPos = strpos($dashboard, 'function renderRecent(');
 ok($safePos !== false && $renderPos !== false && $safePos < $renderPos,
    'safeOutput() is defined before renderRecent() — no temporal dead zone');
 
-// ── 3. HTML structure — tbody IDs that the JS populates ─────────────────────
+// ── 3. HTML structure — table IDs DataTable is initialised on ───────────────
 echo "\n\033[1m── 3. HTML widget structure ──\033[0m\n";
-ok(strpos($dashboard, 'id="bodyRecent"') !== false,   '#bodyRecent tbody present');
-ok(strpos($dashboard, 'id="bodyDue"') !== false,      '#bodyDue tbody present');
-ok(strpos($dashboard, 'id="bodyTop"') !== false,      '#bodyTop tbody present');
-ok(strpos($dashboard, 'id="tblRecent"') !== false,    '#tblRecent table present');
-ok(strpos($dashboard, 'id="tblDue"') !== false,       '#tblDue table present');
-ok(strpos($dashboard, 'id="tblTop"') !== false,       '#tblTop table present');
+ok(strpos($dashboard, 'id="tblRecent"') !== false, '#tblRecent table present');
+ok(strpos($dashboard, 'id="tblDue"') !== false,    '#tblDue table present');
+ok(strpos($dashboard, 'id="tblTop"') !== false,    '#tblTop table present');
+ok(strpos($dashboard, "dtRecent = $('#tblRecent').DataTable(") !== false || strpos($dashboard, "DataTable({") !== false,
+   'DataTable initialised for tblRecent');
+ok(strpos($dashboard, "dtDue = $('#tblDue').DataTable(") !== false || substr_count($dashboard, 'DataTable({') >= 3,
+   'DataTable initialised for tblDue');
+ok(strpos($dashboard, "dtTop = $('#tblTop').DataTable(") !== false || substr_count($dashboard, 'DataTable({') >= 3,
+   'DataTable initialised for tblTop');
 
 // ── 4. JS render functions all defined ──────────────────────────────────────
 echo "\n\033[1m── 4. JS render functions ──\033[0m\n";
@@ -54,23 +57,25 @@ ok(strpos($dashboard, 'function renderDue(')    !== false, 'renderDue() defined'
 ok(strpos($dashboard, 'function renderTop(')    !== false, 'renderTop() defined');
 ok(strpos($dashboard, 'function loadDashboard(') !== false,'loadDashboard() defined');
 
-// ── 5. render functions all write to the correct tbody ───────────────────────
-echo "\n\033[1m── 5. Render functions target correct tbody ──\033[0m\n";
-ok(strpos($dashboard, "'#bodyRecent'") !== false || strpos($dashboard, '"#bodyRecent"') !== false,
-   'renderRecent writes to #bodyRecent');
-ok(strpos($dashboard, "'#bodyDue'") !== false || strpos($dashboard, '"#bodyDue"') !== false,
-   'renderDue writes to #bodyDue');
-ok(strpos($dashboard, "'#bodyTop'") !== false || strpos($dashboard, '"#bodyTop"') !== false,
-   'renderTop writes to #bodyTop');
+// ── 5. render functions use DataTables API ────────────────────────────────────
+echo "\n\033[1m── 5. Render functions use DataTables API ──\033[0m\n";
+ok(strpos($dashboard, 'dtRecent.clear()') !== false && strpos($dashboard, 'dtRecent.draw()') !== false,
+   'renderRecent uses dtRecent.clear()/.draw()');
+ok(strpos($dashboard, 'dtDue.clear()') !== false && strpos($dashboard, 'dtDue.draw()') !== false,
+   'renderDue uses dtDue.clear()/.draw()');
+ok(strpos($dashboard, 'dtTop.clear()') !== false && strpos($dashboard, 'dtTop.draw()') !== false,
+   'renderTop uses dtTop.clear()/.draw()');
 
 // ── 6. loadDashboard calls all three render functions ────────────────────────
 echo "\n\033[1m── 6. loadDashboard wires all three tables ──\033[0m\n";
-ok(strpos($dashboard, 'renderRecent(') !== false && substr_count($dashboard, 'renderRecent(') >= 2,
-   'renderRecent() called inside loadDashboard (defined + called)');
-ok(strpos($dashboard, 'renderDue(') !== false && substr_count($dashboard, 'renderDue(') >= 2,
-   'renderDue() called inside loadDashboard');
-ok(strpos($dashboard, 'renderTop(') !== false && substr_count($dashboard, 'renderTop(') >= 2,
-   'renderTop() called inside loadDashboard');
+ok(substr_count($dashboard, 'renderRecent(') >= 2,
+   'renderRecent() defined + called in loadDashboard');
+ok(substr_count($dashboard, 'renderDue(') >= 2,
+   'renderDue() defined + called in loadDashboard');
+ok(substr_count($dashboard, 'renderTop(') >= 2,
+   'renderTop() defined + called in loadDashboard');
+ok(strpos($dashboard, 'initTables()') !== false,
+   'initTables() called in $(document).ready()');
 
 // ── 7. API permission key exists in DB ───────────────────────────────────────
 echo "\n\033[1m── 7. Permission key in DB ──\033[0m\n";
