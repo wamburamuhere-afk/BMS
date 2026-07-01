@@ -1,5 +1,65 @@
 # BMS Changelog
 
+## 2026-06-30 (feat) — GRN context-aware navigation in project details
+
+- `api/operations/get_project.php` — GRN query now uses `pr.project_id` directly
+  (was `po.project_id` via PO join — missed GRNs without a linked PO)
+- `app/bms/grn/grn_create.php` — back/save returns to `tab=grn` (was `tab=procurement`);
+  show only "Back to Project" when opened from project (removed duplicate "Back to GRNs")
+- `app/bms/grn/grn_edit.php` — both `project_return_url` and `origin_return_url` corrected
+  to `tab=grn`
+- `app/bms/grn/grn_view.php` — "Back to Project" goes to `tab=grn`; shown exclusively
+  when in project context (no duplicate "Back to List")
+- `app/bms/operations/project_view.php` — Edit GRN action added to renderGRNs dropdown
+  with `project_id` so edit form returns to project GRN tab after save
+
+## 2026-06-30 (fix) — PO create: RFQ auto-fill, warehouse always shows, clean URLs
+
+- `app/bms/purchase/purchase_order_create.php` — fixed 3 issues:
+  (1) RFQ Reference now auto-fills: warehouse pre-selected from RFQ in PHP so
+      `fetchProducts()` loads prices before `loadRFQs()` triggers item population;
+      `const rfqRefId` moved to top-level (removed duplicate `const isEdit`);
+      blank row skipped when RFQ items will auto-fill;
+      chain is now `fetchProducts → loadRFQs(cb) → select RFQ → trigger change`.
+  (2) Warehouse always appears: removed PHP project-filter on warehouses (too
+      strict); `filterWarehousesByProject` now falls back to all accessible
+      warehouses when no project-linked ones are found.
+  (3) URLs are clean: replaced `return_url=<encoded_path>` with short `back=<tab>`
+      param; PHP derives full back URL from `project_id` + `back` tab name.
+- `app/bms/purchase/rfq_view.php` — same `back=` approach; back_url computed after
+  rfq record is loaded (uses rfq.project_id).
+- `app/bms/purchase/rfq_create.php` — same `back=` approach.
+- `app/bms/operations/project_view.php` — all links updated to `back=rfq` or
+  `back=procurement`; removed all `retUrl`/`poRetUrl` encoded-URL variables.
+
+## 2026-06-30 (feat) — PO create/edit context-awareness + project_context_pattern.md
+
+- `app/bms/purchase/purchase_order_create.php` — reads `return_url` (relative-path guard);
+  breadcrumb, Back button and Cancel link all use `$back_url`; post-save redirect uses
+  `$back_url` instead of hard-coded project_view; when `$project_id > 0` the supplier
+  and warehouse dropdowns are narrowed to project-only rows; the project field is locked
+  (hidden input + read-only display) in create mode; `loadRFQs()` now accepts an optional
+  callback; when `?rfq_ref=ID` is in the URL the RFQ is auto-selected on page load and its
+  items are loaded immediately.
+- `app/bms/purchase/rfq_view.php` — Create PO button now passes `?project=`, `?rfq_ref=`,
+  and `?return_url=` (pointing at the project POs tab when opened from a project).
+- `app/bms/operations/project_view.php` — renderRFQs Create PO link now includes `project`
+  and `return_url`; renderPurchases and renderPurchasesFull Edit Order links include
+  `return_url` pointing at the project procurement tab.
+- `docs/project_context_pattern.md` — new document: full pattern (return_url guard,
+  supplier/warehouse/project-lock, auto-fill from parent doc, tab name map, module checklist).
+
+## 2026-06-30 (feat) — RFQ context-awareness: project stays in project, external stays external
+
+- `app/bms/operations/project_view.php` — View, Review, Edit links in renderRFQs now carry
+  `return_url` encoding the project view URL (?tab=rfq) so users return to the project tab.
+- `app/bms/purchase/rfq_view.php` — reads `return_url` (relative-path guard); Back button and
+  breadcrumb switch to "Back to Project / Project RFQs" when opened from a project; Edit link
+  forwards the same `return_url` so the edit→save chain stays inside the project.
+- `app/bms/purchase/rfq_create.php` — reads `return_url`; Back button and breadcrumb reflect
+  project context; post-save redirect goes to project RFQ tab instead of external list; when a
+  project is pre-selected the supplier dropdown narrows to suppliers linked to that project only.
+
 ## 2026-06-30 (fix) — Project view: RFQs now appear in Procurements > RFQ tab
 
 - `api/operations/get_project.php` — added RFQ query (with `supplier_id` for Create PO link);

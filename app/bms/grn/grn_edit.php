@@ -58,7 +58,7 @@ $attachments = $stmtAtt->fetchAll(PDO::FETCH_ASSOC);
 
 // Build return URL for project context
 $project_return_url = $project_id_param > 0
-    ? getUrl('project_view') . '?id=' . $project_id_param . '&tab=procurement'
+    ? getUrl('project_view') . '?id=' . $project_id_param . '&tab=grn'
     : null;
 
 // Origin context (URL only): where the user came FROM. Drives the post-save redirect so
@@ -66,7 +66,7 @@ $project_return_url = $project_id_param > 0
 // (The GRN keeps its own project link via projectIdHidden below — unchanged.)
 $origin_project_id = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
 $origin_return_url = $origin_project_id > 0
-    ? getUrl('project_view') . '?id=' . $origin_project_id . '&tab=procurement'
+    ? getUrl('project_view') . '?id=' . $origin_project_id . '&tab=grn'
     : '';
 
 // Get current user info

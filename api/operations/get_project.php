@@ -87,13 +87,13 @@ try {
     $stmt->execute([$id]);
     $purchase_orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Get GRNs (Purchase Receipts) linked to this project via PO
+    // Get GRNs (Purchase Receipts) linked to this project directly
     $stmt = $pdo->prepare("
         SELECT pr.*, s.supplier_name, po.order_number
         FROM purchase_receipts pr
         LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
         LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
-        WHERE po.project_id = ?
+        WHERE pr.project_id = ?
         ORDER BY pr.receipt_date DESC
     ");
     $stmt->execute([$id]);
