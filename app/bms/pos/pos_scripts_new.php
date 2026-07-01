@@ -7,7 +7,8 @@ let saleVatRate = 0; // POS VAT: cashier-selected per sale — 0 = No Tax, 18 = 
 let currentProduct = null;
 let categories = [];
 let currentReceiptNumber = '<?= generate_receipt_number() ?>';
-let products = [];
+let products    = [];
+let allProducts = [];  // full catalog, never filtered — scanner always searches here
 let currentDiscountPercentage = 0;
 let currentShiftId = '<?= $shift_id ?>';
 let currentShiftActive = <?= $shift_active ? 'true' : 'false' ?>;
@@ -199,6 +200,11 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
             
             if (response.success && response.data && response.data.length > 0) {
                 products = response.data;
+                // Keep a full-catalog copy for the barcode scanner so it can find
+                // any product even when the grid is filtered to one category.
+                if (categoryId === 'all' || categoryId === '' || categoryId === undefined) {
+                    allProducts = response.data;
+                }
                 const grid = $('#productGrid');
                 grid.empty();
                 
@@ -1382,4 +1388,226 @@ function updateCashBalanceUI() {
         }
     });
 }
+
+// ── Barcode Scanner Interceptor ──────────────────────────────────────────────
+// USB/Bluetooth barcode scanners behave as keyboards: they send all characters
+// in a burst (< 80 ms total), then fire Enter. We distinguish this from normal
+// human typing (> 100 ms per keystroke) using a timing buffer.
+(function () {
+    'use strict';
+
+    let _scanBuffer = '';
+    let _scanTimer  = null;
+    const SCAN_MAX_MS = 80;
+
+    // ── Audio feedback (Web Audio API — no library needed) ───────────────────
+    function _beep(freq, durationMs, type) {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx  = new AudioCtx();
+            const osc  = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type            = type || 'square';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.25, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationMs / 1000);
+            osc.start();
+            osc.stop(ctx.currentTime + durationMs / 1000);
+        } catch (e) { /* audio is non-critical */ }
+    }
+    function scanSuccess() { _beep(880,  80,  'square');   }
+    function scanError()   { _beep(200, 300, 'sawtooth'); }
+
+    // ── Visual feedback — flash the POS header bar ───────────────────────────
+    function flashHeader(cssColour, ms) {
+        const bar = document.getElementById('posHeaderBar');
+        if (!bar) return;
+        bar.style.transition       = 'background-color 0.08s';
+        bar.style.backgroundColor  = cssColour;
+        setTimeout(function () {
+            bar.style.backgroundColor = '';
+            setTimeout(function () { bar.style.transition = ''; }, 200);
+        }, ms || 400);
+    }
+
+    // ── Non-blocking toast notification ─────────────────────────────────────
+    function scanToast(html, isError) {
+        const id = 'posScanToast_' + Date.now();
+        const el = document.createElement('div');
+        el.id = id;
+        el.setAttribute('aria-live', 'assertive');
+        el.style.cssText = [
+            'position:fixed', 'top:70px', 'right:16px',
+            'z-index:99999',  'min-width:240px', 'max-width:320px'
+        ].join(';');
+        el.innerHTML = '<div class="toast show border-0 shadow ' +
+            (isError ? 'bg-danger' : 'bg-success') +
+            ' text-white">' +
+            '<div class="toast-body d-flex align-items-start gap-2" style="font-size:0.85rem">' +
+            html + '</div></div>';
+        document.body.appendChild(el);
+        setTimeout(function () {
+            if (document.getElementById(id)) el.remove();
+        }, 3000);
+    }
+
+    // ── Add product to cart (scanner path — no modal, no click required) ─────
+    function scanAddToCart(product) {
+        const price    = parseFloat(product.selling_price) || 0;
+        const existing = cart.find(function (item) {
+            return item.product_id == product.product_id;
+        });
+
+        if (existing) {
+            existing.quantity += 1;
+        } else {
+            cart.push({
+                product_id:        product.product_id,
+                product_name:      product.product_name,
+                sku:               product.sku || '',
+                price:             price,
+                quantity:          1,
+                tax_rate:          saleVatRate,
+                min_selling_price: parseFloat(product.min_selling_price) || 0,
+                discount_type:     'percentage',
+                discount_value:    0,
+                discount_percent:  0,
+                discounted_price:  price
+            });
+        }
+
+        updateCartDisplay();
+        saveCartToStorage();
+
+        const newQty = existing ? existing.quantity : 1;
+        const fmtPrice = price.toLocaleString('en-US');
+        scanToast(
+            '<i class="bi bi-check-circle-fill me-1" style="margin-top:2px;flex-shrink:0"></i>' +
+            '<span><strong>' + product.product_name + '</strong><br>' +
+            '<small>TZS ' + fmtPrice + ' &mdash; cart qty: ' + newQty + '</small></span>',
+            false
+        );
+    }
+
+    // ── Core barcode lookup ──────────────────────────────────────────────────
+    function handleBarcodeScanned(code) {
+        if (!code || code.length < 3) return;
+
+        // Search allProducts first (full catalog, unaffected by category filter).
+        // Fall back to products[] if allProducts hasn't been populated yet.
+        var catalog = (allProducts && allProducts.length > 0) ? allProducts : products;
+
+        if (!catalog || catalog.length === 0) {
+            console.warn('[Scanner] Products not yet loaded — scan ignored:', code);
+            return;
+        }
+
+        const needle = code.toLowerCase();
+        const found  = catalog.find(function (p) {
+            return (p.barcode && p.barcode.toLowerCase() === needle) ||
+                   (p.sku     && p.sku.toLowerCase()     === needle);
+        });
+
+        if (found) {
+            scanSuccess();
+            flashHeader('#198754', 400);
+            scanAddToCart(found);
+            console.info('[Scanner] Found:', found.product_name, '— code:', code);
+        } else {
+            scanError();
+            flashHeader('#dc3545', 600);
+            scanToast(
+                '<i class="bi bi-exclamation-triangle-fill me-1" style="margin-top:2px;flex-shrink:0"></i>' +
+                '<span>Barcode not found<br><small><code>' + code + '</code></small></span>',
+                true
+            );
+            console.warn('[Scanner] Not found:', code);
+        }
+    }
+
+    // ── Focus management ─────────────────────────────────────────────────────
+    // Keep the hidden input focused so some scanner configs that require a
+    // focused field still work. Re-focus after clicking non-interactive areas.
+    function reFocusHidden() {
+        var h = document.getElementById('hiddenScanInput');
+        if (h && document.activeElement !== h) h.focus({ preventScroll: true });
+    }
+
+    // Show the "SCANNER READY" badge once DOM is ready
+    document.addEventListener('DOMContentLoaded', function () {
+        var badge = document.getElementById('scannerReadyBadge');
+        if (badge) badge.style.display = '';
+        reFocusHidden();
+    });
+    // If DOM is already ready (script runs after DOMContentLoaded)
+    if (document.readyState !== 'loading') {
+        setTimeout(function () {
+            var badge = document.getElementById('scannerReadyBadge');
+            if (badge) badge.style.display = '';
+            reFocusHidden();
+        }, 0);
+    }
+
+    // Inputs where scanner should NOT intercept (cashier is typing there)
+    var INTERACTIVE_IDS = [
+        'productSearch', 'amountTendered', 'openingCash', 'endingCash',
+        'quickViewQty', 'modal_barcode', 'edit_barcode', 'customerSearch'
+    ];
+
+    document.addEventListener('keydown', function (e) {
+        var active = document.activeElement;
+        var tag    = active ? active.tagName : '';
+        var id     = active ? (active.id || '') : '';
+
+        // If focus is in a real user input (not the hidden scanner field), skip
+        if ((tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') &&
+             id !== 'hiddenScanInput') {
+            return;
+        }
+
+        // Skip modifier combos — scanners never produce those
+        if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+        // F-key passthrough (handled by the existing shortcuts block above)
+        if (e.key.length > 1 && e.key !== 'Enter') return;
+
+        if (e.key === 'Enter') {
+            clearTimeout(_scanTimer);
+            var code = _scanBuffer.trim();
+            _scanBuffer = '';
+            if (code.length >= 3) {
+                handleBarcodeScanned(code);
+            }
+            return;
+        }
+
+        if (e.key.length === 1) {
+            _scanBuffer += e.key;
+            clearTimeout(_scanTimer);
+            // If Enter does not arrive within SCAN_MAX_MS the burst ended without
+            // Enter — discard (shouldn't normally happen with a scanner).
+            _scanTimer = setTimeout(function () { _scanBuffer = ''; }, SCAN_MAX_MS);
+        }
+    });
+
+    // Re-focus hidden input when user clicks on non-interactive areas of the POS
+    document.addEventListener('click', function (e) {
+        var tag = e.target ? e.target.tagName : '';
+        if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A', 'LABEL'].indexOf(tag) === -1) {
+            setTimeout(reFocusHidden, 150);
+        }
+    });
+
+    // Also re-focus when a Bootstrap modal closes (the modal steals focus)
+    document.addEventListener('hidden.bs.modal', function () {
+        setTimeout(reFocusHidden, 200);
+    });
+
+    // Expose for CLI/browser testing
+    window._posHandleScan    = handleBarcodeScanned;
+    window._posScanAddToCart = scanAddToCart;
+})();
 </script>

@@ -75,7 +75,7 @@ try {
     }
     
     if (!empty($search)) {
-        $sql .= " AND (p.product_name LIKE :search OR p.sku LIKE :search)";
+        $sql .= " AND (p.product_name LIKE :search OR p.sku LIKE :search OR p.barcode LIKE :search)";
         $params[':search'] = "%$search%";
     }
     
