@@ -124,9 +124,10 @@ $can_pipeline = canView('crm_pipeline');
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0 align-middle" id="tblRecent">
-                            <thead class="table-light">
+                        <table class="table table-sm table-hover mb-0 align-middle w-100" id="tblRecent">
+                            <thead class="table-dark">
                                 <tr>
+                                    <th style="width:40px">S/No</th>
                                     <th>Lead</th>
                                     <th>Company</th>
                                     <th>Stage</th>
@@ -134,9 +135,7 @@ $can_pipeline = canView('crm_pipeline');
                                     <th class="text-end">Date</th>
                                 </tr>
                             </thead>
-                            <tbody id="bodyRecent">
-                                <tr><td colspan="5" class="text-center py-3 text-muted">Loading…</td></tr>
-                            </tbody>
+                            <tbody></tbody>
                         </table>
                     </div>
                 </div>
@@ -151,24 +150,23 @@ $can_pipeline = canView('crm_pipeline');
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0 align-middle" id="tblDue">
-                            <thead class="table-light">
+                        <table class="table table-sm table-hover mb-0 align-middle w-100" id="tblDue">
+                            <thead class="table-dark">
                                 <tr>
+                                    <th style="width:40px">S/No</th>
                                     <th>Lead</th>
                                     <th>Activity</th>
                                     <th>Due</th>
                                 </tr>
                             </thead>
-                            <tbody id="bodyDue">
-                                <tr><td colspan="3" class="text-center py-3 text-muted">Loading…</td></tr>
-                            </tbody>
+                            <tbody></tbody>
                         </table>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Top Assignees -->
+        <!-- Top Performers -->
         <div class="col-12">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white fw-semibold small text-uppercase text-muted border-bottom py-2">
@@ -176,18 +174,16 @@ $can_pipeline = canView('crm_pipeline');
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0 align-middle" id="tblTop">
-                            <thead class="table-light">
+                        <table class="table table-sm table-hover mb-0 align-middle w-100" id="tblTop">
+                            <thead class="table-dark">
                                 <tr>
-                                    <th>#</th>
+                                    <th style="width:40px">S/No</th>
                                     <th>User</th>
                                     <th class="text-center">Won</th>
                                     <th class="text-end">Won Value</th>
                                 </tr>
                             </thead>
-                            <tbody id="bodyTop">
-                                <tr><td colspan="4" class="text-center py-3 text-muted">Loading…</td></tr>
-                            </tbody>
+                            <tbody></tbody>
                         </table>
                     </div>
                 </div>
@@ -200,6 +196,11 @@ $can_pipeline = canView('crm_pipeline');
 <script>
 const DASH_URL = '<?= buildUrl('api/crm/get_dashboard_data.php') ?>';
 const LEAD_URL = '<?= getUrl('crm/lead_view') ?>';
+
+function safeOutput(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
 
 const SOURCE_LABELS = {
     website:'Website', referral:'Referral', walk_in:'Walk-in',
@@ -217,6 +218,45 @@ const TYPE_META = {
 };
 
 let cStage, cSource, cMonthly, cWinLoss;
+let dtRecent, dtDue, dtTop;
+
+function initTables() {
+    dtRecent = $('#tblRecent').DataTable({
+        responsive: false, scrollX: false, pageLength: 10,
+        order: [], dom: 'tip',
+        language: { emptyTable: 'No leads yet' },
+        columns: [
+            { orderable: false, width: '40px', className: 'text-muted' },
+            { orderable: true },
+            { orderable: true },
+            { orderable: true },
+            { orderable: false, className: 'text-end' },
+            { orderable: true,  className: 'text-end' },
+        ]
+    });
+    dtDue = $('#tblDue').DataTable({
+        responsive: false, scrollX: false, pageLength: 10,
+        order: [], dom: 'tip',
+        language: { emptyTable: 'No pending activities' },
+        columns: [
+            { orderable: false, width: '40px', className: 'text-muted' },
+            { orderable: true },
+            { orderable: true },
+            { orderable: true },
+        ]
+    });
+    dtTop = $('#tblTop').DataTable({
+        responsive: false, scrollX: false, pageLength: 10,
+        order: [], dom: 'tip',
+        language: { emptyTable: 'No won leads yet' },
+        columns: [
+            { orderable: false, width: '40px', className: 'text-muted' },
+            { orderable: true },
+            { orderable: false, className: 'text-center' },
+            { orderable: true,  className: 'text-end' },
+        ]
+    });
+}
 
 function fmtNum(n) {
     return Number(n).toLocaleString('en-TZ', {minimumFractionDigits:0, maximumFractionDigits:0});
@@ -317,65 +357,55 @@ function renderWinLoss(rows) {
 }
 
 function renderRecent(rows) {
-    if (!rows.length) {
-        $('#bodyRecent').html('<tr><td colspan="5" class="text-center text-muted py-3">No leads yet</td></tr>');
-        return;
-    }
-    let html = '';
-    rows.forEach(r => {
-        html += `<tr>
-            <td><a href="${LEAD_URL}?id=${r.lead_id}" class="text-decoration-none fw-semibold">${safeOutput(r.full_name)}</a>
-                <div class="text-muted small">${safeOutput(r.lead_code)}</div></td>
-            <td class="text-muted small">${safeOutput(r.company_name || '—')}</td>
-            <td><span class="badge rounded-pill" style="background:${safeOutput(r.stage_color||'#6c757d')}">${safeOutput(r.stage_name||'—')}</span></td>
-            <td class="text-end small">TZS ${fmtNum(r.lead_value)}</td>
-            <td class="text-end small text-muted">${fmtDate(r.created_at)}</td>
-        </tr>`;
+    dtRecent.clear();
+    rows.forEach((r, i) => {
+        dtRecent.row.add([
+            i + 1,
+            `<a href="${LEAD_URL}?id=${r.lead_id}" class="text-decoration-none fw-semibold">${safeOutput(r.full_name)}</a>` +
+            `<div class="text-muted small">${safeOutput(r.lead_code)}</div>`,
+            `<span class="small text-muted">${safeOutput(r.company_name || '—')}</span>`,
+            `<span class="badge rounded-pill" style="background:${safeOutput(r.stage_color||'#6c757d')}">${safeOutput(r.stage_name||'—')}</span>`,
+            `TZS ${fmtNum(r.lead_value)}`,
+            fmtDate(r.created_at)
+        ]);
     });
-    $('#bodyRecent').html(html);
+    dtRecent.draw();
 }
 
 function renderDue(rows) {
-    if (!rows.length) {
-        $('#bodyDue').html('<tr><td colspan="3" class="text-center text-muted py-3">No pending activities</td></tr>');
-        return;
-    }
-    let html = '';
+    dtDue.clear();
     const now = new Date();
-    rows.forEach(r => {
+    rows.forEach((r, i) => {
         const due  = r.due_date ? new Date(r.due_date) : null;
         const late = due && due < now;
         const meta = TYPE_META[r.activity_type] || {icon:'bi-circle',color:'#6c757d',label:r.activity_type};
-        html += `<tr class="${late ? 'table-danger' : ''}">
-            <td><a href="${LEAD_URL}?id=${r.lead_id}" class="text-decoration-none small fw-semibold">${safeOutput(r.lead_name)}</a>
-                <div class="text-muted" style="font-size:.7rem">${safeOutput(r.lead_code)}</div></td>
-            <td><span class="badge" style="background:${meta.color};font-size:.68rem">${safeOutput(meta.label)}</span>
-                <div class="small">${safeOutput(r.subject)}</div></td>
-            <td class="small ${late?'text-danger fw-semibold':''}">${fmtDate(r.due_date)}</td>
-        </tr>`;
+        dtDue.row.add([
+            i + 1,
+            `<a href="${LEAD_URL}?id=${r.lead_id}" class="text-decoration-none small fw-semibold">${safeOutput(r.lead_name)}</a>` +
+            `<div class="text-muted" style="font-size:.7rem">${safeOutput(r.lead_code)}</div>`,
+            `<span class="badge" style="background:${meta.color};font-size:.68rem">${safeOutput(meta.label)}</span>` +
+            `<div class="small">${safeOutput(r.subject)}</div>`,
+            `<span class="${late ? 'text-danger fw-semibold' : 'small'}">${fmtDate(r.due_date)}</span>`
+        ]);
     });
-    $('#bodyDue').html(html);
+    dtDue.draw();
 }
 
 function renderTop(rows) {
-    if (!rows.length) {
-        $('#bodyTop').html('<tr><td colspan="4" class="text-center text-muted py-3">No data</td></tr>');
-        return;
-    }
-    let html = '';
+    dtTop.clear();
     rows.forEach((r, i) => {
-        const medals = ['🥇','🥈','🥉'];
-        html += `<tr>
-            <td class="text-muted">${medals[i] || (i+1)}</td>
-            <td class="fw-semibold">${safeOutput(r.name)}</td>
-            <td class="text-center"><span class="badge bg-success">${r.won_count}</span></td>
-            <td class="text-end small">TZS ${fmtNum(r.won_value)}</td>
-        </tr>`;
+        dtTop.row.add([
+            i + 1,
+            `<span class="fw-semibold">${safeOutput(r.name)}</span>`,
+            `<span class="badge bg-success">${r.won_count}</span>`,
+            `TZS ${fmtNum(r.won_value)}`
+        ]);
     });
-    $('#bodyTop').html(html);
+    dtTop.draw();
 }
 
 $(document).ready(function () {
+    initTables();
     loadDashboard($('#periodSelect').val());
     $('#periodSelect').on('change', function () {
         loadDashboard($(this).val());
