@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-07-01 (fix) — GRN create: ONLY_FULL_GROUP_BY crash on production
+
+- `app/bms/grn/grn_create.php` — DN-items query grouped by `di.delivery_item_id`
+  but referenced `recv.received_qty` (from a LEFT JOIN subquery) without an
+  aggregate function; production MySQL has `sql_mode=only_full_group_by` (default
+  since 5.7.5) and rejects this even though each group has exactly one recv row.
+  Fix: wrapped both uses in `MAX()` — `COALESCE(MAX(recv.received_qty), 0)` —
+  in both the SELECT column and the GREATEST() expression. Result is identical.
+
 ## 2026-07-01 (fix) — POS barcode scanner: category-filter bug + search-by-barcode + expanded tests
 
 - `app/bms/pos/pos_scripts_new.php` — added `allProducts[]` global that holds the full
