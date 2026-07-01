@@ -27,8 +27,8 @@ $doc_short = $is_dn ? 'DN' : 'GRN';
 $doc_icon = $is_dn ? 'bi-file-earmark-check' : 'bi-clipboard-plus';
 
 // Build return URL for project context
-$project_return_url = $project_id_param > 0 
-    ? getUrl('project_view') . '?id=' . $project_id_param . '&tab=procurement'
+$project_return_url = $project_id_param > 0
+    ? getUrl('project_view') . '?id=' . $project_id_param . '&tab=grn'
     : null;
 
 // Get current user info
@@ -151,6 +151,10 @@ if ($project_id_param > 0) {
     $supp_params = [$project_id_param];
 }
 
+// Suppliers: any active supplier with at least one approved/partially_received PO
+// (scoped to project when $project_id_param is set).
+// DN is NOT required here — users may create a GRN directly against a PO without
+// a DN, or the DN is pre-filled from the URL when arriving from the DN view.
 $suppliers_query = "
     SELECT DISTINCT s.supplier_id, s.supplier_name, s.company_name
     FROM suppliers s
@@ -158,15 +162,6 @@ $suppliers_query = "
     WHERE s.status = 'active'
     AND po.status IN ('approved','partially_received')
     {$proj_cond}
-    AND (
-        /* PO has at least one approved/partially_delivered inbound DN */
-        EXISTS (
-            SELECT 1 FROM deliveries d
-            WHERE d.purchase_order_id = po.purchase_order_id
-            AND d.dn_type = 'inbound'
-            AND d.status IN ('approved','partially_delivered')
-        )
-    )
     ORDER BY s.supplier_name
 ";
 
@@ -174,8 +169,8 @@ $stmt = $pdo->prepare($suppliers_query);
 $stmt->execute($supp_params);
 $suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// When arriving from ?dn=, guarantee the DN's supplier is in the list
-// even if the PO's current status doesn't match the filter.
+// When arriving from ?dn= and the DN's supplier still isn't in the list
+// (edge case: PO completed/voided after DN was approved), force-add them.
 if ($dn_id_param > 0 && $supplier_id > 0) {
     $inList = array_filter($suppliers, fn($s) => (int)$s['supplier_id'] === $supplier_id);
     if (empty($inList)) {
@@ -307,12 +302,13 @@ function generate_grn_number() {
                     <p class="text-muted mb-0">Record receipt of goods from suppliers</p>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
-                    <a href="<?= getUrl($is_dn ? 'delivery_notes' : 'grn') ?>" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-left"></i> Back to <?= $doc_short ?>s
-                    </a>
                     <?php if ($project_id_param > 0): ?>
                     <a href="<?= $project_return_url ?>" class="btn btn-outline-primary">
                         <i class="bi bi-kanban"></i> Back to Project
+                    </a>
+                    <?php else: ?>
+                    <a href="<?= getUrl($is_dn ? 'delivery_notes' : 'grn') ?>" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to <?= $doc_short ?>s
                     </a>
                     <?php endif; ?>
                 </div>

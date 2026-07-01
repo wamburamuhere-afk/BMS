@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-06-30 (feat) — GRN context-aware navigation in project details
+
+- `api/operations/get_project.php` — GRN query now uses `pr.project_id` directly
+  (was `po.project_id` via PO join — missed GRNs without a linked PO)
+- `app/bms/grn/grn_create.php` — back/save returns to `tab=grn` (was `tab=procurement`);
+  show only "Back to Project" when opened from project (removed duplicate "Back to GRNs")
+- `app/bms/grn/grn_edit.php` — both `project_return_url` and `origin_return_url` corrected
+  to `tab=grn`
+- `app/bms/grn/grn_view.php` — "Back to Project" goes to `tab=grn`; shown exclusively
+  when in project context (no duplicate "Back to List")
+- `app/bms/operations/project_view.php` — Edit GRN action added to renderGRNs dropdown
+  with `project_id` so edit form returns to project GRN tab after save
+
 ## 2026-06-30 (fix) — PO create: RFQ auto-fill, warehouse always shows, clean URLs
 
 - `app/bms/purchase/purchase_order_create.php` — fixed 3 issues:
