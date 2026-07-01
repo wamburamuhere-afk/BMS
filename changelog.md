@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-07-01 (fix) — deploy CI "critical files" allowlist blocked production deploy after LPO module merge
+
+`.github/workflows/deploy.yml`'s "Check critical API files exist" step still
+listed `api/customer/add_lpo.php` and `api/customer/update_lpo.php` — both
+intentionally deleted in the standalone Customer LPO module (superseded by
+`api/customer/save_lpo.php`). No `tests/*.php` file covers this hardcoded
+list, so it slipped through and failed the develop→main promotion deploy
+(PR #1065, run 28518964216), blocking production deploy.
+
+- `.github/workflows/deploy.yml` — removed the two deleted files from the
+  critical-files list; added their replacements
+  (`save_lpo.php`/`review_lpo.php`/`approve_lpo.php`) plus the new LPO
+  standalone pages and both new migrations from the LPO module work, so the
+  gate actually reflects what the feature now depends on
+
 ## 2026-07-01 (feat) — standalone Customer LPO module + LPO → DN(Outbound) → Invoice chain + Sales menu reorder
 
 Sales menu was reordered to the natural document flow (Quotations → Sales Orders
