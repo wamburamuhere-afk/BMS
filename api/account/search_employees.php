@@ -18,7 +18,9 @@ if (!isAuthenticated()) {
     echo json_encode(['results' => []]);
     exit;
 }
-if (!canView('financial_reports')) {
+// financial_reports = original Employee Statement use; employee_lifecycle =
+// HR Actions picker (Tier 1) — either grants access, neither is narrowed.
+if (!canView('financial_reports') && !canView('employee_lifecycle')) {
     http_response_code(403);
     echo json_encode(['results' => []]);
     exit;
