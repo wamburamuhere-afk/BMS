@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-07-01 (test) — financial report integrity suite (capstone of the transaction-safety sweep)
+
+- `tests/test_financial_reports_integrity_cli.php` — 17 checks proving the four
+  statutory reports stay correct after the webroot-quarantine + fix/tx-*
+  changes, and guarding them for every future push (pre-push hook runs all
+  suites):
+  - Ledger invariant Σ Dr = Σ Cr over posted lines (`assertLedgerBalanced`)
+    and Balance Sheet balances (Assets = Liabilities + Equity).
+  - Trial Balance totals agree; P&L internally consistent (net = income −
+    costs); Cash Flow runs clean with its three sections.
+  - **Live end-to-end**: posts a real entry via `postLedgerEntry()` (Dr
+    Expense / Cr Asset), proves the P&L net moves by exactly that amount, the
+    TB expense row moves by exactly that amount, every statement still
+    balances, then removes the entry and re-proves the ledger is balanced.
+  - Static guards that `core/financial_reports.php` keeps the one-ledger
+    rules: `status='posted'` only, `entry_date` filtering, sums from
+    `journal_entry_items`.
+  - Cross-check counter of tx-sweep endpoints carrying their transaction
+    (informational until all fix/tx-* PRs merge).
 ## 2026-07-01 (fix) — payroll multi-step writes are now atomic; all tables converted to InnoDB
 
 Payroll payout/edit endpoints performed 3–5 dependent writes (payroll status →
