@@ -88,36 +88,48 @@ try {
         logActivity($pdo, $_SESSION['user_id'], "Updated IPC {$ipc_id} on project {$project_id}");
         echo json_encode(['success'=>true,'message'=>'IPC updated successfully','net_payable'=>$net_payable]);
     } else {
-        // Company-wide sequential IPC number (BFS-IPC-0001).
+        // Number allocation + IPC INSERT + creation signature are one atomic
+        // unit: a failed save can't burn a sequential IPC number, and an IPC
+        // can't exist without its "created" signature.
         require_once __DIR__ . '/../../core/code_generator.php';
-        $no = nextCode($pdo, 'IPC');
-
-        $stmt = $pdo->prepare("INSERT INTO interim_payment_certificates
-            (project_id, sales_order_id, ipc_number, ipc_date, period_from, period_to,
-             certified_amount, retention_percent, retention_amount,
-             previous_payments, net_payable, status, notes, items_json, created_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-        $stmt->execute([
-            $project_id, $sales_order_id, $no, $ipc_date, $period_from ?: null, $period_to ?: null,
-            $certified_amount, $retention_percent, $retention_amount,
-            $previous_payments, $net_payable, $status, $notes,
-            $items_json, $_SESSION['user_id']
-        ]);
-        $new_id = $pdo->lastInsertId();
-
-        // ── e-signature capture (Created By) ─ Issue 1 fix
         if (!function_exists('workflowCaptureSignature')) {
             require_once __DIR__ . '/../../core/workflow.php';
         }
-        $wfActor = workflowActorSnapshot();
-        workflowCaptureSignature(
-            $pdo, 'ipc', (int)$new_id, 'created',
-            (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']
-        );
+
+        $pdo->beginTransaction();
+        try {
+            // Company-wide sequential IPC number (BFS-IPC-0001).
+            $no = nextCode($pdo, 'IPC');
+
+            $stmt = $pdo->prepare("INSERT INTO interim_payment_certificates
+                (project_id, sales_order_id, ipc_number, ipc_date, period_from, period_to,
+                 certified_amount, retention_percent, retention_amount,
+                 previous_payments, net_payable, status, notes, items_json, created_by)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+            $stmt->execute([
+                $project_id, $sales_order_id, $no, $ipc_date, $period_from ?: null, $period_to ?: null,
+                $certified_amount, $retention_percent, $retention_amount,
+                $previous_payments, $net_payable, $status, $notes,
+                $items_json, $_SESSION['user_id']
+            ]);
+            $new_id = $pdo->lastInsertId();
+
+            // ── e-signature capture (Created By) ─ Issue 1 fix
+            $wfActor = workflowActorSnapshot();
+            workflowCaptureSignature(
+                $pdo, 'ipc', (int)$new_id, 'created',
+                (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']
+            );
+
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
 
         logActivity($pdo, $_SESSION['user_id'], "Created IPC {$no} on project {$project_id}");
         echo json_encode(['success'=>true,'message'=>'IPC created successfully','ipc_number'=>$no,'ipc_id'=>$new_id,'net_payable'=>$net_payable]);
     }
-} catch (PDOException $e) {
+} catch (Throwable $e) {
     echo json_encode(['success'=>false,'message'=>'DB error: '.$e->getMessage()]);
 }

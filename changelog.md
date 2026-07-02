@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-07-01 (fix) — IPC/invoice/voucher multi-step writes are now atomic
+
+Four endpoints performed dependent writes with no transaction; the worst was
+IPC invoicing: `INSERT invoices` then `UPDATE interim_payment_certificates` —
+a failure between them left an invoice with no IPC link, and a retry created
+a **duplicate invoice for the same certificate**.
+
+- `api/operations/create_invoice_from_ipc.php` — number allocation + invoice
+  INSERT + IPC link are one transaction, and the link UPDATE is guarded on
+  `invoice_id IS NULL` so two concurrent requests can't both invoice the same
+  certificate.
+- `api/operations/update_ipc_status.php` — status flip + workflow signature
+  commit together (an IPC can't reach a status with no record of who moved it).
+- `api/operations/save_ipc.php` — IPC number + INSERT + "created" signature
+  atomic; a failed save no longer burns a sequential IPC number.
+- `api/account/save_voucher.php` — edit path (re-code + body UPDATE) and
+  create path (PV number + INSERT) each atomic; failed saves burn no numbers.
+  Outer catches widened to `Throwable`.
+- `tests/test_ipc_invoice_tx_cli.php` — 11 checks: static guards, live forced
+  failure leaves no orphan invoice and IPC untouched, real run links exactly
+  once and a retry is refused, failed voucher save leaves no row and burns no
+  sequence number. All 17 IPC/voucher/invoice suites pass.
 ## 2026-07-01 (test) — financial report integrity suite (capstone of the transaction-safety sweep)
 
 - `tests/test_financial_reports_integrity_cli.php` — 17 checks proving the four
