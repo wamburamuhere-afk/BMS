@@ -103,6 +103,7 @@ try {
     // non-payment status changes (approved, processing, cancelled …).
     $affected_periods = [];
     $rowCount = 0;
+    $payment_failures = [];
 
     if ($status === 'paid') {
         foreach ($to_pay as $p) {
@@ -118,28 +119,43 @@ try {
             $newAmtPaid = round($alreadyPd + $thisPayment, 2);
             $newStatus  = ($newAmtPaid >= $net - 0.005) ? 'paid' : 'partial';
 
-            $pdo->prepare("UPDATE payroll
-                              SET payment_status      = ?,
-                                  amount_paid         = ?,
-                                  paid_from_account_id = ?,
-                                  payment_date        = NOW(),
-                                  updated_at          = NOW()
-                            WHERE payroll_id = ?")
-                ->execute([$newStatus, $newAmtPaid, (int)$paid_from_account_id, $p['payroll_id']]);
-            $rowCount++;
+            // One employee's payment = one atomic unit: status update, GL posting
+            // and bank register all commit together or not at all. A failure rolls
+            // this record back completely and the loop moves to the next one.
+            $pdo->beginTransaction();
+            try {
+                $pdo->prepare("UPDATE payroll
+                                  SET payment_status      = ?,
+                                      amount_paid         = ?,
+                                      paid_from_account_id = ?,
+                                      payment_date        = NOW(),
+                                      updated_at          = NOW()
+                                WHERE payroll_id = ?")
+                    ->execute([$newStatus, $newAmtPaid, (int)$paid_from_account_id, $p['payroll_id']]);
 
-            // Post GL: Dr Salaries Payable / Cr Bank (for the instalment amount only)
-            $txn = postPayrollPayment($pdo, $p, (int)$paid_from_account_id, (int)$_SESSION['user_id'], $thisPayment);
-            if ($txn) {
+                // Post GL: Dr Salaries Payable / Cr Bank (for the instalment amount only).
+                // No GL entry = no payment: a null posting rolls the whole record back
+                // so a payroll can never be marked paid without its ledger entry.
+                $txn = postPayrollPayment($pdo, $p, (int)$paid_from_account_id, (int)$_SESSION['user_id'], $thisPayment);
+                if (!$txn) {
+                    throw new Exception('GL payment posting failed — check the payroll account mapping in System Settings.');
+                }
                 $pdo->prepare("UPDATE payroll SET payment_transaction_id = ? WHERE payroll_id = ?")
                     ->execute([$txn, $p['payroll_id']]);
+                // Bank register — salary withdrawal per employee
+                recordBankTransaction($pdo, (int)$paid_from_account_id, $thisPayment, 'withdrawal',
+                    $p['payroll_date'] ?: date('Y-m-d'),
+                    $p['payroll_number'],
+                    "Payroll {$p['payroll_number']} payment", (int)$_SESSION['user_id']);
+
+                $pdo->commit();
+                $rowCount++;
+                if (!empty($p['payroll_period'])) $affected_periods[$p['payroll_period']] = true;
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                error_log("bulk payroll payment PAY#{$p['payroll_id']}: " . $e->getMessage());
+                $payment_failures[] = "PAY #{$p['payroll_id']}: payment not posted — " . $e->getMessage();
             }
-            // Bank register — salary withdrawal per employee
-            recordBankTransaction($pdo, (int)$paid_from_account_id, $thisPayment, 'withdrawal',
-                $p['payroll_date'] ?: date('Y-m-d'),
-                $p['payroll_number'],
-                "Payroll {$p['payroll_number']} payment", (int)$_SESSION['user_id']);
-            if (!empty($p['payroll_period'])) $affected_periods[$p['payroll_period']] = true;
         }
     } else {
         // Non-payment status changes use the original bulk UPDATE
@@ -157,9 +173,17 @@ try {
     // (Dr Salaries Expense / Cr PAYE + NSSF + Salaries Payable).
     $accrual_warnings = [];
     foreach ($to_approve as $p) {
+        // Each record's accrual (journal legs + payroll link) is atomic: a failure
+        // rolls back that record's partial legs instead of leaving a lopsided entry.
         $txn = null;
-        try { $txn = ensurePayrollAccrued($pdo, (int)$p['payroll_id'], (int)$_SESSION['user_id']); }
-        catch (Throwable $e) { error_log('approve accrual: ' . $e->getMessage()); }
+        $pdo->beginTransaction();
+        try {
+            $txn = ensurePayrollAccrued($pdo, (int)$p['payroll_id'], (int)$_SESSION['user_id']);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            error_log('approve accrual: ' . $e->getMessage());
+        }
         if (!$txn) {
             $accrual_warnings[] = "PAY #{$p['payroll_id']}: GL accrual not posted — check account mapping in System Settings.";
         }
@@ -167,11 +191,18 @@ try {
     }
 
     // Keep the remittance schedule + SDL accrual in step for every affected period.
+    // Both writes for a period commit together so the schedule and the SDL journal
+    // can never disagree.
     foreach (array_keys($affected_periods) as $per) {
+        $pdo->beginTransaction();
         try {
             $rs = syncStatutoryRemittances($pdo, $per, (int)$_SESSION['user_id']);
             postSdlAccrual($pdo, $per, (float)($rs['amounts']['sdl'] ?? 0), (int)$_SESSION['user_id']);
-        } catch (Throwable $e) { error_log('statutory sync/accrual: ' . $e->getMessage()); }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            error_log('statutory sync/accrual: ' . $e->getMessage());
+        }
     }
 
     // Log bulk update action
@@ -182,10 +213,19 @@ try {
     ]);
     
     $msg = "Bulk status update completed. $rowCount records updated successfully.";
+    if (!empty($payment_failures)) {
+        $msg .= ' ' . count($payment_failures) . ' record(s) FAILED and were rolled back: '
+              . implode('; ', $payment_failures);
+    }
     if (!empty($accrual_warnings)) {
         $msg .= ' GL warning: ' . implode('; ', $accrual_warnings);
     }
-    echo json_encode(['success' => true, 'message' => $msg]);
+    echo json_encode([
+        'success'  => true,
+        'message'  => $msg,
+        'updated'  => $rowCount,
+        'failures' => $payment_failures,
+    ]);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
 }

@@ -139,9 +139,19 @@ if ($action === 'reorder') {
         echo json_encode(['success' => false, 'message' => 'Order array required']); exit;
     }
 
-    $upd = $pdo->prepare("UPDATE crm_pipeline_stages SET stage_order = ? WHERE stage_id = ?");
-    foreach ($order as $pos => $sid) {
-        $upd->execute([$pos + 1, intval($sid)]);
+    // All position updates commit together — a failure mid-loop can't leave the
+    // pipeline half-reordered with duplicate positions.
+    $pdo->beginTransaction();
+    try {
+        $upd = $pdo->prepare("UPDATE crm_pipeline_stages SET stage_order = ? WHERE stage_id = ?");
+        foreach ($order as $pos => $sid) {
+            $upd->execute([$pos + 1, intval($sid)]);
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Reorder failed — no changes were saved.']); exit;
     }
 
     echo json_encode(['success' => true, 'message' => 'Stage order saved.']);

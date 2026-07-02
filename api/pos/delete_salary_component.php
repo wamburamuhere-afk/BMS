@@ -16,9 +16,18 @@ try {
     $id = (int)($_POST['component_id'] ?? 0);
     if ($id <= 0) throw new Exception('Missing component.');
 
-    $pdo->prepare("UPDATE salary_components SET status = 'deleted', updated_at = NOW() WHERE component_id = ?")->execute([$id]);
-    // Also retire any active employee assignments of this component.
-    $pdo->prepare("UPDATE employee_salary_components SET status = 'inactive', updated_at = NOW() WHERE component_id = ? AND status = 'active'")->execute([$id]);
+    // Component soft-delete + retirement of its employee assignments commit
+    // together — no deleted component can keep live assignments.
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("UPDATE salary_components SET status = 'deleted', updated_at = NOW() WHERE component_id = ?")->execute([$id]);
+        // Also retire any active employee assignments of this component.
+        $pdo->prepare("UPDATE employee_salary_components SET status = 'inactive', updated_at = NOW() WHERE component_id = ? AND status = 'active'")->execute([$id]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
 
     logActivity($pdo, $_SESSION['user_id'], "Delete salary component", "deleted salary component with id $id");
     echo json_encode(['success' => true, 'message' => 'Component deleted.']);
