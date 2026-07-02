@@ -657,7 +657,23 @@ $routes = [
     'api/delete_employee.php' => API_DIR . '/delete_employee.php',
     'api/update_employee' => API_DIR . '/update_employee.php',
     'api/update_employee.php' => API_DIR . '/update_employee.php',
-    
+
+    // HR Actions — employee lifecycle events (Tier 1)
+    'hr_actions' => POS_DIR . '/hr_actions.php',
+    'hr_actions.php' => POS_DIR . '/hr_actions.php',
+    'api/add_lifecycle_event' => API_DIR . '/add_lifecycle_event.php',
+    'api/add_lifecycle_event.php' => API_DIR . '/add_lifecycle_event.php',
+    'api/get_lifecycle_event' => API_DIR . '/get_lifecycle_event.php',
+    'api/get_lifecycle_event.php' => API_DIR . '/get_lifecycle_event.php',
+    'api/get_lifecycle_events' => API_DIR . '/get_lifecycle_events.php',
+    'api/get_lifecycle_events.php' => API_DIR . '/get_lifecycle_events.php',
+    'api/change_lifecycle_status' => API_DIR . '/change_lifecycle_status.php',
+    'api/change_lifecycle_status.php' => API_DIR . '/change_lifecycle_status.php',
+    'api/delete_lifecycle_event' => API_DIR . '/delete_lifecycle_event.php',
+    'api/delete_lifecycle_event.php' => API_DIR . '/delete_lifecycle_event.php',
+    'api/download_lifecycle_attachment' => API_DIR . '/download_lifecycle_attachment.php',
+    'api/download_lifecycle_attachment.php' => API_DIR . '/download_lifecycle_attachment.php',
+
     // Payroll APIs
     'api/get_payrolls' => API_DIR . '/get_payrolls.php',
     'api/get_payrolls.php' => API_DIR . '/get_payrolls.php',
