@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-07-02 (feature) — employee_details page now shows all data captured at registration
+
+The 5-step employee registration/edit wizard (`app/bms/pos/employees.php`) captures 50
+columns on `employees`, but `employee_details.php` only rendered 22 of them — 28 fields
+a user fills in when registering an employee (employment type, project, reporting line,
+compensation/payment details, benefits, secondary contact info, notes) were invisible on
+their profile page. Document attachments were already fully displayed; no change needed there.
+
+- `app/bms/pos/employee_details.php`:
+  - Query now joins `employment_types` and `projects` (previously only `departments`/`designations`
+    were joined, so employment type and project name couldn't be shown at all).
+  - "Personal & Employment Information" card: added middle name (folded into full name),
+    marital status, passport number, employment type, reporting to, work location, project,
+    probation/contract end date (shown conditionally by employment status), bank branch, mobile money.
+  - New "Compensation & Payment" card: hourly rate, currency, payment frequency, payment method,
+    tax ID (TIN), social security number, benefits (badges).
+  - Contact Info card: added alternate phone, postal address, city, country. Also fixed a latent
+    bug — the card read the legacy `address` column, which goes stale after the first edit (the
+    edit form only ever submits `physical_address`, never `address`); switched to `physical_address`.
+  - New "Notes" card (shown only when populated): personal notes + additional notes from the
+    documents step.
+
 ## 2026-07-02 (fix) — MyISAM→InnoDB conversion migration failed on legacy zero-dates
 
 `2026_07_01_convert_myisam_to_innodb.php` rebuilds every MyISAM table via
