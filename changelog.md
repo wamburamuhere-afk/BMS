@@ -1,5 +1,121 @@
 # BMS Changelog
 
+## 2026-07-02 (feat) — Service Record on employee_details (Tier 1, Phase 1.5)
+
+The employee profile becomes a true personnel file. Additions only — every
+existing section untouched (proven by test).
+
+- `app/bms/pos/employee_details.php` —
+  new **Service Record** card after Personal & Employment Information: vertical
+  timeline (newest first) of the employee's non-deleted lifecycle events with
+  per-type icon/colour, old→new change line, status badge, recorder/approver +
+  dates, reject reason, gatekeeper attachment link; print-friendly (attachment
+  links hidden in print). **HR Action** quick dropdown in the top bar
+  (Promote / Transfer / Award / Warn / Record Complaint / Resignation /
+  Termination) opening the shared Phase 1.4 modal with the employee locked
+  pre-selected and the type pre-picked. Sidebar footer gains **Awards** and
+  **Warnings** mini-counters (two more scalar subqueries, same pattern).
+  `applyDueLifecycleEffects()` (D5) runs on load so a resignation whose last
+  working day passed shows the correct status.
+- `tests/test_employee_service_record_cli.php` — 27 assertions: all 9 existing
+  sections intact in source AND in live render, end-to-end promote→approve→
+  profile shows new designation + timeline entry, mini-stats, view-only render,
+  zero-event clean empty state.
+
+## 2026-07-02 (feat) — HR Actions page (Tier 1, Phase 1.4)
+
+The management UI for the lifecycle module — one page for all 8 event types.
+
+- `app/bms/pos/hr_actions.php` — house template §8, page_key `employee_lifecycle`:
+  6 stat cards (Pending / Promotions / Transfers / Awards / Warnings / Exits — current
+  year, scope-filtered with the same helper the API uses), filters row (type, status,
+  employee AJAX Select2, date range), DataTable + §UI-7 mobile cards, §UI-5 gear-dropdown
+  actions rendered per state + permission (View always; Approve/Reject on pending +
+  canApprove with reject-reason prompt; Cancel for creator/canEdit; Delete non-approved +
+  canDelete; attachment download), rich View modal, `applyDueLifecycleEffects()` (D5)
+  on load, AJAX redraw (no reloads).
+- `app/bms/pos/includes/lifecycle_modal.php` — the shared "New HR Action" modal
+  (one include reused by employee_details in Phase 1.5): employee AJAX picker (or locked
+  pre-selected employee), per-type field groups toggled by JS, read-only "Current
+  position" panel loaded from `api/get_employee.php`, per-type required-field mirror of
+  the API's validation, CSRF, §16 submit pattern, strict-scope project dropdown.
+- `api/account/search_employees.php` — gate broadened additively:
+  `canView('financial_reports') OR canView('employee_lifecycle')` so HR users can use
+  the existing employee search; no access removed.
+- `tests/test_hr_actions_page_cli.php` — 31 assertions: lint, UI-standard source checks,
+  live render as real admin (buttons/modal/flags present) and real view-only Director
+  (create+approve hidden, modal not included), end-to-end create→approve→employee-changed
+  through the page's own endpoints.
+
+## 2026-07-02 (feat) — HR Lifecycle workflow: approve/reject/cancel + effects (Tier 1, Phase 1.3)
+
+The approval workflow that makes lifecycle events real. `api/update_employee_status.php`
+is untouched — both paths stay valid (D6).
+
+- `core/lifecycle_effects.php` — `applyLifecycleEffectRow()` applies an approved
+  event's D4 effect to `employees` inside the caller's transaction (promotion/demotion
+  → designation+salary; transfer → department_id + legacy `department` varchar sync +
+  project; resignation/termination → employment_status; award/warning/complaint =
+  record-only) and stamps `effect_applied_at`. `applyDueLifecycleEffects()` = D5
+  catch-up for approved resignations whose last working day has arrived — idempotent,
+  row-locked, audit-logged.
+- `api/change_lifecycle_status.php` — transitions `pending → approved/rejected/cancelled`;
+  approved/rejected terminal (no edit of history, double-approve blocked via `FOR UPDATE`);
+  **creator cannot approve their own event** (admins exempt); reject requires a reason;
+  cancel = creator or canEdit; on approval writes TWO audits — the event approval and,
+  when a field changed, the same `status_change` employee audit shape the legacy endpoint
+  writes; future-dated resignations defer their effect (D5).
+- `api/delete_lifecycle_event.php` — soft delete, only pending/rejected/cancelled
+  (approved history immutable), canDelete gate, scope gate.
+- `api/download_lifecycle_attachment.php` — §19 gatekeeper: auth + canView + employee
+  scope + realpath containment inside `uploads/lifecycle/` before streaming.
+- `tests/test_hr_lifecycle_workflow_cli.php` — 28 assertions: promotion/transfer/
+  termination effects applied atomically, legacy varchar sync, deferred resignation +
+  exactly-once catch-up, reject/cancel no-effect, segregation of duties, immutability,
+  scope + permission denials, and a D6 regression proving the legacy status endpoint
+  still works.
+
+## 2026-07-02 (feat) — HR Lifecycle core APIs (Tier 1, Phase 1.2)
+
+Create/read/list APIs for employee lifecycle events. Effects do NOT apply here —
+that is Phase 1.3's approval workflow.
+
+- `api/add_lifecycle_event.php` — 6-step template; per-type validation matrix
+  (promotion/demotion→designation, transfer→department/project, warning→severity,
+  complaint→complainant, resignation→end_date, termination→type); old values
+  snapshotted **server-side** from the employees row (forged client values ignored);
+  optional attachment via the §19 5-step upload into `uploads/lifecycle/` +
+  `registerFileInLibrary`; scope gates (`assertScopeForEmployee`, destination-project
+  `userCan` check on transfers); `logActivity` + `logAudit`.
+- `api/get_lifecycle_events.php` — filters (type/status/employee/date range), JOINs
+  for employee + old/new designation/department/project + creator/approver names,
+  `scopeFilterSqlNullable('project','e')` for non-admins, excludes deleted.
+- `api/get_lifecycle_event.php` — single event with resolved names,
+  `assertScopeForEmployeeRecord` scope gate.
+- `tests/test_hr_lifecycle_apis_cli.php` — 40 assertions: all 8 types create as
+  pending, 15-case validation matrix, forged-old-values proof, .exe attachment
+  rejection, list filters, scope denial (create/list/single) for non-admins,
+  view-only role blocked from creating.
+
+## 2026-07-02 (feat) — HR Lifecycle foundation (Tier 1, Phase 1.1)
+
+Foundation for the employee lifecycle module (promotions, transfers, awards,
+warnings, complaints, resignations, terminations → recorded, approvable Service
+Record entries). Purely additive — no existing table altered, no endpoint changed.
+
+- `migrations/2026_07_02_employee_lifecycle_events.php` — new `employee_lifecycle_events`
+  table (one table for all 8 event types, old→new snapshots, pending→approved/rejected/
+  cancelled workflow, InnoDB, FK to employees) + `uploads/lifecycle/` with deny-exec `.htaccess`.
+- `migrations/2026_07_02_employee_lifecycle_permissions.php` — `employee_lifecycle`
+  permission row (HR Actions, module Human Resources); full CRUD + approve resolved at
+  runtime (admin roles + roles holding `can_edit` on employees), view-only for the rest.
+- `roots.php` — routes for `hr_actions` page + 6 lifecycle APIs (both clean and `.php` forms).
+- `header.php` — "HR Actions" item in Operations → Human Resources, gated by
+  `canView('employee_lifecycle')`.
+- `core/permissions.php` — router-fallback mapping `hr_actions.php` → `employee_lifecycle`.
+- `tests/test_hr_lifecycle_foundation_cli.php` — 31 assertions: idempotent migrations,
+  schema/indexes/FK, permission matrix, routes, nav gating, upload hardening, no-break checks.
+
 ## 2026-07-02 (refactor) — procurement side joins the shared Project ↔ Warehouse mechanism
 
 Follow-up to the sales-side centralisation below: the four procurement pages that
