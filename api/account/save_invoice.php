@@ -86,11 +86,18 @@ try {
     } else {
         $status = 'pending';
     }
-    $project_id = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
+    $project_id   = !empty($_POST['project_id'])   ? intval($_POST['project_id'])   : null;
+    $warehouse_id = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null;
+    $is_service_invoice = isset($_POST['is_service_invoice']);
     $items = $_POST['items'] ?? [];
 
     if (empty($customer_id) || empty($invoice_date) || empty($items)) {
         throw new Exception("Missing required fields");
+    }
+    // Required on creation only — existing invoices may predate this field
+    // (invoice_edit.php has no Service-Invoice toggle to know their intent).
+    if (!$is_update && !$is_service_invoice && !$warehouse_id) {
+        throw new Exception("Warehouse is required for inventory invoices");
     }
 
     // Calculate totals
@@ -126,13 +133,13 @@ try {
         // Update existing
         $stmt = $pdo->prepare("
             UPDATE invoices SET
-                invoice_number = ?, customer_id = ?, order_id = ?, delivery_id = ?, customer_lpo_id = ?, project_id = ?, invoice_date = ?, due_date = ?,
+                invoice_number = ?, customer_id = ?, order_id = ?, delivery_id = ?, customer_lpo_id = ?, project_id = ?, warehouse_id = ?, invoice_date = ?, due_date = ?,
                 subtotal = ?, tax_amount = ?, discount_amount = ?, shipping_cost = ?, grand_total = ?,
                 currency = ?, notes = ?, terms_conditions = ?, status = ?, updated_by = ?, updated_at = NOW()
             WHERE invoice_id = ?
         ");
         $stmt->execute([
-            $invoice_number, $customer_id, $order_id ?: null, $delivery_id, $customer_lpo_id, $project_id, $invoice_date, $due_date,
+            $invoice_number, $customer_id, $order_id ?: null, $delivery_id, $customer_lpo_id, $project_id, $warehouse_id, $invoice_date, $due_date,
             $subtotal, $tax_total, $discount, $shipping, $grand_total,
             $currency, $notes, $terms, $status, $_SESSION['user_id'], $invoice_id
         ]);
@@ -167,14 +174,14 @@ try {
 
         $stmt = $pdo->prepare("
             INSERT INTO invoices (
-                invoice_number, customer_id, order_id, delivery_id, customer_lpo_id, project_id, invoice_date, due_date,
+                invoice_number, customer_id, order_id, delivery_id, customer_lpo_id, project_id, warehouse_id, invoice_date, due_date,
                 subtotal, tax_amount, discount_amount, shipping_cost, grand_total,
                 paid_amount, balance_due,
                 currency, notes, terms_conditions, status, created_by, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, NOW())
         ");
         $stmt->execute([
-            $invoice_number, $customer_id, $order_id ?: null, $delivery_id, $customer_lpo_id, $project_id, $invoice_date, $due_date,
+            $invoice_number, $customer_id, $order_id ?: null, $delivery_id, $customer_lpo_id, $project_id, $warehouse_id, $invoice_date, $due_date,
             $subtotal, $tax_total, $discount, $shipping, $grand_total,
             $grand_total,
             $currency, $notes, $terms, $status, $_SESSION['user_id']
