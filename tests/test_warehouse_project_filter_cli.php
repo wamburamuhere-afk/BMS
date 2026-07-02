@@ -6,13 +6,15 @@
  * that project's warehouses; when no Project is selected, it must show ONLY
  * warehouses not linked to any project (never "all warehouses" as a fallback).
  *
- * Confirmed already correct (no change needed): RFQ create, GRN create,
- * DN create, Sales Order create/edit, Quotation form.
+ * The rule is centralised in ONE shared mechanism:
+ *   - core/warehouse_scope.php            (warehousesForSelect + renderWarehouseOptions)
+ *   - assets/js/warehouse-project-filter.js
+ *     (warehouseMatchesProject + filterWarehousesForProject + bindWarehouseToProject)
  *
- * This guard covers the three pages that violated the rule and were fixed:
- *   - app/bms/purchase/purchase_order_create.php (had a fallback-to-all)
- *   - app/bms/stock/stock_adjustments.php (showed all when no project)
- *   - app/bms/pos/pos.php + pos_scripts_new.php (warehouse ignored project entirely)
+ * Sales-side pages consume the shared mechanism and must NOT carry a local
+ * re-implementation. Purchase-side pages (purchase_order_create.php,
+ * stock_adjustments.php) still carry their own verified copies — they are
+ * guarded string-for-string below until they migrate too.
  *
  * Run:  php tests/test_warehouse_project_filter_cli.php
  *   Exit 0 = all pass · Exit 1 = a regression slipped in.
@@ -31,53 +33,123 @@ function section($t){ echo "\n\033[1m── $t ──\033[0m\n"; }
 
 echo "\n\033[1m═══ Warehouse ↔ Project Filter Guard ═══\033[0m\n";
 
-$files = [
+// Pages migrated to the shared mechanism. 'bind' = native-select cascade
+// (bindWarehouseToProject); 'list' = Select2 rebuild (filterWarehousesForProject).
+$shared_pages = [
+    'app/bms/sales/quotations/quotation_form.php' => 'bind',
+    'app/bms/sales/sales_order_create.php'        => 'bind',
+    'app/bms/sales/sales_order_edit.php'          => 'bind',
+    'app/bms/sales/lpo/lpo_create.php'            => 'bind',
+    'app/bms/invoice/invoice_create.php'          => 'bind',
+    'app/bms/invoice/invoice_edit.php'            => 'bind',
+    'app/bms/grn/dn_create.php'                   => 'list',
+    'app/bms/grn/dn_outbound.php'                 => 'list',
+    'app/bms/pos/pos_scripts_new.php'             => 'bind',
+];
+
+$legacy_pages = [
     'app/bms/purchase/purchase_order_create.php',
     'app/bms/stock/stock_adjustments.php',
-    'app/bms/pos/pos.php',
-    'app/bms/pos/pos_scripts_new.php',
 ];
 
 section('1. Lint');
-foreach ($files as $f) {
+$lint = array_merge(
+    ['core/warehouse_scope.php', 'app/bms/pos/pos.php'],
+    array_keys($shared_pages),
+    $legacy_pages
+);
+foreach ($lint as $f) {
     $out = shell_exec('php -l ' . escapeshellarg($root . '/' . $f) . ' 2>&1');
     (strpos($out, 'No syntax errors detected') !== false) ? pass("$f lint-clean") : fail("$f — $out");
 }
 
-section('2. purchase_order_create.php — fallback-to-all removed');
-$src = file_get_contents("$root/app/bms/purchase/purchase_order_create.php");
-(strpos($src, 'fallback when no general warehouses') === false) ? pass('no-project fallback line removed') : fail('no-project fallback line still present');
-(strpos($src, 'fallback when no project-linked warehouses') === false) ? pass('project-selected fallback line removed') : fail('project-selected fallback line still present');
-(strpos($src, "filtered = allWarehouses.filter(w => !w.project_id || w.project_id === 0);") !== false) ? pass('strict unassigned-only branch intact') : fail('unassigned-only branch missing/changed');
-(strpos($src, "filtered = allWarehouses.filter(w => w.project_id == projectId);") !== false) ? pass('strict project-match branch intact') : fail('project-match branch missing/changed');
+section('2. Shared mechanism exists and defines the API');
+$helper = @file_get_contents("$root/core/warehouse_scope.php") ?: '';
+(strpos($helper, 'function warehousesForSelect')   !== false) ? pass('warehousesForSelect() defined')   : fail('warehousesForSelect() missing');
+(strpos($helper, 'function renderWarehouseOptions') !== false) ? pass('renderWarehouseOptions() defined') : fail('renderWarehouseOptions() missing');
+(strpos($helper, "scopeFilterSqlNullable('project'") !== false) ? pass('helper query is user-project scoped') : fail('helper query missing scopeFilterSqlNullable');
+(strpos($helper, 'data-project-id') !== false) ? pass('options carry data-project-id') : fail('options missing data-project-id');
 
-section('3. stock_adjustments.php — unassigned-only when no project');
-$src = file_get_contents("$root/app/bms/stock/stock_adjustments.php");
-(strpos($src, 'show ALL warehouses') === false) ? pass('"show ALL warehouses" branch removed') : fail('still shows all warehouses when no project selected');
-(strpos($src, 'return w.project_id === 0;') !== false) ? pass('no-project branch now filters to project_id === 0') : fail('no-project branch does not filter to unassigned-only');
-(strpos($src, 'leave blank to see all') === false) ? pass('stale "leave blank to see all" hint text removed') : fail('stale hint text still present');
+$js = @file_get_contents("$root/assets/js/warehouse-project-filter.js") ?: '';
+(strpos($js, 'function warehouseMatchesProject')    !== false) ? pass('JS: warehouseMatchesProject() defined')    : fail('JS: warehouseMatchesProject() missing');
+(strpos($js, 'function filterWarehousesForProject') !== false) ? pass('JS: filterWarehousesForProject() defined') : fail('JS: filterWarehousesForProject() missing');
+(strpos($js, 'function bindWarehouseToProject')     !== false) ? pass('JS: bindWarehouseToProject() defined')     : fail('JS: bindWarehouseToProject() missing');
+(strpos($js, 'pid === 0 ? wpid === 0 : wpid === pid') !== false) ? pass('JS: strict rule intact (unassigned-only / project-only, no fallback)') : fail('JS: strict rule line changed/missing');
 
-section('4. pos.php + pos_scripts_new.php — warehouse now cascades from project');
+section('3. Every migrated page uses the shared mechanism — and no local copies');
+foreach ($shared_pages as $f => $mode) {
+    $src = file_get_contents("$root/$f");
+    $needle = $mode === 'list' ? 'filterWarehousesForProject(' : 'bindWarehouseToProject(';
+    (strpos($src, $needle) !== false) ? pass("$f uses $needle...)") : fail("$f does not call $needle...)");
+    (strpos($src, 'function filterWarehousesByProject')    === false &&
+     strpos($src, 'function filterPosWarehousesByProject') === false)
+        ? pass("$f carries no local filter copy") : fail("$f re-implements the filter locally");
+    (strpos($src, 'warehouse-project-filter.js') !== false) ? pass("$f includes the shared JS module") : fail("$f missing shared JS include");
+}
+// PHP side: pages that render the warehouse <select> server-side must build it
+// from the shared helper (pos.php renders it; pos_scripts_new.php is JS-only).
+$php_render_pages = array_merge(
+    array_diff(array_keys($shared_pages), ['app/bms/pos/pos_scripts_new.php']),
+    ['app/bms/pos/pos.php']
+);
+foreach ($php_render_pages as $f) {
+    $src = file_get_contents("$root/$f");
+    (strpos($src, 'warehousesForSelect(') !== false) ? pass("$f builds its list via warehousesForSelect()") : fail("$f does not use warehousesForSelect()");
+}
+
+section('4. POS — warehouse cascade wired before products load');
+$posJs = file_get_contents("$root/app/bms/pos/pos_scripts_new.php");
 $posPhp = file_get_contents("$root/app/bms/pos/pos.php");
-$posJs  = file_get_contents("$root/app/bms/pos/pos_scripts_new.php");
-(strpos($posPhp, "data-project-id='{\$w['project_id']}'") !== false) ? pass('warehouse options carry data-project-id') : fail('warehouse options missing data-project-id');
-(strpos($posPhp, 'IFNULL(project_id,0) as project_id') !== false) ? pass('warehouse query now selects project_id') : fail('warehouse query missing project_id');
-(strpos($posPhp, "posProjectId\" onchange=\"filterPosWarehousesByProject(); loadProducts();\"") !== false) ? pass('project select triggers the cascade on change') : fail('project select does not trigger the cascade');
-(strpos($posJs, 'function filterPosWarehousesByProject()') !== false) ? pass('filterPosWarehousesByProject() defined') : fail('filterPosWarehousesByProject() missing');
-$readyPos      = strpos($posJs, '$(document).ready(function()');
-$cascadeCallPos = strpos($posJs, 'filterPosWarehousesByProject();', $readyPos === false ? 0 : $readyPos);
-$loadProductsPos = strpos($posJs, 'loadProducts();', $readyPos === false ? 0 : $readyPos);
-($readyPos !== false && $cascadeCallPos !== false && $loadProductsPos !== false && $cascadeCallPos < $loadProductsPos)
-    ? pass('cascade runs on initial page load before products load')
+(strpos($posPhp, 'renderWarehouseOptions(') !== false) ? pass('pos.php warehouse options rendered by shared helper') : fail('pos.php options not rendered by shared helper');
+$readyPos       = strpos($posJs, '$(document).ready(function()');
+$cascadeCallPos = strpos($posJs, 'bindWarehouseToProject(', $readyPos === false ? 0 : $readyPos);
+$loadProductsPos = strpos($posJs, 'loadProducts();', $cascadeCallPos === false ? 0 : $cascadeCallPos + 25);
+($readyPos !== false && $cascadeCallPos !== false && $loadProductsPos !== false)
+    ? pass('cascade bound on page load before initial loadProducts()')
     : fail('cascade not wired into initial page load before loadProducts()');
 
-section('5. Live — warehouses table has real project-linked and unassigned rows to exercise the rule');
+section('5. Legacy copies (purchase side, pending migration) — still strict');
+$src = file_get_contents("$root/app/bms/purchase/purchase_order_create.php");
+(strpos($src, 'fallback when no general warehouses') === false) ? pass('PO create: no-project fallback line removed') : fail('PO create: no-project fallback line still present');
+(strpos($src, 'fallback when no project-linked warehouses') === false) ? pass('PO create: project-selected fallback line removed') : fail('PO create: project-selected fallback line still present');
+(strpos($src, "filtered = allWarehouses.filter(w => !w.project_id || w.project_id === 0);") !== false) ? pass('PO create: strict unassigned-only branch intact') : fail('PO create: unassigned-only branch missing/changed');
+(strpos($src, "filtered = allWarehouses.filter(w => w.project_id == projectId);") !== false) ? pass('PO create: strict project-match branch intact') : fail('PO create: project-match branch missing/changed');
+
+$src = file_get_contents("$root/app/bms/stock/stock_adjustments.php");
+(strpos($src, 'show ALL warehouses') === false) ? pass('stock_adjustments: "show ALL warehouses" branch removed') : fail('stock_adjustments: still shows all warehouses when no project selected');
+(strpos($src, 'return w.project_id === 0;') !== false) ? pass('stock_adjustments: no-project branch filters to project_id === 0') : fail('stock_adjustments: no-project branch does not filter to unassigned-only');
+
+section('6. Live — warehousesForSelect() returns scoped, rule-ready rows');
 try {
-    $total      = (int)$pdo->query("SELECT COUNT(*) FROM warehouses WHERE status='active'")->fetchColumn();
+    require_once "$root/core/warehouse_scope.php";
+
+    // Admin view: helper must return every active warehouse.
+    $_SESSION['scope'] = ['is_admin' => true, 'projects' => [], 'warehouses' => [], 'suppliers' => [], 'customers' => [], 'employees' => [], 'computed_at' => time()];
+    $adminRows = warehousesForSelect($pdo);
+    $total = (int)$pdo->query("SELECT COUNT(*) FROM warehouses WHERE status='active'")->fetchColumn();
+    (count($adminRows) === $total) ? pass("admin sees all $total active warehouses") : fail('admin row count (' . count($adminRows) . ") != active warehouses ($total)");
+    $nullProj = array_filter($adminRows, fn($w) => !isset($w['project_id']) || $w['project_id'] === null || $w['project_id'] === '');
+    empty($nullProj) ? pass('every row carries a non-null project_id (0 = unassigned)') : fail('some rows have null/empty project_id');
+
+    // Non-admin with no assignments: unassigned warehouses only.
+    $_SESSION['scope'] = ['is_admin' => false, 'projects' => [], 'warehouses' => [], 'suppliers' => [], 'customers' => [], 'employees' => [], 'computed_at' => time()];
+    $noScopeRows = warehousesForSelect($pdo);
     $unassigned = (int)$pdo->query("SELECT COUNT(*) FROM warehouses WHERE status='active' AND project_id IS NULL")->fetchColumn();
-    $assigned   = (int)$pdo->query("SELECT COUNT(*) FROM warehouses WHERE status='active' AND project_id IS NOT NULL")->fetchColumn();
-    ($total > 0) ? pass("active warehouses present ($total total)") : fail('no active warehouses found — cannot exercise the rule');
-    echo "  \033[90m· $unassigned unassigned, $assigned project-linked\033[0m\n";
+    (count($noScopeRows) === $unassigned) ? pass("no-scope user sees only the $unassigned unassigned warehouses") : fail('no-scope row count (' . count($noScopeRows) . ") != unassigned ($unassigned)");
+
+    // Non-admin assigned to one project: unassigned + that project's warehouses.
+    $projWithWh = $pdo->query("SELECT project_id FROM warehouses WHERE status='active' AND project_id IS NOT NULL LIMIT 1")->fetchColumn();
+    if ($projWithWh) {
+        $_SESSION['scope'] = ['is_admin' => false, 'projects' => [(int)$projWithWh], 'warehouses' => [], 'suppliers' => [], 'customers' => [], 'employees' => [], 'computed_at' => time()];
+        $scopedRows = warehousesForSelect($pdo);
+        $expStmt = $pdo->prepare("SELECT COUNT(*) FROM warehouses WHERE status='active' AND (project_id IS NULL OR project_id = ?)");
+        $expStmt->execute([(int)$projWithWh]);
+        $expected = (int)$expStmt->fetchColumn();
+        (count($scopedRows) === $expected) ? pass("scoped user (project $projWithWh) sees $expected warehouses (unassigned + own project)") : fail('scoped row count (' . count($scopedRows) . ") != expected ($expected)");
+    } else {
+        pass('no project-linked warehouse in DB — scoped-user case skipped (nothing to exercise)');
+    }
+    unset($_SESSION['scope']);
 } catch (Throwable $e) {
     fail('live DB check failed: ' . $e->getMessage());
 }

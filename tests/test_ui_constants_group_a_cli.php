@@ -48,7 +48,7 @@ $specs = [
     ],
     'app/bms/sales/quotations/quotation_form.php' => [
         'has'  => ["'#customer_id', '#project_id'"],
-        'keep' => ["function filterWarehousesByProject", "loadCustomerInfo", "saveQuotationFinal"],
+        'keep' => ["bindWarehouseToProject", "loadCustomerInfo", "saveQuotationFinal"],
     ],
     'app/bms/sales/sales_returns/sales_returns.php' => [
         'has'  => ["filter_customer').select2"],
