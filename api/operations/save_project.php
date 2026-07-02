@@ -19,7 +19,7 @@ if (!empty($project_id) ? !canEdit('projects') : !canCreate('projects')) {
 }
 
 // Phase B (scope) — when editing, block updates against projects not in user scope.
-// Creates are allowed (admin will pick up assignment in user_projects.php).
+// Creates are allowed; the non-admin creator is auto-assigned in user_projects below.
 if (!empty($project_id) && !userCan('project', (int)$project_id)) {
     http_response_code(403);
     echo json_encode(["success" => false, "message" => "Access denied: this project is not in your scope."]);
@@ -121,6 +121,14 @@ try {
             $project_manager, $priority, $start_date, $deadline, $duration_days, $status, $description
         ]);
         $project_id = $pdo->lastInsertId();
+
+        // Auto-scope: a non-admin who creates a project is immediately granted
+        // access to it in user_projects (self-assigned). Everyone else still
+        // waits for an admin to assign them via user_projects.php.
+        if (!isAdmin()) {
+            $pdo->prepare("INSERT IGNORE INTO user_projects (user_id, project_id, assigned_by) VALUES (?, ?, ?)")
+                ->execute([$_SESSION['user_id'], $project_id, $_SESSION['user_id']]);
+        }
 
         if ($contract_attachment) {
             // Move file to project-specific folder
