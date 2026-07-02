@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-07-02 (feature) — project creator is auto-assigned to the project's scope
+
+A non-admin with create permission on projects (via `user_roles`) could create a
+project but then not see it: `user_projects` is default-deny, so the creator had
+to wait for an admin to assign them their own project.
+
+- `api/operations/save_project.php` — after a new project INSERT, if the creator
+  is not an admin, a `user_projects` row (`user_id`, `project_id`, `assigned_by`
+  = creator) is inserted via `INSERT IGNORE`, granting the creator immediate
+  scope access to the project they created. Admins are skipped (they bypass
+  scope). Other users are unchanged — they still wait for admin assignment in
+  `user_projects.php`.
+
 ## 2026-07-02 (feature) — employee_details page now shows all data captured at registration
 
 The 5-step employee registration/edit wizard (`app/bms/pos/employees.php`) captures 50
