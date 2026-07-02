@@ -1,5 +1,46 @@
 # BMS Changelog
 
+## 2026-07-01 (fix) — IPC/invoice/voucher multi-step writes are now atomic
+
+Four endpoints performed dependent writes with no transaction; the worst was
+IPC invoicing: `INSERT invoices` then `UPDATE interim_payment_certificates` —
+a failure between them left an invoice with no IPC link, and a retry created
+a **duplicate invoice for the same certificate**.
+
+- `api/operations/create_invoice_from_ipc.php` — number allocation + invoice
+  INSERT + IPC link are one transaction, and the link UPDATE is guarded on
+  `invoice_id IS NULL` so two concurrent requests can't both invoice the same
+  certificate.
+- `api/operations/update_ipc_status.php` — status flip + workflow signature
+  commit together (an IPC can't reach a status with no record of who moved it).
+- `api/operations/save_ipc.php` — IPC number + INSERT + "created" signature
+  atomic; a failed save no longer burns a sequential IPC number.
+- `api/account/save_voucher.php` — edit path (re-code + body UPDATE) and
+  create path (PV number + INSERT) each atomic; failed saves burn no numbers.
+  Outer catches widened to `Throwable`.
+- `tests/test_ipc_invoice_tx_cli.php` — 11 checks: static guards, live forced
+  failure leaves no orphan invoice and IPC untouched, real run links exactly
+  once and a retry is refused, failed voucher save leaves no row and burns no
+  sequence number. All 17 IPC/voucher/invoice suites pass.
+## 2026-07-01 (test) — financial report integrity suite (capstone of the transaction-safety sweep)
+
+- `tests/test_financial_reports_integrity_cli.php` — 17 checks proving the four
+  statutory reports stay correct after the webroot-quarantine + fix/tx-*
+  changes, and guarding them for every future push (pre-push hook runs all
+  suites):
+  - Ledger invariant Σ Dr = Σ Cr over posted lines (`assertLedgerBalanced`)
+    and Balance Sheet balances (Assets = Liabilities + Equity).
+  - Trial Balance totals agree; P&L internally consistent (net = income −
+    costs); Cash Flow runs clean with its three sections.
+  - **Live end-to-end**: posts a real entry via `postLedgerEntry()` (Dr
+    Expense / Cr Asset), proves the P&L net moves by exactly that amount, the
+    TB expense row moves by exactly that amount, every statement still
+    balances, then removes the entry and re-proves the ledger is balanced.
+  - Static guards that `core/financial_reports.php` keeps the one-ledger
+    rules: `status='posted'` only, `entry_date` filtering, sums from
+    `journal_entry_items`.
+  - Cross-check counter of tx-sweep endpoints carrying their transaction
+    (informational until all fix/tx-* PRs merge).
 ## 2026-07-01 (fix) — payroll multi-step writes are now atomic; all tables converted to InnoDB
 
 Payroll payout/edit endpoints performed 3–5 dependent writes (payroll status →

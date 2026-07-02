@@ -84,48 +84,67 @@ try {
             exit();
         }
 
-        // Re-code a legacy voucher number on edit.
-        $curPv = $pdo->prepare("SELECT voucher_number FROM payment_vouchers WHERE id = ?");
-        $curPv->execute([$voucher_id]);
-        $oldPv = (string)$curPv->fetchColumn();
-        $newPv = codeForEdit($pdo, 'PV', $oldPv, 'PV-[0-9].*', 'payment_vouchers', (int)$voucher_id);
-        if ($newPv !== $oldPv) {
-            $pdo->prepare("UPDATE payment_vouchers SET voucher_number = ? WHERE id = ?")->execute([$newPv, $voucher_id]);
-        }
+        // Re-code (legacy/stale number) + body update commit together — a
+        // partial failure can't leave a re-coded number on stale voucher data.
+        $pdo->beginTransaction();
+        try {
+            $curPv = $pdo->prepare("SELECT voucher_number FROM payment_vouchers WHERE id = ?");
+            $curPv->execute([$voucher_id]);
+            $oldPv = (string)$curPv->fetchColumn();
+            $newPv = codeForEdit($pdo, 'PV', $oldPv, 'PV-[0-9].*', 'payment_vouchers', (int)$voucher_id);
+            if ($newPv !== $oldPv) {
+                $pdo->prepare("UPDATE payment_vouchers SET voucher_number = ? WHERE id = ?")->execute([$newPv, $voucher_id]);
+            }
 
-        // Update
-        $stmt = $pdo->prepare("
-            UPDATE payment_vouchers
-            SET vouch_date=?, payee_name=?, amount=?, amount_in_words=?, description=?,
-                payment_method=?, reference_number=?, expense_category_id=?, expense_account_id=?,
-                needs_review=0, project_id=?, expense_id=?, attachment=?
-            WHERE id=?
-        ");
-        $stmt->execute([
-            $date, $payee_name, $amount, $amount_in_words, $description,
-            $payment_method, $reference, $category_id, $expense_account_id, $project_id,
-            $expense_id, $attachment_path, $voucher_id
-        ]);
+            // Update
+            $stmt = $pdo->prepare("
+                UPDATE payment_vouchers
+                SET vouch_date=?, payee_name=?, amount=?, amount_in_words=?, description=?,
+                    payment_method=?, reference_number=?, expense_category_id=?, expense_account_id=?,
+                    needs_review=0, project_id=?, expense_id=?, attachment=?
+                WHERE id=?
+            ");
+            $stmt->execute([
+                $date, $payee_name, $amount, $amount_in_words, $description,
+                $payment_method, $reference, $category_id, $expense_account_id, $project_id,
+                $expense_id, $attachment_path, $voucher_id
+            ]);
+
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
         $message = "Voucher updated successfully";
     } else {
-        // Company-prefixed sequential voucher number (BFS-PV-0001), gap-free.
+        // Number allocation + INSERT commit together so a failed save can't
+        // burn a sequential voucher number.
         require_once __DIR__ . '/../../core/code_generator.php';
-        $voucher_number = nextCode($pdo, 'PV');
+        $pdo->beginTransaction();
+        try {
+            // Company-prefixed sequential voucher number (BFS-PV-0001), gap-free.
+            $voucher_number = nextCode($pdo, 'PV');
 
-        // Insert
-        $stmt = $pdo->prepare("
-            INSERT INTO payment_vouchers
-            (voucher_number, vouch_date, payee_name, amount, amount_in_words, description,
-             payment_method, reference_number, expense_category_id, expense_account_id, project_id,
-             expense_id, attachment, prepared_by, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())
-        ");
-        $stmt->execute([
-            $voucher_number, $date, $payee_name, $amount, $amount_in_words, $description,
-            $payment_method, $reference, $category_id, $expense_account_id, $project_id,
-            $expense_id, $attachment_path, $_SESSION['user_id']
-        ]);
-        $voucher_id = $pdo->lastInsertId();
+            // Insert
+            $stmt = $pdo->prepare("
+                INSERT INTO payment_vouchers
+                (voucher_number, vouch_date, payee_name, amount, amount_in_words, description,
+                 payment_method, reference_number, expense_category_id, expense_account_id, project_id,
+                 expense_id, attachment, prepared_by, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())
+            ");
+            $stmt->execute([
+                $voucher_number, $date, $payee_name, $amount, $amount_in_words, $description,
+                $payment_method, $reference, $category_id, $expense_account_id, $project_id,
+                $expense_id, $attachment_path, $_SESSION['user_id']
+            ]);
+            $voucher_id = $pdo->lastInsertId();
+
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
         $message = "Voucher created successfully ($voucher_number)";
     }
 
@@ -168,6 +187,6 @@ try {
 
     echo json_encode(['success' => true, 'message' => $message, 'id' => $voucher_id]);
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
