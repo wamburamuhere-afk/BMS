@@ -548,6 +548,7 @@ function getPagePermissionMapping()
 
         // HR / Payroll / Leaves
         'employee_details.php' => 'employees',
+        'hr_actions.php'       => 'employee_lifecycle',
         'payroll_details.php'  => 'payroll',
         'payroll_settings.php' => 'payroll',
         'payslip.php'          => 'payslip',
