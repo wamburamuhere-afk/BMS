@@ -31,6 +31,25 @@ a failure leaves a valid reusable row, not corruption).
   guard over all 18 tx-fixed endpoints (sibling-branch files auto-activate
   once merged), InnoDB foundation check, live rollback proof for CRM stage
   move and RFQ quick-add. All 26 related CRM/account suites pass.
+## 2026-07-01 (fix) — warehouse delete cascade is atomic and preserves stock movement history
+
+The warehouse delete cascade (product_stocks → stock_movements → locations →
+soft-delete) ran as 4 separate statements with no transaction: a mid-cascade
+failure left stock rows deleted but the warehouse alive. It also hard-deleted
+`stock_movements` — destroying the stock in/out audit history — while only
+soft-deleting the warehouse itself.
+
+- `ajax_delete_warehouse.php` — cascade wrapped in one transaction;
+  `stock_movements` no longer deleted (history preserved); catch widened to
+  `Throwable`.
+- `app/bms/stock/warehouses.php` — duplicate delete branch fixed the same way;
+  the add path (primary demote + warehouse INSERT + default location INSERT)
+  is now one transaction too.
+- `tests/test_warehouse_delete_tx_cli.php` — 12 checks: static guards on both
+  files, live forced mid-cascade failure leaves warehouse/stocks/locations/
+  movements untouched, live real cascade removes current state, keeps
+  movement history and soft-deletes the warehouse. All warehouse/stock/
+  transfer suites pass.
 
 ## 2026-07-01 (feature) — Customer LPO and Invoice had no warehouse field at all
 
