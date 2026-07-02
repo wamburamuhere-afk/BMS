@@ -44,21 +44,33 @@ try {
 
     $userId = $_SESSION['user_id'];
     $actor  = workflowActorSnapshot();
-    if ($newStatus === 'Viewed') {
-        $upd = $pdo->prepare("UPDATE interim_payment_certificates SET status=?, reviewed_by=?, updated_at=NOW() WHERE ipc_id=?");
-        $upd->execute([$newStatus, $userId, $ipc_id]);
-        workflowCaptureSignature($pdo, 'ipc', $ipc_id, 'reviewed', $userId, $actor['name'], $actor['role']);
-    } else {
-        $upd = $pdo->prepare("UPDATE interim_payment_certificates SET status=?, approved_by=?, updated_at=NOW() WHERE ipc_id=?");
-        $upd->execute([$newStatus, $userId, $ipc_id]);
-        workflowCaptureSignature($pdo, 'ipc', $ipc_id, 'approved', $userId, $actor['name'], $actor['role']);
+
+    // Status flip + workflow signature commit together — an IPC can't reach a
+    // new status with no record of who moved it there.
+    $pdo->beginTransaction();
+    try {
+        if ($newStatus === 'Viewed') {
+            $upd = $pdo->prepare("UPDATE interim_payment_certificates SET status=?, reviewed_by=?, updated_at=NOW() WHERE ipc_id=?");
+            $upd->execute([$newStatus, $userId, $ipc_id]);
+            workflowCaptureSignature($pdo, 'ipc', $ipc_id, 'reviewed', $userId, $actor['name'], $actor['role']);
+        } else {
+            $upd = $pdo->prepare("UPDATE interim_payment_certificates SET status=?, approved_by=?, updated_at=NOW() WHERE ipc_id=?");
+            $upd->execute([$newStatus, $userId, $ipc_id]);
+            workflowCaptureSignature($pdo, 'ipc', $ipc_id, 'approved', $userId, $actor['name'], $actor['role']);
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
     }
     logActivity($pdo, $_SESSION['user_id'], "Updated IPC {$ipc_id} status to {$newStatus}");
 
     // money.md OUT-15 — recognise contract revenue when the IPC is certified
     // (Approved): Dr Accounts Receivable / Cr Contract Revenue (net_payable).
     // Best-effort: a missing account never blocks certification — it surfaces as
-    // a ledger warning. Idempotent on (entity_type='ipc', ipc_id).
+    // a ledger warning. Idempotent on (entity_type='ipc', ipc_id), so a warned
+    // approval is healed by re-approving flows or the posting backfill.
+    // (postIpcRevenue posts via ledger_post.php, which is internally atomic.)
     $resp = ['success' => true, 'message' => 'Status updated to ' . $newStatus];
     if ($newStatus === 'Approved') {
         $ipc_post = postIpcRevenue($pdo, (int)$ipc_id, (int)$userId);
@@ -72,6 +84,6 @@ try {
         }
     }
     echo json_encode($resp);
-} catch (PDOException $e) {
+} catch (Throwable $e) {
     echo json_encode(['success'=>false,'message'=>'DB error: '.$e->getMessage()]);
 }
