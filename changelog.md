@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-07-02 (feat) — HR Lifecycle core APIs (Tier 1, Phase 1.2)
+
+Create/read/list APIs for employee lifecycle events. Effects do NOT apply here —
+that is Phase 1.3's approval workflow.
+
+- `api/add_lifecycle_event.php` — 6-step template; per-type validation matrix
+  (promotion/demotion→designation, transfer→department/project, warning→severity,
+  complaint→complainant, resignation→end_date, termination→type); old values
+  snapshotted **server-side** from the employees row (forged client values ignored);
+  optional attachment via the §19 5-step upload into `uploads/lifecycle/` +
+  `registerFileInLibrary`; scope gates (`assertScopeForEmployee`, destination-project
+  `userCan` check on transfers); `logActivity` + `logAudit`.
+- `api/get_lifecycle_events.php` — filters (type/status/employee/date range), JOINs
+  for employee + old/new designation/department/project + creator/approver names,
+  `scopeFilterSqlNullable('project','e')` for non-admins, excludes deleted.
+- `api/get_lifecycle_event.php` — single event with resolved names,
+  `assertScopeForEmployeeRecord` scope gate.
+- `tests/test_hr_lifecycle_apis_cli.php` — 40 assertions: all 8 types create as
+  pending, 15-case validation matrix, forged-old-values proof, .exe attachment
+  rejection, list filters, scope denial (create/list/single) for non-admins,
+  view-only role blocked from creating.
+
 ## 2026-07-02 (feat) — HR Lifecycle foundation (Tier 1, Phase 1.1)
 
 Foundation for the employee lifecycle module (promotions, transfers, awards,
