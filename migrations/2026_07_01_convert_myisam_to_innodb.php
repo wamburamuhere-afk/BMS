@@ -19,6 +19,20 @@ global $pdo;
 
 echo "Starting migration: convert MyISAM tables to InnoDB...\n";
 
+// Rebuilding a table for an engine change makes MySQL re-validate every row
+// against the session's sql_mode, even though no column is being altered.
+// Old MyISAM data commonly holds zero-dates ('0000-00-00') in optional date
+// columns (e.g. probation_end_date) from years before validation was
+// tightened — harmless as stored data, but STRICT_TRANS_TABLES/NO_ZERO_DATE
+// reject the rebuild outright. Relax just those flags for this session only
+// (no data is touched) and always restore the original mode afterward.
+$originalSqlMode = $pdo->query("SELECT @@SESSION.sql_mode")->fetchColumn();
+$relaxedSqlMode = implode(',', array_diff(
+    array_filter(explode(',', $originalSqlMode)),
+    ['STRICT_TRANS_TABLES', 'STRICT_ALL_TABLES', 'NO_ZERO_DATE', 'NO_ZERO_IN_DATE']
+));
+$pdo->exec("SET SESSION sql_mode = " . $pdo->quote($relaxedSqlMode));
+
 try {
     $tables = $pdo->query("
         SELECT TABLE_NAME
@@ -67,4 +81,6 @@ try {
 } catch (PDOException $e) {
     echo "Migration failed: " . $e->getMessage() . "\n";
     exit(1);
+} finally {
+    $pdo->exec("SET SESSION sql_mode = " . $pdo->quote($originalSqlMode));
 }
