@@ -66,6 +66,20 @@ if ($enable_projects) {
     } catch (Exception $e) {}
 }
 
+// Warehouses for dropdown — scoped by project for non-admins; JS filters further
+// by the selected project (project's warehouses only, or unassigned-only if none).
+$_ie_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+if (isAdmin()) {
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_ie_assigned)) {
+    $_ie_wph = implode(',', array_fill(0, count($_ie_assigned), '?'));
+    $_ie_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_ie_wph)) ORDER BY warehouse_name");
+    $_ie_wstmt->execute($_ie_assigned);
+    $warehouses = $_ie_wstmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+}
+
 ?>
 
 <style>
@@ -171,7 +185,7 @@ if ($enable_projects) {
                     <?php if ($enable_projects): ?>
                     <div class="col-md-6 mb-3">
                         <label class="form-label small fw-bold">Project</label>
-                        <select class="form-select select2" name="project_id">
+                        <select class="form-select select2" name="project_id" id="project_id">
                             <option value="">Select Project</option>
                             <?php foreach ($projects as $proj): ?>
                                 <option value="<?= $proj['project_id'] ?>" <?= (isset($invoice['project_id']) && $invoice['project_id'] == $proj['project_id']) ? 'selected' : '' ?>>
@@ -181,6 +195,20 @@ if ($enable_projects) {
                         </select>
                     </div>
                     <?php endif; ?>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label small fw-bold">Warehouse</label>
+                        <select class="form-select" id="warehouse_id" name="warehouse_id">
+                            <option value="">Select Warehouse</option>
+                            <?php foreach ($warehouses as $w): ?>
+                                <option value="<?= $w['warehouse_id'] ?>" data-project-id="<?= $w['project_id'] ?>"
+                                    <?= (!empty($invoice['warehouse_id']) && $invoice['warehouse_id'] == $w['warehouse_id']) ? 'selected' : '' ?>>
+                                    <?= safe_output($w['warehouse_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text">Stock for inventory items is checked against this warehouse.</div>
+                    </div>
                 </div>
                 
                 <!-- Invoice Items -->
@@ -300,8 +328,12 @@ $(document).ready(function() {
         addItemRow();
     }
     
+    filterWarehousesByProject(true);
     loadProductsCache();
-    
+
+    $('#project_id').on('change', function() { filterWarehousesByProject(); });
+    $('#warehouse_id').on('change', function() { loadProductsCache(); });
+
     $('#invoiceForm').on('submit', function(e) {
         e.preventDefault();
         saveInvoice('<?= safe_output($invoice['status']) ?>');
@@ -423,7 +455,8 @@ function saveInvoice(status) {
 }
 
 function loadProductsCache(callback = null) {
-    $.get('<?= getUrl('/api/account/get_products.php') ?>', { active_only: true, limit: 1000 }, function(res) {
+    const whId = $('#warehouse_id').val() || '';
+    $.get('<?= getUrl('/api/account/get_products.php') ?>', { active_only: true, limit: 1000, warehouse_id: whId }, function(res) {
         if (res.success) {
             productsCache = res.data;
             if (callback) callback();
@@ -431,6 +464,29 @@ function loadProductsCache(callback = null) {
     }, 'json').fail(function() {
         if (callback) callback();
     });
+}
+
+function filterWarehousesByProject(isInitial = false) {
+    const projectId = $('#project_id').val();
+    const warehouseSelect = $('#warehouse_id');
+
+    warehouseSelect.find('option').each(function() {
+        const optionProjectId = $(this).data('project-id');
+        if ($(this).val() === '') { $(this).show(); return; }
+        if (projectId) {
+            (String(optionProjectId) === String(projectId)) ? $(this).show() : $(this).hide();
+        } else {
+            (!optionProjectId) ? $(this).show() : $(this).hide();
+        }
+    });
+
+    if (!isInitial) {
+        const sel = warehouseSelect.find('option:selected');
+        if (sel.css('display') === 'none') {
+            warehouseSelect.val('');
+        }
+        loadProductsCache();
+    }
 }
 
 function openProductSearch(index, term = '') {

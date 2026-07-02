@@ -9,8 +9,9 @@ autoEnforcePermission('lpo');
 includeHeader();
 
 // Optional deep link from the Customer detail page
-$customer_id = isset($_GET['customer_id']) ? intval($_GET['customer_id']) : 0;
-$project_id  = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
+$customer_id  = isset($_GET['customer_id']) ? intval($_GET['customer_id']) : 0;
+$project_id   = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
+$warehouse_id = 0;
 
 global $pdo;
 
@@ -27,6 +28,19 @@ if (isAdmin()) {
     $customers = $_lc_cstmt->fetchAll(PDO::FETCH_ASSOC);
 } else {
     $customers = $pdo->query("SELECT customer_id, customer_name, company_name, customer_type, currency FROM customers WHERE status = 'active' AND project_id IS NULL ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Warehouses for dropdown — scoped by project for non-admins; JS filters further
+// by the selected project (project's warehouses only, or unassigned-only if none).
+if (isAdmin()) {
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_lc_assigned)) {
+    $_lc_wph = implode(',', array_fill(0, count($_lc_assigned), '?'));
+    $_lc_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_lc_wph)) ORDER BY warehouse_name");
+    $_lc_wstmt->execute($_lc_assigned);
+    $warehouses = $_lc_wstmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // Tax rates — same VAT-only restriction as the Purchase Order module.
@@ -76,8 +90,9 @@ if ($is_edit) {
     $lpo_data = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($lpo_data) {
-        $customer_id = $lpo_data['customer_id'];
-        $project_id  = $lpo_data['project_id'];
+        $customer_id  = $lpo_data['customer_id'];
+        $project_id   = $lpo_data['project_id'];
+        $warehouse_id = (int)($lpo_data['warehouse_id'] ?? 0);
 
         $stmt = $pdo->prepare("
             SELECT loi.*, tr.rate_id AS tax_rate_id
@@ -171,6 +186,21 @@ $back_url = getUrl('lpos');
                             </select>
                         </div>
                         <?php endif; ?>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Warehouse <span class="text-danger">*</span></label>
+                            <select class="form-select" id="warehouse_id" name="warehouse_id" required>
+                                <option value="">Select Warehouse</option>
+                                <?php foreach ($warehouses as $w): ?>
+                                    <option value="<?= $w['warehouse_id'] ?>"
+                                            data-project-id="<?= $w['project_id'] ?>"
+                                            <?= ($warehouse_id > 0 && $warehouse_id == $w['warehouse_id']) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($w['warehouse_name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text">Stock for the items below will be checked against this warehouse.</div>
+                        </div>
 
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Issue Date <span class="text-danger">*</span></label>
@@ -424,6 +454,7 @@ function initTaxSelect2(rowId) {
 $(document).ready(function() {
     initSelect2Fields();
     initTaxSelect2();
+    filterWarehousesByProject(true);
 
     if (isEdit) {
         $('h2').html('<i class="bi bi-pencil-square text-primary"></i> Edit Customer LPO');
@@ -438,6 +469,9 @@ $(document).ready(function() {
             calculateGrandTotal();
         }
     });
+
+    $('#project_id').on('change', function() { filterWarehousesByProject(); });
+    $('#warehouse_id').on('change', function() { fetchProducts(); });
 
     $('#customer_id').on('change', function() {
         const option = $(this).find('option:selected');
@@ -642,11 +676,35 @@ $(document).on('change', '#currency', updateCurSymbols);
 
 async function fetchProducts() {
     try {
-        const response = await fetch('<?= buildUrl('api/account/get_products.php') ?>?limit=1000&is_service=0');
+        const whId = $('#warehouse_id').val() || '';
+        const response = await fetch('<?= buildUrl('api/account/get_products.php') ?>?limit=1000&is_service=0&warehouse_id=' + whId);
         const result = await response.json();
         if (result.success) productsList = result.data;
     } catch (error) {
         console.error('Failed to fetch products:', error);
+    }
+}
+
+function filterWarehousesByProject(isInitial = false) {
+    const projectId = $('#project_id').val();
+    const warehouseSelect = $('#warehouse_id');
+
+    warehouseSelect.find('option').each(function() {
+        const optionProjectId = $(this).data('project-id');
+        if ($(this).val() === '') { $(this).show(); return; }
+        if (projectId) {
+            (String(optionProjectId) === String(projectId)) ? $(this).show() : $(this).hide();
+        } else {
+            (!optionProjectId) ? $(this).show() : $(this).hide();
+        }
+    });
+
+    if (!isInitial) {
+        const sel = warehouseSelect.find('option:selected');
+        if (sel.css('display') === 'none') {
+            warehouseSelect.val('');
+        }
+        fetchProducts();
     }
 }
 
