@@ -35,25 +35,34 @@ try {
     $lead = $chk->fetch(PDO::FETCH_ASSOC);
     if (!$lead) { echo json_encode(['success'=>false,'message'=>'Lead not found']); exit; }
 
-    $pdo->prepare("
-        INSERT INTO crm_lead_activities (lead_id, activity_type, subject, description, activity_date, due_date, outcome, status, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ")->execute([
-        $lead_id, $type, $subject,
-        trim($_POST['description'] ?? '') ?: null,
-        $activity_date, $due_date,
-        trim($_POST['outcome'] ?? '') ?: null,
-        $status,
-        $_SESSION['user_id']
-    ]);
-    $aid = (int)$pdo->lastInsertId();
+    // Activity insert + lead timestamp + score update commit together.
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("
+            INSERT INTO crm_lead_activities (lead_id, activity_type, subject, description, activity_date, due_date, outcome, status, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ")->execute([
+            $lead_id, $type, $subject,
+            trim($_POST['description'] ?? '') ?: null,
+            $activity_date, $due_date,
+            trim($_POST['outcome'] ?? '') ?: null,
+            $status,
+            $_SESSION['user_id']
+        ]);
+        $aid = (int)$pdo->lastInsertId();
 
-    // Update last_activity timestamp on the lead
-    $pdo->prepare("UPDATE crm_leads SET last_activity = NOW() WHERE lead_id = ?")->execute([$lead_id]);
+        // Update last_activity timestamp on the lead
+        $pdo->prepare("UPDATE crm_leads SET last_activity = NOW() WHERE lead_id = ?")->execute([$lead_id]);
 
-    // Recalculate lead score
-    $score = computeLeadScore($pdo, $lead_id);
-    $pdo->prepare("UPDATE crm_leads SET lead_score = ? WHERE lead_id = ?")->execute([$score, $lead_id]);
+        // Recalculate lead score
+        $score = computeLeadScore($pdo, $lead_id);
+        $pdo->prepare("UPDATE crm_leads SET lead_score = ? WHERE lead_id = ?")->execute([$score, $lead_id]);
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
 
     $full_name = trim($lead['first_name'].' '.$lead['last_name']);
     logActivity($pdo, $_SESSION['user_id'], "Logged $type on lead {$lead['lead_code']} ($full_name): $subject");

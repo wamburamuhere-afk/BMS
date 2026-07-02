@@ -51,14 +51,22 @@ try {
             if ((int)$inUse->fetchColumn() > 0) {
                 throw new Exception('Cannot delete: this category is linked to revenue records.');
             }
-            // Cascade delete descendants (depth-first).
+            // Cascade delete descendants (depth-first) — the whole subtree goes
+            // in one transaction, so a mid-cascade failure can't orphan children.
             $deleteTree = function (int $cid) use (&$deleteTree, $pdo) {
                 $kids = $pdo->prepare("SELECT id FROM revenue_categories WHERE parent_id = ?");
                 $kids->execute([$cid]);
                 foreach ($kids->fetchAll(PDO::FETCH_COLUMN) as $kid) $deleteTree((int)$kid);
                 $pdo->prepare("DELETE FROM revenue_categories WHERE id = ?")->execute([$cid]);
             };
-            $deleteTree($id);
+            $pdo->beginTransaction();
+            try {
+                $deleteTree($id);
+                $pdo->commit();
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $e;
+            }
             logActivity($pdo, $user_id, "Deleted Revenue Category", "ID: $id (cascade)");
             echo json_encode(['success' => true, 'message' => 'Category deleted.']);
             break;

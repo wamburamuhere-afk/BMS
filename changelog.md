@@ -19,6 +19,84 @@
     `journal_entry_items`.
   - Cross-check counter of tx-sweep endpoints carrying their transaction
     (informational until all fix/tx-* PRs merge).
+## 2026-07-01 (fix) — payroll multi-step writes are now atomic; all tables converted to InnoDB
+
+Payroll payout/edit endpoints performed 3–5 dependent writes (payroll status →
+GL posting → bank register / accrual reverse → re-post) with **no transaction**:
+a mid-sequence failure left some employees paid with GL posted and others not,
+or a payroll amount changed with its accrual reversed-but-never-reposted.
+
+- `migrations/2026_07_01_convert_myisam_to_innodb.php` — **foundation fix**: 80
+  tables (payroll, payment_vouchers, bank_transactions, pos_payments,
+  product_stocks, loans, …) were still MyISAM, where MySQL silently ignores
+  rollbacks — every existing "transaction" touching them was unprotected.
+  Criteria-based + idempotent; converts with `ROW_FORMAT=DYNAMIC` (fixes
+  row_format=FIXED tables under innodb_strict_mode).
+- `api/bulk_update_payroll_status.php` — each employee's payment (status UPDATE
+  + `postPayrollPayment()` GL + bank register) is one transaction per row: a
+  failure rolls that employee back completely and is reported in the response
+  (`failures` array); other rows proceed. A null GL posting is now fatal for
+  the row — a payroll can no longer be marked paid without its ledger entry.
+  Accruals and the period statutory sync + SDL pair are wrapped likewise.
+- `api/update_payroll.php` — edit + accrual reversal + re-accrual are one
+  transaction; a failed re-post rolls the whole edit back (previously it
+  committed reversed books and only wrote to error_log).
+- `api/operations/process_project_payroll.php` — per-record accrual and the
+  statutory pair each atomic.
+- `tests/test_payroll_tx_atomicity_cli.php` — 16 checks: no MyISAM tables
+  remain, endpoints wrap writes, live forced-failure rollback leaves zero
+  partial rows, live accrual commits balanced (Σ Dr = Σ Cr). All 8 existing
+  payroll suites still pass.
+## 2026-07-01 (fix) — remaining multi-write endpoints (stock/CRM/config) made atomic
+
+Final batch of the transaction-safety sweep. Nine endpoints performed genuine
+multi-step writes with no transaction:
+
+- `api/rfq_quick_add_product.php` — product INSERT + stock row INSERT atomic.
+- `api/crm/move_lead_stage.php` — stage UPDATE + history INSERT + score UPDATE
+  atomic (a lead can't change stage without its history row).
+- `api/crm/bulk_update_leads.php` — bulk stage move + all history rows atomic.
+- `api/crm/add_activity.php` — activity INSERT + lead timestamp + score atomic.
+- `api/crm/edit_lead.php` — lead UPDATE + re-code + label replace atomic (a
+  failure can't leave labels deleted but not re-inserted).
+- `api/crm/manage_stage.php` — pipeline reorder loop atomic (no half-reordered
+  pipeline with duplicate positions).
+- `api/pos/delete_salary_component.php` — component soft-delete + assignment
+  retirement atomic.
+- `api/account/save_account.php` — account UPDATE + subtree level recompute
+  atomic (no stale-level children in the COA tree).
+- `api/finance/manage_revenue_schema.php` — category delete-tree cascade atomic.
+
+Audited and intentionally NOT wrapped (single write per request): the
+update-or-insert endpoints (`save_category`, `save_document_template`,
+`save_compliance`, `rules_api`), per-row-reporting bulk loops (attendance
+marks, supplier/customer/lead imports), and get-or-create lookup inserts
+(`add_budget`/`update_budget`/`process_edit_customer` category creation —
+a failure leaves a valid reusable row, not corruption).
+
+- `tests/test_multiwrite_tx_coverage_cli.php` — 22 checks: static regression
+  guard over all 18 tx-fixed endpoints (sibling-branch files auto-activate
+  once merged), InnoDB foundation check, live rollback proof for CRM stage
+  move and RFQ quick-add. All 26 related CRM/account suites pass.
+## 2026-07-01 (fix) — warehouse delete cascade is atomic and preserves stock movement history
+
+The warehouse delete cascade (product_stocks → stock_movements → locations →
+soft-delete) ran as 4 separate statements with no transaction: a mid-cascade
+failure left stock rows deleted but the warehouse alive. It also hard-deleted
+`stock_movements` — destroying the stock in/out audit history — while only
+soft-deleting the warehouse itself.
+
+- `ajax_delete_warehouse.php` — cascade wrapped in one transaction;
+  `stock_movements` no longer deleted (history preserved); catch widened to
+  `Throwable`.
+- `app/bms/stock/warehouses.php` — duplicate delete branch fixed the same way;
+  the add path (primary demote + warehouse INSERT + default location INSERT)
+  is now one transaction too.
+- `tests/test_warehouse_delete_tx_cli.php` — 12 checks: static guards on both
+  files, live forced mid-cascade failure leaves warehouse/stocks/locations/
+  movements untouched, live real cascade removes current state, keeps
+  movement history and soft-deletes the warehouse. All warehouse/stock/
+  transfer suites pass.
 
 ## 2026-07-01 (feature) — Customer LPO and Invoice had no warehouse field at all
 
