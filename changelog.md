@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-07-02 (feat) — HR Lifecycle workflow: approve/reject/cancel + effects (Tier 1, Phase 1.3)
+
+The approval workflow that makes lifecycle events real. `api/update_employee_status.php`
+is untouched — both paths stay valid (D6).
+
+- `core/lifecycle_effects.php` — `applyLifecycleEffectRow()` applies an approved
+  event's D4 effect to `employees` inside the caller's transaction (promotion/demotion
+  → designation+salary; transfer → department_id + legacy `department` varchar sync +
+  project; resignation/termination → employment_status; award/warning/complaint =
+  record-only) and stamps `effect_applied_at`. `applyDueLifecycleEffects()` = D5
+  catch-up for approved resignations whose last working day has arrived — idempotent,
+  row-locked, audit-logged.
+- `api/change_lifecycle_status.php` — transitions `pending → approved/rejected/cancelled`;
+  approved/rejected terminal (no edit of history, double-approve blocked via `FOR UPDATE`);
+  **creator cannot approve their own event** (admins exempt); reject requires a reason;
+  cancel = creator or canEdit; on approval writes TWO audits — the event approval and,
+  when a field changed, the same `status_change` employee audit shape the legacy endpoint
+  writes; future-dated resignations defer their effect (D5).
+- `api/delete_lifecycle_event.php` — soft delete, only pending/rejected/cancelled
+  (approved history immutable), canDelete gate, scope gate.
+- `api/download_lifecycle_attachment.php` — §19 gatekeeper: auth + canView + employee
+  scope + realpath containment inside `uploads/lifecycle/` before streaming.
+- `tests/test_hr_lifecycle_workflow_cli.php` — 28 assertions: promotion/transfer/
+  termination effects applied atomically, legacy varchar sync, deferred resignation +
+  exactly-once catch-up, reject/cancel no-effect, segregation of duties, immutability,
+  scope + permission denials, and a D6 regression proving the legacy status endpoint
+  still works.
+
 ## 2026-07-02 (feat) — HR Lifecycle core APIs (Tier 1, Phase 1.2)
 
 Create/read/list APIs for employee lifecycle events. Effects do NOT apply here —
