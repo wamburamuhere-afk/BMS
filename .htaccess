@@ -2,6 +2,13 @@ Options -Indexes -MultiViews
 RewriteEngine On
 RewriteBase /
 
+# ── Security: non-web code must never be reachable over HTTP ─────────────────
+# scripts/ (quarantined legacy one-off scripts), tests/, cron/ and migrations/
+# run from the CLI only. migrations/status.php is the login-guarded dashboard
+# and stays reachable.
+RewriteRule ^migrations/status\.php$ - [L]
+RewriteRule ^(scripts|tests|cron|migrations)(/|$) - [F,L]
+
 # Allow direct access to real files only
 RewriteCond %{REQUEST_FILENAME} !-f
 

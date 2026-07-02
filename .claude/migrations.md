@@ -16,6 +16,8 @@ Never suggest raw SQL to run manually. Every schema change must go through a mig
 2. **Structure — always use this template:**
 ```php
 <?php
+if (PHP_SAPI !== 'cli') { http_response_code(403); exit('CLI only'); }
+
 require_once __DIR__ . '/../roots.php';
 global $pdo;
 
