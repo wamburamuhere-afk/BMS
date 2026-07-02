@@ -58,6 +58,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (empty($errors)) {
             try {
+                // Primary demote + warehouse insert + default location are one
+                // atomic unit — a failure can't demote the old primary and then
+                // leave no new warehouse, or create a warehouse with no location.
+                $pdo->beginTransaction();
+
                 // If setting as primary, update all others to not primary
                 if ($is_primary) {
                     $pdo->query("UPDATE warehouses SET is_primary = 0 WHERE is_primary = 1");
@@ -108,11 +113,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $user_id
                 ]);
 
+                $pdo->commit();
+
                 logActivity($pdo, $user_id, 'Create warehouse', "User created a new warehouse: $warehouse_name ($warehouse_code)");
                 $_SESSION['success'] = "Warehouse added successfully!";
                 header("Location: warehouses.php");
                 exit();
             } catch (PDOException $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
                 $_SESSION['error'] = "Database error: " . $e->getMessage();
                 header("Location: warehouses.php");
                 exit();
@@ -208,14 +216,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $warehouse_id = intval($_POST['warehouse_id']);
 
         try {
-            // Cascade delete related data, then soft-delete the warehouse
-            $pdo->prepare("DELETE FROM product_stocks WHERE warehouse_id = ?")->execute([$warehouse_id]);
-            $pdo->prepare("DELETE FROM stock_movements WHERE warehouse_id = ?")->execute([$warehouse_id]);
-            $pdo->prepare("DELETE FROM locations WHERE warehouse_id = ?")->execute([$warehouse_id]);
-            $pdo->prepare("UPDATE warehouses SET status = 'deleted', updated_by = ?, updated_at = NOW() WHERE warehouse_id = ?")
-                ->execute([$user_id, $warehouse_id]);
+            // Cascade delete related data, then soft-delete the warehouse — one
+            // atomic unit (all or nothing). stock_movements are intentionally
+            // KEPT: they are the audit history of stock in/out.
+            $pdo->beginTransaction();
+            try {
+                $pdo->prepare("DELETE FROM product_stocks WHERE warehouse_id = ?")->execute([$warehouse_id]);
+                $pdo->prepare("DELETE FROM locations WHERE warehouse_id = ?")->execute([$warehouse_id]);
+                $pdo->prepare("UPDATE warehouses SET status = 'deleted', updated_by = ?, updated_at = NOW() WHERE warehouse_id = ?")
+                    ->execute([$user_id, $warehouse_id]);
+                $pdo->commit();
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $e;
+            }
 
-            logActivity($pdo, $user_id, 'Deleted Warehouse', "User deleted warehouse ID: $warehouse_id");
+            logActivity($pdo, $user_id, 'Deleted Warehouse', "User deleted warehouse ID: $warehouse_id (movement history preserved)");
             $_SESSION['success'] = "Warehouse deleted successfully!";
             header("Location: warehouses.php");
             exit();
