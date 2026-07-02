@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMS Progress Report — 1 July 2026</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; color: #1a1a2e; background: #f8f9fa; line-height: 1.7; }
+  @media print {
+    body { background: white; }
+    .page { page-break-after: always; }
+    .page:last-child { page-break-after: auto; }
+  }
+  .page { max-width: 860px; margin: 0 auto; padding: 40px; min-height: 1000px; }
+  .cover { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 55%, #0f3460 100%); color: white; border-radius: 14px; padding: 70px 50px; text-align: center; margin-top: 60px; }
+  .cover .eyebrow { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.7; margin-bottom: 18px; }
+  .cover .title { font-size: 32px; font-weight: 700; margin-bottom: 12px; }
+  .cover .subtitle { font-size: 15px; opacity: 0.85; margin-bottom: 30px; }
+  .cover .period { font-size: 13px; opacity: 0.65; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 20px; margin-top: 20px; display: inline-block; }
+  .toc { margin-top: 50px; }
+  .toc h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 1px; color: #6c757d; margin-bottom: 18px; }
+  .toc-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #e9ecef; font-size: 14px; }
+  .toc-item .toc-num { color: #0d6efd; font-weight: 700; margin-right: 10px; }
+  .exec-summary { background: white; border-radius: 12px; padding: 28px 32px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); margin-top: 40px; font-size: 14px; color: #333; }
+  .exec-summary h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #6c757d; margin-bottom: 14px; }
+
+  .phase-header { display: flex; align-items: center; gap: 16px; margin-bottom: 6px; margin-top: 10px; }
+  .phase-num { background: #0f3460; color: white; font-size: 20px; font-weight: 700; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .phase-eyebrow { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.5px; color: #6c757d; }
+  .phase-title { font-size: 23px; font-weight: 700; color: #1a1a2e; }
+  .phase-underline { height: 3px; width: 70px; background: #0d6efd; border-radius: 3px; margin: 14px 0 26px 0; }
+
+  .status-pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; margin-bottom: 18px; }
+  .status-pill.risk { background: #f8d7da; color: #842029; }
+  .status-pill.done { background: #d1e7dd; color: #0f5132; }
+  .status-pill.new { background: #cff4fc; color: #055160; }
+  .status-pill.critical { background: #6f42c1; color: white; }
+
+  .block { margin-bottom: 22px; }
+  .block h3 { font-size: 14.5px; font-weight: 700; color: #1a1a2e; margin-bottom: 8px; }
+  .block p { font-size: 13.5px; color: #444; margin-bottom: 8px; }
+
+  .callout { background: #f8f9fa; border-left: 4px solid #0d6efd; border-radius: 6px; padding: 16px 20px; margin: 18px 0; }
+  .callout.why { border-left-color: #fd7e14; }
+  .callout .callout-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; margin-bottom: 6px; }
+  .callout p { font-size: 13.5px; color: #444; margin: 0; }
+
+  .mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
+  .mini-card { background: #f8f9fa; border-radius: 8px; padding: 14px 16px; }
+  .mini-card .mini-title { font-size: 12.5px; font-weight: 700; color: #0f3460; margin-bottom: 5px; }
+  .mini-card .mini-body { font-size: 12.5px; color: #555; }
+
+  .footer-note { text-align: center; font-size: 11px; color: #adb5bd; margin-top: 50px; }
+
+  .next-item { display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid #f0f0f0; }
+  .next-item:last-child { border-bottom: none; }
+  .next-num { background: #0f3460; color: white; font-size: 12px; font-weight: 700; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .next-body { flex: 1; font-size: 13.5px; }
+  .next-body strong { display: block; margin-bottom: 3px; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ PAGE 1 — COVER + SUMMARY ═══════════ -->
+<div class="page">
+  <div class="cover">
+    <div class="eyebrow">Internal Progress Report</div>
+    <div class="title">Business Management System</div>
+    <div class="subtitle">BJP Technologies Co. Ltd</div>
+    <div class="period">Work completed &middot; 1 July 2026</div>
+  </div>
+
+  <div class="exec-summary">
+    <h2>Executive Summary</h2>
+    <p style="margin-bottom:10px;">
+      This update covers six phases of work completed in this session: a security review that
+      closed a real exposure, a system-wide effort to make every money-handling process fail
+      safely, the launch of a complete Customer Order approval workflow, an urgent payroll fix,
+      a set of Sales dashboard corrections, and a batch of smaller consistency fixes across the
+      system.
+    </p>
+    <p>
+      Nothing here required stopping normal operations. All changes were tested before being
+      released, and one item &mdash; described in Phase 1 &mdash; still needs a final internal
+      step before it is fully live.
+    </p>
+  </div>
+
+  <div class="toc">
+    <h2>In This Report</h2>
+    <div class="toc-item"><span><span class="toc-num">1.</span>Security Review &amp; Clean-Up</span><span>Page 2</span></div>
+    <div class="toc-item"><span><span class="toc-num">2.</span>Making Money-Handling Fail Safely</span><span>Page 3</span></div>
+    <div class="toc-item"><span><span class="toc-num">3.</span>Customer Order Workflow &mdash; New Feature</span><span>Page 4</span></div>
+    <div class="toc-item"><span><span class="toc-num">4.</span>Payroll Processing Fix</span><span>Page 5</span></div>
+    <div class="toc-item"><span><span class="toc-num">5.</span>Sales Dashboard &amp; Customer Data Fixes</span><span>Page 5</span></div>
+    <div class="toc-item"><span><span class="toc-num">6.</span>Smaller Corrections &amp; What's Next</span><span>Page 6</span></div>
+  </div>
+
+  <div class="footer-note">BJP Technologies Co. Ltd &middot; Confidential &middot; Page 1 of 6</div>
+</div>
+
+<!-- ═══════════ PAGE 2 — PHASE 1: SECURITY ═══════════ -->
+<div class="page">
+  <div class="phase-header">
+    <div class="phase-num">1</div>
+    <div>
+      <div class="phase-eyebrow">Phase One</div>
+      <div class="phase-title">Security Review &amp; Clean-Up</div>
+    </div>
+  </div>
+  <div class="phase-underline"></div>
+
+  <span class="status-pill risk">Risk Identified &amp; Removed</span>
+
+  <div class="block">
+    <h3>What we found</h3>
+    <p>
+      As part of a routine security review of the system, we checked every single page and tool
+      sitting on the live server against the list of pages the system is actually supposed to
+      expose. Out of just under 300 items found at the top level of the website, only 15 turned
+      out to be legitimate, currently-used parts of the system.
+    </p>
+    <p>
+      The remaining 284 were leftovers from the system's early development — one-off scripts that
+      had been used years ago to check or repair data during setup, and were never removed. Because
+      of how they were placed, anyone who found or guessed the right web address could open them
+      directly, without logging in at all. A number of these old tools were capable of directly
+      changing information in the database.
+    </p>
+  </div>
+
+  <div class="callout why">
+    <div class="callout-label">Why this matters</div>
+    <p>
+      A tool that can alter company data and doesn't require a login is a serious weak point —
+      even if it was never actually misused, its mere presence is a risk that has no place on a
+      live business system handling financial and operational data.
+    </p>
+  </div>
+
+  <div class="block">
+    <h3>What we did about it</h3>
+    <p>
+      Every one of the 284 old tools was moved out of the publicly reachable part of the system
+      into a locked-away area that cannot be accessed from a web browser at all. The normal system
+      — everything staff and customers actually use — was not touched and continues to work exactly
+      as before. We also added a permanent, automated check that will immediately flag it if
+      anything like this is ever accidentally exposed again in the future.
+    </p>
+  </div>
+
+  <div class="mini-grid">
+    <div class="mini-card">
+      <div class="mini-title">Before</div>
+      <div class="mini-body">284 unprotected internal tools reachable from the open internet, some able to alter company data.</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-title">After</div>
+      <div class="mini-body">All 284 locked away and unreachable; a standing check now guards against this recurring.</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">Status</div>
+    <p>
+      This fix has been fully built and tested. It is one internal release step away from being
+      active on the live production system — expected to be finalised in the next session.
+    </p>
+  </div>
+
+  <div class="footer-note">BJP Technologies Co. Ltd &middot; Confidential &middot; Page 2 of 6</div>
+</div>
+
+<!-- ═══════════ PAGE 3 — PHASE 2: RELIABILITY ═══════════ -->
+<div class="page">
+  <div class="phase-header">
+    <div class="phase-num">2</div>
+    <div>
+      <div class="phase-eyebrow">Phase Two</div>
+      <div class="phase-title">Making Money-Handling Fail Safely</div>
+    </div>
+  </div>
+  <div class="phase-underline"></div>
+
+  <span class="status-pill done">Strengthened</span>
+
+  <div class="block">
+    <h3>The underlying problem</h3>
+    <p>
+      Many everyday actions in the system — paying an employee, raising an invoice, removing a
+      warehouse, updating a customer record — actually involve several related updates happening
+      one after another behind the scenes. Normally that happens instantly and without issue. But
+      if something interrupts the process partway through — a lost connection, a server restart,
+      a timing clash between two people acting at once — some systems can be left in a
+      "half-done" state: for example, an employee marked as paid without the payment actually
+      being recorded in the books, or a stock removal that deletes some records but not others.
+    </p>
+    <p>
+      We reviewed every process in the system that performs this kind of multi-step update and
+      found several — across payroll, invoicing, warehouse management, and customer records —
+      that were not fully protected against this kind of interruption.
+    </p>
+  </div>
+
+  <div class="callout why">
+    <div class="callout-label">Why this matters</div>
+    <p>
+      In a system that handles company money and stock, a "half-done" update isn't a cosmetic
+      glitch — it can mean a payment that looks made but isn't recorded, or an invoice
+      accidentally duplicated on a retry. These are the kinds of errors that are expensive and
+      time-consuming to trace and correct after the fact.
+    </p>
+  </div>
+
+  <div class="block">
+    <h3>What we did about it</h3>
+    <p>
+      Every one of these processes has been rebuilt so that each multi-step update is now
+      "all-or-nothing": either every part of it completes successfully, or the whole thing is
+      automatically cancelled and the records are left exactly as they were before the attempt.
+      There is no longer a scenario where an interruption leaves a partial, inconsistent result.
+      This protection now covers payroll payments, invoicing, warehouse stock removal, and the
+      main customer-record update processes.
+    </p>
+  </div>
+
+  <div class="mini-grid">
+    <div class="mini-card">
+      <div class="mini-title">Payroll</div>
+      <div class="mini-body">Each employee's payment now completes fully or not at all — no more partially-paid batches.</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-title">Invoicing</div>
+      <div class="mini-body">Removed a scenario where a retry after a failure could create a duplicate invoice.</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-title">Warehouse Records</div>
+      <div class="mini-body">Stock removal no longer risks deleting some records while leaving others behind.</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-title">Customer &amp; Sales Records</div>
+      <div class="mini-body">Update processes across sales and customer management given the same protection.</div>
+    </div>
+  </div>
+
+  <div class="block">
+    <h3>An extra safeguard: automatic accuracy checks</h3>
+    <p>
+      On top of the fixes above, the system now automatically verifies — every time a change
+      happens — that all four core financial reports (Trial Balance, Income Statement, Balance
+      Sheet, and Cash Flow) still add up correctly and agree with one another. Any inconsistency
+      would now be caught immediately by the system itself, rather than being discovered later
+      during a manual review.
+    </p>
+  </div>
+
+  <div class="footer-note">BJP Technologies Co. Ltd &middot; Confidential &middot; Page 3 of 6</div>
+</div>
+
+<!-- ═══════════ PAGE 4 — PHASE 3: LPO WORKFLOW ═══════════ -->
+<div class="page">
+  <div class="phase-header">
+    <div class="phase-num">3</div>
+    <div>
+      <div class="phase-eyebrow">Phase Three</div>
+      <div class="phase-title">Customer Order Workflow &mdash; New Feature</div>
+    </div>
+  </div>
+  <div class="phase-underline"></div>
+
+  <span class="status-pill new">Launched</span>
+
+  <div class="block">
+    <h3>Where we started</h3>
+    <p>
+      Customer purchase orders (the formal orders customers place with us) previously lived as a
+      simple note attached to a customer's profile. There was no structured review step, no formal
+      approval, and no direct connection to the delivery or invoicing that followed — everything
+      downstream had to be handled and cross-checked manually.
+    </p>
+  </div>
+
+  <div class="block">
+    <h3>What was built</h3>
+    <p>
+      A complete, standalone Customer Order module, built to the same standard as our existing
+      Purchase Order process. A customer order now goes through a proper three-step approval —
+      prepared, reviewed, and approved by the appropriate level of authority — before it can move
+      forward, exactly mirroring how we already control outgoing purchase orders.
+    </p>
+    <p>
+      From there, the order flows directly into a delivery record and then into an invoice,
+      without anyone needing to re-type quantities, prices, or customer details. Every document in
+      that chain carries a visible reference back to where it started, so at any point it's
+      possible to trace an invoice back through its delivery to the original customer order that
+      triggered it.
+    </p>
+    <p>
+      We also reorganised the Sales menu so that the steps — order, order confirmation, delivery,
+      invoice — appear in the natural sequence they happen in, rather than scattered across
+      unrelated sections.
+    </p>
+  </div>
+
+  <div class="callout why">
+    <div class="callout-label">Why this matters</div>
+    <p>
+      This closes a control gap: large or high-value customer orders now go through the same
+      level of formal sign-off as our purchasing does, and the whole order-to-invoice trail is
+      recorded in one connected system instead of living across separate notes and manual
+      cross-referencing.
+    </p>
+  </div>
+
+  <div class="mini-grid">
+    <div class="mini-card">
+      <div class="mini-title">Before</div>
+      <div class="mini-body">A note on the customer's file; no formal approval; no link to delivery or invoicing.</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-title">After</div>
+      <div class="mini-body">A full order → approval → delivery → invoice chain, fully traceable, properly authorised.</div>
+    </div>
+  </div>
+
+  <div class="footer-note">BJP Technologies Co. Ltd &middot; Confidential &middot; Page 4 of 6</div>
+</div>
+
+<!-- ═══════════ PAGE 5 — PHASE 4 + 5 ═══════════ -->
+<div class="page">
+  <div class="phase-header">
+    <div class="phase-num">4</div>
+    <div>
+      <div class="phase-eyebrow">Phase Four</div>
+      <div class="phase-title">Payroll Processing Fix</div>
+    </div>
+  </div>
+  <div class="phase-underline"></div>
+
+  <span class="status-pill critical">Urgent Fix</span>
+
+  <div class="block">
+    <p>
+      A recent enhancement to how employer statutory contributions are calculated had introduced
+      an oversight that caused the "Process Payroll" function to fail outright for every single
+      employee, every time it was run. Nobody could be paid through the system until this was
+      resolved.
+    </p>
+    <p>
+      We traced the fault to a technical gap left behind by that earlier change, corrected it, and
+      confirmed that payroll now processes normally end-to-end for every employee. We also checked
+      for any leftover partial records from the earlier failed attempts and confirmed none were
+      created — no cleanup was required.
+    </p>
+  </div>
+
+  <div style="height:20px;"></div>
+
+  <div class="phase-header">
+    <div class="phase-num">5</div>
+    <div>
+      <div class="phase-eyebrow">Phase Five</div>
+      <div class="phase-title">Sales Dashboard &amp; Customer Data Fixes</div>
+    </div>
+  </div>
+  <div class="phase-underline"></div>
+
+  <span class="status-pill done">Fixed</span>
+
+  <div class="block">
+    <h3>Dashboard issues</h3>
+    <p>
+      The dashboard the sales team uses to track leads, follow-ups, and top performers was
+      displaying blank charts and tables that appeared permanently stuck loading, for some staff.
+      This has been corrected — all charts and summary tables on the dashboard now display
+      correctly.
+    </p>
+  </div>
+
+  <div class="block">
+    <h3>Bulk customer/lead upload</h3>
+    <p>
+      The tool that lets staff upload a list of customers or sales leads in bulk from a spreadsheet
+      had become unreachable, and once restored, had a few rough edges — the file selection did
+      not always respond, and the upload button could get stuck after certain errors. All of this
+      has been corrected and the tool has been tested with a range of file conditions.
+    </p>
+  </div>
+
+  <div class="footer-note">BJP Technologies Co. Ltd &middot; Confidential &middot; Page 5 of 6</div>
+</div>
+
+<!-- ═══════════ PAGE 6 — PHASE 6 + NEXT ═══════════ -->
+<div class="page">
+  <div class="phase-header">
+    <div class="phase-num">6</div>
+    <div>
+      <div class="phase-eyebrow">Phase Six</div>
+      <div class="phase-title">Smaller Corrections &amp; Consistency Fixes</div>
+    </div>
+  </div>
+  <div class="phase-underline"></div>
+
+  <span class="status-pill done">Fixed</span>
+
+  <div class="mini-grid">
+    <div class="mini-card">
+      <div class="mini-title">Warehouse Selection</div>
+      <div class="mini-body">A few screens allowed a warehouse to be picked that didn't belong to the project being worked on. Now consistent everywhere, reducing the risk of stock being recorded against the wrong location.</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-title">Document Numbering</div>
+      <div class="mini-body">Changing the company's document numbering format now correctly updates existing records when they are next edited, instead of silently staying on the old format.</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-title">Delivery Note Screens</div>
+      <div class="mini-body">Delivery note options now only appear on the correct screen for the correct department (Purchases vs. Sales), removing a source of confusion for staff.</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-title">Order Entry Accuracy</div>
+      <div class="mini-body">The unit of measure on a product (kilograms, litres, pieces, etc.) can no longer be accidentally changed after the product is selected on an order or invoice.</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-title">Release Process</div>
+      <div class="mini-body">An outdated internal safety check was blocking new updates from reaching the live system after the Customer Order feature was added. Corrected so releases now go live smoothly.</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-title">Housekeeping</div>
+      <div class="mini-body">Confirmed a handful of previously completed database updates were properly and permanently recorded, closing a small gap that could otherwise have caused inconsistency between environments.</div>
+    </div>
+  </div>
+
+  <div style="height:10px;"></div>
+
+  <div class="phase-header" style="margin-top:20px;">
+    <div class="phase-num" style="background:#6f42c1;">&rarr;</div>
+    <div>
+      <div class="phase-eyebrow">Looking Ahead</div>
+      <div class="phase-title">What's Next</div>
+    </div>
+  </div>
+  <div class="phase-underline"></div>
+
+  <div class="next-item">
+    <div class="next-num">1</div>
+    <div class="next-body">
+      <strong>Finalise the security fix on the live system</strong>
+      The clean-up described in Phase 1 is complete and tested; only the final release step
+      remains. Expected to close in the next working session.
+    </div>
+  </div>
+  <div class="next-item">
+    <div class="next-num">2</div>
+    <div class="next-body">
+      <strong>Confirm the Balance Sheet balances on live data</strong>
+      A final verification that Assets equal Liabilities plus Equity on the production system,
+      following on from the reliability work in Phase 2.
+    </div>
+  </div>
+  <div class="next-item">
+    <div class="next-num">3</div>
+    <div class="next-body">
+      <strong>Build the Expenses by Category report</strong>
+      A more detailed breakdown of company expenses, already designed and approved, next in line
+      for development.
+    </div>
+  </div>
+
+  <div class="footer-note">BJP Technologies Co. Ltd &middot; Confidential &middot; Page 6 of 6</div>
+</div>
+
+</body>
+</html>

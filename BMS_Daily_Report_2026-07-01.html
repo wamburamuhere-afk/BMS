@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMS Daily Development Report — 1 July 2026</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a2e; background: #f8f9fa; }
+  @media print {
+    body { background: white; }
+    .no-print { display: none; }
+    .page-break { page-break-before: always; }
+    .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+  }
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  .report-header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%); color: white; padding: 36px 40px; border-radius: 12px; margin-bottom: 28px; display: flex; justify-content: space-between; align-items: center; }
+  .report-header .title { font-size: 26px; font-weight: 700; letter-spacing: 0.5px; }
+  .report-header .subtitle { font-size: 13px; opacity: 0.75; margin-top: 4px; }
+  .report-header .meta { text-align: right; font-size: 12px; opacity: 0.8; line-height: 1.8; }
+  .report-header .meta strong { font-size: 18px; display: block; opacity: 1; }
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .sum-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); border-left: 4px solid; }
+  .sum-card.blue { border-left-color: #0d6efd; }
+  .sum-card.green { border-left-color: #198754; }
+  .sum-card.orange { border-left-color: #fd7e14; }
+  .sum-card.purple { border-left-color: #6f42c1; }
+  .sum-card .num { font-size: 32px; font-weight: 700; line-height: 1; }
+  .sum-card .label { font-size: 11px; color: #6c757d; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .sum-card.blue .num { color: #0d6efd; }
+  .sum-card.green .num { color: #198754; }
+  .sum-card.orange .num { color: #fd7e14; }
+  .sum-card.purple .num { color: #6f42c1; }
+  .section { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); margin-bottom: 24px; overflow: hidden; }
+  .section-header { padding: 16px 22px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 10px; }
+  .section-header .icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .section-header h2 { font-size: 15px; font-weight: 700; }
+  .section-header .badge-count { background: #e9ecef; color: #495057; border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 600; margin-left: auto; }
+  .section-body { padding: 20px 22px; }
+  .module { margin-bottom: 22px; border-left: 3px solid #dee2e6; padding-left: 16px; }
+  .module:last-child { margin-bottom: 0; }
+  .module-title { font-weight: 700; font-size: 13px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .module-title .tag { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+  .tag.feat { background: #d1e7dd; color: #0f5132; }
+  .tag.fix { background: #fff3cd; color: #664d03; }
+  .tag.critical { background: #f8d7da; color: #842029; }
+  .tag.refactor { background: #cff4fc; color: #055160; }
+  .module ul { list-style: none; }
+  .module ul li { padding: 4px 0; color: #444; font-size: 12.5px; display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
+  .module ul li::before { content: "▸"; color: #adb5bd; flex-shrink: 0; margin-top: 1px; }
+  .file-chip { background: #f0f0f0; border-radius: 4px; padding: 1px 6px; font-size: 10.5px; font-family: 'Consolas', monospace; color: #495057; }
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .tl-item { display: flex; gap: 16px; position: relative; }
+  .tl-item::before { content: ''; position: absolute; left: 38px; top: 32px; bottom: 0; width: 1px; background: #dee2e6; }
+  .tl-item:last-child::before { display: none; }
+  .tl-time { font-size: 10.5px; color: #6c757d; font-family: monospace; width: 40px; padding-top: 12px; flex-shrink: 0; text-align: right; }
+  .tl-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; flex-shrink: 0; margin-top: 11px; box-shadow: 0 0 0 2px #dee2e6; }
+  .tl-dot.feat { background: #198754; box-shadow: 0 0 0 2px #d1e7dd; }
+  .tl-dot.fix { background: #ffc107; box-shadow: 0 0 0 2px #fff3cd; }
+  .tl-dot.chore { background: #6c757d; box-shadow: 0 0 0 2px #e2e3e5; }
+  .tl-dot.sec { background: #dc3545; box-shadow: 0 0 0 2px #f8d7da; }
+  .tl-content { flex: 1; padding: 8px 0 16px 0; }
+  .tl-content .tl-title { font-weight: 600; font-size: 12px; }
+  .tl-content .tl-sub { font-size: 11px; color: #6c757d; margin-top: 2px; }
+  .tl-hash { font-family: monospace; font-size: 10px; background: #f0f0f0; padding: 1px 5px; border-radius: 3px; color: #495057; }
+  .bug-table { width: 100%; border-collapse: collapse; }
+  .bug-table th { background: #f8f9fa; padding: 9px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: #6c757d; border-bottom: 2px solid #dee2e6; }
+  .bug-table td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; font-size: 12px; vertical-align: top; }
+  .bug-table tr:last-child td { border-bottom: none; }
+  .sev { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
+  .sev.high { background: #f8d7da; color: #842029; }
+  .sev.med { background: #fff3cd; color: #664d03; }
+  .sev.crit { background: #6f42c1; color: white; }
+  .files-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .file-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: #f8f9fa; border-radius: 6px; }
+  .file-row .ftype { font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 3px; min-width: 26px; text-align: center; }
+  .ftype.php { background: #6f42c1; color: white; }
+  .ftype.sql { background: #198754; color: white; }
+  .ftype.test { background: #dc3545; color: white; }
+  .ftype.core { background: #fd7e14; color: white; }
+  .ftype.ci { background: #0d6efd; color: white; }
+  .file-row .fname { font-family: monospace; font-size: 11px; color: #1a1a2e; flex: 1; }
+  .file-row .fchange { font-size: 10px; color: #198754; font-weight: 600; }
+  .phase-row { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid #f0f0f0; }
+  .phase-row:last-child { border-bottom: none; }
+  .phase-badge { color: white; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+  .phase-badge.done { background: #198754; }
+  .phase-badge.fix { background: #fd7e14; }
+  .phase-badge.sec { background: #dc3545; }
+  .phase-content { flex: 1; }
+  .phase-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+  .phase-items { font-size: 12px; color: #555; line-height: 1.8; }
+  .phase-items code { background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+  .test-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px; }
+  .test-name { font-family: monospace; font-size: 11px; flex: 1; color: #1a1a2e; }
+  .test-result.pass { color: #198754; font-size:11px; font-weight:700; }
+  .total-bar { background: #d1e7dd; border-radius: 8px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+  .total-bar .total-label { font-weight: 700; color: #0f5132; font-size: 13px; }
+  .total-bar .total-num { font-size: 22px; font-weight: 700; color: #0f5132; }
+  .insight-box { border-left: 4px solid; border-radius: 6px; padding: 13px 16px; margin-bottom: 13px; }
+  .insight-box.danger { background: #f8d7da; border-left-color: #dc3545; }
+  .insight-box.info { background: #cff4fc; border-left-color: #0dcaf0; }
+  .insight-box.success { background: #d1e7dd; border-left-color: #198754; }
+  .insight-box.warning { background: #fff3cd; border-left-color: #ffc107; }
+  .insight-title { font-weight: 700; font-size: 12px; margin-bottom: 4px; }
+  .insight-body { font-size: 12px; color: #444; line-height: 1.6; }
+  .insight-body code { background: rgba(0,0,0,0.07); padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+  .next-item { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+  .next-item:last-child { border-bottom: none; }
+  .next-num { background: #0f3460; color: white; font-size: 11px; font-weight: 700; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .next-body { flex: 1; font-size: 12.5px; line-height: 1.6; }
+  .next-body strong { display: block; margin-bottom: 2px; }
+  .crm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
+  .crm-phase { background: #f8f9fa; border-radius: 8px; padding: 12px 14px; border-left: 3px solid #0d6efd; }
+  .crm-phase .cp-title { font-size: 11px; font-weight: 700; color: #0f3460; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .crm-phase .cp-body { font-size: 11.5px; color: #444; line-height: 1.7; }
+  .crm-phase .cp-body code { background: #e9ecef; padding: 1px 4px; border-radius: 3px; font-size: 10.5px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="report-header">
+    <div>
+      <div class="title">BMS Development Report</div>
+      <div class="subtitle">BJP Technologies Co. Ltd &middot; Daily Progress Report</div>
+      <div style="margin-top:14px;font-size:11px;opacity:0.7;">
+        Period covered: After 30 June 2026 report &rarr; 1 July 2026<br>
+        Previous report: BMS Daily Report &mdash; 30 June 2026
+      </div>
+    </div>
+    <div class="meta">
+      <strong>1 July 2026</strong>
+      Report for 1 July 2026<br>
+      24 commits &middot; 18 PRs merged to main + 1 to develop<br>
+      PRs: #1053&ndash;#1083 range &middot; MERGED<br>
+      Main areas: Transaction Safety, LPO Module, CRM Fixes, Warehouse Scoping
+    </div>
+  </div>
+
+  <!-- SUMMARY CARDS -->
+  <div class="summary-grid">
+    <div class="sum-card blue">
+      <div class="num">5</div>
+      <div class="label">Major Areas Updated</div>
+    </div>
+    <div class="sum-card green">
+      <div class="num">330+</div>
+      <div class="label">New Test Assertions (11 suites)</div>
+    </div>
+    <div class="sum-card orange">
+      <div class="num">19</div>
+      <div class="label">Branches Merged</div>
+    </div>
+    <div class="sum-card purple">
+      <div class="num">18</div>
+      <div class="label">Bug Fixes (incl. 1 security, 1 prod-blocking)</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 1. TRANSACTION-SAFETY SWEEP                 -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#f8d7da;">&#128274;</div>
+      <h2>Transaction-Safety Sweep &mdash; Webroot Security + Atomic Money Writes</h2>
+      <span class="badge-count">PRs #1078&ndash;#1083 &middot; 7 commits &middot; capstone test suite</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12.5px;color:#555;margin-bottom:20px;line-height:1.7;">
+        The largest single body of work today. Started from a question: "is every multi-step
+        money write in this system actually safe if it fails halfway?" The answer was no in
+        several places, and the webroot itself had a much bigger problem &mdash; 284 unauthenticated
+        scripts sitting at the site root. Both were closed out in one coordinated sweep across
+        six branches, capped by an end-to-end integrity test that proves the four statutory
+        reports still balance after all of it.
+      </p>
+
+      <div class="phase-row">
+        <span class="phase-badge sec">SECURITY</span>
+        <div class="phase-content">
+          <div class="phase-title">284 Unauthenticated Scripts Quarantined Out of the Public Webroot</div>
+          <div class="phase-items">
+            <b>Finding:</b> Of 299 top-level <code>.php</code> files, only 15 are real entry points (verified against the <code>roots.php</code> router, every JS/fetch call, includes, CI and deploy). The other 284 were pre-migration-system dev/debug/data-fix scripts (<code>check_*</code>, <code>debug_*</code>, <code>fix_*</code>, <code>alter_*</code>...) reachable over plain HTTP with <b>no authentication</b> &mdash; several would run <code>ALTER TABLE</code>/<code>UPDATE</code> against the production database for anyone who hit the URL.<br>
+            <b>Fix:</b> All 284 moved to <code>scripts/legacy/</code> via <code>git mv</code> (full history preserved), slated for permanent deletion one stable release after merge. <code>.htaccess</code> now denies HTTP access to <code>scripts/</code>, <code>tests/</code>, <code>cron/</code>, <code>migrations/</code> (except the login-guarded <code>migrations/status.php</code> dashboard). <code>migrations/runner.php</code> is now CLI-only (<code>PHP_SAPI</code> guard) &mdash; deploy over SSH unaffected.<br>
+            Test: <code>tests/test_webroot_quarantine_cli.php</code> &mdash; 9/9 passing (webroot whitelist, <code>.htaccess</code> rules, runner CLI guard, <code>ajax_*</code> endpoints still authenticate).<br>
+            <b>Status:</b> merged to <code>develop</code> (PR #1078) &mdash; not yet promoted to <code>main</code>.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">FOUNDATION</span>
+        <div class="phase-content">
+          <div class="phase-title">80 Tables Silently Ignoring Rollbacks &mdash; Converted MyISAM &rarr; InnoDB</div>
+          <div class="phase-items">
+            <b>Bug:</b> 80 tables (<code>payroll</code>, <code>payment_vouchers</code>, <code>bank_transactions</code>, <code>pos_payments</code>, <code>product_stocks</code>, <code>loans</code>, ...) were still MyISAM, a storage engine with no transaction support &mdash; every existing <code>beginTransaction()</code>/<code>commit()</code> touching them was doing nothing on failure.<br>
+            <b>Fix:</b> <code>migrations/2026_07_01_convert_myisam_to_innodb.php</code> &mdash; criteria-based, idempotent, converts with <code>ROW_FORMAT=DYNAMIC</code> (fixes legacy <code>row_format=FIXED</code> tables that would otherwise fail under <code>innodb_strict_mode</code>). This underpins every atomicity fix below.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">FIX</span>
+        <div class="phase-content">
+          <div class="phase-title">Payroll &mdash; Multi-Step Writes Made Atomic</div>
+          <div class="phase-items">
+            <b>Bug:</b> Payroll payout/edit endpoints ran 3&ndash;5 dependent writes (status update &rarr; GL posting &rarr; bank register/accrual reversal &rarr; re-post) with no transaction &mdash; a mid-sequence failure could leave some employees paid with GL posted and others not, or an amount changed with its accrual reversed but never reposted.<br>
+            <b>Fix:</b> <code>api/bulk_update_payroll_status.php</code> &mdash; each employee's payment is now one transaction per row; a failure rolls that row back completely and is reported in the response, other rows proceed; a null GL posting is now fatal for the row. <code>api/update_payroll.php</code>, <code>api/operations/process_project_payroll.php</code> similarly wrapped.<br>
+            Test: <code>tests/test_payroll_tx_atomicity_cli.php</code> &mdash; 16 checks, all 8 existing payroll suites still pass.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">FIX</span>
+        <div class="phase-content">
+          <div class="phase-title">IPC / Invoice / Voucher &mdash; Multi-Step Writes Made Atomic</div>
+          <div class="phase-items">
+            <b>Bug:</b> Worst case found &mdash; IPC invoicing ran <code>INSERT invoices</code> then <code>UPDATE interim_payment_certificates</code> with no transaction. A failure between the two left an invoice with no IPC link, and a retry created a <b>duplicate invoice for the same certificate</b>.<br>
+            <b>Fix:</b> <code>api/operations/create_invoice_from_ipc.php</code> &mdash; number allocation + invoice insert + IPC link are one transaction, link update guarded on <code>invoice_id IS NULL</code> so two concurrent requests can't both invoice the same certificate. <code>update_ipc_status.php</code>, <code>save_ipc.php</code>, <code>api/account/save_voucher.php</code> similarly wrapped.<br>
+            Test: <code>tests/test_ipc_invoice_tx_cli.php</code> &mdash; 11 checks, all 17 IPC/voucher/invoice suites pass.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">FIX</span>
+        <div class="phase-content">
+          <div class="phase-title">Warehouse Delete &mdash; Cascade Made Atomic, Stock History Preserved</div>
+          <div class="phase-items">
+            <b>Bug:</b> The delete cascade (<code>product_stocks &rarr; stock_movements &rarr; locations &rarr; soft-delete</code>) ran as 4 separate statements with no transaction &mdash; a mid-cascade failure left stock rows deleted but the warehouse still alive. It also <b>hard-deleted <code>stock_movements</code></b>, destroying the stock in/out audit trail, while only soft-deleting the warehouse itself.<br>
+            <b>Fix:</b> <code>ajax_delete_warehouse.php</code> and the duplicate delete branch in <code>app/bms/stock/warehouses.php</code> now cascade in one transaction; <code>stock_movements</code> is no longer deleted &mdash; history preserved.<br>
+            Test: <code>tests/test_warehouse_delete_tx_cli.php</code> &mdash; 12 checks: live forced mid-cascade failure leaves everything untouched, live real cascade removes current state, keeps movement history, soft-deletes the warehouse.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">FIX</span>
+        <div class="phase-content">
+          <div class="phase-title">Remaining Multi-Write Endpoints (Stock / CRM / Config) Made Atomic</div>
+          <div class="phase-items">
+            Final batch &mdash; 9 endpoints with genuine multi-step writes and no transaction, now wrapped: <code>api/rfq_quick_add_product.php</code>, <code>api/crm/move_lead_stage.php</code>, <code>bulk_update_leads.php</code>, <code>add_activity.php</code>, <code>edit_lead.php</code>, <code>manage_stage.php</code>, <code>api/pos/delete_salary_component.php</code>, <code>api/account/save_account.php</code>, <code>api/finance/manage_revenue_schema.php</code>.<br>
+            Also audited and deliberately left <b>not</b> wrapped: update-or-insert endpoints, per-row-reporting bulk import loops, and get-or-create lookups &mdash; a failure there leaves a valid reusable row, not corruption.<br>
+            Test: <code>tests/test_multiwrite_tx_coverage_cli.php</code> &mdash; 22 checks, all 26 related CRM/account suites pass.
+          </div>
+        </div>
+      </div>
+
+      <div class="insight-box success">
+        <div class="insight-title">&#10003; Capstone: Financial Report Integrity Suite</div>
+        <div class="insight-body">
+          <code>tests/test_financial_reports_integrity_cli.php</code> &mdash; 17 checks proving the four statutory reports stay correct after the whole sweep, and guarding them going forward (runs on every push via the pre-push hook): ledger invariant &Sigma;Dr = &Sigma;Cr, Balance Sheet balances (Assets = Liabilities + Equity), TB/P&amp;L/Cash Flow internal consistency, and a <b>live end-to-end</b> proof &mdash; posts a real Dr Expense / Cr Asset entry, confirms P&amp;L and TB move by exactly that amount, confirms every statement still balances, then removes the entry and re-proves the ledger is balanced.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 2. CUSTOMER LPO MODULE                      -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#d1e7dd;">&#128230;</div>
+      <h2>Standalone Customer LPO Module &mdash; LPO &rarr; DN(Outbound) &rarr; Invoice Chain</h2>
+      <span class="badge-count">PRs #1063, #1076 &middot; 105+ test checks</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12.5px;color:#555;margin-bottom:20px;line-height:1.7;">
+        LPO previously only existed as a modal-based tab inside a customer's detail page with
+        no real approval workflow. Rebuilt to Purchase-Order parity as a full standalone module,
+        wired all the way through to a working document chain: LPO &rarr; Delivery Note (Outbound)
+        &rarr; Invoice. The Sales menu was reordered to match the natural document flow.
+      </p>
+
+      <div class="phase-row">
+        <span class="phase-badge done">FEAT</span>
+        <div class="phase-content">
+          <div class="phase-title">LPO Foundation + Three-Approval Workflow</div>
+          <div class="phase-items">
+            <code>migrations/2026_07_01_lpo_standalone_foundation.php</code> adds prepared/reviewed/approved actor+role+timestamp columns and <code>project_id</code> to <code>customer_lpos</code>; new permission page-key <code>lpo</code> (review/approve restricted to Admin + Managing Director).<br>
+            New standalone pages mirroring the PO module: <code>lpos.php</code>, <code>lpo_create.php</code>, <code>lpo_view.php</code>, <code>print_lpo.php</code> &mdash; live product search, three-approval trail, matching print letterhead.<br>
+            <code>api/customer/save_lpo.php</code> (unified save, no longer accepts an arbitrary status field), <code>review_lpo.php</code>, <code>approve_lpo.php</code> replace the deleted <code>add_lpo.php</code>/<code>update_lpo.php</code>.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge done">FEAT</span>
+        <div class="phase-content">
+          <div class="phase-title">LPO &rarr; DN(Outbound) &rarr; Invoice Linkage</div>
+          <div class="phase-items">
+            <code>deliveries.party_type</code> widened to include <code>'customer'</code>; <code>dn_outbound.php</code> accepts <code>?lpo_id=</code> to prefill remaining-to-deliver quantities and locks "Send To" to the LPO's customer.<br>
+            <code>api/approve_dn.php</code> auto-advances the linked LPO to <code>partially_fulfilled</code>/<code>fulfilled</code> based on delivered-vs-ordered quantities (status only ever advances).<br>
+            <code>invoice_create.php</code> accepts <code>?delivery=</code> to prefill from an approved outbound DN, pricing from the matching LPO line falling back to <code>products.selling_price</code>; invoice view/print show "DN Ref:" / "LPO Ref:".<br>
+            Sales menu reordered: Quotations &rarr; Sales Orders &rarr; LPO &rarr; DN(Outbound) &rarr; Invoices &rarr; POS &rarr; ... &rarr; Credit Notes.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge done">FEAT</span>
+        <div class="phase-content">
+          <div class="phase-title">Warehouse Field Added to LPO and Invoice</div>
+          <div class="phase-items">
+            <b>Gap:</b> neither <code>customer_lpos</code> nor <code>invoices</code> had a <code>warehouse_id</code> column, so their inventory-product stock figures always fell back to <code>products.current_stock</code> (not warehouse-specific).<br>
+            <b>Fix:</b> added the field to both, project-filtered the same way every other module works &mdash; project selected &rarr; only that project's warehouses; no project &rarr; only unassigned warehouses. LPO always requires a warehouse (inventory-only document); Invoice requires one only outside Service Invoice mode, and only on create.<br>
+            Test: <code>tests/test_lpo_invoice_warehouse_cli.php</code> &mdash; schema + wiring checks, live insert/round-trip proof (transaction-wrapped, rolled back).
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <div class="test-bar">
+          <span class="test-name">tests/test_lpo_module_cli.php</span>
+          <span class="test-result pass">ALL PASS</span>
+          <span style="font-size:11px;color:#6c757d;min-width:60px;text-align:right;">105 / 105</span>
+        </div>
+        <div style="font-size:11.5px;color:#555;padding:8px 14px;background:#f8f9fa;border-radius:6px;">
+          Lint, migration content, three-approval gating, LPO&harr;DN&harr;Invoice wiring, menu order, live DB state, and a transaction-wrapped live create/review/approve round trip.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 3. CRM DASHBOARD + IMPORT WIZARD FIXES     -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#cff4fc;">&#128101;</div>
+      <h2>CRM Dashboard &amp; Lead Import &mdash; Stabilization (5 Bugs)</h2>
+      <span class="badge-count">PRs #1053, #1055, #1057 &middot; 6 commits &middot; 100/100 tests</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12.5px;color:#555;margin-bottom:20px;line-height:1.7;">
+        Yesterday's CRM Professional Upgrade shipped nine feature phases; today closed out the
+        rough edges that only surface once real users click through the dashboard and the CSV
+        import wizard.
+      </p>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">BUG 1</span>
+        <div class="phase-content">
+          <div class="phase-title">Dashboard Widgets Stuck on "Loading&hellip;" Forever</div>
+          <div class="phase-items">
+            <b>Bug:</b> <code>safeOutput()</code> is not a global function &mdash; it only lived in <code>pos_dashboard.php</code>. <code>crm_dashboard.php</code>, <code>crm_campaigns.php</code>, and <code>crm_leads.php</code> all called it without defining it, throwing <code>ReferenceError</code> on every render and leaving Recent Leads, Due Activities, Top Performers, and the mobile card view stuck at "Loading&hellip;" permanently. KPI cards and charts were unaffected (no <code>safeOutput</code> calls there).<br>
+            <b>Fix:</b> defined the 3-line XSS-escape helper at the top of each file's <code>&lt;script&gt;</code> block.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">BUG 2</span>
+        <div class="phase-content">
+          <div class="phase-title">Dashboard Charts Blank &mdash; Chart.js Was Never Loaded</div>
+          <div class="phase-items">
+            <b>Bug:</b> Chart.js was never loaded on the dashboard page. <code>new Chart()</code> threw <code>ReferenceError</code>, which silently aborted the entire <code>$.getJSON</code> callback &mdash; leaving all four charts blank <i>and</i> all three DataTables unpopulated, not just the charts.<br>
+            <b>Fix:</b> added the Chart.js 4.4.0 CDN tag before the inline script block.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge done">FEAT</span>
+        <div class="phase-content">
+          <div class="phase-title">All Three Dashboard Tables Converted to Proper DataTables</div>
+          <div class="phase-items">
+            Recent Leads, Due/Overdue Activities, and Top Performers moved from raw HTML injection (<code>.html()</code>) to real DataTables with an S/No first column &mdash; gives sort, search, and pagination for free, and DataTables' own <code>emptyTable</code> message replaces the permanent "Loading&hellip;" when the API legitimately returns zero rows. Table headers also restyled from black to blue (<code>table-primary</code>) for visual consistency with the rest of the app.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">BUG 3</span>
+        <div class="phase-content">
+          <div class="phase-title">CRM Import Leads &mdash; Page and API Both 404'd</div>
+          <div class="phase-items">
+            <b>Bug:</b> <code>crm/import_leads</code> and <code>api/crm/import_leads</code> were never registered in <code>roots.php</code> &mdash; the page and API already existed from yesterday's Phase 8 work, only the route entries were missing.<br>
+            <b>Fix:</b> registered both routes.
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row">
+        <span class="phase-badge fix">BUG 4, 5, 6</span>
+        <div class="phase-content">
+          <div class="phase-title">CSV Import Wizard &mdash; 3 Bugs Once It Was Reachable</div>
+          <div class="phase-items">
+            <b>Bug 1 &mdash; click opened no file dialog:</b> <code>#csvFile</code> was nested inside <code>#dropZone</code>; a programmatic click on the hidden input bubbled back to the parent div and retriggered the handler, hitting <code>RangeError: Maximum call stack</code>. Fixed by moving the input above the drop zone and binding the click in JS instead of inline <code>onclick</code>.<br>
+            <b>Bug 2 &mdash; TypeError on empty CSV headers:</b> the column auto-match loop called <code>h.toLowerCase()</code> with no null guard; added a <code>h != null &amp;&amp;</code> guard before every keyword check.<br>
+            <b>Bug 3 &mdash; upload button stuck disabled after an error:</b> an uncaught exception inside the <code>$.ajax</code> success callback skipped the <code>complete</code> handler. Wrapped the success body in try/catch so errors show a friendly message and the button always re-enables.<br>
+            Bonus: drag-and-drop now updates the drop-zone visual on drop (previously only on file-picker select); <code>dragleave</code> resets the highlight.
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <div class="test-bar">
+          <span class="test-name">tests/test_crm_dashboard_cli.php</span>
+          <span class="test-result pass">ALL PASS</span>
+          <span style="font-size:11px;color:#6c757d;min-width:60px;text-align:right;">50 / 50</span>
+        </div>
+        <div class="test-bar">
+          <span class="test-name">tests/test_crm_import_leads_cli.php</span>
+          <span class="test-result pass">ALL PASS</span>
+          <span style="font-size:11px;color:#6c757d;min-width:60px;text-align:right;">50 / 50</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 4. WAREHOUSE + PROJECT SCOPING              -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#e0cffc;">&#128506;</div>
+      <h2>Warehouse &amp; Project-Scope Consistency</h2>
+      <span class="badge-count">PRs #1059, #1060 &middot; 2 commits &middot; 17 tests</span>
+    </div>
+    <div class="section-body">
+
+      <div class="module">
+        <div class="module-title">Warehouse Dropdown Silently Fell Back to "All Warehouses" in 3 Pages <span class="tag fix">FIX</span></div>
+        <ul>
+          <li><b>Rule that should hold everywhere:</b> project selected &rarr; only that project's warehouses; no project selected &rarr; only warehouses not linked to any project (never an "all warehouses" fallback). RFQ create, GRN create, DN create, Sales Order create/edit, and the Quotation form already followed this correctly &mdash; three pages didn't.</li>
+          <li><code>app/bms/purchase/purchase_order_create.php</code> &mdash; removed the fallback-to-all-warehouses that kicked in whenever the strict filter returned zero results.</li>
+          <li><code>app/bms/stock/stock_adjustments.php</code> &mdash; no-project case was showing every warehouse instead of unassigned-only.</li>
+          <li><code>app/bms/pos/pos.php</code> + <code>pos_scripts_new.php</code> &mdash; POS had a Project selector completely disconnected from the Warehouse selector; added <code>filterPosWarehousesByProject()</code> wired to both the <code>onchange</code> event and initial page load.</li>
+          <li>Test: <code>tests/test_warehouse_project_filter_cli.php</code> &mdash; 17 assertions (lint + source-level behaviour + live warehouse data check).</li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-title">Four Migrations Existed Locally but Were Never Committed <span class="tag fix">FIX</span></div>
+        <ul>
+          <li>Found during a routine drift check: <code>2026_06_11_crm_campaign_link.php</code>, <code>2026_06_24_nssf_employer.php</code>, <code>2026_06_24_payroll_void_status.php</code>, <code>2026_06_24_sdl_reclassify_journal_entries.php</code> had all been applied locally but were sitting uncommitted &mdash; meaning a fresh clone or another developer's machine would silently diverge from this schema.</li>
+          <li>All four committed as-is (each already idempotent/guarded); no schema change, purely closing a commit gap.</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 5. SMALLER FIXES                            -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#fff3cd;">&#128295;</div>
+      <h2>Smaller Fixes &mdash; Payroll, Codes, DN Navigation, Deploy CI</h2>
+      <span class="badge-count">PRs #1066, #1067, #1070, #1072, #1074 &middot; 6 commits</span>
+    </div>
+    <div class="section-body">
+
+      <div class="module">
+        <div class="module-title">Payroll Processing Failed for Every Employee (Production) <span class="tag critical">PROD</span></div>
+        <ul>
+          <li><b>Bug:</b> yesterday's NSSF-employer feature made <code>process_payroll.php</code> write an <code>'employer_cost'</code> breakdown line into <code>payroll_items</code> for every employee, but its migration only added the <code>payroll.nssf_employer</code> column &mdash; never added <code>'employer_cost'</code> to <code>payroll_items.item_type</code>'s ENUM. Every employee has <code>nssf_employer &gt; 0</code>, so every "Process Payroll" run failed the whole batch with <code>SQLSTATE[01000]: Data truncated for column 'item_type'</code>.</li>
+          <li><b>Fix:</b> <code>migrations/2026_07_01_payroll_items_employer_cost.php</code> adds the missing ENUM value (additive, idempotent). Checked for orphaned rows from prior failed attempts &mdash; none found. Test: <code>tests/test_payroll_items_employer_cost_cli.php</code>.</li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-title">Company-Prefix Codes Never Re-Coded on Edit After Changing the Prefix <span class="tag fix">FIX</span></div>
+        <ul>
+          <li><b>Bug:</b> <code>codeForEdit()</code> only recognised a code as "auto-generated, eligible for re-coding" if blank or matching the pre-prefix legacy pattern. A code already in <code>PREFIX-TYPE-NNNN</code> shape but stamped with a <i>previous</i> company prefix fell through to "manual code, leave alone" &mdash; so changing Company Profile's Document Code Prefix never propagated to existing records, even on edit. Shared by 16 edit endpoints (customers, suppliers, employees, quotations, sales orders, POs, vouchers, RFQ, DN, LPO, CRM leads, &hellip;).</li>
+          <li><b>Fix:</b> added a second auto-generated shape &mdash; any prefix + TYPE + NNNN &mdash; so a stale-prefix code now re-codes to the current prefix on edit, same as blank/legacy codes always did. Genuinely custom codes are still left untouched. Test: <code>tests/test_code_for_edit_stale_prefix_cli.php</code> &mdash; proves exactly one sequence number burns on re-code, zero on already-current or genuinely-manual codes.</li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-title">Outbound Delivery Note Tab/Button Leaked Into the Purchases View <span class="tag fix">FIX</span></div>
+        <ul>
+          <li><code>delivery_notes.php</code> is shared by both menus &mdash; Purchases links to it plain, Sales links with <code>?type=outbound</code>. The Outbound tab and its "Create DN (Outbound)" button rendered unconditionally, letting a Purchases user create sales delivery notes from the wrong screen. Follow-up fix caught the same leak in reverse: the "Record DN (Inbound)" button was showing on the Sales outbound view too.</li>
+          <li>Both wrapped in an <code>$is_outbound_view</code> check; Sales-side rendering (tabs, buttons, permission gate) left byte-for-byte identical.</li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-title">Deploy CI Blocked Production After the LPO Module Merge <span class="tag critical">PROD</span></div>
+        <ul>
+          <li><b>Bug:</b> <code>deploy.yml</code>'s "Check critical API files exist" gate still listed <code>api/customer/add_lpo.php</code> / <code>update_lpo.php</code> &mdash; both intentionally deleted when the standalone LPO module replaced them with <code>save_lpo.php</code>. No test covers this hardcoded list, so it slipped through and failed the develop&rarr;main promotion deploy for PR #1065, blocking production.</li>
+          <li><b>Fix:</b> removed the deleted files from the allowlist; added their replacements plus the new LPO pages and migrations so the gate reflects what the feature actually depends on.</li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-title">Product Unit Field Editable Where It Should Be Locked <span class="tag fix">FIX</span></div>
+        <ul>
+          <li>A product's unit (kg, lt, pcs&hellip;) is set once at registration, but several line-item forms showed it as an independently-editable field after product selection. Scouted every Procurement/Sales form with live product search: Sales Order create/edit, Quotation form, GRN create all had it editable (DN Create, DN Outbound, Invoice Create were already correct). RFQ create is the one exception left editable by design (it allows free-text non-catalog requests) &mdash; but now locks once a real catalog product is linked.</li>
+          <li>Test: <code>tests/test_unit_autofill_lock_cli.php</code> &mdash; 24 checks.</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 6. BUG FIXES SUMMARY                       -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#f8d7da;">&#128027;</div>
+      <h2>Bug Fixes Summary</h2>
+      <span class="badge-count">18 bugs fixed (incl. 1 security, 2 prod-blocking)</span>
+    </div>
+    <div class="section-body">
+      <table class="bug-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Module</th>
+            <th>Bug</th>
+            <th>Severity</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>Webroot</td><td>284 unauthenticated dev/debug scripts reachable over HTTP, several could ALTER/UPDATE prod DB</td><td><span class="sev crit">SECURITY</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>2</td><td>Payroll</td><td>Multi-step GL posting had no transaction &mdash; partial-paid batches possible on failure</td><td><span class="sev high">HIGH</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>3</td><td>IPC / Invoicing</td><td>No transaction between invoice INSERT and IPC link &mdash; retries created duplicate invoices</td><td><span class="sev high">HIGH</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>4</td><td>Warehouse Delete</td><td>Cascade not atomic; hard-deleted stock_movements, destroying audit history</td><td><span class="sev high">HIGH</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>5</td><td>Stock/CRM/Config</td><td>9 remaining multi-write endpoints had no transaction</td><td><span class="sev med">MED</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>6</td><td>Payroll (PROD)</td><td>"Data truncated for column item_type" &mdash; every Process Payroll run failed</td><td><span class="sev crit">PROD CRASH</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>7</td><td>Deploy CI</td><td>Critical-files allowlist referenced deleted LPO files &mdash; blocked production deploy</td><td><span class="sev crit">PROD BLOCK</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>8</td><td>CRM Dashboard</td><td>safeOutput() undefined &mdash; all three tables + mobile cards stuck on "Loading&hellip;"</td><td><span class="sev high">HIGH</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>9</td><td>CRM Dashboard</td><td>Chart.js never loaded &mdash; all charts blank and tables silently unpopulated</td><td><span class="sev high">HIGH</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>10</td><td>CRM Import Leads</td><td>Page + API routes never registered &mdash; 404 on the feature shipped yesterday</td><td><span class="sev high">HIGH</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>11</td><td>CRM Import Leads</td><td>3 bugs once reachable: no file dialog, TypeError on empty headers, stuck upload button</td><td><span class="sev high">HIGH</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>12</td><td>Warehouse Filter</td><td>3 pages (PO create, stock adjustments, POS) fell back to "all warehouses" instead of strict project scope</td><td><span class="sev med">MED</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>13</td><td>Migrations</td><td>4 applied migrations existed locally but were never committed &mdash; schema drift risk</td><td><span class="sev med">MED</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>14</td><td>Company Codes</td><td>Changing Document Code Prefix never took effect on existing records, even on edit</td><td><span class="sev med">MED</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>15</td><td>DN Navigation</td><td>Outbound tab/button leaked into Purchases view; Inbound button leaked into Sales view</td><td><span class="sev med">MED</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>16</td><td>Product Unit Field</td><td>Editable in Sales Order, Quotation, GRN forms instead of locked to registered value</td><td><span class="sev med">MED</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>17</td><td>LPO / Invoice</td><td>No warehouse_id column at all &mdash; stock figures fell back to non-warehouse-specific totals</td><td><span class="sev med">MED</span></td><td>&#10003; Fixed</td></tr>
+          <tr><td>18</td><td>LPO (legacy)</td><td>Modal-based, no real approval workflow &mdash; replaced by standalone module</td><td><span class="sev med">MED</span></td><td>&#10003; Fixed</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 7. COMMIT TIMELINE                         -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#f0f0f0;">&#128337;</div>
+      <h2>Commit Timeline &mdash; 1 &ndash; 2 July 2026</h2>
+      <span class="badge-count">24 commits</span>
+    </div>
+    <div class="section-body">
+      <div class="timeline">
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">a5e5754</span> &nbsp; fix(crm): define safeOutput in dashboard, campaigns, leads</div>
+            <div class="tl-sub">Widgets stuck on "Loading" &middot; PR #1053</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot feat"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">51c9d53</span> &nbsp; feat(crm/dashboard): all three tables now DataTables with S/No column</div>
+            <div class="tl-sub">Sort, search, pagination + proper empty-state handling</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">b3f973c</span> &nbsp; fix(crm/dashboard): add Chart.js — charts+tables were blank</div>
+            <div class="tl-sub">CDN tag was missing, silently killed the whole render callback</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot chore"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">22929d6</span> &nbsp; style(crm/dashboard): change table headers from black to blue</div>
+            <div class="tl-sub">table-primary styling to match the rest of the app</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">ae34207</span> &nbsp; fix(crm/import_leads): register missing routes in roots.php</div>
+            <div class="tl-sub">Page + API existed since yesterday but were unreachable — 404</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">6af4d73</span> &nbsp; fix(crm/import_leads): fix 3 bugs + 50-assertion test suite</div>
+            <div class="tl-sub">File-dialog loop, null TypeError, stuck upload button &middot; PR #1055/#1057</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">7c29589</span> &nbsp; fix(migrations): commit 4 pending migrations left uncommitted locally</div>
+            <div class="tl-sub">CRM campaign link, NSSF employer, payroll void status, SDL reclassify &middot; PR #1059</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">956d519</span> &nbsp; fix(warehouse): warehouse dropdown strictly follows selected project</div>
+            <div class="tl-sub">PO create, stock adjustments, POS &middot; PR #1060</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot feat"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">01c0340</span> &nbsp; feat: standalone Customer LPO module + LPO -> DN(Outbound) -> Invoice chain</div>
+            <div class="tl-sub">6 phases, 105-check test suite, Sales menu reorder &middot; PR #1063</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">6be0cd8</span> &nbsp; fix: lock product Unit field to its registered value in line-item forms</div>
+            <div class="tl-sub">Sales Order, Quotation, GRN + conditional RFQ lock &middot; PR #1066</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">c404c4c</span> &nbsp; fix: update deploy CI critical-files allowlist for LPO module changes</div>
+            <div class="tl-sub">Was blocking the develop→main production deploy &middot; PR #1067</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">303ce9c</span> &nbsp; fix: hide Outbound DN tab/button from Purchases delivery notes view</div>
+            <div class="tl-sub">&middot; PR #1070</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">f6fbbfc</span> &nbsp; fix: hide "Record DN (Inbound)" button on the Sales (outbound) DN view</div>
+            <div class="tl-sub">Follow-up to the Purchases-side fix, same PR</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">394626a</span> &nbsp; fix: add missing 'employer_cost' ENUM value to payroll_items.item_type</div>
+            <div class="tl-sub">Production crash — every Process Payroll run was failing &middot; PR #1072</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">fd0f376</span> &nbsp; fix: re-code stale company-prefix codes on edit, not just blank/legacy</div>
+            <div class="tl-sub">Shared by 16 edit endpoints &middot; PR #1074</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot feat"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">8f5356a</span> &nbsp; feat: add project-filtered warehouse field to Customer LPO and Invoice</div>
+            <div class="tl-sub">&middot; PR #1076</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot sec"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">94867bb</span> &nbsp; security: quarantine 284 unauthenticated one-off scripts out of the webroot</div>
+            <div class="tl-sub">First version &middot; superseded by 458b317 after rebase</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">b43c568</span> &nbsp; fix: make payroll multi-step writes atomic; convert all MyISAM tables to InnoDB</div>
+            <div class="tl-sub">Foundation fix underpinning the whole tx-safety sweep &middot; PR #1079</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">9ca6e6c</span> &nbsp; fix: make warehouse delete cascade atomic and preserve stock movement history</div>
+            <div class="tl-sub">&middot; PR #1080</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">2257dd5</span> &nbsp; fix: make IPC/invoice/voucher multi-step writes atomic</div>
+            <div class="tl-sub">Closed the duplicate-invoice-on-retry risk &middot; PR #1081</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot fix"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">3da5db7</span> &nbsp; fix: make remaining multi-write endpoints (stock/CRM/config) atomic</div>
+            <div class="tl-sub">Final batch — 9 endpoints &middot; PR #1082</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">1 Jul</div>
+          <div class="tl-dot feat"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">72d4509</span> &nbsp; test: financial report integrity suite (capstone of the tx-safety sweep)</div>
+            <div class="tl-sub">17 checks proving the ledger stays balanced through the whole sweep &middot; PR #1083</div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-time">2 Jul</div>
+          <div class="tl-dot sec"></div>
+          <div class="tl-content">
+            <div class="tl-title"><span class="tl-hash">458b317</span> &nbsp; security: quarantine 284 unauthenticated one-off scripts out of the webroot (#1078)</div>
+            <div class="tl-sub">Rebased/synced final version, merged to develop</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 8. FILES CHANGED                           -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#fff3cd;">&#128196;</div>
+      <h2>Files Changed</h2>
+      <span class="badge-count">375 files touched &middot; 285 quarantined &middot; 14 test suites &middot; 10 migrations</span>
+    </div>
+    <div class="section-body">
+      <div class="files-grid">
+        <div class="file-row"><span class="ftype ci">CI</span><span class="fname">.htaccess</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype ci">CI</span><span class="fname">.github/workflows/deploy.yml</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">migrations/runner.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">migrations/2026_07_01_convert_myisam_to_innodb.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">migrations/2026_07_01_lpo_standalone_foundation.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">migrations/2026_07_01_dn_customer_party_type.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">migrations/2026_07_01_lpo_invoice_warehouse.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">migrations/2026_07_01_payroll_items_employer_cost.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/bulk_update_payroll_status.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/update_payroll.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/operations/create_invoice_from_ipc.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/account/save_voucher.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">ajax_delete_warehouse.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/stock/warehouses.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/crm/move_lead_stage.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/account/save_account.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/sales/lpo/lpo_create.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/sales/lpo/lpo_view.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/customer/save_lpo.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">api/customer/review_lpo.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/grn/dn_outbound.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/invoice/invoice_create.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/crm/crm_dashboard.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/crm/crm_import_leads.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">roots.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/purchase/purchase_order_create.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/pos/pos.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">core/code_generator.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">app/bms/grn/delivery_notes.php</span><span class="fchange">MODIFIED</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_webroot_quarantine_cli.php</span><span class="fchange">NEW &middot; 9 checks</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_payroll_tx_atomicity_cli.php</span><span class="fchange">NEW &middot; 16 checks</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_ipc_invoice_tx_cli.php</span><span class="fchange">NEW &middot; 11 checks</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_warehouse_delete_tx_cli.php</span><span class="fchange">NEW &middot; 12 checks</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_multiwrite_tx_coverage_cli.php</span><span class="fchange">NEW &middot; 22 checks</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_financial_reports_integrity_cli.php</span><span class="fchange">NEW &middot; 17 checks</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_lpo_module_cli.php</span><span class="fchange">NEW &middot; 105 checks</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_lpo_invoice_warehouse_cli.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_crm_dashboard_cli.php</span><span class="fchange">NEW &middot; 50 checks</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_crm_import_leads_cli.php</span><span class="fchange">NEW &middot; 50 checks</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_warehouse_project_filter_cli.php</span><span class="fchange">NEW &middot; 17 checks</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_unit_autofill_lock_cli.php</span><span class="fchange">NEW &middot; 24 checks</span></div>
+        <div class="file-row"><span class="ftype test">TEST</span><span class="fname">tests/test_code_for_edit_stale_prefix_cli.php</span><span class="fchange">NEW</span></div>
+        <div class="file-row"><span class="ftype php">PHP</span><span class="fname">scripts/legacy/*.php</span><span class="fchange">MOVED &middot; 284 files</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 9. NEXT SESSION PRIORITIES                 -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#e0cffc;">&#128640;</div>
+      <h2>Next Session Priorities</h2>
+    </div>
+    <div class="section-body">
+      <div class="next-item">
+        <div class="next-num">1</div>
+        <div class="next-body">
+          <strong>Promote develop &rarr; main (Webroot Quarantine Still Not Live)</strong>
+          PR #1078 (284-script quarantine + .htaccess lockdown) is merged to <code>develop</code> only — every other branch from today is already on <code>main</code>. This is the one still-open production-security gap; open the develop&rarr;main PR to close it.
+        </div>
+      </div>
+      <div class="next-item">
+        <div class="next-num">2</div>
+        <div class="next-body">
+          <strong>Verify Transaction-Safety Sweep on Production</strong>
+          Run <code>test_financial_reports_integrity_cli.php</code> and <code>assertLedgerBalanced()</code> against live data after deploy — confirm the MyISAM&rarr;InnoDB conversion and all seven atomicity fixes behave the same under real production load/concurrency as they did in local testing.
+        </div>
+      </div>
+      <div class="next-item">
+        <div class="next-num">3</div>
+        <div class="next-body">
+          <strong>Delete <code>scripts/legacy/</code> After One Stable Release</strong>
+          The 284 quarantined scripts are slated for permanent deletion once this release has run clean in production for a while — track this so it doesn't get forgotten.
+        </div>
+      </div>
+      <div class="next-item">
+        <div class="next-num">4</div>
+        <div class="next-body">
+          <strong>Balance Sheet &mdash; Verify It Balances on Production</strong>
+          Carried over from yesterday: confirm Assets = Liabilities + Equity on live data. If a gap appears, trace via the <code>money.md</code> checklist.
+        </div>
+      </div>
+      <div class="next-item">
+        <div class="next-num">5</div>
+        <div class="next-body">
+          <strong>Expenses by Category &mdash; Tree + Rollup View</strong>
+          Still not started. Mockups approved, plan in <code>expenses_by_category_plan.md</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="text-align:center;padding:24px 0 12px;font-size:11px;color:#adb5bd;">
+    BJP Technologies Co. Ltd &mdash; BMS Internal Development Report &middot; 1 July 2026<br>
+    Generated by Claude Code &middot; Confidential
+  </div>
+
+</div>
+</body>
+</html>
