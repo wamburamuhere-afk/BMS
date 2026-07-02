@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-07-02 (refactor) — procurement side joins the shared Project ↔ Warehouse mechanism
+
+Follow-up to the sales-side centralisation below: the four procurement pages that
+carry the project→warehouse cascade now consume the shared mechanism instead of
+their local copies. Page-specific rendering (hint texts, single-warehouse
+auto-select, Select2 re-init) is untouched — only the rule line and the PHP
+warehouse query moved to the shared pair.
+
+- `app/bms/purchase/purchase_order_create.php` (PO create+edit) — query →
+  `warehousesForSelect()`; local `filterWarehousesByProject()` renamed
+  `rebuildPoWarehouses()` with its rule swapped for `filterWarehousesForProject()`.
+- `app/bms/purchase/rfq_create.php` (RFQ create+edit) — same; `filterRfqWarehouses()`
+  keeps its hint/auto-select logic, rule delegated to the shared module.
+- `app/bms/grn/grn_create.php` + `app/bms/grn/grn_edit.php` — same;
+  `filterGrnWarehouses()` delegates the rule. **grn_edit's warehouse list was the
+  only one not user-project scoped (listed all active warehouses) — now scoped
+  like grn_create via the shared helper.**
+- Intentionally NOT migrated (no cascade or different mechanism; left as-is per
+  "don't force it"): `purchase_returns.php` (scoped list, no project cascade on
+  page), `nip_materials.php`/`edit_nip_materials.php` (modal-based variant with
+  include-inactive-saved-warehouse quirk), `stock_adjustments.php` (stock side,
+  still guarded string-for-string in the test).
+- `tests/test_warehouse_project_filter_cli.php` — the four pages moved into the
+  shared-mechanism section (must use it, no local rule copies); PO's legacy
+  string guards removed; stock_adjustments remains the only legacy entry.
+
 ## 2026-07-02 (refactor) — Project ↔ Warehouse filtering centralised into one shared mechanism
 
 The rule (project selected → only that project's warehouses; no project → only
