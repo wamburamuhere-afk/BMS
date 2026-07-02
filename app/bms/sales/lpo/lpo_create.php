@@ -32,16 +32,8 @@ if (isAdmin()) {
 
 // Warehouses for dropdown — scoped by project for non-admins; JS filters further
 // by the selected project (project's warehouses only, or unassigned-only if none).
-if (isAdmin()) {
-    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-} elseif (!empty($_lc_assigned)) {
-    $_lc_wph = implode(',', array_fill(0, count($_lc_assigned), '?'));
-    $_lc_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_lc_wph)) ORDER BY warehouse_name");
-    $_lc_wstmt->execute($_lc_assigned);
-    $warehouses = $_lc_wstmt->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-}
+require_once ROOT_DIR . '/core/warehouse_scope.php';
+$warehouses = warehousesForSelect($pdo);
 
 // Tax rates — same VAT-only restriction as the Purchase Order module.
 $tax_rates = $pdo->query("SELECT * FROM tax_rates WHERE status = 'active' AND rate_percentage IN (0, 18) ORDER BY rate_percentage")->fetchAll(PDO::FETCH_ASSOC);
@@ -191,13 +183,7 @@ $back_url = getUrl('lpos');
                             <label class="form-label fw-semibold">Warehouse <span class="text-danger">*</span></label>
                             <select class="form-select" id="warehouse_id" name="warehouse_id" required>
                                 <option value="">Select Warehouse</option>
-                                <?php foreach ($warehouses as $w): ?>
-                                    <option value="<?= $w['warehouse_id'] ?>"
-                                            data-project-id="<?= $w['project_id'] ?>"
-                                            <?= ($warehouse_id > 0 && $warehouse_id == $w['warehouse_id']) ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($w['warehouse_name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
+                                <?= renderWarehouseOptions($warehouses, $warehouse_id) ?>
                             </select>
                             <div class="form-text">Stock for the items below will be checked against this warehouse.</div>
                         </div>
@@ -430,6 +416,7 @@ $back_url = getUrl('lpos');
 <link href="/assets/css/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
 <script src="/assets/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <script>
 let productsList = [];
 const editId = <?= json_encode($edit_id) ?>;
@@ -454,7 +441,10 @@ function initTaxSelect2(rowId) {
 $(document).ready(function() {
     initSelect2Fields();
     initTaxSelect2();
-    filterWarehousesByProject(true);
+    // Shared Project → Warehouse cascade (assets/js/warehouse-project-filter.js)
+    bindWarehouseToProject({
+        onFiltered: function () { fetchProducts(); }
+    });
 
     if (isEdit) {
         $('h2').html('<i class="bi bi-pencil-square text-primary"></i> Edit Customer LPO');
@@ -470,7 +460,6 @@ $(document).ready(function() {
         }
     });
 
-    $('#project_id').on('change', function() { filterWarehousesByProject(); });
     $('#warehouse_id').on('change', function() { fetchProducts(); });
 
     $('#customer_id').on('change', function() {
@@ -682,29 +671,6 @@ async function fetchProducts() {
         if (result.success) productsList = result.data;
     } catch (error) {
         console.error('Failed to fetch products:', error);
-    }
-}
-
-function filterWarehousesByProject(isInitial = false) {
-    const projectId = $('#project_id').val();
-    const warehouseSelect = $('#warehouse_id');
-
-    warehouseSelect.find('option').each(function() {
-        const optionProjectId = $(this).data('project-id');
-        if ($(this).val() === '') { $(this).show(); return; }
-        if (projectId) {
-            (String(optionProjectId) === String(projectId)) ? $(this).show() : $(this).hide();
-        } else {
-            (!optionProjectId) ? $(this).show() : $(this).hide();
-        }
-    });
-
-    if (!isInitial) {
-        const sel = warehouseSelect.find('option:selected');
-        if (sel.css('display') === 'none') {
-            warehouseSelect.val('');
-        }
-        fetchProducts();
     }
 }
 
