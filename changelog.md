@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-07-02 (feat) — Service Record on employee_details (Tier 1, Phase 1.5)
+
+The employee profile becomes a true personnel file. Additions only — every
+existing section untouched (proven by test).
+
+- `app/bms/pos/employee_details.php` —
+  new **Service Record** card after Personal & Employment Information: vertical
+  timeline (newest first) of the employee's non-deleted lifecycle events with
+  per-type icon/colour, old→new change line, status badge, recorder/approver +
+  dates, reject reason, gatekeeper attachment link; print-friendly (attachment
+  links hidden in print). **HR Action** quick dropdown in the top bar
+  (Promote / Transfer / Award / Warn / Record Complaint / Resignation /
+  Termination) opening the shared Phase 1.4 modal with the employee locked
+  pre-selected and the type pre-picked. Sidebar footer gains **Awards** and
+  **Warnings** mini-counters (two more scalar subqueries, same pattern).
+  `applyDueLifecycleEffects()` (D5) runs on load so a resignation whose last
+  working day passed shows the correct status.
+- `tests/test_employee_service_record_cli.php` — 27 assertions: all 9 existing
+  sections intact in source AND in live render, end-to-end promote→approve→
+  profile shows new designation + timeline entry, mini-stats, view-only render,
+  zero-event clean empty state.
+
 ## 2026-07-02 (feat) — HR Actions page (Tier 1, Phase 1.4)
 
 The management UI for the lifecycle module — one page for all 8 event types.

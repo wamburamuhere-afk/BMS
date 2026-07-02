@@ -6,6 +6,11 @@ require_once __DIR__ . '/../../../roots.php';
 // Enforce permission BEFORE any output
 autoEnforcePermission('employees');
 
+// D5 — apply any approved resignation whose last working day has passed,
+// so the status shown below is always current
+require_once __DIR__ . '/../../../core/lifecycle_effects.php';
+applyDueLifecycleEffects($pdo);
+
 // Include the header
 includeHeader();
 
@@ -21,7 +26,9 @@ if ($employee_id <= 0) {
 $stmt = $pdo->prepare("
     SELECT e.*, d.department_name, des.designation_name, et.type_name as employment_type, pr.project_name,
     (SELECT COUNT(*) FROM attendance WHERE employee_id = e.employee_id AND status = 'present') as total_attendance,
-    (SELECT COUNT(*) FROM leaves WHERE employee_id = e.employee_id AND status = 'approved') as total_leaves
+    (SELECT COUNT(*) FROM leaves WHERE employee_id = e.employee_id AND status = 'approved') as total_leaves,
+    (SELECT COUNT(*) FROM employee_lifecycle_events WHERE employee_id = e.employee_id AND event_type = 'award' AND status = 'approved') as total_awards,
+    (SELECT COUNT(*) FROM employee_lifecycle_events WHERE employee_id = e.employee_id AND event_type = 'warning' AND status = 'approved') as total_warnings
     FROM employees e
     LEFT JOIN departments d ON e.department_id = d.department_id
     LEFT JOIN designations des ON e.designation_id = des.designation_id
@@ -64,6 +71,51 @@ foreach ($sc_rows as $r) {
     if ($r['component_type'] === 'deduction') $struct_deduct += $val; else $struct_earn += $val;
 }
 $struct_net = $struct_earn - $struct_deduct;
+
+// Service Record (Tier 1, Phase 1.5) — this employee's lifecycle timeline,
+// newest first. Old/new ids resolved via LEFT JOIN like the rest of the page.
+$can_create_lifecycle = canCreate('employee_lifecycle');
+$can_view_lifecycle   = canView('employee_lifecycle');
+$sr_events = [];
+if ($can_view_lifecycle) {
+    $sr_stmt = $pdo->prepare("
+        SELECT ele.*,
+               od.designation_name AS old_designation_name, nd.designation_name AS new_designation_name,
+               odp.department_name AS old_department_name, ndp.department_name AS new_department_name,
+               op.project_name AS old_project_name, np.project_name AS new_project_name,
+               cu.username AS created_by_name, au.username AS approved_by_name
+        FROM employee_lifecycle_events ele
+        LEFT JOIN designations od ON od.designation_id = ele.old_designation_id
+        LEFT JOIN designations nd ON nd.designation_id = ele.new_designation_id
+        LEFT JOIN departments odp ON odp.department_id = ele.old_department_id
+        LEFT JOIN departments ndp ON ndp.department_id = ele.new_department_id
+        LEFT JOIN projects op ON op.project_id = ele.old_project_id
+        LEFT JOIN projects np ON np.project_id = ele.new_project_id
+        LEFT JOIN users cu ON cu.user_id = ele.created_by
+        LEFT JOIN users au ON au.user_id = ele.approved_by
+        WHERE ele.employee_id = ? AND ele.status != 'deleted'
+        ORDER BY ele.event_date DESC, ele.event_id DESC
+    ");
+    $sr_stmt->execute([$employee_id]);
+    $sr_events = $sr_stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+// icon + colour per event type (blue-scale per §UI-1; red only for termination)
+$sr_meta = [
+    'promotion'   => ['bi-arrow-up-circle',  '#0d6efd'],
+    'demotion'    => ['bi-arrow-down-circle','#6c757d'],
+    'transfer'    => ['bi-arrow-left-right', '#084298'],
+    'award'       => ['bi-trophy',           '#1e3a8a'],
+    'warning'     => ['bi-exclamation-triangle', '#495057'],
+    'complaint'   => ['bi-chat-left-text',   '#495057'],
+    'resignation' => ['bi-box-arrow-right',  '#6c757d'],
+    'termination' => ['bi-x-octagon',        '#dc3545'],
+];
+$sr_status_badge = [
+    'pending'   => ['#e9ecef', '#495057'],
+    'approved'  => ['#0d6efd', '#fff'],
+    'rejected'  => ['#dc3545', '#fff'],
+    'cancelled' => ['#6c757d', '#fff'],
+];
 ?>
 
 <style>
@@ -110,9 +162,28 @@ $struct_net = $struct_earn - $struct_deduct;
             <a href="<?= getUrl('employees') ?>" class="btn btn-outline-secondary d-print-none">
                 <i class="bi bi-arrow-left"></i> Back to Employees
             </a>
-            <button onclick="printEmployeeReport()" class="btn btn-info text-white shadow-sm d-print-none">
-                <i class="bi bi-printer"></i> Print Employee Profile
-            </button>
+            <div class="d-flex gap-2 d-print-none">
+                <?php if ($can_create_lifecycle): ?>
+                <div class="dropdown">
+                    <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-person-lines-fill me-1"></i> HR Action
+                    </button>
+                    <ul class="dropdown-menu shadow border-0 p-2">
+                        <li><button class="dropdown-item py-2 rounded" onclick="openLifecycleModal('promotion')"><i class="bi bi-arrow-up-circle text-primary me-2"></i> Promote</button></li>
+                        <li><button class="dropdown-item py-2 rounded" onclick="openLifecycleModal('transfer')"><i class="bi bi-arrow-left-right text-primary me-2"></i> Transfer</button></li>
+                        <li><button class="dropdown-item py-2 rounded" onclick="openLifecycleModal('award')"><i class="bi bi-trophy text-primary me-2"></i> Award</button></li>
+                        <li><button class="dropdown-item py-2 rounded" onclick="openLifecycleModal('warning')"><i class="bi bi-exclamation-triangle text-primary me-2"></i> Warn</button></li>
+                        <li><button class="dropdown-item py-2 rounded" onclick="openLifecycleModal('complaint')"><i class="bi bi-chat-left-text text-primary me-2"></i> Record Complaint</button></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><button class="dropdown-item py-2 rounded" onclick="openLifecycleModal('resignation')"><i class="bi bi-box-arrow-right me-2"></i> Resignation</button></li>
+                        <li><button class="dropdown-item py-2 rounded text-danger" onclick="openLifecycleModal('termination')"><i class="bi bi-x-octagon text-danger me-2"></i> Termination</button></li>
+                    </ul>
+                </div>
+                <?php endif; ?>
+                <button onclick="printEmployeeReport()" class="btn btn-info text-white shadow-sm">
+                    <i class="bi bi-printer"></i> Print Employee Profile
+                </button>
+            </div>
         </div>
     </div>
 
@@ -151,13 +222,21 @@ $struct_net = $struct_earn - $struct_deduct;
                 </div>
                 <div class="card-footer bg-light p-3">
                     <div class="row text-center">
-                        <div class="col-6 border-end">
+                        <div class="col-3 border-end">
                             <h5 class="mb-0"><?= $employee['total_attendance'] ?></h5>
                             <small class="text-muted">Attendance</small>
                         </div>
-                        <div class="col-6">
+                        <div class="col-3 border-end">
                             <h5 class="mb-0"><?= $employee['total_leaves'] ?></h5>
                             <small class="text-muted">Leaves</small>
+                        </div>
+                        <div class="col-3 border-end">
+                            <h5 class="mb-0"><?= (int)$employee['total_awards'] ?></h5>
+                            <small class="text-muted">Awards</small>
+                        </div>
+                        <div class="col-3">
+                            <h5 class="mb-0"><?= (int)$employee['total_warnings'] ?></h5>
+                            <small class="text-muted">Warnings</small>
                         </div>
                     </div>
                 </div>
@@ -309,6 +388,83 @@ $struct_net = $struct_earn - $struct_deduct;
                 </div>
                 </div>
             </div>
+
+            <?php if ($can_view_lifecycle): ?>
+            <!-- Service Record (Tier 1 — lifecycle timeline) -->
+            <div class="card shadow-sm mb-4" id="serviceRecordCard">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="mb-0"><i class="bi bi-clock-history text-primary me-1"></i> Service Record</h5>
+                    <span class="badge" style="background:#e7f0ff;color:#084298;border:1px solid #b6ccfe"><?= count($sr_events) ?> event<?= count($sr_events) === 1 ? '' : 's' ?></span>
+                </div>
+                <div class="card-body">
+                    <?php if (!$sr_events): ?>
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-clock-history" style="font-size:2rem;"></i>
+                        <p class="mb-0 mt-2">No service record entries yet. Promotions, transfers, awards and other HR actions will appear here once recorded.</p>
+                    </div>
+                    <?php else: ?>
+                    <div class="sr-timeline">
+                        <?php foreach ($sr_events as $ev):
+                            [$icon, $color] = $sr_meta[$ev['event_type']] ?? ['bi-tag', '#495057'];
+                            [$sbg, $sfg] = $sr_status_badge[$ev['status']] ?? ['#e9ecef', '#495057'];
+                            // old→new line per type
+                            $change = '';
+                            switch ($ev['event_type']) {
+                                case 'promotion':
+                                case 'demotion':
+                                    $change = safe_output($ev['old_designation_name'], '—') . ' → ' . safe_output($ev['new_designation_name'], '—');
+                                    if ($ev['new_salary'] !== null) $change .= ' · salary ' . number_format((float)$ev['old_salary'], 0) . ' → ' . number_format((float)$ev['new_salary'], 0);
+                                    break;
+                                case 'transfer':
+                                    $bits = [];
+                                    if ($ev['new_department_id']) $bits[] = safe_output($ev['old_department_name'], '—') . ' → ' . safe_output($ev['new_department_name'], '—');
+                                    if ($ev['new_project_id']) $bits[] = safe_output($ev['old_project_name'], 'No project') . ' → ' . safe_output($ev['new_project_name'], '—');
+                                    $change = implode(' · ', $bits);
+                                    break;
+                                case 'award':       $change = safe_output($ev['award_type'], '—') . ($ev['award_amount'] ? ' · ' . number_format((float)$ev['award_amount'], 0) : ''); break;
+                                case 'warning':     $change = $ev['severity'] ? ucfirst($ev['severity']) . ' warning' : ''; break;
+                                case 'complaint':   $change = 'By: ' . safe_output($ev['complainant'], '—'); break;
+                                case 'resignation': $change = 'Last working day: ' . safe_output($ev['end_date'], '—'); break;
+                                case 'termination': $change = safe_output($ev['termination_type'], '—'); break;
+                            }
+                        ?>
+                        <div class="d-flex gap-3 pb-3 mb-1 border-start ms-2 ps-3 position-relative" style="border-color:#b6ccfe!important;">
+                            <span class="position-absolute rounded-circle d-flex align-items-center justify-content-center"
+                                  style="left:-14px;top:0;width:26px;height:26px;background:<?= $color ?>;color:#fff;font-size:.8rem;">
+                                <i class="bi <?= $icon ?>"></i>
+                            </span>
+                            <div class="flex-grow-1 ms-2">
+                                <div class="d-flex justify-content-between flex-wrap gap-1">
+                                    <strong><?= safe_output($ev['title']) ?></strong>
+                                    <span>
+                                        <span class="badge" style="background:<?= $sbg ?>;color:<?= $sfg ?>"><?= ucfirst($ev['status']) ?></span>
+                                        <small class="text-muted ms-1"><?= date('d M Y', strtotime($ev['event_date'])) ?></small>
+                                    </span>
+                                </div>
+                                <?php if ($change): ?><div class="small text-muted"><?= $change ?></div><?php endif; ?>
+                                <?php if (!empty($ev['description'])): ?>
+                                <div class="small mt-1"><?= safe_output($ev['description']) ?></div>
+                                <?php endif; ?>
+                                <div class="small text-muted mt-1">
+                                    Recorded by <?= safe_output($ev['created_by_name'], '—') ?>
+                                    <?php if ($ev['approved_by_name']): ?>
+                                        · <?= $ev['status'] === 'rejected' ? 'Rejected' : 'Approved' ?> by <?= safe_output($ev['approved_by_name']) ?><?= $ev['approved_at'] ? ' on ' . date('d M Y', strtotime($ev['approved_at'])) : '' ?>
+                                    <?php endif; ?>
+                                    <?php if (!empty($ev['reject_reason'])): ?>
+                                        · <span class="text-danger">Reason: <?= safe_output($ev['reject_reason']) ?></span>
+                                    <?php endif; ?>
+                                    <?php if (!empty($ev['attachment_path'])): ?>
+                                        · <a href="<?= buildUrl('api/download_lifecycle_attachment.php') ?>?event_id=<?= (int)$ev['event_id'] ?>" class="d-print-none"><i class="bi bi-paperclip"></i> <?= safe_output($ev['attachment_name'], 'Attachment') ?></a>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <!-- Compensation & Payment -->
             <div class="card shadow-sm mb-4">
@@ -707,6 +863,28 @@ function editEmployee(id) {
     window.location.href = APP_URL + '/employees?edit_id=' + id;
 }
 </script>
+
+<?php if ($can_create_lifecycle):
+    // Shared New-HR-Action modal, locked to this employee (Tier 1, Phase 1.5)
+    $lifecycle_preselect = [
+        'employee_id' => (int)$employee_id,
+        'name' => trim(implode(' ', array_filter([$employee['first_name'], $employee['last_name']]))),
+    ];
+    require __DIR__ . '/includes/lifecycle_modal.php';
+?>
+<script>
+// Open the shared modal with the action type pre-picked (HR Action dropdown)
+function openLifecycleModal(type) {
+    const el = document.getElementById('lifecycleModal');
+    $(el).one('shown.bs.modal', function () {
+        $('#lc_type').val(type).trigger('change');
+    });
+    new bootstrap.Modal(el).show();
+}
+// After a save, reload so the timeline, status badge and mini-stats refresh
+window.onLifecycleSaved = function () { location.reload(); };
+</script>
+<?php endif; ?>
 
 <?php
 include("footer.php");
