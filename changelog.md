@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-07-02 (feat) — HR Lifecycle foundation (Tier 1, Phase 1.1)
+
+Foundation for the employee lifecycle module (promotions, transfers, awards,
+warnings, complaints, resignations, terminations → recorded, approvable Service
+Record entries). Purely additive — no existing table altered, no endpoint changed.
+
+- `migrations/2026_07_02_employee_lifecycle_events.php` — new `employee_lifecycle_events`
+  table (one table for all 8 event types, old→new snapshots, pending→approved/rejected/
+  cancelled workflow, InnoDB, FK to employees) + `uploads/lifecycle/` with deny-exec `.htaccess`.
+- `migrations/2026_07_02_employee_lifecycle_permissions.php` — `employee_lifecycle`
+  permission row (HR Actions, module Human Resources); full CRUD + approve resolved at
+  runtime (admin roles + roles holding `can_edit` on employees), view-only for the rest.
+- `roots.php` — routes for `hr_actions` page + 6 lifecycle APIs (both clean and `.php` forms).
+- `header.php` — "HR Actions" item in Operations → Human Resources, gated by
+  `canView('employee_lifecycle')`.
+- `core/permissions.php` — router-fallback mapping `hr_actions.php` → `employee_lifecycle`.
+- `tests/test_hr_lifecycle_foundation_cli.php` — 31 assertions: idempotent migrations,
+  schema/indexes/FK, permission matrix, routes, nav gating, upload hardening, no-break checks.
+
 ## 2026-07-02 (refactor) — procurement side joins the shared Project ↔ Warehouse mechanism
 
 Follow-up to the sales-side centralisation below: the four procurement pages that
