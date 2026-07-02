@@ -58,24 +58,32 @@ try {
         exit();
     }
 
-    // Confirmed — cascade delete then soft-delete warehouse
-    // 1. Remove stock records
-    $pdo->prepare("DELETE FROM product_stocks WHERE warehouse_id = ?")->execute([$warehouse_id]);
+    // Confirmed — cascade delete then soft-delete warehouse as ONE atomic unit:
+    // a failure anywhere rolls everything back (no orphaned half-deleted state).
+    // stock_movements are intentionally KEPT — they are the audit history of
+    // stock in/out; only current-state rows (stocks, locations) are removed.
+    $pdo->beginTransaction();
+    try {
+        // 1. Remove current stock records
+        $pdo->prepare("DELETE FROM product_stocks WHERE warehouse_id = ?")->execute([$warehouse_id]);
 
-    // 2. Remove stock movements linked to this warehouse
-    $pdo->prepare("DELETE FROM stock_movements WHERE warehouse_id = ?")->execute([$warehouse_id]);
+        // 2. Remove locations
+        $pdo->prepare("DELETE FROM locations WHERE warehouse_id = ?")->execute([$warehouse_id]);
 
-    // 3. Remove locations
-    $pdo->prepare("DELETE FROM locations WHERE warehouse_id = ?")->execute([$warehouse_id]);
+        // 3. Soft-delete the warehouse
+        $pdo->prepare("UPDATE warehouses SET status = 'deleted', updated_by = ?, updated_at = NOW() WHERE warehouse_id = ?")
+            ->execute([$_SESSION['user_id'], $warehouse_id]);
 
-    // 4. Soft-delete the warehouse
-    $pdo->prepare("UPDATE warehouses SET status = 'deleted', updated_by = ?, updated_at = NOW() WHERE warehouse_id = ?")
-        ->execute([$_SESSION['user_id'], $warehouse_id]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
 
-    logActivity($pdo, $_SESSION['user_id'], 'Deleted Warehouse', "Warehouse ID $warehouse_id deleted (cascade: $productCount products, $locationCount locations).");
+    logActivity($pdo, $_SESSION['user_id'], 'Deleted Warehouse', "Warehouse ID $warehouse_id deleted (cascade: $productCount products, $locationCount locations; movement history preserved).");
 
     echo json_encode(['success' => true, 'message' => 'Warehouse deleted successfully.']);
 
-} catch (PDOException $e) {
+} catch (Throwable $e) {
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
 }

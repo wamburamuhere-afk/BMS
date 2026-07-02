@@ -52,52 +52,73 @@ try {
     $net_salary = $gross_salary - ($deductions + $nssf + $tax_amount);
     $new_status = $_POST['payment_status'] ?? $existing['payment_status'] ?? 'pending';
 
-    $stmt = $pdo->prepare("
-        UPDATE payroll SET
-            basic_salary = ?,
-            allowances = ?,
-            deductions = ?,
-            tax_amount = ?,
-            gross_salary = ?,
-            net_salary = ?,
-            payment_method = ?,
-            payment_status = ?,
-            notes = ?,
-            updated_at = NOW()
-        WHERE payroll_id = ?
-    ");
+    // The edit and its ledger consequences are one atomic unit: payroll UPDATE,
+    // old accrual reversal and re-accrual all commit together. A failure anywhere
+    // rolls the whole edit back — never a payroll changed with its accrual
+    // reversed-but-not-reposted.
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare("
+            UPDATE payroll SET
+                basic_salary = ?,
+                allowances = ?,
+                deductions = ?,
+                tax_amount = ?,
+                gross_salary = ?,
+                net_salary = ?,
+                payment_method = ?,
+                payment_status = ?,
+                notes = ?,
+                updated_at = NOW()
+            WHERE payroll_id = ?
+        ");
 
-    $stmt->execute([
-        $basic_salary,
-        $allowances,
-        $deductions,
-        $tax_amount,
-        $gross_salary,
-        $net_salary,
-        $_POST['payment_method'] ?? 'bank',
-        $new_status,
-        $_POST['notes'] ?? '',
-        $payroll_id
-    ]);
+        $stmt->execute([
+            $basic_salary,
+            $allowances,
+            $deductions,
+            $tax_amount,
+            $gross_salary,
+            $net_salary,
+            $_POST['payment_method'] ?? 'bank',
+            $new_status,
+            $_POST['notes'] ?? '',
+            $payroll_id
+        ]);
 
-    // Accrual model — if the record was accrued and is NOT yet paid, re-post the
-    // accrual to match the edited amounts (a paid record's ledger is left intact).
-    if (empty($existing['payment_transaction_id']) && ($existing['payment_status'] ?? '') !== 'paid') {
-        if (!empty($existing['accrual_transaction_id'])) {
-            reverseJournalBalances($pdo, (int)$existing['accrual_transaction_id']);
-            $pdo->prepare("UPDATE payroll SET accrual_transaction_id = NULL WHERE payroll_id = ?")->execute([$payroll_id]);
+        // Accrual model — if the record was accrued and is NOT yet paid, re-post the
+        // accrual to match the edited amounts (a paid record's ledger is left intact).
+        if (empty($existing['payment_transaction_id']) && ($existing['payment_status'] ?? '') !== 'paid') {
+            if (!empty($existing['accrual_transaction_id'])) {
+                reverseJournalBalances($pdo, (int)$existing['accrual_transaction_id']);
+                $pdo->prepare("UPDATE payroll SET accrual_transaction_id = NULL WHERE payroll_id = ?")->execute([$payroll_id]);
+            }
+            if (in_array($new_status, ['approved', 'processing'], true)) {
+                $txn = ensurePayrollAccrued($pdo, (int)$payroll_id, (int)$_SESSION['user_id']);
+                if (!$txn) {
+                    throw new Exception('GL accrual could not be re-posted — check the payroll account mapping in System Settings. The edit was not saved.');
+                }
+            }
         }
-        if (in_array($new_status, ['approved', 'processing'], true)) {
-            try { ensurePayrollAccrued($pdo, (int)$payroll_id, (int)$_SESSION['user_id']); }
-            catch (Throwable $e) { error_log('update re-accrual: ' . $e->getMessage()); }
-        }
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
     }
-    // Refresh the period's schedule + SDL accrual to match the edit.
+
+    // Refresh the period's schedule + SDL accrual to match the edit — its own
+    // atomic unit so the schedule and the SDL journal can never disagree.
     if (!empty($existing['payroll_period'])) {
+        $pdo->beginTransaction();
         try {
             $rs = syncStatutoryRemittances($pdo, $existing['payroll_period'], (int)$_SESSION['user_id']);
             postSdlAccrual($pdo, $existing['payroll_period'], (float)($rs['amounts']['sdl'] ?? 0), (int)$_SESSION['user_id']);
-        } catch (Throwable $e) { error_log('update statutory refresh: ' . $e->getMessage()); }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            error_log('update statutory refresh: ' . $e->getMessage());
+        }
     }
 
     logActivity($pdo, $_SESSION['user_id'], 'Edit payroll', "User edited payroll record for period: {$existing['payroll_period']} (ID $payroll_id)");
@@ -112,6 +133,6 @@ try {
 
     echo json_encode(['success' => true, 'message' => 'Payroll record updated successfully']);
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }

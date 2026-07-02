@@ -54,24 +54,34 @@ try {
     $wonDate  = $stage['is_won']  ? date('Y-m-d') : null;
     $lostDate = $stage['is_lost'] ? date('Y-m-d') : null;
 
-    if ($probability !== null) {
-        $pdo->prepare("UPDATE crm_leads SET pipeline_stage_id = ?, probability = ?, lost_reason = ?,
-                       won_date = COALESCE(won_date, ?), lost_date = COALESCE(lost_date, ?),
-                       stage_entered = NOW(), updated_at = NOW() WHERE lead_id = ?")
-            ->execute([$new_stage_id, $probability, ($stage['is_lost'] && $lost_reason ? $lost_reason : null),
-                       $wonDate, $lostDate, $lead_id]);
-    } else {
-        $pdo->prepare("UPDATE crm_leads SET pipeline_stage_id = ?, stage_entered = NOW(), updated_at = NOW() WHERE lead_id = ?")
-            ->execute([$new_stage_id, $lead_id]);
+    // Stage move + history entry + score update commit together — a lead can't
+    // change stage without its history row.
+    $pdo->beginTransaction();
+    try {
+        if ($probability !== null) {
+            $pdo->prepare("UPDATE crm_leads SET pipeline_stage_id = ?, probability = ?, lost_reason = ?,
+                           won_date = COALESCE(won_date, ?), lost_date = COALESCE(lost_date, ?),
+                           stage_entered = NOW(), updated_at = NOW() WHERE lead_id = ?")
+                ->execute([$new_stage_id, $probability, ($stage['is_lost'] && $lost_reason ? $lost_reason : null),
+                           $wonDate, $lostDate, $lead_id]);
+        } else {
+            $pdo->prepare("UPDATE crm_leads SET pipeline_stage_id = ?, stage_entered = NOW(), updated_at = NOW() WHERE lead_id = ?")
+                ->execute([$new_stage_id, $lead_id]);
+        }
+
+        // Log stage history
+        $pdo->prepare("INSERT INTO crm_lead_stage_history (lead_id, from_stage_id, to_stage_id, changed_by) VALUES (?, ?, ?, ?)")
+            ->execute([$lead_id, $from_stage_id, $new_stage_id, $_SESSION['user_id']]);
+
+        // Recalculate score
+        $score = computeLeadScore($pdo, $lead_id);
+        $pdo->prepare("UPDATE crm_leads SET lead_score = ? WHERE lead_id = ?")->execute([$score, $lead_id]);
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
     }
-
-    // Log stage history
-    $pdo->prepare("INSERT INTO crm_lead_stage_history (lead_id, from_stage_id, to_stage_id, changed_by) VALUES (?, ?, ?, ?)")
-        ->execute([$lead_id, $from_stage_id, $new_stage_id, $_SESSION['user_id']]);
-
-    // Recalculate score
-    $score = computeLeadScore($pdo, $lead_id);
-    $pdo->prepare("UPDATE crm_leads SET lead_score = ? WHERE lead_id = ?")->execute([$score, $lead_id]);
 
     $full_name = trim($lead['first_name'] . ' ' . $lead['last_name']);
     logActivity($pdo, $_SESSION['user_id'], "Lead {$lead['lead_code']} ({$full_name}) moved to stage: {$stage['stage_name']}");

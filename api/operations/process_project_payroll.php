@@ -131,14 +131,26 @@ try {
     // idempotent via payroll.accrual_transaction_id), then the period's statutory
     // schedule + SDL are refreshed once. Pending rows accrue later at their approval.
     if (!empty($approved_ids)) {
-        try {
-            foreach ($approved_ids as $pid) {
+        // Each record's accrual is its own atomic unit (all journal legs or none);
+        // the period's schedule + SDL pair likewise commit together.
+        foreach ($approved_ids as $pid) {
+            $pdo->beginTransaction();
+            try {
                 ensurePayrollAccrued($pdo, $pid, (int)$_SESSION['user_id']);
+                $pdo->commit();
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                error_log("project payroll accrual PAY#$pid: " . $e->getMessage());
             }
+        }
+        $pdo->beginTransaction();
+        try {
             $rs = syncStatutoryRemittances($pdo, $payroll_period, (int)$_SESSION['user_id']);
             postSdlAccrual($pdo, $payroll_period, (float)($rs['amounts']['sdl'] ?? 0), (int)$_SESSION['user_id']);
+            $pdo->commit();
         } catch (Throwable $e) {
-            error_log('project payroll accrual: ' . $e->getMessage());
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            error_log('project payroll statutory sync: ' . $e->getMessage());
         }
     }
 
