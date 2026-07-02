@@ -19,12 +19,14 @@ if ($employee_id <= 0) {
 
 // Fetch Employee Details
 $stmt = $pdo->prepare("
-    SELECT e.*, d.department_name, des.designation_name,
+    SELECT e.*, d.department_name, des.designation_name, et.type_name as employment_type, pr.project_name,
     (SELECT COUNT(*) FROM attendance WHERE employee_id = e.employee_id AND status = 'present') as total_attendance,
     (SELECT COUNT(*) FROM leaves WHERE employee_id = e.employee_id AND status = 'approved') as total_leaves
-    FROM employees e 
-    LEFT JOIN departments d ON e.department_id = d.department_id 
+    FROM employees e
+    LEFT JOIN departments d ON e.department_id = d.department_id
     LEFT JOIN designations des ON e.designation_id = des.designation_id
+    LEFT JOIN employment_types et ON e.employment_type_id = et.type_id
+    LEFT JOIN projects pr ON e.project_id = pr.project_id
     WHERE e.employee_id = ?
 ");
 $stmt->execute([$employee_id]);
@@ -127,7 +129,7 @@ $struct_net = $struct_earn - $struct_deduct;
                         </div>
                     <?php endif; ?>
                     
-                    <h4 class="card-title mb-1"><?= safe_output($employee['first_name'] . ' ' . $employee['last_name']) ?></h4>
+                    <h4 class="card-title mb-1"><?= safe_output(implode(' ', array_filter([$employee['first_name'], $employee['middle_name'] ?? '', $employee['last_name']]))) ?></h4>
                     <p class="text-muted mb-2"><?= safe_output($employee['designation_name']) ?></p>
                     <span class="badge bg-<?= $employee['employment_status'] === 'active' ? 'success' : 'secondary' ?> mb-3">
                         <?= ucfirst(str_replace('_', ' ', $employee['employment_status'])) ?>
@@ -174,15 +176,36 @@ $struct_net = $struct_earn - $struct_deduct;
                             <a href="mailto:<?= safe_output($employee['email']) ?>" class="text-decoration-none ms-4"><?= safe_output($employee['email']) ?></a>
                         </li>
                         <li class="mb-3">
-                            <i class="bi bi-telephone text-primary me-2"></i> 
+                            <i class="bi bi-telephone text-primary me-2"></i>
                             <strong>Phone:</strong><br>
                             <span class="ms-4"><?= safe_output($employee['phone']) ?></span>
                         </li>
+                        <?php if (!empty($employee['alternate_phone'])): ?>
                         <li class="mb-3">
-                            <i class="bi bi-geo-alt text-primary me-2"></i> 
-                            <strong>Address:</strong><br>
-                            <span class="ms-4"><?= safe_output($employee['address']) ?></span>
+                            <i class="bi bi-telephone-plus text-primary me-2"></i>
+                            <strong>Alternate Phone:</strong><br>
+                            <span class="ms-4"><?= safe_output($employee['alternate_phone']) ?></span>
                         </li>
+                        <?php endif; ?>
+                        <li class="mb-3">
+                            <i class="bi bi-geo-alt text-primary me-2"></i>
+                            <strong>Address:</strong><br>
+                            <span class="ms-4"><?= safe_output($employee['physical_address'] ?? $employee['address']) ?></span>
+                        </li>
+                        <?php if (!empty($employee['postal_address'])): ?>
+                        <li class="mb-3">
+                            <i class="bi bi-mailbox text-primary me-2"></i>
+                            <strong>Postal Address:</strong><br>
+                            <span class="ms-4"><?= safe_output($employee['postal_address']) ?></span>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (!empty($employee['city']) || !empty($employee['country'])): ?>
+                        <li class="mb-3">
+                            <i class="bi bi-globe text-primary me-2"></i>
+                            <strong>City / Country:</strong><br>
+                            <span class="ms-4"><?= safe_output(implode(', ', array_filter([$employee['city'] ?? '', $employee['country'] ?? '']))) ?></span>
+                        </li>
+                        <?php endif; ?>
                     </ul>
                 </div>
             </div>
@@ -205,12 +228,40 @@ $struct_net = $struct_earn - $struct_deduct;
                             <p class="fw-bold"><?= safe_output($employee['department_name']) ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Employment Type</label>
+                            <p class="fw-bold"><?= safe_output($employee['employment_type'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Join Date</label>
                             <p class="fw-bold"><?= !empty($employee['hire_date']) ? date('M d, Y', strtotime($employee['hire_date'])) : '-' ?></p>
                         </div>
-                        
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Reporting To</label>
+                            <p class="fw-bold"><?= safe_output($employee['reporting_to'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Work Location</label>
+                            <p class="fw-bold"><?= safe_output($employee['work_location'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Project</label>
+                            <p class="fw-bold"><?= safe_output($employee['project_name'] ?? 'N/A') ?></p>
+                        </div>
+                        <?php if ($employee['employment_status'] === 'probation' && !empty($employee['probation_end_date'])): ?>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Probation End Date</label>
+                            <p class="fw-bold"><?= date('M d, Y', strtotime($employee['probation_end_date'])) ?></p>
+                        </div>
+                        <?php endif; ?>
+                        <?php if ($employee['employment_status'] === 'contract' && !empty($employee['contract_end_date'])): ?>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Contract End Date</label>
+                            <p class="fw-bold"><?= date('M d, Y', strtotime($employee['contract_end_date'])) ?></p>
+                        </div>
+                        <?php endif; ?>
+
                         <div class="col-12"><hr class="my-2"></div>
-                        
+
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Date of Birth</label>
                             <p class="fw-bold"><?= !empty($employee['date_of_birth']) ? date('M d, Y', strtotime($employee['date_of_birth'])) : '-' ?></p>
@@ -222,6 +273,14 @@ $struct_net = $struct_earn - $struct_deduct;
                          <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">NIDA / ID Number</label>
                             <p class="fw-bold"><?= safe_output($employee['national_id'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Marital Status</label>
+                            <p class="fw-bold"><?= !empty($employee['marital_status']) ? ucfirst($employee['marital_status']) : 'N/A' ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Passport Number</label>
+                            <p class="fw-bold"><?= safe_output($employee['passport_number'] ?? 'N/A') ?></p>
                         </div>
 
                         <div class="col-12"><hr class="my-2"></div>
@@ -238,8 +297,65 @@ $struct_net = $struct_earn - $struct_deduct;
                             <label class="text-muted small text-uppercase">Bank Name</label>
                             <p class="fw-bold"><?= safe_output($employee['bank_name'] ?? 'N/A') ?></p>
                         </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Bank Branch</label>
+                            <p class="fw-bold"><?= safe_output($employee['bank_branch'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Mobile Money</label>
+                            <p class="fw-bold"><?= safe_output($employee['mobile_money'] ?? 'N/A') ?></p>
+                        </div>
                     </div>
                 </div>
+                </div>
+            </div>
+
+            <!-- Compensation & Payment -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0"><i class="bi bi-cash-coin text-success me-1"></i> Compensation &amp; Payment</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Hourly Rate</label>
+                            <p class="fw-bold"><?= !empty($employee['hourly_rate']) ? format_currency($employee['hourly_rate']) : 'N/A' ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Currency</label>
+                            <p class="fw-bold"><?= safe_output($employee['currency'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Payment Frequency</label>
+                            <p class="fw-bold"><?= !empty($employee['payment_frequency']) ? ucfirst(str_replace('_', ' ', $employee['payment_frequency'])) : 'N/A' ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Payment Method</label>
+                            <p class="fw-bold"><?= !empty($employee['payment_method']) ? ucfirst(str_replace('_', ' ', $employee['payment_method'])) : 'N/A' ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Tax ID (TIN)</label>
+                            <p class="fw-bold"><?= safe_output($employee['tax_id'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Social Security Number</label>
+                            <p class="fw-bold"><?= safe_output($employee['social_security_number'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-12">
+                            <label class="text-muted small text-uppercase">Benefits</label>
+                            <p class="fw-bold">
+                                <?php
+                                $benefits = !empty($employee['benefits']) ? json_decode($employee['benefits'], true) : [];
+                                if (is_array($benefits) && count($benefits)):
+                                    foreach ($benefits as $b): ?>
+                                        <span class="badge bg-success me-1"><?= ucfirst(str_replace('_', ' ', $b)) ?></span>
+                                    <?php endforeach;
+                                else: ?>
+                                    <span class="text-muted fw-normal">None</span>
+                                <?php endif; ?>
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -421,6 +537,24 @@ $struct_net = $struct_earn - $struct_deduct;
                     </div>
                 </div>
             </div>
+
+            <?php $notes_text = trim(($employee['notes'] ?? '') . "\n" . ($employee['additional_notes'] ?? '')); ?>
+            <?php if ($notes_text !== ''): ?>
+            <!-- Notes Card -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0"><i class="bi bi-sticky text-warning me-1"></i> Notes</h5>
+                </div>
+                <div class="card-body">
+                    <?php if (!empty($employee['notes'])): ?>
+                    <p class="mb-2"><?= nl2br(safe_output($employee['notes'])) ?></p>
+                    <?php endif; ?>
+                    <?php if (!empty($employee['additional_notes'])): ?>
+                    <p class="mb-0 text-muted"><strong>Additional:</strong> <?= nl2br(safe_output($employee['additional_notes'])) ?></p>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <!-- Full Payroll & Payment History (all records, since day one) -->
             <?php
