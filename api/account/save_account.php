@@ -200,47 +200,56 @@ try {
         $balance_delta = $opening_balance - $orig['opening_balance'];
         $new_current_balance = $orig['current_balance'] + $balance_delta;
 
-        // Update
-        $stmt = $pdo->prepare("
-            UPDATE accounts SET 
-                account_code = ?, 
-                account_name = ?, 
-                account_type_id = ?,
-                account_type = ?,
-                sub_type_id = ?,
-                category_id = ?,
-                description = ?,
-                opening_balance = ?,
-                current_balance = ?,
-                parent_account_id = ?,
-                level = ?,
-                normal_balance = ?,
-                cash_flow_category = COALESCE(?, cash_flow_category),
-                status = ?,
-                updated_at = NOW()
-            WHERE account_id = ?
-        ");
-        $stmt->execute([
-            $account_code,
-            $account_name,
-            $account_type_id,
-            $account_type_name,
-            $sub_type_id,
-            $category_id,
-            $description,
-            $opening_balance,
-            $new_current_balance,
-            $parent_account_id,
-            $level,
-            $normal_balance,
-            $cash_flow_category,
-            $status,
-            $account_id
-        ]);
+        // Update + subtree re-level commit together — a failure mid-cascade
+        // can't leave children with stale levels (breaks the indented COA tree).
+        $pdo->beginTransaction();
+        try {
+            $stmt = $pdo->prepare("
+                UPDATE accounts SET
+                    account_code = ?,
+                    account_name = ?,
+                    account_type_id = ?,
+                    account_type = ?,
+                    sub_type_id = ?,
+                    category_id = ?,
+                    description = ?,
+                    opening_balance = ?,
+                    current_balance = ?,
+                    parent_account_id = ?,
+                    level = ?,
+                    normal_balance = ?,
+                    cash_flow_category = COALESCE(?, cash_flow_category),
+                    status = ?,
+                    updated_at = NOW()
+                WHERE account_id = ?
+            ");
+            $stmt->execute([
+                $account_code,
+                $account_name,
+                $account_type_id,
+                $account_type_name,
+                $sub_type_id,
+                $category_id,
+                $description,
+                $opening_balance,
+                $new_current_balance,
+                $parent_account_id,
+                $level,
+                $normal_balance,
+                $cash_flow_category,
+                $status,
+                $account_id
+            ]);
 
-        // Re-parenting changes this account's level; cascade the fix to descendants
-        // so child.level stays parent.level + 1 throughout the moved subtree.
-        recomputeSubtreeLevels($pdo, (int)$account_id);
+            // Re-parenting changes this account's level; cascade the fix to descendants
+            // so child.level stays parent.level + 1 throughout the moved subtree.
+            recomputeSubtreeLevels($pdo, (int)$account_id);
+
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
 
         logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Edit account', "User edited account: $account_name ($account_code, ID $account_id)");
         logAudit($pdo, $_SESSION['user_id'] ?? 0, 'Updated Account', [

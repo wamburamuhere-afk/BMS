@@ -1,5 +1,36 @@
 # BMS Changelog
 
+## 2026-07-01 (fix) — remaining multi-write endpoints (stock/CRM/config) made atomic
+
+Final batch of the transaction-safety sweep. Nine endpoints performed genuine
+multi-step writes with no transaction:
+
+- `api/rfq_quick_add_product.php` — product INSERT + stock row INSERT atomic.
+- `api/crm/move_lead_stage.php` — stage UPDATE + history INSERT + score UPDATE
+  atomic (a lead can't change stage without its history row).
+- `api/crm/bulk_update_leads.php` — bulk stage move + all history rows atomic.
+- `api/crm/add_activity.php` — activity INSERT + lead timestamp + score atomic.
+- `api/crm/edit_lead.php` — lead UPDATE + re-code + label replace atomic (a
+  failure can't leave labels deleted but not re-inserted).
+- `api/crm/manage_stage.php` — pipeline reorder loop atomic (no half-reordered
+  pipeline with duplicate positions).
+- `api/pos/delete_salary_component.php` — component soft-delete + assignment
+  retirement atomic.
+- `api/account/save_account.php` — account UPDATE + subtree level recompute
+  atomic (no stale-level children in the COA tree).
+- `api/finance/manage_revenue_schema.php` — category delete-tree cascade atomic.
+
+Audited and intentionally NOT wrapped (single write per request): the
+update-or-insert endpoints (`save_category`, `save_document_template`,
+`save_compliance`, `rules_api`), per-row-reporting bulk loops (attendance
+marks, supplier/customer/lead imports), and get-or-create lookup inserts
+(`add_budget`/`update_budget`/`process_edit_customer` category creation —
+a failure leaves a valid reusable row, not corruption).
+
+- `tests/test_multiwrite_tx_coverage_cli.php` — 22 checks: static regression
+  guard over all 18 tx-fixed endpoints (sibling-branch files auto-activate
+  once merged), InnoDB foundation check, live rollback proof for CRM stage
+  move and RFQ quick-add. All 26 related CRM/account suites pass.
 ## 2026-07-01 (fix) — warehouse delete cascade is atomic and preserves stock movement history
 
 The warehouse delete cascade (product_stocks → stock_movements → locations →
