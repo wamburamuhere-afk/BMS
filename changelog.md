@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-07-02 (fix) — MyISAM→InnoDB conversion migration failed on legacy zero-dates
+
+`2026_07_01_convert_myisam_to_innodb.php` rebuilds every MyISAM table via
+`ALTER TABLE ... ENGINE=InnoDB`. Rebuilding a table makes MySQL re-validate
+every row against the session's `sql_mode`, even though no column is being
+altered. Production data (e.g. `employees.probation_end_date`,
+`employees.contract_end_date`, `sales_orders.delivery_date`) holds legacy
+`'0000-00-00'` values from years before validation was tightened — harmless
+as stored data, but `STRICT_TRANS_TABLES`/`NO_ZERO_DATE` rejected the
+rebuild outright. This stopped the deploy (`script_stop: true`) on the
+`demo` server mid-rollout, after 3 of 5 servers had already deployed
+cleanly (their data has no zero-dates); `bejus` was never reached.
+
+- `migrations/2026_07_01_convert_myisam_to_innodb.php` — relaxes
+  `STRICT_TRANS_TABLES`/`STRICT_ALL_TABLES`/`NO_ZERO_DATE`/`NO_ZERO_IN_DATE`
+  for the session for the duration of the conversion only (no data is
+  touched), restored via `finally` even on failure. Reproduced the exact
+  production error locally on a throwaway table and confirmed the fix
+  converts the engine, preserves the zero-date value untouched, and fully
+  restores the original `sql_mode` afterward.
+
 ## 2026-07-01 (security) — quarantine 284 unauthenticated one-off scripts out of the public webroot
 
 Of 299 top-level `.php` files, only 15 are real entry points (verified against the
