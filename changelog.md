@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-07-02 (feat) — HR Actions page (Tier 1, Phase 1.4)
+
+The management UI for the lifecycle module — one page for all 8 event types.
+
+- `app/bms/pos/hr_actions.php` — house template §8, page_key `employee_lifecycle`:
+  6 stat cards (Pending / Promotions / Transfers / Awards / Warnings / Exits — current
+  year, scope-filtered with the same helper the API uses), filters row (type, status,
+  employee AJAX Select2, date range), DataTable + §UI-7 mobile cards, §UI-5 gear-dropdown
+  actions rendered per state + permission (View always; Approve/Reject on pending +
+  canApprove with reject-reason prompt; Cancel for creator/canEdit; Delete non-approved +
+  canDelete; attachment download), rich View modal, `applyDueLifecycleEffects()` (D5)
+  on load, AJAX redraw (no reloads).
+- `app/bms/pos/includes/lifecycle_modal.php` — the shared "New HR Action" modal
+  (one include reused by employee_details in Phase 1.5): employee AJAX picker (or locked
+  pre-selected employee), per-type field groups toggled by JS, read-only "Current
+  position" panel loaded from `api/get_employee.php`, per-type required-field mirror of
+  the API's validation, CSRF, §16 submit pattern, strict-scope project dropdown.
+- `api/account/search_employees.php` — gate broadened additively:
+  `canView('financial_reports') OR canView('employee_lifecycle')` so HR users can use
+  the existing employee search; no access removed.
+- `tests/test_hr_actions_page_cli.php` — 31 assertions: lint, UI-standard source checks,
+  live render as real admin (buttons/modal/flags present) and real view-only Director
+  (create+approve hidden, modal not included), end-to-end create→approve→employee-changed
+  through the page's own endpoints.
+
 ## 2026-07-02 (feat) — HR Lifecycle workflow: approve/reject/cancel + effects (Tier 1, Phase 1.3)
 
 The approval workflow that makes lifecycle events real. `api/update_employee_status.php`
