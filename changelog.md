@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-07-01 (fix) — payroll multi-step writes are now atomic; all tables converted to InnoDB
+
+Payroll payout/edit endpoints performed 3–5 dependent writes (payroll status →
+GL posting → bank register / accrual reverse → re-post) with **no transaction**:
+a mid-sequence failure left some employees paid with GL posted and others not,
+or a payroll amount changed with its accrual reversed-but-never-reposted.
+
+- `migrations/2026_07_01_convert_myisam_to_innodb.php` — **foundation fix**: 80
+  tables (payroll, payment_vouchers, bank_transactions, pos_payments,
+  product_stocks, loans, …) were still MyISAM, where MySQL silently ignores
+  rollbacks — every existing "transaction" touching them was unprotected.
+  Criteria-based + idempotent; converts with `ROW_FORMAT=DYNAMIC` (fixes
+  row_format=FIXED tables under innodb_strict_mode).
+- `api/bulk_update_payroll_status.php` — each employee's payment (status UPDATE
+  + `postPayrollPayment()` GL + bank register) is one transaction per row: a
+  failure rolls that employee back completely and is reported in the response
+  (`failures` array); other rows proceed. A null GL posting is now fatal for
+  the row — a payroll can no longer be marked paid without its ledger entry.
+  Accruals and the period statutory sync + SDL pair are wrapped likewise.
+- `api/update_payroll.php` — edit + accrual reversal + re-accrual are one
+  transaction; a failed re-post rolls the whole edit back (previously it
+  committed reversed books and only wrote to error_log).
+- `api/operations/process_project_payroll.php` — per-record accrual and the
+  statutory pair each atomic.
+- `tests/test_payroll_tx_atomicity_cli.php` — 16 checks: no MyISAM tables
+  remain, endpoints wrap writes, live forced-failure rollback leaves zero
+  partial rows, live accrual commits balanced (Σ Dr = Σ Cr). All 8 existing
+  payroll suites still pass.
+
 ## 2026-07-01 (fix) — changing Company Profile's Document Code Prefix never took effect on existing records
 
 `codeForEdit()` (`core/code_generator.php`) decides whether to re-generate a
