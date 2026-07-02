@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-07-01 (security) — quarantine 284 unauthenticated one-off scripts out of the public webroot
+
+Of 299 top-level `.php` files, only 15 are real entry points (verified against the
+`roots.php` router, all JS/fetch calls, includes, CI and deploy). The other 284 were
+pre-migration-system dev/debug/data-fix scripts (`check_*`, `debug_*`, `fix_*`,
+`alter_*`, …) reachable over HTTP with **no authentication** — several ran
+`ALTER TABLE`/`UPDATE` against the production DB for anyone who hit the URL.
+
+- `scripts/legacy/` — new quarantine directory; all 284 orphans moved here via
+  `git mv` (history preserved). See its `README.md`; slated for deletion one
+  stable release after merge. Kept at root: the 14 referenced entry points +
+  `calculate_penalties.php` (possible server crontab target; has a CLI guard).
+- `.htaccess` — denies HTTP access to `scripts/`, `tests/`, `cron/`, `migrations/`
+  (except the login-guarded `migrations/status.php` dashboard).
+- `migrations/runner.php` — now CLI-only (`PHP_SAPI` guard); deploy over SSH unaffected.
+- `.claude/migrations.md` — migration template now includes the CLI guard.
+- `tests/test_webroot_quarantine_cli.php` — regression guard: webroot whitelist
+  (only the 15 approved files), `.htaccess` deny rules present, runner CLI guard
+  present, kept `ajax_*` endpoints authenticate. 9/9 passing.
+
 ## 2026-07-01 (fix) — changing Company Profile's Document Code Prefix never took effect on existing records
 
 `codeForEdit()` (`core/code_generator.php`) decides whether to re-generate a
