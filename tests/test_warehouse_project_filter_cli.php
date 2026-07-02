@@ -11,10 +11,10 @@
  *   - assets/js/warehouse-project-filter.js
  *     (warehouseMatchesProject + filterWarehousesForProject + bindWarehouseToProject)
  *
- * Sales-side pages consume the shared mechanism and must NOT carry a local
- * re-implementation. Purchase-side pages (purchase_order_create.php,
- * stock_adjustments.php) still carry their own verified copies — they are
- * guarded string-for-string below until they migrate too.
+ * Sales-side AND procurement-side pages consume the shared mechanism and must
+ * NOT carry a local re-implementation of the rule. stock_adjustments.php
+ * (stock side) still carries its own verified copy — guarded string-for-string
+ * below until it migrates too.
  *
  * Run:  php tests/test_warehouse_project_filter_cli.php
  *   Exit 0 = all pass · Exit 1 = a regression slipped in.
@@ -45,10 +45,13 @@ $shared_pages = [
     'app/bms/grn/dn_create.php'                   => 'list',
     'app/bms/grn/dn_outbound.php'                 => 'list',
     'app/bms/pos/pos_scripts_new.php'             => 'bind',
+    'app/bms/purchase/purchase_order_create.php'  => 'list',
+    'app/bms/purchase/rfq_create.php'             => 'list',
+    'app/bms/grn/grn_create.php'                  => 'list',
+    'app/bms/grn/grn_edit.php'                    => 'list',
 ];
 
 $legacy_pages = [
-    'app/bms/purchase/purchase_order_create.php',
     'app/bms/stock/stock_adjustments.php',
 ];
 
@@ -108,13 +111,7 @@ $loadProductsPos = strpos($posJs, 'loadProducts();', $cascadeCallPos === false ?
     ? pass('cascade bound on page load before initial loadProducts()')
     : fail('cascade not wired into initial page load before loadProducts()');
 
-section('5. Legacy copies (purchase side, pending migration) — still strict');
-$src = file_get_contents("$root/app/bms/purchase/purchase_order_create.php");
-(strpos($src, 'fallback when no general warehouses') === false) ? pass('PO create: no-project fallback line removed') : fail('PO create: no-project fallback line still present');
-(strpos($src, 'fallback when no project-linked warehouses') === false) ? pass('PO create: project-selected fallback line removed') : fail('PO create: project-selected fallback line still present');
-(strpos($src, "filtered = allWarehouses.filter(w => !w.project_id || w.project_id === 0);") !== false) ? pass('PO create: strict unassigned-only branch intact') : fail('PO create: unassigned-only branch missing/changed');
-(strpos($src, "filtered = allWarehouses.filter(w => w.project_id == projectId);") !== false) ? pass('PO create: strict project-match branch intact') : fail('PO create: project-match branch missing/changed');
-
+section('5. Legacy copies (pending migration) — still strict');
 $src = file_get_contents("$root/app/bms/stock/stock_adjustments.php");
 (strpos($src, 'show ALL warehouses') === false) ? pass('stock_adjustments: "show ALL warehouses" branch removed') : fail('stock_adjustments: still shows all warehouses when no project selected');
 (strpos($src, 'return w.project_id === 0;') !== false) ? pass('stock_adjustments: no-project branch filters to project_id === 0') : fail('stock_adjustments: no-project branch does not filter to unassigned-only');

@@ -165,8 +165,9 @@ $stmt = $pdo->prepare($suppliers_query);
 $stmt->execute($supp_params);
 $suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get warehouses for dropdown
-$warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) as project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+// Get warehouses for dropdown — scoped by project for non-admins (shared helper)
+require_once ROOT_DIR . '/core/warehouse_scope.php';
+$warehouses = warehousesForSelect($pdo);
 
 // Get projects for dropdown
 $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
@@ -630,6 +631,7 @@ function generate_grn_number() {
 </div>
 
 
+<script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <script>
 let currentItemIndex = null;
 let itemCount = 0;
@@ -990,15 +992,16 @@ function filterGrnWarehouses(projectId) {
     const hint  = document.getElementById('grnWarehouseHint');
     const curVal = parseInt(sel.value) || 0;
     sel.innerHTML = '<option value="">Select Warehouse</option>';
-    let filtered;
-    if (!projectId || projectId === '' || projectId === '0') {
-        filtered = grnAllWarehouses.filter(w => w.project_id === 0);
-        if (hint) hint.textContent = 'Showing warehouses not linked to any project.';
-    } else {
-        filtered = grnAllWarehouses.filter(w => w.project_id === parseInt(projectId));
-        if (hint) hint.textContent = filtered.length === 0
-            ? 'No warehouses found for this project.'
-            : 'Showing ' + filtered.length + ' warehouse(s) for selected project.';
+    // The filtering rule lives in the shared assets/js/warehouse-project-filter.js.
+    const filtered = filterWarehousesForProject(grnAllWarehouses, projectId);
+    if (hint) {
+        if (!projectId || projectId === '' || projectId === '0') {
+            hint.textContent = 'Showing warehouses not linked to any project.';
+        } else {
+            hint.textContent = filtered.length === 0
+                ? 'No warehouses found for this project.'
+                : 'Showing ' + filtered.length + ' warehouse(s) for selected project.';
+        }
     }
     filtered.forEach(w => {
         const opt = document.createElement('option');

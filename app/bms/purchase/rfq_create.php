@@ -47,17 +47,9 @@ if (isAdmin()) {
     $suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status='active' AND project_id IS NULL ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// All warehouses with project_id for JS filtering — scoped for non-admins
-if (isAdmin()) {
-    $all_warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status='active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-} elseif (!empty($_rfq_assigned)) {
-    $_rfq_wph = implode(',', array_fill(0, count($_rfq_assigned), '?'));
-    $_rfq_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status='active' AND (project_id IS NULL OR project_id IN ($_rfq_wph)) ORDER BY warehouse_name");
-    $_rfq_wstmt->execute($_rfq_assigned);
-    $all_warehouses = $_rfq_wstmt->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $all_warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status='active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-}
+// All warehouses with project_id for JS filtering — scoped for non-admins (shared helper)
+require_once ROOT_DIR . '/core/warehouse_scope.php';
+$all_warehouses = warehousesForSelect($pdo);
 
 // Projects
 $enable_projects = 0;
@@ -363,6 +355,7 @@ if ($selected_project > 0) {
 .rfq-product-search tbody td{padding:.45rem .75rem;font-size:.85rem;vertical-align:middle;}
 </style>
 
+<script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <script>
 // ── Product search ─────────────────────────────────────────────────────
 let rfqProductsList = [];
@@ -508,9 +501,10 @@ const rfqAllWarehouses = <?= json_encode(array_values(array_map(function($w){
 }, $all_warehouses))) ?>;
 
 /**
- * Filter warehouse dropdown based on selected project.
- * - No project selected  → show warehouses with project_id = 0 (not linked to any project)
- * - Project selected     → show ONLY warehouses linked to that project
+ * Rebuild the warehouse dropdown for the selected project. The filtering rule
+ * itself lives in the shared assets/js/warehouse-project-filter.js:
+ * - No project selected  → only warehouses not linked to any project
+ * - Project selected     → ONLY warehouses linked to that project
  * - If project has no warehouses → show empty with message
  */
 function filterRfqWarehouses(projectId) {
@@ -521,15 +515,11 @@ function filterRfqWarehouses(projectId) {
     // Clear options
     sel.innerHTML = '<option value="">Select Warehouse</option>';
 
-    let filtered;
-    if (!projectId || projectId === '' || projectId === '0') {
-        // No project: show warehouses NOT linked to any project
-        filtered = rfqAllWarehouses.filter(w => w.project_id === 0);
-        if (hint) hint.textContent = 'Showing warehouses not linked to any project.';
-    } else {
-        // Project selected: show ONLY warehouses of that project
-        filtered = rfqAllWarehouses.filter(w => w.project_id === parseInt(projectId));
-        if (hint) {
+    const filtered = filterWarehousesForProject(rfqAllWarehouses, projectId);
+    if (hint) {
+        if (!projectId || projectId === '' || projectId === '0') {
+            hint.textContent = 'Showing warehouses not linked to any project.';
+        } else {
             hint.textContent = filtered.length === 0
                 ? 'No warehouses found for this project.'
                 : `Showing ${filtered.length} warehouse(s) for the selected project.`;
