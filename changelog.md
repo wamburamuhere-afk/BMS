@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-07-02 (refactor) — Project ↔ Warehouse filtering centralised into one shared mechanism
+
+The rule (project selected → only that project's warehouses; no project → only
+unassigned warehouses; never "all" as a fallback) was correct on every sales-side
+page but implemented as ~10 private near-identical copies of the same JS function —
+fix one and the others silently drift. Centralised into a single source of truth;
+no user-visible behavior change, except quotation_form.php's warehouse list is now
+also user-project scoped like all its sibling pages (it previously listed all
+active warehouses; the JS filter hid the difference).
+
+- NEW `core/warehouse_scope.php` — `warehousesForSelect($pdo)` (one scoped query via
+  `scopeFilterSqlNullable`) + `renderWarehouseOptions($warehouses, $selectedId)`.
+- NEW `assets/js/warehouse-project-filter.js` — `warehouseMatchesProject()` (the rule,
+  written once), `filterWarehousesForProject()` (array flavor for Select2-rebuild
+  pages), `bindWarehouseToProject()` (native-select cascade with initial-load
+  saved-value preservation and per-page `onFiltered` callback).
+- Migrated to the shared pair, deleting their local copies:
+  `quotation_form.php` (covers quotation create+edit), `sales_order_create.php`,
+  `sales_order_edit.php`, `lpo_create.php` (create+edit), `invoice_create.php`,
+  `invoice_edit.php`, `dn_create.php`, `dn_outbound.php`, `pos.php` + `pos_scripts_new.php`.
+- `tests/test_warehouse_project_filter_cli.php` rewritten: asserts every migrated page
+  uses the shared mechanism and carries NO local re-implementation; live-DB checks of
+  the helper for admin / no-scope / scoped users; purchase-side legacy copies
+  (`purchase_order_create.php`, `stock_adjustments.php` — pending migration) still
+  guarded string-for-string.
+- `tests/test_lpo_invoice_warehouse_cli.php` + `tests/test_ui_constants_group_a_cli.php`
+  expectations updated from the old per-page function names to the shared module.
+
 ## 2026-07-02 (feature) — project creator is auto-assigned to the project's scope
 
 A non-admin with create permission on projects (via `user_roles`) could create a

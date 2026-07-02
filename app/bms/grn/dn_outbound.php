@@ -96,24 +96,24 @@ $has_project = $project_id > 0;
 // ── LISTS — scoped by project for non-admins ─────────────────
 $_dno_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
 
+// Warehouses come from the shared helper (core/warehouse_scope.php);
+// the JS cascade filters them further by the selected project.
+require_once ROOT_DIR . '/core/warehouse_scope.php';
+$all_warehouses = warehousesForSelect($pdo);
+
 if (isAdmin()) {
     $all_projects   = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
-    $all_warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
     $all_suppliers  = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
 } elseif (!empty($_dno_assigned)) {
     $_dno_ph = implode(',', array_fill(0, count($_dno_assigned), '?'));
     $_dno_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($_dno_ph) ORDER BY project_name");
     $_dno_pstmt->execute($_dno_assigned);
     $all_projects = $_dno_pstmt->fetchAll(PDO::FETCH_ASSOC);
-    $_dno_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_dno_ph)) ORDER BY warehouse_name");
-    $_dno_wstmt->execute($_dno_assigned);
-    $all_warehouses = $_dno_wstmt->fetchAll(PDO::FETCH_ASSOC);
     $_dno_sstmt = $pdo->prepare("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_dno_ph)) ORDER BY supplier_name");
     $_dno_sstmt->execute($_dno_assigned);
     $all_suppliers = $_dno_sstmt->fetchAll(PDO::FETCH_ASSOC);
 } else {
     $all_projects   = [];
-    $all_warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
     $all_suppliers  = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' AND project_id IS NULL ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
 }
 $all_subs = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM sub_contractors WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
@@ -354,6 +354,7 @@ $return_url = getUrl('delivery_notes');
     </form>
 </div>
 
+<script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <script>
 let PROJECT_ID = <?= $project_id ?>;
 let warehouseStock = [];
@@ -389,9 +390,9 @@ function rebuildWarehouses() {
     const current = $sel.val() || PRESET_WH;
     initS2($sel, '-- Select Warehouse --');
     $sel.empty().append($('<option>').val('').text('-- Select Warehouse --'));
-    // Warehouse depends on Project: no project -> only warehouses not assigned
-    // to any project; project selected -> only that project's warehouses.
-    ALL_WAREHOUSES.filter(w => PROJECT_ID === 0 ? w.project_id === 0 : w.project_id === PROJECT_ID)
+    // Shared Project → Warehouse rule (assets/js/warehouse-project-filter.js):
+    // no project -> only unassigned warehouses; project -> only its warehouses.
+    filterWarehousesForProject(ALL_WAREHOUSES, PROJECT_ID)
         .forEach(w => $sel.append($('<option>').val(w.id).text(w.text).prop('selected', w.id == current)));
     $sel.trigger('change.select2');
 }

@@ -105,17 +105,9 @@ if (isAdmin()) {
 // Get salespeople for dropdown (not project-scoped — role-based only)
 $salespeople = $pdo->query("SELECT user_id, username, CONCAT(first_name, ' ', last_name) as full_name FROM users WHERE is_active = '1' AND role IN ('Admin', 'Manager', 'Sales') ORDER BY username")->fetchAll(PDO::FETCH_ASSOC);
 
-// Get warehouses — scoped by project for non-admins
-if (isAdmin()) {
-    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-} elseif (!empty($_soc_assigned)) {
-    $_soc_wph = implode(',', array_fill(0, count($_soc_assigned), '?'));
-    $_soc_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, project_id FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_soc_wph)) ORDER BY warehouse_name");
-    $_soc_wstmt->execute($_soc_assigned);
-    $warehouses = $_soc_wstmt->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, project_id FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-}
+// Get warehouses — scoped by project for non-admins (shared helper)
+require_once ROOT_DIR . '/core/warehouse_scope.php';
+$warehouses = warehousesForSelect($pdo);
 
 // Check projects setting
 $enable_projects = 0;
@@ -297,7 +289,7 @@ $is_quote = isset($_GET['quote']) ? true : false;
                     <?php if ($enable_projects): ?>
                     <div class="col-md-4 mb-3" id="project_container">
                         <label for="project_id" class="form-label">Project</label>
-                        <select class="form-select" id="project_id" name="project_id" onchange="filterWarehousesByProject()">
+                        <select class="form-select" id="project_id" name="project_id">
                             <option value="">Select Project</option>
                             <?php foreach ($projects as $proj): ?>
                                 <option value="<?= $proj['project_id'] ?>"
@@ -339,13 +331,7 @@ $is_quote = isset($_GET['quote']) ? true : false;
                         <label for="warehouse_id" class="form-label">Warehouse / Delivery Point <span class="text-dark">*</span></label>
                         <select class="form-select" id="warehouse_id" name="warehouse_id" required>
                             <option value="">Select Warehouse</option>
-                            <?php foreach ($warehouses as $w): ?>
-                                <option value="<?= $w['warehouse_id'] ?>" 
-                                        data-project-id="<?= $w['project_id'] ?? '' ?>"
-                                        <?= ($sales_order && $sales_order['warehouse_id'] == $w['warehouse_id']) ? 'selected' : '' ?>>
-                                    <?= safe_output($w['warehouse_name']) ?>
-                                </option>
-                            <?php endforeach; ?>
+                            <?= renderWarehouseOptions($warehouses, $sales_order['warehouse_id'] ?? 0) ?>
                         </select>
                     </div>
                     
@@ -630,6 +616,7 @@ $is_quote = isset($_GET['quote']) ? true : false;
 
 
 
+<script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <script>
 let currentItemIndex = null;
 let itemCount = 0;
@@ -750,41 +737,22 @@ $(document).ready(function() {
         poAllowedNames = null;
     });
     
-    // Initial warehouse filtering
-    filterWarehousesByProject(true);
-    
-    // Initialize with default tax rates (you can load from API)
-    loadTaxRates();
-});
-
-function filterWarehousesByProject(isInitial = false) {
-    const projectId = $('#project_id').val();
-    const warehouseSelect = $('#warehouse_id');
-
-    warehouseSelect.find('option').each(function() {
-        const optionProjectId = $(this).data('project-id');
-        if ($(this).val() === '') { $(this).show(); return; }
-        if (projectId) {
-            (String(optionProjectId) === String(projectId)) ? $(this).show() : $(this).hide();
-        } else {
-            (!optionProjectId) ? $(this).show() : $(this).hide();
+    // Shared Project → Warehouse cascade (assets/js/warehouse-project-filter.js)
+    bindWarehouseToProject({
+        onFiltered: function (cleared) {
+            if (cleared) toggleProductInputs('');
+            // Clear PO field when the project (and thus warehouse list) changes
+            $('#po_no').val('');
+            $('#poSearchResults').hide();
+            currentWarehouseStockMap = {};
+            poAllowedProductIds = null;
+            poAllowedNames = null;
         }
     });
 
-    if (!isInitial) {
-        const sel = warehouseSelect.find('option:selected');
-        if (sel.css('display') === 'none') {
-            warehouseSelect.val('');
-            toggleProductInputs('');
-        }
-        // Clear PO field when warehouse changes
-        $('#po_no').val('');
-        $('#poSearchResults').hide();
-        currentWarehouseStockMap = {};
-        poAllowedProductIds = null;
-        poAllowedNames = null;
-    }
-}
+    // Initialize with default tax rates (you can load from API)
+    loadTaxRates();
+});
 
 // --- Payment Terms toggle (in-place swap) ---
 function toggleCustomPaymentTerms() {

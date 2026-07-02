@@ -159,16 +159,8 @@ if (isAdmin()) {
 // Warehouses for dropdown — scoped by project for non-admins; JS filters further
 // by the selected project (project's warehouses only, or unassigned-only if none).
 // Required only for non-service (inventory) invoices — see toggleServiceInvoiceMode().
-if (isAdmin()) {
-    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-} elseif (!empty($_ic_assigned)) {
-    $_ic_wph = implode(',', array_fill(0, count($_ic_assigned), '?'));
-    $_ic_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_ic_wph)) ORDER BY warehouse_name");
-    $_ic_wstmt->execute($_ic_assigned);
-    $warehouses = $_ic_wstmt->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-}
+require_once ROOT_DIR . '/core/warehouse_scope.php';
+$warehouses = warehousesForSelect($pdo);
 
 // Get projects if enabled
 $enable_projects = 0;
@@ -375,11 +367,7 @@ function generate_invoice_number() {
                         <label class="form-label small fw-bold">Warehouse <span class="text-danger" id="warehouse_required_mark">*</span></label>
                         <select class="form-select" id="warehouse_id" name="warehouse_id" required>
                             <option value="">Select Warehouse</option>
-                            <?php foreach ($warehouses as $w): ?>
-                                <option value="<?= $w['warehouse_id'] ?>" data-project-id="<?= $w['project_id'] ?>">
-                                    <?= safe_output($w['warehouse_name']) ?>
-                                </option>
-                            <?php endforeach; ?>
+                            <?= renderWarehouseOptions($warehouses) ?>
                         </select>
                         <div class="form-text">Stock for inventory items is checked against this warehouse. Not needed for Service Invoices.</div>
                     </div>
@@ -523,6 +511,7 @@ function generate_invoice_number() {
     </div>
 </div>
 
+<script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <script>
 let itemCount = 0;
 $(document).ready(function() {
@@ -530,10 +519,12 @@ $(document).ready(function() {
     logReportAction('Viewed Invoice Create Page', 'User viewed the create invoice page');
 
     addItemRow();
-    filterWarehousesByProject(true);
+    // Shared Project → Warehouse cascade (assets/js/warehouse-project-filter.js)
+    bindWarehouseToProject({
+        onFiltered: function () { loadProductsCache(); }
+    });
     loadProductsCache();
 
-    $('#project_id').on('change', function() { filterWarehousesByProject(); });
     $('#warehouse_id').on('change', function() { loadProductsCache(); });
 
     $('#invoiceForm').on('submit', function(e) {
@@ -584,29 +575,6 @@ function toggleServiceInvoiceMode() {
 
     // Refresh cache to only show services if needed, or just let search filter it
     loadProductsCache();
-}
-
-function filterWarehousesByProject(isInitial = false) {
-    const projectId = $('#project_id').val();
-    const warehouseSelect = $('#warehouse_id');
-
-    warehouseSelect.find('option').each(function() {
-        const optionProjectId = $(this).data('project-id');
-        if ($(this).val() === '') { $(this).show(); return; }
-        if (projectId) {
-            (String(optionProjectId) === String(projectId)) ? $(this).show() : $(this).hide();
-        } else {
-            (!optionProjectId) ? $(this).show() : $(this).hide();
-        }
-    });
-
-    if (!isInitial) {
-        const sel = warehouseSelect.find('option:selected');
-        if (sel.css('display') === 'none') {
-            warehouseSelect.val('');
-        }
-        loadProductsCache();
-    }
 }
 
 function addItemRow(item = null) {

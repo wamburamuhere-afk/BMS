@@ -65,23 +65,22 @@ $saveInv    = readSrc($root, 'api/account/save_invoice.php');
 
 section('3. lpo_create.php — warehouse field, always required, project-filtered');
 (strpos($lpoCreate, 'id="warehouse_id" name="warehouse_id" required') !== false) ? pass('warehouse select present and required') : fail('warehouse select missing or not required');
-(strpos($lpoCreate, 'function filterWarehousesByProject') !== false) ? pass('filterWarehousesByProject() defined') : fail('filterWarehousesByProject() missing');
-(strpos($lpoCreate, "\$('#project_id').on('change', function() { filterWarehousesByProject(); });") !== false) ? pass('project change triggers the cascade') : fail('project change does not trigger the cascade');
-(strpos($lpoCreate, 'filterWarehousesByProject(true);') !== false) ? pass('cascade runs on initial page load') : fail('cascade not wired into initial page load');
+(strpos($lpoCreate, 'bindWarehouseToProject(') !== false) ? pass('shared cascade bound (covers project-change + initial load)') : fail('bindWarehouseToProject() call missing');
+(strpos($lpoCreate, 'warehouse-project-filter.js') !== false) ? pass('shared JS module included') : fail('shared JS module include missing');
 (strpos($lpoCreate, "warehouse_id=' + whId") !== false) ? pass('product fetch passes warehouse_id (warehouse-scoped stock)') : fail('product fetch does not pass warehouse_id');
 (strpos($lpoCreate, '$warehouse_id = (int)($lpo_data[\'warehouse_id\'] ?? 0);') !== false) ? pass('edit mode pre-fills the saved warehouse') : fail('edit mode does not pre-fill warehouse');
 
 section('4. invoice_create.php — warehouse required unless Service Invoice mode');
 (strpos($invCreate, 'id="warehouse_id" name="warehouse_id" required') !== false) ? pass('warehouse select present, required by default (inventory mode)') : fail('warehouse select missing or not required by default');
 (strpos($invCreate, "\$('#warehouse_id').prop('required', !isService);") !== false) ? pass('required toggled off in Service Invoice mode') : fail('required is not tied to Service Invoice toggle');
-(strpos($invCreate, 'function filterWarehousesByProject') !== false) ? pass('filterWarehousesByProject() defined') : fail('filterWarehousesByProject() missing');
-(strpos($invCreate, "\$('#project_id').on('change', function() { filterWarehousesByProject(); });") !== false) ? pass('project change triggers the cascade') : fail('project change does not trigger the cascade');
+(strpos($invCreate, 'bindWarehouseToProject(') !== false) ? pass('shared cascade bound (covers project-change + initial load)') : fail('bindWarehouseToProject() call missing');
+(strpos($invCreate, 'warehouse-project-filter.js') !== false) ? pass('shared JS module included') : fail('shared JS module include missing');
 (strpos($invCreate, 'is_service: isService, warehouse_id: whId') !== false) ? pass('product cache load passes warehouse_id') : fail('product cache load does not pass warehouse_id');
 
 section('5. invoice_edit.php — warehouse field present, project-filtered, pre-filled');
 (strpos($invEdit, 'id="warehouse_id" name="warehouse_id"') !== false) ? pass('warehouse select present') : fail('warehouse select missing');
-(strpos($invEdit, 'function filterWarehousesByProject') !== false) ? pass('filterWarehousesByProject() defined') : fail('filterWarehousesByProject() missing');
-(strpos($invEdit, "\$invoice['warehouse_id'] == \$w['warehouse_id']) ? 'selected'") !== false) ? pass('pre-fills the invoice\'s saved warehouse') : fail('does not pre-fill saved warehouse');
+(strpos($invEdit, 'bindWarehouseToProject(') !== false) ? pass('shared cascade bound (covers project-change + initial load)') : fail('bindWarehouseToProject() call missing');
+(strpos($invEdit, "renderWarehouseOptions(\$warehouses, \$invoice['warehouse_id']") !== false) ? pass('pre-fills the invoice\'s saved warehouse') : fail('does not pre-fill saved warehouse');
 (strpos($invEdit, 'warehouse_id: whId') !== false) ? pass('product cache load passes warehouse_id') : fail('product cache load does not pass warehouse_id');
 
 section('6. Backend — save_lpo.php always requires warehouse_id, persists it');

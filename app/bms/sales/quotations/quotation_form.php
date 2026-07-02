@@ -50,8 +50,9 @@ if ($customer_id > 0) {
 }
 
 // Dropdown data.
+require_once ROOT_DIR . '/core/warehouse_scope.php';
 $customers   = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
-$warehouses  = $pdo->query("SELECT warehouse_id, warehouse_name, project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+$warehouses  = warehousesForSelect($pdo);
 
 $enable_projects = 0;
 try {
@@ -221,7 +222,7 @@ includeHeader();
                     <?php if ($enable_projects): ?>
                     <div class="col-md-4 mb-3" id="project_container">
                         <label for="project_id" class="form-label">Project</label>
-                        <select class="form-select" id="project_id" name="project_id" onchange="filterWarehousesByProject()">
+                        <select class="form-select" id="project_id" name="project_id">
                             <option value="">Select Project</option>
                             <?php foreach ($projects as $proj): ?>
                                 <option value="<?= $proj['project_id'] ?>"
@@ -261,13 +262,7 @@ includeHeader();
                         <label for="warehouse_id" class="form-label">Warehouse / Delivery Point <span class="text-danger">*</span></label>
                         <select class="form-select" id="warehouse_id" name="warehouse_id" required>
                             <option value="">Select Warehouse</option>
-                            <?php foreach ($warehouses as $w): ?>
-                                <option value="<?= $w['warehouse_id'] ?>"
-                                        data-project-id="<?= $w['project_id'] ?? '' ?>"
-                                        <?= ($quotation && $quotation['warehouse_id'] == $w['warehouse_id']) ? 'selected' : '' ?>>
-                                    <?= safe_output($w['warehouse_name']) ?>
-                                </option>
-                            <?php endforeach; ?>
+                            <?= renderWarehouseOptions($warehouses, $quotation['warehouse_id'] ?? 0) ?>
                         </select>
                     </div>
 
@@ -501,6 +496,7 @@ includeHeader();
     </div>
 </div>
 
+<script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <script>
 let currentItemIndex = null;
 let itemCount = 0;
@@ -560,13 +556,16 @@ $(document).ready(function() {
         toggleProductInputs($(this).val());
     });
 
-    filterWarehousesByProject(true);
+    // Shared Project → Warehouse cascade (assets/js/warehouse-project-filter.js)
+    bindWarehouseToProject({
+        onFiltered: function (cleared) { if (cleared) toggleProductInputs(''); }
+    });
     loadTaxRates();
 
     // §UI-3 — searchable Select2 on the DB-backed dropdowns. Selecting fires the
-    // native 'change', so loadCustomerInfo()/filterWarehousesByProject() still run.
-    // warehouse_id is intentionally left native: filterWarehousesByProject()
-    // filters it via option .show()/.hide(), which Select2 does not honor.
+    // native 'change', so loadCustomerInfo() and the warehouse cascade still run.
+    // warehouse_id is intentionally left native: the cascade filters it via
+    // option .show()/.hide(), which Select2 does not honor.
     ['#customer_id', '#project_id'].forEach(function (sel) {
         const $el = $(sel);
         if ($el.length && !$el.hasClass('select2-hidden-accessible')) {
@@ -574,29 +573,6 @@ $(document).ready(function() {
         }
     });
 });
-
-function filterWarehousesByProject(isInitial = false) {
-    const projectId = $('#project_id').val();
-    const warehouseSelect = $('#warehouse_id');
-
-    warehouseSelect.find('option').each(function() {
-        const optionProjectId = $(this).data('project-id');
-        if ($(this).val() === '') { $(this).show(); return; }
-        if (projectId) {
-            (String(optionProjectId) === String(projectId)) ? $(this).show() : $(this).hide();
-        } else {
-            (!optionProjectId) ? $(this).show() : $(this).hide();
-        }
-    });
-
-    if (!isInitial) {
-        const sel = warehouseSelect.find('option:selected');
-        if (sel.css('display') === 'none') {
-            warehouseSelect.val('');
-            toggleProductInputs('');
-        }
-    }
-}
 
 function toggleCustomPaymentTerms() {
     const val = $('#payment_terms_select').val();
