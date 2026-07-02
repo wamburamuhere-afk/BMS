@@ -52,7 +52,8 @@ if (!empty($_POST['project_id']) && !userCan('project', (int)$_POST['project_id'
 try {
     global $pdo;
 
-    $project_id  = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
+    $project_id   = !empty($_POST['project_id']) ? intval($_POST['project_id']) : null;
+    $warehouse_id = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null;
     $issue_date  = trim($_POST['issue_date'] ?? '');
     $expiry_date = trim($_POST['expiry_date'] ?? '') ?: null;
     $currency    = trim($_POST['currency'] ?? 'TZS');
@@ -63,6 +64,9 @@ try {
 
     if (empty($issue_date) || empty($items)) {
         throw new Exception('Missing required fields (Issue Date or Items)');
+    }
+    if (!$warehouse_id) {
+        throw new Exception('Warehouse is required');
     }
 
     $pdo->beginTransaction();
@@ -86,11 +90,11 @@ try {
 
         $stmt = $pdo->prepare("
             UPDATE customer_lpos SET
-                lpo_number = ?, project_id = ?, issue_date = ?, expiry_date = ?,
+                lpo_number = ?, project_id = ?, warehouse_id = ?, issue_date = ?, expiry_date = ?,
                 amount = ?, currency = ?, description = ?, notes = ?, updated_at = NOW()
             WHERE lpo_id = ?
         ");
-        $stmt->execute([$lpo_number, $project_id, $issue_date, $expiry_date, $item_total, $currency, $description, $notes, $lpo_id]);
+        $stmt->execute([$lpo_number, $project_id, $warehouse_id, $issue_date, $expiry_date, $item_total, $currency, $description, $notes, $lpo_id]);
 
         $customer_id = $existing['customer_id'];
 
@@ -105,13 +109,13 @@ try {
 
         $stmt = $pdo->prepare("
             INSERT INTO customer_lpos (
-                lpo_number, customer_id, project_id, issue_date, expiry_date,
+                lpo_number, customer_id, project_id, warehouse_id, issue_date, expiry_date,
                 amount, currency, description, status, notes,
                 created_by, prepared_by_name, prepared_by_role, prepared_at, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, NOW(), NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, NOW(), NOW())
         ");
         $stmt->execute([
-            $lpo_number, $customer_id, $project_id, $issue_date, $expiry_date,
+            $lpo_number, $customer_id, $project_id, $warehouse_id, $issue_date, $expiry_date,
             $item_total, $currency, $description, $notes,
             $_SESSION['user_id'], $actor['name'], $actor['role']
         ]);

@@ -20,6 +20,39 @@ soft-deleting the warehouse itself.
   movement history and soft-deletes the warehouse. All warehouse/stock/
   transfer suites pass.
 
+## 2026-07-01 (feature) — Customer LPO and Invoice had no warehouse field at all
+
+`customer_lpos` and `invoices` had no `warehouse_id` column, so their
+inventory-product stock figures always fell back to `products.current_stock`
+(a non-warehouse-specific total) instead of the selected warehouse's actual
+stock — and there was no way to tell the system which warehouse an LPO or
+Invoice's stock should come from. Added the field with the same
+project-filtering rule used everywhere else: project selected -> only that
+project's warehouses; no project -> only unassigned warehouses.
+
+- `migrations/2026_07_01_lpo_invoice_warehouse.php` (new) — adds nullable
+  `warehouse_id` to `customer_lpos` and `invoices` (mirrors
+  `sales_orders.warehouse_id`). Additive, idempotent.
+- `app/bms/sales/lpo/lpo_create.php` — added a Warehouse field (always
+  required — LPO only ever deals in inventory products), project-filtered
+  via `filterWarehousesByProject()`; product search now scopes stock to the
+  selected warehouse; edit mode pre-fills the saved warehouse.
+- `app/bms/invoice/invoice_create.php` — same Warehouse field, required
+  unless "Service Invoice (Non-Inventory)" mode is on; product cache load
+  now scopes stock to the selected warehouse.
+- `app/bms/invoice/invoice_edit.php` — same field for parity, pre-filled
+  from the invoice's saved warehouse; not force-required on edit (existing
+  invoices predate this field and this page has no service/inventory
+  toggle to judge intent).
+- `api/customer/save_lpo.php` — rejects a save with no warehouse; persists
+  `warehouse_id` on create/update.
+- `api/account/save_invoice.php` — requires `warehouse_id` on **create**
+  only, unless `is_service_invoice` was submitted; persists it on
+  create/update either way.
+- `tests/test_lpo_invoice_warehouse_cli.php` (new) — schema + source-wiring
+  checks for all 5 files, plus a live insert/round-trip proof for both
+  tables (transaction-wrapped, rolled back).
+
 ## 2026-07-01 (fix) — changing Company Profile's Document Code Prefix never took effect on existing records
 
 `codeForEdit()` (`core/code_generator.php`) decides whether to re-generate a

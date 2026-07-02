@@ -156,6 +156,20 @@ if (isAdmin()) {
     $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' AND project_id IS NULL ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// Warehouses for dropdown — scoped by project for non-admins; JS filters further
+// by the selected project (project's warehouses only, or unassigned-only if none).
+// Required only for non-service (inventory) invoices — see toggleServiceInvoiceMode().
+if (isAdmin()) {
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+} elseif (!empty($_ic_assigned)) {
+    $_ic_wph = implode(',', array_fill(0, count($_ic_assigned), '?'));
+    $_ic_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_ic_wph)) ORDER BY warehouse_name");
+    $_ic_wstmt->execute($_ic_assigned);
+    $warehouses = $_ic_wstmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) AS project_id FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+}
+
 // Get projects if enabled
 $enable_projects = 0;
 try {
@@ -357,6 +371,19 @@ function generate_invoice_number() {
                     </div>
                     <?php endif; ?>
 
+                    <div class="col-md-4 mb-3" id="warehouse_container">
+                        <label class="form-label small fw-bold">Warehouse <span class="text-danger" id="warehouse_required_mark">*</span></label>
+                        <select class="form-select" id="warehouse_id" name="warehouse_id" required>
+                            <option value="">Select Warehouse</option>
+                            <?php foreach ($warehouses as $w): ?>
+                                <option value="<?= $w['warehouse_id'] ?>" data-project-id="<?= $w['project_id'] ?>">
+                                    <?= safe_output($w['warehouse_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text">Stock for inventory items is checked against this warehouse. Not needed for Service Invoices.</div>
+                    </div>
+
                     <?php if (!empty($approved_ipcs)): ?>
                     <div class="col-md-4 mb-3" id="ipc_container">
                         <label class="form-label small fw-bold">IPC <span class="text-muted fw-normal">(Approved)</span></label>
@@ -503,8 +530,12 @@ $(document).ready(function() {
     logReportAction('Viewed Invoice Create Page', 'User viewed the create invoice page');
 
     addItemRow();
+    filterWarehousesByProject(true);
     loadProductsCache();
-    
+
+    $('#project_id').on('change', function() { filterWarehousesByProject(); });
+    $('#warehouse_id').on('change', function() { loadProductsCache(); });
+
     $('#invoiceForm').on('submit', function(e) {
         e.preventDefault();
         console.log('[invoice_create] submit fired');
@@ -546,8 +577,36 @@ function toggleServiceInvoiceMode() {
         $('#addItemBtnText').text('Add Item');
     }
 
+    // Warehouse only matters when real stock is involved — not required in
+    // Service (Non-Inventory) mode.
+    $('#warehouse_id').prop('required', !isService);
+    $('#warehouse_required_mark').toggle(!isService);
+
     // Refresh cache to only show services if needed, or just let search filter it
     loadProductsCache();
+}
+
+function filterWarehousesByProject(isInitial = false) {
+    const projectId = $('#project_id').val();
+    const warehouseSelect = $('#warehouse_id');
+
+    warehouseSelect.find('option').each(function() {
+        const optionProjectId = $(this).data('project-id');
+        if ($(this).val() === '') { $(this).show(); return; }
+        if (projectId) {
+            (String(optionProjectId) === String(projectId)) ? $(this).show() : $(this).hide();
+        } else {
+            (!optionProjectId) ? $(this).show() : $(this).hide();
+        }
+    });
+
+    if (!isInitial) {
+        const sel = warehouseSelect.find('option:selected');
+        if (sel.css('display') === 'none') {
+            warehouseSelect.val('');
+        }
+        loadProductsCache();
+    }
 }
 
 function addItemRow(item = null) {
@@ -659,7 +718,8 @@ let currentItemIndex = null;
 
 function loadProductsCache(callback = null) {
     const isService = $('#is_service_invoice').is(':checked') ? 1 : 0;
-    $.get('<?= getUrl('/api/account/get_products.php') ?>', { active_only: true, limit: 1000, is_service: isService }, function(res) {
+    const whId = $('#warehouse_id').val() || '';
+    $.get('<?= getUrl('/api/account/get_products.php') ?>', { active_only: true, limit: 1000, is_service: isService, warehouse_id: whId }, function(res) {
         if (res.success) {
             productsCache = res.data;
             console.log('Products loaded:', productsCache.length);
