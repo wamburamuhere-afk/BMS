@@ -27,31 +27,43 @@ try {
     $stmt->execute([$product_name]);
     $existing = $stmt->fetchColumn();
 
-    if ($existing) {
-        $product_id = (int)$existing;
-    } else {
-        // Create minimal product record
-        $stmt = $pdo->prepare("
-            INSERT INTO products
-                (product_name, unit, cost_price, selling_price, purchase_price,
-                 status, is_service, track_inventory, created_by)
-            VALUES (?, ?, 0, 0, 0, 'active', 0, 1, ?)
-        ");
-        $stmt->execute([$product_name, $unit, $_SESSION['user_id']]);
-        $product_id = (int)$pdo->lastInsertId();
+    // Product creation + its stock row commit together — no product can exist
+    // without a stock record for the chosen warehouse.
+    $pdo->beginTransaction();
+    try {
+        if ($existing) {
+            $product_id = (int)$existing;
+        } else {
+            // Create minimal product record
+            $stmt = $pdo->prepare("
+                INSERT INTO products
+                    (product_name, unit, cost_price, selling_price, purchase_price,
+                     status, is_service, track_inventory, created_by)
+                VALUES (?, ?, 0, 0, 0, 'active', 0, 1, ?)
+            ");
+            $stmt->execute([$product_name, $unit, $_SESSION['user_id']]);
+            $product_id = (int)$pdo->lastInsertId();
+        }
 
+        // Ensure product_stocks entry exists for this warehouse (qty stays 0 — will be received via GRN)
+        $pdo->prepare("
+            INSERT INTO product_stocks (product_id, warehouse_id, stock_quantity, reserved_quantity)
+            VALUES (?, ?, 0, 0)
+            ON DUPLICATE KEY UPDATE product_id = product_id
+        ")->execute([$product_id, $warehouse_id]);
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+
+    if (!$existing) {
         logActivity($pdo, $_SESSION['user_id'], "Auto-created product via RFQ: {$product_name}");
     }
 
-    // Ensure product_stocks entry exists for this warehouse (qty stays 0 — will be received via GRN)
-    $pdo->prepare("
-        INSERT INTO product_stocks (product_id, warehouse_id, stock_quantity, reserved_quantity)
-        VALUES (?, ?, 0, 0)
-        ON DUPLICATE KEY UPDATE product_id = product_id
-    ")->execute([$product_id, $warehouse_id]);
-
     echo json_encode(['success' => true, 'product_id' => $product_id]);
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
