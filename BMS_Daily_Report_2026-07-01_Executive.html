@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMS Progress Update — 1 July 2026</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; color: #1a1a2e; background: #f8f9fa; line-height: 1.6; }
+  @media print {
+    body { background: white; }
+    .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+  }
+  .container { max-width: 900px; margin: 0 auto; padding: 28px; }
+  .report-header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%); color: white; padding: 36px 40px; border-radius: 12px; margin-bottom: 28px; }
+  .report-header .title { font-size: 24px; font-weight: 700; letter-spacing: 0.3px; }
+  .report-header .subtitle { font-size: 13px; opacity: 0.8; margin-top: 6px; }
+  .report-header .period { font-size: 12px; opacity: 0.65; margin-top: 14px; }
+  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+  .sum-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); border-left: 4px solid; text-align: center; }
+  .sum-card.blue { border-left-color: #0d6efd; }
+  .sum-card.green { border-left-color: #198754; }
+  .sum-card.orange { border-left-color: #fd7e14; }
+  .sum-card .num { font-size: 26px; font-weight: 700; line-height: 1; }
+  .sum-card .label { font-size: 11.5px; color: #6c757d; margin-top: 6px; }
+  .sum-card.blue .num { color: #0d6efd; }
+  .sum-card.green .num { color: #198754; }
+  .sum-card.orange .num { color: #fd7e14; }
+  .section { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); margin-bottom: 22px; overflow: hidden; }
+  .section-header { padding: 18px 24px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 12px; }
+  .section-header .icon { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .section-header h2 { font-size: 16px; font-weight: 700; }
+  .section-body { padding: 20px 24px; }
+  .item { margin-bottom: 18px; padding-left: 18px; border-left: 3px solid #e9ecef; }
+  .item:last-child { margin-bottom: 0; }
+  .item-title { font-weight: 700; font-size: 14px; margin-bottom: 5px; color: #1a1a2e; }
+  .item-body { font-size: 13px; color: #444; }
+  .badge { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 20px; margin-left: 6px; vertical-align: middle; }
+  .badge.risk { background: #f8d7da; color: #842029; }
+  .badge.fixed { background: #d1e7dd; color: #0f5132; }
+  .badge.new { background: #cff4fc; color: #055160; }
+  .next-item { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+  .next-item:last-child { border-bottom: none; }
+  .next-num { background: #0f3460; color: white; font-size: 11px; font-weight: 700; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .next-body { flex: 1; font-size: 13px; }
+  .next-body strong { display: block; margin-bottom: 2px; }
+  .closing { background: #f8f9fa; border-radius: 10px; padding: 20px 24px; font-size: 13.5px; color: #444; margin-bottom: 22px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="report-header">
+    <div class="title">Business Management System — Progress Update</div>
+    <div class="subtitle">BJP Technologies Co. Ltd</div>
+    <div class="period">Covering work completed since the last update (30 June) through 1 July 2026</div>
+  </div>
+
+  <div class="summary-grid">
+    <div class="sum-card blue">
+      <div class="num">1</div>
+      <div class="label">Security Gap Closed</div>
+    </div>
+    <div class="sum-card green">
+      <div class="num">18</div>
+      <div class="label">Issues Fixed</div>
+    </div>
+    <div class="sum-card orange">
+      <div class="num">1</div>
+      <div class="label">Major New Feature</div>
+    </div>
+  </div>
+
+  <div class="closing" style="margin-bottom:28px;">
+    In short: we found and closed a real security exposure, made the money-handling parts of the
+    system far more resilient to interruptions, launched a proper Customer Order approval workflow,
+    and cleared out a batch of smaller bugs affecting Payroll, the Sales dashboard, and stock records.
+  </div>
+
+  <!-- SECURITY -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#f8d7da;">&#128274;</div>
+      <h2>Security</h2>
+    </div>
+    <div class="section-body">
+      <div class="item">
+        <div class="item-title">Closed an exposure where internal tools were reachable from the open internet <span class="badge risk">RISK REMOVED</span></div>
+        <div class="item-body">
+          During a routine audit, we found close to 300 old internal utility tools — leftover from
+          early system setup and one-off data fixes — that were sitting in a part of the website
+          anyone could reach directly, without logging in. A handful of them were capable of changing
+          data directly in the database. There is no evidence they were misused, but the exposure was
+          real. All of them have now been moved out of reach and locked down, while the system
+          continues to work exactly as before.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RELIABILITY -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#d1e7dd;">&#9989;</div>
+      <h2>System Reliability &mdash; Money-Handling Made Safer</h2>
+    </div>
+    <div class="section-body">
+      <div class="item">
+        <div class="item-title">Payroll, invoices, warehouse records, and other financial processes now protect themselves against interruptions <span class="badge fixed">STRENGTHENED</span></div>
+        <div class="item-body">
+          Several processes that update multiple records at once — for example, paying an employee
+          and posting it to the books, or invoicing against a certificate — were not fully protected
+          against something going wrong halfway through (a network hiccup, a server restart, and so
+          on). In the worst case this could have produced duplicate invoices or half-completed payroll
+          runs. We have now made these processes "all-or-nothing": either the entire update completes
+          correctly, or none of it does, and the record stays clean. This protection now covers
+          payroll, invoicing, warehouse stock removal, and several sales/CRM update flows.
+        </div>
+      </div>
+      <div class="item">
+        <div class="item-title">Added an automatic daily check on all financial reports <span class="badge new">NEW SAFEGUARD</span></div>
+        <div class="item-body">
+          The system now automatically verifies, every time a change is made, that the Trial Balance,
+          Income Statement, Balance Sheet, and Cash Flow all still add up correctly and agree with
+          each other. Any discrepancy would be caught immediately rather than being discovered later
+          during a review.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEW FEATURE -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#cff4fc;">&#128230;</div>
+      <h2>New Feature</h2>
+    </div>
+    <div class="section-body">
+      <div class="item">
+        <div class="item-title">Customer Purchase Order (LPO) workflow, from request to invoice <span class="badge new">LAUNCHED</span></div>
+        <div class="item-body">
+          Customer purchase orders previously lived as a basic note attached to a customer's profile,
+          with no formal review or approval step. This has been rebuilt into a complete workflow:
+          a customer order is raised, reviewed, and approved by the right level of authority, then
+          flows straight through to a delivery note and finally to an invoice — all connected, so
+          nothing has to be re-typed and every step is traceable back to where it started. The Sales
+          menu was also reorganised so the order of these steps is easier to follow.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIXES -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#fff3cd;">&#128295;</div>
+      <h2>Fixes &amp; Corrections</h2>
+    </div>
+    <div class="section-body">
+      <div class="item">
+        <div class="item-title">Payroll processing was failing for every employee <span class="badge fixed">FIXED</span></div>
+        <div class="item-body">
+          A recent update to the payroll calculations had an oversight that caused every "Process
+          Payroll" run to fail outright, for every employee, with an error. This has been corrected
+          and payroll now processes normally.
+        </div>
+      </div>
+      <div class="item">
+        <div class="item-title">Sales/CRM dashboard was showing blank charts and tables stuck on "Loading" <span class="badge fixed">FIXED</span></div>
+        <div class="item-body">
+          The dashboard used by the sales team to track leads, activity, and top performers was
+          failing to display its charts and tables for some users. Also fixed the bulk customer/lead
+          upload tool, which was not accessible and had a few rough edges once reachable.
+        </div>
+      </div>
+      <div class="item">
+        <div class="item-title">A release-process issue was blocking updates from reaching the live system <span class="badge fixed">FIXED</span></div>
+        <div class="item-body">
+          An automated safety check in our release process was out of date after the new Customer
+          Order feature was built, and was refusing to let updates go live. This has been corrected
+          so releases flow through normally again.
+        </div>
+      </div>
+      <div class="item">
+        <div class="item-title">Warehouse selection was inconsistent across a few screens <span class="badge fixed">FIXED</span></div>
+        <div class="item-body">
+          A small number of screens were allowing a warehouse to be selected that didn't belong to
+          the project being worked on, which could have led to stock being recorded against the
+          wrong location. This is now consistent everywhere.
+        </div>
+      </div>
+      <div class="item">
+        <div class="item-title">Several smaller corrections <span class="badge fixed">FIXED</span></div>
+        <div class="item-body">
+          Company document numbering now updates correctly on existing records when the numbering
+          format is changed. Delivery note options now only appear on the correct screens (Purchases
+          vs. Sales), avoiding confusion. The unit of measure on a product (kg, litres, pieces, etc.)
+          can no longer be accidentally changed after the product is selected on an order or invoice.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEXT -->
+  <div class="section">
+    <div class="section-header">
+      <div class="icon" style="background:#e0cffc;">&#128640;</div>
+      <h2>Coming Up Next</h2>
+    </div>
+    <div class="section-body">
+      <div class="next-item">
+        <div class="next-num">1</div>
+        <div class="next-body">
+          <strong>Push the security fix live</strong>
+          The security clean-up described above is complete and tested, but has one more internal
+          step before it takes effect on the live production system. Expected to close within the
+          next working session.
+        </div>
+      </div>
+      <div class="next-item">
+        <div class="next-num">2</div>
+        <div class="next-body">
+          <strong>Confirm the Balance Sheet balances on live data</strong>
+          A final check to make sure Assets equal Liabilities plus Equity on the production system,
+          following on from the reliability work above.
+        </div>
+      </div>
+      <div class="next-item">
+        <div class="next-num">3</div>
+        <div class="next-body">
+          <strong>Expenses by Category report</strong>
+          A more detailed breakdown of expenses view, already designed and approved, next in line
+          to be built.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:20px 0 10px;font-size:11px;color:#adb5bd;">
+    BJP Technologies Co. Ltd &mdash; Internal Progress Update &middot; 1 July 2026 &middot; Confidential
+  </div>
+
+</div>
+</body>
+</html>
