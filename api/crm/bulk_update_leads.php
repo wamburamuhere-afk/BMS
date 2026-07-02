@@ -57,16 +57,25 @@ try {
             $curStmt->execute($validIds);
             $curStages = $curStmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
-            $pdo->prepare("UPDATE crm_leads SET pipeline_stage_id = ?, stage_entered = NOW(), updated_at = NOW() WHERE lead_id IN ($ph)")
-                ->execute(array_merge([$stage_id], $validIds));
+            // Bulk stage move + all history rows commit together — no lead can
+            // land in the new stage without its history entry.
+            $pdo->beginTransaction();
+            try {
+                $pdo->prepare("UPDATE crm_leads SET pipeline_stage_id = ?, stage_entered = NOW(), updated_at = NOW() WHERE lead_id IN ($ph)")
+                    ->execute(array_merge([$stage_id], $validIds));
 
-            // Log stage history for each
-            $histStmt = $pdo->prepare("INSERT INTO crm_lead_stage_history (lead_id, from_stage_id, to_stage_id, changed_by) VALUES (?, ?, ?, ?)");
-            foreach ($validIds as $lid) {
-                $from = $curStages[$lid] ?? null;
-                if ($from != $stage_id) {
-                    $histStmt->execute([$lid, $from, $stage_id, $_SESSION['user_id']]);
+                // Log stage history for each
+                $histStmt = $pdo->prepare("INSERT INTO crm_lead_stage_history (lead_id, from_stage_id, to_stage_id, changed_by) VALUES (?, ?, ?, ?)");
+                foreach ($validIds as $lid) {
+                    $from = $curStages[$lid] ?? null;
+                    if ($from != $stage_id) {
+                        $histStmt->execute([$lid, $from, $stage_id, $_SESSION['user_id']]);
+                    }
                 }
+                $pdo->commit();
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $e;
             }
             logActivity($pdo, $_SESSION['user_id'], "Bulk moved $count lead(s) to stage: {$stage['stage_name']}");
             break;
