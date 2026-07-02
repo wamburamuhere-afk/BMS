@@ -23,17 +23,9 @@ global $pdo;
 // Scope: assigned project IDs for current user
 $_poc_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
 
-// Get warehouse locations — scoped by project for non-admins
-if (isAdmin()) {
-    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-} elseif (!empty($_poc_assigned)) {
-    $_poc_wph = implode(',', array_fill(0, count($_poc_assigned), '?'));
-    $_poc_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_poc_wph)) ORDER BY warehouse_name");
-    $_poc_wstmt->execute($_poc_assigned);
-    $warehouses = $_poc_wstmt->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-}
+// Get warehouse locations — scoped by project for non-admins (shared helper)
+require_once ROOT_DIR . '/core/warehouse_scope.php';
+$warehouses = warehousesForSelect($pdo);
 
 // Get suppliers for dropdown — scoped by project for non-admins
 if (isAdmin()) {
@@ -97,8 +89,9 @@ $back_url     = $from_project
 $rfq_ref_id = isset($_GET['rfq_ref']) ? intval($_GET['rfq_ref']) : 0;
 
 // When a specific project is selected, narrow suppliers to that project only
-// (Warehouses are not filtered server-side; the JS filterWarehousesByProject
-//  handles strict display: project's warehouses only, or unassigned-only when none selected.)
+// (Warehouses are not filtered server-side; the JS rebuildPoWarehouses — backed by
+//  the shared warehouse-project-filter.js rule — handles strict display:
+//  project's warehouses only, or unassigned-only when none selected.)
 if ($project_id > 0) {
     $stmt_pf = $pdo->prepare("SELECT supplier_id, supplier_name, company_name, currency, payment_terms FROM suppliers WHERE status='active' AND project_id = ? ORDER BY supplier_name");
     $stmt_pf->execute([$project_id]);
@@ -573,6 +566,7 @@ if ($is_edit) {
 <link href="/assets/css/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
 <script src="/assets/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <script>
 let productsList = [];
 const editId = <?= json_encode($edit_id) ?>;
@@ -673,7 +667,7 @@ $(document).ready(function() {
 
     // Move inline onchange handlers to jQuery so Select2 fires them
     $('#project_id').on('change', function() {
-        filterWarehousesByProject($(this).val());
+        rebuildPoWarehouses($(this).val());
         loadRFQs();
     });
 
@@ -893,22 +887,18 @@ $(document).on('change', '#rfq_reference', function() {
         });
 });
 
-// Warehouse filter by project
+// Warehouse rebuild by project — the filtering rule itself lives in the shared
+// assets/js/warehouse-project-filter.js (filterWarehousesForProject).
 const allWarehouses = <?= json_encode(array_map(fn($w)=>['warehouse_id'=>$w['warehouse_id'],'warehouse_name'=>$w['warehouse_name'],'project_id'=>(int)$w['project_id']],$warehouses)) ?>;
 
-function filterWarehousesByProject(projectId) {
+function rebuildPoWarehouses(projectId) {
     const $wSel = $('#warehouse_id');
     if ($wSel.data('select2')) $wSel.select2('destroy');
 
     const sel = document.getElementById('warehouse_id');
     const currentVal = sel.value;
     sel.innerHTML = '<option value="">Select Warehouse</option>';
-    let filtered;
-    if (!projectId || projectId === '') {
-        filtered = allWarehouses.filter(w => !w.project_id || w.project_id === 0);
-    } else {
-        filtered = allWarehouses.filter(w => w.project_id == projectId);
-    }
+    const filtered = filterWarehousesForProject(allWarehouses, projectId);
     filtered.forEach(w => {
         const opt = document.createElement('option');
         opt.value = w.warehouse_id;
@@ -929,9 +919,9 @@ function filterWarehousesByProject(projectId) {
 // Filter warehouses on page load + auto-select RFQ when rfq_ref is in URL
 $(document).ready(function(){
     <?php if ($enable_projects): ?>
-    filterWarehousesByProject($('#project_id').val());
+    rebuildPoWarehouses($('#project_id').val());
     <?php else: ?>
-    filterWarehousesByProject('');
+    rebuildPoWarehouses('');
     <?php endif; ?>
 
     if (rfqRefId && !isEdit) {

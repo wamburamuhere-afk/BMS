@@ -188,17 +188,9 @@ if ($dn_id_param > 0 && $supplier_id > 0) {
 // Scope: assigned project IDs for current user
 $_grnc_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
 
-// Get warehouses for dropdown — scoped by project for non-admins
-if (isAdmin()) {
-    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) as project_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-} elseif (!empty($_grnc_assigned)) {
-    $_grnc_wph = implode(',', array_fill(0, count($_grnc_assigned), '?'));
-    $_grnc_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) as project_id FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_grnc_wph)) ORDER BY warehouse_name");
-    $_grnc_wstmt->execute($_grnc_assigned);
-    $warehouses = $_grnc_wstmt->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id,0) as project_id FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-}
+// Get warehouses for dropdown — scoped by project for non-admins (shared helper)
+require_once ROOT_DIR . '/core/warehouse_scope.php';
+$warehouses = warehousesForSelect($pdo);
 
 // Get projects for dropdown — scoped to assigned projects for non-admins
 if (isAdmin()) {
@@ -672,6 +664,7 @@ function generate_grn_number() {
 </div>
 
 
+<script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <script>
 const PRESET_DN_ID = <?= (int)$dn_id_param ?>;
 let currentItemIndex = null;
@@ -1096,15 +1089,16 @@ function filterGrnWarehouses(projectId) {
     const hint  = document.getElementById('grnWarehouseHint');
     const curVal = parseInt(sel.value) || 0;
     sel.innerHTML = '<option value="">Select Warehouse</option>';
-    let filtered;
-    if (!projectId || projectId === '' || projectId === '0') {
-        filtered = grnAllWarehouses.filter(w => w.project_id === 0);
-        if (hint) hint.textContent = 'Showing warehouses not linked to any project.';
-    } else {
-        filtered = grnAllWarehouses.filter(w => w.project_id === parseInt(projectId));
-        if (hint) hint.textContent = filtered.length === 0
-            ? 'No warehouses found for this project.'
-            : 'Showing ' + filtered.length + ' warehouse(s) for selected project.';
+    // The filtering rule lives in the shared assets/js/warehouse-project-filter.js.
+    const filtered = filterWarehousesForProject(grnAllWarehouses, projectId);
+    if (hint) {
+        if (!projectId || projectId === '' || projectId === '0') {
+            hint.textContent = 'Showing warehouses not linked to any project.';
+        } else {
+            hint.textContent = filtered.length === 0
+                ? 'No warehouses found for this project.'
+                : 'Showing ' + filtered.length + ' warehouse(s) for selected project.';
+        }
     }
     filtered.forEach(w => {
         const opt = document.createElement('option');
