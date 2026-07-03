@@ -1,6 +1,18 @@
 # BMS Changelog
 
-## 2026-07-02 (chore) — Tier 2 re-scout + hardening (Phase 2.5) — Tier 2 complete
+## 2026-07-03 (fix) — Migration ordering: reporting_to_id backfill runs after its schema
+
+Production deploy halted: `2026_07_02_backfill_reporting_to_id.php` ran before
+`2026_07_02_hr_compliance_foundation.php` because the runner sorts migrations
+alphabetically ('b' < 'h') and the backfill needs the `reporting_to_id` column
+that foundation creates — so it correctly `exit(1)`'d and `script_stop` stopped
+the deploy.
+
+- Renamed `migrations/2026_07_02_backfill_reporting_to_id.php` →
+  `migrations/2026_07_02_hr_compliance_reporting_backfill.php` so it sorts after
+  `…hr_compliance_foundation` and `…hr_compliance_permissions` (f < p < r). No
+  logic change — the migration is idempotent and, having failed on prod, was
+  never recorded, so all three now run in the correct order on the next deploy.
 
 Final phase of the HR compliance tier (employee.md §7.3 Phase 2.5). No code
 changes — verification + documentation only.
