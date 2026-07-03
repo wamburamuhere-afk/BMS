@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-07-03 (feat) — Employee goals (Tier 3, Phase 3.4)
+
+Goals tab on the HR Performance page. Plan in employee.md §8.3 Phase 3.4.
+
+- `api/add_goal.php` — creates a goal for an employee (scope-gated,
+  `end_date >= start_date`); starts `not_started` at 0%.
+- `api/get_goals.php` — filtered list (type/status/employee) + stat cards
+  (Active, Completed this year, Overdue = `end_date < CURDATE()` and still
+  open, Avg progress of active), scope-gated.
+- `api/update_goal_progress.php` (D23) — percent 0–100 with a **required**
+  progress note that lands in the `logActivity`/`logAudit` entry (the audit
+  trail is the progress history — no separate table); auto-advances
+  `not_started → in_progress` on first progress; completing forces 100%;
+  transitions `not_started → in_progress → completed/cancelled` gated by
+  `canEdit`; a completed/cancelled goal is immutable.
+- `app/bms/pos/hr_performance.php` — Goals tab: stat cards, filters,
+  DataTable + mobile cards with progress bars + overdue badges, New Goal
+  modal (employee Select2), Update Progress modal (slider + status + required
+  note). Loaded lazily when the tab is first opened.
+- `app/bms/pos/employee_details.php` — active goals with progress bars +
+  overdue badges added inside the Performance card.
+- `tests/test_employee_goals_cli.php` — 22 assertions: create validation,
+  progress bounds, required note + audit-trail landing, auto-advance,
+  complete-forces-100, immutability, overdue/stat computation, permission
+  denials, page + details renders.
+
 ## 2026-07-03 (feat) — Employee appraisals (Tier 3, Phase 3.3)
 
 Appraisals tab on the HR Performance page. Plan in employee.md §8.3 Phase 3.3.

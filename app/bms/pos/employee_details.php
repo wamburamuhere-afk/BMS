@@ -131,6 +131,19 @@ if ($can_view_performance) {
     $appraisal_history = $pa_stmt->fetchAll(PDO::FETCH_ASSOC);
     $latest_appraisal = $appraisal_history[0] ?? null;
 }
+// Active goals (Tier 3, Phase 3.4) — shown inside the Performance card
+$active_goals = [];
+if ($can_view_performance) {
+    $ag_stmt = $pdo->prepare("
+        SELECT goal_id, subject, progress, end_date, status,
+               DATEDIFF(end_date, CURDATE()) AS days_to_due
+        FROM employee_goals
+        WHERE employee_id = ? AND status IN ('not_started','in_progress')
+        ORDER BY end_date ASC
+    ");
+    $ag_stmt->execute([$employee_id]);
+    $active_goals = $ag_stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 
 // Direct Reports (Tier 2, Phase 2.4) — employees whose reporting_to_id points here
 $dr_stmt = $pdo->prepare("SELECT employee_id, first_name, last_name FROM employees
@@ -992,6 +1005,24 @@ $sr_status_badge = [
                         <?php endforeach; ?>
                     </ul>
                     <?php endif; ?>
+                    <?php endif; ?>
+
+                    <?php if (!empty($active_goals)): ?>
+                    <hr>
+                    <div class="small text-muted mb-2"><i class="bi bi-flag me-1"></i> Active Goals</div>
+                    <?php foreach ($active_goals as $g):
+                        $g_overdue = (int)$g['days_to_due'] < 0;
+                    ?>
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small">
+                            <span><?= safe_output($g['subject']) ?><?php if ($g_overdue): ?> <span class="badge bg-danger">Overdue</span><?php endif; ?></span>
+                            <span class="text-muted"><?= (int)$g['progress'] ?>%</span>
+                        </div>
+                        <div class="progress" style="height:8px">
+                            <div class="progress-bar <?= $g_overdue ? 'bg-danger' : 'bg-primary' ?>" style="width:<?= (int)$g['progress'] ?>%"></div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
             </div>

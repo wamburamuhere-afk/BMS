@@ -22,6 +22,7 @@ $can_recommend = canCreate('employee_lifecycle');   // D20
 
 // Designations for the target matrix picker (in-scope by nature — company-wide lookup)
 $designations = $pdo->query("SELECT designation_id, designation_name FROM designations WHERE status='active' ORDER BY designation_name")->fetchAll(PDO::FETCH_ASSOC);
+$goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE status='active' ORDER BY goal_type_id")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <?php starRatingAssets(); ?>
@@ -107,9 +108,46 @@ $designations = $pdo->query("SELECT designation_id, designation_name FROM design
 
         <!-- Goals (Phase 3.4) -->
         <div class="tab-pane fade" id="pane-goals" role="tabpanel">
-            <div class="card border-0 shadow-sm"><div class="card-body text-center text-muted py-5">
-                <i class="bi bi-flag fs-1 d-block mb-2"></i> Goals module — coming in this tier.
+            <div class="d-flex justify-content-end mb-3">
+                <?php if ($can_create): ?>
+                <button class="btn btn-primary" onclick="openGoalModal()"><i class="bi bi-plus-circle me-1"></i> New Goal</button>
+                <?php endif; ?>
+            </div>
+            <div class="row g-3 mb-3">
+                <div class="col-6 col-md-3"><div class="card text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe"><div class="fs-4 fw-bold text-primary" id="gst_active">0</div><div class="small text-muted">Active</div></div></div>
+                <div class="col-6 col-md-3"><div class="card text-center p-3" style="background:#d1e7dd;border:1px solid #a3cfbb"><div class="fs-4 fw-bold text-success" id="gst_completed">0</div><div class="small text-muted">Completed this year</div></div></div>
+                <div class="col-6 col-md-3"><div class="card text-center p-3" style="background:#f8d7da;border:1px solid #f1aeb5"><div class="fs-4 fw-bold text-danger" id="gst_overdue">0</div><div class="small text-muted">Overdue</div></div></div>
+                <div class="col-6 col-md-3"><div class="card text-center p-3" style="background:#fff3cd;border:1px solid #ffe69c"><div class="fs-4 fw-bold text-warning" id="gst_avg">—</div><div class="small text-muted">Avg progress</div></div></div>
+            </div>
+            <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
+                <div class="row g-2 align-items-end">
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small mb-1">Type</label>
+                        <select class="form-select form-select-sm" id="gf_type"><option value="">All types</option>
+                            <?php foreach ($goal_types as $gt): ?><option value="<?= (int)$gt['goal_type_id'] ?>"><?= safe_output($gt['type_name']) ?></option><?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small mb-1">Status</label>
+                        <select class="form-select form-select-sm" id="gf_status"><option value="">All statuses</option>
+                            <option value="not_started">Not started</option><option value="in_progress">In progress</option>
+                            <option value="completed">Completed</option><option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label small mb-1">Employee</label>
+                        <select class="form-select form-select-sm" id="gf_employee"><option value="">All employees</option></select>
+                    </div>
+                    <div class="col-12 col-md-2"><button class="btn btn-sm btn-outline-secondary w-100" id="gf_reset"><i class="bi bi-arrow-clockwise"></i></button></div>
+                </div>
             </div></div>
+            <div id="gTableView" class="card border-0 shadow-sm"><div class="card-body">
+                <table id="goalsTable" class="table table-hover align-middle w-100">
+                    <thead class="table-dark"><tr><th>Employee</th><th>Goal</th><th>Type</th><th>Due</th><th style="min-width:140px">Progress</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div></div>
+            <div id="gCardView" class="row g-2 d-none"></div>
         </div>
 
         <?php if ($can_edit): ?>
@@ -308,6 +346,88 @@ $designations = $pdo->query("SELECT designation_id, designation_name FROM design
             </form>
             <div id="cyclesList"><div class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm"></span></div></div>
         </div>
+    </div></div>
+</div>
+<?php endif; ?>
+
+<?php if ($can_create): ?>
+<!-- New Goal modal -->
+<div class="modal fade" id="goalModal" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title"><i class="bi bi-flag me-1"></i> New Goal</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="goalForm">
+            <div class="modal-body">
+                <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                <div class="mb-3">
+                    <label class="form-label">Employee <span class="text-danger">*</span></label>
+                    <select class="form-select" name="employee_id" id="g_employee" required></select>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Type <span class="text-danger">*</span></label>
+                        <select class="form-select" name="goal_type_id" required>
+                            <?php foreach ($goal_types as $gt): ?><option value="<?= (int)$gt['goal_type_id'] ?>"><?= safe_output($gt['type_name']) ?></option><?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Subject <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="subject" required maxlength="255">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3"><label class="form-label">Start <span class="text-danger">*</span></label><input type="date" class="form-control" name="start_date" value="<?= date('Y-m-d') ?>" required></div>
+                    <div class="col-md-6 mb-3"><label class="form-label">End <span class="text-danger">*</span></label><input type="date" class="form-control" name="end_date" required></div>
+                </div>
+                <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2"></textarea></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Save</button>
+            </div>
+        </form>
+    </div></div>
+</div>
+<?php endif; ?>
+
+<?php if ($can_edit): ?>
+<!-- Goal progress modal -->
+<div class="modal fade" id="goalProgressModal" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title"><i class="bi bi-graph-up me-1"></i> Update Progress</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="goalProgressForm">
+            <div class="modal-body">
+                <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                <input type="hidden" name="goal_id" id="gp_id">
+                <div class="mb-2 small text-muted" id="gp_subject"></div>
+                <div class="mb-3">
+                    <label class="form-label">Progress: <span id="gp_val">0</span>%</label>
+                    <input type="range" class="form-range" min="0" max="100" step="5" name="progress" id="gp_progress" oninput="document.getElementById('gp_val').textContent=this.value">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" name="status" id="gp_status">
+                        <option value="">Keep / auto</option>
+                        <option value="in_progress">In progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Progress Note <span class="text-danger">*</span></label>
+                    <textarea class="form-control" name="note" rows="2" required placeholder="What changed? (recorded in the audit trail)"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
     </div></div>
 </div>
 <?php endif; ?>
@@ -707,6 +827,116 @@ $('#cycleForm').on('submit', function (e) {
     const id = $('#cy_id').val();
     const data = { action: id ? 'update' : 'add', cycle_id:id, cycle_name:$('#cy_name').val(), period_from:$('#cy_from').val(), period_to:$('#cy_to').val(), _csrf:HP_CSRF };
     $.post('<?= buildUrl('api/manage_appraisal_cycles.php') ?>', data, function (r) { if (r.success) { this && 0; $('#cycleForm')[0].reset(); $('#cy_id').val(''); cycleDone(r); } else Swal.fire({icon:'error',title:'Error',text:r.message}); }, 'json');
+});
+<?php endif; ?>
+
+// ═══ Goals (Phase 3.4) — available to all viewers ════════════════════════════
+const G_CAN_CREATE = <?= json_encode($can_create) ?>;
+const G_CAN_EDIT   = <?= json_encode($can_edit) ?>;
+let gTable = null, G_ROWS = [];
+
+function goalStatusBadge(s) {
+    const map = { not_started:['#e9ecef','#495057'], in_progress:['#0d6efd','#fff'], completed:['#198754','#fff'], cancelled:['#6c757d','#fff'] };
+    const [bg, fg] = map[s] || ['#e9ecef','#495057'];
+    return `<span class="badge" style="background:${bg};color:${fg}">${s.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase())}</span>`;
+}
+function progressBar(p, overdue) {
+    const color = overdue ? 'bg-danger' : (p >= 100 ? 'bg-success' : 'bg-primary');
+    return `<div class="progress" style="height:16px"><div class="progress-bar ${color}" style="width:${p}%">${p}%</div></div>`;
+}
+function goalActions(r) {
+    let items = '';
+    const active = (r.status === 'not_started' || r.status === 'in_progress');
+    if (active && G_CAN_EDIT) items += `<li><button class="dropdown-item py-2" onclick="openProgress(${r.goal_id})"><i class="bi bi-graph-up text-primary me-2"></i>Update Progress</button></li>`;
+    if (!items) items = '<li><span class="dropdown-item-text small text-muted">No actions</span></li>';
+    return `<div class="dropdown d-flex justify-content-end"><button class="btn btn-sm btn-outline-primary dropdown-toggle px-2" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button><ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${items}</ul></div>`;
+}
+function loadGoals() {
+    const p = { goal_type_id: $('#gf_type').val() || '', status: $('#gf_status').val(), employee_id: $('#gf_employee').val() || '' };
+    $.getJSON('<?= buildUrl('api/get_goals.php') ?>', p, function (res) {
+        if (!res.success) { Swal.fire({ icon:'error', title:'Error', text:res.message || 'Could not load.' }); return; }
+        G_ROWS = res.data;
+        $('#gst_active').text(res.stats.active); $('#gst_completed').text(res.stats.completed_year);
+        $('#gst_overdue').text(res.stats.overdue); $('#gst_avg').text(res.stats.avg_progress !== null ? res.stats.avg_progress + '%' : '—');
+        const data = res.data.map(r => {
+            const overdue = (r.status === 'not_started' || r.status === 'in_progress') && Number(r.days_to_due) < 0;
+            return [
+                `<a href="<?= getUrl('employee_details') ?>?id=${r.employee_id}" class="text-decoration-none fw-semibold">${safeOutput(r.first_name+' '+r.last_name)}</a>`,
+                safeOutput(r.subject), safeOutput(r.type_name || '—'),
+                safeOutput(r.end_date) + (overdue ? ' <span class="badge bg-danger">Overdue</span>' : ''),
+                progressBar(Number(r.progress), overdue), goalStatusBadge(r.status), goalActions(r)
+            ];
+        });
+        gTable.clear().rows.add(data).draw();
+    });
+}
+function gCards(rows) {
+    if (!rows.length) { $('#gCardView').html('<div class="col-12 text-center py-5 text-muted">No goals yet.</div>'); return; }
+    let html = '';
+    rows.forEach(r => {
+        const overdue = (r.status === 'not_started' || r.status === 'in_progress') && Number(r.days_to_due) < 0;
+        html += `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
+            <div class="d-flex justify-content-between"><div class="fw-bold">${safeOutput(r.subject)}</div>${goalStatusBadge(r.status)}</div>
+            <div class="small text-muted mt-1">${safeOutput(r.first_name+' '+r.last_name)} · ${safeOutput(r.type_name||'—')} · due ${safeOutput(r.end_date)}${overdue?' <span class="badge bg-danger">Overdue</span>':''}</div>
+            <div class="mt-2">${progressBar(Number(r.progress), overdue)}</div>
+            ${(r.status==='not_started'||r.status==='in_progress') && G_CAN_EDIT ? `<button class="btn btn-sm btn-outline-primary mt-2" onclick="openProgress(${r.goal_id})"><i class="bi bi-graph-up"></i> Progress</button>` : ''}
+        </div></div></div>`;
+    });
+    $('#gCardView').html(html);
+}
+$(function () {
+    gTable = $('#goalsTable').DataTable({
+        responsive:false, scrollX:true, pageLength:25, order:[[3,'asc']], dom:'rtip',
+        language:{ emptyTable:'No goals yet.', zeroRecords:'No matching records.' },
+        drawCallback: function () { gCards(this.api().rows({page:'current'})[0].map(i=>G_ROWS[i]).filter(Boolean)); }
+    });
+    $('#gf_employee').select2({ theme:'bootstrap-5', placeholder:'All employees', allowClear:true, width:'100%', minimumInputLength:1,
+        ajax:{ url:'<?= buildUrl('api/account/search_employees.php') ?>', dataType:'json', delay:300, data:p=>({q:p.term}), processResults:d=>({results:d.results}), cache:true } });
+    $('#gf_type,#gf_status,#gf_employee').on('change', loadGoals);
+    $('#gf_reset').on('click', function () { $('#gf_type,#gf_status').val(''); $('#gf_employee').val(null).trigger('change.select2'); loadGoals(); });
+    function gView() { if (window.innerWidth < 768) { $('#gTableView').addClass('d-none'); $('#gCardView').removeClass('d-none'); } else { $('#gTableView').removeClass('d-none'); $('#gCardView').addClass('d-none'); } }
+    gView(); $(window).on('resize', gView);
+    // Load goals when the tab is first shown (deferred for speed)
+    let gLoaded = false;
+    $('#tab-goals').on('shown.bs.tab', function () { if (!gLoaded) { gLoaded = true; loadGoals(); } });
+});
+
+<?php if ($can_create): ?>
+window.openGoalModal = function () {
+    $('#goalForm')[0].reset();
+    const m = new bootstrap.Modal(document.getElementById('goalModal')); m.show();
+};
+$('#goalModal').on('shown.bs.modal', function () {
+    if (!$('#g_employee').hasClass('select2-hidden-accessible')) {
+        $('#g_employee').select2({ theme:'bootstrap-5', dropdownParent:$('#goalModal'), placeholder:'Select employee…', width:'100%', minimumInputLength:1,
+            ajax:{ url:'<?= buildUrl('api/account/search_employees.php') ?>', dataType:'json', delay:300, data:p=>({q:p.term}), processResults:d=>({results:d.results}), cache:true } });
+    }
+});
+$('#goalForm').on('submit', function (e) {
+    e.preventDefault();
+    const btn = $(this).find('[type="submit"]'); const orig = btn.html(); btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
+    $.ajax({ url:'<?= buildUrl('api/add_goal.php') ?>', type:'POST', data:new FormData(this), contentType:false, processData:false, dataType:'json',
+        success: r => { if (r.success) { bootstrap.Modal.getInstance(document.getElementById('goalModal')).hide(); loadGoals(); Swal.fire({icon:'success',title:'Saved!',text:r.message,timer:1600,showConfirmButton:false}); } else Swal.fire({icon:'error',title:'Error',text:r.message}); },
+        error: () => Swal.fire({icon:'error',title:'Error',text:'Server error.'}),
+        complete: () => btn.prop('disabled', false).html(orig) });
+});
+<?php endif; ?>
+
+<?php if ($can_edit): ?>
+window.openProgress = function (id) {
+    const g = G_ROWS.find(x => Number(x.goal_id) === id); if (!g) return;
+    $('#goalProgressForm')[0].reset();
+    $('#gp_id').val(id); $('#gp_subject').text(g.subject + ' — ' + g.first_name + ' ' + g.last_name);
+    $('#gp_progress').val(g.progress); $('#gp_val').text(g.progress); $('#gp_status').val('');
+    new bootstrap.Modal(document.getElementById('goalProgressModal')).show();
+};
+$('#goalProgressForm').on('submit', function (e) {
+    e.preventDefault();
+    const btn = $(this).find('[type="submit"]'); btn.prop('disabled', true);
+    $.post('<?= buildUrl('api/update_goal_progress.php') ?>', $(this).serialize(), function (r) {
+        if (r.success) { bootstrap.Modal.getInstance(document.getElementById('goalProgressModal')).hide(); loadGoals(); Swal.fire({icon:'success',title:'Updated!',text:r.message,timer:1600,showConfirmButton:false}); }
+        else Swal.fire({icon:'error',title:'Error',text:r.message});
+    }, 'json').fail(() => Swal.fire({icon:'error',title:'Error',text:'Server error.'})).always(() => btn.prop('disabled', false));
 });
 <?php endif; ?>
 </script>
