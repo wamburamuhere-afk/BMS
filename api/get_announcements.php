@@ -3,6 +3,10 @@
 // mode=manage  → admin/editor list of all non-deleted announcements + stats.
 // mode=feed    → the current announcements THIS user should see (audience match,
 //                within publish/expire window), unread-first (for banners / My HR).
+// scope-audit: skip — the feed does its OWN per-viewer scoping (a non-admin only
+// sees 'all' + their own department/user_projects; admins see everything), which
+// is the correct confidentiality control for a broadcast audience (D25). The
+// manage list is gated by canView('announcements').
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/project_scope.php';
 

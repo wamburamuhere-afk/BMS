@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-07-03 (chore) — Tier 4 re-scout + whole-plan completion (Phase 4.7) — Tier 4 complete
+
+Final phase of the Talent & Engagement tier, and the completion of the whole
+4-tier WorkDo gap-closure plan (employee.md §9.3 Phase 4.7).
+
+- Re-scout: every §9 checklist item implemented (6 pages, 25 APIs, 12 tables +
+  users.employee_id, 2 D28 hooks).
+- Verified the two D28 auto-spawn hooks degrade safely — with
+  `core/checklists.php` moved aside, `add_employee.php` and
+  `change_lifecycle_status.php` still work and the lifecycle workflow test
+  passes 28/28 (the `@is_file` + `function_exists` guards no-op the spawn).
+- Scope hardening: added documented `// scope-audit: skip` markers to the four
+  files where project scope doesn't apply — `api/my_hr_data.php` (D24
+  own-record-only), `api/get_announcements.php` (own per-viewer audience
+  scoping), `api/get_meetings.php` (company-wide, D29), and the admin-only
+  `add_user.php`/`edit_user.php` (linked-employee name preview). Pre-push scope
+  audit passes with 0 unscoped.
+- Confirmed no Tier 4 file reads or writes the ledger (D21/D26).
+- Full Tier 4 CLI suite green: 180 assertions across 6 files
+  (`hr_talent_foundation` 83, `announcements` 18, `meetings_trips` 24,
+  `hr_checklists` 21, `recruitment` 23, `my_hr` 11), covering the three
+  end-to-end loops (hire→onboard, exit→offboard, ESS leave). All prior-tier
+  regressions clean.
+- `employee.md` — Tier 4 marked implemented in the tier table; the whole-plan
+  completion checklist ticked; Phase 4.7 re-scout table recorded.
+
 ## 2026-07-04 (feat) — Employee Self-Service "My HR" (Tier 4, Phase 4.6)
 
 Read-only self-service portal. Plan in employee.md §9.3 Phase 4.6.

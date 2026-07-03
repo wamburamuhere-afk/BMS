@@ -3,6 +3,8 @@
 // SECURITY LINCHPIN: the employee is resolved from the SESSION ONLY
 // (users.employee_id of $_SESSION['user_id']). There is NO employee_id input
 // parameter — a user can only ever see their own record. Unlinked users get 403.
+// scope-audit: skip — ESS is structurally own-record-only (D24); the session
+// link is a stronger control than project scope and applies to every query here.
 // Read-only aggregation of data built across Tiers 1–4. ?section=<name> returns
 // one section; omitted returns the profile + a summary.
 require_once __DIR__ . '/../roots.php';

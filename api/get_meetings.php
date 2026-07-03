@@ -1,5 +1,8 @@
 <?php
 // API: List meetings (+ stats) or a single meeting with attendees (Tier 4, Phase 4.3).
+// scope-audit: skip — meetings are company-wide by design (D29; no project_id);
+// the employees join only resolves attendee display names, which are not
+// project-confidential. Access is gated by canView('meetings').
 require_once __DIR__ . '/../roots.php';
 
 header('Content-Type: application/json');

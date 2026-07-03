@@ -1,4 +1,6 @@
 <?php
+// scope-audit: skip — admin-only user-management page; the employees query only
+// previews the optional "Linked Employee" name (Tier 4 D24). Not project-scoped.
 // Start output buffering at the very beginning
 ob_start();
 
