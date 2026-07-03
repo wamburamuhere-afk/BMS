@@ -162,6 +162,28 @@ try {
         $_POST['benefits'] = json_encode($_POST['benefits']);
     }
 
+    // Tier 2, Phase 2.4 (D14) — optional reporting_to_id from the Select2
+    // manager picker. Only touched when the field is actually submitted (old
+    // clients/imports that never send it leave reporting_to_id untouched).
+    // When set, dual-write the manager's name into the legacy reporting_to
+    // varchar so all 4 existing readers keep working unchanged; a blank
+    // value clears the manager on both columns.
+    $reporting_to_id_present = array_key_exists('reporting_to_id', $_POST);
+    $new_reporting_to_id = null;
+    if ($reporting_to_id_present) {
+        $new_reporting_to_id = trim((string)$_POST['reporting_to_id']) !== '' ? (int)$_POST['reporting_to_id'] : null;
+        if ($new_reporting_to_id !== null) {
+            $mgrStmt = $pdo->prepare("SELECT first_name, last_name FROM employees WHERE employee_id = ? AND (status IS NULL OR status != 'deleted')");
+            $mgrStmt->execute([$new_reporting_to_id]);
+            $mgrRow = $mgrStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$mgrRow) throw new Exception('Selected manager does not exist');
+            if ($new_reporting_to_id === (int)$employee_id) throw new Exception('An employee cannot report to themselves');
+            $_POST['reporting_to'] = trim($mgrRow['first_name'] . ' ' . $mgrRow['last_name']);
+        } else {
+            $_POST['reporting_to'] = '';
+        }
+    }
+
     // Dynamic update query
     $fields = [
         'employee_code', 'first_name', 'last_name', 'middle_name', 'gender', 'date_of_birth',
@@ -187,6 +209,13 @@ try {
             $update_fields[] = "$field = ?";
             $update_params[] = $_POST[$field];
         }
+    }
+
+    // reporting_to_id can legitimately be set to NULL (clear manager), which
+    // isset() would skip above — bind it explicitly when submitted.
+    if ($reporting_to_id_present) {
+        $update_fields[] = "reporting_to_id = ?";
+        $update_params[] = $new_reporting_to_id;
     }
 
     if (empty($update_fields)) {

@@ -126,18 +126,32 @@ try {
     $other_doc_name = $_POST['other_doc_name'] ?? null;
     $benefits_json = isset($_POST['benefits']) && is_array($_POST['benefits']) ? json_encode($_POST['benefits']) : null;
 
+    // Tier 2, Phase 2.4 (D14) — optional reporting_to_id from the new Select2
+    // manager picker. When provided, dual-write the manager's name into the
+    // legacy reporting_to varchar so all existing readers keep working
+    // unchanged. When absent (old clients/imports), reporting_to is used as-is.
+    $reporting_to_id = ($_POST['reporting_to_id'] ?? '') !== '' ? intval($_POST['reporting_to_id']) : null;
+    $reporting_to_name = $_POST['reporting_to'] ?? null;
+    if ($reporting_to_id !== null) {
+        $mgrStmt = $pdo->prepare("SELECT first_name, last_name FROM employees WHERE employee_id = ? AND (status IS NULL OR status != 'deleted')");
+        $mgrStmt->execute([$reporting_to_id]);
+        $mgrRow = $mgrStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$mgrRow) throw new Exception('Selected manager does not exist');
+        $reporting_to_name = trim($mgrRow['first_name'] . ' ' . $mgrRow['last_name']);
+    }
+
     // Insert Employee
     $stmt = $pdo->prepare("
         INSERT INTO employees (
-            employee_code, employee_number, first_name, middle_name, last_name, 
+            employee_code, employee_number, first_name, middle_name, last_name,
             gender, date_of_birth, marital_status, national_id, passport_number,
-            email, phone, alternate_phone, 
-            address, physical_address, postal_address, city, country, hire_date, 
-            probation_end_date, contract_end_date, department_id, 
-            designation_id, employment_type_id, employment_status, reporting_to, work_location,
+            email, phone, alternate_phone,
+            address, physical_address, postal_address, city, country, hire_date,
+            probation_end_date, contract_end_date, department_id,
+            designation_id, employment_type_id, employment_status, reporting_to, reporting_to_id, work_location,
             basic_salary, hourly_rate, currency, payment_frequency,
             bank_name, bank_account, bank_branch, mobile_money,
-            tax_id, social_security_number, emergency_contact, 
+            tax_id, social_security_number, emergency_contact,
             emergency_contact_relationship, emergency_contact_phone, emergency_contact_postal_address,
             emergency_contact_physical_address, emergency_contact_email,
             benefits, notes, documents, other_doc_name, project_id, created_by, created_at
@@ -147,7 +161,7 @@ try {
             ?, ?, ?,         -- row 3: 3
             ?, ?, ?, ?, ?, ?, -- row 4: 6
             ?, ?, ?,         -- row 5: 3
-            ?, ?, ?, ?, ?,   -- row 6: 5
+            ?, ?, ?, ?, ?, ?, -- row 6: 6
             ?, ?, ?, ?,      -- row 7: 4
             ?, ?, ?, ?,      -- row 8: 4
             ?, ?, ?,         -- row 9: 3
@@ -180,9 +194,10 @@ try {
         $_POST['contract_end_date'] ?? null,
         $_POST['department_id'], 
         $_POST['designation_id'],
-        $_POST['employment_type_id'], 
-        $_POST['employment_status'] ?? 'probation', 
-        $_POST['reporting_to'] ?? null,
+        $_POST['employment_type_id'],
+        $_POST['employment_status'] ?? 'probation',
+        $reporting_to_name,
+        $reporting_to_id,
         $_POST['work_location'] ?? null,
         $_POST['basic_salary'] ?? 0, 
         $_POST['hourly_rate'] ?? 0, 

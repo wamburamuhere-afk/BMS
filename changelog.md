@@ -1,5 +1,38 @@
 # BMS Changelog
 
+## 2026-07-02 (feat) — Org structure & org chart (Tier 2, Phase 2.4)
+
+Real manager links replacing the free-text reporting_to field, plus a
+collapsible org chart. Plan in employee.md §7.3 Phase 2.4.
+
+- `api/update_reporting_line.php` — sets `reporting_to_id` with the D15
+  cycle guard (rejects self and any ancestor/descendant in the reporting
+  chain, depth-capped walk) and dual-writes the manager's full name into
+  the legacy `reporting_to` varchar (D14); `canEdit('employees')` + scope
+  gate; `logAudit` with old/new manager.
+- `api/add_employee.php`, `api/update_employee.php` — accept the optional
+  `reporting_to_id` field (ignored when absent, so old clients/imports keep
+  working unchanged) and dual-write the resolved manager's name.
+  `update_employee.php` additionally guards self-reference directly since it
+  writes `reporting_to_id` outside the cycle-guarded endpoint.
+- `app/bms/pos/employees.php` — the free-text "Reporting To" input is now a
+  Select2 AJAX manager picker (reuses `api/account/search_employees.php`)
+  submitting `reporting_to_id`; shows the legacy varchar as a hint when no
+  manager is linked yet.
+- `app/bms/pos/org_chart.php` — pure-CSS collapsible tree (`<details>`) built
+  client-side from `reporting_to_id`; employees with no manager (or whose
+  manager fell outside scope) render as roots; depth-capped so a stray cycle
+  can never hang the page; print-friendly; click-through to
+  `employee_details`. Data from `api/get_org_chart.php` (project-scope
+  filtered).
+- `app/bms/pos/employee_details.php` — additive "Direct Reports" sidebar
+  mini-card: avatars + names of employees whose `reporting_to_id` points
+  here, with a count badge.
+- `tests/test_org_structure_cli.php` — 27 assertions: cycle guard (self,
+  direct, deep), dual-write name sync (set + clear), optional-field
+  back-compat on add/update APIs, permission denial, and both pages render
+  cleanly with 0/1/N-level trees and a legacy-varchar-only manager link.
+
 ## 2026-07-02 (feat) — Employee Contracts module (Tier 2, Phase 2.3)
 
 Contracts with renewal history + expiry alerts. Plan in employee.md §7.3 Phase 2.3.

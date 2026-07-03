@@ -113,6 +113,13 @@ if ($can_view_contracts) {
     $emp_contracts = $ec_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// Direct Reports (Tier 2, Phase 2.4) — employees whose reporting_to_id points here
+$dr_stmt = $pdo->prepare("SELECT employee_id, first_name, last_name FROM employees
+                           WHERE reporting_to_id = ? AND (status IS NULL OR status != 'deleted')
+                           ORDER BY first_name, last_name");
+$dr_stmt->execute([$employee_id]);
+$direct_reports = $dr_stmt->fetchAll(PDO::FETCH_ASSOC);
+
 // Service Record (Tier 1, Phase 1.5) — this employee's lifecycle timeline,
 // newest first. Old/new ids resolved via LEFT JOIN like the rest of the page.
 $can_create_lifecycle = canCreate('employee_lifecycle');
@@ -280,6 +287,32 @@ $sr_status_badge = [
                             <small class="text-muted">Warnings</small>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Direct Reports (Tier 2, Phase 2.4) -->
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0"><i class="bi bi-people text-primary"></i> Direct Reports</h5>
+                    <span class="badge bg-primary"><?= count($direct_reports) ?></span>
+                </div>
+                <div class="card-body">
+                    <?php if (empty($direct_reports)): ?>
+                    <p class="text-muted mb-0 small">No direct reports.</p>
+                    <?php else: ?>
+                    <ul class="list-unstyled mb-0">
+                        <?php foreach ($direct_reports as $dr): ?>
+                        <li class="d-flex align-items-center mb-2">
+                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2" style="width:32px;height:32px;font-size:.75rem;font-weight:600;flex-shrink:0;">
+                                <?= strtoupper(substr($dr['first_name'], 0, 1) . substr($dr['last_name'], 0, 1)) ?>
+                            </div>
+                            <a href="<?= getUrl('employee_details') ?>?id=<?= (int)$dr['employee_id'] ?>" class="text-decoration-none text-dark">
+                                <?= safe_output(trim($dr['first_name'] . ' ' . $dr['last_name'])) ?>
+                            </a>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php endif; ?>
                 </div>
             </div>
 
