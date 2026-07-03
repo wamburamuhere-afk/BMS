@@ -189,7 +189,7 @@ try {
         'employee_code', 'first_name', 'last_name', 'middle_name', 'gender', 'date_of_birth',
         'marital_status', 'national_id', 'passport_number',
         'email', 'phone', 'alternate_phone', 'address', 'physical_address', 'postal_address',
-        'city', 'country',
+        'city', 'state', 'ward', 'village', 'country',
         'employee_number', 'hire_date', 'probation_end_date', 'contract_end_date',
         'department_id', 'designation_id', 'employment_type_id', 'employment_status', 
         'reporting_to', 'work_location',

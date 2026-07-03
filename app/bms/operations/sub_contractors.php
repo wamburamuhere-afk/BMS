@@ -559,12 +559,12 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                     <input type="text" class="form-control" id="city" name="city" placeholder="e.g. Ilala">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="council" class="form-label">Council</label>
-                                    <input type="text" class="form-control" id="council" name="council" placeholder="e.g. Ilala Municipal">
-                                </div>
-                                <div class="col-6 col-md-6 mb-3">
                                     <label for="ward" class="form-label">Ward</label>
                                     <input type="text" class="form-control" id="ward" name="ward" placeholder="e.g. Kariakoo">
+                                </div>
+                                <div class="col-6 col-md-6 mb-3">
+                                    <label for="village" class="form-label">Street/Village</label>
+                                    <input type="text" class="form-control" id="village" name="village" placeholder="e.g. Mtaa wa Kariakoo">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="postal_code" class="form-label">Zip Code</label>
@@ -793,12 +793,12 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                     <input type="text" class="form-control" id="edit_city" name="city" placeholder="e.g. Ilala">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_council" class="form-label">Council</label>
-                                    <input type="text" class="form-control" id="edit_council" name="council" placeholder="e.g. Ilala Municipal">
-                                </div>
-                                <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_ward" class="form-label">Ward</label>
                                     <input type="text" class="form-control" id="edit_ward" name="ward" placeholder="e.g. Kariakoo">
+                                </div>
+                                <div class="col-6 col-md-6 mb-3">
+                                    <label for="edit_village" class="form-label">Street/Village</label>
+                                    <input type="text" class="form-control" id="edit_village" name="village" placeholder="e.g. Mtaa wa Kariakoo">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_postal_code" class="form-label">Zip Code</label>
@@ -1098,8 +1098,8 @@ function editSC(id) {
             $('#edit_country').val(d.country);
             $('#edit_state').val(d.state);
             $('#edit_city').val(d.city);
-            $('#edit_council').val(d.council);
             $('#edit_ward').val(d.ward);
+            $('#edit_village').val(d.village);
             $('#edit_postal_code').val(d.postal_code);
             $('#edit_address').val(d.address);
             $('#edit_postal_address').val(d.postal_address);

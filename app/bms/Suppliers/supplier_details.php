@@ -506,16 +506,16 @@ global $company_name, $company_logo;
                             <td><?= htmlspecialchars($supplier['state']) ?></td>
                         </tr>
                         <?php endif; ?>
-                        <?php if (!empty($supplier['council'])): ?>
-                        <tr>
-                            <td><strong>Council:</strong></td>
-                            <td><?= htmlspecialchars($supplier['council']) ?></td>
-                        </tr>
-                        <?php endif; ?>
                         <?php if (!empty($supplier['ward'])): ?>
                         <tr>
                             <td><strong>Ward:</strong></td>
                             <td><?= htmlspecialchars($supplier['ward']) ?></td>
+                        </tr>
+                        <?php endif; ?>
+                        <?php if (!empty($supplier['village'])): ?>
+                        <tr>
+                            <td><strong>Street/Village:</strong></td>
+                            <td><?= htmlspecialchars($supplier['village']) ?></td>
                         </tr>
                         <?php endif; ?>
                         <?php if (!empty($supplier['city'])): ?>

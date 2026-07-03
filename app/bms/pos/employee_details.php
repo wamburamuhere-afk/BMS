@@ -439,11 +439,39 @@ $sr_status_badge = [
                             <span class="ms-4"><?= safe_output($employee['postal_address']) ?></span>
                         </li>
                         <?php endif; ?>
-                        <?php if (!empty($employee['city']) || !empty($employee['country'])): ?>
+                        <?php if (!empty($employee['country'])): ?>
                         <li class="mb-3">
                             <i class="bi bi-globe text-primary me-2"></i>
-                            <strong>City / Country:</strong><br>
-                            <span class="ms-4"><?= safe_output(implode(', ', array_filter([$employee['city'] ?? '', $employee['country'] ?? '']))) ?></span>
+                            <strong>Country:</strong><br>
+                            <span class="ms-4"><?= safe_output($employee['country']) ?></span>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (!empty($employee['state'])): ?>
+                        <li class="mb-3">
+                            <i class="bi bi-globe text-primary me-2"></i>
+                            <strong>Region:</strong><br>
+                            <span class="ms-4"><?= safe_output($employee['state']) ?></span>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (!empty($employee['city'])): ?>
+                        <li class="mb-3">
+                            <i class="bi bi-globe text-primary me-2"></i>
+                            <strong>District:</strong><br>
+                            <span class="ms-4"><?= safe_output($employee['city']) ?></span>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (!empty($employee['ward'])): ?>
+                        <li class="mb-3">
+                            <i class="bi bi-globe text-primary me-2"></i>
+                            <strong>Ward:</strong><br>
+                            <span class="ms-4"><?= safe_output($employee['ward']) ?></span>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (!empty($employee['village'])): ?>
+                        <li class="mb-3">
+                            <i class="bi bi-globe text-primary me-2"></i>
+                            <strong>Street/Village:</strong><br>
+                            <span class="ms-4"><?= safe_output($employee['village']) ?></span>
                         </li>
                         <?php endif; ?>
                     </ul>

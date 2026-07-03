@@ -146,7 +146,7 @@ try {
             employee_code, employee_number, first_name, middle_name, last_name,
             gender, date_of_birth, marital_status, national_id, passport_number,
             email, phone, alternate_phone,
-            address, physical_address, postal_address, city, country, hire_date,
+            address, physical_address, postal_address, city, state, ward, village, country, hire_date,
             probation_end_date, contract_end_date, department_id,
             designation_id, employment_type_id, employment_status, reporting_to, reporting_to_id, work_location,
             basic_salary, hourly_rate, currency, payment_frequency,
@@ -159,7 +159,7 @@ try {
             ?, ?, ?, ?, ?,   -- row 1: 5
             ?, ?, ?, ?, ?,   -- row 2: 5
             ?, ?, ?,         -- row 3: 3
-            ?, ?, ?, ?, ?, ?, -- row 4: 6
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, -- row 4: 9
             ?, ?, ?,         -- row 5: 3
             ?, ?, ?, ?, ?, ?, -- row 6: 6
             ?, ?, ?, ?,      -- row 7: 4
@@ -187,7 +187,10 @@ try {
         $_POST['physical_address'] ?? $_POST['address'] ?? null,
         $_POST['physical_address'] ?? null,
         $_POST['postal_address'] ?? null,
-        $_POST['city'] ?? null, 
+        $_POST['city'] ?? null,
+        $_POST['state'] ?? null,
+        $_POST['ward'] ?? null,
+        $_POST['village'] ?? null,
         $_POST['country'] ?? 'Tanzania',
         $_POST['hire_date'], 
         $_POST['probation_end_date'] ?? null,

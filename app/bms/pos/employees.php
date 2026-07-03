@@ -775,12 +775,24 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     <textarea class="form-control" id="postal_address" name="postal_address" rows="2" placeholder="e.g. P.O. Box 1234, Dar es Salaam"></textarea>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="city" class="form-label">City</label>
-                                    <input type="text" class="form-control" id="city" name="city" placeholder="City">
-                                </div>
-                                <div class="col-md-6 mb-3">
                                     <label for="country" class="form-label">Country</label>
                                     <input type="text" class="form-control" id="country" name="country" placeholder="Country" value="Tanzania">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="state" class="form-label">Region</label>
+                                    <input type="text" class="form-control" id="state" name="state" placeholder="e.g. Dar es Salaam">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="city" class="form-label">District</label>
+                                    <input type="text" class="form-control" id="city" name="city" placeholder="e.g. Ilala">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="ward" class="form-label">Ward</label>
+                                    <input type="text" class="form-control" id="ward" name="ward" placeholder="e.g. Kariakoo">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="village" class="form-label">Street/Village</label>
+                                    <input type="text" class="form-control" id="village" name="village" placeholder="e.g. Mtaa wa Kariakoo">
                                 </div>
 
                                 <!-- Emergency Contact Sub-section -->
@@ -1854,8 +1866,11 @@ function editEmployee(employeeId) {
                 $('#emergency_contact_email').val(emp.emergency_contact_email || '');
                 $('#physical_address').val(emp.physical_address || emp.address || '');
                 $('#postal_address').val(emp.postal_address || '');
-                $('#city').val(emp.city || '');
                 $('#country').val(emp.country || '');
+                $('#state').val(emp.state || '');
+                $('#city').val(emp.city || '');
+                $('#ward').val(emp.ward || '');
+                $('#village').val(emp.village || '');
                 
                 // Step 4: Bank & Documents
                 $('#bank_name').val(emp.bank_name || '');

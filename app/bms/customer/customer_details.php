@@ -613,12 +613,20 @@ global $company_name, $company_logo;
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['address']) ? safe_output($customer['address']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-3 mb-3">
-                            <label class="form-label text-muted small mb-1">City</label>
+                            <label class="form-label text-muted small mb-1">District</label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['city']) ? safe_output($customer['city']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-3 mb-3">
                             <label class="form-label text-muted small mb-1">State/Region</label>
                             <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['state']) ? safe_output($customer['state']) : '<span class="text-muted">N/A</span>' ?></p>
+                        </div>
+                        <div class="col-6 col-md-3 mb-3">
+                            <label class="form-label text-muted small mb-1">Ward</label>
+                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['ward']) ? safe_output($customer['ward']) : '<span class="text-muted">N/A</span>' ?></p>
+                        </div>
+                        <div class="col-6 col-md-3 mb-3">
+                            <label class="form-label text-muted small mb-1">Street/Village</label>
+                            <p class="mb-0 fw-semibold fs-7"><?= !empty($customer['village']) ? safe_output($customer['village']) : '<span class="text-muted">N/A</span>' ?></p>
                         </div>
                         <div class="col-6 col-md-3 mb-3">
                             <label class="form-label text-muted small mb-1">Country</label>
@@ -1864,12 +1872,12 @@ function deleteLpo(lpoId, lpoNumber) {
                                     <input type="text" class="form-control" id="edit_city" name="city" placeholder="District">
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <label for="edit_council" class="form-label">Council</label>
-                                    <input type="text" class="form-control" id="edit_council" name="council" placeholder="Council">
-                                </div>
-                                <div class="col-6 mb-3">
                                     <label for="edit_ward" class="form-label">Ward</label>
                                     <input type="text" class="form-control" id="edit_ward" name="ward" placeholder="Ward">
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="edit_village" class="form-label">Street/Village</label>
+                                    <input type="text" class="form-control" id="edit_village" name="village" placeholder="Street/Village">
                                 </div>
                                 <div class="col-6 mb-3">
                                     <label for="edit_postal_code" class="form-label">Postal Code</label>
@@ -2023,8 +2031,8 @@ function editCustomer(customerId) {
                     'city': '#edit_city',
                     'state': '#edit_state',
                     'country': '#edit_country',
-                    'council': '#edit_council',
                     'ward': '#edit_ward',
+                    'village': '#edit_village',
                     'postal_code': '#edit_postal_code',
                     'postal_address': '#edit_postal_address',
                     'tax_id': '#edit_tax_id',
