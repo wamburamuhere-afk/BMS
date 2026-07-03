@@ -1,5 +1,52 @@
 # BMS Changelog
 
+## 2026-07-03 (feat) — Supplier forms wired to the location cascade engine
+
+- `app/bms/Suppliers/suppliers.php` — Add + Edit supplier modals now use
+  `initLocationCascade()`: Tanzania → defined dropdowns (Country→Region→
+  District→Ward→Street/Village) from the location engine; other countries →
+  free-text automatically. Edit prefill via `setValues()`; add-modal reset
+  restores Tanzania defaults. Removed the leftover legacy country-trigger
+  block. Fields still post names, so `add_supplier.php`/`update_supplier.php`
+  and the DB columns are untouched.
+- `assets/js/location_cascade.js` — legacy-data hardening: a stored value
+  not in the defined list (free-typed before the cascade existed) is kept
+  as an extra selected option instead of being wiped; unknown stored
+  countries fall back to free-text mode with values preserved.
+- Customer, Sub-contractor, Employee wiring pending separate go-ahead.
+
+## 2026-07-03 (feat) — OOP Location Engine (Country→Region→District→Ward→Street/Village)
+
+Professional pattern: local reference tables + provider-based sync engine —
+new administrative areas arrive by re-syncing a dataset, never by code edits.
+
+- `core/Location/` — new OOP engine: `LocationRepository` (all reads),
+  `LocationService` (data-driven select/free-text mode + hierarchy
+  validation), `LocationSyncService` (idempotent import with normalizing
+  district matcher + audit log), `Providers/LocationProviderInterface` +
+  `MtaaCsvProvider` (adapter over the vendored dataset), `bootstrap.php`.
+- `data/locations/tz/` — vendored Tanzania dataset (26 mainland-region CSVs,
+  MIT-licensed, mtaa/HackEAC, NBS-derived) + README with update procedure.
+- `migrations/2026_07_03_location_engine.php` — wards re-keyed to official
+  districts (`district_id`, `ward_code`, `is_active`; 33 legacy council-keyed
+  rows deactivated; unique key per district), new `villages` and
+  `location_sync_log` tables, frame fixes (added missing Tanganyika District/
+  Katavi and Kibiti District/Pwani), initial import. Run live: 3,964 wards +
+  16,692 streets/villages imported; 26/26 dataset regions and 158/158
+  dataset districts matched; Zanzibar regions pending a fuller dataset.
+- `api/location/options.php` — ONE Select2-ready endpoint for all five
+  levels (replaces scattered get_regions/get_districts/get_councils/
+  get_wards for new work). `api/location/sync.php` — admin-only re-sync.
+- `assets/js/location_cascade.js` — reusable cascade component: Tanzania →
+  locked dropdowns; countries without imported subdivisions → free-text
+  automatically (data-driven, flips per country once its regions are
+  imported). Posts location NAMES so existing party text columns are
+  unchanged.
+- `tests/test_location_engine_cli.php` — 38 assertions incl. live reads,
+  chain validation, sync idempotency, endpoint-through-real-path.
+- NOT yet wired into Supplier/Customer/Sub-contractor/Employee forms —
+  awaiting explicit go-ahead per agreement.
+
 ## 2026-07-03 (feat) — Sub-contractor address fields: drop Council, add Street/Village
 
 - `migrations/2026_07_03_add_village_to_sub_contractors.php` — new
