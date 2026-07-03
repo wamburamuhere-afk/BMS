@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-07-04 (feat) — Announcements (Tier 4, Phase 4.2)
+
+Company/department/project broadcast announcements. Plan in employee.md §9.3
+Phase 4.2.
+
+- `api/manage_announcement.php` — add/edit/publish/archive/soft-delete;
+  publish/archive gated by `canPublish` (falls back to `canEdit`). On publish
+  (D25) it resolves the audience (all active users / by `users.department_id` /
+  by `user_projects`) and creates one in-app notification each via the existing
+  `core/notify.php` engine, deduped through `notification_dedupe`
+  (event `hr_announcement`). `message_center` is untouched.
+- `api/get_announcements.php` — `mode=manage` (editor list + stat cards) and
+  `mode=feed` (what the current user should see: audience match within the
+  publish/expire window, unread-first).
+- `api/mark_announcement_read.php` — insert-ignore into `announcement_reads`.
+- `app/bms/pos/announcements.php` — page: stat cards (published & current,
+  drafts, expiring ≤7d, read rate), status filter, DataTable + mobile cards,
+  add/edit modal with audience selector (department/project options via
+  `scopeFilterSql`), publish/archive/delete actions.
+- `tests/test_announcements_cli.php` — 18 assertions: audience-resolution
+  matrix (all/dept/project → correct users notified), dedupe on re-publish,
+  feed audience + expire-window filtering, mark-read idempotency, archive,
+  permission denial, page render.
+
 ## 2026-07-04 (feat) — HR Talent & Engagement foundation + ESS link (Tier 4, Phase 4.1)
 
 Foundation for Tier 4 (announcements, meetings, trips, checklists, recruitment,
