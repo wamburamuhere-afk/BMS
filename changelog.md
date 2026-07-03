@@ -1,5 +1,37 @@
 # BMS Changelog
 
+## 2026-07-04 (feat) — HR Talent & Engagement foundation + ESS link (Tier 4, Phase 4.1)
+
+Foundation for Tier 4 (announcements, meetings, trips, checklists, recruitment,
+employee self-service) — additive scaffolding, plan in employee.md §9.
+
+- `migrations/2026_07_04_hr_talent_foundation.php` — 12 tables (all InnoDB):
+  `announcements`/`announcement_reads`, `meetings`/`meeting_attendees`,
+  `employee_trips`, `checklist_templates`/`checklist_template_items`/
+  `employee_checklists`/`employee_checklist_items`, `job_openings`/`candidates`/
+  `candidate_interviews`; the ESS linchpin `users.employee_id INT NULL` (D24,
+  guarded); seeded one default onboarding + one default offboarding checklist
+  template with starter items (D28); `uploads/candidate_cvs/` + `uploads/trips/`
+  with deny-exec `.htaccess`.
+- `migrations/2026_07_04_hr_talent_permissions.php` — 6 permission rows
+  (`announcements`, `meetings`, `employee_trips`, `hr_checklists`, `recruitment`,
+  `my_hr`); `my_hr` gets `can_view = 1` for **every** role (the page shows only
+  the session user's own data — D24 makes that safe); the rest mirror
+  `employees` editors (runtime-resolved). `notification_events` row
+  `hr_announcement` for D25.
+- `roots.php` — routes for 6 pages + 25 APIs (across Phases 4.2–4.6);
+  `header.php` — HR dropdown gains Recruitment/Checklists/Meetings/Trips/
+  Announcements, and a "My HR" item in the profile area shown only when the
+  session user has a linked employee (resolved each request, guarded);
+  `core/permissions.php` — router-fallback mappings for the 6 pages.
+- `app/constant/settings/add_user.php` + `edit_user.php` — additive "Linked
+  Employee" Select2 field writing the optional `users.employee_id`; absent/blank
+  leaves the link unset, so existing user-save flows keep working unchanged.
+- `tests/test_hr_talent_foundation_cli.php` — 83 assertions: migrations
+  idempotent, tables/engine/FK, seeded default templates, permission + my_hr
+  view-for-all, routes/nav/fallback, upload dirs, and user create with AND
+  without the new optional link (back-compat).
+
 ## 2026-07-03 (chore) — Tier 3 re-scout + hardening (Phase 3.6) — Tier 3 complete
 
 Final phase of the Performance & Development tier (employee.md §8.3 Phase 3.6).

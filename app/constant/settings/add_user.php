@@ -60,6 +60,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $role_id = $_POST['role_id'];
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
+    // Tier 4 D24 — optional "Linked Employee" (ESS). Absent = unchanged/none.
+    $linked_employee_id = (isset($_POST['employee_id']) && $_POST['employee_id'] !== '') ? (int)$_POST['employee_id'] : null;
 
     // Validate inputs
     if (empty($username)) {
@@ -117,12 +119,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Hash password
         $password_hash = password_hash($password, PASSWORD_DEFAULT);
 
-        // Insert user
-        $stmt = $pdo->prepare("INSERT INTO users 
-            (username, email, first_name, last_name, role_id, password, created_at) 
-            VALUES (?, ?, ?, ?, ?, ?, NOW())");
-        
-        if ($stmt->execute([$username, $email, $first_name, $last_name, $role_id, $password_hash])) {
+        // Insert user (employee_id is the Tier 4 ESS link — nullable, optional)
+        $stmt = $pdo->prepare("INSERT INTO users
+            (username, email, first_name, last_name, role_id, employee_id, password, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+
+        if ($stmt->execute([$username, $email, $first_name, $last_name, $role_id, $linked_employee_id, $password_hash])) {
             $new_user_id = $pdo->lastInsertId();
             $success = true;
 
@@ -227,7 +229,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <div class="invalid-feedback"><?= $errors['role_id'] ?></div>
                         <?php endif; ?>
                     </div>
-                    
+
+                    <div class="col-md-6">
+                        <label for="employee_id" class="form-label">Linked Employee <small class="text-muted">(optional — enables self-service)</small></label>
+                        <select class="form-select" id="employee_id" name="employee_id" style="width:100%">
+                            <?php if (!empty($_POST['employee_id'])):
+                                $__e = $pdo->prepare("SELECT first_name, last_name FROM employees WHERE employee_id = ?");
+                                $__e->execute([(int)$_POST['employee_id']]);
+                                $__er = $__e->fetch(PDO::FETCH_ASSOC);
+                                if ($__er): ?>
+                                <option value="<?= (int)$_POST['employee_id'] ?>" selected><?= htmlspecialchars(trim($__er['first_name'].' '.$__er['last_name'])) ?></option>
+                            <?php endif; endif; ?>
+                        </select>
+                    </div>
+
                     <div class="col-md-6">
                         <label for="password" class="form-label">Password *</label>
                         <div class="input-group">
@@ -287,7 +302,24 @@ function togglePasswordVisibility(fieldId) {
         icon.classList.remove('bi-eye-slash');
         icon.classList.add('bi-eye');
     }
-} 
+}
+
+// Tier 4 D24 — "Linked Employee" Select2 AJAX picker
+$(function () {
+    if (window.jQuery && $.fn.select2) {
+        $('#employee_id').select2({
+            theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'Not linked',
+            minimumInputLength: 1,
+            ajax: {
+                url: '<?= buildUrl('api/account/search_employees.php') ?>',
+                dataType: 'json', delay: 300,
+                data: params => ({ q: params.term }),
+                processResults: data => ({ results: data.results }),
+                cache: true
+            }
+        });
+    }
+});
 </script>
 
 <?php 
