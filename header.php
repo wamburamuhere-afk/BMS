@@ -69,6 +69,20 @@ if (function_exists('loadUserScope') && !isset($_SESSION['scope'])) {
     loadUserScope((int)$_SESSION['user_id']);
 }
 
+// ESS linchpin (Tier 4, D24): resolve the session user's linked employee_id
+// each request so the "My HR" nav item + page gates know the link exists.
+// Guarded so it is a no-op on a DB where the column isn't there yet.
+if (!empty($_SESSION['user_id'])) {
+    try {
+        $__essStmt = $pdo->prepare("SELECT employee_id FROM users WHERE user_id = ?");
+        $__essStmt->execute([(int)$_SESSION['user_id']]);
+        $__essEmp = $__essStmt->fetchColumn();
+        $_SESSION['employee_id'] = ($__essEmp !== false && $__essEmp !== null) ? (int)$__essEmp : null;
+    } catch (Throwable $e) {
+        // column not present yet (pre-migration) — leave unset
+    }
+}
+
 // Document expiry check — runs at most once per day (see cron/check_document_expiry.php).
 // The engine is self-contained and fails silently so it can never break a page load.
 if (function_exists('get_setting') && get_setting('doc_expiry_last_run') !== date('Y-m-d')) {
@@ -934,6 +948,21 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('trainings')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('trainings') ?>"><i class="bi bi-mortarboard"></i> Training</a></li>
                                 <?php endif; ?>
+                                <?php if(canView('recruitment')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('recruitment') ?>"><i class="bi bi-person-badge"></i> Recruitment</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('hr_checklists')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('hr_checklists') ?>"><i class="bi bi-check2-square"></i> Checklists</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('meetings')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('meetings') ?>"><i class="bi bi-calendar-event"></i> Meetings</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('employee_trips')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('employee_trips') ?>"><i class="bi bi-airplane"></i> Trips</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('announcements')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('announcements') ?>"><i class="bi bi-megaphone"></i> Announcements</a></li>
+                                <?php endif; ?>
                                 <?php if(canView('payroll')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('payroll') ?>"><i class="bi bi-cash"></i> Payroll</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('salary_components') ?>"><i class="bi bi-sliders"></i> Salary Components</a></li>
@@ -1125,6 +1154,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                     <div class="text-muted" style="font-size:0.72rem;text-transform:uppercase;"><?= htmlspecialchars($user_role) ?></div>
                                 </li>
                                 <li><a class="dropdown-item py-2" href="<?= getUrl('profile') ?>"><i class="bi bi-person me-2"></i> Profile</a></li>
+                                <?php if (!empty($_SESSION['employee_id'])): // ESS "My HR" — only for users linked to an employee (D24) ?>
+                                <li><a class="dropdown-item py-2" href="<?= getUrl('my_hr') ?>"><i class="bi bi-person-workspace me-2"></i> My HR</a></li>
+                                <?php endif; ?>
                                 <li><a class="dropdown-item py-2" href="<?= getUrl('my_settings') ?>"><i class="bi bi-gear me-2"></i> Settings</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item py-2" href="<?= getUrl('help') ?>"><i class="bi bi-question-circle me-2"></i> Help</a></li>

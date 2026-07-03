@@ -244,6 +244,18 @@ try {
     ]);
 
     $pdo->commit();
+
+    // Tier 4 D28(b) — auto-spawn an onboarding checklist if a default template
+    // is configured. Runs AFTER the employee transaction commits; guarded +
+    // non-fatal so a checklist problem can never fail employee creation.
+    if (function_exists('spawnChecklistIfConfigured')) {
+        try { spawnChecklistIfConfigured($pdo, (int)$employee_id, 'onboarding', (int)$_SESSION['user_id']); }
+        catch (Throwable $e) { error_log('onboarding auto-spawn: ' . $e->getMessage()); }
+    } elseif (@is_file(__DIR__ . '/../core/checklists.php')) {
+        try { require_once __DIR__ . '/../core/checklists.php'; spawnChecklistIfConfigured($pdo, (int)$employee_id, 'onboarding', (int)$_SESSION['user_id']); }
+        catch (Throwable $e) { error_log('onboarding auto-spawn: ' . $e->getMessage()); }
+    }
+
     echo json_encode(['success' => true, 'message' => 'Employee added successfully', 'id' => $employee_id]);
 
 } catch (Exception $e) {

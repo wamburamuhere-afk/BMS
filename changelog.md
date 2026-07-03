@@ -1,5 +1,205 @@
 # BMS Changelog
 
+## 2026-07-03 (chore) — Tier 4 re-scout + whole-plan completion (Phase 4.7) — Tier 4 complete
+
+Final phase of the Talent & Engagement tier, and the completion of the whole
+4-tier WorkDo gap-closure plan (employee.md §9.3 Phase 4.7).
+
+- Re-scout: every §9 checklist item implemented (6 pages, 25 APIs, 12 tables +
+  users.employee_id, 2 D28 hooks).
+- Verified the two D28 auto-spawn hooks degrade safely — with
+  `core/checklists.php` moved aside, `add_employee.php` and
+  `change_lifecycle_status.php` still work and the lifecycle workflow test
+  passes 28/28 (the `@is_file` + `function_exists` guards no-op the spawn).
+- Scope hardening: added documented `// scope-audit: skip` markers to the four
+  files where project scope doesn't apply — `api/my_hr_data.php` (D24
+  own-record-only), `api/get_announcements.php` (own per-viewer audience
+  scoping), `api/get_meetings.php` (company-wide, D29), and the admin-only
+  `add_user.php`/`edit_user.php` (linked-employee name preview). Pre-push scope
+  audit passes with 0 unscoped.
+- Confirmed no Tier 4 file reads or writes the ledger (D21/D26).
+- Full Tier 4 CLI suite green: 180 assertions across 6 files
+  (`hr_talent_foundation` 83, `announcements` 18, `meetings_trips` 24,
+  `hr_checklists` 21, `recruitment` 23, `my_hr` 11), covering the three
+  end-to-end loops (hire→onboard, exit→offboard, ESS leave). All prior-tier
+  regressions clean.
+- `employee.md` — Tier 4 marked implemented in the tier table; the whole-plan
+  completion checklist ticked; Phase 4.7 re-scout table recorded.
+
+## 2026-07-04 (feat) — Employee Self-Service "My HR" (Tier 4, Phase 4.6)
+
+Read-only self-service portal. Plan in employee.md §9.3 Phase 4.6.
+
+- `api/my_hr_data.php` (D24 security linchpin) — resolves the employee from
+  the SESSION link only (`users.employee_id` of `$_SESSION['user_id']`);
+  there is **no `employee_id` input parameter**, so a user can only ever see
+  their own record. Unlinked → 403/not_linked. `?section=` returns own
+  profile / payslips / leave / documents+contracts / performance+training /
+  service-record+trips+meetings / leave-types — all read-only aggregations of
+  Tier 1–4 data.
+- `api/my_leave_apply.php` — inserts into the SAME `leaves` table + workflow
+  the admin module uses, with `employee_id` forced from the session link; the
+  application appears in the existing approval screens unchanged. A forged
+  `employee_id` in the payload is ignored.
+- `app/bms/pos/my_hr.php` — tabbed portal (Profile / Payslips / Leave /
+  Documents / Performance / Record / Announcements); unlinked users get a
+  friendly notice, the page never errors. "Apply for Leave" posts to the ESS
+  endpoint; gatekeeper downloads for own documents/certificates; announcements
+  feed with mark-read.
+- `header.php` — "My HR" already gated on the session link (Phase 4.1).
+- `tests/test_my_hr_cli.php` — 11 assertions: unlinked→not_linked, linked sees
+  only own profile, **forged employee_id ignored**, leave history own-rows-only,
+  ESS leave lands in the existing workflow tagged to the session employee
+  (forged id ignored there too), unlinked can't apply, both linked + unlinked
+  pages render without error.
+
+## 2026-07-04 (feat) — Recruitment / internal ATS (Tier 4, Phase 4.5)
+
+Internal applicant tracking (D27 — no public career page). Plan in employee.md
+§9.3 Phase 4.5.
+
+- `api/manage_opening.php`, `api/get_openings.php` — job-opening CRUD +
+  open/hold/close; recruitment stat cards (Open positions, Total candidates,
+  In interview, Hired this year).
+- `api/manage_candidate.php`, `api/get_candidates.php` — candidate add/update/
+  delete with optional CV upload (§19 5-step → central library, D27); pipeline
+  list by opening/stage.
+- `api/change_candidate_stage.php` (D28a) — forward-only pipeline
+  `applied → shortlisted → interview → offered → hired` (one step at a time,
+  no backward/skip), `rejected` from any non-terminal stage, every move needs a
+  note; `hired` requires the opening still open; `link_employee` action stores
+  `hired_employee_id` after the employee is created (onboarding auto-spawn then
+  fires inside the untouched `add_employee.php`).
+- `api/manage_interview.php` — schedule + record (1–5 star rating + feedback,
+  shared star partial) + cancel. **Fix:** captured `lastInsertId()` before
+  `logActivity()` so the scheduled-interview id (not the activity-log id) is
+  returned.
+- `api/download_candidate_cv.php` — gatekeeper for candidate PII.
+- `app/bms/pos/recruitment.php` — page: stat cards, Openings tab (cards + CRUD +
+  status), Candidates tab (pipeline cards, stage moves, interviews, hire → link
+  employee).
+- `tests/test_recruitment_cli.php` — 23 assertions: opening CRUD/status,
+  candidate add + CV validation, full stage map (no skip/backward,
+  rejected-from-any, terminal), hire-requires-open-opening, D28a linkage,
+  interview schedule + rating record + range guard, CV gatekeeper + permission
+  denials, page render.
+
+## 2026-07-04 (feat) — Onboarding / Offboarding checklists (Tier 4, Phase 4.4)
+
+Template-driven checklists with the D28 auto-spawn hooks — the only two touches
+to prior-tier code in Tier 4, both append-only, guarded and non-fatal. Plan in
+employee.md §9.3 Phase 4.4.
+
+- `core/checklists.php` — `spawnChecklistIfConfigured()` (spawns from the active
+  default template for a type; idempotent — no double-spawn while one is in
+  progress; never throws) and `spawnChecklistFromTemplate()`. Spawning snapshots
+  the template's item text into the instance (D30) so editing a template never
+  rewrites in-flight checklists.
+- `api/manage_checklist_template.php` — template + item CRUD; `set_default`
+  enforces one default per type server-side.
+- `api/get_checklists.php` (templates / active list / single checklist),
+  `api/spawn_checklist.php` (manual), `api/tick_checklist_item.php` (stamps
+  done_by/done_at + optional note, logged), `api/change_checklist_status.php`
+  (complete requires all items ticked / cancel).
+- `app/bms/pos/hr_checklists.php` — Templates tab (CRUD, items, set-default) and
+  Active tab (progress cards, inline ticking, spawn).
+- **D28(b)** — `api/add_employee.php`: one guarded, non-fatal call after its
+  transaction commits, auto-spawns an onboarding checklist.
+- **D28(c)** — `api/change_lifecycle_status.php`: in the approval branch, an
+  approved resignation/termination auto-spawns an offboarding checklist (guarded,
+  non-fatal). `tests/test_hr_lifecycle_workflow_cli.php` cleanup extended to
+  remove the auto-spawned checklist (the FK would otherwise block fixture
+  teardown) — no behavioural change to Tier 1.
+- `app/bms/pos/employee_details.php` — additive active-checklist card with a
+  progress bar.
+- `tests/test_hr_checklists_cli.php` — 21 assertions: template CRUD + single
+  default, D30 snapshot isolation, tick + completion gate, D28(b) onboarding
+  auto-spawn (+ idempotency), D28(c) offboarding auto-spawn through the real
+  lifecycle endpoint, non-fatal safety, permission denials, page render.
+
+## 2026-07-04 (feat) — Meetings & Business Trips (Tier 4, Phase 4.3)
+
+Plan in employee.md §9.3 Phase 4.3.
+
+- `api/manage_trip.php` (D26) — trip requests; §11.1 transitions
+  `pending→approved/rejected`, `approved→completed/cancelled`; requester
+  cannot approve their own (SoD); completion requires a trip report; a trip
+  **never moves money** — `estimated_cost`/`requested_advance` are
+  informational only and `expense_reference` is a plain string pointing at the
+  real Petty Cash / Expenses record. Optional §19 attachment.
+- `api/get_trips.php`, `api/download_trip_attachment.php` (gatekeeper) — list
+  + stats (Pending / Approved & ongoing / Completed this year), scope-gated.
+- `api/manage_meeting.php` (D29) — schedule + attendees + minutes + status;
+  `mark_attendance` per attendee; complete (with minutes) / cancel; notifies
+  attendees' linked users on schedule/cancel via the notification engine
+  (deduped). Minimal by design — no rooms/recurrence/video.
+- `api/get_meetings.php` — list + stats (Upcoming / This week / Completed this
+  month) and single-meeting detail with attendees.
+- `app/bms/pos/employee_trips.php` + `app/bms/pos/meetings.php` — full pages
+  (stat cards, filters, DataTable + mobile cards, request/schedule modals,
+  per-state workflow actions, attendance marking).
+- `app/bms/pos/employee_details.php` — additive "Meetings & Trips" card:
+  the employee's upcoming meetings + recent trips with status chips.
+- `tests/test_meetings_trips_cli.php` — 24 assertions: trip transition map +
+  SoD + completion-requires-report + D26 informational-only, meeting schedule/
+  attendance/complete/cancel, permission denials, both pages + details render.
+
+## 2026-07-04 (feat) — Announcements (Tier 4, Phase 4.2)
+
+Company/department/project broadcast announcements. Plan in employee.md §9.3
+Phase 4.2.
+
+- `api/manage_announcement.php` — add/edit/publish/archive/soft-delete;
+  publish/archive gated by `canPublish` (falls back to `canEdit`). On publish
+  (D25) it resolves the audience (all active users / by `users.department_id` /
+  by `user_projects`) and creates one in-app notification each via the existing
+  `core/notify.php` engine, deduped through `notification_dedupe`
+  (event `hr_announcement`). `message_center` is untouched.
+- `api/get_announcements.php` — `mode=manage` (editor list + stat cards) and
+  `mode=feed` (what the current user should see: audience match within the
+  publish/expire window, unread-first).
+- `api/mark_announcement_read.php` — insert-ignore into `announcement_reads`.
+- `app/bms/pos/announcements.php` — page: stat cards (published & current,
+  drafts, expiring ≤7d, read rate), status filter, DataTable + mobile cards,
+  add/edit modal with audience selector (department/project options via
+  `scopeFilterSql`), publish/archive/delete actions.
+- `tests/test_announcements_cli.php` — 18 assertions: audience-resolution
+  matrix (all/dept/project → correct users notified), dedupe on re-publish,
+  feed audience + expire-window filtering, mark-read idempotency, archive,
+  permission denial, page render.
+
+## 2026-07-04 (feat) — HR Talent & Engagement foundation + ESS link (Tier 4, Phase 4.1)
+
+Foundation for Tier 4 (announcements, meetings, trips, checklists, recruitment,
+employee self-service) — additive scaffolding, plan in employee.md §9.
+
+- `migrations/2026_07_04_hr_talent_foundation.php` — 12 tables (all InnoDB):
+  `announcements`/`announcement_reads`, `meetings`/`meeting_attendees`,
+  `employee_trips`, `checklist_templates`/`checklist_template_items`/
+  `employee_checklists`/`employee_checklist_items`, `job_openings`/`candidates`/
+  `candidate_interviews`; the ESS linchpin `users.employee_id INT NULL` (D24,
+  guarded); seeded one default onboarding + one default offboarding checklist
+  template with starter items (D28); `uploads/candidate_cvs/` + `uploads/trips/`
+  with deny-exec `.htaccess`.
+- `migrations/2026_07_04_hr_talent_permissions.php` — 6 permission rows
+  (`announcements`, `meetings`, `employee_trips`, `hr_checklists`, `recruitment`,
+  `my_hr`); `my_hr` gets `can_view = 1` for **every** role (the page shows only
+  the session user's own data — D24 makes that safe); the rest mirror
+  `employees` editors (runtime-resolved). `notification_events` row
+  `hr_announcement` for D25.
+- `roots.php` — routes for 6 pages + 25 APIs (across Phases 4.2–4.6);
+  `header.php` — HR dropdown gains Recruitment/Checklists/Meetings/Trips/
+  Announcements, and a "My HR" item in the profile area shown only when the
+  session user has a linked employee (resolved each request, guarded);
+  `core/permissions.php` — router-fallback mappings for the 6 pages.
+- `app/constant/settings/add_user.php` + `edit_user.php` — additive "Linked
+  Employee" Select2 field writing the optional `users.employee_id`; absent/blank
+  leaves the link unset, so existing user-save flows keep working unchanged.
+- `tests/test_hr_talent_foundation_cli.php` — 83 assertions: migrations
+  idempotent, tables/engine/FK, seeded default templates, permission + my_hr
+  view-for-all, routes/nav/fallback, upload dirs, and user create with AND
+  without the new optional link (back-compat).
+
 ## 2026-07-03 (chore) — Tier 3 re-scout + hardening (Phase 3.6) — Tier 3 complete
 
 Final phase of the Performance & Development tier (employee.md §8.3 Phase 3.6).
