@@ -547,8 +547,10 @@ function getPagePermissionMapping()
         'ajax_get_transfer_items.php'=> 'stock_adjustments',
 
         // HR / Payroll / Leaves
-        'employee_details.php' => 'employees',
-        'hr_actions.php'       => 'employee_lifecycle',
+        'employee_details.php'   => 'employees',
+        'hr_actions.php'         => 'employee_lifecycle',
+        'employee_contracts.php' => 'employee_contracts',
+        'org_chart.php'          => 'org_chart',
         'payroll_details.php'  => 'payroll',
         'payroll_settings.php' => 'payroll',
         'payslip.php'          => 'payslip',
