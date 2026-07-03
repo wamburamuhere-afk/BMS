@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-07-02 (feat) — Employee documents with expiry (Tier 2, Phase 2.2)
+
+Employee documents typed + expiry-tracked, on top of the Phase 2.1 foundation
+(routes/permissions already wired). Plan in employee.md §7.3 Phase 2.2.
+
+- `api/add_employee_document.php` — 6-step template + §19 5-step upload; requires
+  `expire_date` when the chosen type has `requires_expiry=1`; registers the file in
+  the central `documents` library (D8) then mirrors `issue_date`/`expire_date` onto
+  that row so the existing expiry cron alerts on it with zero new alert code;
+  scope-gated via `assertScopeForEmployee`; txn-wrapped, unlinks the file on failure.
+- `api/get_employee_documents.php` — per-employee list (type, uploader, days-to-expiry),
+  scope-gated, excludes deleted.
+- `api/delete_employee_document.php` — soft delete; also clears the linked library
+  row's `expire_date` so stale alerts stop firing.
+- `api/download_employee_document.php` — gatekeeper (§19): auth + `canView` + employee
+  scope + `realpath` path-containment check before streaming.
+- `api/manage_document_types.php` — add/rename/deactivate `employee_document_types`
+  (`canEdit`), resurrects a soft-deleted type name on re-add.
+- `tests/test_employee_documents_cli.php` — 26 assertions: upload validation matrix,
+  D8 library wiring proven live through the real `check_document_expiry.php` cron
+  (no new alert code), gatekeeper containment, scope + permission denials, type
+  management. Fixed a test-ordering bug: the cron file auto-runs its check on
+  `require_once` (same as `header.php`'s daily include), so `$before` must be
+  captured ahead of the require, not after.
+
 ## 2026-07-02 (feat) — HR Compliance foundation (Tier 2, Phase 2.1)
 
 Foundation for Tier 2 (documents with expiry, contracts, org structure) —
