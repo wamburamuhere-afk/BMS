@@ -1,5 +1,36 @@
 # BMS Changelog
 
+## 2026-07-04 (feat) — Recruitment / internal ATS (Tier 4, Phase 4.5)
+
+Internal applicant tracking (D27 — no public career page). Plan in employee.md
+§9.3 Phase 4.5.
+
+- `api/manage_opening.php`, `api/get_openings.php` — job-opening CRUD +
+  open/hold/close; recruitment stat cards (Open positions, Total candidates,
+  In interview, Hired this year).
+- `api/manage_candidate.php`, `api/get_candidates.php` — candidate add/update/
+  delete with optional CV upload (§19 5-step → central library, D27); pipeline
+  list by opening/stage.
+- `api/change_candidate_stage.php` (D28a) — forward-only pipeline
+  `applied → shortlisted → interview → offered → hired` (one step at a time,
+  no backward/skip), `rejected` from any non-terminal stage, every move needs a
+  note; `hired` requires the opening still open; `link_employee` action stores
+  `hired_employee_id` after the employee is created (onboarding auto-spawn then
+  fires inside the untouched `add_employee.php`).
+- `api/manage_interview.php` — schedule + record (1–5 star rating + feedback,
+  shared star partial) + cancel. **Fix:** captured `lastInsertId()` before
+  `logActivity()` so the scheduled-interview id (not the activity-log id) is
+  returned.
+- `api/download_candidate_cv.php` — gatekeeper for candidate PII.
+- `app/bms/pos/recruitment.php` — page: stat cards, Openings tab (cards + CRUD +
+  status), Candidates tab (pipeline cards, stage moves, interviews, hire → link
+  employee).
+- `tests/test_recruitment_cli.php` — 23 assertions: opening CRUD/status,
+  candidate add + CV validation, full stage map (no skip/backward,
+  rejected-from-any, terminal), hire-requires-open-opening, D28a linkage,
+  interview schedule + rating record + range guard, CV gatekeeper + permission
+  denials, page render.
+
 ## 2026-07-04 (feat) — Onboarding / Offboarding checklists (Tier 4, Phase 4.4)
 
 Template-driven checklists with the D28 auto-spawn hooks — the only two touches
