@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-07-04 (feat) — Employee Self-Service "My HR" (Tier 4, Phase 4.6)
+
+Read-only self-service portal. Plan in employee.md §9.3 Phase 4.6.
+
+- `api/my_hr_data.php` (D24 security linchpin) — resolves the employee from
+  the SESSION link only (`users.employee_id` of `$_SESSION['user_id']`);
+  there is **no `employee_id` input parameter**, so a user can only ever see
+  their own record. Unlinked → 403/not_linked. `?section=` returns own
+  profile / payslips / leave / documents+contracts / performance+training /
+  service-record+trips+meetings / leave-types — all read-only aggregations of
+  Tier 1–4 data.
+- `api/my_leave_apply.php` — inserts into the SAME `leaves` table + workflow
+  the admin module uses, with `employee_id` forced from the session link; the
+  application appears in the existing approval screens unchanged. A forged
+  `employee_id` in the payload is ignored.
+- `app/bms/pos/my_hr.php` — tabbed portal (Profile / Payslips / Leave /
+  Documents / Performance / Record / Announcements); unlinked users get a
+  friendly notice, the page never errors. "Apply for Leave" posts to the ESS
+  endpoint; gatekeeper downloads for own documents/certificates; announcements
+  feed with mark-read.
+- `header.php` — "My HR" already gated on the session link (Phase 4.1).
+- `tests/test_my_hr_cli.php` — 11 assertions: unlinked→not_linked, linked sees
+  only own profile, **forged employee_id ignored**, leave history own-rows-only,
+  ESS leave lands in the existing workflow tagged to the session employee
+  (forged id ignored there too), unlinked can't apply, both linked + unlinked
+  pages render without error.
+
 ## 2026-07-04 (feat) — Recruitment / internal ATS (Tier 4, Phase 4.5)
 
 Internal applicant tracking (D27 — no public career page). Plan in employee.md
