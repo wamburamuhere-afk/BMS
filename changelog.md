@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-07-03 (feat) — Sub-contractor + Employee forms wired to the location cascade engine
+
+- `app/bms/operations/sub_contractors.php` — Add + Edit modals wired to
+  `initLocationCascade()` (Tanzania → defined dropdowns, other countries →
+  free text); edit prefill via `setValues()`, add-modal reset restores
+  Tanzania defaults.
+- `app/bms/operations/sub_contractor_details.php` — same wiring for its own
+  Edit modal.
+- `app/bms/pos/employees.php` — one cascade on the shared Add/full-edit
+  form (the Quick Edit modal has no location fields); edit prefill via
+  `setValues()`, add-modal reset restores defaults.
+- All four party modules (Supplier, Customer, Sub-contractor, Employee) now
+  use the location engine. Fields still post names — APIs/DB unchanged.
+
 ## 2026-07-03 (fix) — Location engine migration: production deploy failure (error 1364)
 
 - `migrations/2026_07_03_location_engine.php` — production's strict SQL mode
