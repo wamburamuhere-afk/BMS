@@ -918,8 +918,12 @@ if (isAdmin()) {
 <!-- Include DataTables and other scripts -->
 <!-- Custom scripts for this page -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="<?= getUrl('assets/js/location_cascade.js') ?>"></script>
 
 <script>
+// Location cascade engine — Tanzania gets defined dropdowns (Region→District→
+// Ward→Street/Village), other countries fall back to free text automatically.
+let addLocationCascade, editLocationCascade;
 $(document).ready(function() {
     // Initialize DataTable Safely
     if (!$.fn.DataTable.isDataTable('#customersTable')) {
@@ -1219,6 +1223,22 @@ $(document).ready(function() {
     });
     $('#addCustomerModal, #editCustomerModal').on('hidden.bs.modal', function() {
         resetOtherFields('#' + this.id);
+        if (this.id === 'addCustomerModal') {
+            addLocationCascade.setValues({ country: 'Tanzania' }); // back to defaults
+        }
+    });
+
+    // Location cascade (OOP location engine): defined dropdowns for Tanzania,
+    // free-text automatically for countries without imported subdivisions.
+    addLocationCascade = initLocationCascade({
+        endpoint: '<?= buildUrl('api/location/options.php') ?>',
+        fields: { country: '#country', region: '#state', district: '#city', ward: '#ward', village: '#village' },
+        dropdownParent: '#addCustomerModal'
+    });
+    editLocationCascade = initLocationCascade({
+        endpoint: '<?= buildUrl('api/location/options.php') ?>',
+        fields: { country: '#edit_country', region: '#edit_state', district: '#edit_city', ward: '#edit_ward', village: '#edit_village' },
+        dropdownParent: '#editCustomerModal'
     });
 
     // Form Submissions
@@ -1411,11 +1431,6 @@ function editCustomer(customerId) {
                     'fax': '#edit_fax',
                     'website': '#edit_website',
                     'address': '#edit_address',
-                    'city': '#edit_city',
-                    'state': '#edit_state',
-                    'country': '#edit_country',
-                    'ward': '#edit_ward',
-                    'village': '#edit_village',
                     'postal_code': '#edit_postal_code',
                     'postal_address': '#edit_postal_address',
                     'tax_id': '#edit_tax_id',
@@ -1452,6 +1467,17 @@ function editCustomer(customerId) {
                     }
                     $el.val(value).trigger('change');
                 }
+
+                // Location cascade prefill — matches stored names against the
+                // defined lists; unmatched legacy values are kept as extra
+                // options instead of being wiped.
+                editLocationCascade.setValues({
+                    country:  c.country || 'Tanzania',
+                    region:   c.state || '',
+                    district: c.city || '',
+                    ward:     c.ward || '',
+                    village:  c.village || ''
+                });
 
                 const modalEl = document.getElementById('editCustomerModal');
                 bootstrap.Modal.getOrCreateInstance(modalEl).show();
