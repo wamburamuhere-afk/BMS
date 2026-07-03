@@ -87,6 +87,12 @@ if (function_exists('get_setting') && get_setting('leave_accrual_last_run') !== 
     @include_once __DIR__ . '/cron/run_leave_accrual.php';
 }
 
+// HR expiry check (contracts + probation, D13) — runs at most once per day
+// (see cron/check_hr_expiry.php). Self-contained + fail-silent.
+if (function_exists('get_setting') && get_setting('hr_expiry_last_run') !== date('Y-m-d')) {
+    @include_once __DIR__ . '/cron/check_hr_expiry.php';
+}
+
 // Smart notification engine — time-based event checks (overdue/expiring/due),
 // at most once per day. Self-contained + fail-silent (see cron/run_notification_checks.php).
 if (function_exists('get_setting') && get_setting('notif_checks_last_run') !== date('Y-m-d')) {

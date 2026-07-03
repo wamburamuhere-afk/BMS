@@ -1,5 +1,138 @@
 # BMS Changelog
 
+## 2026-07-02 (chore) — Tier 2 re-scout + hardening (Phase 2.5) — Tier 2 complete
+
+Final phase of the HR compliance tier (employee.md §7.3 Phase 2.5). No code
+changes — verification + documentation only.
+
+- Re-scout sweep of every writer/reader of `employees.documents`,
+  `contract_end_date`, `probation_end_date`, `reporting_to` — no conflicts
+  with Phases 2.1–2.4. One gap documented as Tier 2+ debt (not fixed now,
+  per the same convention Tier 1's Phase 1.6 re-scout used):
+  `api/operations/create_project_staff.php` (the "Add Project Staff" form on
+  `project_view.php`) writes `reporting_to` as free text without ever
+  setting `reporting_to_id`, so employees added through that path won't
+  appear under Direct Reports / the org chart until edited via
+  `employees.php`. Recorded in `employee.md` §7.3 Phase 2.5 re-scout table.
+- Confirmed the document-expiry and HR-expiry crons coexist cleanly —
+  6 daily-throttled cron jobs in `header.php` each use a distinct
+  `*_last_run` settings key, no collisions, no double-fire risk.
+- Full Tier 2 CLI suite re-run clean: 160 assertions across
+  `test_hr_compliance_foundation_cli.php` (56),
+  `test_employee_documents_cli.php` (26),
+  `test_employee_documents_card_cli.php` (17),
+  `test_employee_contracts_cli.php` (34),
+  `test_org_structure_cli.php` (27) — no regressions.
+
+## 2026-07-02 (feat) — Org structure & org chart (Tier 2, Phase 2.4)
+
+Real manager links replacing the free-text reporting_to field, plus a
+collapsible org chart. Plan in employee.md §7.3 Phase 2.4.
+
+- `api/update_reporting_line.php` — sets `reporting_to_id` with the D15
+  cycle guard (rejects self and any ancestor/descendant in the reporting
+  chain, depth-capped walk) and dual-writes the manager's full name into
+  the legacy `reporting_to` varchar (D14); `canEdit('employees')` + scope
+  gate; `logAudit` with old/new manager.
+- `api/add_employee.php`, `api/update_employee.php` — accept the optional
+  `reporting_to_id` field (ignored when absent, so old clients/imports keep
+  working unchanged) and dual-write the resolved manager's name.
+  `update_employee.php` additionally guards self-reference directly since it
+  writes `reporting_to_id` outside the cycle-guarded endpoint.
+- `app/bms/pos/employees.php` — the free-text "Reporting To" input is now a
+  Select2 AJAX manager picker (reuses `api/account/search_employees.php`)
+  submitting `reporting_to_id`; shows the legacy varchar as a hint when no
+  manager is linked yet.
+- `app/bms/pos/org_chart.php` — pure-CSS collapsible tree (`<details>`) built
+  client-side from `reporting_to_id`; employees with no manager (or whose
+  manager fell outside scope) render as roots; depth-capped so a stray cycle
+  can never hang the page; print-friendly; click-through to
+  `employee_details`. Data from `api/get_org_chart.php` (project-scope
+  filtered).
+- `app/bms/pos/employee_details.php` — additive "Direct Reports" sidebar
+  mini-card: avatars + names of employees whose `reporting_to_id` points
+  here, with a count badge.
+- `tests/test_org_structure_cli.php` — 27 assertions: cycle guard (self,
+  direct, deep), dual-write name sync (set + clear), optional-field
+  back-compat on add/update APIs, permission denial, and both pages render
+  cleanly with 0/1/N-level trees and a legacy-varchar-only manager link.
+
+## 2026-07-02 (feat) — Employee Contracts module (Tier 2, Phase 2.3)
+
+Contracts with renewal history + expiry alerts. Plan in employee.md §7.3 Phase 2.3.
+
+- `api/add_contract.php` — creates a DRAFT contract; optional signed-copy
+  upload (§19 5-step) registered in the central `documents` library with
+  `expire_date = end_date`; scope-gated.
+- `api/change_contract_status.php` — `draft → active` (activate) and
+  `active → terminated` (terminate), both `canApprove('employee_contracts')`.
+  Activation (D12, single transaction): row-locks any existing `active`
+  contract for the employee and auto-renews it (`status='renewed'`, new row
+  gets `renewed_from_contract_id`) so at most one contract is ever active;
+  dual-writes `employees.contract_end_date` (and `probation_end_date` when
+  `probation_months` is set) so every existing reader of those columns keeps
+  working unchanged.
+- `api/get_contract.php`, `api/get_contracts.php` — single-record + filtered
+  list (status/type/employee/expiring-in-N-days), scope-gated.
+- `app/bms/pos/employee_contracts.php` — stat cards (Active, Expiring ≤60d,
+  Expired, On Probation), filters, DataTable + mobile cards, per-row
+  Activate/Renew/Terminate/View/Download, "New Contract" modal.
+- `app/bms/pos/employee_details.php` — additive Contracts card: history
+  newest-first, active contract highlighted, expiry chip.
+- `cron/check_hr_expiry.php` (D13) — contract milestones 60/30/14/7 days,
+  probation milestones 14/7/1 days; dispatches through the existing
+  `core/notify.php` engine (`hr_contract_expiry` / `hr_probation_end` events
+  registered in Phase 2.1) — recipients, dedupe and logging all reused, zero
+  new alert plumbing. Wired into `header.php`'s daily throttle chain
+  alongside the document-expiry and leave-accrual crons.
+- `tests/test_employee_contracts_cli.php` — 34 assertions: validation
+  matrix, dual-write on activation, auto-renewal (only one active contract
+  per employee), termination, scope + permission denials, expiry cron fires
+  once per milestone via the shared engine (dedupe holds on re-run), both
+  pages render cleanly.
+
+## 2026-07-02 (feat) — Documents card upgrade on employee_details.php (Tier 2, Phase 2.2 closeout)
+
+Closes a gap found on re-scout: Phase 2.2 spec item 4 (upgrading the Documents
+card) had not been done yet.
+
+- `app/bms/pos/employee_details.php` — Documents card now shows a table of
+  new-system typed documents (type, name, issue/expiry, colour chip, download
+  via gatekeeper, delete) plus an "Upload Document" button/modal
+  (`canCreate('employee_documents')`), with expiry-required types enforced
+  client-side via a data attribute. The legacy JSON documents render exactly
+  as before, underneath a "Legacy files" divider shown only when legacy docs
+  exist (D9) — no behavioural change to the legacy path.
+- `tests/test_employee_documents_card_cli.php` — 17 assertions: legacy-only
+  renders unchanged (plus divider), new-only renders with no legacy noise,
+  mixed renders both sections, and an employee with neither shows exactly one
+  clean empty-state message (no duplicates).
+
+## 2026-07-02 (feat) — Employee documents with expiry (Tier 2, Phase 2.2)
+
+Employee documents typed + expiry-tracked, on top of the Phase 2.1 foundation
+(routes/permissions already wired). Plan in employee.md §7.3 Phase 2.2.
+
+- `api/add_employee_document.php` — 6-step template + §19 5-step upload; requires
+  `expire_date` when the chosen type has `requires_expiry=1`; registers the file in
+  the central `documents` library (D8) then mirrors `issue_date`/`expire_date` onto
+  that row so the existing expiry cron alerts on it with zero new alert code;
+  scope-gated via `assertScopeForEmployee`; txn-wrapped, unlinks the file on failure.
+- `api/get_employee_documents.php` — per-employee list (type, uploader, days-to-expiry),
+  scope-gated, excludes deleted.
+- `api/delete_employee_document.php` — soft delete; also clears the linked library
+  row's `expire_date` so stale alerts stop firing.
+- `api/download_employee_document.php` — gatekeeper (§19): auth + `canView` + employee
+  scope + `realpath` path-containment check before streaming.
+- `api/manage_document_types.php` — add/rename/deactivate `employee_document_types`
+  (`canEdit`), resurrects a soft-deleted type name on re-add.
+- `tests/test_employee_documents_cli.php` — 26 assertions: upload validation matrix,
+  D8 library wiring proven live through the real `check_document_expiry.php` cron
+  (no new alert code), gatekeeper containment, scope + permission denials, type
+  management. Fixed a test-ordering bug: the cron file auto-runs its check on
+  `require_once` (same as `header.php`'s daily include), so `$before` must be
+  captured ahead of the require, not after.
+
 ## 2026-07-02 (feat) — HR Compliance foundation (Tier 2, Phase 2.1)
 
 Foundation for Tier 2 (documents with expiry, contracts, org structure) —

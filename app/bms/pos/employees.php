@@ -643,8 +643,9 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     <input type="date" class="form-control" id="contract_end_date" name="contract_end_date">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="reporting_to" class="form-label">Reporting To</label>
-                                    <input type="text" class="form-control" id="reporting_to" name="reporting_to" placeholder="Manager name or ID">
+                                    <label for="reporting_to_id" class="form-label">Reporting To</label>
+                                    <select class="form-select select2-employee-ajax" id="reporting_to_id" name="reporting_to_id" style="width:100%"></select>
+                                    <div class="form-text" id="reporting_to_legacy_hint"></div>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="work_location" class="form-label">Work Location</label>
@@ -1085,6 +1086,46 @@ function initEmpSelect2(context, dropdownParent) {
     });
 }
 
+// Tier 2, Phase 2.4 (D14) — "Reporting To" Select2 AJAX manager picker,
+// replacing the old free-text input. Submits reporting_to_id; the server
+// dual-writes the legacy reporting_to varchar from the chosen manager's name.
+function initReportingToPicker(dropdownParent) {
+    const $el = $('#reporting_to_id');
+    if ($el.hasClass('select2-hidden-accessible')) return;
+    $el.select2({
+        theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'Select manager...',
+        dropdownParent: dropdownParent, minimumInputLength: 1,
+        ajax: {
+            url: APP_URL + '/api/account/search_employees',
+            dataType: 'json', delay: 300,
+            data: params => ({ q: params.term }),
+            processResults: data => ({ results: data.results }),
+            cache: true
+        }
+    });
+}
+
+// Preselects the manager picker for an employee being edited. When the
+// employee has a reporting_to_id, resolve and show that employee's name;
+// otherwise fall back to showing the legacy free-text value as a hint
+// (D14 no-break requirement — the varchar is never lost, just displayed
+// differently once a real manager link exists).
+function populateReportingTo(emp) {
+    $('#reporting_to_id').val(null).trigger('change');
+    $('#reporting_to_legacy_hint').text('');
+    if (emp.reporting_to_id) {
+        $.getJSON(APP_URL + '/api/get_employee', { id: emp.reporting_to_id }, function (res) {
+            if (res && res.success && res.data) {
+                const mgr = res.data;
+                const opt = new Option((mgr.first_name + ' ' + mgr.last_name).trim(), mgr.employee_id, true, true);
+                $('#reporting_to_id').append(opt).trigger('change');
+            }
+        });
+    } else if (emp.reporting_to) {
+        $('#reporting_to_legacy_hint').text('Legacy value (no linked record): ' + emp.reporting_to);
+    }
+}
+
 $(document).ready(function() {
     // Filter selects (outside any modal)
     $('.select2-static:not(.modal .select2-static)').each(function() {
@@ -1097,6 +1138,7 @@ $(document).ready(function() {
     // Modal selects — initialize when modal opens
     $('#addEmployeeModal').on('shown.bs.modal', function() {
         initEmpSelect2($(this), $(this));
+        initReportingToPicker($(this));
     });
     $('#editEmployeeModal').on('shown.bs.modal', function() {
         initEmpSelect2($(this), $(this));
@@ -1315,6 +1357,10 @@ $(document).ready(function() {
         $('#payment_frequency_other_div').addClass('d-none');
         $('#payment_frequency_other').val('');
         $('#employeeTabs .nav-link:first').tab('show');
+        if ($('#reporting_to_id').hasClass('select2-hidden-accessible')) {
+            $('#reporting_to_id').empty().val(null).trigger('change');
+        }
+        $('#reporting_to_legacy_hint').text('');
     });
     
     $('#importEmployeesModal').on('hidden.bs.modal', function() {
@@ -1754,7 +1800,7 @@ function editEmployee(employeeId) {
                 $('#designation_id').val(emp.designation_id || '');
                 $('#employment_type_id').val(emp.employment_type_id || '');
                 $('#employment_status').val(emp.employment_status || '');
-                $('#reporting_to').val(emp.reporting_to || '');
+                populateReportingTo(emp);
                 $('#work_location').val(emp.work_location || '');
                 $('#project_id').val(emp.project_id || '');
                 $('#basic_salary').val(emp.basic_salary || '');
