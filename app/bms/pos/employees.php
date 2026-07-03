@@ -1083,7 +1083,13 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
 
+<script src="<?= getUrl('assets/js/location_cascade.js') ?>"></script>
 <script>
+// Location cascade engine — Tanzania gets defined dropdowns (Region→District→
+// Ward→Street/Village), other countries fall back to free text automatically.
+// The Add modal's form doubles as the full-edit form, so ONE cascade serves both.
+let employeeLocationCascade;
+
 // Initialize Select2 on elements with select2-static class
 function initEmpSelect2(context, dropdownParent) {
     var opts = { theme: 'bootstrap-5', width: '100%', allowClear: true };
@@ -1361,10 +1367,19 @@ $(document).ready(function() {
         });
     });
 
+    // Location cascade (OOP location engine): defined dropdowns for Tanzania,
+    // free-text automatically for countries without imported subdivisions.
+    employeeLocationCascade = initLocationCascade({
+        endpoint: '<?= buildUrl('api/location/options.php') ?>',
+        fields: { country: '#country', region: '#state', district: '#city', ward: '#ward', village: '#village' },
+        dropdownParent: '#addEmployeeModal'
+    });
+
     // Reset forms when modals are closed
     $('#addEmployeeModal').on('hidden.bs.modal', function() {
         $('#addEmployeeForm')[0].reset();
         $('#add-employee-message').html('');
+        employeeLocationCascade.setValues({ country: 'Tanzania' }); // back to defaults
         $('#addEmployeeForm [type="submit"]').prop('disabled', false).html('<i class="bi bi-check-circle"></i> Save Employee');
         $('#payment_frequency_other_div').addClass('d-none');
         $('#payment_frequency_other').val('');
@@ -1866,11 +1881,17 @@ function editEmployee(employeeId) {
                 $('#emergency_contact_email').val(emp.emergency_contact_email || '');
                 $('#physical_address').val(emp.physical_address || emp.address || '');
                 $('#postal_address').val(emp.postal_address || '');
-                $('#country').val(emp.country || '');
-                $('#state').val(emp.state || '');
-                $('#city').val(emp.city || '');
-                $('#ward').val(emp.ward || '');
-                $('#village').val(emp.village || '');
+
+                // Location cascade prefill — matches stored names against the
+                // defined lists; unmatched legacy values are kept as extra
+                // options instead of being wiped.
+                employeeLocationCascade.setValues({
+                    country:  emp.country || 'Tanzania',
+                    region:   emp.state || '',
+                    district: emp.city || '',
+                    ward:     emp.ward || '',
+                    village:  emp.village || ''
+                });
                 
                 // Step 4: Bank & Documents
                 $('#bank_name').val(emp.bank_name || '');
