@@ -145,6 +145,23 @@ if ($can_view_performance) {
     $active_goals = $ag_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// Active checklists (Tier 4, Phase 4.4)
+$can_view_checklists = canView('hr_checklists');
+$can_edit_checklists = canEdit('hr_checklists');
+$emp_checklists = [];
+if ($can_view_checklists) {
+    $cl_stmt = $pdo->prepare("
+        SELECT ec.checklist_id, ec.checklist_type, ec.status,
+               (SELECT COUNT(*) FROM employee_checklist_items i WHERE i.checklist_id=ec.checklist_id) AS total,
+               (SELECT COUNT(*) FROM employee_checklist_items i WHERE i.checklist_id=ec.checklist_id AND i.is_done=1) AS done
+        FROM employee_checklists ec
+        WHERE ec.employee_id = ? AND ec.status = 'in_progress'
+        ORDER BY ec.created_at DESC
+    ");
+    $cl_stmt->execute([$employee_id]);
+    $emp_checklists = $cl_stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 // Trips + upcoming meetings (Tier 4, Phase 4.3)
 $can_view_trips = canView('employee_trips');
 $emp_trips = [];
@@ -1110,6 +1127,29 @@ $sr_status_badge = [
                         </table>
                     </div>
                     <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if ($can_view_checklists && !empty($emp_checklists)): ?>
+            <!-- Active Checklist Card (Tier 4, Phase 4.4) -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-check2-square text-primary me-1"></i> Onboarding / Offboarding</h5>
+                    <a href="<?= getUrl('hr_checklists') ?>" class="btn btn-sm btn-outline-primary d-print-none"><i class="bi bi-list-check me-1"></i> Manage</a>
+                </div>
+                <div class="card-body">
+                    <?php foreach ($emp_checklists as $cl):
+                        $pct = (int)$cl['total'] > 0 ? round((int)$cl['done'] / (int)$cl['total'] * 100) : 0;
+                    ?>
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small">
+                            <span><span class="badge bg-<?= $cl['checklist_type'] === 'onboarding' ? 'success' : 'secondary' ?>"><?= ucfirst($cl['checklist_type']) ?></span></span>
+                            <span class="text-muted"><?= (int)$cl['done'] ?>/<?= (int)$cl['total'] ?></span>
+                        </div>
+                        <div class="progress" style="height:10px"><div class="progress-bar <?= $pct === 100 ? 'bg-success' : 'bg-primary' ?>" style="width:<?= $pct ?>%"></div></div>
+                    </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
             <?php endif; ?>

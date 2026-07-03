@@ -1,5 +1,38 @@
 # BMS Changelog
 
+## 2026-07-04 (feat) — Onboarding / Offboarding checklists (Tier 4, Phase 4.4)
+
+Template-driven checklists with the D28 auto-spawn hooks — the only two touches
+to prior-tier code in Tier 4, both append-only, guarded and non-fatal. Plan in
+employee.md §9.3 Phase 4.4.
+
+- `core/checklists.php` — `spawnChecklistIfConfigured()` (spawns from the active
+  default template for a type; idempotent — no double-spawn while one is in
+  progress; never throws) and `spawnChecklistFromTemplate()`. Spawning snapshots
+  the template's item text into the instance (D30) so editing a template never
+  rewrites in-flight checklists.
+- `api/manage_checklist_template.php` — template + item CRUD; `set_default`
+  enforces one default per type server-side.
+- `api/get_checklists.php` (templates / active list / single checklist),
+  `api/spawn_checklist.php` (manual), `api/tick_checklist_item.php` (stamps
+  done_by/done_at + optional note, logged), `api/change_checklist_status.php`
+  (complete requires all items ticked / cancel).
+- `app/bms/pos/hr_checklists.php` — Templates tab (CRUD, items, set-default) and
+  Active tab (progress cards, inline ticking, spawn).
+- **D28(b)** — `api/add_employee.php`: one guarded, non-fatal call after its
+  transaction commits, auto-spawns an onboarding checklist.
+- **D28(c)** — `api/change_lifecycle_status.php`: in the approval branch, an
+  approved resignation/termination auto-spawns an offboarding checklist (guarded,
+  non-fatal). `tests/test_hr_lifecycle_workflow_cli.php` cleanup extended to
+  remove the auto-spawned checklist (the FK would otherwise block fixture
+  teardown) — no behavioural change to Tier 1.
+- `app/bms/pos/employee_details.php` — additive active-checklist card with a
+  progress bar.
+- `tests/test_hr_checklists_cli.php` — 21 assertions: template CRUD + single
+  default, D30 snapshot isolation, tick + completion gate, D28(b) onboarding
+  auto-spawn (+ idempotency), D28(c) offboarding auto-spawn through the real
+  lifecycle endpoint, non-fatal safety, permission denials, page render.
+
 ## 2026-07-04 (feat) — Meetings & Business Trips (Tier 4, Phase 4.3)
 
 Plan in employee.md §9.3 Phase 4.3.
