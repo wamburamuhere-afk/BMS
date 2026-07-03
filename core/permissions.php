@@ -162,6 +162,43 @@ function canApprove($pageKey)
 }
 
 /**
+ * Can move a record draft → submitted. Derived helper (no separate
+ * can_submit column in the loader): whoever may create or edit the record
+ * may submit it. Keeps every workflow transition gated (§11.1) without a
+ * schema change to role_permissions.
+ *
+ * @param string $pageKey Page identifier
+ * @return bool
+ */
+function canSubmit($pageKey)
+{
+    if (isAdmin()) {
+        return true;
+    }
+    // explicit column if one ever exists, else fall back to create/edit rights
+    return (bool)($_SESSION['permissions'][$pageKey]['submit'] ?? false)
+        || (bool)($_SESSION['permissions'][$pageKey]['create'] ?? false)
+        || (bool)($_SESSION['permissions'][$pageKey]['edit'] ?? false);
+}
+
+/**
+ * Can reject a submitted record. House convention (established in Tier 1
+ * lifecycle): rejection is an approver's decision, so it mirrors canApprove
+ * unless an explicit can_reject is present.
+ *
+ * @param string $pageKey Page identifier
+ * @return bool
+ */
+function canReject($pageKey)
+{
+    if (isAdmin()) {
+        return true;
+    }
+    return (bool)($_SESSION['permissions'][$pageKey]['reject'] ?? false)
+        || (bool)($_SESSION['permissions'][$pageKey]['approve'] ?? false);
+}
+
+/**
  * Check if user has any permission for a page
  * 
  * @param string $pageKey Page identifier

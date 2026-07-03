@@ -1,5 +1,40 @@
 # BMS Changelog
 
+## 2026-07-03 (feat) — Employee appraisals (Tier 3, Phase 3.3)
+
+Appraisals tab on the HR Performance page. Plan in employee.md §8.3 Phase 3.3.
+
+- `core/permissions.php` — added derived `canSubmit()` (create/edit rights)
+  and `canReject()` (mirrors approve, per Tier 1's house convention) so every
+  appraisal workflow transition is gated (§11.1) without a role_permissions
+  schema change.
+- `api/manage_appraisal_cycles.php` — cycle CRUD; closing a cycle blocks new
+  appraisals in it (existing ones finish their workflow); can't delete a cycle
+  with appraisals.
+- `api/add_appraisal.php` — creates an appraisal, snapshotting the employee's
+  designation and each rated indicator's expected_rating from the designation
+  targets (D19) so later target/designation changes never rewrite it; one per
+  employee per cycle (`uniq_cycle_emp`); saves draft or submitted; scope-gated.
+- `api/change_appraisal_status.php` — `draft→submitted`/`submitted→approved|
+  rejected` (§11.1); terminal states immutable; appraiser can't approve their
+  own (SoD, admins exempt); on approval `overall_rating = AVG(actual)` is
+  computed + stored (D17).
+- `api/get_appraisal.php`, `api/get_appraisals.php` — scorecard + filtered
+  list with stat cards (draft/submitted/approved/avg), scope-gated.
+- `app/bms/pos/hr_performance.php` — Appraisals tab: stat cards, filters,
+  DataTable + mobile cards, print-friendly scorecard view modal, New Appraisal
+  modal (cycle + employee Select2 → star-rate each indicator with the
+  designation target marked), Cycles management modal. D20: an approved
+  appraisal shows "Recommend Promotion/Award" opening the shared Tier 1
+  lifecycle modal pre-filled (employee + description referencing the appraisal).
+- `app/bms/pos/employee_details.php` — additive Performance card: latest
+  approved appraisal (cycle, overall stars, approver, date) + rating history.
+- `tests/test_employee_appraisals_cli.php` — 25 assertions: cycle CRUD +
+  closed-cycle block, one-per-cycle, D19 snapshot integrity (target changed
+  after creation → item keeps old expected), submit→approve with stored
+  AVG (D17), SoD block, terminal-state immutability, reject-with-reason,
+  permission denial, page + details renders.
+
 ## 2026-07-03 (feat) — Performance indicators & competency targets (Tier 3, Phase 3.2)
 
 Indicators tab on the HR Performance page. Plan in employee.md §8.3 Phase 3.2.

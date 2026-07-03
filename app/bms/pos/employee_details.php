@@ -113,6 +113,25 @@ if ($can_view_contracts) {
     $emp_contracts = $ec_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// Performance — appraisals (Tier 3, Phase 3.3) — latest approved + history
+$can_view_performance = canView('hr_performance');
+$latest_appraisal = null;
+$appraisal_history = [];
+if ($can_view_performance) {
+    $pa_stmt = $pdo->prepare("
+        SELECT a.appraisal_id, a.overall_rating, a.appraisal_date, a.status,
+               c.cycle_name, au.username AS approved_by_name
+        FROM employee_appraisals a
+        LEFT JOIN appraisal_cycles c ON c.cycle_id = a.cycle_id
+        LEFT JOIN users au ON au.user_id = a.approved_by
+        WHERE a.employee_id = ? AND a.status = 'approved'
+        ORDER BY a.appraisal_date DESC, a.appraisal_id DESC
+    ");
+    $pa_stmt->execute([$employee_id]);
+    $appraisal_history = $pa_stmt->fetchAll(PDO::FETCH_ASSOC);
+    $latest_appraisal = $appraisal_history[0] ?? null;
+}
+
 // Direct Reports (Tier 2, Phase 2.4) — employees whose reporting_to_id points here
 $dr_stmt = $pdo->prepare("SELECT employee_id, first_name, last_name FROM employees
                            WHERE reporting_to_id = ? AND (status IS NULL OR status != 'deleted')
@@ -923,6 +942,56 @@ $sr_status_badge = [
                             </tbody>
                         </table>
                     </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if ($can_view_performance): ?>
+            <!-- Performance Card (Tier 3, Phase 3.3) -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-graph-up-arrow text-primary me-1"></i> Performance</h5>
+                    <a href="<?= getUrl('hr_performance') ?>" class="btn btn-sm btn-outline-primary d-print-none">
+                        <i class="bi bi-clipboard-check me-1"></i> Appraisals
+                    </a>
+                </div>
+                <div class="card-body">
+                    <?php
+                    $starRow = function ($v) {
+                        $v = (int)round($v);
+                        $h = '';
+                        for ($i = 1; $i <= 5; $i++) $h .= '<span style="color:' . ($i <= $v ? '#f5b301' : '#ced4da') . '">&#9733;</span>';
+                        return $h;
+                    };
+                    ?>
+                    <?php if (!$latest_appraisal): ?>
+                    <p class="text-muted mb-0"><i class="bi bi-clipboard-x me-1"></i> No approved appraisals yet.</p>
+                    <?php else: ?>
+                    <div class="mb-3 p-3 rounded" style="background:#e7f0ff;border:1px solid #b6ccfe">
+                        <div class="d-flex justify-content-between align-items-start flex-wrap">
+                            <div>
+                                <div class="small text-muted">Latest — <?= safe_output($latest_appraisal['cycle_name']) ?></div>
+                                <div class="fs-5"><?= $starRow($latest_appraisal['overall_rating']) ?>
+                                    <strong class="ms-1"><?= number_format((float)$latest_appraisal['overall_rating'], 2) ?>/5</strong></div>
+                            </div>
+                            <div class="small text-muted text-end">
+                                <?= safe_output($latest_appraisal['appraisal_date']) ?><br>
+                                <?php if (!empty($latest_appraisal['approved_by_name'])): ?>Approved by <?= safe_output($latest_appraisal['approved_by_name']) ?><?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    <?php if (count($appraisal_history) > 1): ?>
+                    <div class="small text-muted mb-1">History</div>
+                    <ul class="list-unstyled mb-0">
+                        <?php foreach (array_slice($appraisal_history, 1) as $h): ?>
+                        <li class="d-flex justify-content-between py-1 border-bottom">
+                            <span><?= safe_output($h['cycle_name']) ?></span>
+                            <span><?= $starRow($h['overall_rating']) ?> <small class="text-muted"><?= number_format((float)$h['overall_rating'], 2) ?></small></span>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>
