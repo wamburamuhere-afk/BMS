@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-07-02 (chore) — Tier 2 re-scout + hardening (Phase 2.5) — Tier 2 complete
+
+Final phase of the HR compliance tier (employee.md §7.3 Phase 2.5). No code
+changes — verification + documentation only.
+
+- Re-scout sweep of every writer/reader of `employees.documents`,
+  `contract_end_date`, `probation_end_date`, `reporting_to` — no conflicts
+  with Phases 2.1–2.4. One gap documented as Tier 2+ debt (not fixed now,
+  per the same convention Tier 1's Phase 1.6 re-scout used):
+  `api/operations/create_project_staff.php` (the "Add Project Staff" form on
+  `project_view.php`) writes `reporting_to` as free text without ever
+  setting `reporting_to_id`, so employees added through that path won't
+  appear under Direct Reports / the org chart until edited via
+  `employees.php`. Recorded in `employee.md` §7.3 Phase 2.5 re-scout table.
+- Confirmed the document-expiry and HR-expiry crons coexist cleanly —
+  6 daily-throttled cron jobs in `header.php` each use a distinct
+  `*_last_run` settings key, no collisions, no double-fire risk.
+- Full Tier 2 CLI suite re-run clean: 160 assertions across
+  `test_hr_compliance_foundation_cli.php` (56),
+  `test_employee_documents_cli.php` (26),
+  `test_employee_documents_card_cli.php` (17),
+  `test_employee_contracts_cli.php` (34),
+  `test_org_structure_cli.php` (27) — no regressions.
+
 ## 2026-07-02 (feat) — Org structure & org chart (Tier 2, Phase 2.4)
 
 Real manager links replacing the free-text reporting_to field, plus a
