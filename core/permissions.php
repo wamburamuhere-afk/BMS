@@ -551,6 +551,8 @@ function getPagePermissionMapping()
         'hr_actions.php'         => 'employee_lifecycle',
         'employee_contracts.php' => 'employee_contracts',
         'org_chart.php'          => 'org_chart',
+        'hr_performance.php'     => 'hr_performance',
+        'trainings.php'          => 'trainings',
         'payroll_details.php'  => 'payroll',
         'payroll_settings.php' => 'payroll',
         'payslip.php'          => 'payslip',

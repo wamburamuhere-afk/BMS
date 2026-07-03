@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-07-03 (feat) — HR Performance & Development foundation (Tier 3, Phase 3.1)
+
+Foundation for Tier 3 (appraisals, goals, indicators, training) — purely
+additive scaffolding, plan in employee.md §8. Distinct page keys
+(`hr_performance`, `trainings`) chosen to avoid any confusion with the
+business `performance_dashboard` report (D16).
+
+- `migrations/2026_07_03_hr_performance_foundation.php` — 11 tables (all
+  InnoDB): competency framework (`performance_indicator_categories`,
+  `performance_indicators`, `designation_indicator_targets`), appraisals
+  (`appraisal_cycles`, `employee_appraisals`, `employee_appraisal_items`),
+  goals (`goal_types`, `employee_goals`), training (`training_types`,
+  `trainings`, `training_participants`); seeded indicator categories, goal
+  types and training types (`INSERT IGNORE`); `uploads/training_certs/` with
+  deny-exec `.htaccess`.
+- `migrations/2026_07_03_hr_performance_permissions.php` — `hr_performance` +
+  `trainings` permission rows (module HR) with runtime-resolved role seeding
+  (admin + holders of can_edit on employees = full incl. submit/approve/reject
+  verbs, rest view-only).
+- `roots.php` — routes for 2 pages + 16 APIs; `header.php` — "Performance (HR)"
+  (`bi-graph-up-arrow`) and "Training" (`bi-mortarboard`) nav items;
+  `core/permissions.php` — router-fallback mappings for both pages.
+- `tests/test_hr_performance_foundation_cli.php` — 74 assertions: migrations
+  idempotent, tables/engine/FK/unique-keys, seeds, permission + role matrix,
+  routes, nav, router fallback, hardened upload dir, and no collision with the
+  business performance_dashboard.
+
 ## 2026-07-03 (fix) — Migration ordering: reporting_to_id backfill runs after its schema
 
 Production deploy halted: `2026_07_02_backfill_reporting_to_id.php` ran before
