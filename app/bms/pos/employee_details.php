@@ -145,6 +145,26 @@ if ($can_view_performance) {
     $active_goals = $ag_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// Trips + upcoming meetings (Tier 4, Phase 4.3)
+$can_view_trips = canView('employee_trips');
+$emp_trips = [];
+if ($can_view_trips) {
+    $tr_stmt = $pdo->prepare("SELECT trip_id, destination, start_date, end_date, status FROM employee_trips
+                               WHERE employee_id = ? AND status != 'deleted' ORDER BY start_date DESC LIMIT 5");
+    $tr_stmt->execute([$employee_id]);
+    $emp_trips = $tr_stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+$can_view_meetings = canView('meetings');
+$emp_meetings = [];
+if ($can_view_meetings) {
+    $mt_stmt = $pdo->prepare("SELECT m.meeting_id, m.title, m.meeting_date, m.start_time
+                               FROM meeting_attendees ma JOIN meetings m ON m.meeting_id = ma.meeting_id
+                               WHERE ma.employee_id = ? AND m.status = 'scheduled' AND m.meeting_date >= CURDATE()
+                               ORDER BY m.meeting_date ASC LIMIT 5");
+    $mt_stmt->execute([$employee_id]);
+    $emp_meetings = $mt_stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 // Training history (Tier 3, Phase 3.5)
 $can_view_training = canView('trainings');
 $training_history = [];
@@ -1089,6 +1109,42 @@ $sr_status_badge = [
                             </tbody>
                         </table>
                     </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if (($can_view_meetings && !empty($emp_meetings)) || ($can_view_trips && !empty($emp_trips))): ?>
+            <!-- Meetings & Trips Card (Tier 4, Phase 4.3) -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0"><i class="bi bi-calendar-event text-primary me-1"></i> Meetings &amp; Trips</h5>
+                </div>
+                <div class="card-body">
+                    <?php if ($can_view_meetings && !empty($emp_meetings)): ?>
+                    <div class="small text-muted mb-1"><i class="bi bi-calendar-event me-1"></i> Upcoming meetings</div>
+                    <ul class="list-unstyled mb-3">
+                        <?php foreach ($emp_meetings as $m): ?>
+                        <li class="d-flex justify-content-between py-1 border-bottom">
+                            <span><?= safe_output($m['title']) ?></span>
+                            <span class="text-muted small"><?= safe_output($m['meeting_date']) ?><?php if (!empty($m['start_time'])): ?> <?= safe_output(substr($m['start_time'], 0, 5)) ?><?php endif; ?></span>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php endif; ?>
+                    <?php if ($can_view_trips && !empty($emp_trips)): ?>
+                    <div class="small text-muted mb-1"><i class="bi bi-airplane me-1"></i> Trips</div>
+                    <ul class="list-unstyled mb-0">
+                        <?php foreach ($emp_trips as $t):
+                            $tmap = ['pending'=>'warning','approved'=>'primary','completed'=>'success','rejected'=>'danger','cancelled'=>'secondary'];
+                            $tc = $tmap[$t['status']] ?? 'secondary';
+                        ?>
+                        <li class="d-flex justify-content-between py-1 border-bottom">
+                            <span><?= safe_output($t['destination']) ?> <small class="text-muted"><?= safe_output($t['start_date']) ?></small></span>
+                            <span class="badge bg-<?= $tc ?>"><?= ucfirst($t['status']) ?></span>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
                     <?php endif; ?>
                 </div>
             </div>

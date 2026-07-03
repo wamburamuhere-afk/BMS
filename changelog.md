@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-07-04 (feat) — Meetings & Business Trips (Tier 4, Phase 4.3)
+
+Plan in employee.md §9.3 Phase 4.3.
+
+- `api/manage_trip.php` (D26) — trip requests; §11.1 transitions
+  `pending→approved/rejected`, `approved→completed/cancelled`; requester
+  cannot approve their own (SoD); completion requires a trip report; a trip
+  **never moves money** — `estimated_cost`/`requested_advance` are
+  informational only and `expense_reference` is a plain string pointing at the
+  real Petty Cash / Expenses record. Optional §19 attachment.
+- `api/get_trips.php`, `api/download_trip_attachment.php` (gatekeeper) — list
+  + stats (Pending / Approved & ongoing / Completed this year), scope-gated.
+- `api/manage_meeting.php` (D29) — schedule + attendees + minutes + status;
+  `mark_attendance` per attendee; complete (with minutes) / cancel; notifies
+  attendees' linked users on schedule/cancel via the notification engine
+  (deduped). Minimal by design — no rooms/recurrence/video.
+- `api/get_meetings.php` — list + stats (Upcoming / This week / Completed this
+  month) and single-meeting detail with attendees.
+- `app/bms/pos/employee_trips.php` + `app/bms/pos/meetings.php` — full pages
+  (stat cards, filters, DataTable + mobile cards, request/schedule modals,
+  per-state workflow actions, attendance marking).
+- `app/bms/pos/employee_details.php` — additive "Meetings & Trips" card:
+  the employee's upcoming meetings + recent trips with status chips.
+- `tests/test_meetings_trips_cli.php` — 24 assertions: trip transition map +
+  SoD + completion-requires-report + D26 informational-only, meeting schedule/
+  attendance/complete/cancel, permission denials, both pages + details render.
+
 ## 2026-07-04 (feat) — Announcements (Tier 4, Phase 4.2)
 
 Company/department/project broadcast announcements. Plan in employee.md §9.3
