@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-07-02 (feat) — Employee Contracts module (Tier 2, Phase 2.3)
+
+Contracts with renewal history + expiry alerts. Plan in employee.md §7.3 Phase 2.3.
+
+- `api/add_contract.php` — creates a DRAFT contract; optional signed-copy
+  upload (§19 5-step) registered in the central `documents` library with
+  `expire_date = end_date`; scope-gated.
+- `api/change_contract_status.php` — `draft → active` (activate) and
+  `active → terminated` (terminate), both `canApprove('employee_contracts')`.
+  Activation (D12, single transaction): row-locks any existing `active`
+  contract for the employee and auto-renews it (`status='renewed'`, new row
+  gets `renewed_from_contract_id`) so at most one contract is ever active;
+  dual-writes `employees.contract_end_date` (and `probation_end_date` when
+  `probation_months` is set) so every existing reader of those columns keeps
+  working unchanged.
+- `api/get_contract.php`, `api/get_contracts.php` — single-record + filtered
+  list (status/type/employee/expiring-in-N-days), scope-gated.
+- `app/bms/pos/employee_contracts.php` — stat cards (Active, Expiring ≤60d,
+  Expired, On Probation), filters, DataTable + mobile cards, per-row
+  Activate/Renew/Terminate/View/Download, "New Contract" modal.
+- `app/bms/pos/employee_details.php` — additive Contracts card: history
+  newest-first, active contract highlighted, expiry chip.
+- `cron/check_hr_expiry.php` (D13) — contract milestones 60/30/14/7 days,
+  probation milestones 14/7/1 days; dispatches through the existing
+  `core/notify.php` engine (`hr_contract_expiry` / `hr_probation_end` events
+  registered in Phase 2.1) — recipients, dedupe and logging all reused, zero
+  new alert plumbing. Wired into `header.php`'s daily throttle chain
+  alongside the document-expiry and leave-accrual crons.
+- `tests/test_employee_contracts_cli.php` — 34 assertions: validation
+  matrix, dual-write on activation, auto-renewal (only one active contract
+  per employee), termination, scope + permission denials, expiry cron fires
+  once per milestone via the shared engine (dedupe holds on re-run), both
+  pages render cleanly.
+
 ## 2026-07-02 (feat) — Documents card upgrade on employee_details.php (Tier 2, Phase 2.2 closeout)
 
 Closes a gap found on re-scout: Phase 2.2 spec item 4 (upgrading the Documents

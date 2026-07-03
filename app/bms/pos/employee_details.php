@@ -96,6 +96,23 @@ if ($can_create_documents) {
                                WHERE status = 'active' ORDER BY sort_order, type_name")->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// Employee Contracts (Tier 2, Phase 2.3) — history newest-first, current
+// contract highlighted. Activation/renewal/termination happen on the
+// Employee Contracts page (api/change_contract_status.php); this card is
+// read-only + a Renew shortcut.
+$can_view_contracts = canView('employee_contracts');
+$emp_contracts = [];
+if ($can_view_contracts) {
+    $ec_stmt = $pdo->prepare("
+        SELECT ec.*, DATEDIFF(ec.end_date, CURDATE()) AS days_to_expiry
+        FROM employee_contracts ec
+        WHERE ec.employee_id = ? AND ec.status != 'deleted'
+        ORDER BY ec.created_at DESC
+    ");
+    $ec_stmt->execute([$employee_id]);
+    $emp_contracts = $ec_stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 // Service Record (Tier 1, Phase 1.5) — this employee's lifecycle timeline,
 // newest first. Old/new ids resolved via LEFT JOIN like the rest of the page.
 $can_create_lifecycle = canCreate('employee_lifecycle');
@@ -829,6 +846,51 @@ $sr_status_badge = [
                             </div>
                         </form>
                     </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if ($can_view_contracts): ?>
+            <!-- Contracts Card (Tier 2, Phase 2.3) -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Contracts</h5>
+                    <a href="<?= getUrl('employee_contracts') ?>" class="btn btn-sm btn-outline-primary d-print-none">
+                        <i class="bi bi-arrow-repeat me-1"></i> Manage Contracts
+                    </a>
+                </div>
+                <div class="card-body">
+                    <?php if (empty($emp_contracts)): ?>
+                    <p class="text-muted mb-0"><i class="bi bi-file-earmark-x me-1"></i> No contracts recorded for this employee.</p>
+                    <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr><th>Type</th><th>Start</th><th>End</th><th>Status</th></tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($emp_contracts as $c):
+                                $isActive = ($c['status'] === 'active');
+                                $chip = '';
+                                if ($isActive && !empty($c['end_date'])) {
+                                    $dte = (int)$c['days_to_expiry'];
+                                    if ($dte < 0)       $chip = '<span class="badge bg-danger">Expired</span>';
+                                    elseif ($dte <= 60) $chip = '<span class="badge bg-warning text-dark">' . $dte . 'd left</span>';
+                                }
+                                $status_colors = ['draft' => 'secondary', 'active' => 'primary', 'expired' => 'danger', 'renewed' => 'secondary', 'terminated' => 'danger'];
+                                $status_color = $status_colors[$c['status']] ?? 'secondary';
+                            ?>
+                                <tr <?= $isActive ? 'class="table-primary"' : '' ?>>
+                                    <td><?= safe_output($c['contract_type']) ?></td>
+                                    <td><?= safe_output($c['start_date']) ?></td>
+                                    <td><?= safe_output($c['end_date'], 'Open-ended') ?> <?= $chip ?></td>
+                                    <td><span class="badge bg-<?= $status_color ?>"><?= ucfirst($c['status']) ?></span></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>
