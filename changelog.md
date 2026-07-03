@@ -1,5 +1,37 @@
 # BMS Changelog
 
+## 2026-07-03 (feat) — Training module (Tier 3, Phase 3.5)
+
+Standalone Training page + certificate tracking. Plan in employee.md §8.3
+Phase 3.5.
+
+- `api/manage_trainings.php` — training CRUD; status flow
+  `planned → in_progress → completed/cancelled` (`canEdit`); completion is
+  blocked until every participant is in a terminal state (completed/failed/
+  withdrawn); cost is informational only (D21) — no ledger posting.
+- `api/get_trainings.php` — filtered list + stat cards (Planned, In progress,
+  Completed this year, Trained this year) and single-training detail with
+  participants.
+- `api/manage_training_participants.php` — add (Select2 multi, scope-gated,
+  `uniq_training_emp` dedupe), update (status/score/remarks), remove.
+- `api/upload_training_certificate.php` (D22) — §19 5-step upload; registers
+  into the central `documents` library with an optional `expire_date` so the
+  existing document-expiry cron alerts on expiring certifications with zero
+  new alert code.
+- `api/download_training_certificate.php` — gatekeeper (auth + `canView` +
+  participant's-employee scope + path containment).
+- `app/bms/pos/trainings.php` — page (`trainings`): stat cards, filters,
+  DataTable + mobile cards, New Training modal (internal Select2 / external
+  free text, cost note), detail modal with participant management + per-
+  participant status/score/certificate.
+- `app/bms/pos/employee_details.php` — additive Training card: the employee's
+  training history (title, type, dates, result badge, certificate download +
+  expiry chip).
+- `tests/test_employee_training_cli.php` — 19 assertions: CRUD + validation,
+  status flow + completion gate, participant uniqueness/update/remove,
+  D22 library wiring proven live through `check_document_expiry.php`,
+  gatekeeper containment + permission denial, page + details renders.
+
 ## 2026-07-03 (feat) — Employee goals (Tier 3, Phase 3.4)
 
 Goals tab on the HR Performance page. Plan in employee.md §8.3 Phase 3.4.

@@ -145,6 +145,24 @@ if ($can_view_performance) {
     $active_goals = $ag_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// Training history (Tier 3, Phase 3.5)
+$can_view_training = canView('trainings');
+$training_history = [];
+if ($can_view_training) {
+    $th_stmt = $pdo->prepare("
+        SELECT p.participant_id, p.status AS part_status, p.certificate_path, p.certificate_expire_date,
+               DATEDIFF(p.certificate_expire_date, CURDATE()) AS cert_days_left,
+               t.title, t.start_date, t.end_date, tt.type_name
+        FROM training_participants p
+        JOIN trainings t ON t.training_id = p.training_id AND t.status != 'deleted'
+        LEFT JOIN training_types tt ON tt.training_type_id = t.training_type_id
+        WHERE p.employee_id = ?
+        ORDER BY t.start_date DESC
+    ");
+    $th_stmt->execute([$employee_id]);
+    $training_history = $th_stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 // Direct Reports (Tier 2, Phase 2.4) — employees whose reporting_to_id points here
 $dr_stmt = $pdo->prepare("SELECT employee_id, first_name, last_name FROM employees
                            WHERE reporting_to_id = ? AND (status IS NULL OR status != 'deleted')
@@ -1023,6 +1041,54 @@ $sr_status_badge = [
                         </div>
                     </div>
                     <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if ($can_view_training): ?>
+            <!-- Training Card (Tier 3, Phase 3.5) -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-mortarboard text-primary me-1"></i> Training</h5>
+                    <a href="<?= getUrl('trainings') ?>" class="btn btn-sm btn-outline-primary d-print-none">
+                        <i class="bi bi-mortarboard me-1"></i> All Trainings
+                    </a>
+                </div>
+                <div class="card-body">
+                    <?php if (empty($training_history)): ?>
+                    <p class="text-muted mb-0"><i class="bi bi-mortarboard me-1"></i> No training records yet.</p>
+                    <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead><tr><th>Training</th><th>Type</th><th>Date</th><th>Result</th><th class="d-print-none">Certificate</th></tr></thead>
+                            <tbody>
+                            <?php foreach ($training_history as $th):
+                                $pmap = ['enrolled'=>'secondary','attended'=>'info','completed'=>'success','failed'=>'danger','withdrawn'=>'dark'];
+                                $pcolor = $pmap[$th['part_status']] ?? 'secondary';
+                                $cchip = '';
+                                if (!empty($th['certificate_path']) && !empty($th['certificate_expire_date'])) {
+                                    $cd = (int)$th['cert_days_left'];
+                                    if ($cd < 0) $cchip = '<span class="badge bg-danger">Expired</span>';
+                                    elseif ($cd <= 30) $cchip = '<span class="badge bg-warning text-dark">' . $cd . 'd</span>';
+                                }
+                            ?>
+                                <tr>
+                                    <td><?= safe_output($th['title']) ?></td>
+                                    <td><?= safe_output($th['type_name'], '—') ?></td>
+                                    <td><?= safe_output($th['start_date']) ?></td>
+                                    <td><span class="badge bg-<?= $pcolor ?>"><?= ucfirst($th['part_status']) ?></span></td>
+                                    <td class="d-print-none">
+                                        <?php if (!empty($th['certificate_path'])): ?>
+                                        <a href="<?= buildUrl('api/download_training_certificate.php') ?>?participant_id=<?= (int)$th['participant_id'] ?>" target="_blank" class="btn btn-sm btn-outline-primary py-0"><i class="bi bi-download"></i></a>
+                                        <?= $cchip ?>
+                                        <?php else: ?><span class="text-muted">—</span><?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
                     <?php endif; ?>
                 </div>
             </div>
