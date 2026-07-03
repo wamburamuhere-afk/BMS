@@ -765,12 +765,12 @@ if (isAdmin()) {
                                     <input type="text" class="form-control" id="city" name="city" placeholder="e.g. Ilala">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="council" class="form-label">Council</label>
-                                    <input type="text" class="form-control" id="council" name="council" placeholder="e.g. Ilala Municipal">
-                                </div>
-                                <div class="col-6 col-md-6 mb-3">
                                     <label for="ward" class="form-label">Ward</label>
                                     <input type="text" class="form-control" id="ward" name="ward" placeholder="e.g. Kariakoo">
+                                </div>
+                                <div class="col-6 col-md-6 mb-3">
+                                    <label for="village" class="form-label">Street/Village</label>
+                                    <input type="text" class="form-control" id="village" name="village" placeholder="e.g. Mtaa wa Kariakoo">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="postal_code" class="form-label">Zip Code</label>
@@ -1062,12 +1062,12 @@ if (isAdmin()) {
                                     <input type="text" class="form-control" id="edit_city" name="city" placeholder="District">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_council" class="form-label">Council</label>
-                                    <input type="text" class="form-control" id="edit_council" name="council" placeholder="Council">
-                                </div>
-                                <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_ward" class="form-label">Ward</label>
                                     <input type="text" class="form-control" id="edit_ward" name="ward" placeholder="Ward">
+                                </div>
+                                <div class="col-6 col-md-6 mb-3">
+                                    <label for="edit_village" class="form-label">Street/Village</label>
+                                    <input type="text" class="form-control" id="edit_village" name="village" placeholder="Street/Village">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_postal_code" class="form-label">Zip Code</label>
@@ -1622,8 +1622,8 @@ function editSupplier(supplierId) {
                 $('#edit_state').val(response.data.state || '');
                 $('#edit_city').val(response.data.city || '');
 
-                $('#edit_council').val(response.data.council || '');
                 $('#edit_ward').val(response.data.ward || '');
+                $('#edit_village').val(response.data.village || '');
 
                 $('#edit_postal_code').val(response.data.postal_code || '');
                 

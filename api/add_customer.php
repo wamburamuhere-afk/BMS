@@ -100,8 +100,8 @@ try {
         'city'    => $_POST['city'] ?? null,
         'state'   => $_POST['state'] ?? null,
         'country' => $_POST['country'] ?? 'Tanzania',
-        'council' => $_POST['council'] ?? null,
         'ward'    => $_POST['ward'] ?? null,
+        'village' => $_POST['village'] ?? null,
         'postal_code'    => $_POST['postal_code'] ?? null,
         'postal_address' => $_POST['postal_address'] ?? null,
         
