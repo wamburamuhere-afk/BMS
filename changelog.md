@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-07-03 (chore) — Tier 3 re-scout + hardening (Phase 3.6) — Tier 3 complete
+
+Final phase of the Performance & Development tier (employee.md §8.3 Phase 3.6).
+No code changes — verification + documentation only.
+
+- Re-scout confirmed D21 clean: no report or `core/financial_reports.php`
+  function joins any Tier 3 table, and no Tier 3 list/stat API reads the
+  ledger — HR performance data never becomes a financial figure.
+- Confirmed `hr_performance`/`trainings` are distinct page keys from the
+  business `performance_dashboard` (no collision).
+- Verified every Tier 3 list/stat query excludes `deleted` and applies
+  employee project scope (`scopeFilterSqlNullable` / `assertScopeForEmployee`);
+  certificates reuse the Tier 2 central-library path with no schema drift.
+- Full Tier 3 CLI suite re-run clean: 161 assertions across
+  `test_hr_performance_foundation_cli.php` (74),
+  `test_performance_indicators_cli.php` (21),
+  `test_employee_appraisals_cli.php` (25), `test_employee_goals_cli.php` (22),
+  `test_employee_training_cli.php` (19). Shared-file regressions
+  (service record, documents card, contracts, org structure, admin break-glass)
+  all pass — no regressions from the shared `employee_details.php` /
+  `core/permissions.php` / `header.php` changes.
+- Re-scout table recorded in `employee.md` §8.3 Phase 3.6.
+
 ## 2026-07-03 (feat) — Training module (Tier 3, Phase 3.5)
 
 Standalone Training page + certificate tracking. Plan in employee.md §8.3
