@@ -72,6 +72,30 @@ foreach ($sc_rows as $r) {
 }
 $struct_net = $struct_earn - $struct_deduct;
 
+// Employee Documents (Tier 2, Phase 2.2) — new typed & expiry-tracked system.
+// The legacy JSON documents below stay read-only and untouched (D9).
+$can_view_documents   = canView('employee_documents');
+$can_create_documents = canCreate('employee_documents');
+$can_delete_documents = canDelete('employee_documents');
+$emp_documents = [];
+$doc_types     = [];
+if ($can_view_documents) {
+    $ed_stmt = $pdo->prepare("
+        SELECT ed.*, dt.type_name,
+               DATEDIFF(ed.expire_date, CURDATE()) AS days_to_expiry
+        FROM employee_documents ed
+        JOIN employee_document_types dt ON dt.doc_type_id = ed.doc_type_id
+        WHERE ed.employee_id = ? AND ed.status = 'active'
+        ORDER BY ed.created_at DESC
+    ");
+    $ed_stmt->execute([$employee_id]);
+    $emp_documents = $ed_stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+if ($can_create_documents) {
+    $doc_types = $pdo->query("SELECT doc_type_id, type_name, requires_expiry FROM employee_document_types
+                               WHERE status = 'active' ORDER BY sort_order, type_name")->fetchAll(PDO::FETCH_ASSOC);
+}
+
 // Service Record (Tier 1, Phase 1.5) — this employee's lifecycle timeline,
 // newest first. Old/new ids resolved via LEFT JOIN like the rest of the page.
 $can_create_lifecycle = canCreate('employee_lifecycle');
@@ -647,12 +671,60 @@ $sr_status_badge = [
 
             <!-- Documents Card -->
             <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white py-3">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Employee Documents</h5>
+                    <?php if ($can_create_documents): ?>
+                    <button class="btn btn-sm btn-primary d-print-none" data-bs-toggle="modal" data-bs-target="#uploadDocModal">
+                        <i class="bi bi-cloud-upload me-1"></i> Upload Document
+                    </button>
+                    <?php endif; ?>
                 </div>
                 <div class="card-body">
+                    <?php if ($can_view_documents && !empty($emp_documents)): ?>
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm align-middle" id="empDocsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th><th>Name</th><th>Issued</th><th>Expires</th><th></th>
+                                        <th class="text-end d-print-none">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ($emp_documents as $d):
+                                    $chip = '';
+                                    if (!empty($d['expire_date'])) {
+                                        $dte = (int)$d['days_to_expiry'];
+                                        if ($dte < 0)        $chip = '<span class="badge bg-danger">Expired</span>';
+                                        elseif ($dte <= 30)  $chip = '<span class="badge bg-warning text-dark">' . $dte . 'd left</span>';
+                                        else                 $chip = '<span class="badge bg-success">Valid</span>';
+                                    }
+                                ?>
+                                    <tr>
+                                        <td><?= safe_output($d['type_name']) ?></td>
+                                        <td><?= safe_output($d['document_name']) ?></td>
+                                        <td><?= safe_output($d['issue_date'], '—') ?></td>
+                                        <td><?= safe_output($d['expire_date'], '—') ?></td>
+                                        <td><?= $chip ?></td>
+                                        <td class="text-end d-print-none">
+                                            <a href="<?= buildUrl('api/download_employee_document.php') ?>?emp_doc_id=<?= (int)$d['emp_doc_id'] ?>"
+                                               class="btn btn-sm btn-outline-primary" target="_blank" title="Download">
+                                                <i class="bi bi-download"></i>
+                                            </a>
+                                            <?php if ($can_delete_documents): ?>
+                                            <button class="btn btn-sm btn-outline-danger" onclick="deleteEmpDoc(<?= (int)$d['emp_doc_id'] ?>)" title="Delete">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+
                     <div class="row">
-                        <?php 
+                        <?php
                         $docs = !empty($employee['documents']) ? json_decode($employee['documents'], true) : [];
                         $doc_labels = [
                             'cv' => ['label' => 'CV / Resume', 'icon' => 'bi-file-earmark-person'],
@@ -662,11 +734,20 @@ $sr_status_badge = [
                             'app_letter' => ['label' => 'Application Letter', 'icon' => 'bi-file-earmark-text'],
                             'other_doc' => ['label' => (!empty($employee['other_doc_name']) ? $employee['other_doc_name'] : 'Other Document'), 'icon' => 'bi-paperclip']
                         ];
-                        
+
                         $has_docs = false;
+                        foreach ($doc_labels as $key => $info) {
+                            if (isset($docs[$key])) { $has_docs = true; break; }
+                        }
+                        if ($has_docs):
+                        ?>
+                        <div class="col-12 d-print-none">
+                            <p class="text-muted small mb-2"><i class="bi bi-archive me-1"></i> Legacy files</p>
+                        </div>
+                        <?php
+                        endif;
                         foreach ($doc_labels as $key => $info):
                             if (isset($docs[$key])):
-                                $has_docs = true;
                                 $file_path = getUrl('') . $docs[$key];
                         ?>
                         <div class="col-md-4 mb-3">
@@ -680,12 +761,11 @@ $sr_status_badge = [
                                 </div>
                             </div>
                         </div>
-                        <?php 
+                        <?php
                             endif;
                         endforeach;
-                        
-                        if (!$has_docs):
-                        ?>
+
+                        if (!$has_docs && !($can_view_documents && !empty($emp_documents))): ?>
                         <div class="col-12 text-center py-4">
                             <p class="text-muted mb-0"><i class="bi bi-file-earmark-x me-1"></i> No documents uploaded for this employee.</p>
                         </div>
@@ -693,6 +773,65 @@ $sr_status_badge = [
                     </div>
                 </div>
             </div>
+
+            <?php if ($can_create_documents): ?>
+            <!-- Upload Employee Document Modal (Tier 2, Phase 2.2) -->
+            <div class="modal fade" id="uploadDocModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title"><i class="bi bi-cloud-upload me-1"></i> Upload Document</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form id="uploadDocForm" autocomplete="off">
+                            <div class="modal-body">
+                                <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                                <input type="hidden" name="employee_id" value="<?= (int)$employee_id ?>">
+                                <div id="upload-doc-message" class="mb-2"></div>
+                                <div class="mb-3">
+                                    <label class="form-label">Document Type <span class="text-danger">*</span></label>
+                                    <select name="doc_type_id" id="upload_doc_type_id" class="form-select select2-static" required>
+                                        <option value=""></option>
+                                        <?php foreach ($doc_types as $dt): ?>
+                                        <option value="<?= (int)$dt['doc_type_id'] ?>" data-requires-expiry="<?= (int)$dt['requires_expiry'] ?>">
+                                            <?= safe_output($dt['type_name']) ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Document Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" name="document_name" required>
+                                </div>
+                                <div class="row">
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label">Issue Date</label>
+                                        <input type="date" class="form-control" name="issue_date">
+                                    </div>
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label" id="upload_expiry_label">Expiry Date</label>
+                                        <input type="date" class="form-control" name="expire_date" id="upload_expire_date">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Notes</label>
+                                    <textarea class="form-control" name="notes" rows="2"></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">File <span class="text-danger">*</span></label>
+                                    <input type="file" class="form-control" name="file" required>
+                                    <div class="form-text">PDF, Word, Excel or image. Max 10MB.</div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Upload</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <?php $notes_text = trim(($employee['notes'] ?? '') . "\n" . ($employee['additional_notes'] ?? '')); ?>
             <?php if ($notes_text !== ''): ?>
@@ -854,6 +993,57 @@ $(document).ready(function() {
         .then(r => { if (!r.isConfirmed) return;
             $.ajax({ url:SC_REMOVE_URL, type:'POST', dataType:'json', data:{ employee_component_id:id, _csrf:SC_CSRF },
                 success:function(res){ if(res.success){ location.reload(); } else { Swal.fire({icon:'error',title:'Error',text:res.message}); } },
+                error:function(){ Swal.fire({icon:'error',title:'Error',text:'Server error.'}); } });
+        });
+    };
+
+    // ── Employee Documents (Tier 2, Phase 2.2) ──────────────────────────
+    const ED_DELETE_URL = '<?= buildUrl('api/delete_employee_document.php') ?>';
+    const ED_CSRF = '<?= csrf_token() ?>';
+
+    $('#uploadDocModal').appendTo('body');
+    $('#uploadDocModal').on('shown.bs.modal', function () {
+        $(this).find('.select2-static').each(function () {
+            if (!$(this).hasClass('select2-hidden-accessible')) $(this).select2({ theme:'bootstrap-5', dropdownParent:$('#uploadDocModal'), placeholder:'Select type...', width:'100%' });
+        });
+    });
+    $('#uploadDocModal').on('hidden.bs.modal', function () {
+        $('#uploadDocForm')[0].reset();
+        $('#upload_doc_type_id').val('').trigger('change');
+        $('#upload-doc-message').html('');
+    });
+
+    $('#upload_doc_type_id').on('change', function () {
+        const requiresExpiry = $(this).find(':selected').data('requires-expiry') == 1;
+        $('#upload_expiry_label').html('Expiry Date' + (requiresExpiry ? ' <span class="text-danger">*</span>' : ''));
+        $('#upload_expire_date').prop('required', requiresExpiry);
+    });
+
+    $('#uploadDocForm').on('submit', function (e) {
+        e.preventDefault();
+        const btn = $(this).find('[type="submit"]'); const orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Uploading...');
+        $.ajax({
+            url: '<?= buildUrl('api/add_employee_document.php') ?>', type: 'POST',
+            data: new FormData(this), contentType: false, processData: false, dataType: 'json',
+            success: function (res) {
+                if (res.success) {
+                    Swal.fire({ icon:'success', title:'Uploaded!', text:res.message, timer:1600, showConfirmButton:false }).then(() => location.reload());
+                } else {
+                    Swal.fire({ icon:'error', title:'Error', text: res.message || 'Could not upload document.' });
+                }
+            },
+            error: function () { Swal.fire({ icon:'error', title:'Error', text:'Server error.' }); },
+            complete: function () { btn.prop('disabled', false).html(orig); }
+        });
+    });
+
+    window.deleteEmpDoc = function (id) {
+        Swal.fire({ title:'Delete this document?', text:'This cannot be undone.', icon:'warning',
+            showCancelButton:true, confirmButtonColor:'#dc3545', confirmButtonText:'Yes, delete' })
+        .then(r => { if (!r.isConfirmed) return;
+            $.ajax({ url: ED_DELETE_URL, type:'POST', dataType:'json', data:{ emp_doc_id:id, _csrf:ED_CSRF },
+                success:function(res){ if (res.success) { location.reload(); } else { Swal.fire({icon:'error',title:'Error',text:res.message}); } },
                 error:function(){ Swal.fire({icon:'error',title:'Error',text:'Server error.'}); } });
         });
     };

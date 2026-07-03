@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-07-02 (feat) — Documents card upgrade on employee_details.php (Tier 2, Phase 2.2 closeout)
+
+Closes a gap found on re-scout: Phase 2.2 spec item 4 (upgrading the Documents
+card) had not been done yet.
+
+- `app/bms/pos/employee_details.php` — Documents card now shows a table of
+  new-system typed documents (type, name, issue/expiry, colour chip, download
+  via gatekeeper, delete) plus an "Upload Document" button/modal
+  (`canCreate('employee_documents')`), with expiry-required types enforced
+  client-side via a data attribute. The legacy JSON documents render exactly
+  as before, underneath a "Legacy files" divider shown only when legacy docs
+  exist (D9) — no behavioural change to the legacy path.
+- `tests/test_employee_documents_card_cli.php` — 17 assertions: legacy-only
+  renders unchanged (plus divider), new-only renders with no legacy noise,
+  mixed renders both sections, and an employee with neither shows exactly one
+  clean empty-state message (no duplicates).
+
 ## 2026-07-02 (feat) — Employee documents with expiry (Tier 2, Phase 2.2)
 
 Employee documents typed + expiry-tracked, on top of the Phase 2.1 foundation
