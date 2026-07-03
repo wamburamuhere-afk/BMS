@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-07-03 (feat) — Performance indicators & competency targets (Tier 3, Phase 3.2)
+
+Indicators tab on the HR Performance page. Plan in employee.md §8.3 Phase 3.2.
+
+- `app/bms/pos/includes/star_rating.php` — shared 1–5 star widget partial
+  (`starRatingAssets()` + `starRatingWidget()`), reused by the target matrix
+  now and appraisals next (§8.4).
+- `api/manage_indicators.php` — CRUD for indicator categories + indicators
+  (soft delete §12); a category with active indicators can't be deleted; an
+  indicator referenced by any appraisal item is soft-deleted only so history
+  keeps rendering via its snapshot (its designation targets, which are not
+  history, are dropped).
+- `api/get_indicators.php` — active categories + indicators, plus a
+  designation's current target ratings.
+- `api/save_designation_targets.php` — upserts expected ratings per indicator
+  for a designation (`INSERT … ON DUPLICATE KEY UPDATE` on `uniq_desig_ind`);
+  a 0/out-of-range rating clears that indicator's target row.
+- `app/bms/pos/hr_performance.php` — page skeleton with three tabs
+  (Appraisals / Goals placeholders for later phases; Indicators & Targets
+  functional): category+indicator management and a designation target matrix
+  (Select2 designation → star grid grouped by category → save). `canEdit`-gated.
+- `tests/test_performance_indicators_cli.php` — 21 assertions: CRUD, upsert +
+  clear, out-of-range guard, soft-delete-preserves-appraisal-history, permission
+  denial, page render.
+
 ## 2026-07-03 (feat) — HR Performance & Development foundation (Tier 3, Phase 3.1)
 
 Foundation for Tier 3 (appraisals, goals, indicators, training) — purely
