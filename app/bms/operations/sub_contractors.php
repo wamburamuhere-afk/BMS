@@ -869,12 +869,29 @@ if (!empty($_SESSION['scope']['is_admin'])) {
     </div>
 </div>
 
+<script src="<?= getUrl('assets/js/location_cascade.js') ?>"></script>
 <script>
+// Location cascade engine — Tanzania gets defined dropdowns (Region→District→
+// Ward→Street/Village), other countries fall back to free text automatically.
+let addLocationCascade, editLocationCascade;
 $(document).ready(function() {
     $('#scTable').DataTable({
         pageLength: 25,
         responsive: true,
         dom: 'rtip'
+    });
+
+    // Location cascade (OOP location engine): defined dropdowns for Tanzania,
+    // free-text automatically for countries without imported subdivisions.
+    addLocationCascade = initLocationCascade({
+        endpoint: '<?= buildUrl('api/location/options.php') ?>',
+        fields: { country: '#country', region: '#state', district: '#city', ward: '#ward', village: '#village' },
+        dropdownParent: '#addSubContractorModal'
+    });
+    editLocationCascade = initLocationCascade({
+        endpoint: '<?= buildUrl('api/location/options.php') ?>',
+        fields: { country: '#edit_country', region: '#edit_state', district: '#edit_city', ward: '#edit_ward', village: '#edit_village' },
+        dropdownParent: '#editSCModal'
     });
 
     // Select2 for filter (outside modal)
@@ -1002,6 +1019,7 @@ $(document).ready(function() {
     $('#addSubContractorModal').on('hidden.bs.modal', function() {
         $('#addSubContractorForm')[0].reset();
         resetOtherFields('#addSubContractorModal');
+        addLocationCascade.setValues({ country: 'Tanzania' }); // back to defaults
     });
 
     $('#editSCModal').on('hidden.bs.modal', function() {
@@ -1094,12 +1112,15 @@ function editSC(id) {
             $('#edit_fax').val(d.fax);
             $('#edit_website').val(d.website);
             
-            // Address
-            $('#edit_country').val(d.country);
-            $('#edit_state').val(d.state);
-            $('#edit_city').val(d.city);
-            $('#edit_ward').val(d.ward);
-            $('#edit_village').val(d.village);
+            // Address — location cascade prefill (unmatched legacy values are
+            // kept as extra options instead of being wiped).
+            editLocationCascade.setValues({
+                country:  d.country || 'Tanzania',
+                region:   d.state || '',
+                district: d.city || '',
+                ward:     d.ward || '',
+                village:  d.village || ''
+            });
             $('#edit_postal_code').val(d.postal_code);
             $('#edit_address').val(d.address);
             $('#edit_postal_address').val(d.postal_address);
