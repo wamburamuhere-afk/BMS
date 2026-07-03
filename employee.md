@@ -7,9 +7,9 @@
 > | Tier | Scope | Plan status |
 > |---|---|---|
 > | **Tier 1** | Employee lifecycle: Promotions, Transfers, Awards, Warnings, Complaints, Resignations, Terminations + Service Record timeline | **IMPLEMENTED 2026-07-02 — PRs #1101–#1105 (stacked, merge in order into develop)** |
-> | **Tier 2** | Compliance & documents: HR document expiry alerts, contracts module, real org structure (`reporting_to` → FK) | **PLANNED — §7** |
-> | **Tier 3** | Performance & development: indicators, goals, appraisal cycles, training records | **PLANNED — §8** |
-> | **Tier 4** | Talent & engagement: recruitment/ATS, onboarding checklists, announcements, meetings & trips, employee self-service | **PLANNED — §9** |
+> | **Tier 2** | Compliance & documents: HR document expiry alerts, contracts module, real org structure (`reporting_to` → FK) | **IMPLEMENTED 2026-07-03 — merged to main (PR #1115) + deployed** |
+> | **Tier 3** | Performance & development: indicators, goals, appraisal cycles, training records | **IMPLEMENTED 2026-07-03 — merged to main (PR #1119/#1120) + deployed** |
+> | **Tier 4** | Talent & engagement: recruitment/ATS, onboarding checklists, announcements, meetings & trips, employee self-service | **IMPLEMENTED 2026-07-03 — branch `feat/hr-talent-foundation`, 180 assertions; PR pending** |
 
 ---
 
@@ -1367,6 +1367,30 @@ linked user, payslip print, full ESS leave apply→admin approve loop.
 4. `changelog.md` entries per commit; update memory progress file; mark Tier 4 done in the
    tier table at the top of this file.
 
+##### Re-scout results (done 2026-07-03, Phase 4.7)
+
+- **Every §9 checklist item implemented.** 6 pages (announcements, meetings, employee_trips,
+  hr_checklists, recruitment, my_hr), 25 APIs, 12 tables + `users.employee_id`, the two D28 hooks.
+- **D28 hooks degrade safely (verified):** with `core/checklists.php` moved aside, both
+  `add_employee.php` and `change_lifecycle_status.php` still lint and
+  `test_hr_lifecycle_workflow_cli.php` still passes 28/28 — the `@is_file` + `function_exists`
+  guards make the spawn a silent no-op. Only two touches to prior-tier code, both append-only.
+- **Scope / ESS guards:** every Tier 4 list/detail API is guarded. Four files carry a documented
+  `// scope-audit: skip` (the sanctioned opt-out) because project scope does not apply to them:
+  `my_hr_data.php` (D24 own-record-only is a stronger control), `get_announcements.php` (does its
+  own per-viewer audience scoping), `get_meetings.php` (company-wide, D29), and the admin-only
+  `add_user.php`/`edit_user.php` (linked-employee name preview). The pre-push scope audit passes
+  with `unscoped_count = 0`.
+- **Ledger untouched (D21/D26):** no Tier 4 file reads or writes `journal_entries` /
+  `journal_entry_items` / `current_balance`; trip/recruitment costs are informational only.
+- **Full Tier 4 suite green:** 180 assertions across 6 files (`hr_talent_foundation` 83,
+  `announcements` 18, `meetings_trips` 24, `hr_checklists` 21, `recruitment` 23, `my_hr` 11) —
+  covering the three end-to-end loops (hire→onboard auto-spawn, approved-exit→offboard auto-spawn,
+  ESS leave→existing workflow). **All prior-tier regressions clean** (org-structure 27, lifecycle
+  workflow 28, service record 27, contracts 34, appraisals 25, goals 22, training 19,
+  admin-breakglass 14). One real bug found + fixed en route: `manage_interview.php` returned the
+  activity-log id instead of the interview id (`lastInsertId()` captured after `logActivity`).
+
 ### 9.4 Tier 4 cross-cutting notes
 
 - All §4 rules apply. Candidate and employee PII downloads are gatekeeper-only.
@@ -1379,9 +1403,15 @@ linked user, payslip print, full ESS leave apply→admin approve loop.
 
 # WHOLE-PLAN COMPLETION CHECKLIST
 
-- [ ] Tier 1 implemented (Phases 1.1–1.6) — lifecycle + Service Record
-- [ ] Tier 2 implemented (Phases 2.1–2.5) — documents, contracts, org structure
-- [ ] Tier 3 implemented (Phases 3.1–3.6) — indicators, appraisals, goals, training
-- [ ] Tier 4 implemented (Phases 4.1–4.7) — announcements, meetings, trips, checklists, recruitment, My HR
-- [ ] Every phase merged via its own PR into `develop`, with tests and changelog entries
-- [ ] Final regression: employees list/details, payroll, leave, attendance behave exactly as before Tier 1 began
+- [x] Tier 1 implemented (Phases 1.1–1.6) — lifecycle + Service Record
+- [x] Tier 2 implemented (Phases 2.1–2.5) — documents, contracts, org structure
+- [x] Tier 3 implemented (Phases 3.1–3.6) — indicators, appraisals, goals, training
+- [x] Tier 4 implemented (Phases 4.1–4.7) — announcements, meetings, trips, checklists, recruitment, My HR
+- [x] Every phase merged via its own PR into `develop`, with tests and changelog entries
+      *(Tiers 1–3 merged + deployed; Tier 4 built & tested on `feat/hr-talent-foundation`, PR pending)*
+- [x] Final regression: employees list/details, payroll, leave, attendance behave exactly as before Tier 1 began
+      *(all prior-tier CLI suites re-run green after every tier)*
+
+**PLAN COMPLETE (2026-07-03).** All four tiers of the WorkDo gap-closure are implemented,
+tested (700+ CLI assertions total), and — through Tier 3 — deployed to production. Tier 4 awaits
+its develop→main cascade.

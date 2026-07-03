@@ -208,6 +208,12 @@ try {
 } finally {
     if ($emp_id) {
         $pdo->exec("DELETE FROM employee_lifecycle_events WHERE employee_id = $emp_id");
+        // Tier 4 D28(c): approving a termination auto-spawns an offboarding
+        // checklist — remove any so the FK on employees does not block cleanup.
+        foreach ($pdo->query("SELECT checklist_id FROM employee_checklists WHERE employee_id = $emp_id")->fetchAll(PDO::FETCH_COLUMN) as $__cid) {
+            $pdo->exec("DELETE FROM employee_checklist_items WHERE checklist_id = " . (int)$__cid);
+        }
+        $pdo->exec("DELETE FROM employee_checklists WHERE employee_id = $emp_id");
         $pdo->exec("DELETE FROM employees WHERE employee_id = $emp_id");
         $pdo->exec("DELETE FROM audit_logs WHERE entity_type='employee' AND entity_id = $emp_id");
     }

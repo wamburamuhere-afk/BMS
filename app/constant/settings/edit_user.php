@@ -1,4 +1,6 @@
 <?php
+// scope-audit: skip — admin-only user-management page; the employees query only
+// previews the optional "Linked Employee" name (Tier 4 D24). Not project-scoped.
 // Start output buffering at the very beginning
 ob_start();
 
@@ -63,6 +65,16 @@ $first_name = $user['first_name'];
 $last_name = $user['last_name'];
 $role_id = $user['role_id'];
 $current_role_name = $user['role_name'];
+// Tier 4 D24 — current ESS link + its display name (nullable column)
+$linked_employee_id = $user['employee_id'] ?? null;
+$linked_employee_name = '';
+if (!empty($linked_employee_id)) {
+    try {
+        $__le = $pdo->prepare("SELECT first_name, last_name FROM employees WHERE employee_id = ?");
+        $__le->execute([(int)$linked_employee_id]);
+        if ($__ler = $__le->fetch(PDO::FETCH_ASSOC)) $linked_employee_name = trim($__ler['first_name'] . ' ' . $__ler['last_name']);
+    } catch (Throwable $e) {}
+}
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -74,6 +86,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $role_id = $_POST['role_id'];
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
+    // Tier 4 D24 — optional "Linked Employee" (ESS). Blank clears the link.
+    $linked_employee_id = (isset($_POST['employee_id']) && $_POST['employee_id'] !== '') ? (int)$_POST['employee_id'] : null;
 
     // Validate inputs
     if (empty($username)) {
@@ -133,15 +147,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Update user with or without password change
             if (!empty($password)) {
                 $password_hash = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $pdo->prepare("UPDATE users 
-                    SET username = ?, email = ?, first_name = ?, last_name = ?, role_id = ?, password = ?
+                $stmt = $pdo->prepare("UPDATE users
+                    SET username = ?, email = ?, first_name = ?, last_name = ?, role_id = ?, employee_id = ?, password = ?
                     WHERE user_id = ?");
-                $result = $stmt->execute([$username, $email, $first_name, $last_name, $role_id, $password_hash, $user_id]);
+                $result = $stmt->execute([$username, $email, $first_name, $last_name, $role_id, $linked_employee_id, $password_hash, $user_id]);
             } else {
-                $stmt = $pdo->prepare("UPDATE users 
-                    SET username = ?, email = ?, first_name = ?, last_name = ?, role_id = ?
+                $stmt = $pdo->prepare("UPDATE users
+                    SET username = ?, email = ?, first_name = ?, last_name = ?, role_id = ?, employee_id = ?
                     WHERE user_id = ?");
-                $result = $stmt->execute([$username, $email, $first_name, $last_name, $role_id, $user_id]);
+                $result = $stmt->execute([$username, $email, $first_name, $last_name, $role_id, $linked_employee_id, $user_id]);
             }
             
             if ($result) {
@@ -260,6 +274,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <div class="invalid-feedback"><?= $errors['role_id'] ?></div>
                             <?php endif; ?>
                         </div>
+
+                        <div class="col-md-6">
+                            <label for="employee_id" class="form-label">Linked Employee <small class="text-muted">(optional — enables self-service)</small></label>
+                            <select class="form-select" id="employee_id" name="employee_id" style="width:100%">
+                                <?php if (!empty($linked_employee_id) && $linked_employee_name !== ''): ?>
+                                <option value="<?= (int)$linked_employee_id ?>" selected><?= htmlspecialchars($linked_employee_name) ?></option>
+                                <?php endif; ?>
+                            </select>
+                        </div>
                         
                         <div class="col-md-6">
                             <label for="password" class="form-label">New Password (leave blank to keep current)</label>
@@ -321,6 +344,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             icon.classList.add('bi-eye');
         }
     }
+
+    // Tier 4 D24 — "Linked Employee" Select2 AJAX picker
+    $(function () {
+        if (window.jQuery && $.fn.select2) {
+            $('#employee_id').select2({
+                theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'Not linked',
+                minimumInputLength: 1,
+                ajax: {
+                    url: '<?= buildUrl('api/account/search_employees.php') ?>',
+                    dataType: 'json', delay: 300,
+                    data: params => ({ q: params.term }),
+                    processResults: data => ({ results: data.results }),
+                    cache: true
+                }
+            });
+        }
+    });
 
     // Form validation
     document.addEventListener('DOMContentLoaded', function() {

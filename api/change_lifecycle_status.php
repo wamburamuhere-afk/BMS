@@ -129,6 +129,18 @@ try {
         logActivity($pdo, $_SESSION['user_id'], 'Approve HR action',
             "approved {$ev['event_type']} \"{$ev['title']}\" for \"$emp_name\"" . ($defer ? ' (takes effect ' . $ev['end_date'] . ')' : ''));
 
+        // Tier 4 D28(c) — an approved resignation/termination auto-spawns an
+        // offboarding checklist if a default template is configured. Guarded +
+        // non-fatal (a checklist problem must never fail the approval).
+        if (in_array($ev['event_type'], ['resignation', 'termination'], true) && @is_file(__DIR__ . '/../core/checklists.php')) {
+            try {
+                require_once __DIR__ . '/../core/checklists.php';
+                if (function_exists('spawnChecklistIfConfigured')) {
+                    spawnChecklistIfConfigured($pdo, (int)$ev['employee_id'], 'offboarding', (int)$_SESSION['user_id']);
+                }
+            } catch (Throwable $e) { error_log('offboarding auto-spawn: ' . $e->getMessage()); }
+        }
+
         $message = ucfirst($ev['event_type']) . ' approved' . ($defer ? ' — takes effect on ' . $ev['end_date'] : ' and applied');
 
     } elseif ($action === 'reject') {
