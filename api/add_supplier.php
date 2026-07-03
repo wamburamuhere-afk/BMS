@@ -35,8 +35,8 @@ $fax = trim($_POST['fax'] ?? '');
 $website = trim($_POST['website'] ?? '');
 $address = trim($_POST['address'] ?? '');
 $postal_address = trim($_POST['postal_address'] ?? '');
-$council = trim($_POST['council'] ?? '');
 $ward = trim($_POST['ward'] ?? '');
+$village = trim($_POST['village'] ?? '');
 $city = trim($_POST['city'] ?? '');
 $state = trim($_POST['state'] ?? '');
 $country = trim($_POST['country'] ?? 'Tanzania');
@@ -203,7 +203,7 @@ $mobile = clean_phone($mobile);
 $insert_stmt = $pdo->prepare("
     INSERT INTO suppliers (
         supplier_name, company_name, acronym, supplier_type, year, contact_person, contact_title,
-        email, company_email, phone, mobile, fax, website, address, postal_address, council, ward,
+        email, company_email, phone, mobile, fax, website, address, postal_address, ward, village,
         city, state, country, postal_code, tax_id, vat_number, default_wht_rate_id, payment_terms,
         currency, bank_name, bank_account, bank_address, category_id,
         project_id, credit_limit, description, status, supplier_code, created_by, created_at, updated_at
@@ -216,7 +216,7 @@ try {
     $supplier_code = nextCode($pdo, 'SUP');
     $insert_stmt->execute([
         $supplier_name, $company_name, $acronym, $supplier_type, $year, $contact_person, $contact_title,
-        $email, $company_email, $phone, $mobile, $fax, $website, $address, $postal_address, $council, $ward,
+        $email, $company_email, $phone, $mobile, $fax, $website, $address, $postal_address, $ward, $village,
         $city, $state, $country, $postal_code, $tax_id, $vat_number, $default_wht_rate_id, $payment_terms,
         $currency, $bank_name, $bank_account, $bank_address, $category_id,
         $project_id, $credit_limit, $description, $status, $supplier_code, $_SESSION['user_id']

@@ -33,8 +33,8 @@ $fax = trim($_POST['fax'] ?? '');
 $website = trim($_POST['website'] ?? '');
 $address = trim($_POST['address'] ?? '');
 $postal_address = trim($_POST['postal_address'] ?? '');
-$council = trim($_POST['council'] ?? '');
 $ward = trim($_POST['ward'] ?? '');
+$village = trim($_POST['village'] ?? '');
 $city = trim($_POST['city'] ?? '');
 $state = trim($_POST['state'] ?? '');
 $country = trim($_POST['country'] ?? 'Tanzania');
@@ -217,8 +217,8 @@ $sql .= " supplier_type = ?,
         website = ?,
         address = ?,
         postal_address = ?,
-        council = ?,
         ward = ?,
+        village = ?,
         city = ?,
         state = ?,
         country = ?,
@@ -252,7 +252,7 @@ if ($logo_updated) {
 
 $params = array_merge($params, [
     $supplier_type, $year, $contact_person, $contact_title,
-    $email, $company_email, $phone, $mobile, $fax, $website, $address, $postal_address, $council, $ward,
+    $email, $company_email, $phone, $mobile, $fax, $website, $address, $postal_address, $ward, $village,
     $city, $state, $country, $postal_code, $tax_id, $vat_number, $default_wht_rate_id, $payment_terms,
     $currency, $bank_name, $bank_account, $bank_address, $category_id,
     $description, $status, $project_id, $credit_limit, $_SESSION['user_id'], $supplier_id

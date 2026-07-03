@@ -1,5 +1,73 @@
 # BMS Changelog
 
+## 2026-07-03 (feat) — Sub-contractor address fields: drop Council, add Street/Village
+
+- `migrations/2026_07_03_add_village_to_sub_contractors.php` — new
+  `sub_contractors.village` column (VARCHAR 150, nullable), run live.
+- `app/bms/operations/sub_contractors.php` — Add and Edit modals: removed
+  Council, added Street/Village (incl. edit-modal JS population).
+- `app/bms/operations/sub_contractor_details.php` — same swap in its own
+  Edit modal + JS population; added Street/Village to both read-only address
+  displays (the summary card and the info-table view), which already
+  omitted Council so no removal needed there.
+- `api/add_sub_contractor.php`, `api/update_sub_contractor.php` — stopped
+  reading/writing `council`, now read/write `village`.
+- Final sub-contractor location field set matches Supplier/Employee/
+  Customer: Country, Region, District, Ward, Street/Village.
+
+## 2026-07-03 (feat) — Customer address fields: drop Council, add Street/Village
+
+- `migrations/2026_07_03_add_village_to_customers.php` — new `customers.village`
+  column (VARCHAR 150, nullable), run live.
+- `app/bms/customer/customers.php` — Add and Edit customer modals: removed
+  Council, added Street/Village (incl. edit-modal JS field-mapping object).
+- `app/bms/customer/customer_details.php` — same swap in its own Edit modal
+  and JS mapping; also fixed the read-only Address Information card, which
+  was missing Ward entirely and mislabeled the District field as "City" —
+  now shows District, State/Region, Ward, Street/Village, Country, Postal
+  Code consistently with the edit form.
+- `api/add_customer.php`, `api/process_edit_customer.php` — stopped
+  reading/writing `council`, now read/write `village`.
+- Noted but left untouched: `app/bms/customer/edit_customer.php` (route
+  `customers/edit`) appears orphaned — no link in the UI points to it
+  anymore (list/detail pages both use the inline Edit modal via
+  `process_edit_customer.php`). Flagging for a separate cleanup decision.
+- Final customer location field set matches Supplier/Employee: Country,
+  Region, District, Ward, Street/Village.
+
+## 2026-07-03 (feat) — Employee address fields: add Region, Ward, Street/Village
+
+- `migrations/2026_07_03_add_region_ward_village_to_employees.php` — new
+  `employees.state`, `employees.ward`, `employees.village` columns, run live.
+- `app/bms/pos/employees.php` — Add/Edit employee form (single shared form):
+  relabeled City → District (same `city` field/column), added Region
+  (`state`), Ward, and Street/Village fields; edit-mode JS now populates all
+  three new fields.
+- `api/add_employee.php` — insert now writes `state`, `ward`, `village`.
+- `api/update_employee.php` — added `state`, `ward`, `village` to the dynamic
+  update field list.
+- `app/bms/pos/employee_details.php` — replaced the combined "City / Country"
+  row with separate Country, Region, District, Ward, Street/Village rows.
+- Final employee location field set matches Supplier: Country, Region,
+  District, Ward, Street/Village. Physical Address and Postal Address left
+  untouched (general free-text, outside the hierarchy). Emergency Contact
+  address fields untouched (out of scope).
+
+## 2026-07-03 (feat) — Supplier address fields: drop Council, add Street/Village
+
+- `migrations/2026_07_03_add_village_to_suppliers.php` — new `suppliers.village`
+  column (VARCHAR 150, nullable), run live.
+- `app/bms/Suppliers/suppliers.php` — Add and Edit supplier forms: removed the
+  Council field, added Street/Village in its place (incl. edit-modal JS
+  population).
+- `api/add_supplier.php`, `api/update_supplier.php` — stopped reading/writing
+  `council`, now read/write `village`.
+- `app/bms/Suppliers/supplier_details.php` — removed the Council row from the
+  Address Information card, added Street/Village. Existing `council` column/data
+  left in the DB untouched, just no longer collected or displayed.
+- Final supplier location field set: Country, Region, District, Ward,
+  Street/Village.
+
 ## 2026-07-03 (chore) — Tier 4 re-scout + whole-plan completion (Phase 4.7) — Tier 4 complete
 
 Final phase of the Talent & Engagement tier, and the completion of the whole

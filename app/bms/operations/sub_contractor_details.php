@@ -371,6 +371,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                         <div class="col-6"><p class="mb-0 text-muted small"><strong>District:</strong> <?= htmlspecialchars($sc['city'] ?: 'N/A') ?></p></div>
                         <div class="col-6"><p class="mb-0 text-muted small"><strong>Region:</strong> <?= htmlspecialchars($sc['state'] ?: 'N/A') ?></p></div>
                         <div class="col-6"><p class="mb-0 text-muted small"><strong>Ward:</strong> <?= htmlspecialchars($sc['ward'] ?: 'N/A') ?></p></div>
+                        <div class="col-6"><p class="mb-0 text-muted small"><strong>Street/Village:</strong> <?= htmlspecialchars($sc['village'] ?: 'N/A') ?></p></div>
                         <div class="col-6"><p class="mb-0 text-muted small"><strong>Zip:</strong> <?= htmlspecialchars($sc['postal_code'] ?: 'N/A') ?></p></div>
                         <div class="col-12"><p class="mb-0 text-muted small"><strong>Country:</strong> <?= htmlspecialchars($sc['country'] ?: 'Tanzania') ?></p></div>
                     </div>
@@ -880,8 +881,8 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                 <div class="col-6 mb-3"><label class="form-label">Country</label><input type="text" class="form-control" id="edit_country" name="country"></div>
                                 <div class="col-6 mb-3"><label class="form-label">Region</label><input type="text" class="form-control" id="edit_state" name="state"></div>
                                 <div class="col-6 mb-3"><label class="form-label">District</label><input type="text" class="form-control" id="edit_city" name="city"></div>
-                                <div class="col-6 mb-3"><label class="form-label">Council</label><input type="text" class="form-control" id="edit_council" name="council"></div>
                                 <div class="col-6 mb-3"><label class="form-label">Ward</label><input type="text" class="form-control" id="edit_ward" name="ward"></div>
+                                <div class="col-6 mb-3"><label class="form-label">Street/Village</label><input type="text" class="form-control" id="edit_village" name="village"></div>
                                 <div class="col-6 mb-3"><label class="form-label">Zip Code</label><input type="text" class="form-control" id="edit_postal_code" name="postal_code"></div>
                                 <div class="col-12 mb-3"><label class="form-label">Physical Address</label><textarea class="form-control" id="edit_address" name="address" rows="2"></textarea></div>
                                 <div class="col-12 mb-3"><label class="form-label">Postal Address</label><input type="text" class="form-control" id="edit_postal_address" name="postal_address"></div>
@@ -968,8 +969,8 @@ function editSC(id) {
             $('#edit_country').val(d.country);
             $('#edit_state').val(d.state);
             $('#edit_city').val(d.city);
-            $('#edit_council').val(d.council);
             $('#edit_ward').val(d.ward);
+            $('#edit_village').val(d.village);
             $('#edit_postal_code').val(d.postal_code);
             $('#edit_address').val(d.address);
             $('#edit_postal_address').val(d.postal_address);
@@ -1131,6 +1132,7 @@ function printScDetails() {
                         <tr><td>District</td><td><?= htmlspecialchars($sc['city'] ?: 'N/A') ?></td></tr>
                         <tr><td>Region</td><td><?= htmlspecialchars($sc['state'] ?: 'N/A') ?></td></tr>
                         <tr><td>Ward</td><td><?= htmlspecialchars($sc['ward'] ?: 'N/A') ?></td></tr>
+                        <tr><td>Street/Village</td><td><?= htmlspecialchars($sc['village'] ?: 'N/A') ?></td></tr>
                         <tr><td>Country</td><td><?= htmlspecialchars($sc['country'] ?: 'Tanzania') ?></td></tr>
                     </table></div>
                 </td>
