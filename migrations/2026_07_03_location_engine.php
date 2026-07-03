@@ -33,6 +33,17 @@ try {
         }
     }
 
+    // Legacy column from the old council-keyed flow: NOT NULL with no default,
+    // which rejects the engine's district-keyed inserts under strict SQL mode
+    // (production failure 1364). New rows have no council — make it nullable.
+    $col = $pdo->query("SHOW COLUMNS FROM wards LIKE 'council_id'")->fetch(PDO::FETCH_ASSOC);
+    if ($col && strtoupper($col['Null']) === 'NO') {
+        $pdo->exec("ALTER TABLE wards MODIFY council_id {$col['Type']} NULL");
+        echo "  ~ made legacy wards.council_id nullable.\n";
+    } else {
+        echo "  · wards.council_id already nullable (or absent), skipping.\n";
+    }
+
     // Deactivate legacy council-keyed rows (free-typed junk from the old flow).
     $n = $pdo->exec("UPDATE wards SET is_active = 0 WHERE district_id IS NULL AND is_active = 1");
     if ($n > 0) {
