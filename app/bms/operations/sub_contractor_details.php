@@ -935,6 +935,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
     </div>
 </div>
 
+<script src="<?= getUrl('assets/js/location_cascade.js') ?>"></script>
 <script>
 function safeOutput(str) {
     if (str === null || str === undefined || str === false) return '';
@@ -942,6 +943,17 @@ function safeOutput(str) {
         return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[m];
     });
 }
+
+// Location cascade engine — Tanzania gets defined dropdowns (Region→District→
+// Ward→Street/Village), other countries fall back to free text automatically.
+let editLocationCascade;
+$(function () {
+    editLocationCascade = initLocationCascade({
+        endpoint: '<?= buildUrl('api/location/options.php') ?>',
+        fields: { country: '#edit_country', region: '#edit_state', district: '#edit_city', ward: '#edit_ward', village: '#edit_village' },
+        dropdownParent: '#editSCModal'
+    });
+});
 
 function editSC(id) {
     $.getJSON(APP_URL + '/api/get_sub_contractor.php', { id: id }, function(res) {
@@ -966,11 +978,15 @@ function editSC(id) {
             $('#edit_mobile').val(d.mobile);
             $('#edit_fax').val(d.fax);
             $('#edit_website').val(d.website);
-            $('#edit_country').val(d.country);
-            $('#edit_state').val(d.state);
-            $('#edit_city').val(d.city);
-            $('#edit_ward').val(d.ward);
-            $('#edit_village').val(d.village);
+            // Location cascade prefill (unmatched legacy values are kept as
+            // extra options instead of being wiped).
+            editLocationCascade.setValues({
+                country:  d.country || 'Tanzania',
+                region:   d.state || '',
+                district: d.city || '',
+                ward:     d.ward || '',
+                village:  d.village || ''
+            });
             $('#edit_postal_code').val(d.postal_code);
             $('#edit_address').val(d.address);
             $('#edit_postal_address').val(d.postal_address);
