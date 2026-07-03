@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-07-03 (feat) — Customer forms wired to the location cascade engine
+
+- `app/bms/customer/customers.php` — Add + Edit customer modals now use
+  `initLocationCascade()` (same behaviour as Supplier: Tanzania → defined
+  dropdowns, other countries → free text). Location keys removed from the
+  edit field-mapping object in favour of `setValues()` prefill; add-modal
+  reset restores Tanzania defaults.
+- `app/bms/customer/customer_details.php` — same wiring for its own Edit
+  modal (cascade init + mapping swap + `setValues()` prefill).
+- Fields still post names — `add_customer.php`/`process_edit_customer.php`
+  and DB columns untouched. Orphaned `edit_customer.php` intentionally not
+  wired (nothing links to it; separate cleanup pending).
+- Sub-contractor and Employee wiring pending separate go-ahead.
+
 ## 2026-07-03 (feat) — Supplier forms wired to the location cascade engine
 
 - `app/bms/Suppliers/suppliers.php` — Add + Edit supplier modals now use
