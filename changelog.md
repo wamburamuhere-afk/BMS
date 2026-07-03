@@ -1,5 +1,177 @@
 # BMS Changelog
 
+## 2026-07-03 (chore) — Tier 3 re-scout + hardening (Phase 3.6) — Tier 3 complete
+
+Final phase of the Performance & Development tier (employee.md §8.3 Phase 3.6).
+No code changes — verification + documentation only.
+
+- Re-scout confirmed D21 clean: no report or `core/financial_reports.php`
+  function joins any Tier 3 table, and no Tier 3 list/stat API reads the
+  ledger — HR performance data never becomes a financial figure.
+- Confirmed `hr_performance`/`trainings` are distinct page keys from the
+  business `performance_dashboard` (no collision).
+- Verified every Tier 3 list/stat query excludes `deleted` and applies
+  employee project scope (`scopeFilterSqlNullable` / `assertScopeForEmployee`);
+  certificates reuse the Tier 2 central-library path with no schema drift.
+- Full Tier 3 CLI suite re-run clean: 161 assertions across
+  `test_hr_performance_foundation_cli.php` (74),
+  `test_performance_indicators_cli.php` (21),
+  `test_employee_appraisals_cli.php` (25), `test_employee_goals_cli.php` (22),
+  `test_employee_training_cli.php` (19). Shared-file regressions
+  (service record, documents card, contracts, org structure, admin break-glass)
+  all pass — no regressions from the shared `employee_details.php` /
+  `core/permissions.php` / `header.php` changes.
+- Re-scout table recorded in `employee.md` §8.3 Phase 3.6.
+- `api/get_trainings.php` — scoped the participant-detail query with
+  `scopeFilterSqlNullable('project','e')` (the pre-push scope-audit guard flags
+  any new file that joins a scoped table without a helper): a non-admin now sees
+  only in-scope participants of a training, admins see all (§23).
+
+## 2026-07-03 (feat) — Training module (Tier 3, Phase 3.5)
+
+Standalone Training page + certificate tracking. Plan in employee.md §8.3
+Phase 3.5.
+
+- `api/manage_trainings.php` — training CRUD; status flow
+  `planned → in_progress → completed/cancelled` (`canEdit`); completion is
+  blocked until every participant is in a terminal state (completed/failed/
+  withdrawn); cost is informational only (D21) — no ledger posting.
+- `api/get_trainings.php` — filtered list + stat cards (Planned, In progress,
+  Completed this year, Trained this year) and single-training detail with
+  participants.
+- `api/manage_training_participants.php` — add (Select2 multi, scope-gated,
+  `uniq_training_emp` dedupe), update (status/score/remarks), remove.
+- `api/upload_training_certificate.php` (D22) — §19 5-step upload; registers
+  into the central `documents` library with an optional `expire_date` so the
+  existing document-expiry cron alerts on expiring certifications with zero
+  new alert code.
+- `api/download_training_certificate.php` — gatekeeper (auth + `canView` +
+  participant's-employee scope + path containment).
+- `app/bms/pos/trainings.php` — page (`trainings`): stat cards, filters,
+  DataTable + mobile cards, New Training modal (internal Select2 / external
+  free text, cost note), detail modal with participant management + per-
+  participant status/score/certificate.
+- `app/bms/pos/employee_details.php` — additive Training card: the employee's
+  training history (title, type, dates, result badge, certificate download +
+  expiry chip).
+- `tests/test_employee_training_cli.php` — 19 assertions: CRUD + validation,
+  status flow + completion gate, participant uniqueness/update/remove,
+  D22 library wiring proven live through `check_document_expiry.php`,
+  gatekeeper containment + permission denial, page + details renders.
+
+## 2026-07-03 (feat) — Employee goals (Tier 3, Phase 3.4)
+
+Goals tab on the HR Performance page. Plan in employee.md §8.3 Phase 3.4.
+
+- `api/add_goal.php` — creates a goal for an employee (scope-gated,
+  `end_date >= start_date`); starts `not_started` at 0%.
+- `api/get_goals.php` — filtered list (type/status/employee) + stat cards
+  (Active, Completed this year, Overdue = `end_date < CURDATE()` and still
+  open, Avg progress of active), scope-gated.
+- `api/update_goal_progress.php` (D23) — percent 0–100 with a **required**
+  progress note that lands in the `logActivity`/`logAudit` entry (the audit
+  trail is the progress history — no separate table); auto-advances
+  `not_started → in_progress` on first progress; completing forces 100%;
+  transitions `not_started → in_progress → completed/cancelled` gated by
+  `canEdit`; a completed/cancelled goal is immutable.
+- `app/bms/pos/hr_performance.php` — Goals tab: stat cards, filters,
+  DataTable + mobile cards with progress bars + overdue badges, New Goal
+  modal (employee Select2), Update Progress modal (slider + status + required
+  note). Loaded lazily when the tab is first opened.
+- `app/bms/pos/employee_details.php` — active goals with progress bars +
+  overdue badges added inside the Performance card.
+- `tests/test_employee_goals_cli.php` — 22 assertions: create validation,
+  progress bounds, required note + audit-trail landing, auto-advance,
+  complete-forces-100, immutability, overdue/stat computation, permission
+  denials, page + details renders.
+
+## 2026-07-03 (feat) — Employee appraisals (Tier 3, Phase 3.3)
+
+Appraisals tab on the HR Performance page. Plan in employee.md §8.3 Phase 3.3.
+
+- `core/permissions.php` — added derived `canSubmit()` (create/edit rights)
+  and `canReject()` (mirrors approve, per Tier 1's house convention) so every
+  appraisal workflow transition is gated (§11.1) without a role_permissions
+  schema change.
+- `api/manage_appraisal_cycles.php` — cycle CRUD; closing a cycle blocks new
+  appraisals in it (existing ones finish their workflow); can't delete a cycle
+  with appraisals.
+- `api/add_appraisal.php` — creates an appraisal, snapshotting the employee's
+  designation and each rated indicator's expected_rating from the designation
+  targets (D19) so later target/designation changes never rewrite it; one per
+  employee per cycle (`uniq_cycle_emp`); saves draft or submitted; scope-gated.
+- `api/change_appraisal_status.php` — `draft→submitted`/`submitted→approved|
+  rejected` (§11.1); terminal states immutable; appraiser can't approve their
+  own (SoD, admins exempt); on approval `overall_rating = AVG(actual)` is
+  computed + stored (D17).
+- `api/get_appraisal.php`, `api/get_appraisals.php` — scorecard + filtered
+  list with stat cards (draft/submitted/approved/avg), scope-gated.
+- `app/bms/pos/hr_performance.php` — Appraisals tab: stat cards, filters,
+  DataTable + mobile cards, print-friendly scorecard view modal, New Appraisal
+  modal (cycle + employee Select2 → star-rate each indicator with the
+  designation target marked), Cycles management modal. D20: an approved
+  appraisal shows "Recommend Promotion/Award" opening the shared Tier 1
+  lifecycle modal pre-filled (employee + description referencing the appraisal).
+- `app/bms/pos/employee_details.php` — additive Performance card: latest
+  approved appraisal (cycle, overall stars, approver, date) + rating history.
+- `tests/test_employee_appraisals_cli.php` — 25 assertions: cycle CRUD +
+  closed-cycle block, one-per-cycle, D19 snapshot integrity (target changed
+  after creation → item keeps old expected), submit→approve with stored
+  AVG (D17), SoD block, terminal-state immutability, reject-with-reason,
+  permission denial, page + details renders.
+
+## 2026-07-03 (feat) — Performance indicators & competency targets (Tier 3, Phase 3.2)
+
+Indicators tab on the HR Performance page. Plan in employee.md §8.3 Phase 3.2.
+
+- `app/bms/pos/includes/star_rating.php` — shared 1–5 star widget partial
+  (`starRatingAssets()` + `starRatingWidget()`), reused by the target matrix
+  now and appraisals next (§8.4).
+- `api/manage_indicators.php` — CRUD for indicator categories + indicators
+  (soft delete §12); a category with active indicators can't be deleted; an
+  indicator referenced by any appraisal item is soft-deleted only so history
+  keeps rendering via its snapshot (its designation targets, which are not
+  history, are dropped).
+- `api/get_indicators.php` — active categories + indicators, plus a
+  designation's current target ratings.
+- `api/save_designation_targets.php` — upserts expected ratings per indicator
+  for a designation (`INSERT … ON DUPLICATE KEY UPDATE` on `uniq_desig_ind`);
+  a 0/out-of-range rating clears that indicator's target row.
+- `app/bms/pos/hr_performance.php` — page skeleton with three tabs
+  (Appraisals / Goals placeholders for later phases; Indicators & Targets
+  functional): category+indicator management and a designation target matrix
+  (Select2 designation → star grid grouped by category → save). `canEdit`-gated.
+- `tests/test_performance_indicators_cli.php` — 21 assertions: CRUD, upsert +
+  clear, out-of-range guard, soft-delete-preserves-appraisal-history, permission
+  denial, page render.
+
+## 2026-07-03 (feat) — HR Performance & Development foundation (Tier 3, Phase 3.1)
+
+Foundation for Tier 3 (appraisals, goals, indicators, training) — purely
+additive scaffolding, plan in employee.md §8. Distinct page keys
+(`hr_performance`, `trainings`) chosen to avoid any confusion with the
+business `performance_dashboard` report (D16).
+
+- `migrations/2026_07_03_hr_performance_foundation.php` — 11 tables (all
+  InnoDB): competency framework (`performance_indicator_categories`,
+  `performance_indicators`, `designation_indicator_targets`), appraisals
+  (`appraisal_cycles`, `employee_appraisals`, `employee_appraisal_items`),
+  goals (`goal_types`, `employee_goals`), training (`training_types`,
+  `trainings`, `training_participants`); seeded indicator categories, goal
+  types and training types (`INSERT IGNORE`); `uploads/training_certs/` with
+  deny-exec `.htaccess`.
+- `migrations/2026_07_03_hr_performance_permissions.php` — `hr_performance` +
+  `trainings` permission rows (module HR) with runtime-resolved role seeding
+  (admin + holders of can_edit on employees = full incl. submit/approve/reject
+  verbs, rest view-only).
+- `roots.php` — routes for 2 pages + 16 APIs; `header.php` — "Performance (HR)"
+  (`bi-graph-up-arrow`) and "Training" (`bi-mortarboard`) nav items;
+  `core/permissions.php` — router-fallback mappings for both pages.
+- `tests/test_hr_performance_foundation_cli.php` — 74 assertions: migrations
+  idempotent, tables/engine/FK/unique-keys, seeds, permission + role matrix,
+  routes, nav, router fallback, hardened upload dir, and no collision with the
+  business performance_dashboard.
+
 ## 2026-07-03 (fix) — Migration ordering: reporting_to_id backfill runs after its schema
 
 Production deploy halted: `2026_07_02_backfill_reporting_to_id.php` ran before

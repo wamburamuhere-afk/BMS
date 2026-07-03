@@ -113,6 +113,56 @@ if ($can_view_contracts) {
     $emp_contracts = $ec_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// Performance — appraisals (Tier 3, Phase 3.3) — latest approved + history
+$can_view_performance = canView('hr_performance');
+$latest_appraisal = null;
+$appraisal_history = [];
+if ($can_view_performance) {
+    $pa_stmt = $pdo->prepare("
+        SELECT a.appraisal_id, a.overall_rating, a.appraisal_date, a.status,
+               c.cycle_name, au.username AS approved_by_name
+        FROM employee_appraisals a
+        LEFT JOIN appraisal_cycles c ON c.cycle_id = a.cycle_id
+        LEFT JOIN users au ON au.user_id = a.approved_by
+        WHERE a.employee_id = ? AND a.status = 'approved'
+        ORDER BY a.appraisal_date DESC, a.appraisal_id DESC
+    ");
+    $pa_stmt->execute([$employee_id]);
+    $appraisal_history = $pa_stmt->fetchAll(PDO::FETCH_ASSOC);
+    $latest_appraisal = $appraisal_history[0] ?? null;
+}
+// Active goals (Tier 3, Phase 3.4) — shown inside the Performance card
+$active_goals = [];
+if ($can_view_performance) {
+    $ag_stmt = $pdo->prepare("
+        SELECT goal_id, subject, progress, end_date, status,
+               DATEDIFF(end_date, CURDATE()) AS days_to_due
+        FROM employee_goals
+        WHERE employee_id = ? AND status IN ('not_started','in_progress')
+        ORDER BY end_date ASC
+    ");
+    $ag_stmt->execute([$employee_id]);
+    $active_goals = $ag_stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Training history (Tier 3, Phase 3.5)
+$can_view_training = canView('trainings');
+$training_history = [];
+if ($can_view_training) {
+    $th_stmt = $pdo->prepare("
+        SELECT p.participant_id, p.status AS part_status, p.certificate_path, p.certificate_expire_date,
+               DATEDIFF(p.certificate_expire_date, CURDATE()) AS cert_days_left,
+               t.title, t.start_date, t.end_date, tt.type_name
+        FROM training_participants p
+        JOIN trainings t ON t.training_id = p.training_id AND t.status != 'deleted'
+        LEFT JOIN training_types tt ON tt.training_type_id = t.training_type_id
+        WHERE p.employee_id = ?
+        ORDER BY t.start_date DESC
+    ");
+    $th_stmt->execute([$employee_id]);
+    $training_history = $th_stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 // Direct Reports (Tier 2, Phase 2.4) — employees whose reporting_to_id points here
 $dr_stmt = $pdo->prepare("SELECT employee_id, first_name, last_name FROM employees
                            WHERE reporting_to_id = ? AND (status IS NULL OR status != 'deleted')
@@ -918,6 +968,122 @@ $sr_status_badge = [
                                     <td><?= safe_output($c['start_date']) ?></td>
                                     <td><?= safe_output($c['end_date'], 'Open-ended') ?> <?= $chip ?></td>
                                     <td><span class="badge bg-<?= $status_color ?>"><?= ucfirst($c['status']) ?></span></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if ($can_view_performance): ?>
+            <!-- Performance Card (Tier 3, Phase 3.3) -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-graph-up-arrow text-primary me-1"></i> Performance</h5>
+                    <a href="<?= getUrl('hr_performance') ?>" class="btn btn-sm btn-outline-primary d-print-none">
+                        <i class="bi bi-clipboard-check me-1"></i> Appraisals
+                    </a>
+                </div>
+                <div class="card-body">
+                    <?php
+                    $starRow = function ($v) {
+                        $v = (int)round($v);
+                        $h = '';
+                        for ($i = 1; $i <= 5; $i++) $h .= '<span style="color:' . ($i <= $v ? '#f5b301' : '#ced4da') . '">&#9733;</span>';
+                        return $h;
+                    };
+                    ?>
+                    <?php if (!$latest_appraisal): ?>
+                    <p class="text-muted mb-0"><i class="bi bi-clipboard-x me-1"></i> No approved appraisals yet.</p>
+                    <?php else: ?>
+                    <div class="mb-3 p-3 rounded" style="background:#e7f0ff;border:1px solid #b6ccfe">
+                        <div class="d-flex justify-content-between align-items-start flex-wrap">
+                            <div>
+                                <div class="small text-muted">Latest — <?= safe_output($latest_appraisal['cycle_name']) ?></div>
+                                <div class="fs-5"><?= $starRow($latest_appraisal['overall_rating']) ?>
+                                    <strong class="ms-1"><?= number_format((float)$latest_appraisal['overall_rating'], 2) ?>/5</strong></div>
+                            </div>
+                            <div class="small text-muted text-end">
+                                <?= safe_output($latest_appraisal['appraisal_date']) ?><br>
+                                <?php if (!empty($latest_appraisal['approved_by_name'])): ?>Approved by <?= safe_output($latest_appraisal['approved_by_name']) ?><?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    <?php if (count($appraisal_history) > 1): ?>
+                    <div class="small text-muted mb-1">History</div>
+                    <ul class="list-unstyled mb-0">
+                        <?php foreach (array_slice($appraisal_history, 1) as $h): ?>
+                        <li class="d-flex justify-content-between py-1 border-bottom">
+                            <span><?= safe_output($h['cycle_name']) ?></span>
+                            <span><?= $starRow($h['overall_rating']) ?> <small class="text-muted"><?= number_format((float)$h['overall_rating'], 2) ?></small></span>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php endif; ?>
+                    <?php endif; ?>
+
+                    <?php if (!empty($active_goals)): ?>
+                    <hr>
+                    <div class="small text-muted mb-2"><i class="bi bi-flag me-1"></i> Active Goals</div>
+                    <?php foreach ($active_goals as $g):
+                        $g_overdue = (int)$g['days_to_due'] < 0;
+                    ?>
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small">
+                            <span><?= safe_output($g['subject']) ?><?php if ($g_overdue): ?> <span class="badge bg-danger">Overdue</span><?php endif; ?></span>
+                            <span class="text-muted"><?= (int)$g['progress'] ?>%</span>
+                        </div>
+                        <div class="progress" style="height:8px">
+                            <div class="progress-bar <?= $g_overdue ? 'bg-danger' : 'bg-primary' ?>" style="width:<?= (int)$g['progress'] ?>%"></div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if ($can_view_training): ?>
+            <!-- Training Card (Tier 3, Phase 3.5) -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-mortarboard text-primary me-1"></i> Training</h5>
+                    <a href="<?= getUrl('trainings') ?>" class="btn btn-sm btn-outline-primary d-print-none">
+                        <i class="bi bi-mortarboard me-1"></i> All Trainings
+                    </a>
+                </div>
+                <div class="card-body">
+                    <?php if (empty($training_history)): ?>
+                    <p class="text-muted mb-0"><i class="bi bi-mortarboard me-1"></i> No training records yet.</p>
+                    <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead><tr><th>Training</th><th>Type</th><th>Date</th><th>Result</th><th class="d-print-none">Certificate</th></tr></thead>
+                            <tbody>
+                            <?php foreach ($training_history as $th):
+                                $pmap = ['enrolled'=>'secondary','attended'=>'info','completed'=>'success','failed'=>'danger','withdrawn'=>'dark'];
+                                $pcolor = $pmap[$th['part_status']] ?? 'secondary';
+                                $cchip = '';
+                                if (!empty($th['certificate_path']) && !empty($th['certificate_expire_date'])) {
+                                    $cd = (int)$th['cert_days_left'];
+                                    if ($cd < 0) $cchip = '<span class="badge bg-danger">Expired</span>';
+                                    elseif ($cd <= 30) $cchip = '<span class="badge bg-warning text-dark">' . $cd . 'd</span>';
+                                }
+                            ?>
+                                <tr>
+                                    <td><?= safe_output($th['title']) ?></td>
+                                    <td><?= safe_output($th['type_name'], '—') ?></td>
+                                    <td><?= safe_output($th['start_date']) ?></td>
+                                    <td><span class="badge bg-<?= $pcolor ?>"><?= ucfirst($th['part_status']) ?></span></td>
+                                    <td class="d-print-none">
+                                        <?php if (!empty($th['certificate_path'])): ?>
+                                        <a href="<?= buildUrl('api/download_training_certificate.php') ?>?participant_id=<?= (int)$th['participant_id'] ?>" target="_blank" class="btn btn-sm btn-outline-primary py-0"><i class="bi bi-download"></i></a>
+                                        <?= $cchip ?>
+                                        <?php else: ?><span class="text-muted">—</span><?php endif; ?>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
