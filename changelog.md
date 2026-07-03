@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-07-03 (fix) — Location engine migration: production deploy failure (error 1364)
+
+- `migrations/2026_07_03_location_engine.php` — production's strict SQL mode
+  rejected the engine's ward inserts because the legacy `wards.council_id`
+  column is NOT NULL with no default (deploy runs #556/#557 failed on the
+  first host). The migration now makes `council_id` nullable (idempotent,
+  preserves legacy values) before the initial sync. Verified locally by
+  re-running the migration and probing the exact insert under
+  `STRICT_TRANS_TABLES`.
+
 ## 2026-07-03 (feat) — Customer forms wired to the location cascade engine
 
 - `app/bms/customer/customers.php` — Add + Edit customer modals now use
