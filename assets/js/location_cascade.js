@@ -104,6 +104,29 @@
             return matchId;
         }
 
+        /**
+         * A stored value that isn't in the defined list (legacy free-typed
+         * data from before the cascade) is kept as an extra selected option
+         * rather than silently wiped — the user re-picks a proper value
+         * whenever they next edit the record.
+         */
+        function appendLegacy(key, name) {
+            if (!name || !cfg.fields[key]) return;
+            var $sel = ensureTag(key, 'select');
+            var esc = $('<i>').text(name).html();
+            var exists = $sel.find('option').filter(function () { return $(this).val() === name; }).length > 0;
+            if (!exists) $sel.append('<option value="' + esc + '" data-id="">' + esc + '</option>');
+            select2ify($sel);
+            $sel.val(name).trigger('change.select2');
+        }
+
+        /** Preserve this level's and every lower level's stored value as legacy options. */
+        function preserveFrom(key) {
+            for (var i = LEVELS.indexOf(key); i < LEVELS.length; i++) {
+                appendLegacy(LEVELS[i], values[LEVELS[i]]);
+            }
+        }
+
         // ── cascade wiring ──────────────────────────────────────────────
         function selectedId(key) {
             var opt = el(key).find('option:selected');
@@ -125,6 +148,7 @@
                     fetchOptions('region', state.ids.country, function (results) {
                         var id = populate('region', results, prefill ? values.region : null);
                         if (id !== null) { state.ids.region = id; onLevelChange('region', prefill); }
+                        else if (prefill) { preserveFrom('region'); }
                     });
                 }
             } else {
@@ -142,17 +166,22 @@
             var childKey = LEVELS[idx + 1];
             resetBelow(key);
             state.ids[key] = selectedId(key);
-            if (!childKey || !cfg.fields[childKey] || state.ids[key] === null) return;
+            if (!childKey || !cfg.fields[childKey] || state.ids[key] === null) {
+                if (prefill && childKey) preserveFrom(childKey);
+                return;
+            }
             fetchOptions(childKey, state.ids[key], function (results) {
                 var id = populate(childKey, results, prefill ? values[childKey] : null);
                 if (id !== null) { state.ids[childKey] = id; onLevelChange(childKey, prefill); }
+                else if (prefill) { preserveFrom(childKey); }
             });
         }
 
         // ── boot: load countries, bind events, apply prefill ───────────
         var $country = ensureTag('country', 'select');
         fetchOptions('countries', null, function (results) {
-            populate('country', results, values.country || 'Tanzania');
+            var id = populate('country', results, values.country || 'Tanzania');
+            if (id === null && values.country) appendLegacy('country', values.country);
             onCountryChange(true);
         });
 
@@ -172,12 +201,15 @@
             /** Re-apply a fresh set of values (e.g. loading a record into an edit modal). */
             setValues: function (newValues) {
                 values = newValues || {};
-                var want = (values.country || 'Tanzania').trim().toLowerCase();
+                var wantName = (values.country || 'Tanzania').trim();
+                var found = false;
                 el('country').find('option').each(function () {
-                    if ($(this).text().trim().toLowerCase() === want) {
+                    if ($(this).text().trim().toLowerCase() === wantName.toLowerCase()) {
                         el('country').val($(this).val()).trigger('change.select2');
+                        found = true;
                     }
                 });
+                if (!found && values.country) appendLegacy('country', values.country);
                 onCountryChange(true);
             }
         };
