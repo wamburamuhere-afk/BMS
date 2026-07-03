@@ -22,6 +22,10 @@ No code changes — verification + documentation only.
   all pass — no regressions from the shared `employee_details.php` /
   `core/permissions.php` / `header.php` changes.
 - Re-scout table recorded in `employee.md` §8.3 Phase 3.6.
+- `api/get_trainings.php` — scoped the participant-detail query with
+  `scopeFilterSqlNullable('project','e')` (the pre-push scope-audit guard flags
+  any new file that joins a scoped table without a helper): a non-admin now sees
+  only in-scope participants of a training, admins see all (§23).
 
 ## 2026-07-03 (feat) — Training module (Tier 3, Phase 3.5)
 

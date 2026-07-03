@@ -1,6 +1,7 @@
 <?php
 // API: List trainings (+ stats) or a single training with participants (Tier 3, Phase 3.5).
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/project_scope.php';   // scope the participant list (§23)
 
 header('Content-Type: application/json');
 
@@ -23,12 +24,16 @@ try {
         $t = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$t) { echo json_encode(['success' => false, 'message' => 'Training not found']); exit; }
 
+        // Trainings are company-wide, but the participant list exposes employee
+        // rows — so a non-admin sees only participants in their project scope
+        // (+ untagged); admins get the unfiltered list. §23 confidentiality.
+        $part_scope = function_exists('scopeFilterSqlNullable') ? scopeFilterSqlNullable('project', 'e') : '';
         $parts = $pdo->prepare("
             SELECT p.*, e.first_name, e.last_name, e.employee_number,
                    DATEDIFF(p.certificate_expire_date, CURDATE()) AS cert_days_left
             FROM training_participants p
             JOIN employees e ON e.employee_id = p.employee_id
-            WHERE p.training_id = ?
+            WHERE p.training_id = ? $part_scope
             ORDER BY e.first_name, e.last_name
         ");
         $parts->execute([$training_id]);
