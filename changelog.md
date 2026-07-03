@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-07-03 (fix) — Correct phantom Sokon wards + malformed Kilosampepo code
+
+- `migrations/2026_07_03_fix_phantom_sokon_wards_and_kilosampepo_code.php` — a
+  full 26-region reconciliation of the location frame against the authoritative
+  HackEAC/NBS dataset found the mainland data ~99.9% complete, with only two
+  genuine defects, both fixed here (idempotent, criteria-based so it self-heals
+  the live bms/bejus DBs on deploy):
+  - **Phantom wards** "Sokon 2".."Sokon 6" (Arusha City, code `23115`): a bad
+    import had promoted Sokon 1's five streets (Longdong, Murriet, Kanisani,
+    Sainevuno, Madukani) into fake same-code wards. The migration re-parents
+    those streets back under the real "Sokon 1" and deactivates the five
+    phantoms (`is_active = 0`, reversible) so they leave every location dropdown.
+  - **Malformed code** on "Kilosampepo" (Malinyi District, Morogoro): recoded
+    the invalid 6-digit `678010` to the correct 5-digit `67810`.
+  - Verified through the `LocationRepository` read path: Arusha City now lists
+    only "Sokon 1" (holding all 6 streets); Kilosampepo → `67810`; re-run makes
+    zero changes.
+
 ## 2026-07-03 (feat) — Seed full Tanzania frame on partially-seeded sites
 
 - `migrations/2026_07_03_seed_full_tz_location_frame.php` — the first engine
