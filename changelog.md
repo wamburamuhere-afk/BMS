@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-07-03 (feat) — Supplier forms wired to the location cascade engine
+
+- `app/bms/Suppliers/suppliers.php` — Add + Edit supplier modals now use
+  `initLocationCascade()`: Tanzania → defined dropdowns (Country→Region→
+  District→Ward→Street/Village) from the location engine; other countries →
+  free-text automatically. Edit prefill via `setValues()`; add-modal reset
+  restores Tanzania defaults. Removed the leftover legacy country-trigger
+  block. Fields still post names, so `add_supplier.php`/`update_supplier.php`
+  and the DB columns are untouched.
+- `assets/js/location_cascade.js` — legacy-data hardening: a stored value
+  not in the defined list (free-typed before the cascade existed) is kept
+  as an extra selected option instead of being wiped; unknown stored
+  countries fall back to free-text mode with values preserved.
+- Customer, Sub-contractor, Employee wiring pending separate go-ahead.
+
 ## 2026-07-03 (feat) — OOP Location Engine (Country→Region→District→Ward→Street/Village)
 
 Professional pattern: local reference tables + provider-based sync engine —

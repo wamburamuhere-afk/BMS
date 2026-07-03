@@ -1143,7 +1143,11 @@ if (isAdmin()) {
 
 <!-- Scripts are included via header.php and footer.php -->
 
+<script src="<?= getUrl('assets/js/location_cascade.js') ?>"></script>
 <script>
+// Location cascade engine — Tanzania gets defined dropdowns (Region→District→
+// Ward→Street/Village), other countries fall back to free text automatically.
+let addLocationCascade, editLocationCascade;
 $(document).ready(function() {
     // Initialize Select2
     // Initialize Select2 safely
@@ -1210,10 +1214,6 @@ $(document).ready(function() {
     $('#addSupplierModal').on('shown.bs.modal', function() {
         initSelect2('#addSupplierModal .select2-enable', $('#addSupplierModal'));
         initOtherSelects('#addSupplierModal', $('#addSupplierModal'));
-        const countrySelect = $('#country');
-        if (countrySelect.val()) {
-            countrySelect.trigger('change');
-        }
     });
 
     // Initialize for Edit Modal
@@ -1222,7 +1222,18 @@ $(document).ready(function() {
         initOtherSelects('#editSupplierModal', $('#editSupplierModal'));
     });
 
-    // Location fields are now text inputs - cascading logic removed.
+    // Location cascade (OOP location engine): defined dropdowns for Tanzania,
+    // free-text automatically for countries without imported subdivisions.
+    addLocationCascade = initLocationCascade({
+        endpoint: '<?= buildUrl('api/location/options.php') ?>',
+        fields: { country: '#country', region: '#state', district: '#city', ward: '#ward', village: '#village' },
+        dropdownParent: '#addSupplierModal'
+    });
+    editLocationCascade = initLocationCascade({
+        endpoint: '<?= buildUrl('api/location/options.php') ?>',
+        fields: { country: '#edit_country', region: '#edit_state', district: '#edit_city', ward: '#edit_ward', village: '#edit_village' },
+        dropdownParent: '#editSupplierModal'
+    });
 
     // =========================================================
     // Handle "Other" option — inline swap: hide select, show input
@@ -1513,6 +1524,7 @@ $(document).ready(function() {
         $('#addSupplierForm')[0].reset();
         $('#category_id').val('').trigger('change');
         resetOtherFields('#addSupplierModal');
+        addLocationCascade.setValues({ country: 'Tanzania' }); // back to defaults
         $('#addSupplierTabs .nav-link:first').tab('show');
     });
     
@@ -1617,13 +1629,16 @@ function editSupplier(supplierId) {
                 $('#edit_address').val(response.data.address || '');
                 $('#edit_postal_address').val(response.data.postal_address || '');
                 
-                // Directly set text values for location fields
-                $('#edit_country').val(response.data.country || '');
-                $('#edit_state').val(response.data.state || '');
-                $('#edit_city').val(response.data.city || '');
-
-                $('#edit_ward').val(response.data.ward || '');
-                $('#edit_village').val(response.data.village || '');
+                // Location cascade prefill — matches stored names against the
+                // defined lists; unmatched legacy values are kept as extra
+                // options instead of being wiped.
+                editLocationCascade.setValues({
+                    country:  response.data.country || 'Tanzania',
+                    region:   response.data.state || '',
+                    district: response.data.city || '',
+                    ward:     response.data.ward || '',
+                    village:  response.data.village || ''
+                });
 
                 $('#edit_postal_code').val(response.data.postal_code || '');
                 
