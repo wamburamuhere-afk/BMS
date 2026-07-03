@@ -19,7 +19,7 @@ function ok($c, $m) { global $pass, $fail; if ($c) { $pass++; echo "  \033[32m�
 $fix = [];   // fixture employee ids
 try {
     // ── 1. Migrations idempotent ─────────────────────────────────────────────
-    foreach (['2026_07_02_hr_compliance_foundation', '2026_07_02_hr_compliance_permissions', '2026_07_02_backfill_reporting_to_id'] as $mig) {
+    foreach (['2026_07_02_hr_compliance_foundation', '2026_07_02_hr_compliance_permissions', '2026_07_02_hr_compliance_reporting_backfill'] as $mig) {
         exec("php " . escapeshellarg("$root/migrations/$mig.php") . " 2>&1", $o1, $rc1);
         exec("php " . escapeshellarg("$root/migrations/$mig.php") . " 2>&1", $o2, $rc2);
         ok($rc1 === 0 && $rc2 === 0, "$mig runs twice cleanly (rc=$rc1/$rc2)");
@@ -70,7 +70,7 @@ try {
                 VALUES ('Zzq', 'Report2', '__T2-R2', 'active', 'Zzq Dupmgr', NOW())");
     $r2 = (int)$pdo->lastInsertId(); $fix[] = $r2;
 
-    exec("php " . escapeshellarg("$root/migrations/2026_07_02_backfill_reporting_to_id.php") . " 2>&1", $bo, $brc);
+    exec("php " . escapeshellarg("$root/migrations/2026_07_02_hr_compliance_reporting_backfill.php") . " 2>&1", $bo, $brc);
     ok($brc === 0, "backfill re-run over fixtures succeeds");
     $v1 = $pdo->query("SELECT reporting_to_id FROM employees WHERE employee_id = $r1")->fetchColumn();
     ok((int)$v1 === $mgr, "unique full-name match backfilled correctly");
