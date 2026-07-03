@@ -916,6 +916,12 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('employee_lifecycle')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('hr_actions') ?>"><i class="bi bi-person-lines-fill"></i> HR Actions</a></li>
                                 <?php endif; ?>
+                                <?php if(canView('employee_contracts')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('employee_contracts') ?>"><i class="bi bi-file-earmark-text"></i> Contracts</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('org_chart')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('org_chart') ?>"><i class="bi bi-diagram-3"></i> Org Chart</a></li>
+                                <?php endif; ?>
                                 <?php if(canView('payroll')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('payroll') ?>"><i class="bi bi-cash"></i> Payroll</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('salary_components') ?>"><i class="bi bi-sliders"></i> Salary Components</a></li>

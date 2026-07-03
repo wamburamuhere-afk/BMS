@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-07-02 (feat) — HR Compliance foundation (Tier 2, Phase 2.1)
+
+Foundation for Tier 2 (documents with expiry, contracts, org structure) —
+purely additive scaffolding, plan in employee.md §7.
+
+- `migrations/2026_07_02_hr_compliance_foundation.php` — `employee_document_types`
+  (seeded 8 types; contracts/permits/licenses flagged `requires_expiry`),
+  `employee_documents` (with `library_document_id` for the D8 central-library hookup),
+  `employee_contracts` (renewal chain via `renewed_from_contract_id`, dual-write design
+  D12); additive `employees.reporting_to_id INT NULL` (guarded); `uploads/employee_docs/`
+  + `uploads/contracts/` with deny-exec `.htaccess` (also hardened the pre-existing
+  contracts dir which had no .htaccess).
+- `migrations/2026_07_02_hr_compliance_permissions.php` — 4 permission rows
+  (`employee_documents`, `employee_contracts`, `org_chart`, `hr_expiry_alerts`) with
+  runtime-resolved role seeding (admin + holders of can_edit on employees = full, rest
+  view-only); `notification_events` rows `hr_contract_expiry` + `hr_probation_end`
+  per the 2026_06_28 catalog format.
+- `migrations/2026_07_02_backfill_reporting_to_id.php` — D14 backfill: exact UNIQUE
+  full-name match against active employees only; ambiguous/no-match/self-reference
+  skipped; only fills NULLs (idempotent); prints matched/skipped counts. (Local data:
+  12 candidates all skipped — values are nicknames, correctly left untouched.)
+- `roots.php` — routes for 2 pages + 11 APIs; `header.php` — Contracts + Org Chart nav
+  items; `core/permissions.php` — router-fallback mappings.
+- `tests/test_hr_compliance_foundation_cli.php` — 56 assertions incl. fixture-proven
+  backfill safety (unique matches, ambiguous skipped, legacy varchar untouched).
+
 ## 2026-07-02 (feat) — Service Record on employee_details (Tier 1, Phase 1.5)
 
 The employee profile becomes a true personnel file. Additions only — every
