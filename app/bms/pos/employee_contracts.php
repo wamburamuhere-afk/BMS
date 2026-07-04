@@ -117,8 +117,9 @@ $probation_count = (int)$pdo->query($probation_sql)->fetchColumn();
     <div id="tableView" class="card border-0 shadow-sm">
         <div class="card-body">
             <table id="contractsTable" class="table table-hover align-middle w-100">
-                <thead class="table-dark">
+                <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;">
                     <tr>
+                        <th class="text-center">S/NO</th>
                         <th>Employee</th>
                         <th>Type</th>
                         <th>Start</th>
@@ -276,6 +277,7 @@ function loadData() {
         if (!res.success) { Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not load data.' }); return; }
         ROWS = res.data;
         const data = res.data.map(r => [
+            '',
             `<a href="<?= getUrl('employee_details') ?>?id=${r.employee_id}" class="text-decoration-none fw-semibold">${safeOutput(r.first_name + ' ' + r.last_name)}</a>`,
             safeOutput(r.contract_type),
             safeOutput(r.start_date),
@@ -303,8 +305,10 @@ function empSelect2(el, dropdownParent) {
 
 $(document).ready(function () {
     table = $('#contractsTable').DataTable({
-        responsive: false, scrollX: true, pageLength: 25, order: [[2, 'desc']], dom: 'rtipB',
-        buttons: [{ extend: 'excelHtml5', className: 'd-none', exportOptions: { columns: ':not(:last-child)' } }],
+        responsive: false, scrollX: true, pageLength: 25, order: [[3, 'desc']], dom: 'rtipB',
+        columnDefs: [{ targets: 0, orderable: false, searchable: false, className: 'text-center',
+            render: (d, t, row, meta) => meta.row + 1 + meta.settings._iDisplayStart }],
+        buttons: [{ extend: 'excelHtml5', className: 'd-none', exportOptions: { columns: ':not(:first-child):not(:last-child)' } }],
         language: { emptyTable: 'No contracts recorded yet.', zeroRecords: 'No matching records.' },
         drawCallback: function () {
             const pageRows = this.api().rows({ page: 'current' })[0].map(i => ROWS[i]).filter(Boolean);

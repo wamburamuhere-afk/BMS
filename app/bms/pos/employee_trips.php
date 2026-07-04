@@ -44,7 +44,7 @@ $can_reject  = function_exists('canReject') ? canReject('employee_trips') : $can
 
     <div id="tpTableView" class="card border-0 shadow-sm"><div class="card-body">
         <table id="tripsTable" class="table table-hover align-middle w-100">
-            <thead class="table-dark"><tr><th>Employee</th><th>Destination</th><th>Dates</th><th>Est. cost</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+            <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"><tr><th class="text-center">S/NO</th><th>Employee</th><th>Destination</th><th>Dates</th><th>Est. cost</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
             <tbody></tbody>
         </table>
     </div></div>
@@ -107,6 +107,7 @@ function loadTrips(){
         TP_ROWS=res.data;
         $('#tps_pending').text(res.stats.pending); $('#tps_approved').text(res.stats.approved); $('#tps_completed').text(res.stats.completed_year);
         tpTable.clear().rows.add(res.data.map(r=>[
+            '',
             `<a href="<?= getUrl('employee_details') ?>?id=${r.employee_id}" class="text-decoration-none fw-semibold">${safeOutput(r.first_name+' '+r.last_name)}</a>`,
             safeOutput(r.destination), safeOutput(r.start_date)+' → '+safeOutput(r.end_date),
             r.estimated_cost?Number(r.estimated_cost).toLocaleString():'—', tpStatusBadge(r.status), tpActions(r)
@@ -156,7 +157,7 @@ function tripAction(id, status){
 function tripDelete(id){ Swal.fire({title:'Delete trip?',icon:'warning',showCancelButton:true,confirmButtonColor:'#dc3545',confirmButtonText:'Delete'}).then(r=>{ if(r.isConfirmed) $.post('<?= buildUrl('api/manage_trip.php') ?>',{action:'delete',trip_id:id,_csrf:TP_CSRF},function(res){ if(res.success) loadTrips(); else Swal.fire({icon:'error',title:'Error',text:res.message}); },'json'); }); }
 
 $(function(){
-    tpTable=$('#tripsTable').DataTable({ responsive:false,scrollX:true,pageLength:25,order:[[2,'desc']],dom:'rtip',language:{emptyTable:'No trips yet.'},drawCallback:function(){ tpCards(this.api().rows({page:'current'})[0].map(i=>TP_ROWS[i]).filter(Boolean)); } });
+    tpTable=$('#tripsTable').DataTable({ responsive:false,scrollX:true,pageLength:25,order:[[3,'desc']],dom:'rtip',columnDefs:[{targets:0,orderable:false,searchable:false,className:'text-center',render:(d,t,row,meta)=>meta.row+1+meta.settings._iDisplayStart}],language:{emptyTable:'No trips yet.'},drawCallback:function(){ tpCards(this.api().rows({page:'current'})[0].map(i=>TP_ROWS[i]).filter(Boolean)); } });
     $('#tpf_employee').select2({ theme:'bootstrap-5',placeholder:'All employees',allowClear:true,width:'100%',minimumInputLength:1,ajax:{url:'<?= buildUrl('api/account/search_employees.php') ?>',dataType:'json',delay:300,data:p=>({q:p.term}),processResults:d=>({results:d.results}),cache:true} });
     $('#tpf_status,#tpf_employee').on('change', loadTrips);
     $('#tpf_reset').on('click', function(){ $('#tpf_status').val(''); $('#tpf_employee').val(null).trigger('change.select2'); loadTrips(); });

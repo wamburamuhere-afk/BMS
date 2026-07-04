@@ -144,8 +144,9 @@ $stats = $pdo->query($stats_sql)->fetch(PDO::FETCH_ASSOC) ?: [];
     <div id="tableView" class="card border-0 shadow-sm">
         <div class="card-body">
             <table id="hrActionsTable" class="table table-hover align-middle w-100">
-                <thead class="table-dark">
+                <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;">
                     <tr>
+                        <th class="text-center">S/NO</th>
                         <th>Date</th>
                         <th>Employee</th>
                         <th>Type</th>
@@ -274,6 +275,7 @@ function loadData() {
         if (!res.success) { Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not load data.' }); return; }
         ROWS = res.data;
         const data = res.data.map(r => [
+            '',
             safeOutput(r.event_date),
             `<a href="<?= getUrl('employee_details') ?>?id=${r.employee_id}" class="text-decoration-none fw-semibold">${safeOutput(r.first_name + ' ' + r.last_name)}</a>`,
             typeBadge(r.event_type),
@@ -291,9 +293,11 @@ $(document).ready(function () {
         responsive: false,
         scrollX: true,
         pageLength: 25,
-        order: [[0, 'desc']],
+        order: [[1, 'desc']],
         dom: 'rtipB',
-        buttons: [{ extend: 'excelHtml5', className: 'd-none', exportOptions: { columns: ':not(:last-child)' } }],
+        columnDefs: [{ targets: 0, orderable: false, searchable: false, className: 'text-center',
+            render: (d, t, row, meta) => meta.row + 1 + meta.settings._iDisplayStart }],
+        buttons: [{ extend: 'excelHtml5', className: 'd-none', exportOptions: { columns: ':not(:first-child):not(:last-child)' } }],
         language: { emptyTable: 'No HR actions recorded yet.', zeroRecords: 'No matching records.' },
         drawCallback: function () {
             const pageRows = this.api().rows({ page: 'current' })[0].map(i => ROWS[i]).filter(Boolean);

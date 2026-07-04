@@ -56,7 +56,7 @@ $training_types = $pdo->query("SELECT training_type_id, type_name FROM training_
 
     <div id="trTableView" class="card border-0 shadow-sm"><div class="card-body">
         <table id="trainingsTable" class="table table-hover align-middle w-100">
-            <thead class="table-dark"><tr><th>Title</th><th>Type</th><th>Dates</th><th>Participants</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+            <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"><tr><th class="text-center">S/NO</th><th>Title</th><th>Type</th><th>Dates</th><th>Participants</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
             <tbody></tbody>
         </table>
     </div></div>
@@ -165,7 +165,7 @@ function loadTrainings() {
         $('#ts_planned').text(res.stats.planned); $('#ts_progress').text(res.stats.in_progress);
         $('#ts_completed').text(res.stats.completed_year); $('#ts_participants').text(res.stats.participants_year);
         const data = res.data.map(r => [
-            safeOutput(r.title), safeOutput(r.type_name || '—'),
+            '', safeOutput(r.title), safeOutput(r.type_name || '—'),
             safeOutput(r.start_date) + (r.end_date ? ' → ' + safeOutput(r.end_date) : ''),
             r.participant_count, trStatusBadge(r.status), trActions(r)
         ]);
@@ -286,7 +286,9 @@ window.editParticipant = function (pid) {
 
 $(function () {
     trTable = $('#trainingsTable').DataTable({
-        responsive:false, scrollX:true, pageLength:25, order:[[2,'desc']], dom:'rtip',
+        responsive:false, scrollX:true, pageLength:25, order:[[3,'desc']], dom:'rtip',
+        columnDefs: [{ targets: 0, orderable: false, searchable: false, className: 'text-center',
+            render: (d, t, row, meta) => meta.row + 1 + meta.settings._iDisplayStart }],
         language:{ emptyTable:'No trainings yet.', zeroRecords:'No matching records.' },
         drawCallback: function () { trCards(this.api().rows({page:'current'})[0].map(i=>TR_ROWS[i]).filter(Boolean)); }
     });
