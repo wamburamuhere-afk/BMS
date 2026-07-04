@@ -20,6 +20,20 @@ so the save never reached the server. Fixed, and hardened the SKU duplicate guar
     message) for consistency with the rest of the product forms.
 - The products list quick-add modal already notified on every response — unchanged.
 
+## 2026-07-04 (feat) — Sales Order salesperson auto-set to the logged-in user
+
+The Salesperson on **Sales Order create and edit** is no longer a picker — it is
+always the user logged in at that moment (whoever is handling/editing the order),
+matching the Quotation form. Shown read-only; a hidden input carries the id.
+
+- **`app/bms/sales/sales_order_create.php`**, **`app/bms/sales/sales_order_edit.php`**
+  - Replaced the editable Salesperson `<select>` with a read-only display
+    (username + full name) plus a hidden `salesperson_id` set to `$_SESSION['user_id']`.
+  - Removed the now-unused `$salespeople` fetch (and its stale comment) from both.
+  - The list-page Salesperson **filter** dropdown is unchanged (it is a filter, not a
+    form field). `save_sales_order.php` already defaults to the session user, so the
+    hidden input carries the logged-in id.
+
 ## 2026-07-04 (feat) — Clean "Back to Project" mechanism across Supplier/Sub-contractor/Staff + remove dead staff wizard
 
 When a Supplier, Sub-contractor or Staff record is created/edited/viewed **from inside a
