@@ -19,6 +19,23 @@ if (!$can_view_suppliers) {
 
 logActivity($pdo, $_SESSION['user_id'], 'View suppliers', 'User viewed the suppliers management list');
 
+// ── Project context (clean deep-link from Project Details) ───────────────────
+// Arriving as ?project=<id>&back=<tab> pre-selects & locks the project, shows a
+// "Back to Project" affordance, and returns there after save — mirroring the
+// Purchase Order create/edit pattern. The return URL is rebuilt server-side from
+// the project id + short tab key, so the address bar stays clean.
+$proj_ctx_id     = isset($_GET['project']) ? intval($_GET['project']) : 0;
+$proj_ctx_back   = preg_replace('/[^a-z0-9\-]/', '', strtolower($_GET['back'] ?? ''));
+$proj_ctx_name   = '';
+$proj_ctx_return = '';
+if ($proj_ctx_id > 0) {
+    $pcs = $pdo->prepare("SELECT project_name FROM projects WHERE project_id = ?");
+    $pcs->execute([$proj_ctx_id]);
+    $proj_ctx_name   = $pcs->fetchColumn() ?: '';
+    $proj_ctx_tab    = $proj_ctx_back !== '' ? $proj_ctx_back : 'suppliers';
+    $proj_ctx_return = getUrl('project_view') . '?id=' . $proj_ctx_id . '&tab=' . $proj_ctx_tab;
+}
+
 // Get company type for conditional features
 $settings_stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'company_type'");
 $settings_stmt->execute();
@@ -625,6 +642,14 @@ if (isAdmin()) {
             <form id="addSupplierForm" method="POST" enctype="multipart/form-data">
                 <div class="modal-body">
                     <div id="add-supplier-message" class="mb-3"></div>
+                    <?php if ($proj_ctx_id > 0): ?>
+                    <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3">
+                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Adding to project: <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+                        <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
+                            <i class="bi bi-arrow-left me-1"></i> Back to Project
+                        </a>
+                    </div>
+                    <?php endif; ?>
                     
                     <!-- Tabs Navigation -->
                 <ul class="nav nav-tabs mb-3" id="addSupplierTabs" role="tablist">
@@ -916,6 +941,14 @@ if (isAdmin()) {
             <form id="editSupplierForm" method="POST" enctype="multipart/form-data">
                 <div class="modal-body">
                     <div id="edit-supplier-message" class="mb-3"></div>
+                    <?php if ($proj_ctx_id > 0): ?>
+                    <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3">
+                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Editing within project: <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+                        <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
+                            <i class="bi bi-arrow-left me-1"></i> Back to Project
+                        </a>
+                    </div>
+                    <?php endif; ?>
                     <input type="hidden" id="edit_supplier_id" name="supplier_id">
                     
                     <!-- Tabs Navigation -->
@@ -1421,7 +1454,8 @@ $(document).ready(function() {
                         timer: 2000,
                         showConfirmButton: false
                     }).then(() => {
-                        location.reload();
+                        if (window.__projReturnUrl) { window.location.href = window.__projReturnUrl; }
+                        else { location.reload(); }
                     });
                 } else {
                     Swal.fire('Error', response.message || 'Failed to add supplier.', 'error');
@@ -1504,7 +1538,8 @@ $(document).ready(function() {
                         timer: 2000,
                         showConfirmButton: false
                     }).then(() => {
-                        location.reload();
+                        if (window.__projReturnUrl) { window.location.href = window.__projReturnUrl; }
+                        else { location.reload(); }
                     });
                 } else {
                     Swal.fire('Error', response.message || 'Update failed.', 'error');
@@ -1893,19 +1928,38 @@ $('#searchSuppliers').on('keyup', function(e) {
 // Check for action/edit parameter in URL — runs after document is ready so Bootstrap modals are available
 $(document).ready(function() {
     const urlParams = new URLSearchParams(window.location.search);
-    const action = urlParams.get('action');
+    const action   = urlParams.get('action');
+    const editId   = urlParams.get('edit');
+    // Project context resolved server-side (clean URL: ?project=<id>&back=<tab>).
+    const projLock  = <?= $proj_ctx_id ?: 'null' ?>;   // opened from inside a project → lock onto it
+    const projName  = <?= json_encode($proj_ctx_name) ?>;
+    window.__projReturnUrl = <?= $proj_ctx_return !== '' ? json_encode($proj_ctx_return) : 'null' ?>;  // return here after save
+
+    // When opened from a project, force the project field to that project and lock it.
+    function lockProjectField(selId) {
+        if (!projLock) return;
+        const $sel = $(selId);
+        if (!$sel.length) return;
+        if ($sel.find('option[value="' + projLock + '"]').length === 0) {
+            const label = projName || ('Project #' + projLock);
+            $sel.append(new Option(label, projLock, true, true));
+        }
+        $sel.val(projLock).trigger('change');
+        $sel.prop('disabled', true).trigger('change.select2');
+        const $form = $sel.closest('form');
+        if ($form.find('input[type=hidden][name="project_id"]').length === 0) {
+            $('<input type="hidden" name="project_id">').val(projLock).appendTo($form);
+        }
+    }
+    $('#addSupplierModal').on('shown.bs.modal',  function(){ lockProjectField('#project_id'); });
+    $('#editSupplierModal').on('shown.bs.modal', function(){ lockProjectField('#edit_project_id'); });
+
     if (action === 'add') {
-        // Clean up the URL first to keep it clean
-        window.history.replaceState({}, document.title, window.location.pathname);
-        // Small delay to ensure Bootstrap modal is fully initialized
         setTimeout(function() {
-            var addModal = new bootstrap.Modal(document.getElementById('addSupplierModal'));
-            addModal.show();
+            new bootstrap.Modal(document.getElementById('addSupplierModal')).show();
         }, 300);
     }
 
-    // Check for edit parameter in URL
-    const editId = urlParams.get('edit');
     if (editId) {
         editSupplier(editId);
     }

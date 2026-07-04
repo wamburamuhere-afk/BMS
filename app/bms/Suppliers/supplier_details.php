@@ -12,6 +12,21 @@ $can_create = canCreate('suppliers');
 $can_edit   = canEdit('suppliers');
 $can_delete = canDelete('suppliers');
 
+// ── Project context (clean deep-link from Project Details) ───────────────────
+// Arriving as ?project=<id>&back=<tab> shows a "Back to Project" banner and
+// rebuilds the return URL server-side, so the address bar stays clean.
+$proj_ctx_id     = isset($_GET['project']) ? intval($_GET['project']) : 0;
+$proj_ctx_back   = preg_replace('/[^a-z0-9\-]/', '', strtolower($_GET['back'] ?? ''));
+$proj_ctx_name   = '';
+$proj_ctx_return = '';
+if ($proj_ctx_id > 0) {
+    $pcs = $pdo->prepare("SELECT project_name FROM projects WHERE project_id = ?");
+    $pcs->execute([$proj_ctx_id]);
+    $proj_ctx_name   = $pcs->fetchColumn() ?: '';
+    $proj_ctx_tab    = $proj_ctx_back !== '' ? $proj_ctx_back : 'suppliers';
+    $proj_ctx_return = getUrl('project_view') . '?id=' . $proj_ctx_id . '&tab=' . $proj_ctx_tab;
+}
+
 
 // Get supplier ID
 $supplier_id = $_GET['id'] ?? '';
@@ -151,6 +166,14 @@ global $company_name, $company_logo;
 ?>
 
 <div class="container-fluid mt-2 mt-md-4 px-2 px-md-4 mb-5">
+    <?php if ($proj_ctx_id > 0): ?>
+    <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3 d-print-none">
+        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Viewing within project: <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+        <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
+            <i class="bi bi-arrow-left me-1"></i> Back to Project
+        </a>
+    </div>
+    <?php endif; ?>
     <!-- Print-only Header -->
     <div class="d-none d-print-block text-center mb-4">
        

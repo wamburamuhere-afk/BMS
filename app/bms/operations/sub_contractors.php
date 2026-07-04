@@ -66,6 +66,24 @@ $query = "
 $stmt = $pdo->query($query);
 $sub_contractors = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// ── Project context (clean deep-link from Project Details) ───────────────────
+// Arriving as ?project=<id>&back=<tab> pre-selects & locks the project, shows a
+// "Back to Project" affordance, and returns there after save — mirroring the
+// Purchase Order create/edit pattern. The return URL is rebuilt server-side from
+// the project id + short tab key, so the link in the address bar stays clean
+// (no full URL embedded in the query string, and no project name to pass).
+$proj_ctx_id     = isset($_GET['project']) ? intval($_GET['project']) : 0;
+$proj_ctx_back   = preg_replace('/[^a-z0-9\-]/', '', strtolower($_GET['back'] ?? ''));
+$proj_ctx_name   = '';
+$proj_ctx_return = '';
+if ($proj_ctx_id > 0) {
+    $pcs = $pdo->prepare("SELECT project_name FROM projects WHERE project_id = ?");
+    $pcs->execute([$proj_ctx_id]);
+    $proj_ctx_name   = $pcs->fetchColumn() ?: '';
+    $proj_ctx_tab    = $proj_ctx_back !== '' ? $proj_ctx_back : 'sub-contractors';
+    $proj_ctx_return = getUrl('project_view') . '?id=' . $proj_ctx_id . '&tab=' . $proj_ctx_tab;
+}
+
 // Calculate statistics
 $total_sc = count($sub_contractors);
 $active_sc = array_filter($sub_contractors, function($sc) {
@@ -420,7 +438,15 @@ if (!empty($_SESSION['scope']['is_admin'])) {
             <form id="addSubContractorForm" method="POST" enctype="multipart/form-data">
                 <div class="modal-body">
                     <div id="add-sc-message" class="mb-3"></div>
-                    
+                    <?php if ($proj_ctx_id > 0): ?>
+                    <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3">
+                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Adding to project: <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+                        <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
+                            <i class="bi bi-arrow-left me-1"></i> Back to Project
+                        </a>
+                    </div>
+                    <?php endif; ?>
+
                     <!-- Tabs Navigation -->
                 <ul class="nav nav-tabs mb-3" id="addSubContractorTabs" role="tablist">
                     <li class="nav-item">
@@ -648,7 +674,15 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                 <input type="hidden" name="supplier_id" id="edit_sc_id">
                 <div class="modal-body">
                     <div id="edit-sc-message" class="mb-3"></div>
-                    
+                    <?php if ($proj_ctx_id > 0): ?>
+                    <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3">
+                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Editing within project: <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+                        <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
+                            <i class="bi bi-arrow-left me-1"></i> Back to Project
+                        </a>
+                    </div>
+                    <?php endif; ?>
+
                     <!-- Tabs Navigation -->
                 <ul class="nav nav-tabs mb-3" id="editSubContractorTabs" role="tablist">
                     <li class="nav-item">
@@ -1047,7 +1081,7 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(res) {
                 if(res.success) {
-                    Swal.fire('Success', res.message, 'success').then(() => location.reload());
+                    Swal.fire('Success', res.message, 'success').then(() => { if (window.__projReturnUrl) window.location.href = window.__projReturnUrl; else location.reload(); });
                 } else {
                     Swal.fire('Error', res.message, 'error');
                 }
@@ -1068,13 +1102,50 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(res) {
                 if(res.success) {
-                    Swal.fire('Updated', res.message, 'success').then(() => location.reload());
+                    Swal.fire('Updated', res.message, 'success').then(() => { if (window.__projReturnUrl) window.location.href = window.__projReturnUrl; else location.reload(); });
                 } else {
                     Swal.fire('Error', res.message, 'error');
                 }
             }
         });
     });
+});
+
+// Open Add/Edit modal + lock the project when arriving from a project view,
+// and return to that project after a successful save.
+$(document).ready(function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const action   = urlParams.get('action');
+    const editId   = urlParams.get('edit');
+    // Project context resolved server-side (clean URL: ?project=<id>&back=<tab>).
+    const projLock  = <?= $proj_ctx_id ?: 'null' ?>;
+    const projName  = <?= json_encode($proj_ctx_name) ?>;
+    window.__projReturnUrl = <?= $proj_ctx_return !== '' ? json_encode($proj_ctx_return) : 'null' ?>;
+
+    function lockProjectField(selId) {
+        if (!projLock) return;
+        const $sel = $(selId);
+        if (!$sel.length) return;
+        if ($sel.find('option[value="' + projLock + '"]').length === 0) {
+            const label = projName || ('Project #' + projLock);
+            $sel.append(new Option(label, projLock, true, true));
+        }
+        $sel.val(projLock).trigger('change');
+        $sel.prop('disabled', true).trigger('change.select2');
+        const $form = $sel.closest('form');
+        if ($form.find('input[type=hidden][name="project_id"]').length === 0) {
+            $('<input type="hidden" name="project_id">').val(projLock).appendTo($form);
+        }
+    }
+    $('#addSubContractorModal').on('shown.bs.modal', function(){ lockProjectField('#project_id'); });
+    $('#editSCModal').on('shown.bs.modal', function(){ lockProjectField('#edit_project_id'); });
+
+    if (action === 'add') {
+        setTimeout(function(){ new bootstrap.Modal(document.getElementById('addSubContractorModal')).show(); }, 300);
+    }
+    if (editId) {
+        setTimeout(function(){ editSC(editId); }, 300);
+    }
 });
 
 function editSC(id) {

@@ -63,10 +63,8 @@ $ri_can_delete  = canDelete('received_invoices');
 $ri_can_review  = canReview('received_invoices');
 $ri_can_approve = canApprove('received_invoices');
 
-// Fetch Departments, Designations, and Employment Types for New Staff modal
+// Departments feed the Payroll "Filter Department" dropdown; leave types feed the Apply Leave modal
 $hr_departments      = $pdo->query("SELECT department_id, department_name FROM departments WHERE status='active' ORDER BY department_name")->fetchAll(PDO::FETCH_ASSOC);
-$hr_designations     = $pdo->query("SELECT designation_id, designation_name FROM designations WHERE status='active' ORDER BY designation_name")->fetchAll(PDO::FETCH_ASSOC);
-$hr_employment_types = $pdo->query("SELECT type_id, type_name FROM employment_types WHERE status='active' ORDER BY type_name")->fetchAll(PDO::FETCH_ASSOC);
 $hr_leave_types      = $pdo->query("SELECT type_name, max_days_per_year, requires_document FROM leave_types WHERE status='active' ORDER BY type_name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch Expense Categories for the Add Budget Modal
@@ -1904,9 +1902,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <button class="btn btn-outline-primary btn-sm flex-fill flex-md-grow-0 shadow-sm" onclick="loadProjectDetails()">
                                     <i class="bi bi-arrow-clockwise"></i> Refresh
                                 </button>
-                                <button class="btn btn-primary btn-sm flex-fill flex-md-grow-0 shadow-sm" data-bs-toggle="modal" data-bs-target="#addProjectSupplierModal">
+                                <a href="<?= getUrl('suppliers') ?>?action=add&project=<?= $project_id ?>&back=suppliers" class="btn btn-primary btn-sm flex-fill flex-md-grow-0 shadow-sm">
                                     <i class="bi bi-plus-circle me-1"></i> Register
-                                </button>
+                                </a>
                                 <div class="btn-group shadow-sm" role="group">
                                     <button type="button" class="btn btn-primary btn-sm text-white" id="projSuppliersTable-btn-tbl" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('projSuppliersTable','table')" title="Table View"><i class="bi bi-table"></i></button>
                                     <button type="button" class="btn btn-light btn-sm border" id="projSuppliersTable-btn-crd" onclick="window.bmsMobileCards&&window.bmsMobileCards.toggleAuto('projSuppliersTable','card')" title="Card View"><i class="bi bi-grid-3x3-gap"></i></button>
@@ -1951,7 +1949,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="d-flex gap-2 flex-wrap">
                                 <button class="btn btn-outline-primary btn-sm shadow-sm" onclick="projScLoadTable()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
                                 <button class="btn btn-outline-warning btn-sm shadow-sm" onclick="openAssignExistingScModal()"><i class="bi bi-link-45deg me-1"></i> Assign Existing</button>
-                                <button class="btn btn-primary btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#projScAddModal"><i class="bi bi-plus-circle me-1"></i> Add New</button>
+                                <a href="<?= getUrl('sub_contractors') ?>?action=add&project=<?= $project_id ?>&back=sub-contractors" class="btn btn-primary btn-sm shadow-sm"><i class="bi bi-plus-circle me-1"></i> Add New</a>
                             </div>
                         </div>
 
@@ -2297,9 +2295,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <button class="btn btn-primary btn-sm px-3 shadow-sm" onclick="openAssignStaffModal()">
                                     <i class="bi bi-person-plus me-1"></i> Assign
                                 </button>
-                                <button class="btn btn-success btn-sm px-3 shadow-sm" onclick="createNewProjectStaff()">
+                                <a href="<?= getUrl('employees') ?>?action=new&project=<?= $project_id ?>&back=staff" class="btn btn-success btn-sm px-3 shadow-sm">
                                     <i class="bi bi-plus-lg me-1"></i> New Staff
-                                </button>
+                                </a>
                             </div>
                         </div>
                         <!-- Print Header -->
@@ -5006,311 +5004,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
-<!-- ===== HR: New Project Staff Modal (5-Step Wizard) ===== -->
-<div class="modal fade" id="newProjectStaffModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-xl">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-primary text-white py-3">
-                <h5 class="modal-title fw-bold"><i class="bi bi-person-plus me-2"></i>Create New Project Staff</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form id="newProjectStaffForm">
-                <input type="hidden" name="project_id" id="nps_project_id">
-                <div class="modal-body p-4">
-                    <div id="nps-message" class="mb-3"></div>
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 id="npsStepIndicator" class="text-primary fw-bold mb-0">Step 1 of 5: Personal Info</h6>
-                        <div class="progress" style="width: 200px; height: 10px;">
-                            <div id="npsProgressBar" class="progress-bar bg-primary" role="progressbar" style="width: 20%;"></div>
-                        </div>
-                    </div>
-                    <!-- Step 1: Personal Info -->
-                    <div class="nps-wizard-step" id="nps-step-0">
-                        <div class="row">
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">First Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" name="first_name" id="nps_first_name" required placeholder="Enter first name">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Middle Name</label>
-                                <input type="text" class="form-control" name="middle_name" placeholder="Enter middle name">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Last Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" name="last_name" required placeholder="Enter last name">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Gender <span class="text-danger">*</span></label>
-                                <select class="form-select" name="gender" required>
-                                    <option value="">Select Gender</option>
-                                    <option value="male">Male</option>
-                                    <option value="female">Female</option>
-                                    <option value="other">Other</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
-                                <input type="date" class="form-control" name="date_of_birth" required>
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Marital Status</label>
-                                <select class="form-select" name="marital_status">
-                                    <option value="">Select Status</option>
-                                    <option value="single">Single</option>
-                                    <option value="married">Married</option>
-                                    <option value="divorced">Divorced</option>
-                                    <option value="widowed">Widowed</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">National ID Number</label>
-                                <input type="text" class="form-control" name="national_id" placeholder="National ID">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Passport Number</label>
-                                <input type="text" class="form-control" name="passport_number" placeholder="Passport number">
-                            </div>
-                            <div class="col-12 mb-3">
-                                <label class="form-label">Personal Notes</label>
-                                <textarea class="form-control" name="notes" rows="2" placeholder="Any personal notes about this employee"></textarea>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Step 2: Employment Details -->
-                    <div class="nps-wizard-step" id="nps-step-1" style="display:none;">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Employee Number <span class="text-muted small">(Auto-generated)</span> <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control bg-light" name="employee_number" id="nps_emp_number" required readonly>
-                                <small class="text-muted"><i class="bi bi-info-circle me-1"></i> Unique code automatically assigned by system</small>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Hire Date <span class="text-danger">*</span></label>
-                                <input type="date" class="form-control" name="hire_date" id="nps_hire_date" required>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Department <span class="text-danger">*</span></label>
-                                <select class="form-select select2-static" name="department_id" required>
-                                    <option value="">Select Department</option>
-                                    <?php foreach ($hr_departments as $dept): ?>
-                                        <option value="<?= $dept['department_id'] ?>"><?= htmlspecialchars($dept['department_name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Designation <span class="text-danger">*</span></label>
-                                <select class="form-select select2-static" name="designation_id" required>
-                                    <option value="">Select Designation</option>
-                                    <?php foreach ($hr_designations as $des): ?>
-                                        <option value="<?= $des['designation_id'] ?>"><?= htmlspecialchars($des['designation_name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Employment Type <span class="text-danger">*</span></label>
-                                <select class="form-select select2-static" name="employment_type_id" required>
-                                    <option value="">Select Type</option>
-                                    <?php foreach ($hr_employment_types as $type): ?>
-                                        <option value="<?= $type['type_id'] ?>"><?= htmlspecialchars($type['type_name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Employment Status <span class="text-danger">*</span></label>
-                                <select class="form-select" name="employment_status" required>
-                                    <option value="probation" selected>Probation</option>
-                                    <option value="active">Active</option>
-                                    <option value="contract">Contract</option>
-                                    <option value="on_leave">On Leave</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Probation End Date</label>
-                                <input type="date" class="form-control" name="probation_end_date">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Contract End Date</label>
-                                <input type="date" class="form-control" name="contract_end_date">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Reporting To</label>
-                                <input type="text" class="form-control" name="reporting_to" placeholder="Manager name or ID">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Work Location</label>
-                                <input type="text" class="form-control" name="work_location" placeholder="Office location">
-                            </div>
-                            <div class="col-12 mb-3">
-                                <div class="alert alert-info border-0 small py-2">
-                                    <i class="bi bi-pin-map me-1"></i> Project: <strong><?= htmlspecialchars($project_name) ?></strong> — Staff will be automatically assigned to this project.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Step 3: Salary & Benefits -->
-                    <div class="nps-wizard-step" id="nps-step-2" style="display:none;">
-                        <div class="row">
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Basic Salary <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" name="basic_salary" step="0.01" required placeholder="0.00">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Hourly Rate</label>
-                                <input type="number" class="form-control" name="hourly_rate" step="0.01" placeholder="If applicable">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Currency</label>
-                                <select class="form-select" name="currency">
-                                    <option value="TZS" selected>Tanzanian Shilling (TZS)</option>
-                                    <option value="USD">US Dollar (USD)</option>
-                                    <option value="EUR">Euro (EUR)</option>
-                                    <option value="GBP">British Pound (GBP)</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Payment Frequency</label>
-                                <select class="form-select" name="payment_frequency">
-                                    <option value="monthly" selected>Monthly</option>
-                                    <option value="biweekly">Bi-Weekly</option>
-                                    <option value="weekly">Weekly</option>
-                                    <option value="daily">Daily</option>
-                                    <option value="hourly">Hourly</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Payment Method</label>
-                                <select class="form-select" name="payment_method">
-                                    <option value="bank">Bank Transfer</option>
-                                    <option value="cash">Cash</option>
-                                    <option value="check">Check</option>
-                                    <option value="mobile">Mobile Money</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Tax ID (TIN)</label>
-                                <input type="text" class="form-control" name="tax_id" placeholder="Tax Identification Number">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Social Security Number</label>
-                                <input type="text" class="form-control" name="social_security_number" placeholder="SSN/NIDA">
-                            </div>
-                            <div class="col-12 mb-3">
-                                <label class="form-label">Benefits</label>
-                                <div class="row">
-                                    <div class="col-md-3"><div class="form-check"><input class="form-check-input" type="checkbox" name="benefits[]" value="health_insurance" id="nps_health"><label class="form-check-label" for="nps_health">Health Insurance</label></div></div>
-                                    <div class="col-md-3"><div class="form-check"><input class="form-check-input" type="checkbox" name="benefits[]" value="life_insurance" id="nps_life"><label class="form-check-label" for="nps_life">Life Insurance</label></div></div>
-                                    <div class="col-md-3"><div class="form-check"><input class="form-check-input" type="checkbox" name="benefits[]" value="pension" id="nps_pension"><label class="form-check-label" for="nps_pension">Pension</label></div></div>
-                                    <div class="col-md-3"><div class="form-check"><input class="form-check-input" type="checkbox" name="benefits[]" value="transport_allowance" id="nps_transport"><label class="form-check-label" for="nps_transport">Transport Allowance</label></div></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Step 4: Contact Details -->
-                    <div class="nps-wizard-step" id="nps-step-3" style="display:none;">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Email Address <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control" name="email" required placeholder="employee@company.com">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Phone Number <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" name="phone" required placeholder="+255 123 456 789">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Alternate Phone</label>
-                                <input type="text" class="form-control" name="alternate_phone" placeholder="Alternate phone number">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Physical Address <span class="text-danger">*</span></label>
-                                <textarea class="form-control" name="physical_address" rows="2" required placeholder="e.g. Msasani, Dar es Salaam"></textarea>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Postal Address</label>
-                                <textarea class="form-control" name="postal_address" rows="2" placeholder="e.g. P.O. Box 1234"></textarea>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">City</label>
-                                <input type="text" class="form-control" name="city" placeholder="City">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Country</label>
-                                <input type="text" class="form-control" name="country" value="Tanzania" placeholder="Country">
-                            </div>
-                            <div class="col-12 mb-2 mt-2">
-                                <div class="d-flex align-items-center gap-2">
-                                    <i class="bi bi-person-exclamation text-primary"></i>
-                                    <h6 class="fw-bold text-primary mb-0" style="font-size:0.9rem; text-transform:uppercase;">Emergency Contact</h6>
-                                </div>
-                                <hr class="mt-1 mb-2 border-primary border-opacity-25">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Contact Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" name="emergency_contact" required placeholder="Full name of emergency contact">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Relationship with Employee</label>
-                                <input type="text" class="form-control" name="emergency_contact_relationship" placeholder="e.g. Spouse, Parent, Sibling">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Phone Number <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" name="emergency_contact_phone" required placeholder="Phone number of emergency contact">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Email Address <small class="text-muted">(if available)</small></label>
-                                <input type="email" class="form-control" name="emergency_contact_email" placeholder="contact@example.com">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Postal Address <small class="text-muted">(of Contact)</small></label>
-                                <input type="text" class="form-control" name="emergency_contact_postal_address" placeholder="P.O. Box or postal address">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Physical Address <small class="text-muted">(of Contact)</small></label>
-                                <textarea class="form-control" name="emergency_contact_physical_address" rows="2" placeholder="Street, neighbourhood, town/city"></textarea>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Step 5: Bank Details -->
-                    <div class="nps-wizard-step" id="nps-step-4" style="display:none;">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Bank Name</label>
-                                <input type="text" class="form-control" name="bank_name" placeholder="Bank name">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Bank Account Number</label>
-                                <input type="text" class="form-control" name="bank_account" placeholder="Bank account number">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Bank Branch</label>
-                                <input type="text" class="form-control" name="bank_branch" placeholder="Bank branch">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Mobile Money Number</label>
-                                <input type="text" class="form-control" name="mobile_money" placeholder="Mobile money number">
-                            </div>
-                            <div class="col-12 mb-3">
-                                <label class="form-label">Additional Notes</label>
-                                <textarea class="form-control" name="additional_notes" rows="3" placeholder="Any additional notes or information"></textarea>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer bg-light p-3">
-                    <button type="button" class="btn btn-secondary me-auto" id="npsPrevBtn" style="display:none;" onclick="npsNextTab(-1)">
-                        <i class="bi bi-arrow-left"></i> Previous
-                    </button>
-                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="npsNextBtn" onclick="npsNextTab(1)">
-                        Next <i class="bi bi-arrow-right"></i>
-                    </button>
-                    <button type="submit" class="btn btn-primary px-4" id="btnCreateProjectStaff" style="display:none;">
-                        <i class="bi bi-person-plus me-1"></i> Create & Assign
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 
 <!-- ===== HR: Mark / Edit Attendance Modal ===== -->
 <div class="modal fade" id="markAttendanceModal" tabindex="-1" aria-hidden="true">
@@ -7121,25 +6814,30 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <!-- Tab 3: Address -->
                         <div class="tab-pane fade" id="aps-address" role="tabpanel" aria-labelledby="aps-address-tab">
                             <div class="row">
+                                <!-- Location cascade: Country → Region → District → Ward → Street/Village -->
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Country</label>
-                                    <input type="text" class="form-control" name="country" placeholder="e.g. Tanzania">
+                                    <input type="text" class="form-control" id="aps_country" name="country" placeholder="e.g. Tanzania">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Region</label>
-                                    <input type="text" class="form-control" name="state" placeholder="e.g. Dar es Salaam">
+                                    <input type="text" class="form-control" id="aps_state" name="state" placeholder="e.g. Dar es Salaam">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">District (City)</label>
-                                    <input type="text" class="form-control" name="city" placeholder="e.g. Ilala">
+                                    <input type="text" class="form-control" id="aps_city" name="city" placeholder="e.g. Ilala">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Ward</label>
+                                    <input type="text" class="form-control" id="aps_ward" name="ward" placeholder="e.g. Kariakoo">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Street/Village</label>
+                                    <input type="text" class="form-control" id="aps_village" name="village" placeholder="e.g. Mtaa wa Kariakoo">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Council</label>
                                     <input type="text" class="form-control" name="council" placeholder="e.g. Ilala Municipal">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Ward</label>
-                                    <input type="text" class="form-control" name="ward" placeholder="e.g. Kariakoo">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Postal Code (Zip)</label>
@@ -7333,17 +7031,26 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <label class="form-label">Physical Address</label>
                                     <textarea class="form-control" id="eps_address" name="address" rows="2" placeholder="Street, Building, etc."></textarea>
                                 </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">City</label>
-                                    <input type="text" class="form-control" id="eps_city" name="city" placeholder="City">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">State/Region</label>
-                                    <input type="text" class="form-control" id="eps_state" name="state" placeholder="State/Region">
-                                </div>
+                                <!-- Location cascade: Country → Region → District → Ward → Street/Village -->
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Country</label>
                                     <input type="text" class="form-control" id="eps_country" name="country" placeholder="Country">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Region</label>
+                                    <input type="text" class="form-control" id="eps_state" name="state" placeholder="Region">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">District (City)</label>
+                                    <input type="text" class="form-control" id="eps_city" name="city" placeholder="District">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Ward</label>
+                                    <input type="text" class="form-control" id="eps_ward" name="ward" placeholder="Ward">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Street/Village</label>
+                                    <input type="text" class="form-control" id="eps_village" name="village" placeholder="Street/Village">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Postal Code</label>
@@ -8001,20 +7708,6 @@ $(document).ready(function() {
                 width: '100%'
             });
         }
-    });
-
-    $('#newProjectStaffModal').on('shown.bs.modal', function () {
-        $(this).find('.select2-static').each(function () {
-            if (!$(this).hasClass('select2-hidden-accessible')) {
-                $(this).select2({
-                    theme: 'bootstrap-5',
-                    dropdownParent: $('#newProjectStaffModal'),
-                    placeholder: 'Select...',
-                    allowClear: true,
-                    width: '100%'
-                });
-            }
-        });
     });
 
     $('#applyLeaveModal').on('shown.bs.modal', function () {
@@ -15602,8 +15295,8 @@ function renderProjectSuppliers(suppliers) {
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="min-width: 220px; max-height: 350px; overflow-y: auto;">
                             <li class="dropdown-header text-uppercase small fw-bold">Management</li>
-                            <li><a class="dropdown-item py-2" href="suppliers/details?id=${s.supplier_id}"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
-                            <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editProjectSupplier(${s.supplier_id})"><i class="bi bi-pencil text-primary me-2"></i>Edit Supplier</a></li>
+                            <li><a class="dropdown-item py-2" href="suppliers/details?id=${s.supplier_id}&project=<?= $project_id ?>&back=suppliers"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
+                            <li><a class="dropdown-item py-2" href="<?= getUrl('suppliers') ?>?edit=${s.supplier_id}&project=<?= $project_id ?>&back=suppliers"><i class="bi bi-pencil text-primary me-2"></i>Edit Supplier</a></li>
                             <li><a class="dropdown-item py-2" href="purchase_orders?supplier=${s.supplier_id}"><i class="bi bi-cart text-success me-2"></i>View Orders</a></li>
                            
                             
@@ -15713,10 +15406,16 @@ function editProjectSupplier(id) {
             $('#eps_website').val(s.website);
             
             $('#eps_address').val(s.address);
-            $('#eps_city').val(s.city);
-            $('#eps_state').val(s.state);
-            $('#eps_country').val(s.country);
             $('#eps_postal_code').val(s.postal_code);
+            // Location cascade prefill — matches stored names to the defined lists;
+            // unmatched legacy values are preserved as extra options.
+            if (window.editSupplierCascade) window.editSupplierCascade.setValues({
+                country:  s.country || 'Tanzania',
+                region:   s.state || '',
+                district: s.city || '',
+                ward:     s.ward || '',
+                village:  s.village || ''
+            });
             
             $('#eps_tax_id').val(s.tax_id);
             $('#eps_vat_number').val(s.vat_number);
@@ -15819,7 +15518,7 @@ function renderProjectStaff(staff) {
                 <p class="small text-muted mb-0">Assign existing employees or create new ones for this project.</p>
                 <div class="mt-3">
                     <button class="btn btn-sm btn-primary" onclick="openAssignStaffModal()">Assign Existing Staff</button>
-                    <button class="btn btn-sm btn-success" onclick="createNewProjectStaff()">Create New Staff Member</button>
+                    <a class="btn btn-sm btn-success" href="<?= getUrl('employees') ?>?action=new&project=<?= $project_id ?>&back=staff">Create New Staff Member</a>
                 </div>
             </div>
         `);
@@ -15871,9 +15570,12 @@ function renderProjectStaff(staff) {
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                             <li class="dropdown-header text-uppercase small fw-bold">Staff Actions</li>
-                            <li><a class="dropdown-item py-2" href="employee_details?id=${s.employee_id}"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
+                            <li><a class="dropdown-item py-2" href="employee_details?id=${s.employee_id}&project=<?= $project_id ?>&back=staff"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
+                            <li><a class="dropdown-item py-2" href="<?= getUrl('employees') ?>?edit_id=${s.employee_id}&project=<?= $project_id ?>&back=staff"><i class="bi bi-pencil text-primary me-2"></i>Edit</a></li>
+                            <li><a class="dropdown-item py-2" href="payroll?employee=${s.employee_id}"><i class="bi bi-cash-coin text-success me-2"></i>Payroll</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="unassignStaff(${s.employee_id}, '${name}')"><i class="bi bi-person-dash me-2"></i>Remove from Project</a></li>
+                            <li><a class="dropdown-item py-2 text-warning" href="javascript:void(0)" onclick="unassignStaff(${s.employee_id}, '${name}')"><i class="bi bi-person-dash me-2"></i>Remove from Project</a></li>
+                            <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteProjectStaff(${s.employee_id}, '${name}')"><i class="bi bi-trash me-2"></i>Delete Staff</a></li>
                         </ul>
                     </div>
                 </td>
@@ -15914,98 +15616,31 @@ function unassignStaff(id, name) {
     });
 }
 
-// ---- New Project Staff Wizard ----
-var npsCurrentStep = 0;
-var npsTotalSteps  = 5;
-var npsStepTitles  = ['Personal Info', 'Employment', 'Salary & Benefits', 'Contact Details', 'Bank Details'];
-
-function npsShowStep(n) {
-    npsCurrentStep = n;
-    $('#newProjectStaffModal .nps-wizard-step').hide();
-    $('#nps-step-' + n).show();
-    $('#npsStepIndicator').text('Step ' + (n + 1) + ' of ' + npsTotalSteps + ': ' + npsStepTitles[n]);
-    var pct = ((n + 1) / npsTotalSteps) * 100;
-    $('#npsProgressBar').css('width', pct + '%');
-    $('#npsPrevBtn').toggle(n > 0);
-    $('#npsNextBtn').toggle(n < npsTotalSteps - 1);
-    $('#btnCreateProjectStaff').toggle(n === npsTotalSteps - 1);
-    $('#nps-message').html('');
-}
-
-function npsValidateStep() {
-    var valid = true;
-    $('#nps-step-' + npsCurrentStep).find('input[required], select[required], textarea[required]').each(function() {
-        if (!$(this).val().trim()) {
-            $(this).addClass('is-invalid');
-            valid = false;
-        } else {
-            $(this).removeClass('is-invalid');
+// Permanently delete a staff member (same action as the external HR > Staff list).
+function deleteProjectStaff(id, name) {
+    Swal.fire({
+        title: 'Delete Staff?',
+        text: `This will delete (terminate) ${name} from the whole system, not just this project. This cannot be undone.`,
+        icon: 'error',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#aaa',
+        confirmButtonText: 'Yes, delete'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post(APP_URL + '/api/delete_employee.php', {
+                employee_id: id
+            }, function(res) {
+                if (res.success) {
+                    Swal.fire('Deleted!', res.message || 'Staff member deleted.', 'success');
+                    loadProjectDetails();
+                } else {
+                    Swal.fire('Error', res.message || 'Delete failed.', 'error');
+                }
+            }, 'json');
         }
     });
-    if (!valid) {
-        $('#nps-message').html('<div class="alert alert-warning py-2"><i class="bi bi-exclamation-triangle-fill me-1"></i> Please fill in all required fields.</div>');
-    }
-    return valid;
 }
-
-function npsNextTab(dir) {
-    if (dir === 1 && !npsValidateStep()) return;
-    var next = npsCurrentStep + dir;
-    if (next < 0 || next >= npsTotalSteps) return;
-    npsShowStep(next);
-}
-
-function createNewProjectStaff() {
-    $('#newProjectStaffForm')[0].reset();
-    $('#nps_project_id').val(projectId);
-    $('#nps_hire_date').val(new Date().toISOString().split('T')[0]);
-    autoGenerateEmployeeNumber();
-    npsShowStep(0);
-    $('#newProjectStaffModal').modal('show');
-}
-
-function autoGenerateEmployeeNumber() {
-    $.getJSON(APP_URL + '/api/operations/get_project.php', { id: projectId }, function(res) {
-        const count = (res.staff || []).length + 1;
-        const pad = String(count).padStart(3, '0');
-        $('#nps_emp_number').val('EMP-' + new Date().getFullYear() + '-' + pad);
-    });
-}
-
-$('#newProjectStaffModal').on('hidden.bs.modal', function() {
-    npsShowStep(0);
-    $('#newProjectStaffForm')[0].reset();
-});
-
-$('#newProjectStaffForm').on('submit', function(e) {
-    e.preventDefault();
-    if (!npsValidateStep()) return;
-    const btn = $('#btnCreateProjectStaff');
-    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Creating...');
-    const formData = new FormData(this);
-    $.ajax({
-        url: APP_URL + '/api/operations/create_project_staff.php',
-        method: 'POST',
-        data: formData,
-        processData: false,
-        contentType: false,
-        dataType: 'json',
-        success: function(res) {
-            btn.prop('disabled', false).html('<i class="bi bi-person-plus me-1"></i> Create & Assign');
-            if (res.success) {
-                $('#newProjectStaffModal').modal('hide');
-                Swal.fire({ icon: 'success', title: 'Staff Created!', text: res.message || 'Staff member created and assigned to this project.', timer: 2000, showConfirmButton: false });
-                loadProjectDetails();
-            } else {
-                Swal.fire('Error', res.message || 'Failed to create staff.', 'error');
-            }
-        },
-        error: function() {
-            btn.prop('disabled', false).html('<i class="bi bi-person-plus me-1"></i> Create & Assign');
-            Swal.fire('Error', 'Request failed. Please try again.', 'error');
-        }
-    });
-});
 
 function openAssignStaffModal() {
     // Load unassigned staff and show modal
@@ -18931,6 +18566,8 @@ function deleteDO(doId, doNumber) {
         'expenses':        'expenses-tab',
         'nip-products':    'proc-nip-products-tab',
         'sub-contractors': 'proj-sc-tab',
+        'suppliers':       'suppliers-tab',
+        'staff':           'staff-tab',
     };
     const targetId = map[tabParam];
     if (!targetId) return;
@@ -19544,7 +19181,7 @@ function projScLoadTable() {
                         <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-2" data-bs-toggle="dropdown"><i class="bi bi-gear-fill me-1"></i>Actions</button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
                             <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('sub_contractors/view') ?>?id=${sc.supplier_id}&from=project&project_id=<?= $project_id ?>"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
-                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="projScEdit(${sc.supplier_id})"><i class="bi bi-pencil text-primary me-2"></i>Edit</a></li>
+                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('sub_contractors') ?>?edit=${sc.supplier_id}&project=<?= $project_id ?>&back=sub-contractors"><i class="bi bi-pencil text-primary me-2"></i>Edit</a></li>
                             <li><a class="dropdown-item py-2 rounded" href="${APP_URL}/purchase_orders?supplier=${sc.supplier_id}"><i class="bi bi-cart text-success me-2"></i>View Orders</a></li>
                             <li><a class="dropdown-item py-2 rounded" href="${APP_URL}/suppliers/payments?id=${sc.supplier_id}"><i class="bi bi-cash-stack text-warning me-2"></i>View Payments</a></li>
                             <li><hr class="dropdown-divider"></li>
@@ -22231,6 +21868,37 @@ window.addEventListener('afterprint', function () {
     });
 });
 
+</script>
+
+<!-- Location cascade engine (Country → Region → District → Ward → Street/Village).
+     Same component the external Suppliers / Employees forms use. Tanzania gets
+     locked cascading dropdowns; other countries fall back to free text. -->
+<script src="<?= getUrl('assets/js/location_cascade.js') ?>"></script>
+<script>
+$(function () {
+    if (typeof initLocationCascade !== 'function') return;
+    var LOC_URL = '<?= buildUrl('api/location/options.php') ?>';
+
+    // Procurements → Add Supplier (only when the modal is on the page)
+    if ($('#aps_country').length) {
+        window.addSupplierCascade = initLocationCascade({
+            endpoint: LOC_URL,
+            fields: { country: '#aps_country', region: '#aps_state', district: '#aps_city', ward: '#aps_ward', village: '#aps_village' },
+            dropdownParent: '#addProjectSupplierModal'
+        });
+        $('#addProjectSupplierModal').on('shown.bs.modal', function () {
+            if (window.addSupplierCascade) window.addSupplierCascade.setValues({ country: 'Tanzania' });
+        });
+    }
+    // Procurements → Edit Supplier (prefilled via setValues() in editProjectSupplier())
+    if ($('#eps_country').length) {
+        window.editSupplierCascade = initLocationCascade({
+            endpoint: LOC_URL,
+            fields: { country: '#eps_country', region: '#eps_state', district: '#eps_city', ward: '#eps_ward', village: '#eps_village' },
+            dropdownParent: '#editProjectSupplierModal'
+        });
+    }
+});
 </script>
 
 <?php includeFooter(); ?>

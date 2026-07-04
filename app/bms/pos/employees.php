@@ -18,6 +18,23 @@ logActivity($pdo, $_SESSION['user_id'], 'View employees', 'User viewed the emplo
 $can_edit_employees = isAdmin() || canEdit('employees');
 $can_delete_employees = isAdmin() || canDelete('employees');
 
+// ── Project context (clean deep-link from Project Details) ───────────────────
+// Arriving as ?project=<id>&back=<tab> pre-selects & locks the project, shows a
+// "Back to Project" affordance, and returns there after save — mirroring the
+// Purchase Order create/edit pattern. The return URL is rebuilt server-side from
+// the project id + short tab key, so the address bar stays clean.
+$proj_ctx_id     = isset($_GET['project']) ? intval($_GET['project']) : 0;
+$proj_ctx_back   = preg_replace('/[^a-z0-9\-]/', '', strtolower($_GET['back'] ?? ''));
+$proj_ctx_name   = '';
+$proj_ctx_return = '';
+if ($proj_ctx_id > 0) {
+    $pcs = $pdo->prepare("SELECT project_name FROM projects WHERE project_id = ?");
+    $pcs->execute([$proj_ctx_id]);
+    $proj_ctx_name   = $pcs->fetchColumn() ?: '';
+    $proj_ctx_tab    = $proj_ctx_back !== '' ? $proj_ctx_back : 'staff';
+    $proj_ctx_return = getUrl('project_view') . '?id=' . $proj_ctx_id . '&tab=' . $proj_ctx_tab;
+}
+
 
 // Get departments
 $departments = $pdo->query("SELECT * FROM departments WHERE status = 'active' ORDER BY department_name")->fetchAll(PDO::FETCH_ASSOC);
@@ -524,6 +541,14 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                 <input type="hidden" id="employee_id" name="employee_id" value="">
                 <div class="modal-body">
                     <div id="add-employee-message" class="mb-3"></div>
+                    <?php if ($proj_ctx_id > 0): ?>
+                    <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3">
+                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Adding to project: <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+                        <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
+                            <i class="bi bi-arrow-left me-1"></i> Back to Project
+                        </a>
+                    </div>
+                    <?php endif; ?>
                     
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h6 id="stepIndicator" class="text-primary fw-bold mb-0">Step 1 of 5: Personal Info</h6>
@@ -1010,6 +1035,14 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
             <form id="editEmployeeForm">
                 <div class="modal-body">
                     <div id="edit-employee-message" class="mb-3"></div>
+                    <?php if ($proj_ctx_id > 0): ?>
+                    <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3">
+                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Editing within project: <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+                        <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
+                            <i class="bi bi-arrow-left me-1"></i> Back to Project
+                        </a>
+                    </div>
+                    <?php endif; ?>
                     <input type="hidden" id="edit_employee_id" name="employee_id">
                     
                     <div class="row">
@@ -1055,7 +1088,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label for="edit_basic_salary" class="form-label">Basic Salary</label>
                         <input type="number" class="form-control" id="edit_basic_salary" name="basic_salary" step="0.01">
@@ -1239,7 +1272,8 @@ $(document).ready(function() {
         
         const formData = $(this).serialize();
         const submitBtn = $(this).find('[type="submit"]');
-        
+        const selectedProjectId = $('#project_id').val();   // capture before any reset
+
         submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...');
 
         $.ajax({
@@ -1256,7 +1290,7 @@ $(document).ready(function() {
                         confirmButtonText: 'OK',
                         confirmButtonColor: '#28a745'
                     }).then(() => {
-                        location.reload();
+                        redirectAfterEmployeeSave(selectedProjectId);
                     });
                 } else {
                     $('#add-employee-message').html('<div class="alert alert-danger">' + response.message + '</div>');
@@ -1352,7 +1386,8 @@ $(document).ready(function() {
                         confirmButtonText: 'OK',
                         confirmButtonColor: '#28a745'
                     }).then(() => {
-                        location.reload();
+                        if (window.__projReturnUrl) { window.location.href = window.__projReturnUrl; }
+                        else { location.reload(); }
                     });
                 } else {
                     Swal.fire('Error', response.message || 'Update failed.', 'error');
@@ -1648,6 +1683,7 @@ window.submitEmployeeForm = function() {
     
     let formData = new FormData(document.getElementById('addEmployeeForm'));
     const submitBtn = $('#saveBtn');
+    const selectedProjectId = $('#project_id').val();   // capture before the modal resets the form
 
     $.ajax({
         url: apiUrl,
@@ -1669,7 +1705,7 @@ window.submitEmployeeForm = function() {
                     confirmButtonText: 'OK',
                     confirmButtonColor: '#28a745'
                 }).then(() => {
-                    location.reload();
+                    redirectAfterEmployeeSave(selectedProjectId);
                 });
             } else {
                 Swal.fire('Error', response.message, 'error');
@@ -2505,6 +2541,44 @@ $(document).ready(function() {
     const urlParams = new URLSearchParams(window.location.search);
     const editId = urlParams.get('edit_id');
     const action = urlParams.get('action');
+    // Project context resolved server-side (clean URL: ?project=<id>&back=<tab>).
+    const projLock  = <?= $proj_ctx_id ?: 'null' ?>;   // opened from inside a project → lock onto it
+    const projName  = <?= json_encode($proj_ctx_name) ?>;
+    window.__projReturnUrl = <?= $proj_ctx_return !== '' ? json_encode($proj_ctx_return) : 'null' ?>;  // return here after save
+
+    // After a successful create/edit: if a project is selected on the form, go
+    // straight to that project's Staff tab; otherwise return to the project we
+    // came from (if any), else just refresh the list.
+    window.redirectAfterEmployeeSave = function(pidArg) {
+        // pidArg is captured before the modal resets the form; fall back to the
+        // live field for handlers that don't reset before redirecting.
+        const pid = ((pidArg != null ? pidArg : $('#project_id').val()) || '').toString().trim();
+        if (pid) {
+            window.location.href = '<?= getUrl('project_view') ?>?id=' + encodeURIComponent(pid) + '&tab=staff';
+        } else if (window.__projReturnUrl) {
+            window.location.href = window.__projReturnUrl;
+        } else {
+            location.reload();
+        }
+    };
+
+    // When opened from a project, force the project field to that project and lock it.
+    function lockEmpProject() {
+        if (!projLock) return;
+        const $sel = $('#project_id');
+        if (!$sel.length) return;
+        if ($sel.find('option[value="' + projLock + '"]').length === 0) {
+            const label = projName || ('Project #' + projLock);
+            $sel.append(new Option(label, projLock, true, true));
+        }
+        $sel.val(projLock).trigger('change');
+        $sel.prop('disabled', true).trigger('change.select2');
+        const $form = $sel.closest('form');
+        if ($form.find('input[type=hidden][name="project_id"]').length === 0) {
+            $('<input type="hidden" name="project_id">').val(projLock).appendTo($form);
+        }
+    }
+    $('#addEmployeeModal').on('shown.bs.modal', lockEmpProject);
 
     if (editId) {
         // Small delay to ensure functions are loaded
@@ -2512,14 +2586,10 @@ $(document).ready(function() {
             if (typeof editEmployee === 'function') {
                 editEmployee(editId);
             }
-            // Clean URL
-            window.history.replaceState({}, document.title, window.location.pathname);
         }, 300);
     } else if (action === 'new') {
         setTimeout(function() {
             $('#addEmployeeModal').modal('show');
-            // Clean URL
-            window.history.replaceState({}, document.title, window.location.pathname);
         }, 500);
     }
 
