@@ -97,8 +97,8 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
 
             <div id="apTableView" class="card border-0 shadow-sm"><div class="card-body">
                 <table id="appraisalsTable" class="table table-hover align-middle w-100">
-                    <thead class="table-dark"><tr>
-                        <th>Date</th><th>Employee</th><th>Cycle</th><th>Designation</th><th>Overall</th><th>Status</th><th class="text-end">Actions</th>
+                    <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"><tr>
+                        <th class="text-center">S/NO</th><th>Date</th><th>Employee</th><th>Cycle</th><th>Designation</th><th>Overall</th><th>Status</th><th class="text-end">Actions</th>
                     </tr></thead>
                     <tbody></tbody>
                 </table>
@@ -143,7 +143,7 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
             </div></div>
             <div id="gTableView" class="card border-0 shadow-sm"><div class="card-body">
                 <table id="goalsTable" class="table table-hover align-middle w-100">
-                    <thead class="table-dark"><tr><th>Employee</th><th>Goal</th><th>Type</th><th>Due</th><th style="min-width:140px">Progress</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+                    <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"><tr><th class="text-center">S/NO</th><th>Employee</th><th>Goal</th><th>Type</th><th>Due</th><th style="min-width:140px">Progress</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div></div>
@@ -617,6 +617,7 @@ function loadAppraisals() {
         $('#st_draft').text(res.stats.draft); $('#st_submitted').text(res.stats.submitted);
         $('#st_approved').text(res.stats.approved); $('#st_avg').text(res.stats.avg !== null ? res.stats.avg : '—');
         const data = res.data.map(r => [
+            '',
             safeOutput(r.appraisal_date),
             `<a href="<?= getUrl('employee_details') ?>?id=${r.employee_id}" class="text-decoration-none fw-semibold">${safeOutput(r.first_name+' '+r.last_name)}</a>`,
             safeOutput(r.cycle_name), safeOutput(r.designation_name || '—'),
@@ -714,7 +715,9 @@ $(function () {
     if (!AP_CAN_CREATE && !AP_CAN_EDIT && true) { /* viewers still see the list */ }
 
     apTable = $('#appraisalsTable').DataTable({
-        responsive:false, scrollX:true, pageLength:25, order:[[0,'desc']], dom:'rtip',
+        responsive:false, scrollX:true, pageLength:25, order:[[1,'desc']], dom:'rtip',
+        columnDefs: [{ targets: 0, orderable: false, searchable: false, className: 'text-center',
+            render: (d, t, row, meta) => meta.row + 1 + meta.settings._iDisplayStart }],
         language:{ emptyTable:'No appraisals yet.', zeroRecords:'No matching records.' },
         drawCallback: function () { apCards(this.api().rows({page:'current'})[0].map(i=>AP_ROWS[i]).filter(Boolean)); }
     });
@@ -861,6 +864,7 @@ function loadGoals() {
         const data = res.data.map(r => {
             const overdue = (r.status === 'not_started' || r.status === 'in_progress') && Number(r.days_to_due) < 0;
             return [
+                '',
                 `<a href="<?= getUrl('employee_details') ?>?id=${r.employee_id}" class="text-decoration-none fw-semibold">${safeOutput(r.first_name+' '+r.last_name)}</a>`,
                 safeOutput(r.subject), safeOutput(r.type_name || '—'),
                 safeOutput(r.end_date) + (overdue ? ' <span class="badge bg-danger">Overdue</span>' : ''),
@@ -886,7 +890,9 @@ function gCards(rows) {
 }
 $(function () {
     gTable = $('#goalsTable').DataTable({
-        responsive:false, scrollX:true, pageLength:25, order:[[3,'asc']], dom:'rtip',
+        responsive:false, scrollX:true, pageLength:25, order:[[4,'asc']], dom:'rtip',
+        columnDefs: [{ targets: 0, orderable: false, searchable: false, className: 'text-center',
+            render: (d, t, row, meta) => meta.row + 1 + meta.settings._iDisplayStart }],
         language:{ emptyTable:'No goals yet.', zeroRecords:'No matching records.' },
         drawCallback: function () { gCards(this.api().rows({page:'current'})[0].map(i=>G_ROWS[i]).filter(Boolean)); }
     });

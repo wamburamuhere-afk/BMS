@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-07-03 (ui) — Operations/HR pages: blue table headers + S/NO column
+
+Scope: the Operations → Human Resources pages from HR Actions through
+Announcements. Presentation-only changes; no business logic, queries or
+permissions touched.
+
+- **Black → blue table headers.** Replaced every `<thead class="table-dark">`
+  (black) with a solid brand-blue header (`--bs-table-color:#fff;
+  --bs-table-bg:#0d6efd;`) across 8 listing tables in 7 files:
+  `hr_actions.php`, `employee_contracts.php`, `hr_performance.php` (Appraisals +
+  Goals), `trainings.php`, `meetings.php`, `employee_trips.php`,
+  `announcements.php`.
+- **S/NO first column.** Added a centered, non-sortable, non-searchable running
+  serial-number column as the first column of each of those 8 tables. Numbers
+  follow paging/sorting via a DataTables `columnDefs` render
+  (`meta.row + 1 + _iDisplayStart`); default sort targets shifted +1 and the
+  Excel export excludes the S/NO column.
+
+Note: Issue 3 (pages that "load forever" / show empty tables / don't save) was
+investigated — all HR tables exist, every read endpoint returns clean JSON, and
+create/save persists on local — so the reported symptom is front-end/live-env,
+not a backend bug. Root-cause hunt (live browser inspection) still open.
+
 ## 2026-07-03 (fix) — Correct phantom Sokon wards + malformed Kilosampepo code
 
 - `migrations/2026_07_03_fix_phantom_sokon_wards_and_kilosampepo_code.php` — a
