@@ -68,6 +68,8 @@ $can_delete = canDelete('meetings');
 <?php endif; ?>
 
 <script>
+// HTML-escape helper (page-local per app convention)
+function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 const MT_CSRF = <?= json_encode(csrf_token()) ?>;
 const MT_CAN_EDIT=<?= json_encode($can_edit) ?>, MT_CAN_DELETE=<?= json_encode($can_delete) ?>;
 let mtTable=null, MT_ROWS=[], MT_CUR=null;

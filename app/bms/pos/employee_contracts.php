@@ -222,6 +222,8 @@ $probation_count = (int)$pdo->query($probation_sql)->fetchColumn();
 <?php endif; ?>
 
 <script>
+// HTML-escape helper (page-local per app convention)
+function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 const CAN_APPROVE = <?= json_encode($can_approve) ?>;
 const CSRF        = <?= json_encode(csrf_token()) ?>;
 

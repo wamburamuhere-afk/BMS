@@ -86,6 +86,8 @@ $can_reject  = function_exists('canReject') ? canReject('employee_trips') : $can
 <?php endif; ?>
 
 <script>
+// HTML-escape helper (page-local per app convention)
+function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 const TP_CSRF = <?= json_encode(csrf_token()) ?>;
 const TP_CAN_EDIT=<?= json_encode($can_edit) ?>, TP_CAN_DELETE=<?= json_encode($can_delete) ?>, TP_CAN_APPROVE=<?= json_encode($can_approve) ?>, TP_CAN_REJECT=<?= json_encode($can_reject) ?>;
 const TP_MY_ID = <?= (int)$_SESSION['user_id'] ?>;
