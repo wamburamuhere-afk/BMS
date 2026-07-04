@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-07-03 (feat) — Project detail: move Bills to Procurements + external-parity columns/actions
+
+In **Projects → Project Details**, the **Bills** tab (linked `received_invoices`)
+was under the **Sales** menu and rendered a reduced, read-only table. Moved it to
+where it belongs (procurement) and brought it to parity with the standalone Bills
+page, dropping the redundant Project column (we are already inside a project) and
+auto-capturing the project on create.
+
+- **`app/bms/operations/project_view.php`**
+  - Moved the **Bills** menu item out of the **Sales** dropdown into the
+    **Procurements** dropdown, immediately **after GRN** (full project view).
+  - Added `received_invoices` permission flags (`create/edit/delete/review/approve`).
+  - Added a permission-gated **Record Bill** button that opens the standalone
+    Bills page with this project pre-selected and locked (`?add=1&lock_project=<id>`).
+  - Rewrote `renderProjectReceivedInvoices()` to the external column set —
+    `S/NO · Invoice Ref · Type · From · Date Raised · Due Date · PO / Project ·
+    Amount (TZS) · Status · Actions` — with a full-parity Actions dropdown (View,
+    Attachment, Mark Reviewed, Approve, Record Payment, Edit, Delete), gated by
+    permission and bill status. Status changes / delete call the API inline;
+    Edit / Record Payment / Create delegate to the external page.
+- **`app/bms/invoice/received_invoices.php`**
+  - Added deep-links `?add=1`, `?pay=<id>`, and `?lock_project=<id>`.
+  - With `lock_project`, the Project field is pre-selected, **locked, and always
+    POSTed** (re-asserted on supplier change), so a bill created from inside a
+    project auto-captures that project; on save it returns to the project's Bills tab.
+
 ## 2026-07-03 (fix) — Operations/HR pages render blank: missing safeOutput()
 
 Root cause of the "page loads forever / stat cards show numbers but the table is

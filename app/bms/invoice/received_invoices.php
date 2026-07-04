@@ -17,6 +17,21 @@ $can_edit    = canEdit('received_invoices');
 $can_delete  = canDelete('received_invoices');
 $can_review  = canReview('received_invoices');
 $can_approve = canApprove('received_invoices');
+
+// Deep-link / project-lock support — the project detail page opens this page
+// with the project pre-selected and locked, so a Bill recorded from inside a
+// project auto-captures that project (no project picker) and returns there.
+$ri_lock_project      = intval($_GET['lock_project'] ?? 0);
+$ri_lock_project_name = '';
+if ($ri_lock_project > 0) {
+    $lpStmt = $pdo->prepare("SELECT project_name FROM projects WHERE project_id = ?");
+    $lpStmt->execute([$ri_lock_project]);
+    $ri_lock_project_name = $lpStmt->fetchColumn() ?: '';
+    if ($ri_lock_project_name === '') $ri_lock_project = 0;  // unknown project → ignore lock
+}
+$ri_return_url = $ri_lock_project > 0 ? getUrl('project_view') . '?id=' . $ri_lock_project : '';
+$ri_open_add   = !empty($_GET['add']);
+$ri_pay_id     = intval($_GET['pay'] ?? 0);
 ?>
 <style>
 .stat-card { border-radius: 12px; transition: transform .2s; background-color: #e7f0ff; border: 1px solid #b6ccfe !important; }
@@ -521,6 +536,13 @@ const RI_VIEW_URL   = '<?= getUrl('received_invoices_view') ?>';
 // the entire <script> block (so openAddModal() never gets defined and the
 // "Record Invoice" button stops responding to clicks).
 const RI_EDIT_ID    = <?= json_encode(intval($_GET['edit'] ?? 0)) ?>;
+// Project-lock deep-link (opened from a project's Bills tab): the project is
+// pre-selected, locked, and always POSTed so create auto-captures it.
+const RI_LOCK_PROJECT      = <?= json_encode($ri_lock_project) ?>;
+const RI_LOCK_PROJECT_NAME = <?= json_encode($ri_lock_project_name) ?>;
+const RI_RETURN_URL        = <?= json_encode($ri_return_url) ?>;
+const RI_OPEN_ADD          = <?= json_encode($ri_open_add) ?>;
+const RI_PAY_ID            = <?= json_encode($ri_pay_id) ?>;
 
 function safeOutput(str) {
     if (str === null || str === undefined || str === false) return '';
@@ -541,6 +563,10 @@ $(document).ready(function () {
 
     if (RI_EDIT_ID && RI_CAN_EDIT) {
         loadInvoices(function () { editRow(RI_EDIT_ID); });
+    } else if (RI_OPEN_ADD && RI_CAN_CREATE) {
+        openAddModal();                                   // Record Bill (project locked)
+    } else if (RI_PAY_ID && RI_CAN_APPROVE) {
+        loadInvoices(function () { deepLinkPay(RI_PAY_ID); });
     }
 
     // Auto-compute due_date. Reads the real terms value from the hidden #f-payment-terms-value
@@ -677,10 +703,15 @@ $(document).ready(function () {
         const orig = btn.html();
         btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
 
+        const fd = new FormData(this);
+        // A disabled (locked) project select is excluded from FormData — inject
+        // its value so create/update still captures the locked project.
+        if (RI_LOCK_PROJECT && $('#f-project').prop('disabled')) fd.set('project_id', String(RI_LOCK_PROJECT));
+
         $.ajax({
             url: RI_API + '?action=' + ($('#f-id').val() ? 'update' : 'create'),
             type: 'POST',
-            data: new FormData(this),
+            data: fd,
             contentType: false,
             processData: false,
             dataType: 'json',
@@ -688,6 +719,12 @@ $(document).ready(function () {
                 if (res.success) {
                     const modal = bootstrap.Modal.getInstance(document.getElementById('invoiceModal'));
                     if (modal) modal.hide();
+                    // Opened from a project's Bills tab → return there after saving.
+                    if (RI_RETURN_URL) {
+                        Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 1400, showConfirmButton: false })
+                            .then(function () { window.location.href = RI_RETURN_URL; });
+                        return;
+                    }
                     loadInvoices();
                     Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, showConfirmButton: true });
                 } else {
@@ -708,6 +745,15 @@ $(document).ready(function () {
             loadWarehouses('');
             // Start a new invoice (either type) with one empty item row.
             if (!$('#ri-itemsBody tr').length) riAddItemRow();
+            // Project-lock: pre-select + disable so the Bill auto-captures the
+            // project it was launched from. loadProjects re-asserts this on
+            // every supplier change.
+            if (RI_LOCK_PROJECT) {
+                const $sel = $('#f-project');
+                $sel.empty().append($('<option>').val(RI_LOCK_PROJECT).text(RI_LOCK_PROJECT_NAME))
+                    .val(RI_LOCK_PROJECT).prop('disabled', true).trigger('change.select2');
+                $('#project-label').html('Project <span class="badge bg-primary ms-1"><i class="bi bi-lock-fill me-1"></i>Auto-set</span>');
+            }
         }
         // Cost-account options don't change per supplier — load once and cache.
         if ($('#f-cost-account option').length <= 1) loadCostAccounts();
@@ -866,6 +912,19 @@ function openAddModal() {
     $('#modalTitle').html('<i class="bi bi-inbox me-2"></i>Record Bill');
     $('#saveBtn').html('<i class="bi bi-check-circle me-1"></i> Save Invoice').removeClass('btn-warning').addClass('btn-primary');
     new bootstrap.Modal(document.getElementById('invoiceModal')).show();
+}
+
+// Deep-link: open the Record-Payment modal for a bill (from a project's Bills
+// tab). Uses the already-loaded list row so it passes the same data the row's
+// own Actions menu would (accurate amount_paid / subtotal / WHT default).
+function deepLinkPay(id) {
+    const row = (allRows || []).find(r => String(r.id) === String(id));
+    if (!row) { Swal.fire({ icon: 'error', title: 'Not found', text: 'Bill not found.' }); return; }
+    if (row.status !== 'approved' && row.status !== 'partial') {
+        Swal.fire({ icon: 'info', title: 'Not payable', text: 'This bill is not in an approved or partial state.' });
+        return;
+    }
+    openPaymentModal(row.id, row.invoice_ref, row.amount, row.subtotal || 0, row.default_wht_rate_id || 0, row.amount_paid || 0);
 }
 
 function editRow(id) {
@@ -1344,6 +1403,16 @@ function loadProjects(supplierId, type, cb) {
         (res.data || []).forEach(function (item) {
             $sel.append($('<option>').val(item.id).text(item.text));
         });
+        // Project lock (add mode only): force-select and disable so it can't be
+        // changed. loadProjects wipes the list on every supplier change, so the
+        // lock is re-applied here each time.
+        if (RI_LOCK_PROJECT && !$('#f-id').val()) {
+            if (!$sel.find('option[value="' + RI_LOCK_PROJECT + '"]').length) {
+                $sel.append($('<option>').val(RI_LOCK_PROJECT).text(RI_LOCK_PROJECT_NAME));
+            }
+            $sel.val(RI_LOCK_PROJECT).prop('disabled', true);
+            if ($sel.hasClass('select2-hidden-accessible')) $sel.trigger('change.select2');
+        }
         if (cb) cb();
     });
 }
