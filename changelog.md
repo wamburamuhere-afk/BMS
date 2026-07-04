@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-07-04 (feat) — Project details Sales section: DataTables + mobile card view (Sales Orders, IPC, Invoices)
+
+The three tables under **Projects → Project Details → Sales** now use searchable,
+sortable, paged **DataTables** on desktop and a **card view** on mobile, matching the
+rest of the system.
+
+- **`app/bms/operations/project_view.php`**
+  - **Sales Orders** (`renderSalesOrdersFull`): was a plain static table — now a
+    DataTable (`#salesOrdersDT`, search/sort/paging) inside `d-none d-lg-block`, plus
+    a `d-lg-none` card view (order no, customer, date, total, status + Actions).
+  - **Invoices** (`renderInvoicesFull`): same treatment (`#invoicesDT` + card view,
+    reusing `buildInvoiceActions`).
+  - **IPC** (`ipcLoadTable`): the existing DataTable gained a **search box**
+    (`dom: 'frtip'`) and a mobile **card view** (`#proj-ipc-cards`); the table is now
+    desktop-only (`d-none d-lg-block`).
+  - Added a `shown.bs.tab` `columns.adjust()` for the Sales/Invoices/IPC tables so
+    column widths render correctly when a (previously hidden) tab is opened.
+  - Presentation only — no queries, APIs, permissions or data touched.
+
 ## 2026-07-04 (fix) — Product forms: 0-price no longer blocks save, always notify, SKU/product_code dup guard
 
 Editing a product (e.g. re-assigning its SKU) could silently do nothing with no
