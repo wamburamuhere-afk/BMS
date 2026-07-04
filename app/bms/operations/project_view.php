@@ -54,6 +54,15 @@ if ($supplier_mode) {
 // Restricted mode — same limited tab set for both SC and Supplier views
 $restricted_mode = $sc_mode || $supplier_mode;
 
+// Bills (received_invoices) permissions — the project Bills tab mirrors the
+// standalone Bills page and delegates create / edit / payment to it (with the
+// current project pre-selected and locked), so it reuses the same permissions.
+$ri_can_create  = canCreate('received_invoices');
+$ri_can_edit    = canEdit('received_invoices');
+$ri_can_delete  = canDelete('received_invoices');
+$ri_can_review  = canReview('received_invoices');
+$ri_can_approve = canApprove('received_invoices');
+
 // Fetch Departments, Designations, and Employment Types for New Staff modal
 $hr_departments      = $pdo->query("SELECT department_id, department_name FROM departments WHERE status='active' ORDER BY department_name")->fetchAll(PDO::FETCH_ASSOC);
 $hr_designations     = $pdo->query("SELECT designation_id, designation_name FROM designations WHERE status='active' ORDER BY designation_name")->fetchAll(PDO::FETCH_ASSOC);
@@ -916,7 +925,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <li><button class="dropdown-item py-2" id="sales-tab" data-bs-toggle="tab" data-bs-target="#sales" type="button"><i class="bi bi-cart me-2"></i> Sales Orders</button></li>
                                 <li><button class="dropdown-item py-2" id="proj-ipc-tab" data-bs-toggle="tab" data-bs-target="#proj-ipc" type="button"><i class="bi bi-file-earmark-check me-2 text-warning"></i> IPC</button></li>
                                 <li><button class="dropdown-item py-2" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoices" type="button"><i class="bi bi-receipt me-2"></i> Invoices</button></li>
-                                <li><button class="dropdown-item py-2" id="proj-ri-tab" data-bs-toggle="tab" data-bs-target="#proj-received-invoices" type="button"><i class="bi bi-file-invoice-dollar me-2 text-info"></i> Bills</button></li>
                             </ul>
                         </li>
 
@@ -930,6 +938,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <li><button class="dropdown-item py-2" id="proc-rfq-tab" data-bs-toggle="tab" data-bs-target="#proc-rfq" type="button"><i class="bi bi-file-earmark-ruled me-2"></i> RFQ</button></li>
                                 <li><button class="dropdown-item py-2" id="purchases-tab" data-bs-toggle="tab" data-bs-target="#proc-orders" type="button"><i class="bi bi-bag me-2"></i> Purchase Orders</button></li>
                                 <li><button class="dropdown-item py-2" id="proc-grn-tab" data-bs-toggle="tab" data-bs-target="#proc-grn" type="button"><i class="bi bi-check2-square me-2"></i> GRN</button></li>
+                                <li><button class="dropdown-item py-2" id="proj-ri-tab" data-bs-toggle="tab" data-bs-target="#proj-received-invoices" type="button"><i class="bi bi-file-invoice-dollar me-2 text-info"></i> Bills</button></li>
                                 <li><button class="dropdown-item py-2" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory" type="button"><i class="bi bi-box-seam me-2"></i> Inventory</button></li>
                                 <li><button class="dropdown-item py-2" id="proc-do-tab" data-bs-toggle="tab" data-bs-target="#proc-do" type="button"><i class="bi bi-file-earmark-check me-2"></i> Delivery Order</button></li>
                                 <li><button class="dropdown-item py-2" id="proc-dn-tab" data-bs-toggle="tab" data-bs-target="#proc-dn" type="button"><i class="bi bi-truck-flatbed me-2"></i> Delivery Note</button></li>
@@ -1373,6 +1382,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <?php endif; ?>
                             </h5>
                             <div class="d-flex gap-2 justify-content-center justify-content-md-end w-100 w-md-auto">
+                                <?php if ($ri_can_create): ?>
+                                <a class="btn btn-primary btn-sm flex-fill flex-md-grow-0 shadow-sm" href="<?= getUrl('received_invoices') ?>?add=1&lock_project=<?= $project_id ?>">
+                                    <i class="bi bi-plus-circle me-1"></i> Record Bill
+                                </a>
+                                <?php endif; ?>
                                 <button class="btn btn-outline-primary btn-sm flex-fill flex-md-grow-0 shadow-sm" onclick="loadProjectReceivedInvoices()">
                                     <i class="bi bi-arrow-clockwise"></i> Refresh
                                 </button>
@@ -9058,36 +9072,125 @@ function loadProjectReceivedInvoices() {
     });
 }
 
+// ── Project Bills (received_invoices) — mirrors the standalone Bills page ────
+// Columns match the external Bills page; Project is implicit (we are inside one)
+// so it is not shown. Create / Edit / Record Payment delegate to the external
+// page with this project pre-selected and locked.
+const PRI_VIEW_URL    = '<?= getUrl('received_invoices_view') ?>';
+const PRI_PAGE_URL    = '<?= getUrl('received_invoices') ?>';
+const PRI_API_URL     = '<?= buildUrl('api/received_invoices.php') ?>';
+const PRI_CSRF        = '<?= csrf_token() ?>';
+const PRI_PROJECT_ID  = <?= (int)$project_id ?>;
+const PRI_CAN_EDIT    = <?= json_encode($ri_can_edit) ?>;
+const PRI_CAN_DELETE  = <?= json_encode($ri_can_delete) ?>;
+const PRI_CAN_REVIEW  = <?= json_encode($ri_can_review) ?>;
+const PRI_CAN_APPROVE = <?= json_encode($ri_can_approve) ?>;
+
+function priTypeBadge(t) {
+    return t === 'supplier'
+        ? '<span class="badge bg-primary"><i class="bi bi-building me-1"></i>Supplier</span>'
+        : '<span class="badge bg-info text-dark"><i class="bi bi-people me-1"></i>Sub-Contractor</span>';
+}
+
+function priStatusBadge(s) {
+    const labels = { pending: 'Pending', reviewed: 'Reviewed', approved: 'Approved', partial: 'Partial', paid: 'Paid', rejected: 'Rejected', cancelled: 'Cancelled' };
+    const map    = { pending: 'warning', reviewed: 'info', approved: 'primary', partial: 'warning', paid: 'success', rejected: 'danger', cancelled: 'secondary' };
+    return `<span class="badge bg-${map[s] || 'secondary'}">${labels[s] || safeOutput(s)}</span>`;
+}
+
+function priPoProject(r) {
+    if (r.invoice_type === 'supplier') {
+        return r.po_number ? `<span class="badge bg-light text-dark border">${safeOutput(r.po_number)}</span>` : '—';
+    }
+    return r.project_name ? `<small>${safeOutput(r.project_name)}${r.sc_invoice_basis ? ' / ' + safeOutput(r.sc_invoice_basis) : ''}</small>` : '—';
+}
+
+function priDueDate(r) {
+    if (!r.due_date) return '<span class="text-muted small">—</span>';
+    const today = new Date().toISOString().split('T')[0];
+    const overdue = r.status === 'approved' && r.due_date < today;
+    return formatDate(r.due_date) + (overdue ? ' <span class="badge bg-danger ms-1" style="font-size:.63rem">Overdue</span>' : '');
+}
+
+function priActions(r) {
+    const ref = safeOutput(r.invoice_ref);
+    let items = `<li><a class="dropdown-item py-2" href="${PRI_VIEW_URL}?id=${r.id}"><i class="bi bi-eye text-primary me-2"></i> View</a></li>`;
+    items += `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="priViewAttachment('${r.attachment ? safeOutput(r.attachment) : ''}')"><i class="bi bi-paperclip text-secondary me-2"></i> View/Download Attachment</a></li>`;
+    if (PRI_CAN_REVIEW && r.status === 'pending')
+        items += `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="priChangeStatus(${r.id},'reviewed','${ref}')"><i class="bi bi-check2 text-info me-2"></i> Mark Reviewed</a></li>`;
+    if (PRI_CAN_APPROVE && r.status === 'reviewed')
+        items += `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="priChangeStatus(${r.id},'approved','${ref}')"><i class="bi bi-check-circle text-primary me-2"></i> Approve</a></li>`;
+    if (PRI_CAN_APPROVE && (r.status === 'approved' || r.status === 'partial'))
+        items += `<li><a class="dropdown-item py-2" href="${PRI_PAGE_URL}?pay=${r.id}"><i class="bi bi-cash-coin text-success me-2"></i> Record Payment</a></li>`;
+    if (PRI_CAN_EDIT)
+        items += `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item py-2" href="${PRI_PAGE_URL}?edit=${r.id}&lock_project=${PRI_PROJECT_ID}"><i class="bi bi-pencil text-info me-2"></i> Edit</a></li>`;
+    const paid = (parseFloat(r.amount_paid) > 0) || r.status === 'partial' || r.status === 'paid';
+    if (PRI_CAN_DELETE && !paid)
+        items += `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="priDelete(${r.id},'${ref}')"><i class="bi bi-trash me-2"></i> Delete</a></li>`;
+    return `<div class="dropdown">
+        <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button>
+        <ul class="dropdown-menu dropdown-menu-end shadow">${items}</ul>
+    </div>`;
+}
+
+function priViewAttachment(path) {
+    if (!path) { Swal.fire({ icon: 'info', title: 'No attachment', text: 'This bill has no attachment.' }); return; }
+    window.open(path, '_blank');
+}
+
+function priChangeStatus(id, newStatus, ref) {
+    const labels = { reviewed: 'Mark Reviewed', approved: 'Approve' };
+    Swal.fire({ title: labels[newStatus] + '?', text: 'Bill: ' + ref, icon: 'question', showCancelButton: true, confirmButtonColor: '#0d6efd', confirmButtonText: 'Yes, ' + labels[newStatus] })
+        .then(function (r) {
+            if (!r.isConfirmed) return;
+            $.post(PRI_API_URL + '?action=change_status', { id: id, new_status: newStatus, _csrf: PRI_CSRF }, function (res) {
+                if (res.success) { Swal.fire({ icon: 'success', title: 'Done!', text: res.message, timer: 1600, showConfirmButton: false }); loadProjectReceivedInvoices(); }
+                else Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }, 'json');
+        });
+}
+
+function priDelete(id, ref) {
+    Swal.fire({ title: 'Delete Bill?', text: 'Bill "' + ref + '" will be deleted. This cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, Delete' })
+        .then(function (r) {
+            if (!r.isConfirmed) return;
+            $.post(PRI_API_URL + '?action=delete', { id: id, _csrf: PRI_CSRF }, function (res) {
+                if (res.success) { Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 1600, showConfirmButton: false }); loadProjectReceivedInvoices(); }
+                else Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }, 'json');
+        });
+}
+
 function renderProjectReceivedInvoices(rows) {
     const $el = $('#proj-ri-content');
     if (!rows.length) {
-        $el.html('<div class="py-5 text-center text-muted"><i class="bi bi-file-invoice-dollar fs-1 mb-3 d-block"></i><p>No received invoices linked to this project.</p></div>');
+        $el.html('<div class="py-5 text-center text-muted"><i class="bi bi-file-invoice-dollar fs-1 mb-3 d-block"></i><p>No bills linked to this project.</p></div>');
         return;
     }
     let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr>'
         + '<th style="width:50px;">S/NO</th>'
         + '<th>Invoice Ref</th>'
-        + '<th>Supplier</th>'
         + '<th>Type</th>'
+        + '<th>From</th>'
         + '<th>Date Raised</th>'
-        + '<th>Date Recorded</th>'
-        + '<th>PO Number</th>'
-        + '<th>Amount (TZS)</th>'
+        + '<th>Due Date</th>'
+        + '<th>PO / Project</th>'
+        + '<th class="text-end">Amount (TZS)</th>'
         + '<th>Status</th>'
+        + '<th class="text-end d-print-none">Actions</th>'
         + '</tr></thead><tbody>';
     rows.forEach((r, idx) => {
-        const statusColors = { pending: 'warning', approved: 'success', rejected: 'danger', paid: 'primary', cancelled: 'secondary' };
-        const sc = statusColors[r.status] || 'secondary';
         html += `<tr>
             <td class="text-center fw-bold text-muted">${idx + 1}</td>
             <td class="fw-bold">${safeOutput(r.invoice_ref)}</td>
+            <td>${priTypeBadge(r.invoice_type)}</td>
             <td>${safeOutput(r.party_name)}</td>
-            <td><span class="badge bg-light text-dark border">${safeOutput(r.invoice_type)}</span></td>
             <td>${r.date_raised ? formatDate(r.date_raised) : '—'}</td>
-            <td>${r.date_recorded ? formatDate(r.date_recorded) : '—'}</td>
-            <td>${safeOutput(r.po_number) || '—'}</td>
+            <td>${priDueDate(r)}</td>
+            <td>${priPoProject(r)}</td>
             <td class="fw-bold text-end">${formatMoney(r.amount)}</td>
-            <td><span class="badge bg-${sc}">${safeOutput(r.status)}</span></td>
+            <td>${priStatusBadge(r.status)}</td>
+            <td class="text-end d-print-none">${priActions(r)}</td>
         </tr>`;
     });
     html += '</tbody></table></div>';
