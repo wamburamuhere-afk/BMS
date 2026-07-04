@@ -18734,7 +18734,7 @@ function projNipFilter() {
     const q  = ($('#projNipSearch').val() || '').toLowerCase();
     const st = $('#projNipStatusFilter').val();
     let filtered = _projNipAll;
-    if (q)  filtered = filtered.filter(p => (p.product_name||'').toLowerCase().includes(q) || (p.sku||'').toLowerCase().includes(q));
+    if (q)  filtered = filtered.filter(p => (p.product_name||'').toLowerCase().includes(q) || (p.sku||'').toLowerCase().includes(q) || (p.contract_item_no||'').toLowerCase().includes(q));
     if (st) filtered = filtered.filter(p => p.status === st);
     projNipRenderTable(filtered);
 }
@@ -18755,8 +18755,10 @@ function projNipRenderTable(products) {
         const taxInfo = p.tax_name ? `${p.tax_name} (${p.tax_rate}%)` : 'No Tax';
         const enc = JSON.stringify(p).replace(/"/g, '&quot;');
         const safeName = (p.product_name||'').replace(/'/g, "\\'");
+        const itemCode = p.contract_item_no || p.sku || '—';
         rows += `<tr>
             <td class="ps-3 text-muted text-center fw-bold">${i+1}</td>
+            <td><code class="small fw-bold text-primary">${itemCode}</code></td>
             <td>
                 <div class="d-flex align-items-center gap-2">
                     <div class="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;">
@@ -18789,9 +18791,10 @@ function projNipRenderTable(products) {
             <thead class="table-light text-uppercase small fw-bold">
                 <tr>
                     <th class="ps-3" style="width:55px;">S/NO</th>
+                    <th style="width:110px;">Item Code</th>
                     <th>Product Name</th>
-                    <th style="width:170px;">Selling Price</th>
-                    <th style="width:150px;">Tax</th>
+                    <th style="width:150px;">Selling Price</th>
+                    <th style="width:130px;">Tax</th>
                     <th style="width:90px;">Status</th>
                     <th class="text-end pe-3 d-print-none" style="width:80px;">Actions</th>
                 </tr>
@@ -18800,7 +18803,7 @@ function projNipRenderTable(products) {
         </table>
     </div></div></div>`);
     if ($.fn.DataTable.isDataTable('#projNipInnerTable')) $('#projNipInnerTable').DataTable().destroy();
-    $('#projNipInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 5] }] });
+    $('#projNipInnerTable').DataTable({ responsive: true, pageLength: 25, autoWidth: false, columnDefs: [{ orderable: false, targets: [0, 6] }] });
     if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('projNipInnerTable');
 }
 
