@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-07-04 (fix) — Product forms: 0-price no longer blocks save, always notify, SKU/product_code dup guard
+
+Editing a product (e.g. re-assigning its SKU) could silently do nothing with no
+notification. Root cause: the shared client-side `validateForm()` treated a
+legitimate **0** cost/selling price as invalid and **returned without any alert**,
+so the save never reached the server. Fixed, and hardened the SKU duplicate guard.
+
+- **`app/bms/product/product_create_footer.php`** (shared by product create + edit)
+  - `validateForm()` now blocks only on **empty** required fields — a value of `0`
+    (free service / zero price) is allowed — and shows a **SweetAlert** naming the
+    missing field instead of failing silently.
+- **`api/update_product.php`**, **`api/create_product.php`**
+  - Duplicate-SKU check now also matches `product_code` (a UNIQUE column stored equal
+    to the SKU), so a clash returns a clear "SKU already exists" message instead of an
+    opaque DB error.
+- **`app/bms/product/services.php`**
+  - Service add-form validation failure now shows a **SweetAlert** (was an inline
+    message) for consistency with the rest of the product forms.
+- The products list quick-add modal already notified on every response — unchanged.
+
 ## 2026-07-04 (feat) — Clean "Back to Project" mechanism across Supplier/Sub-contractor/Staff + remove dead staff wizard
 
 When a Supplier, Sub-contractor or Staff record is created/edited/viewed **from inside a
