@@ -258,26 +258,34 @@ function saveQuickBrand() {
 }
 
 function validateForm() {
-    let valid = true;
+    // Only presence is required — a legitimate 0 (e.g. a free service or a price
+    // set to zero) must NOT block the save. On failure we ALWAYS notify the user
+    // with a SweetAlert (previously it failed silently, so a blocked save looked
+    // like "nothing happened / not saved").
     const required = [
-        { id: 'product_name', tab: 'general' },
-        { id: 'cost_price', tab: 'pricing' },
-        { id: 'selling_price', tab: 'pricing' },
-        { id: 'unit', tab: 'inventory' }
+        { id: 'product_name',  label: 'Product Name',  tab: 'general' },
+        { id: 'cost_price',    label: 'Cost Price',     tab: 'pricing' },
+        { id: 'selling_price', label: 'Selling Price',  tab: 'pricing' },
+        { id: 'unit',          label: 'Unit',           tab: 'inventory' }
     ];
-    
+
     for (const field of required) {
-        const el = $(`#${field.id}`);
-        if (!el.val() || el.val() == 0) {
+        const el  = $(`#${field.id}`);
+        const val = (el.val() ?? '').toString().trim();
+        if (val === '') {
             $(`#${field.tab}-tab`).tab('show');
             el.addClass('is-invalid').focus();
-            valid = false;
-            break;
-        } else {
-            el.removeClass('is-invalid');
+            Swal.fire({
+                icon: 'warning',
+                title: 'Missing Field',
+                text: `Please enter the ${field.label} before saving.`,
+                confirmButtonColor: '#ffc107'
+            });
+            return false;
         }
+        el.removeClass('is-invalid');
     }
-    return valid;
+    return true;
 }
 
 function createProduct(status = 'active') {
