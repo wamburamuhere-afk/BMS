@@ -184,6 +184,8 @@ $stats = $pdo->query($stats_sql)->fetch(PDO::FETCH_ASSOC) ?: [];
 <?php if ($can_create) { $lifecycle_preselect = null; require __DIR__ . '/includes/lifecycle_modal.php'; } ?>
 
 <script>
+// HTML-escape helper (page-local per app convention)
+function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 const CAN_EDIT    = <?= json_encode($can_edit) ?>;
 const CAN_DELETE  = <?= json_encode($can_delete) ?>;
 const CAN_APPROVE = <?= json_encode($can_approve) ?>;

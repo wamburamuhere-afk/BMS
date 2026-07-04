@@ -54,6 +54,8 @@ details[open] > summary::before { content: "\25BC"; }
 </div>
 
 <script>
+// HTML-escape helper (page-local per app convention)
+function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 const MAX_DEPTH = 20;
 
 function initials(first, last) {

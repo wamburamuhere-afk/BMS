@@ -89,6 +89,8 @@ $departments  = $pdo->query("SELECT department_id, department_name FROM departme
 <?php endif; ?>
 
 <script>
+// HTML-escape helper (page-local per app convention)
+function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 const RC_CSRF = <?= json_encode(csrf_token()) ?>;
 const RC_CAN_CREATE=<?= json_encode($can_create) ?>, RC_CAN_EDIT=<?= json_encode($can_edit) ?>;
 const STAGES = ['applied','shortlisted','interview','offered','hired'];

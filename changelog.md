@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-07-03 (fix) — Operations/HR pages render blank: missing safeOutput()
+
+Root cause of the "page loads forever / stat cards show numbers but the table is
+empty" reports on the Operations → Human Resources pages. `safeOutput()` is a
+page-local JS helper by convention (not a global), but all 10 HR pages *used* it
+without *defining* it — so the first render threw `ReferenceError: safeOutput is
+not defined`, the AJAX success callback aborted before painting the table, and
+the spinner never cleared. (CLI tests only string-check the PHP source, so they
+never caught it.)
+
+- Added the standard page-local `safeOutput()` definition to the top of each
+  page script: `hr_actions.php`, `employee_contracts.php`, `org_chart.php`,
+  `hr_performance.php`, `trainings.php`, `recruitment.php`, `hr_checklists.php`,
+  `meetings.php`, `employee_trips.php`, `announcements.php`.
+
 ## 2026-07-03 (ui) — Operations/HR pages: blue table headers + S/NO column
 
 Scope: the Operations → Human Resources pages from HR Actions through
