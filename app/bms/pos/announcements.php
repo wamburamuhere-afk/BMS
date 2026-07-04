@@ -44,7 +44,7 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
 
     <div id="annTableView" class="card border-0 shadow-sm"><div class="card-body">
         <table id="annTable" class="table table-hover align-middle w-100">
-            <thead class="table-dark"><tr><th>Title</th><th>Audience</th><th>Publish</th><th>Expire</th><th>Reads</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+            <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"><tr><th class="text-center">S/NO</th><th>Title</th><th>Audience</th><th>Publish</th><th>Expire</th><th>Reads</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
             <tbody></tbody>
         </table>
     </div></div>
@@ -110,7 +110,7 @@ function loadAnn() {
         res.data.forEach(r => { if (r.status==='published') { pubCount++; readsSum += Math.min(Number(r.read_count), totalUsers); } });
         $('#as_readrate').text(pubCount && totalUsers ? Math.round(readsSum/(pubCount*totalUsers)*100)+'%' : '—');
         annTable.clear().rows.add(res.data.map(r => [
-            safeOutput(r.title), audLabel(r), safeOutput(r.publish_date), safeOutput(r.expire_date||'—'),
+            '', safeOutput(r.title), audLabel(r), safeOutput(r.publish_date), safeOutput(r.expire_date||'—'),
             r.read_count, annStatusBadge(r.status), annActions(r)
         ])).draw();
     });
@@ -136,7 +136,8 @@ function annAction(id, action) {
 function annDelete(id) { Swal.fire({title:'Delete announcement?',icon:'warning',showCancelButton:true,confirmButtonColor:'#dc3545',confirmButtonText:'Delete'}).then(r=>{ if(r.isConfirmed) $.post('<?= buildUrl('api/manage_announcement.php') ?>',{action:'delete',announcement_id:id,_csrf:AN_CSRF},function(res){ if(res.success) loadAnn(); else Swal.fire({icon:'error',title:'Error',text:res.message}); },'json'); }); }
 
 $(function () {
-    annTable = $('#annTable').DataTable({ responsive:false, scrollX:true, pageLength:25, order:[[2,'desc']], dom:'rtip',
+    annTable = $('#annTable').DataTable({ responsive:false, scrollX:true, pageLength:25, order:[[3,'desc']], dom:'rtip',
+        columnDefs:[{targets:0,orderable:false,searchable:false,className:'text-center',render:(d,t,row,meta)=>meta.row+1+meta.settings._iDisplayStart}],
         language:{emptyTable:'No announcements yet.'}, drawCallback:function(){ annCards(this.api().rows({page:'current'})[0].map(i=>ANN[i]).filter(Boolean)); } });
     $('#af_status').on('change', loadAnn);
     function av(){ if (window.innerWidth<768){$('#annTableView').addClass('d-none');$('#annCardView').removeClass('d-none');}else{$('#annTableView').removeClass('d-none');$('#annCardView').addClass('d-none');} }
