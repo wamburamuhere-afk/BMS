@@ -5228,13 +5228,28 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <label class="form-label">Postal Address</label>
                                 <textarea class="form-control" name="postal_address" rows="2" placeholder="e.g. P.O. Box 1234"></textarea>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">City</label>
-                                <input type="text" class="form-control" name="city" placeholder="City">
-                            </div>
+                            <!-- Location cascade: Country → Region → District → Ward → Street/Village
+                                 (same engine as the external Employees form; Tanzania = locked
+                                 dropdowns, other countries fall back to free text). -->
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Country</label>
-                                <input type="text" class="form-control" name="country" value="Tanzania" placeholder="Country">
+                                <input type="text" class="form-control" id="nps_country" name="country" value="Tanzania" placeholder="Country">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Region</label>
+                                <input type="text" class="form-control" id="nps_state" name="state" placeholder="Region">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">District</label>
+                                <input type="text" class="form-control" id="nps_city" name="city" placeholder="District">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Ward</label>
+                                <input type="text" class="form-control" id="nps_ward" name="ward" placeholder="Ward">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Street/Village</label>
+                                <input type="text" class="form-control" id="nps_village" name="village" placeholder="Street/Village">
                             </div>
                             <div class="col-12 mb-2 mt-2">
                                 <div class="d-flex align-items-center gap-2">
@@ -7121,25 +7136,30 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <!-- Tab 3: Address -->
                         <div class="tab-pane fade" id="aps-address" role="tabpanel" aria-labelledby="aps-address-tab">
                             <div class="row">
+                                <!-- Location cascade: Country → Region → District → Ward → Street/Village -->
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Country</label>
-                                    <input type="text" class="form-control" name="country" placeholder="e.g. Tanzania">
+                                    <input type="text" class="form-control" id="aps_country" name="country" placeholder="e.g. Tanzania">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Region</label>
-                                    <input type="text" class="form-control" name="state" placeholder="e.g. Dar es Salaam">
+                                    <input type="text" class="form-control" id="aps_state" name="state" placeholder="e.g. Dar es Salaam">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">District (City)</label>
-                                    <input type="text" class="form-control" name="city" placeholder="e.g. Ilala">
+                                    <input type="text" class="form-control" id="aps_city" name="city" placeholder="e.g. Ilala">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Ward</label>
+                                    <input type="text" class="form-control" id="aps_ward" name="ward" placeholder="e.g. Kariakoo">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Street/Village</label>
+                                    <input type="text" class="form-control" id="aps_village" name="village" placeholder="e.g. Mtaa wa Kariakoo">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Council</label>
                                     <input type="text" class="form-control" name="council" placeholder="e.g. Ilala Municipal">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Ward</label>
-                                    <input type="text" class="form-control" name="ward" placeholder="e.g. Kariakoo">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Postal Code (Zip)</label>
@@ -7333,17 +7353,26 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <label class="form-label">Physical Address</label>
                                     <textarea class="form-control" id="eps_address" name="address" rows="2" placeholder="Street, Building, etc."></textarea>
                                 </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">City</label>
-                                    <input type="text" class="form-control" id="eps_city" name="city" placeholder="City">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">State/Region</label>
-                                    <input type="text" class="form-control" id="eps_state" name="state" placeholder="State/Region">
-                                </div>
+                                <!-- Location cascade: Country → Region → District → Ward → Street/Village -->
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Country</label>
                                     <input type="text" class="form-control" id="eps_country" name="country" placeholder="Country">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Region</label>
+                                    <input type="text" class="form-control" id="eps_state" name="state" placeholder="Region">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">District (City)</label>
+                                    <input type="text" class="form-control" id="eps_city" name="city" placeholder="District">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Ward</label>
+                                    <input type="text" class="form-control" id="eps_ward" name="ward" placeholder="Ward">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Street/Village</label>
+                                    <input type="text" class="form-control" id="eps_village" name="village" placeholder="Street/Village">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Postal Code</label>
@@ -15713,10 +15742,16 @@ function editProjectSupplier(id) {
             $('#eps_website').val(s.website);
             
             $('#eps_address').val(s.address);
-            $('#eps_city').val(s.city);
-            $('#eps_state').val(s.state);
-            $('#eps_country').val(s.country);
             $('#eps_postal_code').val(s.postal_code);
+            // Location cascade prefill — matches stored names to the defined lists;
+            // unmatched legacy values are preserved as extra options.
+            if (window.editSupplierCascade) window.editSupplierCascade.setValues({
+                country:  s.country || 'Tanzania',
+                region:   s.state || '',
+                district: s.city || '',
+                ward:     s.ward || '',
+                village:  s.village || ''
+            });
             
             $('#eps_tax_id').val(s.tax_id);
             $('#eps_vat_number').val(s.vat_number);
@@ -15872,6 +15907,8 @@ function renderProjectStaff(staff) {
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                             <li class="dropdown-header text-uppercase small fw-bold">Staff Actions</li>
                             <li><a class="dropdown-item py-2" href="employee_details?id=${s.employee_id}"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
+                            <li><a class="dropdown-item py-2" href="employees?edit_id=${s.employee_id}"><i class="bi bi-pencil text-primary me-2"></i>Edit</a></li>
+                            <li><a class="dropdown-item py-2" href="payroll?employee=${s.employee_id}"><i class="bi bi-cash-coin text-success me-2"></i>Payroll</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="unassignStaff(${s.employee_id}, '${name}')"><i class="bi bi-person-dash me-2"></i>Remove from Project</a></li>
                         </ul>
@@ -22231,6 +22268,48 @@ window.addEventListener('afterprint', function () {
     });
 });
 
+</script>
+
+<!-- Location cascade engine (Country → Region → District → Ward → Street/Village).
+     Same component the external Suppliers / Employees forms use. Tanzania gets
+     locked cascading dropdowns; other countries fall back to free text. -->
+<script src="<?= getUrl('assets/js/location_cascade.js') ?>"></script>
+<script>
+$(function () {
+    if (typeof initLocationCascade !== 'function') return;
+    var LOC_URL = '<?= buildUrl('api/location/options.php') ?>';
+
+    // Procurements → Add Supplier (only when the modal is on the page)
+    if ($('#aps_country').length) {
+        window.addSupplierCascade = initLocationCascade({
+            endpoint: LOC_URL,
+            fields: { country: '#aps_country', region: '#aps_state', district: '#aps_city', ward: '#aps_ward', village: '#aps_village' },
+            dropdownParent: '#addProjectSupplierModal'
+        });
+        $('#addProjectSupplierModal').on('shown.bs.modal', function () {
+            if (window.addSupplierCascade) window.addSupplierCascade.setValues({ country: 'Tanzania' });
+        });
+    }
+    // Procurements → Edit Supplier (prefilled via setValues() in editProjectSupplier())
+    if ($('#eps_country').length) {
+        window.editSupplierCascade = initLocationCascade({
+            endpoint: LOC_URL,
+            fields: { country: '#eps_country', region: '#eps_state', district: '#eps_city', ward: '#eps_ward', village: '#eps_village' },
+            dropdownParent: '#editProjectSupplierModal'
+        });
+    }
+    // HR → New Staff (create-only, restore Tanzania defaults each fresh open)
+    if ($('#nps_country').length) {
+        window.newStaffCascade = initLocationCascade({
+            endpoint: LOC_URL,
+            fields: { country: '#nps_country', region: '#nps_state', district: '#nps_city', ward: '#nps_ward', village: '#nps_village' },
+            dropdownParent: '#newProjectStaffModal'
+        });
+        $('#newProjectStaffModal').on('shown.bs.modal', function () {
+            if (window.newStaffCascade) window.newStaffCascade.setValues({ country: 'Tanzania' });
+        });
+    }
+});
 </script>
 
 <?php includeFooter(); ?>

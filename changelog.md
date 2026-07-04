@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-07-03 (feat) — Project detail: location cascade on Supplier/Staff forms + full HR staff actions
+
+Inside **Projects → Project Details**, the in-project **Supplier** (Procurements)
+and **New Staff** (HR) forms still used free-text address fields, while the
+external Suppliers/Employees pages already run the OOP location cascade
+(Country → Region → District → Ward → Street/Village). Brought the in-project
+forms to parity and expanded the HR staff Actions menu.
+
+- **`app/bms/operations/project_view.php`**
+  - **Add Supplier** modal: gave the address inputs ids and added a **Street/Village**
+    field; wired `initLocationCascade` (Country→Region→District→Ward→Street/Village).
+  - **Edit Supplier** modal: added the missing **Ward** and **Street/Village** fields,
+    reordered to cascade order, and prefilled via `editSupplierCascade.setValues()`
+    (unmatched legacy values preserved).
+  - **New Staff** modal: replaced City + Country with the full 5-level cascade.
+  - **Staff Actions** dropdown: added **Edit** (opens the external Employees edit
+    form via `employees?edit_id=…`, which carries the cascade) and **Payroll**
+    (`payroll?employee=…`), alongside View Details and Remove from Project.
+  - Included `assets/js/location_cascade.js` and initialized the three cascades
+    (add-supplier, edit-supplier, new-staff), each guarded by element presence;
+    add-supplier and new-staff reset to Tanzania defaults on each fresh open.
+- **`api/operations/create_project_staff.php`**
+  - Persist **`state`, `ward`, `village`** on the employees insert (previously only
+    `city`, `country`) so the new cascade values are saved. Columns already existed.
+
 ## 2026-07-03 (feat) — Project detail: move Bills to Procurements + external-parity columns/actions
 
 In **Projects → Project Details**, the **Bills** tab (linked `received_invoices`)
