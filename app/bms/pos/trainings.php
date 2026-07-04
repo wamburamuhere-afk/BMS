@@ -124,6 +124,8 @@ $training_types = $pdo->query("SELECT training_type_id, type_name FROM training_
 <?php endif; ?>
 
 <script>
+// HTML-escape helper (page-local per app convention)
+function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 const TR_CSRF = <?= json_encode(csrf_token()) ?>;
 const TR_CAN_CREATE = <?= json_encode($can_create) ?>;
 const TR_CAN_EDIT   = <?= json_encode($can_edit) ?>;

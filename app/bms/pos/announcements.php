@@ -86,6 +86,8 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
 <?php endif; ?>
 
 <script>
+// HTML-escape helper (page-local per app convention)
+function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 const AN_CSRF = <?= json_encode(csrf_token()) ?>;
 const AN_CAN_EDIT = <?= json_encode($can_edit) ?>, AN_CAN_DELETE = <?= json_encode($can_delete) ?>, AN_CAN_PUBLISH = <?= json_encode($can_publish) ?>;
 let annTable = null, ANN = [];

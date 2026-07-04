@@ -435,6 +435,8 @@ $goal_types = $pdo->query("SELECT goal_type_id, type_name FROM goal_types WHERE 
 <?php if ($can_recommend) { require __DIR__ . '/includes/lifecycle_modal.php'; } ?>
 
 <script>
+// HTML-escape helper (page-local per app convention)
+function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 const HP_CSRF = <?= json_encode(csrf_token()) ?>;
 <?php if ($can_edit): ?>
 let CATS = [], INDS = [];

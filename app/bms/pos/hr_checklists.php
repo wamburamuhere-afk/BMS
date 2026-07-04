@@ -76,6 +76,8 @@ $can_edit   = canEdit('hr_checklists');
 <?php endif; ?>
 
 <script>
+// HTML-escape helper (page-local per app convention)
+function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 const CL_CSRF = <?= json_encode(csrf_token()) ?>;
 const CL_CAN_EDIT = <?= json_encode($can_edit) ?>, CL_CAN_CREATE = <?= json_encode($can_create) ?>;
 let TEMPLATES = [], TPL_ITEMS = [];
