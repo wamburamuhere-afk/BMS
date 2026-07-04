@@ -101,8 +101,6 @@ if (isAdmin()) {
     $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' AND project_id IS NULL ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// Get salespeople for dropdown (not project-scoped — role-based only)
-$salespeople = $pdo->query("SELECT user_id, username, CONCAT(first_name, ' ', last_name) as full_name FROM users WHERE is_active = '1' AND role IN ('Admin', 'Manager', 'Sales') ORDER BY username")->fetchAll(PDO::FETCH_ASSOC);
 
 // Get warehouses — scoped by project for non-admins (shared helper)
 require_once ROOT_DIR . '/core/warehouse_scope.php';
@@ -263,20 +261,24 @@ $is_quote = ($sales_order['is_quote'] == 1);
                         </select>
                     </div>
                     
+                    <?php
+                        // Salesperson is fixed — never a picker. It is ALWAYS the
+                        // user logged in right now (i.e. whoever is editing), so it
+                        // reflects who is actually handling the order. Shown
+                        // read-only; the hidden input carries the id to the API.
+                        $spStmt = $pdo->prepare("SELECT username, CONCAT(first_name, ' ', last_name) AS full_name FROM users WHERE user_id = ?");
+                        $spStmt->execute([$user_id]);
+                        $sp = $spStmt->fetch(PDO::FETCH_ASSOC);
+                        $sp_label = $sp
+                            ? trim($sp['username'] . (trim($sp['full_name']) !== '' ? ' (' . trim($sp['full_name']) . ')' : ''))
+                            : 'Unknown';
+                    ?>
                     <div class="<?= $enable_projects ? 'col-md-4' : 'col-md-6' ?> mb-3">
-                        <label for="salesperson_id" class="form-label">Salesperson</label>
-                        <select class="form-select" id="salesperson_id" name="salesperson_id">
-                            <option value="">Select Salesperson</option>
-                            <?php foreach ($salespeople as $salesperson): ?>
-                                <option value="<?= $salesperson['user_id'] ?>" 
-                                    <?= ($sales_order && isset($sales_order['salesperson_id']) && $sales_order['salesperson_id'] == $salesperson['user_id']) ? 'selected' : ((!$sales_order && $user_id == $salesperson['user_id']) ? 'selected' : '') ?>>
-                                    <?= safe_output($salesperson['username']) ?>
-                                    <?php if (!empty($salesperson['full_name'])): ?>
-                                        (<?= safe_output($salesperson['full_name']) ?>)
-                                    <?php endif; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+                        <label for="salesperson_display" class="form-label">Salesperson</label>
+                        <input type="text" class="form-control bg-light" id="salesperson_display"
+                               value="<?= safe_output($sp_label) ?>" readonly
+                               title="Automatically set to the logged-in user">
+                        <input type="hidden" name="salesperson_id" id="salesperson_id" value="<?= (int)$user_id ?>">
                     </div>
 
                     <?php if ($enable_projects): ?>

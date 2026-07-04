@@ -1488,8 +1488,13 @@ function submitSvcForm(addAnother) {
     const msgEl = document.getElementById('add-service-message');
     const name = form.querySelector('[name="product_name"]').value.trim();
     if (!name) {
-        msgEl.innerHTML = '<div class="alert alert-danger py-2"><i class="bi bi-exclamation-circle me-2"></i>Product name is required.</div>';
         toggleSvcAddStep(1);
+        Swal.fire({
+            icon: 'warning',
+            title: 'Missing Field',
+            text: 'Please enter the Service/Product Name before saving.',
+            confirmButtonColor: '#ffc107'
+        });
         return;
     }
     Swal.fire({ title:'Saving...', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
