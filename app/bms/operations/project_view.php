@@ -2255,11 +2255,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                         </div>
 
-                        <!-- Table -->
+                        <!-- Table (desktop) -->
                         <div class="card shadow-sm border-0">
                             <div class="card-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table table-hover align-middle mb-0" id="proj-ipc-table">
+                                <div class="table-responsive d-none d-lg-block p-2">
+                                    <table class="table table-hover align-middle mb-0 w-100" id="proj-ipc-table">
                                         <thead class="table-light border-bottom border-2">
                                             <tr>
                                                 <th>S/NO</th>
@@ -2276,6 +2276,8 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <tbody><tr><td colspan="9" class="text-center text-muted py-4">Loading...</td></tr></tbody>
                                     </table>
                                 </div>
+                                <!-- Cards (mobile) -->
+                                <div id="proj-ipc-cards" class="d-lg-none row g-2 p-2"></div>
                             </div>
                         </div>
 
@@ -8650,12 +8652,31 @@ function renderSalesOrders(orders) {
 
 function renderSalesOrdersFull(orders) {
     const $list = $('#salesOrdersTableFull');
-    if (orders.length === 0) {
+    if (!orders || orders.length === 0) {
         $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-cart fs-1 mb-3"></i><p>No sales orders linked to this project.</p></div>');
         return;
     }
-    
-    let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Customer</th><th>Order Date</th><th>Subtotal</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+
+    // Shared Actions dropdown (used by both the desktop table and the mobile cards)
+    const soActions = (o) => `
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="bi bi-gear"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                <li><a class="dropdown-item py-2" href="sales_order_view?id=${o.sales_order_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                <li><a class="dropdown-item py-2" href="sales_order_edit?id=${o.sales_order_id}"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
+                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeOrderStatus(${o.sales_order_id}, '${o.status}')"><i class="bi bi-arrow-repeat text-warning me-2"></i>Change Status</a></li>
+                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="updateOrderStatus(${o.sales_order_id}, 'approved')"><i class="bi bi-check-circle text-success me-2"></i>Approve Order</a></li>
+                <li><a class="dropdown-item py-2" href="invoice_create?id=${o.sales_order_id}"><i class="bi bi-receipt text-success me-2"></i>Create Invoice</a></li>
+                <li><a class="dropdown-item py-2 text-warning" href="javascript:void(0)" onclick="updateOrderStatus(${o.sales_order_id}, 'cancelled')"><i class="bi bi-x-octagon me-2"></i>Cancel Order</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteOrder(${o.sales_order_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
+            </ul>
+        </div>`;
+
+    // Desktop: DataTable (search / sort / paging). Hidden on small screens.
+    let html = '<div class="d-none d-lg-block"><table id="salesOrdersDT" class="table table-hover align-middle border w-100"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Order Number</th><th>Customer</th><th>Order Date</th><th>Subtotal</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
     orders.forEach((o, idx) => {
         html += `<tr>
             <td class="text-center fw-bold text-muted">${idx + 1}</td>
@@ -8666,27 +8687,36 @@ function renderSalesOrdersFull(orders) {
             <td>${formatMoney(o.tax_amount)}</td>
             <td class="fw-bold text-dark">${formatMoney(o.grand_total)}</td>
             <td><span class="badge bg-${getStatusBadgeColor(o.status)}">${o.status}</span></td>
-            <td class="text-end d-print-none">
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-gear"></i>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                        <li><a class="dropdown-item py-2" href="sales_order_view?id=${o.sales_order_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
-                        <li><a class="dropdown-item py-2" href="sales_order_edit?id=${o.sales_order_id}"><i class="bi bi-pencil text-info me-2"></i>Edit Order</a></li>
-                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeOrderStatus(${o.sales_order_id}, '${o.status}')"><i class="bi bi-arrow-repeat text-warning me-2"></i>Change Status</a></li>
-                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="updateOrderStatus(${o.sales_order_id}, 'approved')"><i class="bi bi-check-circle text-success me-2"></i>Approve Order</a></li>
-                        <li><a class="dropdown-item py-2" href="invoice_create?id=${o.sales_order_id}"><i class="bi bi-receipt text-success me-2"></i>Create Invoice</a></li>
-                        <li><a class="dropdown-item py-2 text-warning" href="javascript:void(0)" onclick="updateOrderStatus(${o.sales_order_id}, 'cancelled')"><i class="bi bi-x-octagon me-2"></i>Cancel Order</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteOrder(${o.sales_order_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
-                    </ul>
-                </div>
-            </td>
+            <td class="text-end d-print-none">${soActions(o)}</td>
         </tr>`;
     });
     html += '</tbody></table></div>';
+
+    // Mobile: card view (matches the rest of the system). Shown below lg.
+    html += '<div class="d-lg-none row g-2">';
+    orders.forEach((o) => {
+        html += `<div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <a href="sales_order_view?id=${o.sales_order_id}" class="fw-bold text-primary">${o.order_number}</a>
+                        <span class="badge bg-${getStatusBadgeColor(o.status)}">${o.status}</span>
+                    </div>
+                    <div class="small text-muted mb-1"><i class="bi bi-person me-1"></i>${o.customer_name || 'N/A'}</div>
+                    <div class="small text-muted mb-2"><i class="bi bi-calendar3 me-1"></i>${formatDate(o.order_date)}</div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold text-dark">${formatMoney(o.grand_total)}</span>
+                        ${soActions(o)}
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    });
+    html += '</div>';
+
     $list.html(html);
+    if ($.fn.DataTable.isDataTable('#salesOrdersDT')) $('#salesOrdersDT').DataTable().destroy();
+    $('#salesOrdersDT').DataTable({ pageLength: 25, autoWidth: false, order: [[3, 'desc']], columnDefs: [{ orderable: false, targets: [0, 8] }] });
 }
 
 function renderInvoices(invoices) {
@@ -8713,12 +8743,24 @@ function renderInvoices(invoices) {
 
 function renderInvoicesFull(invoices) {
     const $list = $('#invoicesTableFull');
-    if (invoices.length === 0) {
+    if (!invoices || invoices.length === 0) {
         $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-receipt fs-1 mb-3"></i><p>No invoices linked to this project.</p></div>');
         return;
     }
-    
-    let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Invoice Number</th><th>Customer</th><th>Date</th><th>Subtotal</th><th>Discount</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+
+    // Shared Actions dropdown (desktop table + mobile cards)
+    const invActions = (i) => `
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-success dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="bi bi-gear"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                ${buildInvoiceActions(i)}
+            </ul>
+        </div>`;
+
+    // Desktop: DataTable (search / sort / paging). Hidden on small screens.
+    let html = '<div class="d-none d-lg-block"><table id="invoicesDT" class="table table-hover align-middle border w-100"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Invoice Number</th><th>Customer</th><th>Date</th><th>Subtotal</th><th>Discount</th><th>Tax</th><th>Grand Total</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
     invoices.forEach((i, idx) => {
         html += `<tr>
             <td class="text-center fw-bold text-muted">${idx + 1}</td>
@@ -8730,21 +8772,49 @@ function renderInvoicesFull(invoices) {
             <td>${formatMoney(i.tax_amount)}</td>
             <td class="fw-bold text-success">${formatMoney(i.grand_total)}</td>
             <td><span class="badge bg-${getStatusBadgeColor(i.status)}">${i.status}</span></td>
-            <td class="text-end d-print-none">
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-success dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-gear"></i>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                        ${buildInvoiceActions(i)}
-                    </ul>
-                </div>
-            </td>
+            <td class="text-end d-print-none">${invActions(i)}</td>
         </tr>`;
     });
     html += '</tbody></table></div>';
+
+    // Mobile: card view (matches the rest of the system). Shown below lg.
+    html += '<div class="d-lg-none row g-2">';
+    invoices.forEach((i) => {
+        html += `<div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <a href="invoice_view?id=${i.invoice_id}" class="fw-bold text-success">${i.invoice_number}</a>
+                        <span class="badge bg-${getStatusBadgeColor(i.status)}">${i.status}</span>
+                    </div>
+                    <div class="small text-muted mb-1"><i class="bi bi-person me-1"></i>${i.customer_name || 'N/A'}</div>
+                    <div class="small text-muted mb-2"><i class="bi bi-calendar3 me-1"></i>${formatDate(i.invoice_date)}</div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold text-success">${formatMoney(i.grand_total)}</span>
+                        ${invActions(i)}
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    });
+    html += '</div>';
+
     $list.html(html);
+    if ($.fn.DataTable.isDataTable('#invoicesDT')) $('#invoicesDT').DataTable().destroy();
+    $('#invoicesDT').DataTable({ pageLength: 25, autoWidth: false, order: [[3, 'desc']], columnDefs: [{ orderable: false, targets: [0, 9] }] });
 }
+
+// The Sales-section DataTables are built while their tab is hidden, so their
+// column widths need a nudge the first time the tab becomes visible.
+$(document).on('shown.bs.tab', '[data-bs-target="#sales"]', function () {
+    if ($.fn.DataTable.isDataTable('#salesOrdersDT')) $('#salesOrdersDT').DataTable().columns.adjust();
+});
+$(document).on('shown.bs.tab', '[data-bs-target="#invoices"]', function () {
+    if ($.fn.DataTable.isDataTable('#invoicesDT')) $('#invoicesDT').DataTable().columns.adjust();
+});
+$(document).on('shown.bs.tab', '[data-bs-target="#proj-ipc"]', function () {
+    if ($.fn.DataTable.isDataTable('#proj-ipc-table')) $('#proj-ipc-table').DataTable().columns.adjust();
+});
 
 // ── Project Received Invoices (supplier_invoices WHERE project_id = ?) ────────
 let projRiLoaded = false;
@@ -20371,6 +20441,10 @@ function ipcLoadTable() {
 
         if (ipcTable) { ipcTable.destroy(); }
         var tbody = $('#proj-ipc-table tbody').empty();
+        var cards = '';
+        if (!data.length) {
+            $('#proj-ipc-cards').html('<div class="col-12"><div class="py-5 text-center text-muted"><i class="bi bi-file-earmark-check fs-1 mb-3 d-block"></i>No IPCs for this project.</div></div>');
+        }
         data.forEach(function(r, idx) {
             var statusBadge = r.status === 'Approved' ? '<span class="badge bg-success">Approved</span>'
                 : r.status === 'Paid' ? '<span class="badge bg-primary">Invoiced</span>'
@@ -20408,8 +20482,20 @@ function ipcLoadTable() {
                 + '<td class="small">' + ipcEscHtml(r.order_number || '-') + '</td>'
                 + '<td class="text-end fw-bold text-primary">' + fmt(r.net_payable) + '</td>'
                 + '<td>' + statusBadge + '</td><td class="d-print-none">' + actions + '</td></tr>');
+
+            // Mobile card (mirrors the row)
+            cards += '<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">'
+                + '<div class="d-flex justify-content-between align-items-start mb-2">'
+                + '<span class="fw-bold text-primary">' + (r.ipc_number || '') + '</span>' + statusBadge + '</div>'
+                + '<div class="small text-muted mb-1"><i class="bi bi-calendar3 me-1"></i>' + (r.ipc_date || '-') + (period ? ' &middot; ' + period : '') + '</div>'
+                + '<div class="small text-muted mb-1"><i class="bi bi-person me-1"></i>' + ipcEscHtml(r.customer_name || '-') + '</div>'
+                + '<div class="small text-muted mb-2"><i class="bi bi-cart me-1"></i>' + ipcEscHtml(r.order_number || '-') + '</div>'
+                + '<div class="d-flex justify-content-between align-items-center">'
+                + '<span class="fw-bold text-primary">TZS ' + fmt(r.net_payable) + '</span>' + actions + '</div>'
+                + '</div></div></div>';
         });
-        ipcTable = $('#proj-ipc-table').DataTable({ pageLength: 25, responsive: true, dom: 'rtip' });
+        if (data.length) { $('#proj-ipc-cards').html(cards); }
+        ipcTable = $('#proj-ipc-table').DataTable({ pageLength: 25, autoWidth: false, dom: 'frtip', columnDefs: [{ orderable: false, targets: [0, 8] }] });
     });
 }
 
