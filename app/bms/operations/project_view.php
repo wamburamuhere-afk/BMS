@@ -8812,6 +8812,15 @@ $(document).on('shown.bs.tab', '[data-bs-target="#invoices"]', function () {
 $(document).on('shown.bs.tab', '[data-bs-target="#proj-ipc"]', function () {
     if ($.fn.DataTable.isDataTable('#proj-ipc-table')) $('#proj-ipc-table').DataTable().columns.adjust();
 });
+$(document).on('shown.bs.tab', '[data-bs-target="#expenses"]', function () {
+    if ($.fn.DataTable.isDataTable('#projExpensesDT')) $('#projExpensesDT').DataTable().columns.adjust();
+});
+$(document).on('shown.bs.tab', '[data-bs-target="#vouchers"]', function () {
+    if ($.fn.DataTable.isDataTable('#projVouchersDT')) $('#projVouchersDT').DataTable().columns.adjust();
+});
+$(document).on('shown.bs.tab', '[data-bs-target="#budget"]', function () {
+    if ($.fn.DataTable.isDataTable('#budgetListTable')) $('#budgetListTable').DataTable().columns.adjust();
+});
 
 // ── Project Received Invoices (supplier_invoices WHERE project_id = ?) ────────
 let projRiLoaded = false;
@@ -8986,12 +8995,24 @@ function renderVouchers(vouchers) {
 
 function renderVouchersFull(vouchers) {
     const $list = $('#vouchersTableFull');
-    if (vouchers.length === 0) {
+    if (!vouchers || vouchers.length === 0) {
         $list.html('<div class="py-5 text-center text-muted"><i class="bi bi-wallet fs-1 mb-3"></i><p>No payment vouchers linked to this project.</p></div>');
         return;
     }
-    
-    let html = '<div class="table-responsive"><table class="table table-hover align-middle border"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Voucher Number</th><th>Payee</th><th>Date</th><th>Category</th><th>Amount</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+
+    const pvActions = (v) => `
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-danger dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button>
+            <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                <li><a class="dropdown-item py-2" href="payment_voucher_view?id=${v.id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeVoucherStatus(${v.id}, '${v.status}')"><i class="bi bi-arrow-repeat text-warning me-2"></i>Change Status</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteVoucher(${v.id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
+            </ul>
+        </div>`;
+
+    // Desktop: DataTable
+    let html = '<div class="d-none d-lg-block"><table id="projVouchersDT" class="table table-hover align-middle border w-100"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Voucher Number</th><th>Payee</th><th>Date</th><th>Category</th><th>Amount</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
     vouchers.forEach((v, idx) => {
         html += `<tr>
             <td class="text-center fw-bold text-muted">${idx + 1}</td>
@@ -9001,23 +9022,33 @@ function renderVouchersFull(vouchers) {
             <td><small class="text-muted">${v.category_name || 'N/A'}</small></td>
             <td class="fw-bold text-danger">${formatMoney(v.amount)}</td>
             <td><span class="badge bg-${getStatusBadgeColor(v.status)}">${v.status}</span></td>
-            <td class="text-end d-print-none">
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-danger dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-gear"></i>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                        <li><a class="dropdown-item py-2" href="payment_voucher_view?id=${v.id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
-                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeVoucherStatus(${v.id}, '${v.status}')"><i class="bi bi-arrow-repeat text-warning me-2"></i>Change Status</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteVoucher(${v.id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
-                    </ul>
-                </div>
-            </td>
+            <td class="text-end d-print-none">${pvActions(v)}</td>
         </tr>`;
     });
     html += '</tbody></table></div>';
+
+    // Mobile: card view
+    html += '<div class="d-lg-none row g-2">';
+    vouchers.forEach((v) => {
+        html += `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <span class="fw-bold text-dark">${v.voucher_number}</span>
+                <span class="badge bg-${getStatusBadgeColor(v.status)}">${v.status}</span>
+            </div>
+            <div class="small text-muted mb-1"><i class="bi bi-person me-1"></i>${v.payee_name || 'N/A'}</div>
+            <div class="small text-muted mb-1"><i class="bi bi-tag me-1"></i>${v.category_name || 'N/A'}</div>
+            <div class="small text-muted mb-2"><i class="bi bi-calendar3 me-1"></i>${formatDate(v.vouch_date)}</div>
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-danger">${formatMoney(v.amount)}</span>
+                ${pvActions(v)}
+            </div>
+        </div></div></div>`;
+    });
+    html += '</div>';
+
     $list.html(html);
+    if ($.fn.DataTable.isDataTable('#projVouchersDT')) $('#projVouchersDT').DataTable().destroy();
+    $('#projVouchersDT').DataTable({ pageLength: 25, autoWidth: false, order: [[3, 'desc']], columnDefs: [{ orderable: false, targets: [0, 7] }] });
 }
 
 function renderPurchases(purchases) {
@@ -9585,57 +9616,73 @@ function deleteRFQ(id, number) {
 }
 
 function renderExpenses(expenses) {
-    if (expenses.length === 0) {
-        $('#expensesTable').html('<p class="text-muted text-center">No expenses linked to this project.</p>');
+    const $c = $('#expensesTable');
+    if (!expenses || expenses.length === 0) {
+        $c.html('<p class="text-muted text-center py-4">No expenses linked to this project.</p>');
         return;
     }
-    
-    let html = '<div class="table-responsive"><table class="table table-hover align-middle"><thead class="table-light"><tr><th style="width:50px;">S/NO</th><th class="text-center">Description</th><th>Allocation Source</th><th>Category</th><th>Date</th><th>Amount</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
-    expenses.forEach((e, idx) => {
-        const dataObj = encodeURIComponent(JSON.stringify(e));
-        
-        let allocationBadge = '<span class="badge bg-light text-muted border small">No Allocation</span>';
-        if (e.budget_id) {
-            allocationBadge = '<span class="badge bg-info-soft text-info border border-info small"><i class="bi bi-piggy-bank me-1"></i>Budget</span>';
-        } else if (e.voucher_id) {
-            allocationBadge = '<span class="badge bg-warning-soft text-warning border border-warning small"><i class="bi bi-wallet2 me-1"></i>PV Link</span>';
-        }
 
+    const allocBadge = (e) => {
+        if (e.budget_id)  return '<span class="badge bg-info-soft text-info border border-info small"><i class="bi bi-piggy-bank me-1"></i>Budget</span>';
+        if (e.voucher_id) return '<span class="badge bg-warning-soft text-warning border border-warning small"><i class="bi bi-wallet2 me-1"></i>PV Link</span>';
+        return '<span class="badge bg-light text-muted border small">No Allocation</span>';
+    };
+    const catBadges = (e) => (e.categories && Array.isArray(e.categories) && e.categories.length > 0)
+        ? e.categories.map(cat => `<span class="badge bg-info-soft text-info border border-info px-2 py-1" style="font-size: 0.65rem;">${cat.category_name || cat.name}</span>`).join(' ')
+        : `<span class="badge bg-light text-primary border-0 small text-uppercase">${e.category_name || 'N/A'}</span>`;
+    const exActions = (e) => {
+        const dataObj = encodeURIComponent(JSON.stringify(e));
+        return `<div class="dropdown">
+            <button class="btn btn-light btn-sm dropdown-toggle shadow-sm border" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-gear-fill text-primary"></i></button>
+            <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                <li><a class="dropdown-item" href="javascript:void(0)" onclick="viewExpenseDetails('${dataObj}')"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                <li><a class="dropdown-item" href="javascript:void(0)" onclick="editExpenseInline('${dataObj}')"><i class="bi bi-pencil text-info me-2"></i>Edit Detail</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteExpenseInline(${e.expense_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
+            </ul>
+        </div>`;
+    };
+
+    // Desktop: DataTable
+    let html = '<div class="d-none d-lg-block"><table id="projExpensesDT" class="table table-hover align-middle border w-100"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Description</th><th>Allocation Source</th><th>Category</th><th>Date</th><th>Amount</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    expenses.forEach((e, idx) => {
         html += `<tr>
             <td class="text-center fw-bold text-muted">${idx + 1}</td>
             <td>
                 <div class="fw-bold text-dark">${e.description || 'N/A'}</div>
                 ${e.reference_number ? `<small class="text-muted"><i class="bi bi-hash"></i>${e.reference_number}</small>` : ''}
             </td>
-            <td>${allocationBadge}</td>
-            <td>
-                <div class="d-flex flex-wrap gap-1">
-                    ${e.categories && Array.isArray(e.categories) && e.categories.length > 0 
-                        ? e.categories.map(cat => `<span class="badge bg-info-soft text-info border border-info px-2 py-1" style="font-size: 0.65rem;">${cat.category_name || cat.name}</span>`).join('')
-                        : `<span class="badge bg-light text-primary border-0 small text-uppercase">${e.category_name || 'N/A'}</span>`
-                    }
-                </div>
-            </td>
+            <td>${allocBadge(e)}</td>
+            <td><div class="d-flex flex-wrap gap-1">${catBadges(e)}</div></td>
             <td>${formatDate(e.expense_date)}</td>
             <td class="fw-bold text-danger">${formatMoney(e.amount)} TZS</td>
             <td><span class="badge bg-${getStatusBadgeColor(e.status)}">${e.status}</span></td>
-            <td class="text-end d-print-none">
-                <div class="dropdown">
-                    <button class="btn btn-light btn-sm dropdown-toggle shadow-sm border" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-gear-fill text-primary"></i>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                        <li><a class="dropdown-item" href="javascript:void(0)" onclick="viewExpenseDetails('${dataObj}')"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
-                        <li><a class="dropdown-item" href="javascript:void(0)" onclick="editExpenseInline('${dataObj}')"><i class="bi bi-pencil text-info me-2"></i>Edit Detail</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteExpenseInline(${e.expense_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
-                    </ul>
-                </div>
-            </td>
+            <td class="text-end d-print-none">${exActions(e)}</td>
         </tr>`;
     });
     html += '</tbody></table></div>';
-    $('#expensesTable').html(html);
+
+    // Mobile: card view
+    html += '<div class="d-lg-none row g-2">';
+    expenses.forEach((e) => {
+        html += `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <span class="fw-bold text-dark">${e.description || 'N/A'}</span>
+                <span class="badge bg-${getStatusBadgeColor(e.status)}">${e.status}</span>
+            </div>
+            <div class="mb-1">${allocBadge(e)} ${catBadges(e)}</div>
+            <div class="small text-muted mb-2"><i class="bi bi-calendar3 me-1"></i>${formatDate(e.expense_date)}</div>
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-danger">${formatMoney(e.amount)} TZS</span>
+                ${exActions(e)}
+            </div>
+        </div></div></div>`;
+    });
+    html += '</div>';
+
+    $c.html(html);
+    if ($.fn.DataTable.isDataTable('#projExpensesDT')) $('#projExpensesDT').DataTable().destroy();
+    $('#projExpensesDT').DataTable({ pageLength: 25, autoWidth: false, order: [[4, 'desc']], columnDefs: [{ orderable: false, targets: [0, 7] }] });
 }
 
 function renderBudgets(budgets, paginationInfo) {
@@ -9652,7 +9699,9 @@ function renderBudgets(budgets, paginationInfo) {
         return;
     }
 
-    let html = '<div class="table-responsive"><table class="table table-hover align-middle border" id="budgetListTable"><thead class="table-light"><tr><th style="width:45px;">S/NO</th><th>Category</th><th style="width:110px;">Type</th><th>Period</th><th>Allocated</th><th>Actual</th><th>Variance</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
+    window._budgetBreakdowns = {};
+    let cards = '';
+    let html = '<div class="d-none d-lg-block"><table class="table table-hover align-middle border w-100" id="budgetListTable"><thead class="table-light"><tr><th style="width:34px;"></th><th style="width:45px;">S/NO</th><th>Category</th><th style="width:110px;">Type</th><th>Period</th><th>Allocated</th><th>Actual</th><th>Variance</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
     budgets.forEach((b, idx) => {
         const monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         const allocated = parseFloat(b.allocated_amount) || 0;
@@ -9721,7 +9770,17 @@ function renderBudgets(budgets, paginationInfo) {
             subTableHtml = '<p class="text-muted small p-2 mb-0"><i class="bi bi-info-circle me-1"></i>No line items recorded.</p>';
         }
 
-        html += `<tr class="budget-parent-row" data-bs-toggle="collapse" data-bs-target="#budgetDetail${idx}" style="cursor:pointer;">
+        window._budgetBreakdowns[b.budget_id] = subTableHtml;
+        const _bActions = `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewBudgetItem('${dataObj}')"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
+                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editBudgetItem('${dataObj}')"><i class="bi bi-pencil text-primary me-2"></i>Edit Detail</a></li>
+                        ${b.status !== 'approved' ? `<li><a class="dropdown-item py-2 text-success" href="javascript:void(0)" onclick="updateBudgetItemStatus(${b.budget_id}, 'approved')"><i class="bi bi-check-circle me-2"></i>Approve</a></li>` : ''}
+                        ${b.status !== 'rejected' && b.status !== 'paid' ? `<li><a class="dropdown-item py-2 text-warning" href="javascript:void(0)" onclick="updateBudgetItemStatus(${b.budget_id}, 'rejected')"><i class="bi bi-x-circle me-2"></i>Reject</a></li>` : ''}
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteBudgetItem(${b.budget_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>`;
+        const _bStatus = `<span class="badge bg-${getStatusBadgeColor(b.status)}">${b.status}</span>${b.rejection_reason ? `<div class="mt-1"><small class="${b.status === 'rejected' ? 'text-danger' : 'text-muted'} fw-bold" style="font-size:0.7rem;" title="${b.rejection_reason}"><i class="bi bi-info-circle me-1"></i>${b.status === 'rejected' ? 'View Reason' : 'Was Rejected'}</small></div>` : ''}`;
+
+        html += `<tr data-bid="${b.budget_id}">
+            <td class="dt-control text-center text-primary" style="cursor:pointer;"><i class="bi bi-chevron-right"></i></td>
             <td class="text-center fw-bold text-muted">${idx + 1}</td>
             <td class="fw-bold text-dark">${b.category_name || 'N/A'}</td>
             <td>${typeBadge}</td>
@@ -9729,66 +9788,69 @@ function renderBudgets(budgets, paginationInfo) {
             <td class="fw-bold">${formatMoney(allocated)}</td>
             <td class="text-primary">${formatMoney(actual)}</td>
             <td class="fw-bold ${vClass}">${variance >= 0 ? '+' : ''}${formatMoney(variance)}</td>
-            <td>
-                <span class="badge bg-${getStatusBadgeColor(b.status)}">${b.status}</span>
-                ${b.rejection_reason ? `<div class="mt-1"><small class="${b.status === 'rejected' ? 'text-danger' : 'text-muted'} fw-bold" style="font-size:0.7rem;" title="${b.rejection_reason}"><i class="bi bi-info-circle me-1"></i>${b.status === 'rejected' ? 'View Reason' : 'Was Rejected'}</small></div>` : ''}
-            </td>
-            <td class="text-end d-print-none" onclick="event.stopPropagation();">
+            <td>${_bStatus}</td>
+            <td class="text-end d-print-none">
                 <div class="dropdown">
-                    <button class="btn btn-light btn-sm dropdown-toggle shadow-sm border" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-gear-fill text-primary"></i>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewBudgetItem('${dataObj}')"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
-                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editBudgetItem('${dataObj}')"><i class="bi bi-pencil text-primary me-2"></i>Edit Detail</a></li>
-                        ${b.status !== 'approved' ? `<li><a class="dropdown-item py-2 text-success" href="javascript:void(0)" onclick="updateBudgetItemStatus(${b.budget_id}, 'approved')"><i class="bi bi-check-circle me-2"></i>Approve</a></li>` : ''}
-                        ${b.status !== 'rejected' && b.status !== 'paid' ? `<li><a class="dropdown-item py-2 text-warning" href="javascript:void(0)" onclick="updateBudgetItemStatus(${b.budget_id}, 'rejected')"><i class="bi bi-x-circle me-2"></i>Reject</a></li>` : ''}
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteBudgetItem(${b.budget_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
-                    </ul>
-                </div>
-            </td>
-        </tr>
-        <tr class="collapse" id="budgetDetail${idx}">
-            <td colspan="9" class="p-0">
-                <div class="px-4 py-3 bg-light border-top border-bottom">
-                    <div class="d-flex align-items-center mb-2">
-                        <i class="bi bi-list-ul me-2 text-primary"></i>
-                        <strong class="small text-uppercase text-primary">Line Items Breakdown — ${b.category_name}</strong>
-                    </div>
-                    ${subTableHtml}
+                    <button class="btn btn-light btn-sm dropdown-toggle shadow-sm border" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-gear-fill text-primary"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">${_bActions}</ul>
                 </div>
             </td>
         </tr>`;
+
+        // Mobile card with a collapsible line-item breakdown
+        const _bcid = 'bcard' + b.budget_id;
+        cards += `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <span class="fw-bold text-dark">${b.category_name || 'N/A'}</span>${_bStatus}
+            </div>
+            <div class="mb-2">${typeBadge} <span class="small text-muted ms-1"><i class="bi bi-calendar3 me-1"></i>${monthNames[b.budget_month]} ${b.budget_year}</span></div>
+            <div class="row g-1 small mb-2 text-center">
+                <div class="col-4">Allocated<div class="fw-bold">${formatMoney(allocated)}</div></div>
+                <div class="col-4">Actual<div class="fw-bold text-primary">${formatMoney(actual)}</div></div>
+                <div class="col-4">Variance<div class="fw-bold ${vClass}">${variance >= 0 ? '+' : ''}${formatMoney(variance)}</div></div>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#${_bcid}"><i class="bi bi-list-ul me-1"></i>Breakdown</button>
+                <div class="dropdown">
+                    <button class="btn btn-light btn-sm dropdown-toggle shadow-sm border" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear-fill text-primary"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">${_bActions}</ul>
+                </div>
+            </div>
+            <div class="collapse mt-2" id="${_bcid}">${subTableHtml}</div>
+        </div></div></div>`;
     });
     html += '</tbody></table></div>';
-
-    // Pagination controls
-    if (paginationInfo && paginationInfo.pages > 1) {
-        const { page, pages, total } = paginationInfo;
-        let pgHtml = `<div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
-            <small class="text-muted">Showing page ${page} of ${pages} (${total} records)</small>
-            <nav><ul class="pagination pagination-sm mb-0">`;
-        pgHtml += `<li class="page-item ${page <= 1 ? 'disabled' : ''}"><a class="page-link" href="javascript:void(0)" onclick="loadProjectBudgetsAjax(${page - 1})">«</a></li>`;
-        const start = Math.max(1, page - 2);
-        const end = Math.min(pages, page + 2);
-        for (let p = start; p <= end; p++) {
-            pgHtml += `<li class="page-item ${p === page ? 'active' : ''}"><a class="page-link" href="javascript:void(0)" onclick="loadProjectBudgetsAjax(${p})">${p}</a></li>`;
-        }
-        pgHtml += `<li class="page-item ${page >= pages ? 'disabled' : ''}"><a class="page-link" href="javascript:void(0)" onclick="loadProjectBudgetsAjax(${page + 1})">»</a></li>`;
-        pgHtml += `</ul></nav></div>`;
-        html += pgHtml;
-    }
+    html += '<div class="d-lg-none row g-2">' + cards + '</div>';
 
     $('#budgetContent').html(html);
 
-    // Animate chevron on collapse toggle
-    $(document).off('show.bs.collapse.budget hide.bs.collapse.budget').on('show.bs.collapse.budget', '[id^="budgetDetail"]', function() {
-        const idx = this.id.replace('budgetDetail', '');
-        $(`#chevron${idx}`).removeClass('bi-chevron-right').addClass('bi-chevron-down text-primary');
-    }).on('hide.bs.collapse.budget', '[id^="budgetDetail"]', function() {
-        const idx = this.id.replace('budgetDetail', '');
-        $(`#chevron${idx}`).removeClass('bi-chevron-down text-primary').addClass('bi-chevron-right');
+    // Desktop DataTable (all rows loaded client-side) with expandable child rows for
+    // the line-item breakdown. Page size follows the "Show" selector.
+    if ($.fn.DataTable.isDataTable('#budgetListTable')) $('#budgetListTable').DataTable().destroy();
+    const _budgetPageLen = (function () {
+        const v = $('#budgetFilterPerPage').val();
+        if (v === 'all') return -1;
+        const n = parseInt(v, 10);
+        return n > 0 ? n : 25;
+    })();
+    const bTable = $('#budgetListTable').DataTable({
+        pageLength: _budgetPageLen,
+        autoWidth: false,
+        order: [[2, 'asc']],
+        columnDefs: [{ orderable: false, targets: [0, 1, 9] }]
+    });
+    $('#budgetListTable tbody').off('click.budgetChild', 'td.dt-control').on('click.budgetChild', 'td.dt-control', function () {
+        const tr    = $(this).closest('tr');
+        const row   = bTable.row(tr);
+        const $icon = $(this).find('i');
+        if (row.child.isShown()) {
+            row.child.hide();
+            $icon.removeClass('bi-chevron-down').addClass('bi-chevron-right');
+        } else {
+            const bid = tr.data('bid');
+            row.child('<div class="px-3 py-2 bg-light">' + (window._budgetBreakdowns[bid] || '') + '</div>').show();
+            $icon.removeClass('bi-chevron-right').addClass('bi-chevron-down');
+        }
     });
 }
 
@@ -9797,7 +9859,9 @@ function loadProjectBudgetsAjax(page) {
     const year    = $('#budgetFilterYear').val() || 'all';
     const month   = $('#budgetFilterMonth').val() || 'all';
     const type    = $('#budgetFilterType').val() || 'all';
-    const perPage = $('#budgetFilterPerPage').val() || '25';
+    // The Year/Month/Type filters are still applied server-side, but we now pull ALL
+    // matching rows and let the desktop DataTable handle sort/search/paging (the
+    // "Show" selector drives the DataTable page length in renderBudgets()).
 
     $('#budgetContent').html('<div class="text-center py-5"><span class="spinner-border text-primary"></span></div>');
 
@@ -9806,8 +9870,8 @@ function loadProjectBudgetsAjax(page) {
         type: 'GET',
         data: {
             project_id: <?= $project_id ?>,
-            page: page,
-            per_page: perPage,
+            page: 1,
+            per_page: 100000,
             year: year,
             month: month,
             type: type
@@ -9815,7 +9879,7 @@ function loadProjectBudgetsAjax(page) {
         dataType: 'json',
         success: function(res) {
             if (res.success) {
-                renderBudgets(res.data, { page: res.page, pages: res.pages, total: res.total });
+                renderBudgets(res.data);
             } else {
                 $('#budgetContent').html('<div class="alert alert-danger">' + (res.message || 'Failed to load budgets') + '</div>');
             }
