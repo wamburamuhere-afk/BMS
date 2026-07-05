@@ -2623,9 +2623,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </button>
                         </div>
                         <div id="communicationsContent">
-                            <div class="alert alert-info py-3 border-0 bg-info-soft">
-                                <i class="bi bi-info-circle-fill me-2"></i> Note: Direct project notes are saved to the project description and activity log.
-                            </div>
                             <div id="projectNotesList"></div>
                         </div>
                     </div>
@@ -10457,6 +10454,8 @@ function viewMovementDetails(id) {
     });
 }
 
+let _notesState = { offset: 0, limit: 20, total: 0 };
+
 function renderNotes(description) {
     const html = `
         <div class="card border-0 shadow-sm mb-4 bg-white" style="border-radius:10px;">
@@ -10470,40 +10469,109 @@ function renderNotes(description) {
             </div>
         </div>
 
-        <h6 class="fw-bold mb-3 mt-4"><i class="bi bi-chat-dots me-2 text-primary"></i>Project Notes</h6>
+        <div class="card border-0 shadow-sm mb-3 d-print-none">
+            <div class="card-body py-2 px-3">
+                <div class="row g-2 align-items-center">
+                    <div class="col-12 col-md">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                            <input type="text" id="noteSearch" class="form-control border-start-0 ps-0" placeholder="Search notes or author...">
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-auto">
+                        <select id="noteAuthor" class="form-select form-select-sm" title="Filter by author"><option value="">All authors</option></select>
+                    </div>
+                    <div class="col-6 col-md-auto">
+                        <input type="date" id="noteDateFrom" class="form-control form-control-sm" title="From date">
+                    </div>
+                    <div class="col-6 col-md-auto">
+                        <input type="date" id="noteDateTo" class="form-control form-control-sm" title="To date">
+                    </div>
+                    <div class="col-6 col-md-auto">
+                        <button class="btn btn-outline-secondary btn-sm w-100" onclick="clearNoteFilters()"><i class="bi bi-x-circle me-1"></i>Clear</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h6 class="fw-bold mb-2"><i class="bi bi-chat-dots me-2 text-primary"></i>Notes <span class="badge bg-primary bg-opacity-10 text-primary ms-1" id="noteCount">0</span></h6>
         <div id="projectNotesTimeline"></div>
+        <div class="text-center mt-3 d-print-none" id="noteLoadMoreWrap" style="display:none;">
+            <button class="btn btn-outline-primary btn-sm" onclick="loadProjectNotes(false)"><i class="bi bi-arrow-down-circle me-1"></i>Load more</button>
+        </div>
     `;
     $('#projectNotesList').html(html);
-    loadProjectNotes();
+
+    let _nt;
+    $('#noteSearch').on('input', function () { clearTimeout(_nt); _nt = setTimeout(() => loadProjectNotes(true), 300); });
+    $('#noteAuthor, #noteDateFrom, #noteDateTo').on('change', function () { loadProjectNotes(true); });
+
+    loadProjectNotes(true);
 }
 
-function loadProjectNotes() {
+function noteCardHtml(n) {
+    const initials = ((n.author || '?').trim().charAt(0) || '?').toUpperCase();
+    return `<div class="border-start border-2 border-primary-soft ps-4 pb-4 position-relative">
+        <span class="position-absolute start-0 translate-middle bg-primary rounded-circle" style="width:14px;height:14px;left:-1px !important;top:0px;"></span>
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="fw-bold small text-dark d-flex align-items-center gap-2">
+                <span class="rounded-circle bg-primary bg-opacity-10 text-primary d-inline-flex align-items-center justify-content-center" style="width:26px;height:26px;font-size:0.7rem;font-weight:700;">${safeOutput(initials)}</span>
+                ${safeOutput(n.author)}
+            </span>
+            <span class="text-muted" style="font-size:0.7rem;"><i class="bi bi-clock me-1"></i>${formatDateTime(n.created_at)}</span>
+        </div>
+        <div class="bg-light p-3 rounded small border-start border-4 border-primary d-flex justify-content-between align-items-start gap-2">
+            <p class="mb-0" style="white-space:pre-wrap;">${safeOutput(n.note)}</p>
+            <button class="btn btn-sm btn-link text-danger p-0 flex-shrink-0 d-print-none" title="Delete note" onclick="deleteProjectNote(${n.note_id})"><i class="bi bi-trash"></i></button>
+        </div>
+    </div>`;
+}
+
+function loadProjectNotes(reset) {
     const $t = $('#projectNotesTimeline');
     if (!$t.length) return;
-    $t.html('<div class="text-center py-3"><span class="spinner-border spinner-border-sm text-primary"></span></div>');
-    $.getJSON(APP_URL + '/api/operations/get_project_notes.php', { project_id: <?= $project_id ?> }, function(res) {
-        if (!res || !res.success) { $t.html('<div class="alert alert-danger">Failed to load notes.</div>'); return; }
-        if (!res.data.length) {
-            $t.html('<div class="text-center text-muted py-4 border rounded bg-light"><i class="bi bi-chat-dots fs-2 d-block mb-2 opacity-25"></i>No notes yet. Click <strong>Add Note</strong> to create the first one.</div>');
-            return;
+    const offset = reset ? 0 : _notesState.offset;
+    if (reset) $t.html('<div class="text-center py-3"><span class="spinner-border spinner-border-sm text-primary"></span></div>');
+
+    $.getJSON(APP_URL + '/api/operations/get_project_notes.php', {
+        project_id: <?= $project_id ?>,
+        search:    $('#noteSearch').val() || '',
+        author:    $('#noteAuthor').val() || '',
+        date_from: $('#noteDateFrom').val() || '',
+        date_to:   $('#noteDateTo').val() || '',
+        limit:     _notesState.limit,
+        offset:    offset
+    }, function (res) {
+        if (!res || !res.success) { if (reset) $t.html('<div class="alert alert-danger">Failed to load notes.</div>'); return; }
+
+        // Author dropdown (populate once; keep current selection)
+        const $auth = $('#noteAuthor'), cur = $auth.val();
+        $auth.find('option:not(:first)').remove();
+        (res.authors || []).forEach(a => $auth.append(`<option value="${a.user_id}">${safeOutput(a.username)}</option>`));
+        if (cur) $auth.val(cur);
+
+        $('#noteCount').text(res.total);
+        const rows = (res.data || []).map(noteCardHtml).join('');
+
+        if (reset) {
+            $t.html(res.total > 0
+                ? '<div class="timeline-notes ps-3">' + rows + '</div>'
+                : '<div class="text-center text-muted py-4 border rounded bg-light"><i class="bi bi-chat-dots fs-2 d-block mb-2 opacity-25"></i>No notes match your filters.</div>');
+        } else {
+            $t.find('.timeline-notes').append(rows);
         }
-        let html = '<div class="timeline-notes ps-3">';
-        res.data.forEach(n => {
-            html += `<div class="border-start border-2 border-primary-soft ps-4 pb-4 position-relative">
-                <span class="position-absolute start-0 translate-middle bg-primary rounded-circle" style="width:14px;height:14px;left:-1px !important;top:0px;"></span>
-                <div class="d-flex justify-content-between mb-1">
-                    <span class="fw-bold small text-dark"><i class="bi bi-person-circle me-1"></i>${safeOutput(n.author)}</span>
-                    <span class="text-muted" style="font-size:0.7rem;">${formatDateTime(n.created_at)}</span>
-                </div>
-                <div class="bg-light p-3 rounded small border-start border-4 border-primary d-flex justify-content-between align-items-start gap-2">
-                    <p class="mb-0" style="white-space:pre-wrap;">${safeOutput(n.note)}</p>
-                    <button class="btn btn-sm btn-link text-danger p-0 flex-shrink-0 d-print-none" title="Delete note" onclick="deleteProjectNote(${n.note_id})"><i class="bi bi-trash"></i></button>
-                </div>
-            </div>`;
-        });
-        html += '</div>';
-        $t.html(html);
-    }).fail(function() { $t.html('<div class="alert alert-danger">Failed to load notes. Please refresh.</div>'); });
+        _notesState.offset = offset + (res.data || []).length;
+        _notesState.total  = res.total;
+        $('#noteLoadMoreWrap').toggle(_notesState.offset < res.total);
+    }).fail(function () { if (reset) $t.html('<div class="alert alert-danger">Failed to load notes. Please refresh.</div>'); });
+}
+
+function clearNoteFilters() {
+    $('#noteSearch').val('');
+    $('#noteAuthor').val('');
+    $('#noteDateFrom').val('');
+    $('#noteDateTo').val('');
+    loadProjectNotes(true);
 }
 
 function deleteProjectNote(id) {
@@ -10511,7 +10579,7 @@ function deleteProjectNote(id) {
         .then((r) => {
             if (!r.isConfirmed) return;
             $.post(APP_URL + '/api/operations/delete_project_note.php', { note_id: id }, function(res) {
-                if (res && res.success) { Swal.fire({ icon: 'success', title: 'Deleted', timer: 1200, showConfirmButton: false }); loadProjectNotes(); }
+                if (res && res.success) { Swal.fire({ icon: 'success', title: 'Deleted', timer: 1200, showConfirmButton: false }); loadProjectNotes(true); }
                 else Swal.fire('Error', (res && res.message) || 'Failed to delete note.', 'error');
             }, 'json').fail(function() { Swal.fire('Error', 'Server error. Please try again.', 'error'); });
         });
@@ -11924,7 +11992,7 @@ function addNote() {
         $.post(APP_URL + '/api/operations/add_project_note.php', { project_id: <?= $project_id ?>, note: result.value }, function(res) {
             if (res && res.success) {
                 Swal.fire({ icon: 'success', title: 'Saved!', text: 'Your note has been added.', timer: 1500, showConfirmButton: false });
-                loadProjectNotes();
+                clearNoteFilters();
             } else {
                 Swal.fire('Error', (res && res.message) || 'Failed to save note.', 'error');
             }

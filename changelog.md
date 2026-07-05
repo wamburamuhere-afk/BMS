@@ -15,6 +15,13 @@ hardcoded static entries. Now notes are really stored, listed, and deletable.
   success/error SweetAlerts) and reloads; `renderNotes()` renders the real notes
   timeline via `loadProjectNotes()` (author + timestamp + delete); removed the
   hardcoded entries; note text escaped via `safeOutput`.
+- **Professional filtering + pagination** (built for many notes):
+  - `get_project_notes.php` accepts **search** (note or author), **author**, and
+    **date_from/date_to** filters plus **limit/offset** paging; returns the total count
+    and the distinct authors list for the filter dropdown.
+  - The Notes tab now has a **filter bar** (search, author dropdown, date range, Clear),
+    a **count badge**, author-initial avatars, and a **"Load more"** button that pages
+    through results 20 at a time (debounced search).
 
 ## 2026-07-05 (fix) — Record Project Expense: always notify on failure (no more silent errors)
 
