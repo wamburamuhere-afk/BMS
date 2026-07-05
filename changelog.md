@@ -22,6 +22,21 @@ had no effect if its name was on the list.
     types appear in the project Expense form (matching the external page). Criteria-based
     (by name) and idempotent.
 
+## 2026-07-04 (feat) — Project NIP list: add Item Code column (external-parity columns)
+
+In **Projects → Project Details → Procurements → Non-inventory Products**, the list
+now shows the same columns as the external Non-Inventory page, minus the Project
+column (redundant — every product here is already assigned to the project):
+**S/NO · Item Code · Product Name · Selling Price · Tax · Status · Actions**.
+
+- **`app/bms/operations/project_view.php`** (`projNipRenderTable`)
+  - Added an **Item Code** column (`contract_item_no`, falling back to `sku` then `—`),
+    matching the external services list.
+  - Search filter now also matches the Item Code.
+  - Already a DataTable on desktop with the shared mobile **card view**
+    (`bms-mobile-cards.js`, card view by default on mobile) — the new column flows
+    into the cards automatically.
+
 ## 2026-07-04 (feat) — Project details Sales section: DataTables + mobile card view (Sales Orders, IPC, Invoices)
 
 The three tables under **Projects → Project Details → Sales** now use searchable,
