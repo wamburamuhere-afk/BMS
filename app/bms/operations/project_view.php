@@ -7719,6 +7719,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
             white-space: normal !important;
             word-break: break-word !important;
         }
+        /* Hide the Budget expand/collapse control column on print (empty on paper). */
+        #budgetListTable thead th:first-child,
+        #budgetListTable tbody td.dt-control { display: none !important; }
 
         /* Ensure schedule fits on one page width */
         #fullScheduleExportArea { 
