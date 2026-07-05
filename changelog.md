@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-07-05 (fix) — Record Project Expense: always notify on failure (no more silent errors)
+
+The Record/Update Project Expense handlers only showed a SweetAlert when the API
+returned `{success:false}`. If the request failed at the HTTP level (server error /
+PHP fatal, expired CSRF token 419, permission 403, network drop, or a non-JSON
+response) the success callback never ran, so **nothing** was shown — a silent
+failure.
+
+- **`app/bms/operations/project_view.php`**
+  - Added a shared `expenseErrorMsg(xhr)` helper that maps HTTP failures to a clear
+    message (419 → token expired, 403 → no permission, 401 → session ended, 0 →
+    network, otherwise the API message or a generic server-error line).
+  - Added a `.fail()` SweetAlert to both the **Record Expense** (`add_expense`) and
+    **Update Expense** (`update_expense`) requests, so every failure now surfaces a
+    proper alert.
+
 ## 2026-07-04 (fix) — Project Expense Type dropdown honours the "Show in Projects" flag (was hardcoded)
 
 In **Project Details → Finance → Expenses → Record Project Expense**, the Expense

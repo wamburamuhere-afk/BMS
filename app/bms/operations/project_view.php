@@ -11173,6 +11173,20 @@ $(document).on('submit', '#addExpenseForm', function(e) {
     submitExpenseForm($(this));
 });
 
+// Build a clear message for a failed expense request (HTTP/server error, expired
+// security token, permission, network, or a non-JSON response) so the user always
+// gets a SweetAlert instead of a silent failure.
+function expenseErrorMsg(xhr) {
+    if (xhr) {
+        if (xhr.status === 419) return 'Your security token expired. Please refresh the page and try again.';
+        if (xhr.status === 403) return 'You do not have permission to record this expense.';
+        if (xhr.status === 401) return 'Your session has ended. Please log in again.';
+        if (xhr.status === 0)   return 'Network error — please check your connection and try again.';
+        try { const j = JSON.parse(xhr.responseText); if (j && j.message) return j.message; } catch (e) {}
+    }
+    return 'Could not save the expense (server error). Please try again.';
+}
+
 function submitExpenseForm($form) {
 
 
@@ -11182,19 +11196,21 @@ function submitExpenseForm($form) {
     $.post('/api/account/add_expense.php', $form.serialize(), function(res) {
         if (res.success) {
             $('#addExpenseModal').modal('hide');
-            Swal.fire({ 
-                icon: 'success', 
-                title: 'Expense Recorded!', 
+            Swal.fire({
+                icon: 'success',
+                title: 'Expense Recorded!',
                 text: res.message,
                 timer: 2000,
-                showConfirmButton: false 
+                showConfirmButton: false
             }).then(() => {
                 loadProjectDetails();
             });
         } else {
             Swal.fire('Error', res.message || 'Failed to add expense', 'error');
         }
-    }, 'json').always(() => {
+    }, 'json').fail(function(xhr) {
+        Swal.fire('Error', expenseErrorMsg(xhr), 'error');
+    }).always(() => {
         $btn.prop('disabled', false).html('<i class="bi bi-save me-1"></i> Record Expense');
     });
 }
@@ -13267,9 +13283,11 @@ $('#expenseActionForm').on('submit', function(e) {
             showActionSuccess(res.message);
             loadProjectDetails();
         } else {
-            Swal.fire('Error', res.message, 'error');
+            Swal.fire('Error', res.message || 'Failed to update expense', 'error');
         }
-    }, 'json').always(() => {
+    }, 'json').fail(function(xhr) {
+        Swal.fire('Error', expenseErrorMsg(xhr), 'error');
+    }).always(() => {
         $btn.prop('disabled', false).html('<i class="bi bi-save me-1"></i> Update Expense');
     });
 });
