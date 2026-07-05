@@ -10458,7 +10458,7 @@ function viewMovementDetails(id) {
 }
 
 function renderNotes(description) {
-    let html = `
+    const html = `
         <div class="card border-0 shadow-sm mb-4 bg-white" style="border-radius:10px;">
             <div class="card-header bg-light border-0 py-2">
                 <div class="d-flex justify-content-between align-items-center">
@@ -10466,37 +10466,55 @@ function renderNotes(description) {
                 </div>
             </div>
             <div class="card-body">
-                <p class="mb-0 text-muted">${description || 'No detailed description provided for this project.'}</p>
+                <p class="mb-0 text-muted" style="white-space:pre-wrap;">${safeOutput(description) || 'No detailed description provided for this project.'}</p>
             </div>
         </div>
-        
-        <h6 class="fw-bold mb-3 mt-4"><i class="bi bi-clock-history me-2 text-primary"></i>Recent Records & Activity</h6>
-        <div class="timeline-notes ps-3">
-            <div class="border-start border-2 border-primary-soft ps-4 pb-4 position-relative">
-                <span class="position-absolute start-0 translate-middle bg-primary rounded-circle" style="width: 14px; height: 14px; left: -1px !important; top: 0px;"></span>
-                <div class="d-flex justify-content-between mb-1">
-                    <span class="fw-bold small text-dark">Project Summary Generation</span>
-                    <span class="text-muted" style="font-size: 0.7rem;">JUST NOW</span>
-                </div>
-                <div class="bg-light p-3 rounded small border-start border-4 border-primary">
-                    <p class="mb-0">All linked financial records (Sales, Invoices, Purchases, Vouchers) have been synchronized for the live dashboard view.</p>
-                </div>
-            </div>
-            
-            <div class="border-start border-2 border-light ps-4 position-relative">
-                <span class="position-absolute start-0 translate-middle bg-light border border-secondary rounded-circle" style="width: 14px; height: 14px; left: -1px !important; top: 0px;"></span>
-                <div class="d-flex justify-content-between mb-1">
-                    <span class="fw-bold small text-muted">Project Initialized</span>
-                    <span class="text-muted" style="font-size: 0.7rem;">SYSTEM</span>
-                </div>
-                <div class="text-muted small italic">
-                    <p class="mb-0">Project record created in the management system.</p>
-                </div>
-            </div>
-        </div>
+
+        <h6 class="fw-bold mb-3 mt-4"><i class="bi bi-chat-dots me-2 text-primary"></i>Project Notes</h6>
+        <div id="projectNotesTimeline"></div>
     `;
-    
     $('#projectNotesList').html(html);
+    loadProjectNotes();
+}
+
+function loadProjectNotes() {
+    const $t = $('#projectNotesTimeline');
+    if (!$t.length) return;
+    $t.html('<div class="text-center py-3"><span class="spinner-border spinner-border-sm text-primary"></span></div>');
+    $.getJSON(APP_URL + '/api/operations/get_project_notes.php', { project_id: <?= $project_id ?> }, function(res) {
+        if (!res || !res.success) { $t.html('<div class="alert alert-danger">Failed to load notes.</div>'); return; }
+        if (!res.data.length) {
+            $t.html('<div class="text-center text-muted py-4 border rounded bg-light"><i class="bi bi-chat-dots fs-2 d-block mb-2 opacity-25"></i>No notes yet. Click <strong>Add Note</strong> to create the first one.</div>');
+            return;
+        }
+        let html = '<div class="timeline-notes ps-3">';
+        res.data.forEach(n => {
+            html += `<div class="border-start border-2 border-primary-soft ps-4 pb-4 position-relative">
+                <span class="position-absolute start-0 translate-middle bg-primary rounded-circle" style="width:14px;height:14px;left:-1px !important;top:0px;"></span>
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="fw-bold small text-dark"><i class="bi bi-person-circle me-1"></i>${safeOutput(n.author)}</span>
+                    <span class="text-muted" style="font-size:0.7rem;">${formatDateTime(n.created_at)}</span>
+                </div>
+                <div class="bg-light p-3 rounded small border-start border-4 border-primary d-flex justify-content-between align-items-start gap-2">
+                    <p class="mb-0" style="white-space:pre-wrap;">${safeOutput(n.note)}</p>
+                    <button class="btn btn-sm btn-link text-danger p-0 flex-shrink-0 d-print-none" title="Delete note" onclick="deleteProjectNote(${n.note_id})"><i class="bi bi-trash"></i></button>
+                </div>
+            </div>`;
+        });
+        html += '</div>';
+        $t.html(html);
+    }).fail(function() { $t.html('<div class="alert alert-danger">Failed to load notes. Please refresh.</div>'); });
+}
+
+function deleteProjectNote(id) {
+    Swal.fire({ title: 'Delete Note?', text: 'This cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Yes, delete' })
+        .then((r) => {
+            if (!r.isConfirmed) return;
+            $.post(APP_URL + '/api/operations/delete_project_note.php', { note_id: id }, function(res) {
+                if (res && res.success) { Swal.fire({ icon: 'success', title: 'Deleted', timer: 1200, showConfirmButton: false }); loadProjectNotes(); }
+                else Swal.fire('Error', (res && res.message) || 'Failed to delete note.', 'error');
+            }, 'json').fail(function() { Swal.fire('Error', 'Server error. Please try again.', 'error'); });
+        });
 }
 
 function renderReports(summary, progress) {
@@ -11895,22 +11913,30 @@ function addNote() {
         showCancelButton: true,
         confirmButtonText: 'Save Note',
         preConfirm: (note) => {
-            if (!note) {
+            if (!note || !note.trim()) {
                 Swal.showValidationMessage('Please enter a note');
+                return false;
             }
-            return note;
+            return note.trim();
         }
     }).then((result) => {
-        if (result.isConfirmed) {
-            // TODO: Save note to database
-            Swal.fire({
-                icon: 'success',
-                title: 'Saved!',
-                text: 'Your note has been saved',
-                confirmButtonColor: '#3085d6',
-                confirmButtonText: 'OK'
-            });
-        }
+        if (!result.isConfirmed) return;
+        $.post(APP_URL + '/api/operations/add_project_note.php', { project_id: <?= $project_id ?>, note: result.value }, function(res) {
+            if (res && res.success) {
+                Swal.fire({ icon: 'success', title: 'Saved!', text: 'Your note has been added.', timer: 1500, showConfirmButton: false });
+                loadProjectNotes();
+            } else {
+                Swal.fire('Error', (res && res.message) || 'Failed to save note.', 'error');
+            }
+        }, 'json').fail(function(xhr) {
+            let msg = 'Could not save the note. Please try again.';
+            if (xhr) {
+                if (xhr.status === 403) msg = 'You do not have permission to add notes to this project.';
+                else if (xhr.status === 419) msg = 'Your security token expired. Please refresh and try again.';
+                else { try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {} }
+            }
+            Swal.fire('Error', msg, 'error');
+        });
     });
 }
 

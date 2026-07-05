@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-07-05 (feat) — Real Project Notes (replaces the hardcoded/no-op mockup)
+
+The **Project Details → Notes** tab was a mockup: "Add Note" showed a "Saved!" popup
+but never saved anything (`// TODO: Save note to database`), and the timeline was two
+hardcoded static entries. Now notes are really stored, listed, and deletable.
+
+- **`migrations/2026_07_05_project_notes.php`** (new) — ensures the `project_notes`
+  table and adds a `status` column for soft-delete on pre-existing installs. Idempotent.
+- **`api/operations/add_project_note.php`**, **`get_project_notes.php`**,
+  **`delete_project_note.php`** (new) — add / list / soft-delete notes; each gated by
+  auth, `canX('projects')`, and `userCan('project', id)` scope; writes activity-logged.
+- **`app/bms/operations/project_view.php`** — `addNote()` now POSTs to the API (with
+  success/error SweetAlerts) and reloads; `renderNotes()` renders the real notes
+  timeline via `loadProjectNotes()` (author + timestamp + delete); removed the
+  hardcoded entries; note text escaped via `safeOutput`.
+
 ## 2026-07-05 (fix) — Record Project Expense: always notify on failure (no more silent errors)
 
 The Record/Update Project Expense handlers only showed a SweetAlert when the API
