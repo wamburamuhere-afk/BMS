@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-07-05 (feat) — Project Finance section: DataTables + mobile card view (Expense, Voucher, Budget)
+
+The three tables under **Project Details → Finance** now use DataTables on desktop
+and a card view on mobile, matching the rest of the system.
+
+- **`app/bms/operations/project_view.php`**
+  - **Expenses** (`renderExpenses`) and **Vouchers** (`renderVouchersFull`): plain
+    static tables → DataTable (`#projExpensesDT` / `#projVouchersDT`, search/sort/paging)
+    in `d-none d-lg-block`, plus a `d-lg-none` card view with the same Actions.
+  - **Budget** (`renderBudgets`): rebuilt as a client-side DataTable (`#budgetListTable`).
+    The line-item breakdown that used sibling collapse rows now uses **DataTables child
+    rows** (click the ▸ control to expand). Server-side pagination was replaced by
+    loading all matching rows (Year/Month/Type filters still applied server-side) and
+    letting the DataTable page; the "Show" selector drives the DataTable page length.
+    Mobile gets a card view with a collapsible breakdown.
+  - Added `shown.bs.tab` `columns.adjust()` for the three tables so widths render
+    correctly when a (previously hidden) tab is opened.
+  - Presentation only — no queries, APIs, permissions or data touched.
+
 ## 2026-07-05 (fix) — Record Project Expense: always notify on failure (no more silent errors)
 
 The Record/Update Project Expense handlers only showed a SweetAlert when the API
