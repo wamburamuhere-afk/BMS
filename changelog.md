@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-07-05 (feat) — Real Project Notes (replaces the hardcoded/no-op mockup)
+
+The **Project Details → Notes** tab was a mockup: "Add Note" showed a "Saved!" popup
+but never saved anything (`// TODO: Save note to database`), and the timeline was two
+hardcoded static entries. Now notes are really stored, listed, and deletable.
+
+- **`migrations/2026_07_05_project_notes.php`** (new) — ensures the `project_notes`
+  table and adds a `status` column for soft-delete on pre-existing installs. Idempotent.
+- **`api/operations/add_project_note.php`**, **`get_project_notes.php`**,
+  **`delete_project_note.php`** (new) — add / list / soft-delete notes; each gated by
+  auth, `canX('projects')`, and `userCan('project', id)` scope; writes activity-logged.
+- **`app/bms/operations/project_view.php`** — `addNote()` now POSTs to the API (with
+  success/error SweetAlerts) and reloads; `renderNotes()` renders the real notes
+  timeline via `loadProjectNotes()` (author + timestamp + delete); removed the
+  hardcoded entries; note text escaped via `safeOutput`.
+- **Professional filtering + pagination** (built for many notes):
+  - `get_project_notes.php` accepts **search** (note or author), **author**, and
+    **date_from/date_to** filters plus **limit/offset** paging; returns the total count
+    and the distinct authors list for the filter dropdown.
+  - The Notes tab now has a **filter bar** (search, author dropdown, date range, Clear),
+    a **count badge**, author-initial avatars, and a **"Load more"** button that pages
+    through results 20 at a time (debounced search).
+
 ## 2026-07-05 (feat) — Project Finance section: DataTables + mobile card view (Expense, Voucher, Budget)
 
 The three tables under **Project Details → Finance** now use DataTables on desktop
