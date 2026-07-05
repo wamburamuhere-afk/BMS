@@ -1390,6 +1390,21 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </button>
                             </div>
                         </div>
+
+                        <!-- Print Header (Visible only on print) -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2">
+                                    <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                                </div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT BILLS</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+
                         <div id="proj-ri-content">
                             <div class="py-5 text-center text-muted">
                                 <span class="spinner-border spinner-border-sm me-2"></span> Loading...
@@ -1889,7 +1904,19 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </a>
                             </div>
                         </div>
-                        
+
+                        <!-- Print Header (Visible only on print) -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT MATERIALS &amp; STOCK</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+
                         <!-- Warehouses Table — click View Details to see stock per warehouse -->
                         <div id="projectWarehousesSummaryTable"></div>
                     </div>
@@ -7600,6 +7627,58 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
         .row { display: flex !important; flex-wrap: wrap !important; width: 100% !important; }
         .col-6 { width: 50% !important; flex: 0 0 50% !important; }
         .mt-4 { margin-top: 0 !important; }
+
+        /* --- Sales Orders list: always print the wide TABLE (never the mobile cards),
+               regardless of phone/desktop. Actions column is hidden via .d-print-none. --- */
+        #salesOrdersTableFull .d-lg-none { display: none !important; }
+        #salesOrdersTableFull .d-none.d-lg-block { display: block !important; }
+        #salesOrdersTableFull .dataTables_length,
+        #salesOrdersTableFull .dataTables_filter,
+        #salesOrdersTableFull .dataTables_info,
+        #salesOrdersTableFull .dataTables_paginate { display: none !important; }
+        /* Kill the DataTables inline pixel width so the table fits the page
+           (a too-wide table overflows and spawns a blank trailing page). */
+        #salesOrdersTableFull .dataTables_wrapper { width: 100% !important; overflow: visible !important; }
+        #salesOrdersTableFull table {
+            width: 100% !important;
+            table-layout: auto !important;
+            font-size: 9pt !important;
+        }
+        #salesOrdersTableFull table th,
+        #salesOrdersTableFull table td {
+            white-space: normal !important;
+            word-break: break-word !important;
+        }
+
+        /* --- Invoices & IPC lists: identical print behaviour to Sales Orders above
+               (always print the wide table, hide cards + DataTables chrome, fit to page). --- */
+        #invoicesTableFull .d-lg-none,
+        #proj-ipc .d-lg-none { display: none !important; }
+        #invoicesTableFull .d-none.d-lg-block,
+        #proj-ipc .d-none.d-lg-block { display: block !important; }
+        #invoicesTableFull .dataTables_length,
+        #invoicesTableFull .dataTables_filter,
+        #invoicesTableFull .dataTables_info,
+        #invoicesTableFull .dataTables_paginate,
+        #proj-ipc .dataTables_filter,
+        #proj-ipc .dataTables_info,
+        #proj-ipc .dataTables_paginate { display: none !important; }
+        #invoicesTableFull .dataTables_wrapper,
+        #proj-ipc .dataTables_wrapper,
+        #proj-ipc .table-responsive { width: 100% !important; overflow: visible !important; }
+        #invoicesTableFull table,
+        #proj-ipc table {
+            width: 100% !important;
+            table-layout: auto !important;
+            font-size: 9pt !important;
+        }
+        #invoicesTableFull table th,
+        #invoicesTableFull table td,
+        #proj-ipc table th,
+        #proj-ipc table td {
+            white-space: normal !important;
+            word-break: break-word !important;
+        }
 
         /* Ensure schedule fits on one page width */
         #fullScheduleExportArea { 

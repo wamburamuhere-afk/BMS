@@ -182,15 +182,16 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
     .section-panel { display: none !important; }
     body.wh-printing .section-panel.active { display: block !important; }
 
+    /* Static (non-fixed) header: prints ONCE at the top of the first page,
+       and the content flows right after it (no repeating header, no blank gap). */
     #whPrintHeader {
         display: none;
-        position: fixed;
-        top: 0; left: 0; right: 0;
+        position: static;
         background: #fff;
         text-align: center;
-        padding: 8px 0 6px;
+        padding: 0 0 8px;
+        margin-bottom: 12px;
         border-bottom: 3px solid #0d6efd;
-        z-index: 9999;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
@@ -199,7 +200,7 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
     #whPrintHeader h1 { font-size: 13pt; font-weight: 800; color: #0d6efd; margin: 0; text-transform: uppercase; }
     #whPrintHeader h2 { font-size: 10pt; font-weight: 700; color: #212529; margin: 2px 0 0; text-transform: uppercase; }
     #whPrintHeader small { font-size: 8pt; color: #6c757d; }
-    body.wh-printing .container-fluid { margin-top: 48mm !important; }
+    body.wh-printing .container-fluid { margin-top: 0 !important; padding-top: 0 !important; }
 
     #whPrintFooter {
         display: none;
@@ -683,7 +684,11 @@ function doPrint() {
     var ftr = document.getElementById('whPrintFooter');
     hdr.style.display = 'block';
     ftr.style.display = 'block';
-    document.body.appendChild(hdr);
+    // Header is now a static block: place it at the very top of the printed
+    // content so it prints ONCE on page 1 and content follows immediately.
+    var container = document.querySelector('.container-fluid');
+    if (container) { container.insertBefore(hdr, container.firstChild); }
+    // Footer stays fixed at the page bottom (appended to body to escape stacking contexts).
     document.body.appendChild(ftr);
     document.body.classList.add('wh-printing');
 

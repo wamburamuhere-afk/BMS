@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-07-05 (fix) — Project Details: print layout fixes across Sales/Invoices/IPC/Bills/Inventory + Warehouse Stock
+
+Several project tabs printed poorly: some printed the narrow mobile **cards**
+instead of the wide table (all text jammed left, empty center, plus a phantom
+blank page from the over-wide DataTable), and others were missing the standard
+print header. The Warehouse "View Details / Stock History" page repeated its
+header on every page and pushed content off page 1.
+
+- **`app/bms/operations/project_view.php`**
+  - Sales Orders / Invoices / IPC tabs — added `@media print` rules so printing
+    always shows the **wide table** (`.d-none.d-lg-block`), never the mobile cards
+    (`.d-lg-none`); hides the DataTables search/paging chrome; and forces the table
+    to `width:100%` / `table-layout:auto` (9pt, wrapping) so it fits the page and
+    no longer spawns a blank trailing page. Actions column already `d-print-none`.
+  - Bills tab (`#proj-received-invoices`) — added the missing print-only header
+    (logo, company name, "PROJECT BILLS", contract no, project name, divider).
+  - Inventory tab (`#inventory`) — added the missing print-only header
+    ("PROJECT MATERIALS & STOCK"). Matches the other tabs.
+- **`app/bms/operations/warehouse_stock_view.php`** — print header `#whPrintHeader`
+  changed from `position:fixed` to **static** so it prints once at the top of
+  page 1 instead of repeating on every page; removed the 48mm reserved gap so
+  content starts on page 1; `doPrint()` now inserts the static header as the first
+  child of `.container-fluid` (footer stays fixed at the bottom).
+
 ## 2026-07-05 (fix) — Project Notes: add the print header (was missing on print)
 
 Printing the Notes tab produced no header (company logo/name, "PROJECT NOTES",
