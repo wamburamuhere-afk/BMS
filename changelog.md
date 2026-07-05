@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-07-05 (fix) — Project Notes: add the print header (was missing on print)
+
+Printing the Notes tab produced no header (company logo/name, "PROJECT NOTES",
+contract no, project name) unlike the other project tabs.
+
+- **`app/bms/operations/project_view.php`** — added the standard print-only header
+  block (`d-none d-print-block`) to the Notes tab, and marked the on-screen
+  header/Add-Note row `d-print-none` so it no longer prints. Matches Sales Orders,
+  Purchases, NIP, etc.
+
 ## 2026-07-05 (feat) — Real Project Notes (replaces the hardcoded/no-op mockup)
 
 The **Project Details → Notes** tab was a mockup: "Add Note" showed a "Saved!" popup

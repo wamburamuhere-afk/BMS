@@ -2616,7 +2616,20 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
                     <!-- Communications Tab -->
                     <div class="tab-pane fade p-3 p-md-4" id="communications" role="tabpanel">
-                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+                        <!-- Print Header (Visible only on print) -->
+                        <div class="text-center mb-4 report-header d-none d-print-block">
+                            <?php if(!empty($company_logo)): ?>
+                                <div class="mb-2">
+                                    <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                                </div>
+                            <?php endif; ?>
+                            <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+                            <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT NOTES</h3>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
+                            <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
+                        </div>
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3 d-print-none">
                             <h5 class="fw-bold mb-0 text-center text-md-start"><i class="bi bi-chat-dots me-2 text-primary"></i>Project Notes</h5>
                             <button class="btn btn-primary btn-sm w-100 w-md-auto shadow-sm" onclick="addNote()">
                                 <i class="bi bi-plus-circle me-1"></i> Add Note
