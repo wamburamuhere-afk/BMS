@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-07-05 (fix) — Project Finance tabs (Budget / Vouchers / Expenses): print the table, not the mobile cards
+
+The three Finance tabs printed the narrow mobile **cards** (text jammed left,
+empty center) instead of the wide table, same bug fixed earlier for
+Sales/Invoices/IPC. They already had print headers and `d-print-none` Actions.
+
+- **`app/bms/operations/project_view.php`** — added `@media print` rules scoped to
+  `#budgetContent`, `#vouchersTableFull`, `#expensesTable`: always show the wide
+  table (`.d-none.d-lg-block`), hide the mobile cards (`.d-lg-none`), hide the
+  DataTables search/paging chrome, and force `width:100%` / `table-layout:auto`
+  (9pt, wrapping) so the table fits the page with no blank trailing page.
+
 ## 2026-07-05 (fix) — Project Details: print layout fixes across Sales/Invoices/IPC/Bills/Inventory + Warehouse Stock
 
 Several project tabs printed poorly: some printed the narrow mobile **cards**
