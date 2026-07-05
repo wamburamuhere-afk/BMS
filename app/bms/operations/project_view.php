@@ -3994,9 +3994,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Expense Type <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold">Expense Type <span class="text-muted small fw-normal">(optional)</span></label>
                             <div class="input-group">
-                                <select class="form-select expense-type-sel" name="expense_type" id="edit_expense_type" required>
+                                <select class="form-select expense-type-sel" name="expense_type" id="edit_expense_type">
                                     <option value="">Select Type</option>
                                 </select>
                                 <button type="button" class="btn btn-outline-primary" onclick="openExpenseConfigModal()" title="Manage Types & Categories">
@@ -4128,9 +4128,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Expense Type <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold">Expense Type <span class="text-muted small fw-normal">(optional)</span></label>
                             <div class="input-group">
-                                <select class="form-select expense-type-sel" name="expense_type" id="ex_expense_type" required>
+                                <select class="form-select expense-type-sel" name="expense_type" id="ex_expense_type">
                                     <option value="">Select Type</option>
                                 </select>
                                 <button type="button" class="btn btn-outline-primary" onclick="openExpenseConfigModal()" title="Manage Types & Categories">
@@ -20727,8 +20727,6 @@ function loadExpenseSchema(callback) {
     });
 }
 
-const PROJ_NON_PROJECT_TYPES = ['administrative', 'fixed', 'operating'];
-
 function populateExpenseTypeDropdowns() {
     const $types   = $('.expense-type-sel');
     const $cfgType = $('#cfg_type_id');
@@ -20740,12 +20738,16 @@ function populateExpenseTypeDropdowns() {
     expenseSchema.forEach(type => {
         allOptions += `<option value="${type.id}">${type.name}</option>`;
         cfgOptions += `<option value="${type.id}">${type.name}</option>`;
-        if (!PROJ_NON_PROJECT_TYPES.includes(type.name.trim().toLowerCase())) {
+        // The project Expense Type selects honour the admin "Show in Projects"
+        // flag (expense_types.show_project) — the single source of truth — instead
+        // of a hardcoded name list, so the toggle on the Expense Types page
+        // actually controls what appears here.
+        if (Number(type.show_project) === 1) {
             projOptions += `<option value="${type.id}">${type.name}</option>`;
         }
     });
 
-    // Project expense selects get filtered options; config gets all
+    // Project expense selects get flag-filtered options; other selects & config get all
     $('#ex_expense_type, #edit_expense_type').html(projOptions);
     $types.not('#ex_expense_type, #edit_expense_type').html(allOptions);
     $cfgType.html(cfgOptions);
