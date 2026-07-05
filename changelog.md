@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-07-04 (fix) — Project Expense Type dropdown honours the "Show in Projects" flag (was hardcoded)
+
+In **Project Details → Finance → Expenses → Record Project Expense**, the Expense
+Type dropdown filtered by a **hardcoded JS name list** (`['administrative','fixed',
+'operating']`) instead of the `expense_types.show_project` flag. This silently
+**overrode the admin "Show in Projects" toggle** — turning a type ON for projects
+had no effect if its name was on the list.
+
+- **`app/bms/operations/project_view.php`** (`populateExpenseTypeDropdowns`)
+  - Project Expense Type selects (`#ex_expense_type`, `#edit_expense_type`) now
+    filter by `type.show_project === 1` — the single source of truth already exposed
+    by `get_expense_schema.php` and toggled on the Expense Types admin page.
+  - Removed the hardcoded `PROJ_NON_PROJECT_TYPES` name list.
+  - Which types appear in projects is now controlled entirely by the per-type toggle
+    (no code change needed to add/remove a type).
+
 ## 2026-07-04 (feat) — Project details Sales section: DataTables + mobile card view (Sales Orders, IPC, Invoices)
 
 The three tables under **Projects → Project Details → Sales** now use searchable,
