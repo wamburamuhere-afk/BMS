@@ -15,6 +15,12 @@ had no effect if its name was on the list.
   - Removed the hardcoded `PROJ_NON_PROJECT_TYPES` name list.
   - Which types appear in projects is now controlled entirely by the per-type toggle
     (no code change needed to add/remove a type).
+  - **Expense Type is now optional** on the project Add/Edit expense forms (dropped the
+    `required` attribute and the `*`; the save APIs already accepted a null type).
+- **`migrations/2026_07_04_enable_project_expense_types.php`** (new)
+  - Sets `show_project = 1` on the **Administrative / Fixed / Operating** types so all
+    types appear in the project Expense form (matching the external page). Criteria-based
+    (by name) and idempotent.
 
 ## 2026-07-04 (feat) — Project details Sales section: DataTables + mobile card view (Sales Orders, IPC, Invoices)
 

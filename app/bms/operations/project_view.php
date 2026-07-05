@@ -3994,9 +3994,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Expense Type <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold">Expense Type <span class="text-muted small fw-normal">(optional)</span></label>
                             <div class="input-group">
-                                <select class="form-select expense-type-sel" name="expense_type" id="edit_expense_type" required>
+                                <select class="form-select expense-type-sel" name="expense_type" id="edit_expense_type">
                                     <option value="">Select Type</option>
                                 </select>
                                 <button type="button" class="btn btn-outline-primary" onclick="openExpenseConfigModal()" title="Manage Types & Categories">
@@ -4128,9 +4128,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Expense Type <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold">Expense Type <span class="text-muted small fw-normal">(optional)</span></label>
                             <div class="input-group">
-                                <select class="form-select expense-type-sel" name="expense_type" id="ex_expense_type" required>
+                                <select class="form-select expense-type-sel" name="expense_type" id="ex_expense_type">
                                     <option value="">Select Type</option>
                                 </select>
                                 <button type="button" class="btn btn-outline-primary" onclick="openExpenseConfigModal()" title="Manage Types & Categories">
