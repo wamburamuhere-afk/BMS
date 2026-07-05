@@ -7680,6 +7680,46 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
             word-break: break-word !important;
         }
 
+        /* --- Finance lists (Budget / Vouchers / Expenses): identical print behaviour
+               (always print the wide table, hide cards + DataTables chrome, fit to page). --- */
+        #budgetContent .d-lg-none,
+        #vouchersTableFull .d-lg-none,
+        #expensesTable .d-lg-none { display: none !important; }
+        #budgetContent .d-none.d-lg-block,
+        #vouchersTableFull .d-none.d-lg-block,
+        #expensesTable .d-none.d-lg-block { display: block !important; }
+        #budgetContent .dataTables_length,
+        #budgetContent .dataTables_filter,
+        #budgetContent .dataTables_info,
+        #budgetContent .dataTables_paginate,
+        #vouchersTableFull .dataTables_length,
+        #vouchersTableFull .dataTables_filter,
+        #vouchersTableFull .dataTables_info,
+        #vouchersTableFull .dataTables_paginate,
+        #expensesTable .dataTables_length,
+        #expensesTable .dataTables_filter,
+        #expensesTable .dataTables_info,
+        #expensesTable .dataTables_paginate { display: none !important; }
+        #budgetContent .dataTables_wrapper,
+        #vouchersTableFull .dataTables_wrapper,
+        #expensesTable .dataTables_wrapper { width: 100% !important; overflow: visible !important; }
+        #budgetContent table,
+        #vouchersTableFull table,
+        #expensesTable table {
+            width: 100% !important;
+            table-layout: auto !important;
+            font-size: 9pt !important;
+        }
+        #budgetContent table th,
+        #budgetContent table td,
+        #vouchersTableFull table th,
+        #vouchersTableFull table td,
+        #expensesTable table th,
+        #expensesTable table td {
+            white-space: normal !important;
+            word-break: break-word !important;
+        }
+
         /* Ensure schedule fits on one page width */
         #fullScheduleExportArea { 
             width: 100% !important; 
