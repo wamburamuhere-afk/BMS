@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-07-04 (fix) — Project Expense Type dropdown honours the "Show in Projects" flag (was hardcoded)
+
+In **Project Details → Finance → Expenses → Record Project Expense**, the Expense
+Type dropdown filtered by a **hardcoded JS name list** (`['administrative','fixed',
+'operating']`) instead of the `expense_types.show_project` flag. This silently
+**overrode the admin "Show in Projects" toggle** — turning a type ON for projects
+had no effect if its name was on the list.
+
+- **`app/bms/operations/project_view.php`** (`populateExpenseTypeDropdowns`)
+  - Project Expense Type selects (`#ex_expense_type`, `#edit_expense_type`) now
+    filter by `type.show_project === 1` — the single source of truth already exposed
+    by `get_expense_schema.php` and toggled on the Expense Types admin page.
+  - Removed the hardcoded `PROJ_NON_PROJECT_TYPES` name list.
+  - Which types appear in projects is now controlled entirely by the per-type toggle
+    (no code change needed to add/remove a type).
+  - **Expense Type is now optional** on the project Add/Edit expense forms (dropped the
+    `required` attribute and the `*`; the save APIs already accepted a null type).
+- **`migrations/2026_07_04_enable_project_expense_types.php`** (new)
+  - Sets `show_project = 1` on the **Administrative / Fixed / Operating** types so all
+    types appear in the project Expense form (matching the external page). Criteria-based
+    (by name) and idempotent.
+
 ## 2026-07-04 (feat) — Project NIP list: add Item Code column (external-parity columns)
 
 In **Projects → Project Details → Procurements → Non-inventory Products**, the list
