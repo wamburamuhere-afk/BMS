@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMS Daily Report — 4 July 2026</title>
+<style>
+    :root{
+        --navy:#0f2b5b; --blue:#1f5fd0; --blue-2:#0d6efd; --ink:#1c2a3a;
+        --muted:#5b6b7f; --line:#e3e8ef; --pill:#e9f1ff; --pill-ink:#1f5fd0;
+        --good:#0f7b46; --good-bg:#e9f7ef; --good-line:#bfe3cd; --amber:#b8791b;
+        --card:#ffffff; --bg:#ffffff;
+    }
+    *{box-sizing:border-box;}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+        font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;line-height:1.6;font-size:15px;}
+    .page{max-width:900px;margin:0 auto;padding:56px 60px;}
+    h1,h2,h3{font-family:Georgia,"Times New Roman",serif;color:var(--navy);line-height:1.15;}
+    h1{font-size:44px;font-weight:700;margin:6px 0 14px;letter-spacing:-.5px;}
+    h2{font-size:28px;font-weight:700;margin:0 0 12px;}
+    h3{font-size:19px;font-weight:700;margin:0 0 8px;color:var(--ink);font-family:"Segoe UI",sans-serif;}
+    p{margin:0 0 14px;color:var(--ink);}
+    strong{color:var(--navy);}
+    .eyebrow{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--blue);font-weight:700;}
+    .kicker{display:inline-block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;
+        color:var(--pill-ink);font-weight:700;background:var(--pill);padding:6px 12px;border-radius:20px;margin-bottom:16px;}
+    .lede{font-size:18px;color:var(--muted);max-width:640px;}
+    .meta{font-size:13.5px;color:var(--muted);margin-top:22px;}
+    .meta b{color:var(--navy);}
+    .rule{height:3px;background:var(--navy);border:0;margin:26px 0 34px;border-radius:2px;}
+    .rule-soft{height:1px;background:var(--line);border:0;margin:40px 0;}
+    /* stat cards */
+    .stats{display:flex;gap:16px;flex-wrap:wrap;margin:28px 0 8px;}
+    .stat{flex:1;min-width:170px;border:1px solid var(--line);border-top:3px solid var(--blue);
+        border-radius:10px;padding:18px 18px 16px;background:var(--card);}
+    .stat .n{font-family:Georgia,serif;font-size:34px;font-weight:700;color:var(--navy);line-height:1;}
+    .stat .l{font-size:13px;color:var(--muted);margin-top:8px;}
+    /* sections */
+    section{margin:38px 0;}
+    ul.clean{list-style:none;padding:0;margin:0 0 14px;}
+    ul.clean li{position:relative;padding:6px 0 6px 24px;}
+    ul.clean li::before{content:"";position:absolute;left:2px;top:14px;width:8px;height:8px;
+        border-radius:50%;background:var(--blue);}
+    .grid2{display:flex;gap:16px;flex-wrap:wrap;}
+    .grid2>.box{flex:1;min-width:250px;}
+    .box{border:1px solid var(--line);border-radius:10px;padding:16px 18px;background:var(--card);}
+    .box h3{margin-bottom:4px;}
+    .box .tag{display:inline-block;margin-top:10px;font-size:12px;font-weight:700;color:var(--good);
+        background:var(--good-bg);border:1px solid var(--good-line);border-radius:16px;padding:3px 10px;}
+    .beforeafter{display:flex;gap:16px;flex-wrap:wrap;margin:18px 0;}
+    .beforeafter>div{flex:1;min-width:250px;border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+    .beforeafter .after{background:var(--good-bg);border-color:var(--good-line);}
+    .beforeafter .lbl{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;
+        color:var(--muted);margin-bottom:6px;}
+    .beforeafter .after .lbl{color:var(--good);}
+    .callout{border:1px solid var(--line);border-left:4px solid var(--amber);border-radius:10px;
+        padding:16px 18px;background:#fffdf6;margin:18px 0;}
+    .callout.blue{border-left-color:var(--blue);background:#f6faff;}
+    /* table */
+    table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px;}
+    thead th{background:var(--blue);color:#fff;text-align:left;padding:11px 14px;font-weight:700;font-size:13px;}
+    tbody td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink);}
+    tbody tr:last-child td{border-bottom:0;}
+    tbody td:first-child{font-weight:700;color:var(--navy);width:26%;}
+    .foot{font-size:13px;color:var(--muted);margin-top:8px;}
+    .foot b{color:var(--navy);}
+    .match{color:var(--good);font-weight:700;}
+    @media print{
+        .page{padding:0;max-width:100%;}
+        section,.stats,.beforeafter,.grid2{break-inside:avoid;}
+        h2{break-after:avoid;}
+        @page{margin:16mm 14mm;}
+    }
+</style>
+</head>
+<body>
+<div class="page">
+
+    <!-- COVER -->
+    <div class="eyebrow">Business Management System · Progress Report</div>
+    <h1>Daily Report — 4 July 2026</h1>
+    <p class="lede">Everything delivered since the 2–4 July report — a rebuilt dashboard
+    attention panel, professional printing across projects, cleaner Sales &amp; Finance
+    screens, real Project Notes, and smoother data entry.</p>
+    <div class="meta">
+        <b>Period covered:</b> 4 July → 6 July 2026 &nbsp;·&nbsp;
+        <b>Prepared by:</b> W. Nyagawa &nbsp;·&nbsp;
+        <b>Company:</b> BJP Technologies Co. Ltd &nbsp;·&nbsp;
+        <b>Continuing from</b> the 2–4 July report
+    </div>
+    <hr class="rule">
+
+    <div class="stats">
+        <div class="stat"><div class="n">8</div><div class="l">dashboard alert types now backed by live, real-time counts</div></div>
+        <div class="stat"><div class="n">7</div><div class="l">one-click "Go to source" views, each filtered to exactly the flagged items</div></div>
+        <div class="stat"><div class="n">3</div><div class="l">hidden counting errors found and corrected</div></div>
+        <div class="stat"><div class="n">13→1</div><div class="l">stale "document expiry" alerts replaced by the real figure</div></div>
+    </div>
+
+    <!-- HEADLINE -->
+    <section>
+        <div class="kicker">Headline change</div>
+        <h2>The "System requires your attention" panel, rebuilt to be trustworthy</h2>
+        <p>The dashboard's yellow alert panel — "You have N pending notifications" — was
+        showing everything at once, some of the numbers were not real, and clicking an item
+        often dropped you on a whole list instead of the thing that needed attention. It has
+        been rebuilt from the ground up so that <strong>every number is true, and every click
+        takes you straight to the work.</strong></p>
+
+        <h3>1. Tidy, grouped view — open only what you need</h3>
+        <p>Clicking <strong>View Details</strong> now opens a neat, collapsible list of
+        <em>categories</em> (Inventory &amp; Products, Invoices, Goods Receipt Pending, and so on),
+        each showing a <strong>count</strong> of items that need attention — nothing is dumped on
+        screen until you ask for it.</p>
+
+        <h3>2. Two clear actions on every category</h3>
+        <ul class="clean">
+            <li><strong>View here</strong> — expands the list of items right on the dashboard, exactly as before.</li>
+            <li><strong>Go to source</strong> — jumps to that module's real page, <strong>filtered to show only the items that need attention</strong> — the same number you saw on the badge.</li>
+        </ul>
+
+        <h3>3. Every item opens the exact record</h3>
+        <p>Previously, clicking an alert could send you to a general list. Now each item goes
+        straight to the right place:</p>
+        <ul class="clean">
+            <li><strong>Goods Receipt Pending</strong> → opens the <strong>Receive-Goods screen for that exact purchase order</strong>.</li>
+            <li><strong>Pending leave</strong> → opens that specific leave; <strong>quotations</strong> and <strong>tenders</strong> → their own record.</li>
+            <li><strong>Over-credit customer</strong> → that customer; <strong>negative stock</strong> → that product; <strong>overdue invoice / low stock</strong> → their detail view.</li>
+        </ul>
+
+        <div class="beforeafter">
+            <div><div class="lbl">Before</div>A wall of mixed alerts, some numbers inflated or stale, and links that landed you on a full list to hunt through.</div>
+            <div class="after"><div class="lbl">Now</div>Grouped counts you can trust, a filtered "Go to source" for each, and per-item links that open the exact record.</div>
+        </div>
+
+        <div class="callout blue"><strong>Self-correcting by design.</strong> Because the counts are
+        now live readings of the actual data (not saved messages), the moment you fix the underlying
+        issue — restock an item, receive goods, renew a document — it <strong>disappears from the
+        count on its own</strong>. No manual clearing needed.</div>
+    </section>
+
+    <!-- WHERE APPLIED -->
+    <section>
+        <div class="kicker">Where it was applied</div>
+        <h2>Seven categories wired, each verified number-for-number</h2>
+        <p>For every category below, we confirmed on the live system that the badge count equals
+        exactly what the filtered page shows when you click "Go to source".</p>
+        <div class="grid2">
+            <div class="box"><h3>Inventory &amp; Products</h3>Low / out / negative stock and items expiring within 30 days.<div class="tag">✓ Count matches page (13 = 13)</div></div>
+            <div class="box"><h3>Invoices &amp; Payments</h3>Overdue invoices — past due with an outstanding balance.<div class="tag">✓ Count matches page (6 = 6)</div></div>
+            <div class="box"><h3>Goods Receipt Pending</h3>Purchase orders past their expected date with nothing received yet.<div class="tag">✓ Count matches page (6 = 6)</div></div>
+            <div class="box"><h3>Customers Over Credit Limit</h3>Unpaid balance above the customer's credit limit.<div class="tag">✓ Count matches page (1 = 1)</div></div>
+            <div class="box"><h3>Expiring Quotations</h3>Quotations expiring within 5 days, still open.<div class="tag">✓ Own count &amp; source</div></div>
+            <div class="box"><h3>Expiring Tenders</h3>Tenders whose submission deadline is within 7 days.<div class="tag">✓ Own count &amp; source</div></div>
+        </div>
+        <p class="foot" style="margin-top:14px">Cash-register shifts, bank reconciliation, HR leave and payroll remain
+        <b>page-level</b> — the action happens directly on that page, so there is no separate "one record" to open.</p>
+    </section>
+
+    <!-- ACCURACY -->
+    <section>
+        <div class="kicker">Accuracy &amp; reliability</div>
+        <h2>Three hidden miscounts, found and corrected</h2>
+        <p>Building the filtered views exposed three genuine counting problems that had been
+        quietly under- or over-stating the figures. All three are now fixed and consistent.</p>
+        <ul class="clean">
+            <li><strong>Overdue invoices were undercounted.</strong> The system automatically re-labels
+            past-due invoices as "overdue", but the dashboard was only counting a narrow set of labels —
+            so re-labelled and "reviewed" invoices silently vanished from the number. Overdue is now defined
+            one consistent way everywhere: <em>not paid, cancelled or draft, past the due date, with a balance</em>.
+            The real figure rose from <strong>1 to 6</strong>.</li>
+            <li><strong>Customer credit exposure used the wrong basis.</strong> A customer's "amount owed" now
+            uses the true outstanding balance (invoice total minus what's been paid) across all unpaid invoices —
+            so partial payments count correctly and no over-limit customer is missed.</li>
+            <li><strong>"Document expiry" was counting stale reminders.</strong> The badge showed
+            <strong>13</strong> based on old, unread reminder messages — but only <strong>1</strong> document is
+            actually expiring. It now reads the document library directly, so it shows the real number and updates
+            itself when a document is renewed.</li>
+        </ul>
+        <div class="callout"><strong>What this means for you:</strong> the number on the alert panel is now a
+        number you can act on. If it says 6, there are 6 — and clicking through shows you those exact 6.</div>
+    </section>
+
+    <hr class="rule-soft">
+
+    <!-- PROJECT SCREENS -->
+    <section>
+        <div class="kicker">Inside a project</div>
+        <h2>Sales, Finance and Notes screens grew up</h2>
+        <p>Several sections inside a project's screen were upgraded from basic lists into full,
+        searchable, sortable tables — with a card view that automatically takes over on phones.</p>
+        <ul class="clean">
+            <li><strong>Sales section</strong> — Sales Orders, Interim Payment Certificates (IPC) and Invoices
+            became proper tables with search, sorting and paging, plus a tidy mobile card view.</li>
+            <li><strong>Finance section</strong> — Expenses, Payment Vouchers and Budget items received the same
+            treatment: searchable tables on desktop, clean cards on mobile.</li>
+            <li><strong>NIP list</strong> — an <strong>Item Code</strong> column was added so the in-project list matches the main page.</li>
+        </ul>
+
+        <h3>Real Project Notes (replacing a mock-up)</h3>
+        <p>The project <strong>Notes</strong> tab used to be a dummy — "Add Note" only showed a success message and
+        saved nothing. It is now a real, working notes feature:</p>
+        <ul class="clean">
+            <li>Notes are genuinely saved, listed, and can be managed.</li>
+            <li>Professional <strong>filtering, pagination and appearance</strong>, in line with the rest of the system.</li>
+            <li>A proper <strong>print header</strong> (company name, project, contract number) so a printed notes sheet looks official.</li>
+        </ul>
+    </section>
+
+    <!-- PRINTING -->
+    <section>
+        <div class="kicker">Printing</div>
+        <h2>Everything now prints the way it looks on screen</h2>
+        <p>Several project screens printed badly — the data came out as a narrow strip of phone-style
+        cards squeezed to the left with an empty page beside it, and some sections had no header at all.
+        The printing was corrected across the board.</p>
+        <ul class="clean">
+            <li><strong>Sales Orders, Invoices, IPC</strong> and the <strong>Finance tables</strong>
+            (Budget, Vouchers, Expenses) now print the <strong>full wide table</strong> — not the phone cards —
+            with the on-screen "Actions" buttons hidden and no more blank extra page.</li>
+            <li><strong>Bills</strong> and <strong>Inventory</strong> tabs gained the professional
+            <strong>print header</strong> (logo, company name, project, contract number) the other tabs already had.</li>
+            <li>The <strong>Budget</strong> print no longer shows the little empty expand column.</li>
+            <li><strong>Warehouse "View Details / Stock History"</strong> — the header used to repeat on every page
+            and push the content onto page 2. It now appears <strong>once at the top of page one, with the content
+            right beneath it</strong>.</li>
+        </ul>
+    </section>
+
+    <!-- DATA ENTRY -->
+    <section>
+        <div class="kicker">Smoother, safer data entry</div>
+        <h2>Fewer dead-ends when adding records</h2>
+        <ul class="clean">
+            <li><strong>Project expenses</strong> — the Expense Type list now respects which types belong to
+            projects (Admin, Fixed, Operating are available and the field is optional), instead of a hard-coded list;
+            and saving an expense now <strong>always tells you</strong> if something fails, rather than failing silently.</li>
+            <li><strong>Products</strong> — a zero price no longer blocks saving, the form always reports the outcome,
+            and duplicate SKU / product codes are caught up front.</li>
+            <li><strong>Sales orders</strong> — the salesperson is now set automatically to the logged-in user on create and edit.</li>
+            <li><strong>Navigation</strong> — a clean "Back to Project" path was added for Supplier, Sub-contractor and
+            Staff screens, and a dead, unused staff wizard was removed.</li>
+        </ul>
+    </section>
+
+    <hr class="rule-soft">
+
+    <!-- AT A GLANCE -->
+    <section>
+        <div class="kicker">At a glance</div>
+        <h2>Everything delivered since the 2–4 July report</h2>
+        <table>
+            <thead><tr><th>Area</th><th>What changed</th><th>Benefit to the business</th></tr></thead>
+            <tbody>
+                <tr><td>Dashboard alerts</td><td>Rebuilt "System requires your attention" — grouped counts, "View here" + "Go to source", per-item links to the exact record</td><td>Alerts you can trust and act on in one click</td></tr>
+                <tr><td>Filtered sources</td><td>7 categories open filtered to only the flagged items; each verified badge = page</td><td>Go straight to exactly what needs doing</td></tr>
+                <tr><td>Counting fixes</td><td>Overdue-invoice, customer-credit and document-expiry counts corrected &amp; unified</td><td>Real numbers, no silent under/over-counting</td></tr>
+                <tr><td>Project Sales &amp; Finance</td><td>Sales Orders, IPC, Invoices, Expenses, Vouchers, Budget → searchable tables + mobile cards; NIP Item Code column</td><td>Easier to find, sort and use on any device</td></tr>
+                <tr><td>Project Notes</td><td>Replaced the non-working mock-up with real notes: save, filter, paginate, print header</td><td>A genuine, usable notes trail per project</td></tr>
+                <tr><td>Printing</td><td>Sales/Invoices/IPC/Finance print as full tables; Bills &amp; Inventory headers; single-page warehouse stock header</td><td>Clean, professional printouts everywhere</td></tr>
+                <tr><td>Data entry</td><td>Expense types, product save/price/duplicate guards, auto salesperson, cleaner navigation</td><td>Fewer dead-ends and silent failures</td></tr>
+            </tbody>
+        </table>
+        <p class="foot"><b>BMS — Business Management System.</b> Report for 4 July 2026, continuing from the
+        2–4 July progress report. <span class="match">All changes are live on the production system.</span></p>
+    </section>
+
+</div>
+</body>
+</html>
