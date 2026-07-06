@@ -1227,15 +1227,17 @@ function get_progress_color($percentage) {
                                                     <?php else:
                                                         $nav_link = '';
                                                         switch ($item['type'] ?? '') {
+                                                            // Specific-record deep links (open the exact item that needs attention):
+                                                            case 'leave_pending':      $nav_link = getUrl('leaves') . '?open_leave=' . (int)$item['id']; break;
+                                                            case 'quote_expiring':     $nav_link = getUrl('quotation_view') . '?id=' . (int)$item['id']; break;
+                                                            case 'tender_deadline':    $nav_link = getUrl('tender_view') . '?id=' . (int)$item['id']; break;
+                                                            case 'grn_pending':        $nav_link = getUrl('grn_create') . '?po=' . (int)$item['id']; break; // Receive Goods screen for this PO
+                                                            case 'credit_over':        $nav_link = getUrl('customers/details') . '?id=' . (int)$item['id']; break;
+                                                            case 'negative_stock':     $nav_link = getUrl('product_view') . '?id=' . (int)$item['id']; break;
+                                                            // Page-level actions (the action happens on the page itself, no per-record view):
                                                             case 'cash_shift_open':    $nav_link = getUrl('cash_register'); break;
                                                             case 'bank_recon_overdue': $nav_link = getUrl('bank_reconciliation'); break;
-                                                            case 'leave_pending':      $nav_link = getUrl('leaves'); break;
                                                             case 'payroll_due':        $nav_link = getUrl('payroll'); break;
-                                                            case 'quote_expiring':     $nav_link = getUrl('quotations'); break;
-                                                            case 'tender_deadline':    $nav_link = getUrl('tenders'); break;
-                                                            case 'grn_pending':        $nav_link = getUrl('purchase_order_details') . '?id=' . (int)$item['id']; break;
-                                                            case 'credit_over':        $nav_link = getUrl('customers/details') . '?id=' . (int)$item['id']; break;
-                                                            case 'negative_stock':     $nav_link = getUrl('stock_adjustments'); break;
                                                         }
                                                         ?>
                                                         <?php if ($nav_link !== ''): ?>

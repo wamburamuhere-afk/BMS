@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-07-05 (fix) — Dashboard attention: per-item links now open the exact record
+
+Audit found several alert types linked to a generic list/page instead of the
+specific record that needs attention (you'd land on "all leaves", "all quotations"
+etc.). Wired each to its own record.
+
+- **`app/dashboard.php`** — per-item "→" links: leave → `leaves?open_leave=ID`,
+  quotation → `quotation_view?id=`, tender → `tender_view?id=`, negative stock →
+  `product_view?id=`, and **GRN pending → `grn_create?po=ID` (the Receive-Goods
+  screen for that PO)**. Credit-over already opened the customer. Cash-shift, bank
+  recon and payroll stay page-level (the action happens on the page; no per-record
+  view exists). Verified target records exist on the live DB.
+- **`app/bms/pos/leaves.php`** — added a tiny loader: `?open_leave=ID` auto-opens
+  that leave's details modal (via the existing `viewLeave()`), so the dashboard
+  deep-link lands on the exact leave.
+
 ## 2026-07-05 (fix) — Dashboard attention: exact badge counts + gate "Go to source" to wired pages
 
 Follow-up to the attention accordion.
