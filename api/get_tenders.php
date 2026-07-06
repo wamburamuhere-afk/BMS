@@ -47,6 +47,14 @@ if (!empty($_GET['date_to'])) {
     $params[] = $_GET['date_to'];
 }
 
+// Attention mode — dashboard "Expiring Tenders" deep-link: deadline within 7 days,
+// still open (mirrors dashboard tender_deadline).
+if (isset($_GET['attention']) && $_GET['attention'] === '1') {
+    $where .= " AND t.submission_deadline IS NOT NULL
+                AND t.submission_deadline BETWEEN CURDATE() AND CURDATE() + INTERVAL 7 DAY
+                AND UPPER(t.status) IN ('PENDING','OPEN','DRAFT')";
+}
+
 // Count total with filters
 $count_query = "SELECT COUNT(*) FROM tenders t LEFT JOIN customers c ON t.customer_id = c.customer_id $where";
 $stmt_count = $pdo->prepare($count_query);

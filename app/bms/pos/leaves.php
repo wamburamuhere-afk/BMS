@@ -1611,6 +1611,13 @@ function viewLeave(leaveId) {
     });
 }
 
+// Deep-link from the dashboard "System requires your attention" panel:
+// ?open_leave=ID auto-opens that specific leave's details on load.
+$(function () {
+    var _lv = parseInt(new URLSearchParams(window.location.search).get('open_leave') || '0', 10);
+    if (_lv > 0 && typeof viewLeave === 'function') { viewLeave(_lv); }
+});
+
 function editLeave(leaveId) {
     // Load leave data for editing
     $.ajax({

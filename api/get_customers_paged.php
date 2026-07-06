@@ -63,6 +63,17 @@ try {
         $params[] = $search_term;
     }
 
+    // Attention mode — "Customers Over Credit Limit": active customers whose unpaid
+    // invoice balance exceeds their credit limit (mirrors dashboard credit_over).
+    if (isset($_GET['attention']) && $_GET['attention'] === '1') {
+        $where_conditions[] = "c.status = 'active'";
+        $where_conditions[] = "c.credit_limit > 0";
+        $where_conditions[] = "(SELECT COALESCE(SUM(i.grand_total - i.paid_amount), 0)
+                                  FROM invoices i
+                                 WHERE i.customer_id = c.customer_id
+                                   AND i.status NOT IN ('paid','cancelled','draft')) > c.credit_limit";
+    }
+
     $scope_sql = scopeFilterSqlNullable('project', 'c');
     $where_sql = implode(" AND ", $where_conditions) . $scope_sql;
 

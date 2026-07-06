@@ -20,6 +20,10 @@ logActivity($pdo, $_SESSION['user_id'], 'View purchase orders', 'User viewed the
 $supplier_id = $_GET['supplier'] ?? '';
 $status = $_GET['status'] ?? '';
 
+// Attention mode — dashboard "Goods Receipt Pending" deep-link (?attention=1):
+// show ONLY POs past their expected date, still open, with no goods receipt recorded.
+$attention = (isset($_GET['attention']) && $_GET['attention'] === '1');
+
 // Get suppliers for filter dropdown — scoped to user's assigned projects for non-admins
 global $pdo;
 if (isAdmin()) {
@@ -103,6 +107,17 @@ try {
             </div>
         </div>
     </div>
+
+    <?php if ($attention): ?>
+    <div class="alert border-0 shadow-sm d-flex flex-wrap align-items-center gap-2 mb-4 d-print-none" style="background:#fff9e6; border-left:5px solid #ffc107 !important; border-radius:10px;">
+        <i class="bi bi-funnel-fill fs-5 text-warning"></i>
+        <div class="flex-grow-1">
+            <strong>Showing only purchase orders that need attention</strong>
+            <span class="text-muted small d-block">Goods receipt pending &mdash; past the expected date, still open, nothing received yet.</span>
+        </div>
+        <a href="<?= getUrl('purchase_orders') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> Show all POs</a>
+    </div>
+    <?php endif; ?>
 
     <!-- Statistics Cards -->
     <div class="row g-3 mb-4 d-print-none">
@@ -303,6 +318,7 @@ $(document).ready(function() {
                 d.supplier = $('select[name="supplier"]').val();
                 d.date_from = $('input[name="date_from"]').val();
                 d.date_to = $('input[name="date_to"]').val();
+                d.attention = <?= $attention ? 1 : 0 ?>;
             },
             dataSrc: function(json) {
                 if (json.stats) {

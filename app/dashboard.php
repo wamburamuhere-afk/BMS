@@ -56,7 +56,8 @@ $notif_groups = [
     'credit_risk' => ['title' => 'Customers Over Credit Limit', 'icon' => 'bi-exclamation-octagon', 'color' => 'danger', 'items' => []],
     'grn_pending' => ['title' => 'Goods Receipt Pending', 'icon' => 'bi-truck', 'color' => 'warning', 'items' => []],
     'hr_payroll' => ['title' => 'HR & Payroll', 'icon' => 'bi-people-fill', 'color' => 'warning', 'items' => []],
-    'quotes_tenders' => ['title' => 'Expiring Quotations & Tenders', 'icon' => 'bi-clock-history', 'color' => 'warning', 'items' => []],
+    'quotes' => ['title' => 'Expiring Quotations', 'icon' => 'bi-file-earmark-text', 'color' => 'warning', 'items' => []],
+    'tenders' => ['title' => 'Expiring Tenders', 'icon' => 'bi-clock-history', 'color' => 'warning', 'items' => []],
     'documents' => ['title' => 'Document Expiry', 'icon' => 'bi-file-earmark-text', 'color' => 'warning', 'items' => []],
     'others' => ['title' => 'General Notifications', 'icon' => 'bi-bell', 'color' => 'info', 'items' => []]
 ];
@@ -78,8 +79,9 @@ foreach ($alerts as $a) {
         case 'payroll_due':
             $notif_groups['hr_payroll']['items'][] = $a; break;
         case 'quote_expiring':
+            $notif_groups['quotes']['items'][] = $a; break;
         case 'tender_deadline':
-            $notif_groups['quotes_tenders']['items'][] = $a; break;
+            $notif_groups['tenders']['items'][] = $a; break;
         case 'grn_pending':
             $notif_groups['grn_pending']['items'][] = $a; break;
         case 'credit_over':
@@ -87,6 +89,24 @@ foreach ($alerts as $a) {
         default:
             $notif_groups['others']['items'][] = $a;
     }
+}
+
+// Inventory & Products: a product can match more than one alert query (e.g. low
+// stock AND expiring, or out/negative counted by two queries). The ?attention=1
+// page counts each product ONCE, so de-duplicate this group by product id here
+// (keep first — low/out before expiring before negative) so the badge matches.
+if (!empty($notif_groups['products']['items'])) {
+    $seen = [];
+    $notif_groups['products']['items'] = array_values(array_filter(
+        $notif_groups['products']['items'],
+        function ($it) use (&$seen) {
+            $pid = $it['id'] ?? null;
+            if ($pid === null) return true;
+            if (isset($seen[$pid])) return false;
+            $seen[$pid] = true;
+            return true;
+        }
+    ));
 }
 
 // Add pending approvals to the groups
@@ -108,6 +128,22 @@ if (!empty($pending_approvals)) {
 $active_notif_groups = array_filter($notif_groups, function($group) {
     return !empty($group['items']);
 });
+
+// Group → "Go to source" URL (opens the real module page, filtered to ONLY the
+// items needing attention via ?attention=1). The button only appears for groups
+// whose source page ACTUALLY honours the filter — otherwise it would just dump the
+// full list. Filtering is rolled out one page at a time; enable each entry below
+// as its page is wired. Inventory & Products is live; the rest are pending.
+$group_sources = [
+    'products'       => getUrl('products') . '?attention=1',
+    'invoices'       => getUrl('invoices') . '?attention=1',
+    'grn_pending'    => getUrl('purchase_orders') . '?attention=1',
+    'credit_risk'    => getUrl('customers') . '?attention=1',
+    'quotes'         => getUrl('quotations') . '?attention=1',
+    'tenders'        => getUrl('tenders') . '?attention=1',
+    'documents'      => getUrl('document_library') . '?attention=1',
+    // Page-level only (no per-record filtered list): cash_bank, hr_payroll.
+];
 
 // Get warehouses for quick stock adjustment
 $warehouses = [];
@@ -498,11 +534,11 @@ function get_system_alerts($pdo, $user_id) {
                 FROM product_stocks GROUP BY product_id
             ) s ON p.product_id = s.product_id
             WHERE p.status = 'active'
+              AND p.is_service = 0
               AND ((COALESCE(s.available_stock, 0) <= p.min_stock_level AND p.min_stock_level > 0)
                 OR (COALESCE(s.available_stock, 0) <= 0))
               {$prodScope}
             ORDER BY COALESCE(s.available_stock, 0) ASC
-            LIMIT 10
         ");
         $stmt->execute();
         $stock_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -517,11 +553,11 @@ function get_system_alerts($pdo, $user_id) {
                    'Product expiring soon' as message
             FROM products p
             WHERE p.expiry_date IS NOT NULL
+              AND p.is_service = 0
               AND p.expiry_date > CURDATE()
               AND DATEDIFF(p.expiry_date, CURDATE()) <= 30
               AND p.status = 'active'
               {$prodScope}
-            LIMIT 5
         ");
         $stmt->execute();
         $expiry_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -541,9 +577,9 @@ function get_system_alerts($pdo, $user_id) {
                     HAVING available_stock < 0
                 ) s ON p.product_id = s.product_id
                 WHERE p.status = 'active'
+                  AND p.is_service = 0
                   {$prodScope}
                 ORDER BY s.available_stock ASC
-                LIMIT 5
             ");
             $stmt->execute();
             $negative_stock_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -565,7 +601,7 @@ function get_system_alerts($pdo, $user_id) {
                    'Overdue payment' as message
             FROM invoices
             LEFT JOIN customers ON customers.customer_id = invoices.customer_id
-            WHERE invoices.status IN ('sent', 'partial', 'pending', 'approved')
+            WHERE invoices.status NOT IN ('paid', 'cancelled', 'draft')
               AND due_date < CURDATE()
               AND (grand_total - paid_amount) > 0
               {$invScope}
@@ -575,27 +611,29 @@ function get_system_alerts($pdo, $user_id) {
         $overdue_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // ── 3. Document expiry — already personal via user_id, no project scope ──
+    // ── 3. Document expiry — LIVE query on the document library, matching the
+    //       ?attention=1 "Expiring Soon (<=30d)" filter. Using the live table (not
+    //       accumulated notifications) keeps the badge equal to the filtered page and
+    //       self-correcting: renew/replace a document and it drops off automatically. ──
     $doc_alerts = [];
-    try {
-        $stmt = $pdo->prepare("
-            SELECT 'doc_expiring' as type,
-                   document_id as id,
-                   title,
-                   message,
-                   action_url,
-                   created_at
-            FROM notifications
-            WHERE user_id = ?
-              AND type = 'alert'
-              AND document_id IS NOT NULL
-              AND is_read = 0
-            ORDER BY created_at DESC
-            LIMIT 5
-        ");
-        $stmt->execute([$user_id]);
-        $doc_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {}
+    if (canView('document_library') || isAdmin()) {
+        try {
+            $stmt = $pdo->query("
+                SELECT 'doc_expiring' as type,
+                       d.id as id,
+                       d.title,
+                       CONCAT('Expires ', DATE_FORMAT(d.expire_date, '%d %b %Y')) as message,
+                       d.expire_date,
+                       DATEDIFF(d.expire_date, CURDATE()) as days_remaining
+                FROM documents d
+                WHERE d.expire_date IS NOT NULL
+                  AND d.expire_date >= CURDATE()
+                  AND d.expire_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+                ORDER BY d.expire_date ASC
+            ");
+            $doc_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {}
+    }
 
     // ── 4. Cash register shifts left open ────────────────────────────────────
     // Gate: finance/admin only — no project scope (company-wide control)
@@ -794,7 +832,7 @@ function get_system_alerts($pdo, $user_id) {
                 INNER JOIN invoices i ON i.customer_id = c.customer_id
                 WHERE c.status = 'active'
                   AND c.credit_limit > 0
-                  AND i.status IN ('sent','partial','pending','approved')
+                  AND i.status NOT IN ('paid','cancelled','draft')
                   {$custScope}
                 GROUP BY c.customer_id, c.customer_name, c.credit_limit
                 HAVING outstanding > c.credit_limit
@@ -1077,19 +1115,28 @@ function get_progress_color($percentage) {
                     <!-- Collapsible Detailed View -->
                     <div class="collapse mt-3" id="detailedNotifications">
                         <hr class="my-3 opacity-10">
-                        <div class="row g-3 px-1">
-                            <?php foreach ($active_notif_groups as $key => $group): ?>
-                            <div class="col-md-4">
-                                <div class="h-100 bg-white rounded-3 border border-light-subtle p-3 shadow-sm">
-                                    <div class="d-flex align-items-center mb-3">
-                                        <div class="bg-<?= $group['color'] ?>-subtle text-<?= $group['color'] ?> p-2 rounded-3 me-2" style="width: 38px; height: 38px; display: flex; align-items:center; justify-content:center;">
-                                            <i class="bi <?= $group['icon'] ?> fs-5"></i>
-                                        </div>
-                                        <h6 class="mb-0 fw-bold small text-uppercase" style="letter-spacing: 0.5px;"><?= $group['title'] ?></h6>
-                                        <span class="badge bg-<?= $group['color'] ?> rounded-pill ms-auto"><?= count($group['items']) ?></span>
+                        <div class="accordion" id="notifAccordion">
+                            <?php foreach ($active_notif_groups as $key => $group): $grp_src = $group_sources[$key] ?? ''; ?>
+                            <div class="accordion-item border border-light-subtle mb-2 rounded-3 shadow-sm overflow-hidden">
+                                <div class="d-flex align-items-center gap-2 bg-white p-2 ps-3 flex-wrap">
+                                    <div class="bg-<?= $group['color'] ?>-subtle text-<?= $group['color'] ?> p-2 rounded-3" style="width: 38px; height: 38px; display: flex; align-items:center; justify-content:center; flex-shrink:0;">
+                                        <i class="bi <?= $group['icon'] ?> fs-5"></i>
                                     </div>
-                                    
-                                    <div class="notification-list custom-scrollbar" style="max-height: 220px; overflow-y: auto; overflow-x: hidden;">
+                                    <h6 class="mb-0 fw-bold small text-uppercase" style="letter-spacing: 0.5px;"><?= $group['title'] ?></h6>
+                                    <span class="badge bg-<?= $group['color'] ?> rounded-pill"><?= count($group['items']) ?></span>
+                                    <div class="ms-auto d-flex gap-2">
+                                        <?php if ($grp_src !== ''): ?>
+                                        <a href="<?= htmlspecialchars($grp_src) ?>" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1" title="Open the source page, filtered to only these items">
+                                            <i class="bi bi-box-arrow-up-right"></i><span class="d-none d-sm-inline">Go to source</span>
+                                        </a>
+                                        <?php endif; ?>
+                                        <button type="button" class="btn btn-sm btn-outline-<?= $group['color'] ?> collapsed d-flex align-items-center gap-1" data-bs-toggle="collapse" data-bs-target="#notifGrp-<?= $key ?>" aria-expanded="false" aria-controls="notifGrp-<?= $key ?>">
+                                            <i class="bi bi-list-ul"></i><span class="d-none d-sm-inline">View here</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="notifGrp-<?= $key ?>" class="accordion-collapse collapse" data-bs-parent="#notifAccordion">
+                                    <div class="notification-list custom-scrollbar p-2" style="max-height: 300px; overflow-y: auto; overflow-x: hidden;">
                                         <?php foreach ($group['items'] as $item): ?>
                                         <div class="p-2 mb-2 rounded-2 border-bottom border-light-subtle position-relative action-row">
                                             <div class="d-flex justify-content-between align-items-start">
@@ -1177,21 +1224,23 @@ function get_progress_color($percentage) {
                                                             <i class="bi bi-arrow-right-short fs-5 text-primary"></i>
                                                         </a>
                                                     <?php elseif ($key === 'documents'): ?>
-                                                        <a href="<?= htmlspecialchars($item['action_url'] ?? getUrl('document_library')) ?>" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" title="View document library">
+                                                        <a href="<?= htmlspecialchars($item['action_url'] ?? (getUrl('document_library') . '?attention=1')) ?>" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" title="View expiring documents">
                                                             <i class="bi bi-arrow-right-short fs-5 text-warning"></i>
                                                         </a>
                                                     <?php else:
                                                         $nav_link = '';
                                                         switch ($item['type'] ?? '') {
+                                                            // Specific-record deep links (open the exact item that needs attention):
+                                                            case 'leave_pending':      $nav_link = getUrl('leaves') . '?open_leave=' . (int)$item['id']; break;
+                                                            case 'quote_expiring':     $nav_link = getUrl('quotation_view') . '?id=' . (int)$item['id']; break;
+                                                            case 'tender_deadline':    $nav_link = getUrl('tender_view') . '?id=' . (int)$item['id']; break;
+                                                            case 'grn_pending':        $nav_link = getUrl('grn_create') . '?po=' . (int)$item['id']; break; // Receive Goods screen for this PO
+                                                            case 'credit_over':        $nav_link = getUrl('customers/details') . '?id=' . (int)$item['id']; break;
+                                                            case 'negative_stock':     $nav_link = getUrl('product_view') . '?id=' . (int)$item['id']; break;
+                                                            // Page-level actions (the action happens on the page itself, no per-record view):
                                                             case 'cash_shift_open':    $nav_link = getUrl('cash_register'); break;
                                                             case 'bank_recon_overdue': $nav_link = getUrl('bank_reconciliation'); break;
-                                                            case 'leave_pending':      $nav_link = getUrl('leaves'); break;
                                                             case 'payroll_due':        $nav_link = getUrl('payroll'); break;
-                                                            case 'quote_expiring':     $nav_link = getUrl('quotations'); break;
-                                                            case 'tender_deadline':    $nav_link = getUrl('tenders'); break;
-                                                            case 'grn_pending':        $nav_link = getUrl('purchase_order_details') . '?id=' . (int)$item['id']; break;
-                                                            case 'credit_over':        $nav_link = getUrl('customers/details') . '?id=' . (int)$item['id']; break;
-                                                            case 'negative_stock':     $nav_link = getUrl('stock_adjustments'); break;
                                                         }
                                                         ?>
                                                         <?php if ($nav_link !== ''): ?>

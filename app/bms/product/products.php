@@ -31,6 +31,16 @@ $per_page = isset($_GET['per_page']) ? intval($_GET['per_page']) : 25;
 $sort_by = isset($_GET['sort_by']) ? $_GET['sort_by'] : 'product_name';
 $sort_order = isset($_GET['sort_order']) ? $_GET['sort_order'] : 'ASC';
 
+// Attention mode — dashboard "Inventory & Products" deep-link (?attention=1).
+// Shows ONLY products that need attention (low/out/negative stock, or expiring
+// within 30 days), all on one page, active only — mirrors get_system_alerts().
+$attention = (isset($_GET['attention']) && $_GET['attention'] === '1');
+if ($attention) {
+    $status_filter = 'active';
+    $page = 1;
+    $per_page = 1000;
+}
+
 // Calculate offset
 $offset = ($page - 1) * $per_page;
 
@@ -185,6 +195,16 @@ if (!empty($conditions)) {
 // Group by product
 $query .= " GROUP BY p.product_id";
 
+// Attention filter (aggregate → must be HAVING). Mirrors dashboard alert logic:
+// low/out stock, negative stock, or expiring within 30 days.
+if ($attention) {
+    $query .= " HAVING (
+        (COALESCE(SUM(ps.stock_quantity - ps.reserved_quantity), 0) <= p.min_stock_level AND p.min_stock_level > 0)
+        OR COALESCE(SUM(ps.stock_quantity - ps.reserved_quantity), 0) <= 0
+        OR (p.expiry_date IS NOT NULL AND p.expiry_date > CURDATE() AND DATEDIFF(p.expiry_date, CURDATE()) <= 30)
+    )";
+}
+
 // Apply sorting
 $valid_sort_columns = [
     'product_name', 'sku', 'selling_price', 'cost_price', 
@@ -244,6 +264,13 @@ $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 
 $stmt->execute();
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Attention mode returns every match on one page — the base count query does not
+// apply the HAVING filter, so derive the true total from the fetched rows.
+if ($attention) {
+    $total_count = count($products);
+    $total_pages = 1;
+}
 
 // Get data for filter dropdowns
 $categories = $pdo->query("SELECT category_id, category_name FROM categories WHERE status = 'active' AND type = 'product' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
@@ -487,6 +514,16 @@ function get_quick_actions($product) {
         window.addEventListener('load', resizeTextToFit);
         window.addEventListener('resize', resizeTextToFit);
     </script>
+    <?php if ($attention): ?>
+    <div class="alert border-0 shadow-sm d-flex flex-wrap align-items-center gap-2 mb-4 d-print-none" style="background:#fff9e6; border-left:5px solid #ffc107 !important; border-radius:10px;">
+        <i class="bi bi-funnel-fill fs-5 text-warning"></i>
+        <div class="flex-grow-1">
+            <strong>Showing only items that need attention</strong>
+            <span class="text-muted small d-block">Low / out / negative stock, or expiring within 30 days — <?= (int)$total_count ?> item(s).</span>
+        </div>
+        <a href="<?= getUrl('products') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> Show all products</a>
+    </div>
+    <?php endif; ?>
     <div class="row mb-4" id="print-stats-cards">
         <div class="col-6 col-md-3 mb-3">
             <div class="card custom-stat-card shadow-sm border-0 h-100">
