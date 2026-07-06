@@ -85,7 +85,7 @@ try {
         } elseif ($payment_filter == 'unpaid') {
             $where_conditions[] = "(i.paid_amount = 0 AND i.status != 'paid')";
         } elseif ($payment_filter == 'overdue') {
-            $where_conditions[] = "(i.status = 'overdue' OR (i.due_date < CURDATE() AND i.paid_amount < i.grand_total))";
+            $where_conditions[] = "(i.status NOT IN ('paid','cancelled','draft') AND i.due_date < CURDATE() AND i.paid_amount < i.grand_total)";
         }
     }
 
@@ -106,8 +106,8 @@ try {
             SUM(CASE WHEN i.status = 'partial' THEN 1 ELSE 0 END) as cnt_partial,
             SUM(CASE WHEN i.status = 'draft' THEN 1 ELSE 0 END) as cnt_draft,
             SUM(CASE WHEN i.status = 'cancelled' THEN 1 ELSE 0 END) as cnt_cancelled,
-            SUM(CASE WHEN (i.status = 'overdue' OR (i.due_date < CURDATE() AND i.paid_amount < i.grand_total AND i.status NOT IN ('paid','cancelled'))) THEN 1 ELSE 0 END) as cnt_overdue,
-            COALESCE(SUM(CASE WHEN (i.status = 'overdue' OR (i.due_date < CURDATE() AND i.paid_amount < i.grand_total AND i.status NOT IN ('paid','cancelled'))) THEN (i.grand_total - i.paid_amount) ELSE 0 END), 0) as overdue_amount
+            SUM(CASE WHEN (i.status NOT IN ('paid','cancelled','draft') AND i.due_date < CURDATE() AND i.paid_amount < i.grand_total) THEN 1 ELSE 0 END) as cnt_overdue,
+            COALESCE(SUM(CASE WHEN (i.status NOT IN ('paid','cancelled','draft') AND i.due_date < CURDATE() AND i.paid_amount < i.grand_total) THEN (i.grand_total - i.paid_amount) ELSE 0 END), 0) as overdue_amount
         FROM invoices i
         LEFT JOIN customers c ON i.customer_id = c.customer_id
         WHERE $where_sql $scopeI

@@ -18,6 +18,9 @@ $awarded_tenders = $pdo->query("SELECT COUNT(*) FROM tenders WHERE status = 'AWA
 $submission_tenders = $pdo->query("SELECT COUNT(*) FROM tenders WHERE status = 'SUBMISSION'")->fetchColumn();
 $other_tenders = $total_tenders - ($pending_tenders + $awarded_tenders + $submission_tenders);
 
+// Attention mode — dashboard "Expiring Tenders" deep-link (?attention=1).
+$attention = (isset($_GET['attention']) && $_GET['attention'] === '1');
+
 // Helper for Workflow Actions
 function get_tender_action($status, $id) {
     $status = strtoupper($status);
@@ -133,6 +136,17 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
             <span class="d-inline d-md-none">New Tender</span>
         </a>
     </div>
+
+    <?php if ($attention): ?>
+    <div class="alert border-0 shadow-sm d-flex flex-wrap align-items-center gap-2 mb-3 d-print-none" style="background:#fff9e6; border-left:5px solid #ffc107 !important; border-radius:10px;">
+        <i class="bi bi-funnel-fill fs-5 text-warning"></i>
+        <div class="flex-grow-1">
+            <strong>Showing only tenders that need attention</strong>
+            <span class="text-muted small d-block">Submission deadline within 7 days &mdash; still open (pending / open / draft).</span>
+        </div>
+        <a href="<?= getUrl('tenders') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> Show all tenders</a>
+    </div>
+    <?php endif; ?>
 
     <!-- Statistics Cards -->
     <div class="row g-2 mb-3 d-print-none">
@@ -993,7 +1007,8 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
         date_from: $('#dateFrom').val(),
         date_to: $('#dateTo').val(),
         limit: $('#pageLimit').val(),
-        page: page
+        page: page,
+        attention: <?= $attention ? 1 : 0 ?>
     };
     
     if (page === 1) {

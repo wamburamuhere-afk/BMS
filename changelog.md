@@ -1,5 +1,135 @@
 # BMS Changelog
 
+## 2026-07-05 (feat/fix) — Document Expiry "Go to source" + badge made live (was counting stale notifications)
+
+Last group wired. Auditing it surfaced a real bug: the Document Expiry badge counted
+**unread `notifications` rows** (13) while only **1** document is actually expiring —
+stale reminders that were never marked read.
+
+- **`app/dashboard.php`** — `doc_expiring` is now a LIVE query on the `documents`
+  table (`expire_date` within 30 days), matching the library's "Expiring Soon (≤30d)"
+  filter exactly (badge = page, 1 = 1), gated by `canView('document_library')`. It
+  self-corrects — renew a document and it drops off. Per-item links now open the
+  filtered document list. Re-enabled the "Go to source" button.
+- **`app/constant/document/document_library.php`** — honours `?attention=1` by
+  pre-selecting the "Expiring Soon (≤30d)" filter and shows a "needs attention"
+  banner with a "Show all documents" reset link (uses the existing
+  `get_documents.php` `expiry_status=expiring` filter; no API change).
+
+## 2026-07-05 (feat) — Quotations & Tenders "Go to source" attention filters (group split)
+
+Fifth/sixth groups wired. The combined "Expiring Quotations & Tenders" group pointed
+at two different pages, so a single "Go to source" could never match — split it into
+two groups, each with its own count and exact-matching filtered source.
+
+- **`app/dashboard.php`** — split `quotes_tenders` into `quotes` ("Expiring
+  Quotations") and `tenders` ("Expiring Tenders"); routed the alert types to the new
+  groups; added both to `$group_sources`.
+- **`app/bms/sales/quotations/quotations.php`** — `?attention=1` filters to
+  quotations expiring within 5 days, still open (pending/sent/draft) + banner.
+- **`app/bms/tenders/tenders.php`** + **`api/get_tenders.php`** — `?attention=1`
+  filters to tenders whose submission deadline is within 7 days, still open
+  (PENDING/OPEN/DRAFT) + banner. Filters use the same queries as the dashboard
+  alerts, so badge = page by construction (both 0 on current data).
+
+## 2026-07-05 (feat) — Customers Over Credit Limit "Go to source" attention filter
+
+Fourth group wired for the dashboard "Go to source" deep-link.
+
+- **`app/bms/customer/customers.php`** — honours `?attention=1`: passes the flag
+  through the (server-side) DataTable AJAX and shows a "needs attention" banner with
+  a "Show all customers" reset link.
+- **`api/get_customers_paged.php`** — `attention=1` filters to active customers with
+  a credit limit whose unpaid invoice **balance** (`SUM(grand_total - paid_amount)`,
+  status NOT IN paid/cancelled/draft) exceeds it — applied to the list, count and
+  stats consistently.
+- **`app/dashboard.php`** — aligned the `credit_over` alert to the same balance
+  definition (was whitelisting `sent/partial/pending/approved`, which dropped
+  auto-promoted `overdue` and `reviewed` invoices) and re-enabled the button.
+  Verified badge = page exactly (1 = 1 on live DB).
+
+## 2026-07-05 (feat) — Goods Receipt Pending "Go to source" attention filter
+
+Third group wired for the dashboard "Go to source" deep-link.
+
+- **`app/bms/purchase/purchase_orders.php`** — honours `?attention=1`: passes the
+  flag through the DataTable AJAX and shows a "needs attention" banner with a
+  "Show all POs" reset link.
+- **`api/account/get_purchase_orders.php`** — `attention=1` filters to POs past
+  their expected date, still open (`ordered/approved/partially_received`), with no
+  goods receipt recorded (`NOT EXISTS purchase_receipts`) — mirrors the dashboard
+  `grn_pending` alert.
+- **`app/dashboard.php`** — re-enabled the Goods Receipt Pending "Go to source"
+  button. Verified badge = page exactly (6 = 6 on live DB).
+
+## 2026-07-05 (feat) — Invoices "Go to source" attention filter (overdue) + consistent overdue definition
+
+Second group wired for the dashboard "Go to source" deep-link. Also fixed a real
+undercount: the dashboard whitelisted `sent/partial/pending/approved`, but the
+invoices API auto-promotes past-due invoices to status `overdue`, so those dropped
+off the badge; `reviewed` past-due invoices were never counted either.
+
+- **`app/bms/invoice/invoices.php`** — honours `?attention=1`: seeds the hidden
+  `payment_status=overdue` filter (without forcing the status dropdown, so
+  partial/reviewed past-due invoices are included) and shows a "needs attention"
+  banner with a "Show all invoices" reset link.
+- **`api/account/get_invoices.php`** — overdue is now defined consistently as
+  `status NOT IN ('paid','cancelled','draft') AND due_date < CURDATE() AND
+  paid_amount < grand_total` — for both the list filter and the overdue stat
+  (previously drafts could slip in and the `status='overdue'` special-case made it
+  depend on the auto-mark side effect).
+- **`app/dashboard.php`** — overdue alert query aligned to the same definition, and
+  re-enabled the Invoices "Go to source" button. Verified badge = page exactly
+  (6 = 6 on live DB).
+
+## 2026-07-05 (fix) — Dashboard attention: per-item links now open the exact record
+
+Audit found several alert types linked to a generic list/page instead of the
+specific record that needs attention (you'd land on "all leaves", "all quotations"
+etc.). Wired each to its own record.
+
+- **`app/dashboard.php`** — per-item "→" links: leave → `leaves?open_leave=ID`,
+  quotation → `quotation_view?id=`, tender → `tender_view?id=`, negative stock →
+  `product_view?id=`, and **GRN pending → `grn_create?po=ID` (the Receive-Goods
+  screen for that PO)**. Credit-over already opened the customer. Cash-shift, bank
+  recon and payroll stay page-level (the action happens on the page; no per-record
+  view exists). Verified target records exist on the live DB.
+- **`app/bms/pos/leaves.php`** — added a tiny loader: `?open_leave=ID` auto-opens
+  that leave's details modal (via the existing `viewLeave()`), so the dashboard
+  deep-link lands on the exact leave.
+
+## 2026-07-05 (fix) — Dashboard attention: exact badge counts + gate "Go to source" to wired pages
+
+Follow-up to the attention accordion.
+
+- **`app/dashboard.php`** — the "Inventory & Products" badge now equals the
+  `?attention=1` page exactly: excluded services (`is_service = 0`) from the three
+  product alert queries (services have 0 stock and were being counted as "out"),
+  removed the `LIMIT 10/5/5` caps, and de-duplicated the group by product id (a
+  product can match several alert queries). Verified against live DB: 13 = 13.
+- **`app/dashboard.php`** — "Go to source" now only renders for groups whose page
+  actually honours `?attention=1` (currently only Products); other groups would
+  have dumped their full list. Remaining groups are commented in `$group_sources`,
+  enabled one at a time as each page is wired.
+
+## 2026-07-05 (feat) — Dashboard "System requires your attention": grouped accordion + filtered source deep-links
+
+Reworked the "View Details" panel so it no longer dumps every alert at once.
+
+- **`app/dashboard.php`** — "View Details" now opens an **accordion of groups**; each
+  group row shows its icon, title and a **count badge**, plus two buttons:
+  **"Go to source"** (opens the real module page filtered to only the attention
+  items via `?attention=1`) and **"View here"** (expands the item list inline —
+  the previous behaviour; each item keeps its direct link to the individual
+  record). Added `$group_sources` map for the per-group deep-links (Pending
+  Approvals has no list page, so it shows "View here" only). Counts recompute on
+  every dashboard load, so resolving an item reduces the number automatically.
+- **`app/bms/product/products.php`** — pilot for the **Inventory & Products** group:
+  honours `?attention=1` to show ONLY products needing attention (low/out/negative
+  stock, or expiring within 30 days — mirrors `get_system_alerts()`), all on one
+  page, active only, via a `HAVING` filter; shows a "needs attention" banner with
+  a "Show all products" reset link. Verified against the live `bms` DB (13 rows).
+
 ## 2026-07-05 (fix) — Project Finance tabs (Budget / Vouchers / Expenses): print the table, not the mobile cards
 
 The three Finance tabs printed the narrow mobile **cards** (text jammed left,
