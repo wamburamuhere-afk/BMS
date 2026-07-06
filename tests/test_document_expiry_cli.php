@@ -144,8 +144,11 @@ want($dash, "'documents' =>", 'Dashboard has the new Document Expiry notificatio
      'Dashboard missing the documents notification group');
 want($dash, 'doc_expiring', 'Dashboard handles the doc_expiring alert type',
      'Dashboard missing doc_expiring handling');
-want($dash, 'document_id IS NOT NULL', 'Dashboard reads document-expiry notifications from the notifications table',
-     'Dashboard missing the document-expiry notifications query');
+// The dashboard "Document Expiry" alert now reads the documents table LIVE (expire_date
+// within 30 days) instead of accumulated notifications — so the badge equals the library's
+// "Expiring Soon" filter exactly and self-corrects when a document is renewed.
+want($dash, 'FROM documents d', 'Dashboard reads document-expiry live from the documents table',
+     'Dashboard missing the live document-expiry query');
 // Additive check — original groups must still be present
 foreach (["'invoices' =>", "'products' =>", "'approvals' =>", "'others' =>"] as $grp) {
     want($dash, $grp, "Dashboard still has the existing group: $grp",
