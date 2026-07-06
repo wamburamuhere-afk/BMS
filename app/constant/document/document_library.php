@@ -9,6 +9,10 @@ require_once __DIR__ . '/../../../roots.php';
 $action = $_GET['action'] ?? '';
 $document_id = isset($_GET['document_id']) ? (int)$_GET['document_id'] : 0;
 
+// Attention mode — dashboard "Document Expiry" deep-link (?attention=1):
+// pre-select the "Expiring Soon (<=30d)" filter so only expiring documents show.
+$attention = (isset($_GET['attention']) && $_GET['attention'] === '1');
+
 if ($action === 'download' && $document_id > 0) {
     downloadDocumentLocal($pdo, $document_id);
     exit;
@@ -300,6 +304,17 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
         </div>
     </div>
 
+    <?php if ($attention): ?>
+    <div class="alert border-0 shadow-sm d-flex flex-wrap align-items-center gap-2 mb-4 d-print-none" style="background:#fff9e6; border-left:5px solid #ffc107 !important; border-radius:10px;">
+        <i class="bi bi-funnel-fill fs-5 text-warning"></i>
+        <div class="flex-grow-1">
+            <strong>Showing only documents that need attention</strong>
+            <span class="text-muted small d-block">Expiring within 30 days.</span>
+        </div>
+        <a href="<?= getUrl('document_library') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> Show all documents</a>
+    </div>
+    <?php endif; ?>
+
     <!-- Filter Bar -->
     <div class="card shadow-sm border-0 mb-4 bg-white" style="border-radius: 12px;">
         <div class="card-body p-3">
@@ -336,8 +351,8 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                     <div class="col-md-2">
                         <label class="form-label small fw-bold text-muted mb-1">Expiry Status</label>
                         <select class="form-select bg-light border-0" id="expiryFilter" style="border-radius: 8px;">
-                            <option value="">All Expiry</option>
-                            <option value="expiring">Expiring Soon (&le;30d)</option>
+                            <option value="" <?= $attention ? '' : 'selected' ?>>All Expiry</option>
+                            <option value="expiring" <?= $attention ? 'selected' : '' ?>>Expiring Soon (&le;30d)</option>
                             <option value="expired">Expired</option>
                             <option value="active">Active</option>
                             <option value="none">No Expiry Date</option>

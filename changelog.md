@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-07-05 (feat/fix) — Document Expiry "Go to source" + badge made live (was counting stale notifications)
+
+Last group wired. Auditing it surfaced a real bug: the Document Expiry badge counted
+**unread `notifications` rows** (13) while only **1** document is actually expiring —
+stale reminders that were never marked read.
+
+- **`app/dashboard.php`** — `doc_expiring` is now a LIVE query on the `documents`
+  table (`expire_date` within 30 days), matching the library's "Expiring Soon (≤30d)"
+  filter exactly (badge = page, 1 = 1), gated by `canView('document_library')`. It
+  self-corrects — renew a document and it drops off. Per-item links now open the
+  filtered document list. Re-enabled the "Go to source" button.
+- **`app/constant/document/document_library.php`** — honours `?attention=1` by
+  pre-selecting the "Expiring Soon (≤30d)" filter and shows a "needs attention"
+  banner with a "Show all documents" reset link (uses the existing
+  `get_documents.php` `expiry_status=expiring` filter; no API change).
+
 ## 2026-07-05 (feat) — Quotations & Tenders "Go to source" attention filters (group split)
 
 Fifth/sixth groups wired. The combined "Expiring Quotations & Tenders" group pointed

@@ -141,10 +141,8 @@ $group_sources = [
     'credit_risk'    => getUrl('customers') . '?attention=1',
     'quotes'         => getUrl('quotations') . '?attention=1',
     'tenders'        => getUrl('tenders') . '?attention=1',
-    // Pending — uncomment each as its page starts honouring ?attention=1:
-    // 'cash_bank'      => getUrl('cash_register') . '?attention=1',
-    // 'hr_payroll'     => getUrl('leaves') . '?attention=1',
-    // 'documents'      => getUrl('document_library') . '?attention=1',
+    'documents'      => getUrl('document_library') . '?attention=1',
+    // Page-level only (no per-record filtered list): cash_bank, hr_payroll.
 ];
 
 // Get warehouses for quick stock adjustment
@@ -613,27 +611,29 @@ function get_system_alerts($pdo, $user_id) {
         $overdue_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // ── 3. Document expiry — already personal via user_id, no project scope ──
+    // ── 3. Document expiry — LIVE query on the document library, matching the
+    //       ?attention=1 "Expiring Soon (<=30d)" filter. Using the live table (not
+    //       accumulated notifications) keeps the badge equal to the filtered page and
+    //       self-correcting: renew/replace a document and it drops off automatically. ──
     $doc_alerts = [];
-    try {
-        $stmt = $pdo->prepare("
-            SELECT 'doc_expiring' as type,
-                   document_id as id,
-                   title,
-                   message,
-                   action_url,
-                   created_at
-            FROM notifications
-            WHERE user_id = ?
-              AND type = 'alert'
-              AND document_id IS NOT NULL
-              AND is_read = 0
-            ORDER BY created_at DESC
-            LIMIT 5
-        ");
-        $stmt->execute([$user_id]);
-        $doc_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {}
+    if (canView('document_library') || isAdmin()) {
+        try {
+            $stmt = $pdo->query("
+                SELECT 'doc_expiring' as type,
+                       d.id as id,
+                       d.title,
+                       CONCAT('Expires ', DATE_FORMAT(d.expire_date, '%d %b %Y')) as message,
+                       d.expire_date,
+                       DATEDIFF(d.expire_date, CURDATE()) as days_remaining
+                FROM documents d
+                WHERE d.expire_date IS NOT NULL
+                  AND d.expire_date >= CURDATE()
+                  AND d.expire_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+                ORDER BY d.expire_date ASC
+            ");
+            $doc_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {}
+    }
 
     // ── 4. Cash register shifts left open ────────────────────────────────────
     // Gate: finance/admin only — no project scope (company-wide control)
@@ -1224,7 +1224,7 @@ function get_progress_color($percentage) {
                                                             <i class="bi bi-arrow-right-short fs-5 text-primary"></i>
                                                         </a>
                                                     <?php elseif ($key === 'documents'): ?>
-                                                        <a href="<?= htmlspecialchars($item['action_url'] ?? getUrl('document_library')) ?>" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" title="View document library">
+                                                        <a href="<?= htmlspecialchars($item['action_url'] ?? (getUrl('document_library') . '?attention=1')) ?>" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" title="View expiring documents">
                                                             <i class="bi bi-arrow-right-short fs-5 text-warning"></i>
                                                         </a>
                                                     <?php else:
