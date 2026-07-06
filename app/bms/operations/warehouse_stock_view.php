@@ -2,6 +2,11 @@
 // File: app/bms/operations/warehouse_stock_view.php
 require_once __DIR__ . '/../../../roots.php';
 
+// This page prints its own project-branded header (#whPrintHeader: company, section,
+// contract no, project, warehouse). Suppress the generic global company-only print
+// header so the two don't compete/overlap on print (mirrors project_view.php).
+define('BMS_SUPPRESS_PRINT_HEADER', true);
+
 autoEnforcePermission('warehouses');
 includeHeader();
 
@@ -28,9 +33,11 @@ if (!$warehouse) {
     includeFooter(); exit;
 }
 
-$proj_stmt = $pdo->prepare("SELECT project_name FROM projects WHERE project_id = ?");
+$proj_stmt = $pdo->prepare("SELECT project_name, contract_number FROM projects WHERE project_id = ?");
 $proj_stmt->execute([$project_id]);
-$project_name = $proj_stmt->fetchColumn() ?: 'Project';
+$proj_row     = $proj_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+$project_name = $proj_row['project_name'] ?: 'Project';
+$contract_no  = $proj_row['contract_number'] ?? '';
 
 $company_name = getSetting('company_name', 'BMS');
 $company_logo = getSetting('company_logo', '');
@@ -113,11 +120,6 @@ $movements = $stmt->fetchAll(PDO::FETCH_ASSOC);
 logActivity($pdo, $_SESSION['user_id'], 'View Warehouse Stock & History',
     "Viewed stock & history for warehouse #{$warehouse_id} ({$warehouse['warehouse_name']})");
 
-// Logged-in user for print footer
-$me_stmt = $pdo->prepare("SELECT CONCAT(first_name,' ',last_name) as full_name FROM users WHERE user_id = ?");
-$me_stmt->execute([$_SESSION['user_id']]);
-$print_user = htmlspecialchars(trim($me_stmt->fetchColumn() ?: $username ?? 'Unknown'));
-
 // Movement type badge helper
 function moveBadge($type) {
     static $map = [
@@ -184,41 +186,28 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
 
     /* Static (non-fixed) header: prints ONCE at the top of the first page,
        and the content flows right after it (no repeating header, no blank gap). */
+    /* Print header — same fonts/layout as the general project print header
+       (project_view.php's .print-header-overview): 80px logo, company at
+       1.5rem, report title at 1.1rem, divider bar, then project + contract. */
     #whPrintHeader {
         display: none;
         position: static;
         background: #fff;
         text-align: center;
-        padding: 0 0 8px;
-        margin-bottom: 12px;
-        border-bottom: 3px solid #0d6efd;
+        padding: 0 0 6px;
+        margin-bottom: 10px;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
     body.wh-printing #whPrintHeader { display: block !important; }
-    #whPrintHeader img { max-height: 40px; width: auto; display: block; margin: 0 auto 4px; }
-    #whPrintHeader h1 { font-size: 13pt; font-weight: 800; color: #0d6efd; margin: 0; text-transform: uppercase; }
-    #whPrintHeader h2 { font-size: 10pt; font-weight: 700; color: #212529; margin: 2px 0 0; text-transform: uppercase; }
-    #whPrintHeader small { font-size: 8pt; color: #6c757d; }
+    #whPrintHeader img { max-height: 80px; width: auto; display: block; margin: 0 auto 8px; }
+    #whPrintHeader h1 { font-size: 1.5rem; font-weight: 700; color: #0d6efd; margin: 0 0 4px; text-transform: uppercase; line-height: 1.1; }
+    #whPrintHeader h2 { font-size: 1.1rem; font-weight: 700; color: #212529; margin: 0 0 8px; text-transform: uppercase; }
+    #whPrintHeader .wh-divider { width: 60px; height: 2px; background: #0d6efd; border-radius: 2px; margin: 0 auto 8px; }
+    #whPrintHeader .wh-project { font-size: 1rem; font-weight: 700; color: #212529; margin: 0; }
+    #whPrintHeader .wh-contract { font-size: 0.85rem; font-weight: 700; color: #6c757d; margin: 2px 0 0; }
+    #whPrintHeader small { font-size: 0.8rem; color: #6c757d; display: block; margin-top: 2px; }
     body.wh-printing .container-fluid { margin-top: 0 !important; padding-top: 0 !important; }
-
-    #whPrintFooter {
-        display: none;
-        position: fixed;
-        bottom: 0; left: 0; right: 0;
-        background: #fff;
-        border-top: 1px solid #dee2e6;
-        text-align: center;
-        padding-top: 5px;
-        font-size: 8pt;
-        color: #495057;
-        z-index: 9999;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-    }
-    body.wh-printing #whPrintFooter { display: block !important; }
-    body.wh-printing #whPrintFooter p { margin: 0 0 2px; }
-    body.wh-printing #whPrintFooter .powered { font-weight: 700; color: #0d6efd; }
 
     .section-heading {
         background: #0d6efd !important;
@@ -257,12 +246,14 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
     <?php endif; ?>
     <h1><?= htmlspecialchars($company_name) ?></h1>
     <h2 id="printSectionHeading">Stock Summary</h2>
-    <small><?= htmlspecialchars($warehouse['warehouse_name']) ?> &nbsp;|&nbsp; <?= htmlspecialchars($project_name) ?></small>
+    <div class="wh-divider"></div>
+    <p class="wh-project"><?= htmlspecialchars($project_name) ?></p>
+    <?php if (!empty($contract_no)): ?>
+    <p class="wh-contract">Contract No: <?= htmlspecialchars($contract_no) ?></p>
+    <?php endif; ?>
+    <small><?= htmlspecialchars($warehouse['warehouse_name']) ?></small>
 </div>
-<div id="whPrintFooter" style="display:none;">
-    <p>Printed by <strong><?= $print_user ?></strong> on <strong><?= date('d M Y, h:i A') ?></strong></p>
-    <p class="powered">Powered By BJP Technologies &copy; <?= date('Y') ?>, All Rights Reserved</p>
-</div>
+<!-- Print footer: shared .bms-print-footer from footer.php (no per-page footer). -->
 
 <div class="container-fluid py-4">
 
@@ -681,21 +672,19 @@ function doPrint() {
     document.getElementById('printSectionHeading').textContent = sectionNames[panelId] || 'Stock Summary';
 
     var hdr = document.getElementById('whPrintHeader');
-    var ftr = document.getElementById('whPrintFooter');
     hdr.style.display = 'block';
-    ftr.style.display = 'block';
-    // Header is now a static block: place it at the very top of the printed
-    // content so it prints ONCE on page 1 and content follows immediately.
-    var container = document.querySelector('.container-fluid');
-    if (container) { container.insertBefore(hdr, container.firstChild); }
-    // Footer stays fixed at the page bottom (appended to body to escape stacking contexts).
-    document.body.appendChild(ftr);
+    // Header is a static block: place it at the very top of the printed content
+    // (body's first child) so it prints ONCE on page 1 and content follows.
+    // Not the first .container-fluid — that one lives inside the top navbar,
+    // which is display:none on print, so the header would vanish.
+    // The print FOOTER is the shared one from footer.php (.bms-print-footer);
+    // responsive.css fixes it to the bottom of every printed page.
+    document.body.insertBefore(hdr, document.body.firstChild);
     document.body.classList.add('wh-printing');
 
     window.addEventListener('afterprint', function restore() {
         document.body.classList.remove('wh-printing');
         hdr.style.display = 'none';
-        ftr.style.display = 'none';
         window.removeEventListener('afterprint', restore);
     });
 

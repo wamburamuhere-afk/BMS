@@ -1,5 +1,37 @@
 # BMS Changelog
 
+## 2026-07-06 (fix) — Warehouse Stock &amp; History print: header now prints + matches project style, shared footer
+
+Follow-up to the header change below. When printing from Projects → Project Details →
+Procurements → View Stock &amp; History, **no header appeared** and the page defined its
+own footer instead of the shared one.
+
+- **`app/bms/operations/warehouse_stock_view.php`**
+  - **Header now prints** — `doPrint()` inserted `#whPrintHeader` into
+    `document.querySelector('.container-fluid')`, which is the *top navbar's* container
+    (hidden by `@media print { .header-wrapper { display:none } }`), so the header
+    vanished. Now inserted as `document.body`'s first child instead.
+  - **Header restyled to read the same as the general project print** (mirrors
+    `project_view.php`'s `.print-header-overview`): 80px logo, company `1.5rem`, section
+    title `1.1rem`, 60px divider bar, then project name + `Contract No:`.
+  - **Internal footer removed** — dropped the per-page `#whPrintFooter` (CSS + HTML +
+    JS + unused `$print_user` query); the page now uses the shared
+    `footer.php` `.bms-print-footer` like the rest of the project (printer name/role/date
+    + BJP brand line, fixed to page bottom via `responsive.css`).
+  - `BMS_SUPPRESS_PRINT_HEADER` retained so the generic company-only global header does
+    not compete with the project-branded one.
+
+## 2026-07-06 (fix) — Warehouse Stock &amp; History print header now shows project + contract no
+
+The in-project Warehouse "View Details / Stock &amp; History" print header only showed
+the warehouse and project names in small text. It now matches the other project print
+headers.
+
+- **`app/bms/operations/warehouse_stock_view.php`** — the project query now also fetches
+  `contract_number`; the print header shows Company → Section → **Contract No:** →
+  **Project name** → Warehouse, styled to match the other in-project print headers
+  (Sales Orders, Bills, Inventory, etc.).
+
 ## 2026-07-05 (feat/fix) — Document Expiry "Go to source" + badge made live (was counting stale notifications)
 
 Last group wired. Auditing it surfaced a real bug: the Document Expiry badge counted
