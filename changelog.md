@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-07-05 (feat) — Goods Receipt Pending "Go to source" attention filter
+
+Third group wired for the dashboard "Go to source" deep-link.
+
+- **`app/bms/purchase/purchase_orders.php`** — honours `?attention=1`: passes the
+  flag through the DataTable AJAX and shows a "needs attention" banner with a
+  "Show all POs" reset link.
+- **`api/account/get_purchase_orders.php`** — `attention=1` filters to POs past
+  their expected date, still open (`ordered/approved/partially_received`), with no
+  goods receipt recorded (`NOT EXISTS purchase_receipts`) — mirrors the dashboard
+  `grn_pending` alert.
+- **`app/dashboard.php`** — re-enabled the Goods Receipt Pending "Go to source"
+  button. Verified badge = page exactly (6 = 6 on live DB).
+
 ## 2026-07-05 (feat) — Invoices "Go to source" attention filter (overdue) + consistent overdue definition
 
 Second group wired for the dashboard "Go to source" deep-link. Also fixed a real

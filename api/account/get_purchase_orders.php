@@ -25,6 +25,7 @@ try {
     $status = $_GET['status'] ?? '';
     $date_from = $_GET['date_from'] ?? '';
     $date_to = $_GET['date_to'] ?? '';
+    $attention = (isset($_GET['attention']) && $_GET['attention'] === '1');
 
     // Build query
     $query = "
@@ -80,6 +81,15 @@ try {
     if (!empty($date_to)) {
         $query .= " AND po.order_date <= ?";
         $params[] = $date_to;
+    }
+
+    // Attention mode — "Goods Receipt Pending": POs past their expected date, still
+    // open, with NO goods receipt recorded (mirrors dashboard get_system_alerts()).
+    if ($attention) {
+        $query .= " AND po.expected_date IS NOT NULL
+                    AND po.expected_date < CURDATE()
+                    AND po.status IN ('ordered','approved','partially_received')
+                    AND NOT EXISTS (SELECT 1 FROM purchase_receipts pr WHERE pr.purchase_order_id = po.purchase_order_id)";
     }
 
     // Phase C — project-scope filter (non-admin: AND po.project_id IN (...) | admin: '')

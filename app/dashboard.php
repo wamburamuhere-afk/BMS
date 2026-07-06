@@ -135,10 +135,10 @@ $active_notif_groups = array_filter($notif_groups, function($group) {
 $group_sources = [
     'products'       => getUrl('products') . '?attention=1',
     'invoices'       => getUrl('invoices') . '?attention=1',
+    'grn_pending'    => getUrl('purchase_orders') . '?attention=1',
     // Pending — uncomment each as its page starts honouring ?attention=1:
     // 'cash_bank'      => getUrl('cash_register') . '?attention=1',
     // 'credit_risk'    => getUrl('customers') . '?attention=1',
-    // 'grn_pending'    => getUrl('purchase_orders') . '?attention=1',
     // 'hr_payroll'     => getUrl('leaves') . '?attention=1',
     // 'quotes_tenders' => getUrl('quotations') . '?attention=1',
     // 'documents'      => getUrl('document_library') . '?attention=1',
