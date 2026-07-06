@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-07-06 (fix) — Warehouse Stock &amp; History print header now shows project + contract no
+
+The in-project Warehouse "View Details / Stock &amp; History" print header only showed
+the warehouse and project names in small text. It now matches the other project print
+headers.
+
+- **`app/bms/operations/warehouse_stock_view.php`** — the project query now also fetches
+  `contract_number`; the print header shows Company → Section → **Contract No:** →
+  **Project name** → Warehouse, styled to match the other in-project print headers
+  (Sales Orders, Bills, Inventory, etc.).
+
 ## 2026-07-05 (feat/fix) — Document Expiry "Go to source" + badge made live (was counting stale notifications)
 
 Last group wired. Auditing it surfaced a real bug: the Document Expiry badge counted
