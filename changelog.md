@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-07-05 (feat) — Quotations & Tenders "Go to source" attention filters (group split)
+
+Fifth/sixth groups wired. The combined "Expiring Quotations & Tenders" group pointed
+at two different pages, so a single "Go to source" could never match — split it into
+two groups, each with its own count and exact-matching filtered source.
+
+- **`app/dashboard.php`** — split `quotes_tenders` into `quotes` ("Expiring
+  Quotations") and `tenders` ("Expiring Tenders"); routed the alert types to the new
+  groups; added both to `$group_sources`.
+- **`app/bms/sales/quotations/quotations.php`** — `?attention=1` filters to
+  quotations expiring within 5 days, still open (pending/sent/draft) + banner.
+- **`app/bms/tenders/tenders.php`** + **`api/get_tenders.php`** — `?attention=1`
+  filters to tenders whose submission deadline is within 7 days, still open
+  (PENDING/OPEN/DRAFT) + banner. Filters use the same queries as the dashboard
+  alerts, so badge = page by construction (both 0 on current data).
+
 ## 2026-07-05 (feat) — Customers Over Credit Limit "Go to source" attention filter
 
 Fourth group wired for the dashboard "Go to source" deep-link.

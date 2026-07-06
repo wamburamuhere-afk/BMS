@@ -56,7 +56,8 @@ $notif_groups = [
     'credit_risk' => ['title' => 'Customers Over Credit Limit', 'icon' => 'bi-exclamation-octagon', 'color' => 'danger', 'items' => []],
     'grn_pending' => ['title' => 'Goods Receipt Pending', 'icon' => 'bi-truck', 'color' => 'warning', 'items' => []],
     'hr_payroll' => ['title' => 'HR & Payroll', 'icon' => 'bi-people-fill', 'color' => 'warning', 'items' => []],
-    'quotes_tenders' => ['title' => 'Expiring Quotations & Tenders', 'icon' => 'bi-clock-history', 'color' => 'warning', 'items' => []],
+    'quotes' => ['title' => 'Expiring Quotations', 'icon' => 'bi-file-earmark-text', 'color' => 'warning', 'items' => []],
+    'tenders' => ['title' => 'Expiring Tenders', 'icon' => 'bi-clock-history', 'color' => 'warning', 'items' => []],
     'documents' => ['title' => 'Document Expiry', 'icon' => 'bi-file-earmark-text', 'color' => 'warning', 'items' => []],
     'others' => ['title' => 'General Notifications', 'icon' => 'bi-bell', 'color' => 'info', 'items' => []]
 ];
@@ -78,8 +79,9 @@ foreach ($alerts as $a) {
         case 'payroll_due':
             $notif_groups['hr_payroll']['items'][] = $a; break;
         case 'quote_expiring':
+            $notif_groups['quotes']['items'][] = $a; break;
         case 'tender_deadline':
-            $notif_groups['quotes_tenders']['items'][] = $a; break;
+            $notif_groups['tenders']['items'][] = $a; break;
         case 'grn_pending':
             $notif_groups['grn_pending']['items'][] = $a; break;
         case 'credit_over':
@@ -137,10 +139,11 @@ $group_sources = [
     'invoices'       => getUrl('invoices') . '?attention=1',
     'grn_pending'    => getUrl('purchase_orders') . '?attention=1',
     'credit_risk'    => getUrl('customers') . '?attention=1',
+    'quotes'         => getUrl('quotations') . '?attention=1',
+    'tenders'        => getUrl('tenders') . '?attention=1',
     // Pending — uncomment each as its page starts honouring ?attention=1:
     // 'cash_bank'      => getUrl('cash_register') . '?attention=1',
     // 'hr_payroll'     => getUrl('leaves') . '?attention=1',
-    // 'quotes_tenders' => getUrl('quotations') . '?attention=1',
     // 'documents'      => getUrl('document_library') . '?attention=1',
 ];
 

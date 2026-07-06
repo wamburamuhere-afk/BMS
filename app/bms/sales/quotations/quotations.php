@@ -16,6 +16,8 @@ $status_filter = isset($_GET['status']) ? $_GET['status'] : '';
 $customer_filter = isset($_GET['customer']) ? intval($_GET['customer']) : 0;
 $date_from = isset($_GET['date_from']) ? $_GET['date_from'] : '';
 $date_to = isset($_GET['date_to']) ? $_GET['date_to'] : '';
+// Attention mode — dashboard "Expiring Quotations" deep-link (?attention=1).
+$attention = (isset($_GET['attention']) && $_GET['attention'] === '1');
 
 // Build query for quotations
 $query = "
@@ -52,6 +54,13 @@ if (!empty($date_from)) {
 if (!empty($date_to)) {
     $query .= " AND q.order_date <= ?";
     $params[] = $date_to;
+}
+
+// Attention: only quotations expiring within 5 days, still open (mirrors dashboard).
+if ($attention) {
+    $query .= " AND q.quote_valid_until IS NOT NULL
+                AND q.quote_valid_until BETWEEN CURDATE() AND CURDATE() + INTERVAL 5 DAY
+                AND q.status IN ('pending','sent','draft')";
 }
 
 $query .= " ORDER BY q.order_date DESC, q.created_at DESC";
@@ -173,6 +182,16 @@ $can_approve = canApprove('sales_orders');
 
     <!-- Scrollable Content Wrapper -->
     <div>
+    <?php if ($attention): ?>
+    <div class="alert border-0 shadow-sm d-flex flex-wrap align-items-center gap-2 mb-4 d-print-none" style="background:#fff9e6; border-left:5px solid #ffc107 !important; border-radius:10px;">
+        <i class="bi bi-funnel-fill fs-5 text-warning"></i>
+        <div class="flex-grow-1">
+            <strong>Showing only quotations that need attention</strong>
+            <span class="text-muted small d-block">Expiring within 5 days &mdash; still open (pending / sent / draft).</span>
+        </div>
+        <a href="<?= getUrl('quotations') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> Show all quotations</a>
+    </div>
+    <?php endif; ?>
     <!-- Statistics Cards -->
     <div class="row g-4 mb-5 flex-nowrap-print">
         <div class="col-md-3 col-3-print">
