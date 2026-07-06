@@ -109,6 +109,23 @@ $active_notif_groups = array_filter($notif_groups, function($group) {
     return !empty($group['items']);
 });
 
+// Group → "Go to source" URL (opens the real module page, filtered to ONLY the
+// items needing attention via ?attention=1). Per-page filtering is rolled out one
+// group at a time — Inventory & Products is the pilot. Empty string = no source
+// button (e.g. Pending Approvals has no single inbox page; use per-item links).
+$group_sources = [
+    'invoices'       => getUrl('invoices') . '?attention=1',
+    'products'       => getUrl('products') . '?attention=1',
+    'approvals'      => '',
+    'cash_bank'      => getUrl('cash_register') . '?attention=1',
+    'credit_risk'    => getUrl('customers') . '?attention=1',
+    'grn_pending'    => getUrl('purchase_orders') . '?attention=1',
+    'hr_payroll'     => getUrl('leaves') . '?attention=1',
+    'quotes_tenders' => getUrl('quotations') . '?attention=1',
+    'documents'      => getUrl('document_library') . '?attention=1',
+    'others'         => '',
+];
+
 // Get warehouses for quick stock adjustment
 $warehouses = [];
 try {
@@ -1077,19 +1094,28 @@ function get_progress_color($percentage) {
                     <!-- Collapsible Detailed View -->
                     <div class="collapse mt-3" id="detailedNotifications">
                         <hr class="my-3 opacity-10">
-                        <div class="row g-3 px-1">
-                            <?php foreach ($active_notif_groups as $key => $group): ?>
-                            <div class="col-md-4">
-                                <div class="h-100 bg-white rounded-3 border border-light-subtle p-3 shadow-sm">
-                                    <div class="d-flex align-items-center mb-3">
-                                        <div class="bg-<?= $group['color'] ?>-subtle text-<?= $group['color'] ?> p-2 rounded-3 me-2" style="width: 38px; height: 38px; display: flex; align-items:center; justify-content:center;">
-                                            <i class="bi <?= $group['icon'] ?> fs-5"></i>
-                                        </div>
-                                        <h6 class="mb-0 fw-bold small text-uppercase" style="letter-spacing: 0.5px;"><?= $group['title'] ?></h6>
-                                        <span class="badge bg-<?= $group['color'] ?> rounded-pill ms-auto"><?= count($group['items']) ?></span>
+                        <div class="accordion" id="notifAccordion">
+                            <?php foreach ($active_notif_groups as $key => $group): $grp_src = $group_sources[$key] ?? ''; ?>
+                            <div class="accordion-item border border-light-subtle mb-2 rounded-3 shadow-sm overflow-hidden">
+                                <div class="d-flex align-items-center gap-2 bg-white p-2 ps-3 flex-wrap">
+                                    <div class="bg-<?= $group['color'] ?>-subtle text-<?= $group['color'] ?> p-2 rounded-3" style="width: 38px; height: 38px; display: flex; align-items:center; justify-content:center; flex-shrink:0;">
+                                        <i class="bi <?= $group['icon'] ?> fs-5"></i>
                                     </div>
-                                    
-                                    <div class="notification-list custom-scrollbar" style="max-height: 220px; overflow-y: auto; overflow-x: hidden;">
+                                    <h6 class="mb-0 fw-bold small text-uppercase" style="letter-spacing: 0.5px;"><?= $group['title'] ?></h6>
+                                    <span class="badge bg-<?= $group['color'] ?> rounded-pill"><?= count($group['items']) ?></span>
+                                    <div class="ms-auto d-flex gap-2">
+                                        <?php if ($grp_src !== ''): ?>
+                                        <a href="<?= htmlspecialchars($grp_src) ?>" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1" title="Open the source page, filtered to only these items">
+                                            <i class="bi bi-box-arrow-up-right"></i><span class="d-none d-sm-inline">Go to source</span>
+                                        </a>
+                                        <?php endif; ?>
+                                        <button type="button" class="btn btn-sm btn-outline-<?= $group['color'] ?> collapsed d-flex align-items-center gap-1" data-bs-toggle="collapse" data-bs-target="#notifGrp-<?= $key ?>" aria-expanded="false" aria-controls="notifGrp-<?= $key ?>">
+                                            <i class="bi bi-list-ul"></i><span class="d-none d-sm-inline">View here</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="notifGrp-<?= $key ?>" class="accordion-collapse collapse" data-bs-parent="#notifAccordion">
+                                    <div class="notification-list custom-scrollbar p-2" style="max-height: 300px; overflow-y: auto; overflow-x: hidden;">
                                         <?php foreach ($group['items'] as $item): ?>
                                         <div class="p-2 mb-2 rounded-2 border-bottom border-light-subtle position-relative action-row">
                                             <div class="d-flex justify-content-between align-items-start">

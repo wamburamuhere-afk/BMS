@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-07-05 (feat) — Dashboard "System requires your attention": grouped accordion + filtered source deep-links
+
+Reworked the "View Details" panel so it no longer dumps every alert at once.
+
+- **`app/dashboard.php`** — "View Details" now opens an **accordion of groups**; each
+  group row shows its icon, title and a **count badge**, plus two buttons:
+  **"Go to source"** (opens the real module page filtered to only the attention
+  items via `?attention=1`) and **"View here"** (expands the item list inline —
+  the previous behaviour; each item keeps its direct link to the individual
+  record). Added `$group_sources` map for the per-group deep-links (Pending
+  Approvals has no list page, so it shows "View here" only). Counts recompute on
+  every dashboard load, so resolving an item reduces the number automatically.
+- **`app/bms/product/products.php`** — pilot for the **Inventory & Products** group:
+  honours `?attention=1` to show ONLY products needing attention (low/out/negative
+  stock, or expiring within 30 days — mirrors `get_system_alerts()`), all on one
+  page, active only, via a `HAVING` filter; shows a "needs attention" banner with
+  a "Show all products" reset link. Verified against the live `bms` DB (13 rows).
+
 ## 2026-07-05 (fix) — Project Finance tabs (Budget / Vouchers / Expenses): print the table, not the mobile cards
 
 The three Finance tabs printed the narrow mobile **cards** (text jammed left,
