@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-07-05 (feat) — Customers Over Credit Limit "Go to source" attention filter
+
+Fourth group wired for the dashboard "Go to source" deep-link.
+
+- **`app/bms/customer/customers.php`** — honours `?attention=1`: passes the flag
+  through the (server-side) DataTable AJAX and shows a "needs attention" banner with
+  a "Show all customers" reset link.
+- **`api/get_customers_paged.php`** — `attention=1` filters to active customers with
+  a credit limit whose unpaid invoice **balance** (`SUM(grand_total - paid_amount)`,
+  status NOT IN paid/cancelled/draft) exceeds it — applied to the list, count and
+  stats consistently.
+- **`app/dashboard.php`** — aligned the `credit_over` alert to the same balance
+  definition (was whitelisting `sent/partial/pending/approved`, which dropped
+  auto-promoted `overdue` and `reviewed` invoices) and re-enabled the button.
+  Verified badge = page exactly (1 = 1 on live DB).
+
 ## 2026-07-05 (feat) — Goods Receipt Pending "Go to source" attention filter
 
 Third group wired for the dashboard "Go to source" deep-link.

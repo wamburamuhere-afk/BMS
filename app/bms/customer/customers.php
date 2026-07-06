@@ -18,6 +18,10 @@ if (!$can_view_customers) {
 
 logActivity($pdo, $_SESSION['user_id'], 'View customers', 'User viewed the customers management list');
 
+// Attention mode — dashboard "Customers Over Credit Limit" deep-link (?attention=1):
+// show ONLY active customers whose unpaid invoice balance exceeds their credit limit.
+$attention = (isset($_GET['attention']) && $_GET['attention'] === '1');
+
 // Get company type for conditional features
 $settings_stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'company_type'");
 $settings_stmt->execute();
@@ -159,6 +163,17 @@ if (isAdmin()) {
     <style>
         .custom-stat-card { background-color: #d1e7dd !important; }
     </style>
+
+    <?php if ($attention): ?>
+    <div class="alert border-0 shadow-sm d-flex flex-wrap align-items-center gap-2 mb-4 d-print-none" style="background:#fff9e6; border-left:5px solid #ffc107 !important; border-radius:10px;">
+        <i class="bi bi-funnel-fill fs-5 text-warning"></i>
+        <div class="flex-grow-1">
+            <strong>Showing only customers that need attention</strong>
+            <span class="text-muted small d-block">Over credit limit &mdash; unpaid invoice balance exceeds the customer's credit limit.</span>
+        </div>
+        <a href="<?= getUrl('customers') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> Show all customers</a>
+    </div>
+    <?php endif; ?>
 
     <!-- Statistics Cards -->
     <div class="row mb-4" id="print-stats-cards">
@@ -944,6 +959,7 @@ $(document).ready(function() {
                     d.category = $('#categoryFilter').val();
                     d.country = $('#countryFilter').val();
                     d.city = $('#cityFilter').val();
+                    d.attention = <?= $attention ? 1 : 0 ?>;
                 },
                 dataSrc: function(json) {
                     if (json.stats) {

@@ -136,9 +136,9 @@ $group_sources = [
     'products'       => getUrl('products') . '?attention=1',
     'invoices'       => getUrl('invoices') . '?attention=1',
     'grn_pending'    => getUrl('purchase_orders') . '?attention=1',
+    'credit_risk'    => getUrl('customers') . '?attention=1',
     // Pending — uncomment each as its page starts honouring ?attention=1:
     // 'cash_bank'      => getUrl('cash_register') . '?attention=1',
-    // 'credit_risk'    => getUrl('customers') . '?attention=1',
     // 'hr_payroll'     => getUrl('leaves') . '?attention=1',
     // 'quotes_tenders' => getUrl('quotations') . '?attention=1',
     // 'documents'      => getUrl('document_library') . '?attention=1',
@@ -829,7 +829,7 @@ function get_system_alerts($pdo, $user_id) {
                 INNER JOIN invoices i ON i.customer_id = c.customer_id
                 WHERE c.status = 'active'
                   AND c.credit_limit > 0
-                  AND i.status IN ('sent','partial','pending','approved')
+                  AND i.status NOT IN ('paid','cancelled','draft')
                   {$custScope}
                 GROUP BY c.customer_id, c.customer_name, c.credit_limit
                 HAVING outstanding > c.credit_limit
