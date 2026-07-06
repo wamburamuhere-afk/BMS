@@ -28,9 +28,11 @@ if (!$warehouse) {
     includeFooter(); exit;
 }
 
-$proj_stmt = $pdo->prepare("SELECT project_name FROM projects WHERE project_id = ?");
+$proj_stmt = $pdo->prepare("SELECT project_name, contract_number FROM projects WHERE project_id = ?");
 $proj_stmt->execute([$project_id]);
-$project_name = $proj_stmt->fetchColumn() ?: 'Project';
+$proj_row     = $proj_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+$project_name = $proj_row['project_name'] ?: 'Project';
+$contract_no  = $proj_row['contract_number'] ?? '';
 
 $company_name = getSetting('company_name', 'BMS');
 $company_logo = getSetting('company_logo', '');
@@ -199,6 +201,8 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
     #whPrintHeader img { max-height: 40px; width: auto; display: block; margin: 0 auto 4px; }
     #whPrintHeader h1 { font-size: 13pt; font-weight: 800; color: #0d6efd; margin: 0; text-transform: uppercase; }
     #whPrintHeader h2 { font-size: 10pt; font-weight: 700; color: #212529; margin: 2px 0 0; text-transform: uppercase; }
+    #whPrintHeader .wh-contract { font-size: 8.5pt; font-weight: 700; color: #6c757d; margin: 3px 0 0; }
+    #whPrintHeader .wh-project { font-size: 10pt; font-weight: 700; color: #212529; margin: 1px 0 0; }
     #whPrintHeader small { font-size: 8pt; color: #6c757d; }
     body.wh-printing .container-fluid { margin-top: 0 !important; padding-top: 0 !important; }
 
@@ -257,7 +261,11 @@ $out_types = ['sale_out','adjustment_out','transfer_out','return_out',
     <?php endif; ?>
     <h1><?= htmlspecialchars($company_name) ?></h1>
     <h2 id="printSectionHeading">Stock Summary</h2>
-    <small><?= htmlspecialchars($warehouse['warehouse_name']) ?> &nbsp;|&nbsp; <?= htmlspecialchars($project_name) ?></small>
+    <?php if (!empty($contract_no)): ?>
+    <p class="wh-contract">Contract No: <?= htmlspecialchars($contract_no) ?></p>
+    <?php endif; ?>
+    <p class="wh-project"><?= htmlspecialchars($project_name) ?></p>
+    <small><?= htmlspecialchars($warehouse['warehouse_name']) ?></small>
 </div>
 <div id="whPrintFooter" style="display:none;">
     <p>Printed by <strong><?= $print_user ?></strong> on <strong><?= date('d M Y, h:i A') ?></strong></p>
