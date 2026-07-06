@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-07-05 (fix) — Dashboard attention: exact badge counts + gate "Go to source" to wired pages
+
+Follow-up to the attention accordion.
+
+- **`app/dashboard.php`** — the "Inventory & Products" badge now equals the
+  `?attention=1` page exactly: excluded services (`is_service = 0`) from the three
+  product alert queries (services have 0 stock and were being counted as "out"),
+  removed the `LIMIT 10/5/5` caps, and de-duplicated the group by product id (a
+  product can match several alert queries). Verified against live DB: 13 = 13.
+- **`app/dashboard.php`** — "Go to source" now only renders for groups whose page
+  actually honours `?attention=1` (currently only Products); other groups would
+  have dumped their full list. Remaining groups are commented in `$group_sources`,
+  enabled one at a time as each page is wired.
+
 ## 2026-07-05 (feat) — Dashboard "System requires your attention": grouped accordion + filtered source deep-links
 
 Reworked the "View Details" panel so it no longer dumps every alert at once.

@@ -89,6 +89,24 @@ foreach ($alerts as $a) {
     }
 }
 
+// Inventory & Products: a product can match more than one alert query (e.g. low
+// stock AND expiring, or out/negative counted by two queries). The ?attention=1
+// page counts each product ONCE, so de-duplicate this group by product id here
+// (keep first — low/out before expiring before negative) so the badge matches.
+if (!empty($notif_groups['products']['items'])) {
+    $seen = [];
+    $notif_groups['products']['items'] = array_values(array_filter(
+        $notif_groups['products']['items'],
+        function ($it) use (&$seen) {
+            $pid = $it['id'] ?? null;
+            if ($pid === null) return true;
+            if (isset($seen[$pid])) return false;
+            $seen[$pid] = true;
+            return true;
+        }
+    ));
+}
+
 // Add pending approvals to the groups
 if (!empty($pending_approvals)) {
     foreach ($pending_approvals as $p) {
@@ -110,20 +128,20 @@ $active_notif_groups = array_filter($notif_groups, function($group) {
 });
 
 // Group → "Go to source" URL (opens the real module page, filtered to ONLY the
-// items needing attention via ?attention=1). Per-page filtering is rolled out one
-// group at a time — Inventory & Products is the pilot. Empty string = no source
-// button (e.g. Pending Approvals has no single inbox page; use per-item links).
+// items needing attention via ?attention=1). The button only appears for groups
+// whose source page ACTUALLY honours the filter — otherwise it would just dump the
+// full list. Filtering is rolled out one page at a time; enable each entry below
+// as its page is wired. Inventory & Products is live; the rest are pending.
 $group_sources = [
-    'invoices'       => getUrl('invoices') . '?attention=1',
     'products'       => getUrl('products') . '?attention=1',
-    'approvals'      => '',
-    'cash_bank'      => getUrl('cash_register') . '?attention=1',
-    'credit_risk'    => getUrl('customers') . '?attention=1',
-    'grn_pending'    => getUrl('purchase_orders') . '?attention=1',
-    'hr_payroll'     => getUrl('leaves') . '?attention=1',
-    'quotes_tenders' => getUrl('quotations') . '?attention=1',
-    'documents'      => getUrl('document_library') . '?attention=1',
-    'others'         => '',
+    // Pending — uncomment each as its page starts honouring ?attention=1:
+    // 'invoices'       => getUrl('invoices') . '?attention=1',
+    // 'cash_bank'      => getUrl('cash_register') . '?attention=1',
+    // 'credit_risk'    => getUrl('customers') . '?attention=1',
+    // 'grn_pending'    => getUrl('purchase_orders') . '?attention=1',
+    // 'hr_payroll'     => getUrl('leaves') . '?attention=1',
+    // 'quotes_tenders' => getUrl('quotations') . '?attention=1',
+    // 'documents'      => getUrl('document_library') . '?attention=1',
 ];
 
 // Get warehouses for quick stock adjustment
@@ -515,11 +533,11 @@ function get_system_alerts($pdo, $user_id) {
                 FROM product_stocks GROUP BY product_id
             ) s ON p.product_id = s.product_id
             WHERE p.status = 'active'
+              AND p.is_service = 0
               AND ((COALESCE(s.available_stock, 0) <= p.min_stock_level AND p.min_stock_level > 0)
                 OR (COALESCE(s.available_stock, 0) <= 0))
               {$prodScope}
             ORDER BY COALESCE(s.available_stock, 0) ASC
-            LIMIT 10
         ");
         $stmt->execute();
         $stock_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -534,11 +552,11 @@ function get_system_alerts($pdo, $user_id) {
                    'Product expiring soon' as message
             FROM products p
             WHERE p.expiry_date IS NOT NULL
+              AND p.is_service = 0
               AND p.expiry_date > CURDATE()
               AND DATEDIFF(p.expiry_date, CURDATE()) <= 30
               AND p.status = 'active'
               {$prodScope}
-            LIMIT 5
         ");
         $stmt->execute();
         $expiry_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -558,9 +576,9 @@ function get_system_alerts($pdo, $user_id) {
                     HAVING available_stock < 0
                 ) s ON p.product_id = s.product_id
                 WHERE p.status = 'active'
+                  AND p.is_service = 0
                   {$prodScope}
                 ORDER BY s.available_stock ASC
-                LIMIT 5
             ");
             $stmt->execute();
             $negative_stock_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
