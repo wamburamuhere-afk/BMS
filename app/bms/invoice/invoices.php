@@ -29,6 +29,12 @@ $date_to = $_GET['date_to'] ?? '';
 $filtered_customer_id = isset($_GET['customer']) ? intval($_GET['customer']) : 0;
 $payment_filter = isset($_GET['payment_status']) ? $_GET['payment_status'] : (isset($_GET['status']) ? $_GET['status'] : '');
 
+// Attention mode — dashboard "Invoices & Payments" deep-link (?attention=1):
+// show ONLY overdue invoices. We set the payment_status filter to 'overdue' via the
+// hidden field (below) WITHOUT touching the status dropdown, so partial/reviewed
+// past-due invoices are included too (mirrors get_system_alerts()).
+$attention = (isset($_GET['attention']) && $_GET['attention'] === '1');
+
 // Fetch specific customer details if filtered
 $filtered_customer = null;
 $filtered_customer_name = '';
@@ -300,11 +306,22 @@ try {
     <!-- Form Message -->
     <div id="form-message" class="mb-3"></div>
 
+    <?php if ($attention): ?>
+    <div class="alert border-0 shadow-sm d-flex flex-wrap align-items-center gap-2 mb-4 d-print-none" style="background:#fff9e6; border-left:5px solid #ffc107 !important; border-radius:10px;">
+        <i class="bi bi-funnel-fill fs-5 text-warning"></i>
+        <div class="flex-grow-1">
+            <strong>Showing only invoices that need attention</strong>
+            <span class="text-muted small d-block">Overdue &mdash; past the due date with an outstanding balance.</span>
+        </div>
+        <a href="<?= getUrl('invoices') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> Show all invoices</a>
+    </div>
+    <?php endif; ?>
+
     <!-- Filters Card -->
     <div class="main-card mb-4 d-print-none">
         <div class="card-body p-4">
             <form id="filterForm" class="row g-3 align-items-end">
-                <input type="hidden" name="payment_status" value="<?= safe_output($payment_filter) ?>">
+                <input type="hidden" name="payment_status" value="<?= $attention ? 'overdue' : safe_output($payment_filter) ?>">
                 <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase">Status</label>
                     <select class="form-select border-0 bg-light" name="status">

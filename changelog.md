@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-07-05 (feat) — Invoices "Go to source" attention filter (overdue) + consistent overdue definition
+
+Second group wired for the dashboard "Go to source" deep-link. Also fixed a real
+undercount: the dashboard whitelisted `sent/partial/pending/approved`, but the
+invoices API auto-promotes past-due invoices to status `overdue`, so those dropped
+off the badge; `reviewed` past-due invoices were never counted either.
+
+- **`app/bms/invoice/invoices.php`** — honours `?attention=1`: seeds the hidden
+  `payment_status=overdue` filter (without forcing the status dropdown, so
+  partial/reviewed past-due invoices are included) and shows a "needs attention"
+  banner with a "Show all invoices" reset link.
+- **`api/account/get_invoices.php`** — overdue is now defined consistently as
+  `status NOT IN ('paid','cancelled','draft') AND due_date < CURDATE() AND
+  paid_amount < grand_total` — for both the list filter and the overdue stat
+  (previously drafts could slip in and the `status='overdue'` special-case made it
+  depend on the auto-mark side effect).
+- **`app/dashboard.php`** — overdue alert query aligned to the same definition, and
+  re-enabled the Invoices "Go to source" button. Verified badge = page exactly
+  (6 = 6 on live DB).
+
 ## 2026-07-05 (fix) — Dashboard attention: per-item links now open the exact record
 
 Audit found several alert types linked to a generic list/page instead of the
