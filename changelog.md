@@ -19,6 +19,28 @@ with the same email/number/code collided with their own terminated row and threw
   proves the re-hire passes the uniqueness check (advances to the CV/document gate
   instead of "already exists"). Verified red-before / green-after (8 assertions).
 
+## 2026-07-06 (fix) — Heal payroll GL orphaned by a bare source delete
+
+When a `payroll` row is removed the *wrong* way — a raw `DELETE`, or an employee
+deleted while their payroll still exists — instead of Voided, its posted journal
+entries are stranded: Salaries Payable / PAYE / Salaries Expense (and the employee
+`2-1440-EMP-NNNNN` sub-account) stay overstated with no source behind them. (The
+Void path in `delete_payroll.php` reverses correctly; this is the retro-fix for
+rows already deleted.)
+
+- `migrations/2026_07_06_payroll_gl_orphan_heal.php` — reverses every posted
+  `payroll` / `payroll_accrual` / `payroll_payment` entry whose `entity_id` is
+  absent from the `payroll` table and not already reversed, by posting a balanced
+  contra (`<type>_void`) and stamping `reverses_entry_id`. The original stays
+  `posted` and the contra nets it to zero (reports sum `status='posted'` only, so
+  it deliberately does NOT also flip the original to `reversed` — that would
+  double-remove). Criteria-based, idempotent, balance-checked; mirrors
+  `2026_06_23_asset_delete_orphan_heal.php`. Cleans all tenant DBs on deploy — no
+  raw SQL.
+- `tests/test_payroll_gl_orphan_heal_cli.php` — seeds a posted orphaned accrual,
+  runs the migration, and proves the contra is posted, the original stays posted,
+  the pair nets to zero on both accounts, and a re-run is idempotent (10 assertions).
+
 ## 2026-07-06 (fix) — Warehouse Stock &amp; History print: header now prints + matches project style, shared footer
 
 Follow-up to the header change below. When printing from Projects → Project Details →
