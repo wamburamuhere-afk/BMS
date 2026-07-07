@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-07-06 (fix) — Re-hiring a deleted employee ("already exists")
+
+Deleting an employee is a **soft delete** (`api/delete_employee.php` sets
+`status='terminated'`; the row stays for HR history). But `api/add_employee.php`'s
+uniqueness check counted *every* row regardless of status, so re-creating a person
+with the same email/number/code collided with their own terminated row and threw
+"Employee code, employee number, or email already exists."
+
+- `api/add_employee.php` — the existence check now excludes soft-deleted rows
+  (`AND (status IS NULL OR status NOT IN ('terminated','deleted'))`). A re-hire may
+  reuse the details of a terminated employee, while duplicates against **active**
+  staff are still blocked. (`email` has no DB-unique index; `employee_number` /
+  `employee_code` do, but they auto-generate for new hires via `nextCode()`, so a
+  re-hire gets a fresh number and does not collide.)
+- `tests/test_employee_rehire_uniqueness_cli.php` — new end-to-end test: seeds an
+  active employee, confirms a duplicate email is rejected, soft-deletes it, then
+  proves the re-hire passes the uniqueness check (advances to the CV/document gate
+  instead of "already exists"). Verified red-before / green-after (8 assertions).
+
 ## 2026-07-06 (fix) — Warehouse Stock &amp; History print: header now prints + matches project style, shared footer
 
 Follow-up to the header change below. When printing from Projects → Project Details →
