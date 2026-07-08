@@ -1,5 +1,65 @@
 # BMS Changelog
 
+## 2026-07-07 (chore) — One-time targeted payroll fresh reset (5 named companies)
+
+Resets the payroll side to zero so five companies can start fresh, then verify
+that newly-created employees/payroll post real, provable numbers to the GL.
+
+- `migrations/2026_07_07_payroll_fresh_reset.php` — deletes all `payroll%` / `sdl%`
+  GL entries (accrual, payment, and every reversal void) + their lines, empties the
+  payroll operational tables (`payroll`, `payroll_items`, `payslip_history`,
+  `statutory_remittances`, `payroll_audit_log`), clears employee→entry links, and
+  drops empty `2-1440-EMP-*` sub-accounts. Touches **nothing** outside payroll —
+  invoices, bills, banks, expenses and the employees themselves are untouched, and
+  the ledger stays balanced.
+- **Scoped by exact database name** (`$TARGET_DBS`): `bejundas_bms_bejus`,
+  `bejundas_bms_bjp`, `bejundas_main`, `bjptechn_main`, `bjptechn_mwpt` — the DBs of
+  the bejus/bms/demo/mufindipower/mwpt hosts. Any other database is **skipped**
+  (fail-safe). Being a migration, the runner records it and never re-runs it.
+- Proved on local: all payroll control accounts → 0.00, Balance Sheet `balanced=true`
+  (Assets = Liabilities + Equity, difference 0.00), ledger Σ Dr = Σ Cr.
+
+## 2026-07-06 (fix) — Re-hiring a deleted employee ("already exists")
+
+Deleting an employee is a **soft delete** (`api/delete_employee.php` sets
+`status='terminated'`; the row stays for HR history). But `api/add_employee.php`'s
+uniqueness check counted *every* row regardless of status, so re-creating a person
+with the same email/number/code collided with their own terminated row and threw
+"Employee code, employee number, or email already exists."
+
+- `api/add_employee.php` — the existence check now excludes soft-deleted rows
+  (`AND (status IS NULL OR status NOT IN ('terminated','deleted'))`). A re-hire may
+  reuse the details of a terminated employee, while duplicates against **active**
+  staff are still blocked. (`email` has no DB-unique index; `employee_number` /
+  `employee_code` do, but they auto-generate for new hires via `nextCode()`, so a
+  re-hire gets a fresh number and does not collide.)
+- `tests/test_employee_rehire_uniqueness_cli.php` — new end-to-end test: seeds an
+  active employee, confirms a duplicate email is rejected, soft-deletes it, then
+  proves the re-hire passes the uniqueness check (advances to the CV/document gate
+  instead of "already exists"). Verified red-before / green-after (8 assertions).
+
+## 2026-07-06 (fix) — Heal payroll GL orphaned by a bare source delete
+
+When a `payroll` row is removed the *wrong* way — a raw `DELETE`, or an employee
+deleted while their payroll still exists — instead of Voided, its posted journal
+entries are stranded: Salaries Payable / PAYE / Salaries Expense (and the employee
+`2-1440-EMP-NNNNN` sub-account) stay overstated with no source behind them. (The
+Void path in `delete_payroll.php` reverses correctly; this is the retro-fix for
+rows already deleted.)
+
+- `migrations/2026_07_06_payroll_gl_orphan_heal.php` — reverses every posted
+  `payroll` / `payroll_accrual` / `payroll_payment` entry whose `entity_id` is
+  absent from the `payroll` table and not already reversed, by posting a balanced
+  contra (`<type>_void`) and stamping `reverses_entry_id`. The original stays
+  `posted` and the contra nets it to zero (reports sum `status='posted'` only, so
+  it deliberately does NOT also flip the original to `reversed` — that would
+  double-remove). Criteria-based, idempotent, balance-checked; mirrors
+  `2026_06_23_asset_delete_orphan_heal.php`. Cleans all tenant DBs on deploy — no
+  raw SQL.
+- `tests/test_payroll_gl_orphan_heal_cli.php` — seeds a posted orphaned accrual,
+  runs the migration, and proves the contra is posted, the original stays posted,
+  the pair nets to zero on both accounts, and a re-run is idempotent (10 assertions).
+
 ## 2026-07-06 (fix) — Warehouse Stock &amp; History print: header now prints + matches project style, shared footer
 
 Follow-up to the header change below. When printing from Projects → Project Details →
