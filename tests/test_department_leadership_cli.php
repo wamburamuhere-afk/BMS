@@ -71,6 +71,11 @@ try {
     ($r3['mode'] ?? '') === 'leadership' ? ok('mode = leadership') : no('mode wrong: ' . json_encode($r3));
     $ids = array_map(fn($o) => (int)$o['id'], $r3['results'] ?? []);
     (in_array($LEADER, $ids, true) && in_array($ASSISTANT, $ids, true)) ? ok('leader + assistant offered') : no('options wrong: ' . json_encode($ids));
+    // roles are labelled so the UI can badge who is Leader vs Assistant Leader
+    $roleOf = [];
+    foreach ($r3['results'] ?? [] as $o) $roleOf[(int)$o['id']] = $o['role'] ?? null;
+    (($roleOf[$LEADER] ?? '') === 'Leader') ? ok('leader tagged role=Leader') : no('leader role wrong: ' . json_encode($roleOf));
+    (($roleOf[$ASSISTANT] ?? '') === 'Assistant Leader') ? ok('assistant tagged role=Assistant Leader') : no('assistant role wrong: ' . json_encode($roleOf));
 
     // ── 4. Reporting-To options: all-employees mode (no leader) ────────────
     section('4. get_reporting_to_options — all-employees mode');

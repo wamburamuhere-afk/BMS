@@ -1212,6 +1212,22 @@ function toggleEmpOther(selectId, boxId, inputId, isOther) {
 // every employee in that department is offered. Submits reporting_to_id; the
 // server dual-writes the legacy reporting_to varchar from the chosen name.
 // (Replaces the old free-across-all-employees AJAX picker.)
+// Renders each Reporting-To option/selection as "Name  [Leader]" with a coloured
+// role badge, so it's always obvious who is the Leader vs the Assistant Leader.
+function fmtReportingOption(state) {
+    if (!state.id) return state.text;
+    const role = state.element ? $(state.element).attr('data-role') : '';
+    const $span = $('<span>').text($(state.element).attr('data-name') || state.text);
+    if (role) {
+        const bg = role === 'Leader' ? '#0d6efd' : '#6f42c1';
+        $span.append($('<span>').text(role).css({
+            background: bg, color: '#fff', borderRadius: '4px',
+            padding: '1px 6px', marginLeft: '6px', fontSize: '0.72rem'
+        }));
+    }
+    return $span;
+}
+
 function loadReportingToOptions(departmentId, selectedId, selectedName, dropdownParent) {
     const $el = $('#reporting_to_id');
     if ($el.hasClass('select2-hidden-accessible')) $el.select2('destroy');
@@ -1220,7 +1236,9 @@ function loadReportingToOptions(departmentId, selectedId, selectedName, dropdown
 
     const initSelect2 = (placeholder) => $el.select2({
         theme: 'bootstrap-5', width: '100%', allowClear: true,
-        placeholder: placeholder, dropdownParent: dropdownParent || undefined
+        placeholder: placeholder, dropdownParent: dropdownParent || undefined,
+        templateResult: fmtReportingOption, templateSelection: fmtReportingOption,
+        escapeMarkup: m => m
     });
 
     // 'other' (brand-new department) or none → nothing to report to yet.
@@ -1233,15 +1251,22 @@ function loadReportingToOptions(departmentId, selectedId, selectedName, dropdown
     $.getJSON(APP_URL + '/api/get_reporting_to_options',
         { department_id: departmentId, exclude_id: editingId, _ts: Date.now() }, function (res) {
         const results = (res && res.results) || [];
-        results.forEach(o => $el.append(new Option(o.text, o.id, false, false)));
+        results.forEach(o => {
+            const opt = new Option(o.text, o.id, false, false);
+            opt.setAttribute('data-name', o.name || o.text);
+            if (o.role) opt.setAttribute('data-role', o.role);
+            $el.append(opt);
+        });
         // Keep an already-set manager selectable even if outside the current list.
         if (selectedId && !results.some(o => String(o.id) === String(selectedId))) {
-            $el.append(new Option(selectedName || ('#' + selectedId), selectedId, false, false));
+            const opt = new Option(selectedName || ('#' + selectedId), selectedId, false, false);
+            opt.setAttribute('data-name', selectedName || ('#' + selectedId));
+            $el.append(opt);
         }
         const mode = res && res.mode;
         initSelect2(mode === 'leadership' ? 'Select leader / assistant…' : 'Select employee…');
         if (selectedId) { $el.val(String(selectedId)).trigger('change.select2'); }
-        if (mode === 'leadership') $('#reporting_to_legacy_hint').text('This department has leadership set — pick the leader or assistant.');
+        if (mode === 'leadership') $('#reporting_to_legacy_hint').html('<i class="bi bi-info-circle"></i> This department has leadership set — pick the <strong>Leader</strong> or <strong>Assistant Leader</strong>.');
         else if (mode === 'all') $('#reporting_to_legacy_hint').text('No leader set for this department — pick any employee in it.');
     });
 }

@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-07-08 (ux) — Reporting To: Select2 with Leader/Assistant role badges
+
+- Reporting To is now a searchable **Select2** in every state (empty, leadership,
+  all-employees), replacing any plain-select fallback.
+- When a department has leadership, each option/selection shows a coloured **role
+  badge** — blue **Leader**, purple **Assistant Leader** — so it's unmistakable who
+  is who. `api/get_reporting_to_options.php` returns a `role` per option; the
+  picker renders it via Select2 `templateResult`/`templateSelection`.
+- Test extended to assert the role tagging (14/14 pass).
+
 ## 2026-07-08 (fix) — Department leadership: apply immediately + clear seed leaders
 
 Follow-up to the leadership feature after testing feedback — two real defects in

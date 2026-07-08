@@ -49,7 +49,8 @@ try {
         foreach ($ids as $id) {                    // keep leader-first ordering
             if ($id === $exclude_id || !isset($byId[$id])) continue;
             $r = $byId[$id];
-            $results[] = ['id' => $id, 'text' => trim($r['first_name'] . ' ' . $r['last_name']) . ' — ' . $roles[$id]];
+            $name = trim($r['first_name'] . ' ' . $r['last_name']);
+            $results[] = ['id' => $id, 'text' => $name . ' — ' . $roles[$id], 'name' => $name, 'role' => $roles[$id]];
         }
         echo json_encode(['success' => true, 'mode' => 'leadership', 'results' => $results]);
         exit();
@@ -67,7 +68,8 @@ try {
     foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $r) {
         $id = (int)$r['employee_id'];
         if ($id === $exclude_id) continue;         // can't report to yourself
-        $results[] = ['id' => $id, 'text' => trim($r['first_name'] . ' ' . $r['last_name'])];
+        $name = trim($r['first_name'] . ' ' . $r['last_name']);
+        $results[] = ['id' => $id, 'text' => $name, 'name' => $name, 'role' => ''];
     }
     echo json_encode(['success' => true, 'mode' => 'all', 'results' => $results]);
 } catch (Exception $e) {
