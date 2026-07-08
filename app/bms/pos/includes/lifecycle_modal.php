@@ -218,7 +218,7 @@ $lc_projects     = $pdo->query("SELECT project_id, project_name FROM projects WH
                             <div class="p-2 rounded small" id="lc_ldr_current" style="background:#fff8e1;border:1px solid #ffe08a">
                                 Pick a department to see its current leadership.
                             </div>
-                            <div class="form-text">Choose the department, then set its leader (the “Employee” above) and, optionally, an assistant leader. Saved on approval — the previous holder is replaced.</div>
+                            <div class="form-text">Choose the department, then set its leader (the “Employee” above) and, optionally, an assistant leader. Applied immediately — the previous holder is replaced.</div>
                         </div>
                     </div>
 
@@ -348,7 +348,7 @@ $lc_projects     = $pdo->query("SELECT project_id, project_name FROM projects WH
             const dn = $(this).find('option:selected').text();
             $('#lc_title').val('Department leadership: ' + dn);
         }
-        $.getJSON('<?= buildUrl('api/get_department_leadership.php') ?>', { department_id: deptId }, function (res) {
+        $.getJSON('<?= buildUrl('api/get_department_leadership.php') ?>', { department_id: deptId, _ts: Date.now() }, function (res) {
             if (!res || !res.success) return;
             const leader = res.leader, asst = res.assistant;
             const bits = [];

@@ -1231,7 +1231,7 @@ function loadReportingToOptions(departmentId, selectedId, selectedName, dropdown
 
     const editingId = $('#employee_id').val() || '';
     $.getJSON(APP_URL + '/api/get_reporting_to_options',
-        { department_id: departmentId, exclude_id: editingId }, function (res) {
+        { department_id: departmentId, exclude_id: editingId, _ts: Date.now() }, function (res) {
         const results = (res && res.results) || [];
         results.forEach(o => $el.append(new Option(o.text, o.id, false, false)));
         // Keep an already-set manager selectable even if outside the current list.

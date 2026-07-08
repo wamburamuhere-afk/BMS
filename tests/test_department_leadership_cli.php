@@ -42,28 +42,23 @@ $event_id = null;
 $touchedDept2 = null;
 
 try {
-    // ── 1. Create the leadership action (pending) ──────────────────────────
-    section('1. Create "Department Leadership" action');
+    // ── 1. Create the leadership action — applies IMMEDIATELY ──────────────
+    section('1. Create "Department Leadership" — immediate effect');
     [$res, $raw] = run_endpoint($root, $root . '/api/add_lifecycle_event.php', [
         'employee_id' => $LEADER, 'event_type' => 'leadership',
         'event_date' => date('Y-m-d'), 'title' => 'ZZ_TEST leadership',
         'new_department_id' => $DEPT, 'leadership_assistant_id' => $ASSISTANT,
     ]);
-    (is_array($res) && !empty($res['success'])) ? ok('event created (pending)') : no('create failed: ' . substr($raw, 0, 200));
+    (is_array($res) && !empty($res['success'])) ? ok('event created') : no('create failed: ' . substr($raw, 0, 200));
     $event_id = $res['event_id'] ?? null;
     $event_id ? ok("got event_id=$event_id") : no('no event_id returned');
 
-    // still pending, department unchanged
-    $mgrNow = $pdo->query("SELECT manager_id FROM departments WHERE department_id = $DEPT")->fetchColumn();
-    ((int)$mgrNow === (int)$origDept['manager_id']) ? ok('department NOT changed before approval') : no('department changed before approval!');
+    // Applied at once — status approved, effect stamped, department updated now
+    $evStatus = $pdo->query("SELECT status FROM employee_lifecycle_events WHERE event_id = $event_id")->fetchColumn();
+    ($evStatus === 'approved') ? ok('event auto-approved (immediate)') : no("status not approved: $evStatus");
 
-    // ── 2. Approve → effect writes to departments ──────────────────────────
-    section('2. Approve → leadership applied');
-    [$res2, $raw2] = run_endpoint($root, $root . '/api/change_lifecycle_status.php', [
-        'event_id' => $event_id, 'action' => 'approve',
-    ]);
-    (is_array($res2) && !empty($res2['success'])) ? ok('approved') : no('approve failed: ' . substr($raw2, 0, 200));
-
+    // ── 2. Department reflects the change straight away ────────────────────
+    section('2. Department updated immediately (no approval step)');
     $after = $pdo->query("SELECT manager_id, assistant_manager_id FROM departments WHERE department_id = $DEPT")->fetch(PDO::FETCH_ASSOC);
     ((int)$after['manager_id'] === $LEADER) ? ok('leader (manager_id) set') : no('manager_id wrong: ' . json_encode($after));
     ((int)$after['assistant_manager_id'] === $ASSISTANT) ? ok('assistant set') : no('assistant wrong: ' . json_encode($after));

@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-07-08 (fix) — Department leadership: apply immediately + clear seed leaders
+
+Follow-up to the leadership feature after testing feedback — two real defects in
+the Reporting To picker:
+
+1. **Phantom leader.** `departments.manager_id` carried pre-feature seed values
+   (dept N → employee N) that nothing else in the app reads, so every department
+   looked "led" even though none had been assigned. New migration
+   `2026_07_08_clear_seed_department_leaders.php` NULLs `manager_id` /
+   `assistant_manager_id` for all departments (criteria-based, idempotent) so an
+   unassigned department correctly falls back to "all employees of that dept".
+2. **Changed leader didn't appear.** Leadership went through pending→approve, so a
+   just-assigned leader wasn't written until approval. `api/add_lifecycle_event.php`
+   now applies a `leadership` event **immediately** (writes the department + marks
+   the event approved in the same transaction) — it still shows in HR Actions as a
+   record, but takes effect at once. Modal copy updated to "Applied immediately".
+3. **Cache-busting** added to the Reporting-To and department-leadership fetches so
+   the browser never serves a stale list after a change.
+
+`tests/test_department_leadership_cli.php` updated for the immediate model
+(12/12 pass); existing HR lifecycle suites still green (40 / 28 / 31).
+
 ## 2026-07-08 (feat) — Department leadership (leader + assistant) via HR Actions; department-scoped Reporting To
 
 Every department can now have ONE leader and ONE assistant leader (a person may

@@ -6,6 +6,7 @@
 // approval (api/change_lifecycle_status.php), never here.
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../core/lifecycle_effects.php';
 
 header('Content-Type: application/json');
 
@@ -209,6 +210,26 @@ try {
     ]);
     $event_id = (int)$pdo->lastInsertId();
 
+    // Department Leadership takes effect IMMEDIATELY (no approval gate): apply
+    // the change to the departments table now and mark the event approved so it
+    // is a clean, self-contained audit record. This is why a just-assigned
+    // leader shows up at once in the department-scoped "Reporting To" picker.
+    $leadership_applied = false;
+    if ($event_type === 'leadership') {
+        applyLifecycleEffectRow($pdo, [
+            'event_id'                => $event_id,
+            'event_type'              => 'leadership',
+            'employee_id'             => $employee_id,
+            'new_department_id'       => $new_department_id,
+            'leadership_assistant_id' => $leadership_assistant_id,
+        ], (int)$_SESSION['user_id']);
+        $pdo->prepare("UPDATE employee_lifecycle_events
+                       SET status = 'approved', approved_by = ?, approved_at = NOW(), updated_by = ?
+                       WHERE event_id = ?")
+            ->execute([$_SESSION['user_id'], $_SESSION['user_id'], $event_id]);
+        $leadership_applied = true;
+    }
+
     // Register the attachment in the central document library (inside the txn)
     if ($attachment_path !== null && function_exists('registerFileInLibrary')) {
         registerFileInLibrary(
@@ -234,7 +255,10 @@ try {
     ]);
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'message' => ucfirst($event_type) . ' recorded and awaiting approval', 'event_id' => $event_id]);
+    $msg = $leadership_applied
+        ? 'Department leadership updated'
+        : ucfirst($event_type) . ' recorded and awaiting approval';
+    echo json_encode(['success' => true, 'message' => $msg, 'event_id' => $event_id]);
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {
