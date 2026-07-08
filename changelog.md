@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-07-07 (chore) — One-time targeted payroll fresh reset (5 named companies)
+
+Resets the payroll side to zero so five companies can start fresh, then verify
+that newly-created employees/payroll post real, provable numbers to the GL.
+
+- `migrations/2026_07_07_payroll_fresh_reset.php` — deletes all `payroll%` / `sdl%`
+  GL entries (accrual, payment, and every reversal void) + their lines, empties the
+  payroll operational tables (`payroll`, `payroll_items`, `payslip_history`,
+  `statutory_remittances`, `payroll_audit_log`), clears employee→entry links, and
+  drops empty `2-1440-EMP-*` sub-accounts. Touches **nothing** outside payroll —
+  invoices, bills, banks, expenses and the employees themselves are untouched, and
+  the ledger stays balanced.
+- **Scoped by exact database name** (`$TARGET_DBS`): `bejundas_bms_bejus`,
+  `bejundas_bms_bjp`, `bejundas_main`, `bjptechn_main`, `bjptechn_mwpt` — the DBs of
+  the bejus/bms/demo/mufindipower/mwpt hosts. Any other database is **skipped**
+  (fail-safe). Being a migration, the runner records it and never re-runs it.
+- Proved on local: all payroll control accounts → 0.00, Balance Sheet `balanced=true`
+  (Assets = Liabilities + Equity, difference 0.00), ledger Σ Dr = Σ Cr.
+
 ## 2026-07-06 (fix) — Re-hiring a deleted employee ("already exists")
 
 Deleting an employee is a **soft delete** (`api/delete_employee.php` sets
