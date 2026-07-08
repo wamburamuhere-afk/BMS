@@ -734,7 +734,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                         <option value="weekly">Weekly</option>
                                         <option value="daily">Daily</option>
                                         <option value="hourly">Hourly</option>
-                                        <option value="other">Other (Manual Entry)</option>
+                                        <option value="other">➕ Other (specify)…</option>
                                     </select>
                                     <div id="payment_frequency_other_div" class="mt-2 d-none">
                                         <input type="text" class="form-control" id="payment_frequency_other" name="payment_frequency_other" placeholder="e.g. 10 days, 3 months">
