@@ -107,6 +107,7 @@ $stats = $pdo->query($stats_sql)->fetch(PDO::FETCH_ASSOC) ?: [];
                         <option value="complaint">Complaint</option>
                         <option value="resignation">Resignation</option>
                         <option value="termination">Termination</option>
+                        <option value="leadership">Department Leadership</option>
                     </select>
                 </div>
                 <div class="col-6 col-md-2">
@@ -201,6 +202,7 @@ const TYPE_BADGES = {
     complaint:   ['#e9ecef', '#495057', 'bi-chat-left-text'],
     resignation: ['#6c757d', '#fff',    'bi-box-arrow-right'],
     termination: ['#dc3545', '#fff',    'bi-x-octagon'],
+    leadership:  ['#0d6efd', '#fff',    'bi-person-badge'],
 };
 const STATUS_BADGES = {
     pending:   ['#e9ecef', '#495057'],
@@ -239,6 +241,11 @@ function changeSummary(r) {
         case 'complaint':   return `By: ${safeOutput(r.complainant || '—')}`;
         case 'resignation': return `Last day: ${safeOutput(r.end_date || '—')}`;
         case 'termination': return safeOutput(r.termination_type || '—');
+        case 'leadership': {
+            let s = `Leader of ${safeOutput(r.new_department_name || '—')}`;
+            if (r.leadership_assistant_name) s += `<br><small class="text-muted">Assistant: ${safeOutput(r.leadership_assistant_name)}</small>`;
+            return s;
+        }
         default: return '—';
     }
 }

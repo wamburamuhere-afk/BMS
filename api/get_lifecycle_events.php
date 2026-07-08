@@ -68,9 +68,11 @@ try {
                op.project_name      AS old_project_name,
                np.project_name      AS new_project_name,
                cu.username          AS created_by_name,
-               au.username          AS approved_by_name
+               au.username          AS approved_by_name,
+               TRIM(CONCAT(la.first_name, ' ', la.last_name)) AS leadership_assistant_name
         FROM employee_lifecycle_events ele
         JOIN employees e        ON e.employee_id = ele.employee_id
+        LEFT JOIN employees la   ON la.employee_id = ele.leadership_assistant_id
         LEFT JOIN designations od ON od.designation_id = ele.old_designation_id
         LEFT JOIN designations nd ON nd.designation_id = ele.new_designation_id
         LEFT JOIN departments odp ON odp.department_id = ele.old_department_id

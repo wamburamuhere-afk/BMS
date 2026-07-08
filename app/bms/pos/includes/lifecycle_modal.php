@@ -36,7 +36,7 @@ $lc_projects     = $pdo->query("SELECT project_id, project_name FROM projects WH
 
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label">Employee <span class="text-danger">*</span></label>
+                            <label class="form-label" id="lc_employee_label">Employee <span class="text-danger">*</span></label>
                             <?php if ($lifecycle_preselect): ?>
                             <input type="hidden" name="employee_id" id="lc_employee" value="<?= (int)$lifecycle_preselect['employee_id'] ?>">
                             <input type="text" class="form-control" value="<?= safe_output($lifecycle_preselect['name']) ?>" disabled>
@@ -57,6 +57,7 @@ $lc_projects     = $pdo->query("SELECT project_id, project_name FROM projects WH
                                 <option value="complaint">Complaint</option>
                                 <option value="resignation">Resignation</option>
                                 <option value="termination">Termination</option>
+                                <option value="leadership">Department Leadership</option>
                             </select>
                         </div>
                     </div>
@@ -196,6 +197,31 @@ $lc_projects     = $pdo->query("SELECT project_id, project_name FROM projects WH
                         </div>
                     </div>
 
+                    <!-- Department Leadership — the top "Employee" picker is the new LEADER -->
+                    <div class="row g-3 mt-0 lc-group lc-leadership d-none">
+                        <div class="col-md-6">
+                            <label class="form-label">Department <span class="text-danger">*</span></label>
+                            <select class="form-select select2-static" name="new_department_id" id="lc_ldr_department">
+                                <option value="">-- Select --</option>
+                                <?php foreach ($lc_departments as $d): ?>
+                                <option value="<?= (int)$d['department_id'] ?>"><?= safe_output($d['department_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Assistant Leader <small class="text-muted">(optional)</small></label>
+                            <select class="form-select" name="leadership_assistant_id" id="lc_ldr_assistant" style="width:100%">
+                                <option value="">Type to search...</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <div class="p-2 rounded small" id="lc_ldr_current" style="background:#fff8e1;border:1px solid #ffe08a">
+                                Pick a department to see its current leadership.
+                            </div>
+                            <div class="form-text">Choose the department, then set its leader (the “Employee” above) and, optionally, an assistant leader. Saved on approval — the previous holder is replaced.</div>
+                        </div>
+                    </div>
+
                     <div class="row g-3 mt-0">
                         <div class="col-12">
                             <label class="form-label">Reason / Details <small class="text-muted">(optional)</small></label>
@@ -230,7 +256,8 @@ $lc_projects     = $pdo->query("SELECT project_id, project_name FROM projects WH
         award:       ['lc_award_type'],
         resignation: ['lc_resignation_end'],
         termination: ['lc_termination_type'],
-        transfer:    []   // "at least one of" — checked on submit
+        transfer:    [],  // "at least one of" — checked on submit
+        leadership:  ['lc_ldr_department']   // leader = the top Employee picker
     };
 
     function toggleGroups() {
@@ -239,9 +266,15 @@ $lc_projects     = $pdo->query("SELECT project_id, project_name FROM projects WH
         if (t) $('.lc-' + t).removeClass('d-none').find('input,select,textarea').prop('disabled', false);
         $('#lifecycleForm [required]').not('#lc_employee,#lc_type,#lc_date,#lc_title').prop('required', false);
         (REQUIRED[t] || []).forEach(id => $('#' + id).prop('required', true));
+        // For "Department Leadership" the top Employee picker IS the leader.
+        $('#lc_employee_label').html(t === 'leadership'
+            ? 'Leader (Employee) <span class="text-danger">*</span>'
+            : 'Employee <span class="text-danger">*</span>');
+        if (t === 'leadership') $('#lc_current').addClass('d-none');
     }
 
     function loadCurrent(empId) {
+        if ($('#lc_type').val() === 'leadership') { $('#lc_current').addClass('d-none'); return; }
         if (!empId) { $('#lc_current').addClass('d-none'); return; }
         $.getJSON('<?= buildUrl('api/get_employee.php') ?>', { id: empId }, function (res) {
             if (!res.success) return;
@@ -278,6 +311,20 @@ $lc_projects     = $pdo->query("SELECT project_id, project_name FROM projects WH
                 }
             });
         }
+        // Assistant Leader AJAX picker (Department Leadership)
+        if (!$('#lc_ldr_assistant').hasClass('select2-hidden-accessible')) {
+            $('#lc_ldr_assistant').select2({
+                theme: 'bootstrap-5', dropdownParent: modal, placeholder: 'Type to search...',
+                allowClear: true, width: '100%', minimumInputLength: 1,
+                ajax: {
+                    url: '<?= buildUrl('api/account/search_employees.php') ?>',
+                    dataType: 'json', delay: 300,
+                    data: params => ({ q: params.term }),
+                    processResults: data => ({ results: data.results }),
+                    cache: true
+                }
+            });
+        }
         if (PRESELECTED) loadCurrent($('#lc_employee').val());
         toggleGroups();
     });
@@ -285,12 +332,42 @@ $lc_projects     = $pdo->query("SELECT project_id, project_name FROM projects WH
     $(document).on('change', '#lc_type', toggleGroups);
     $(document).on('change', '#lc_employee', function () { loadCurrent($(this).val()); });
 
+    // Department Leadership — on department pick, show current leadership and
+    // prefill the leader (top Employee picker) + assistant so an unchanged save
+    // keeps them; a change transfers leadership to whoever is chosen.
+    function setEmpPicker(sel, emp) {
+        const $el = $(sel);
+        $el.val(null).trigger('change');
+        if (emp && emp.id) $el.append(new Option(emp.name, emp.id, true, true)).trigger('change');
+    }
+    $(document).on('change', '#lc_ldr_department', function () {
+        const deptId = $(this).val();
+        if (!deptId) { $('#lc_ldr_current').html('Pick a department to see its current leadership.'); return; }
+        // Auto-title if blank
+        if (!$('#lc_title').val()) {
+            const dn = $(this).find('option:selected').text();
+            $('#lc_title').val('Department leadership: ' + dn);
+        }
+        $.getJSON('<?= buildUrl('api/get_department_leadership.php') ?>', { department_id: deptId }, function (res) {
+            if (!res || !res.success) return;
+            const leader = res.leader, asst = res.assistant;
+            const bits = [];
+            bits.push('<strong>Current Leader:</strong> ' + (leader ? safeOutput(leader.name) : '<em>none set</em>'));
+            bits.push('<strong>Assistant:</strong> ' + (asst ? safeOutput(asst.name) : '<em>none set</em>'));
+            $('#lc_ldr_current').html(bits.join(' &nbsp;•&nbsp; '));
+            setEmpPicker('#lc_employee', leader);
+            setEmpPicker('#lc_ldr_assistant', asst);
+        });
+    });
+
     $(modalEl).on('hidden.bs.modal', function () {
         const form = document.getElementById('lifecycleForm');
         form.reset();
         $('#lifecycle-message').html('');
         $('#lc_current').addClass('d-none');
         if (!PRESELECTED) $('#lc_employee').val(null).trigger('change.select2');
+        $('#lc_ldr_assistant').val(null).trigger('change.select2');
+        $('#lc_ldr_current').html('Pick a department to see its current leadership.');
         $('.lc-group').addClass('d-none');
     });
 
@@ -299,6 +376,10 @@ $lc_projects     = $pdo->query("SELECT project_id, project_name FROM projects WH
         const t = $('#lc_type').val();
         if (t === 'transfer' && !$('#lc_new_department').val() && !$('#lc_new_project').val()) {
             Swal.fire({ icon: 'error', title: 'Error', text: 'A transfer needs a new department and/or a new project.' });
+            return;
+        }
+        if (t === 'leadership' && !$('#lc_employee').val()) {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Choose the employee who will be the department leader.' });
             return;
         }
         const btn = $(this).find('[type="submit"]');

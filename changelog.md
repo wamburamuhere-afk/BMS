@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-07-08 (feat) — Department leadership (leader + assistant) via HR Actions; department-scoped Reporting To
+
+Every department can now have ONE leader and ONE assistant leader (a person may
+lead several departments). Leadership is assigned through a new **"Department
+Leadership"** HR Action — pick the department, see its current leadership
+(pre-filled), set/transfer the leader and assistant — and, like every HR Action,
+it applies on **approval**. The employee form's **Reporting To** is now scoped to
+the chosen department: its leader/assistant if leadership is set, otherwise all
+employees of that department.
+
+- `migrations/2026_07_08_department_leadership.php` — **new.** Adds
+  `departments.assistant_manager_id`, extends `employee_lifecycle_events.event_type`
+  enum with `leadership`, adds `employee_lifecycle_events.leadership_assistant_id`.
+  Additive + idempotent.
+- `core/lifecycle_effects.php` — on approval of a `leadership` event, writes
+  `manager_id` (leader = `employee_id`) + `assistant_manager_id` to the target
+  `new_department_id` (transfer-by-replacement); stamps `effect_applied_at`.
+- `api/add_lifecycle_event.php` — accepts `leadership`; validates department +
+  optional assistant (must differ from leader); stores `leadership_assistant_id`.
+- `api/get_lifecycle_events.php` — joins the assistant's name for the list view.
+- `api/get_department_leadership.php` — **new.** Current leader/assistant of a
+  department (modal prefill + info).
+- `api/get_reporting_to_options.php` — **new.** Department-scoped Reporting-To
+  candidates: `leadership` mode (leader+assistant) or `all` mode (dept employees).
+- `app/bms/pos/includes/lifecycle_modal.php` — "Department Leadership" action type
+  + field group (department, assistant picker, current-leadership box); the top
+  Employee picker doubles as the Leader; prefill/auto-title on department change.
+- `app/bms/pos/hr_actions.php` — leadership filter option, badge, change summary.
+- `app/bms/pos/employees.php` — Reporting To rebuilt as a department-scoped select
+  (replaces the free cross-employee AJAX search); reloads on department change.
+- `tests/test_department_leadership_cli.php` — **new.** 13 assertions end-to-end
+  (create→approve→department updated, both Reporting-To modes, leadership read).
+  All pass; existing HR lifecycle suites (40/28/31/31) still green.
+
 ## 2026-07-08 (feat) — Employee wizard Step 2: Department→Designation cascade + "Other (specify)"
 
 Improves the Add/Edit Employee wizard's **Step 2 (Employment)**. The Designation

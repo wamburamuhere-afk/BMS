@@ -43,7 +43,7 @@ try {
     $description = trim($_POST['description'] ?? '');
     $notice_date = trim($_POST['notice_date'] ?? '');
 
-    $valid_types = ['promotion', 'demotion', 'transfer', 'award', 'warning', 'complaint', 'resignation', 'termination'];
+    $valid_types = ['promotion', 'demotion', 'transfer', 'award', 'warning', 'complaint', 'resignation', 'termination', 'leadership'];
     if (!$employee_id) throw new Exception('Employee is required');
     if (!in_array($event_type, $valid_types, true)) throw new Exception('Invalid event type');
     if (!$event_date || !strtotime($event_date)) throw new Exception('A valid event date is required');
@@ -76,6 +76,7 @@ try {
     $complainant        = trim($_POST['complainant'] ?? '');
     $resolution         = trim($_POST['resolution'] ?? '');
     $termination_type   = trim($_POST['termination_type'] ?? '');
+    $leadership_assistant_id = ($_POST['leadership_assistant_id'] ?? '') !== '' ? intval($_POST['leadership_assistant_id']) : null;
 
     switch ($event_type) {
         case 'promotion':
@@ -126,6 +127,22 @@ try {
         case 'termination':
             if ($termination_type === '') throw new Exception('Termination type is required');
             break;
+
+        case 'leadership':
+            // employee_id is the new LEADER (validated required above).
+            if (!$new_department_id) throw new Exception('A department is required to assign leadership');
+            $chk = $pdo->prepare("SELECT department_id FROM departments WHERE department_id = ? AND status = 'active'");
+            $chk->execute([$new_department_id]);
+            if (!$chk->fetch()) throw new Exception('Selected department does not exist or is inactive');
+            if ($leadership_assistant_id !== null) {
+                if ($leadership_assistant_id === $employee_id) {
+                    throw new Exception('The assistant leader must be a different employee from the leader');
+                }
+                $chk = $pdo->prepare("SELECT employee_id FROM employees WHERE employee_id = ? AND (status IS NULL OR status != 'deleted')");
+                $chk->execute([$leadership_assistant_id]);
+                if (!$chk->fetch()) throw new Exception('Selected assistant leader was not found');
+            }
+            break;
     }
 
     // ── Server-side snapshot of the employee's CURRENT values (D4) ─────────
@@ -173,17 +190,17 @@ try {
         INSERT INTO employee_lifecycle_events (
             employee_id, event_type, event_date, end_date, title, description,
             old_designation_id, new_designation_id, old_salary, new_salary,
-            old_department_id, new_department_id, old_project_id, new_project_id,
+            old_department_id, new_department_id, leadership_assistant_id, old_project_id, new_project_id,
             award_type, award_gift, award_amount,
             severity, complainant, resolution, termination_type, notice_date,
             status, attachment_path, attachment_name, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
     ");
     $stmt->execute([
         $employee_id, $event_type, $event_date, ($end_date !== '' ? $end_date : null), $title,
         ($description !== '' ? $description : null),
         $old_designation_id, $new_designation_id, $old_salary, $new_salary,
-        $old_department_id, $new_department_id, $old_project_id, $new_project_id,
+        $old_department_id, $new_department_id, $leadership_assistant_id, $old_project_id, $new_project_id,
         ($award_type !== '' ? $award_type : null), ($award_gift !== '' ? $award_gift : null), $award_amount,
         ($severity !== '' ? $severity : null), ($complainant !== '' ? $complainant : null),
         ($resolution !== '' ? $resolution : null), ($termination_type !== '' ? $termination_type : null),
