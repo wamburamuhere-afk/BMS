@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-07-08 (ux) — Payment Frequency: relabel "Other (Manual Entry)" → "Other (specify)"
+
+Step 3 Payment Frequency already had a free-text "Other" option; renamed its label
+to "➕ Other (specify)…" so it reads consistently with the Department / Designation /
+Employment Type "Other (specify)" fields. Behaviour unchanged — choosing it still
+reveals the `payment_frequency_other` text box (`togglePaymentFrequencyOther`).
+
 ## 2026-07-08 (hotfix) — Deploy failure: department-leaders migration ordering
 
 The production deploy failed: the migration runner sorts by filename, so
