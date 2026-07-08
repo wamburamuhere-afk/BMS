@@ -24,6 +24,34 @@ if (!function_exists('applyLifecycleEffectRow')) {
         $sets = []; $vals = []; $old = []; $new = [];
         $employee_id = (int)$ev['employee_id'];
 
+        // Leadership assignment writes to the DEPARTMENTS table, not employees:
+        //   employee_id             = the new leader
+        //   new_department_id        = the target department
+        //   leadership_assistant_id  = the new assistant leader (nullable)
+        // Transferable by design — assigning simply replaces whoever was there.
+        if ($ev['event_type'] === 'leadership') {
+            $deptId = (int)($ev['new_department_id'] ?? 0);
+            if (!$deptId) return ['changed' => false, 'old' => [], 'new' => []];
+
+            $cur = $pdo->prepare("SELECT manager_id, assistant_manager_id FROM departments WHERE department_id = ?");
+            $cur->execute([$deptId]);
+            $before = $cur->fetch(PDO::FETCH_ASSOC) ?: ['manager_id' => null, 'assistant_manager_id' => null];
+
+            $newLeader = $employee_id ?: null;
+            $newAsst   = !empty($ev['leadership_assistant_id']) ? (int)$ev['leadership_assistant_id'] : null;
+
+            $pdo->prepare("UPDATE departments SET manager_id = ?, assistant_manager_id = ? WHERE department_id = ?")
+                ->execute([$newLeader, $newAsst, $deptId]);
+            $pdo->prepare("UPDATE employee_lifecycle_events SET effect_applied_at = NOW() WHERE event_id = ?")
+                ->execute([(int)$ev['event_id']]);
+
+            return [
+                'changed' => true,
+                'old' => ['manager_id' => $before['manager_id'], 'assistant_manager_id' => $before['assistant_manager_id']],
+                'new' => ['manager_id' => $newLeader, 'assistant_manager_id' => $newAsst],
+            ];
+        }
+
         switch ($ev['event_type']) {
             case 'promotion':
             case 'demotion':
