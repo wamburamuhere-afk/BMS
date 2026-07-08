@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-07-07 (chore) — One-time targeted payroll fresh reset (5 named companies)
+
+Resets the payroll side to zero so five companies can start fresh, then verify
+that newly-created employees/payroll post real, provable numbers to the GL.
+
+- `migrations/2026_07_07_payroll_fresh_reset.php` — deletes every whole journal
+  entry that touches a payroll-**dedicated** account, then empties the payroll
+  operational tables (`payroll`, `payroll_items`, `payslip_history`,
+  `statutory_remittances`, `payroll_audit_log`), tidies legacy `transactions`
+  mirror rows, clears employee→entry links, and drops empty `2-1440-EMP-*`
+  sub-accounts. **Deletes by ACCOUNT, not entity_type**, because the statutory
+  remittance mirrors to `journal_entries` as the generic `books_transaction` type
+  and would otherwise be missed — leaving PAYE/NSSF/SDL Payable non-zero.
+- The 7 dedicated accounts cleared to zero: `6-2410` Wages/Salaries Exp, `6-2430`
+  SDL Exp, `NSSF-EXP` NSSF Employer Exp, `2-1410` PAYE, `2-1420` NSSF, `2-1430`
+  SDL, `2-1440` Salaries Payable (+ every `2-1440-EMP-*`). Shared accounts (Trade
+  Creditors `2-1200`, Bank) keep their non-payroll history — only the payroll
+  entry's own leg is removed with the whole balanced entry, so the ledger stays
+  balanced.
+- **Scoped by exact database name** (`$TARGET_DBS`): `bejundas_bms_bejus`,
+  `bejundas_bms_bjp`, `bejundas_main`, `bjptechn_main`, `bjptechn_mwpt`. Any other
+  database is **skipped** (fail-safe). Runner records it; never re-runs.
+- Proved on local with a full seeded cycle (accrual + payment + SDL + 3
+  `books_transaction` remittances): all 7 accounts → 0.00, zero leftover remittance
+  entries, Balance Sheet `balanced=true` (diff 0.00), ledger Σ Dr = Σ Cr.
+
 ## 2026-07-06 (fix) — Re-hiring a deleted employee ("already exists")
 
 Deleting an employee is a **soft delete** (`api/delete_employee.php` sets
