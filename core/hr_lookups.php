@@ -72,16 +72,40 @@ if (!function_exists('findOrCreateDesignation')) {
     }
 }
 
+if (!function_exists('findOrCreateEmploymentType')) {
+    /**
+     * Resolve an employment-type name to its type_id, creating the row if new.
+     * Idempotent + case-insensitive.
+     * @return int|null type_id, or null when $name is blank.
+     */
+    function findOrCreateEmploymentType(PDO $pdo, ?string $name, ?int $userId = null): ?int
+    {
+        $name = trim((string)$name);
+        if ($name === '') return null;
+
+        $sel = $pdo->prepare("SELECT type_id FROM employment_types WHERE LOWER(type_name) = LOWER(?) LIMIT 1");
+        $sel->execute([$name]);
+        $existing = $sel->fetchColumn();
+        if ($existing) return (int)$existing;
+
+        $ins = $pdo->prepare("INSERT INTO employment_types (type_name, status, created_by, created_at)
+                              VALUES (?, 'active', ?, NOW())");
+        $ins->execute([$name, $userId]);
+        return (int)$pdo->lastInsertId();
+    }
+}
+
 if (!function_exists('resolveEmployeeDeptDesignation')) {
     /**
-     * Normalise the posted department_id / designation_id so the caller can
-     * insert/update with plain ints. Handles the "other" sentinel by creating
-     * the row from the *_other text. Mutates $post in place and returns it.
+     * Normalise the posted department_id / designation_id / employment_type_id
+     * so the caller can insert/update with plain ints. Handles the "other"
+     * sentinel by creating the row from the *_other text. Mutates $post in place.
      *
      * Rules:
-     *  - department_id === 'other'  → create from department_other
-     *  - designation_id === 'other' → create from designation_other, under the
+     *  - department_id === 'other'      → create from department_other
+     *  - designation_id === 'other'     → create from designation_other, under the
      *    (possibly just-created) department.
+     *  - employment_type_id === 'other' → create from employment_type_other
      */
     function resolveEmployeeDeptDesignation(PDO $pdo, array &$post, ?int $userId = null): void
     {
@@ -101,6 +125,14 @@ if (!function_exists('resolveEmployeeDeptDesignation')) {
                 throw new Exception('Please type the new designation name.');
             }
             $post['designation_id'] = $newId;
+        }
+
+        if (($post['employment_type_id'] ?? '') === 'other') {
+            $newId = findOrCreateEmploymentType($pdo, $post['employment_type_other'] ?? '', $userId);
+            if ($newId === null) {
+                throw new Exception('Please type the new employment type.');
+            }
+            $post['employment_type_id'] = $newId;
         }
     }
 }

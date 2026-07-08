@@ -658,7 +658,12 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                         <?php foreach ($employment_types as $type): ?>
                                         <option value="<?= $type['type_id'] ?>"><?= safe_output($type['type_name']) ?></option>
                                         <?php endforeach; ?>
+                                        <option value="other">➕ Other (specify)…</option>
                                     </select>
+                                    <div id="employment_type_other_box" class="input-group mt-2 d-none">
+                                        <input type="text" class="form-control" id="employment_type_other" name="employment_type_other" placeholder="Type new employment type — it will be saved">
+                                        <button type="button" class="btn btn-outline-secondary" id="employment_type_other_back" title="Back to list"><i class="bi bi-arrow-left"></i></button>
+                                    </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="employment_status" class="form-label">Employment Status <span class="text-danger">*</span></label>
@@ -1207,44 +1212,75 @@ function toggleEmpOther(selectId, boxId, inputId, isOther) {
     }
 }
 
-// Tier 2, Phase 2.4 (D14) — "Reporting To" Select2 AJAX manager picker,
-// replacing the old free-text input. Submits reporting_to_id; the server
-// dual-writes the legacy reporting_to varchar from the chosen manager's name.
-function initReportingToPicker(dropdownParent) {
+// "Reporting To" is scoped to the chosen Department: if that department has a
+// LEADER set, only the leader (+ assistant) can be picked; if it has NO leader,
+// every employee in that department is offered. Submits reporting_to_id; the
+// server dual-writes the legacy reporting_to varchar from the chosen name.
+// (Replaces the old free-across-all-employees AJAX picker.)
+// Renders each Reporting-To option/selection as "Name  [Leader]" with a coloured
+// role badge, so it's always obvious who is the Leader vs the Assistant Leader.
+function fmtReportingOption(state) {
+    if (!state.id) return state.text;
+    const role = state.element ? $(state.element).attr('data-role') : '';
+    const $span = $('<span>').text($(state.element).attr('data-name') || state.text);
+    if (role) {
+        const bg = role === 'Leader' ? '#0d6efd' : '#6f42c1';
+        $span.append($('<span>').text(role).css({
+            background: bg, color: '#fff', borderRadius: '4px',
+            padding: '1px 6px', marginLeft: '6px', fontSize: '0.72rem'
+        }));
+    }
+    return $span;
+}
+
+function loadReportingToOptions(departmentId, selectedId, selectedName, dropdownParent) {
     const $el = $('#reporting_to_id');
-    if ($el.hasClass('select2-hidden-accessible')) return;
-    $el.select2({
-        theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'Select manager...',
-        dropdownParent: dropdownParent, minimumInputLength: 1,
-        ajax: {
-            url: APP_URL + '/api/account/search_employees',
-            dataType: 'json', delay: 300,
-            data: params => ({ q: params.term }),
-            processResults: data => ({ results: data.results }),
-            cache: true
+    if ($el.hasClass('select2-hidden-accessible')) $el.select2('destroy');
+    $el.empty().append(new Option('', '', false, false));
+    $('#reporting_to_legacy_hint').text('');
+
+    const initSelect2 = (placeholder) => $el.select2({
+        theme: 'bootstrap-5', width: '100%', allowClear: true,
+        placeholder: placeholder, dropdownParent: dropdownParent || undefined,
+        templateResult: fmtReportingOption, templateSelection: fmtReportingOption,
+        escapeMarkup: m => m
+    });
+
+    // 'other' (brand-new department) or none → nothing to report to yet.
+    if (!departmentId || departmentId === 'other') {
+        initSelect2('Select a department first');
+        return;
+    }
+
+    const editingId = $('#employee_id').val() || '';
+    $.getJSON(APP_URL + '/api/get_reporting_to_options',
+        { department_id: departmentId, exclude_id: editingId, _ts: Date.now() }, function (res) {
+        const results = (res && res.results) || [];
+        results.forEach(o => {
+            const opt = new Option(o.text, o.id, false, false);
+            opt.setAttribute('data-name', o.name || o.text);
+            if (o.role) opt.setAttribute('data-role', o.role);
+            $el.append(opt);
+        });
+        // Keep an already-set manager selectable even if outside the current list.
+        if (selectedId && !results.some(o => String(o.id) === String(selectedId))) {
+            const opt = new Option(selectedName || ('#' + selectedId), selectedId, false, false);
+            opt.setAttribute('data-name', selectedName || ('#' + selectedId));
+            $el.append(opt);
         }
+        const mode = res && res.mode;
+        initSelect2(mode === 'leadership' ? 'Select leader / assistant…' : 'Select employee…');
+        if (selectedId) { $el.val(String(selectedId)).trigger('change.select2'); }
+        if (mode === 'leadership') $('#reporting_to_legacy_hint').html('<i class="bi bi-info-circle"></i> This department has leadership set — pick the <strong>Leader</strong> or <strong>Assistant Leader</strong>.');
+        else if (mode === 'all') $('#reporting_to_legacy_hint').text('No leader set for this department — pick any employee in it.');
     });
 }
 
-// Preselects the manager picker for an employee being edited. When the
-// employee has a reporting_to_id, resolve and show that employee's name;
-// otherwise fall back to showing the legacy free-text value as a hint
-// (D14 no-break requirement — the varchar is never lost, just displayed
-// differently once a real manager link exists).
+// Edit mode: remember who this employee reports to; the modal's shown handler
+// loads the department-scoped options and re-selects this person.
 function populateReportingTo(emp) {
-    $('#reporting_to_id').val(null).trigger('change');
-    $('#reporting_to_legacy_hint').text('');
-    if (emp.reporting_to_id) {
-        $.getJSON(APP_URL + '/api/get_employee', { id: emp.reporting_to_id }, function (res) {
-            if (res && res.success && res.data) {
-                const mgr = res.data;
-                const opt = new Option((mgr.first_name + ' ' + mgr.last_name).trim(), mgr.employee_id, true, true);
-                $('#reporting_to_id').append(opt).trigger('change');
-            }
-        });
-    } else if (emp.reporting_to) {
-        $('#reporting_to_legacy_hint').text('Legacy value (no linked record): ' + emp.reporting_to);
-    }
+    window._editReportingToId = emp.reporting_to_id || '';
+    window._editReportingToName = emp.reporting_to || '';
 }
 
 $(document).ready(function() {
@@ -1259,13 +1295,16 @@ $(document).ready(function() {
     // Modal selects — initialize when modal opens
     $('#addEmployeeModal').on('shown.bs.modal', function() {
         initEmpSelect2($(this), $(this));
-        initReportingToPicker($(this));
         // Narrow designations to the (pre)selected department without clobbering
         // an already-chosen designation (edit mode populates before this fires).
         // With no department yet (fresh add) the list is empty until one is picked.
         var deptVal = $('#department_id').val() || '';
         rebuildDesignationOptions(deptVal, $('#designation_id').val());
         toggleEmpOther('department_id', 'department_other_box', 'department_other', deptVal === 'other');
+        toggleEmpOther('employment_type_id', 'employment_type_other_box', 'employment_type_other', $('#employment_type_id').val() === 'other');
+        // Reporting To — department-scoped (leader/assistant, else dept employees).
+        loadReportingToOptions(deptVal, window._editReportingToId || '', window._editReportingToName || '', $(this));
+        window._editReportingToId = ''; window._editReportingToName = '';
     });
     $('#editEmployeeModal').on('shown.bs.modal', function() {
         initEmpSelect2($(this), $(this));
@@ -1278,6 +1317,8 @@ $(document).ready(function() {
         toggleEmpOther('department_id', 'department_other_box', 'department_other', val === 'other');
         // New department picked → reset designation to that department's list.
         rebuildDesignationOptions(val, '');
+        // …and refresh Reporting To to that department's leadership / employees.
+        loadReportingToOptions(val, '', '', $('#addEmployeeModal'));
     });
     $(document).on('change', '#designation_id', function() {
         toggleEmpOther('designation_id', 'designation_other_box', 'designation_other', $(this).val() === 'other');
@@ -1291,6 +1332,16 @@ $(document).ready(function() {
         $sel.val('');
         if ($sel.hasClass('select2-hidden-accessible')) { $sel.trigger('change.select2'); }
         toggleEmpOther('designation_id', 'designation_other_box', 'designation_other', false);
+    });
+    // Employment Type "Other (specify)" — same self-growing mechanism (no cascade).
+    $(document).on('change', '#employment_type_id', function() {
+        toggleEmpOther('employment_type_id', 'employment_type_other_box', 'employment_type_other', $(this).val() === 'other');
+    });
+    $(document).on('click', '#employment_type_other_back', function() {
+        var $sel = $('#employment_type_id');
+        $sel.val('');
+        if ($sel.hasClass('select2-hidden-accessible')) { $sel.trigger('change.select2'); }
+        toggleEmpOther('employment_type_id', 'employment_type_other_box', 'employment_type_other', false);
     });
 
     // Initialize DataTable with server-side processing
@@ -1833,9 +1884,10 @@ $(document).ready(function() {
             $('#intro_letter_file, #app_letter_file, #other_doc_file').attr('required', false);
             $('.existing-doc-link').remove();
 
-            // Reset Department/Designation "Other (specify)" state
+            // Reset Department/Designation/Employment-Type "Other (specify)" state
             toggleEmpOther('department_id', 'department_other_box', 'department_other', false);
             toggleEmpOther('designation_id', 'designation_other_box', 'designation_other', false);
+            toggleEmpOther('employment_type_id', 'employment_type_other_box', 'employment_type_other', false);
         }
         window.currentStep = 0;
         window.showStep(0);

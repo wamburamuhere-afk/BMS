@@ -1,5 +1,91 @@
 # BMS Changelog
 
+## 2026-07-08 (feat) — Employee Step 2: "Other (specify)" on Employment Type
+
+Employment Type (the only DB-backed Step-2 select still lacking it — Project is
+excluded as it has its own create module) now has the same self-growing
+"➕ Other (specify)…" mechanism as Department/Designation: choosing it reveals a
+text box; the typed value is saved as a new `employment_types` row (idempotent,
+case-insensitive) and used immediately.
+
+- `core/hr_lookups.php` — `findOrCreateEmploymentType()`; `resolveEmployeeDeptDesignation()`
+  now also resolves the `employment_type_id === 'other'` sentinel from
+  `employment_type_other`. (add_employee/update_employee already call the resolver,
+  so both create and edit are covered.)
+- `app/bms/pos/employees.php` — Employment Type select gains the "Other" option +
+  text input + back button; change/back/reset wiring mirrors Department/Designation.
+- `tests/test_employee_dept_designation_other_cli.php` — extended with employment-type
+  find-or-create, resolve, empty-rejection + markup guard (23/23 pass).
+
+Note: Hourly Rate left unchanged (per request); Payment Frequency already has an
+"Other (Manual Entry)" free-text option.
+
+## 2026-07-08 (ux) — Reporting To: Select2 with Leader/Assistant role badges
+
+- Reporting To is now a searchable **Select2** in every state (empty, leadership,
+  all-employees), replacing any plain-select fallback.
+- When a department has leadership, each option/selection shows a coloured **role
+  badge** — blue **Leader**, purple **Assistant Leader** — so it's unmistakable who
+  is who. `api/get_reporting_to_options.php` returns a `role` per option; the
+  picker renders it via Select2 `templateResult`/`templateSelection`.
+- Test extended to assert the role tagging (14/14 pass).
+
+## 2026-07-08 (fix) — Department leadership: apply immediately + clear seed leaders
+
+Follow-up to the leadership feature after testing feedback — two real defects in
+the Reporting To picker:
+
+1. **Phantom leader.** `departments.manager_id` carried pre-feature seed values
+   (dept N → employee N) that nothing else in the app reads, so every department
+   looked "led" even though none had been assigned. New migration
+   `2026_07_08_clear_seed_department_leaders.php` NULLs `manager_id` /
+   `assistant_manager_id` for all departments (criteria-based, idempotent) so an
+   unassigned department correctly falls back to "all employees of that dept".
+2. **Changed leader didn't appear.** Leadership went through pending→approve, so a
+   just-assigned leader wasn't written until approval. `api/add_lifecycle_event.php`
+   now applies a `leadership` event **immediately** (writes the department + marks
+   the event approved in the same transaction) — it still shows in HR Actions as a
+   record, but takes effect at once. Modal copy updated to "Applied immediately".
+3. **Cache-busting** added to the Reporting-To and department-leadership fetches so
+   the browser never serves a stale list after a change.
+
+`tests/test_department_leadership_cli.php` updated for the immediate model
+(12/12 pass); existing HR lifecycle suites still green (40 / 28 / 31).
+
+## 2026-07-08 (feat) — Department leadership (leader + assistant) via HR Actions; department-scoped Reporting To
+
+Every department can now have ONE leader and ONE assistant leader (a person may
+lead several departments). Leadership is assigned through a new **"Department
+Leadership"** HR Action — pick the department, see its current leadership
+(pre-filled), set/transfer the leader and assistant — and, like every HR Action,
+it applies on **approval**. The employee form's **Reporting To** is now scoped to
+the chosen department: its leader/assistant if leadership is set, otherwise all
+employees of that department.
+
+- `migrations/2026_07_08_department_leadership.php` — **new.** Adds
+  `departments.assistant_manager_id`, extends `employee_lifecycle_events.event_type`
+  enum with `leadership`, adds `employee_lifecycle_events.leadership_assistant_id`.
+  Additive + idempotent.
+- `core/lifecycle_effects.php` — on approval of a `leadership` event, writes
+  `manager_id` (leader = `employee_id`) + `assistant_manager_id` to the target
+  `new_department_id` (transfer-by-replacement); stamps `effect_applied_at`.
+- `api/add_lifecycle_event.php` — accepts `leadership`; validates department +
+  optional assistant (must differ from leader); stores `leadership_assistant_id`.
+- `api/get_lifecycle_events.php` — joins the assistant's name for the list view.
+- `api/get_department_leadership.php` — **new.** Current leader/assistant of a
+  department (modal prefill + info).
+- `api/get_reporting_to_options.php` — **new.** Department-scoped Reporting-To
+  candidates: `leadership` mode (leader+assistant) or `all` mode (dept employees).
+- `app/bms/pos/includes/lifecycle_modal.php` — "Department Leadership" action type
+  + field group (department, assistant picker, current-leadership box); the top
+  Employee picker doubles as the Leader; prefill/auto-title on department change.
+- `app/bms/pos/hr_actions.php` — leadership filter option, badge, change summary.
+- `app/bms/pos/employees.php` — Reporting To rebuilt as a department-scoped select
+  (replaces the free cross-employee AJAX search); reloads on department change.
+- `tests/test_department_leadership_cli.php` — **new.** 13 assertions end-to-end
+  (create→approve→department updated, both Reporting-To modes, leadership read).
+  All pass; existing HR lifecycle suites (40/28/31/31) still green.
+
 ## 2026-07-08 (feat) — Employee wizard Step 2: Department→Designation cascade + "Other (specify)"
 
 Improves the Add/Edit Employee wizard's **Step 2 (Employment)**. The Designation
