@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-07-08 (feat) — Employee wizard Step 2: Department→Designation cascade + "Other (specify)"
+
+Improves the Add/Edit Employee wizard's **Step 2 (Employment)**. The Designation
+dropdown now filters to the chosen Department, and both Department and Designation
+gained an **"➕ Other (specify)…"** option that saves a typed-in value as a new
+record (mirroring the Customers' Customer-Type mechanism, but on the relational
+`departments`/`designations` tables).
+
+- `core/hr_lookups.php` — **new.** `findOrCreateDepartment()`, `findOrCreateDesignation()`
+  (idempotent, case-insensitive; a new designation is linked under its department),
+  and `resolveEmployeeDeptDesignation()` which swaps the posted `'other'` sentinel
+  for a real FK id from the `*_other` text.
+- `app/bms/pos/employees.php` — Step 2 Department/Designation selects now render an
+  "Other (specify)" option + a hidden text input with a back button; added
+  `rebuildDesignationOptions()` (client-side cascade off an embedded designation
+  list) and `toggleEmpOther()`; wired change/back handlers and reset logic. Because
+  Edit reuses this same wizard, both create and edit are covered.
+- `api/add_employee.php`, `api/update_employee.php` — require the helper and call
+  `resolveEmployeeDeptDesignation()` inside the transaction before insert/update.
+- `tests/test_employee_dept_designation_other_cli.php` — **new.** 17 assertions:
+  find-or-create + idempotency + department linkage, sentinel resolution,
+  existing-id passthrough, empty-text rejection, and frontend source guards. All pass.
+
 ## 2026-07-07 (chore) — One-time targeted payroll fresh reset (5 named companies)
 
 Resets the payroll side to zero so five companies can start fresh, then verify

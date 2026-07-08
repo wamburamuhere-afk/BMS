@@ -4,6 +4,7 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../core/actor_account.php';
 require_once __DIR__ . '/../core/code_generator.php';
+require_once __DIR__ . '/../core/hr_lookups.php';
 
 header('Content-Type: application/json');
 
@@ -35,6 +36,10 @@ try {
     }
 
     $pdo->beginTransaction();
+
+    // Resolve "Other (specify)" Department/Designation: create the row from the
+    // typed name (idempotent) and swap the 'other' sentinel for the real FK id.
+    resolveEmployeeDeptDesignation($pdo, $_POST, (int)$_SESSION['user_id']);
 
     // Employee number follows the company format. If it's blank or the page's
     // suggested "EMP-###" / already-prefixed default, allocate the next sequential

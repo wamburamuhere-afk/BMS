@@ -630,16 +630,26 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                         <?php foreach ($departments as $dept): ?>
                                         <option value="<?= $dept['department_id'] ?>"><?= safe_output($dept['department_name']) ?></option>
                                         <?php endforeach; ?>
+                                        <option value="other">➕ Other (specify)…</option>
                                     </select>
+                                    <div id="department_other_box" class="input-group mt-2 d-none">
+                                        <input type="text" class="form-control" id="department_other" name="department_other" placeholder="Type new department — it will be saved">
+                                        <button type="button" class="btn btn-outline-secondary" id="department_other_back" title="Back to list"><i class="bi bi-arrow-left"></i></button>
+                                    </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="designation_id" class="form-label">Designation <span class="text-danger">*</span></label>
                                     <select class="form-select select2-static" id="designation_id" name="designation_id" required>
                                         <option value="">Select Designation</option>
                                         <?php foreach ($designations as $designation): ?>
-                                        <option value="<?= $designation['designation_id'] ?>"><?= safe_output($designation['designation_name']) ?></option>
+                                        <option value="<?= $designation['designation_id'] ?>" data-department-id="<?= $designation['department_id'] ?>"><?= safe_output($designation['designation_name']) ?></option>
                                         <?php endforeach; ?>
+                                        <option value="other">➕ Other (specify)…</option>
                                     </select>
+                                    <div id="designation_other_box" class="input-group mt-2 d-none">
+                                        <input type="text" class="form-control" id="designation_other" name="designation_other" placeholder="Type new designation — it will be saved">
+                                        <button type="button" class="btn btn-outline-secondary" id="designation_other_back" title="Back to list"><i class="bi bi-arrow-left"></i></button>
+                                    </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="employment_type_id" class="form-label">Employment Type <span class="text-danger">*</span></label>
@@ -1137,6 +1147,66 @@ function initEmpSelect2(context, dropdownParent) {
     });
 }
 
+// --- Department → Designation cascade + "Other (specify)" (Step 2) ---------
+// Master list of designations (id, name, department_id) so the Designation
+// dropdown can be narrowed to the chosen Department without a round-trip.
+window.EMP_DESIGNATIONS = <?= json_encode(array_map(function ($d) {
+    return [
+        'id'   => (int)$d['designation_id'],
+        'name' => $d['designation_name'],
+        'dept' => $d['department_id'] !== null ? (int)$d['department_id'] : null,
+    ];
+}, $designations), JSON_UNESCAPED_UNICODE) ?>;
+
+// Rebuild the Designation <select> to only those under $departmentId, keeping
+// the current selection if it still belongs. Re-inits Select2 on the modal.
+function rebuildDesignationOptions(departmentId, keepValue) {
+    var $sel = $('#designation_id');
+    var current = (keepValue !== undefined) ? String(keepValue) : String($sel.val() || '');
+    var isOther = String(departmentId) === 'other';
+    var deptNum = parseInt(departmentId, 10);
+
+    var html = '<option value="">Select Designation</option>';
+    var currentStillValid = false;
+    if (!isOther && !isNaN(deptNum)) {
+        window.EMP_DESIGNATIONS.forEach(function (d) {
+            if (d.dept === deptNum) {
+                var sel = (String(d.id) === current) ? ' selected' : '';
+                if (sel) currentStillValid = true;
+                html += '<option value="' + d.id + '" data-department-id="' + d.dept + '"' + sel + '>' +
+                        $('<div>').text(d.name).html() + '</option>';
+            }
+        });
+    }
+    html += '<option value="other">➕ Other (specify)…</option>';
+    if (current === 'other') { html = html.replace('value="other">', 'value="other" selected>'); }
+
+    if ($sel.hasClass('select2-hidden-accessible')) { $sel.select2('destroy'); }
+    $sel.html(html);
+    if (!currentStillValid && current !== 'other') { $sel.val(''); }
+
+    var $modal = $sel.closest('.modal');
+    $sel.select2({ theme: 'bootstrap-5', width: '100%', allowClear: true,
+                   placeholder: 'Select Designation', dropdownParent: $modal.length ? $modal : undefined });
+    // If Department is "Other" (brand-new), there are no designations to pick —
+    // drop straight into the Designation "Other" text box.
+    toggleEmpOther('designation_id', 'designation_other_box', 'designation_other', $sel.val() === 'other');
+}
+
+// Swap a Select2 dropdown for its free-text "Other" input (and back).
+function toggleEmpOther(selectId, boxId, inputId, isOther) {
+    var $sel = $('#' + selectId), $box = $('#' + boxId), $input = $('#' + inputId);
+    if (isOther) {
+        $sel.addClass('d-none').next('.select2-container').addClass('d-none');
+        $box.removeClass('d-none');
+        $input.attr('required', true).trigger('focus');
+    } else {
+        $sel.removeClass('d-none').next('.select2-container').removeClass('d-none');
+        $box.addClass('d-none');
+        $input.attr('required', false).val('').removeClass('is-invalid');
+    }
+}
+
 // Tier 2, Phase 2.4 (D14) — "Reporting To" Select2 AJAX manager picker,
 // replacing the old free-text input. Submits reporting_to_id; the server
 // dual-writes the legacy reporting_to varchar from the chosen manager's name.
@@ -1190,9 +1260,37 @@ $(document).ready(function() {
     $('#addEmployeeModal').on('shown.bs.modal', function() {
         initEmpSelect2($(this), $(this));
         initReportingToPicker($(this));
+        // Narrow designations to the (pre)selected department without clobbering
+        // an already-chosen designation (edit mode populates before this fires).
+        // With no department yet (fresh add) the list is empty until one is picked.
+        var deptVal = $('#department_id').val() || '';
+        rebuildDesignationOptions(deptVal, $('#designation_id').val());
+        toggleEmpOther('department_id', 'department_other_box', 'department_other', deptVal === 'other');
     });
     $('#editEmployeeModal').on('shown.bs.modal', function() {
         initEmpSelect2($(this), $(this));
+    });
+
+    // Department → Designation cascade + "Other (specify)" wiring (delegated so
+    // it survives the Designation select being rebuilt/re-init'd by Select2).
+    $(document).on('change', '#department_id', function() {
+        var val = $(this).val();
+        toggleEmpOther('department_id', 'department_other_box', 'department_other', val === 'other');
+        // New department picked → reset designation to that department's list.
+        rebuildDesignationOptions(val, '');
+    });
+    $(document).on('change', '#designation_id', function() {
+        toggleEmpOther('designation_id', 'designation_other_box', 'designation_other', $(this).val() === 'other');
+    });
+    $(document).on('click', '#department_other_back', function() {
+        toggleEmpOther('department_id', 'department_other_box', 'department_other', false);
+        $('#department_id').val('').trigger('change');
+    });
+    $(document).on('click', '#designation_other_back', function() {
+        var $sel = $('#designation_id');
+        $sel.val('');
+        if ($sel.hasClass('select2-hidden-accessible')) { $sel.trigger('change.select2'); }
+        toggleEmpOther('designation_id', 'designation_other_box', 'designation_other', false);
     });
 
     // Initialize DataTable with server-side processing
@@ -1734,6 +1832,10 @@ $(document).ready(function() {
             $('#cv_file, #id_file, #certificates_file').attr('required', true);
             $('#intro_letter_file, #app_letter_file, #other_doc_file').attr('required', false);
             $('.existing-doc-link').remove();
+
+            // Reset Department/Designation "Other (specify)" state
+            toggleEmpOther('department_id', 'department_other_box', 'department_other', false);
+            toggleEmpOther('designation_id', 'designation_other_box', 'designation_other', false);
         }
         window.currentStep = 0;
         window.showStep(0);
