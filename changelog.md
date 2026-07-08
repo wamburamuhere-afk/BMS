@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-07-08 (hotfix) — Deploy failure: department-leaders migration ordering
+
+The production deploy failed: the migration runner sorts by filename, so
+`2026_07_08_clear_seed_department_leaders.php` ran BEFORE
+`2026_07_08_department_leadership.php` (which creates `assistant_manager_id`),
+hitting `Unknown column 'assistant_manager_id'` and halting the deploy at the
+first host. Made the clear migration **order-independent**: it now checks which
+leader columns exist (`SHOW COLUMNS`) and only clears those. If it runs first,
+`manager_id` is cleared and the schema migration adds `assistant_manager_id`
+defaulting to NULL — same "no leadership set" end state either way. Verified
+locally with the column both present and absent.
+
 ## 2026-07-08 (feat) — Employee Step 2: "Other (specify)" on Employment Type
 
 Employment Type (the only DB-backed Step-2 select still lacking it — Project is
