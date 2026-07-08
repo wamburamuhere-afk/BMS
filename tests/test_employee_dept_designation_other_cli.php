@@ -23,6 +23,8 @@ function section($t){ echo "\n== $t ==\n"; }
 
 $mkDept = 'ZZ_DEPT_' . substr(md5(uniqid()), 0, 8);
 $mkDesig = 'ZZ_DESIG_' . substr(md5(uniqid()), 0, 8);
+$mkType = 'ZZ_TYPE_' . substr(md5(uniqid()), 0, 8);
+$type2  = 'ZZ_TYPE2_' . substr(md5(uniqid()), 0, 8);
 $createdDeptId = null; $createdDesigId = null;
 
 // ── 1. findOrCreateDepartment: creates + idempotent ──────────────────────
@@ -67,6 +69,23 @@ try {
     no('empty other text should have thrown');
 } catch (Exception $e) { ok('empty other text is rejected'); }
 
+// ── 3b. Employment Type "Other (specify)" ────────────────────────────────
+section('3b. Employment Type find-or-create + resolve');
+$typeId = findOrCreateEmploymentType($pdo, $mkType, 1);
+($typeId > 0) ? ok("created employment type id=$typeId") : no('employment type not created');
+(findOrCreateEmploymentType($pdo, strtoupper($mkType), 1) === $typeId) ? ok('idempotent + case-insensitive') : no('duplicate employment type created');
+$postT = ['employment_type_id' => 'other', 'employment_type_other' => $type2];
+resolveEmployeeDeptDesignation($pdo, $postT, 1);
+(is_numeric($postT['employment_type_id']) && $postT['employment_type_id'] > 0) ? ok('employment_type_id resolved to a real id') : no('employment_type_id not resolved');
+$exists = $pdo->prepare("SELECT COUNT(*) FROM employment_types WHERE type_id = ? AND LOWER(type_name)=LOWER(?)");
+$exists->execute([$postT['employment_type_id'], $type2]);
+((int)$exists->fetchColumn() === 1) ? ok('new employment type row exists') : no('employment type row missing');
+try {
+    $badT = ['employment_type_id' => 'other', 'employment_type_other' => ''];
+    resolveEmployeeDeptDesignation($pdo, $badT, 1);
+    no('empty employment type should have thrown');
+} catch (Exception $e) { ok('empty employment type is rejected'); }
+
 // ── 4. Frontend source guards ────────────────────────────────────────────
 section('4. Frontend markup + JS');
 $src = file_get_contents($root . '/app/bms/pos/employees.php');
@@ -75,12 +94,14 @@ $src = file_get_contents($root . '/app/bms/pos/employees.php');
 (strpos($src, 'data-department-id="') !== false) ? ok('designation options carry data-department-id (cascade)') : no('cascade data attribute missing');
 (strpos($src, 'function rebuildDesignationOptions') !== false) ? ok('rebuildDesignationOptions() present') : no('cascade JS missing');
 (strpos($src, "value=\"other\">➕ Other (specify)") !== false) ? ok('"Other (specify)" option present') : no('Other option markup missing');
+(strpos($src, 'id="employment_type_other"') !== false) ? ok('employment type "Other" input present') : no('employment type Other input missing');
 
 // ── cleanup ──────────────────────────────────────────────────────────────
 section('cleanup');
-$pdo->prepare("DELETE FROM designations WHERE designation_name IN (?, ?)")->execute([$mkDesig, $desig2]);
-$pdo->prepare("DELETE FROM departments  WHERE department_name  IN (?, ?)")->execute([$mkDept, $dept2]);
-echo "  (removed test departments/designations)\n";
+$pdo->prepare("DELETE FROM designations     WHERE designation_name IN (?, ?)")->execute([$mkDesig, $desig2]);
+$pdo->prepare("DELETE FROM departments      WHERE department_name  IN (?, ?)")->execute([$mkDept, $dept2]);
+$pdo->prepare("DELETE FROM employment_types WHERE type_name        IN (?, ?)")->execute([$mkType, $type2]);
+echo "  (removed test departments/designations/employment-types)\n";
 
 echo "\nRESULT: $pass passed, $fail failed\n";
 exit($fail === 0 ? 0 : 1);

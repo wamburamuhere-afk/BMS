@@ -658,7 +658,12 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                         <?php foreach ($employment_types as $type): ?>
                                         <option value="<?= $type['type_id'] ?>"><?= safe_output($type['type_name']) ?></option>
                                         <?php endforeach; ?>
+                                        <option value="other">➕ Other (specify)…</option>
                                     </select>
+                                    <div id="employment_type_other_box" class="input-group mt-2 d-none">
+                                        <input type="text" class="form-control" id="employment_type_other" name="employment_type_other" placeholder="Type new employment type — it will be saved">
+                                        <button type="button" class="btn btn-outline-secondary" id="employment_type_other_back" title="Back to list"><i class="bi bi-arrow-left"></i></button>
+                                    </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="employment_status" class="form-label">Employment Status <span class="text-danger">*</span></label>
@@ -1296,6 +1301,7 @@ $(document).ready(function() {
         var deptVal = $('#department_id').val() || '';
         rebuildDesignationOptions(deptVal, $('#designation_id').val());
         toggleEmpOther('department_id', 'department_other_box', 'department_other', deptVal === 'other');
+        toggleEmpOther('employment_type_id', 'employment_type_other_box', 'employment_type_other', $('#employment_type_id').val() === 'other');
         // Reporting To — department-scoped (leader/assistant, else dept employees).
         loadReportingToOptions(deptVal, window._editReportingToId || '', window._editReportingToName || '', $(this));
         window._editReportingToId = ''; window._editReportingToName = '';
@@ -1326,6 +1332,16 @@ $(document).ready(function() {
         $sel.val('');
         if ($sel.hasClass('select2-hidden-accessible')) { $sel.trigger('change.select2'); }
         toggleEmpOther('designation_id', 'designation_other_box', 'designation_other', false);
+    });
+    // Employment Type "Other (specify)" — same self-growing mechanism (no cascade).
+    $(document).on('change', '#employment_type_id', function() {
+        toggleEmpOther('employment_type_id', 'employment_type_other_box', 'employment_type_other', $(this).val() === 'other');
+    });
+    $(document).on('click', '#employment_type_other_back', function() {
+        var $sel = $('#employment_type_id');
+        $sel.val('');
+        if ($sel.hasClass('select2-hidden-accessible')) { $sel.trigger('change.select2'); }
+        toggleEmpOther('employment_type_id', 'employment_type_other_box', 'employment_type_other', false);
     });
 
     // Initialize DataTable with server-side processing
@@ -1868,9 +1884,10 @@ $(document).ready(function() {
             $('#intro_letter_file, #app_letter_file, #other_doc_file').attr('required', false);
             $('.existing-doc-link').remove();
 
-            // Reset Department/Designation "Other (specify)" state
+            // Reset Department/Designation/Employment-Type "Other (specify)" state
             toggleEmpOther('department_id', 'department_other_box', 'department_other', false);
             toggleEmpOther('designation_id', 'designation_other_box', 'designation_other', false);
+            toggleEmpOther('employment_type_id', 'employment_type_other_box', 'employment_type_other', false);
         }
         window.currentStep = 0;
         window.showStep(0);

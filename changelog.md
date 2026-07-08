@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-07-08 (feat) — Employee Step 2: "Other (specify)" on Employment Type
+
+Employment Type (the only DB-backed Step-2 select still lacking it — Project is
+excluded as it has its own create module) now has the same self-growing
+"➕ Other (specify)…" mechanism as Department/Designation: choosing it reveals a
+text box; the typed value is saved as a new `employment_types` row (idempotent,
+case-insensitive) and used immediately.
+
+- `core/hr_lookups.php` — `findOrCreateEmploymentType()`; `resolveEmployeeDeptDesignation()`
+  now also resolves the `employment_type_id === 'other'` sentinel from
+  `employment_type_other`. (add_employee/update_employee already call the resolver,
+  so both create and edit are covered.)
+- `app/bms/pos/employees.php` — Employment Type select gains the "Other" option +
+  text input + back button; change/back/reset wiring mirrors Department/Designation.
+- `tests/test_employee_dept_designation_other_cli.php` — extended with employment-type
+  find-or-create, resolve, empty-rejection + markup guard (23/23 pass).
+
+Note: Hourly Rate left unchanged (per request); Payment Frequency already has an
+"Other (Manual Entry)" free-text option.
+
 ## 2026-07-08 (ux) — Reporting To: Select2 with Leader/Assistant role badges
 
 - Reporting To is now a searchable **Select2** in every state (empty, leadership,
