@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../core/code_generator.php';
+require_once __DIR__ . '/../core/hr_lookups.php';
 
 header('Content-Type: application/json');
 
@@ -35,6 +36,10 @@ try {
     }
 
     $pdo->beginTransaction();
+
+    // Resolve "Other (specify)" Department/Designation before the update so the
+    // dynamic field loop below writes real FK ids, not the 'other' sentinel.
+    resolveEmployeeDeptDesignation($pdo, $_POST, (int)$_SESSION['user_id']);
 
     // Get old values for logging
     $stmt = $pdo->prepare("SELECT * FROM employees WHERE employee_id = ?");
