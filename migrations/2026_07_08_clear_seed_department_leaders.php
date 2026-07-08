@@ -26,17 +26,30 @@ global $pdo;
 echo "Clearing pre-feature seed department leaders...\n";
 
 try {
-    $stmt = $pdo->query("SELECT COUNT(*) FROM departments
-                         WHERE manager_id IS NOT NULL OR assistant_manager_id IS NOT NULL");
-    $before = (int)$stmt->fetchColumn();
+    // Order-independent: only touch the leader columns that actually exist yet.
+    // If this runs before 2026_07_08_department_leadership.php (filename sorts
+    // "clear…" before "department…"), assistant_manager_id isn't there yet — the
+    // schema migration then adds it defaulting to NULL, so the end state is still
+    // "no leadership set" either way.
+    $hasMgr  = $pdo->query("SHOW COLUMNS FROM departments LIKE 'manager_id'")->rowCount() > 0;
+    $hasAsst = $pdo->query("SHOW COLUMNS FROM departments LIKE 'assistant_manager_id'")->rowCount() > 0;
 
-    if ($before === 0) {
-        echo "  Nothing to clear (no departments carry a leader/assistant).\n";
+    $conds = [];
+    $sets  = [];
+    if ($hasMgr)  { $conds[] = "manager_id IS NOT NULL";           $sets[] = "manager_id = NULL"; }
+    if ($hasAsst) { $conds[] = "assistant_manager_id IS NOT NULL"; $sets[] = "assistant_manager_id = NULL"; }
+
+    if (!$sets) {
+        echo "  No leader columns present yet — nothing to clear.\n";
     } else {
-        $pdo->exec("UPDATE departments
-                    SET manager_id = NULL, assistant_manager_id = NULL
-                    WHERE manager_id IS NOT NULL OR assistant_manager_id IS NOT NULL");
-        echo "  Reset leadership on $before department(s) to NULL.\n";
+        $where  = implode(' OR ', $conds);
+        $before = (int)$pdo->query("SELECT COUNT(*) FROM departments WHERE $where")->fetchColumn();
+        if ($before === 0) {
+            echo "  Nothing to clear (no departments carry a leader/assistant).\n";
+        } else {
+            $pdo->exec("UPDATE departments SET " . implode(', ', $sets) . " WHERE $where");
+            echo "  Reset leadership on $before department(s) to NULL.\n";
+        }
     }
 
     echo "Done.\n";
