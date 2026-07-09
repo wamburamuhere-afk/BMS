@@ -34,13 +34,18 @@ $stmt = $pdo->prepare("
         des.designation_name as designation,
         d.department_name,
         u1.username as applied_by_name,
-        u2.username as approved_by_name
+        u2.username as approved_by_name,
+        lt.type_name AS official_type
     FROM leaves l
     LEFT JOIN employees e ON l.employee_id = e.employee_id
     LEFT JOIN departments d ON e.department_id = d.department_id
     LEFT JOIN designations des ON e.designation_id = des.designation_id
     LEFT JOIN users u1 ON l.applied_by = u1.user_id
     LEFT JOIN users u2 ON l.approved_by = u2.user_id
+    -- Resolve the type through the FK. Printing the raw ENUM showed 'Other' for
+    -- any type without an ENUM member (e.g. Compassionate Leave), and an empty
+    -- string for the legacy rows whose ENUM was coerced to ''.
+    LEFT JOIN leave_types lt ON lt.type_id = l.leave_type_id
     WHERE l.leave_id = ?
 ");
 $stmt->execute([$leave_id]);
@@ -176,7 +181,7 @@ $company_logo = $settings['company_logo'] ?? '';
         <div class="grid">
             <div class="field">
                 <div class="label">Leave Category</div>
-                <div class="value"><?= ucfirst($leave['leave_type']) ?></div>
+                <div class="value"><?= safe_output($leave['official_type'] ?? '', '—') ?></div>
             </div>
             <div class="field">
                 <div class="label">Total Duration</div>

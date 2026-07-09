@@ -39,9 +39,14 @@ try {
 
     $days = (int)((strtotime($end) - strtotime($start)) / 86400) + 1;
 
-    $pdo->prepare("INSERT INTO leaves (employee_id, leave_type, start_date, end_date, total_days, days_count, reason, status, created_by, applied_by, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, NOW())")
-        ->execute([$eid, $leave_type, $start, $end, $days, $days, $reason, $_SESSION['user_id'], $_SESSION['user_id']]);
+    // Carry the leave_types FK alongside the legacy ENUM, or the row shows "—"
+    // on the leaves list and the detail page.
+    require_once __DIR__ . '/../core/leave_rules.php';
+    $leave_type_id = leaveTypeIdForEnum($pdo, $leave_type);
+
+    $pdo->prepare("INSERT INTO leaves (employee_id, leave_type_id, leave_type, start_date, end_date, total_days, days_count, reason, status, created_by, applied_by, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, NOW())")
+        ->execute([$eid, $leave_type_id, $leave_type, $start, $end, $days, $days, $reason, $_SESSION['user_id'], $_SESSION['user_id']]);
     $leave_id = (int)$pdo->lastInsertId();
 
     logActivity($pdo, $_SESSION['user_id'], 'Apply for leave (ESS)', "self-service $leave_type leave for employee #$eid ($days day(s))");

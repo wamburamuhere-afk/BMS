@@ -5,6 +5,7 @@ ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/debug_leave.log');
 
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/leave_rules.php';
 
 ob_clean();
 header('Content-Type: application/json');
@@ -28,7 +29,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
-    $required_fields = ['employee_id', 'leave_type', 'start_date', 'end_date', 'total_days', 'reason'];
+    // total_days is no longer required from the client — it is computed server-side
+    // from the dates and the half-day selection.
+    $required_fields = ['employee_id', 'leave_type_id', 'start_date', 'end_date', 'reason'];
     foreach ($required_fields as $field) {
         if (empty($_POST[$field])) {
             throw new Exception("Field '$field' is required.");
@@ -42,39 +45,34 @@ try {
         assertScopeForEmployee($employee_id);
     }
 
-    $leave_type_input = trim($_POST['leave_type']);
     $start_date = trim($_POST['start_date']);
-    $end_date = trim($_POST['end_date']);
-    $total_days = floatval($_POST['total_days']);
-    $reason = trim($_POST['reason']);
-    $notes = trim($_POST['notes'] ?? '');
-    $contact_during_leave = trim($_POST['contact_during_leave'] ?? '');
+    $end_date   = trim($_POST['end_date']);
+    $reason     = trim($_POST['reason']);
+    $contact_during_leave = trim($_POST['contact_during_leave'] ?? '') ?: null;
     $handover_to = !empty($_POST['handover_to']) ? intval($_POST['handover_to']) : null;
-    $half_day = trim($_POST['half_day'] ?? '');
-    $is_paid = isset($_POST['is_paid']) ? intval($_POST['is_paid']) : 1;
 
-    // Map leave_type to DB ENUM values
-    $type_map = [
-        'Annual Leave' => 'annual',
-        'Sick Leave' => 'sick',
-        'Maternity Leave' => 'maternity',
-        'Paternity Leave' => 'paternity',
-        'Study Leave' => 'study',
-        'Unpaid Leave' => 'unpaid',
-        'Compassionate Leave' => 'other',
-        'Emergency Leave' => 'other',
-        'Other' => 'other'
-    ];
-    
-    $leave_type = isset($type_map[$leave_type_input]) ? $type_map[$leave_type_input] : $leave_type_input;
-    // Final check against enum keys
-    $valid_enums = ['annual', 'sick', 'maternity', 'paternity', 'study', 'unpaid', 'other'];
-    if (!in_array($leave_type, $valid_enums)) {
-        // Fallback: lowercase first word
-        $leave_type = strtolower(explode(' ', $leave_type_input)[0]);
-        if (!in_array($leave_type, $valid_enums)) {
-            $leave_type = 'other';
-        }
+    // The leave type is a real FK now. The legacy ENUM is dual-written for the
+    // readers still on it (leave_reports, export_leaves, project_view); it is
+    // dropped once those are migrated.
+    $type       = leaveTypeForApply($pdo, $_POST['leave_type_id'] ?? null);
+    $leave_type = legacyLeaveTypeEnum($type);
+
+    // Paid/unpaid is a property of the TYPE, not a choice on the form. Snapshot it
+    // so re-classifying the type later never rewrites this leave's history.
+    $is_paid = (int)$type['is_paid'];
+
+    $hd          = normaliseHalfDay($_POST);
+    $half_day    = $hd['half_day'];
+    $leave_hours = $hd['leave_hours'];
+
+    // Days are computed server-side and checked against the type's limits, which
+    // used to be a client-side hint only.
+    $total_days = leaveDaysFor($start_date, $end_date, $half_day, $leave_hours);
+    assertLeaveWithinTypeLimits($pdo, $type, (int)$employee_id, $start_date, $total_days);
+
+    if ((int)$type['requires_document'] === 1
+        && (!isset($_FILES['document']) || $_FILES['document']['error'] !== UPLOAD_ERR_OK)) {
+        throw new Exception("{$type['type_name']} requires a supporting document.");
     }
 
     // Generate reference number: LEV-Year-RandomString
@@ -97,24 +95,38 @@ try {
 
     $pdo->beginTransaction();
 
+    // `notes` is no longer collected (the Additional Notes field was removed) and
+    // is left at its column default rather than written as an empty string.
+    // half_day / leave_hours / is_paid / contact_during_leave / handover_to were
+    // all read from $_POST before and silently dropped — they are stored now.
     $query = "INSERT INTO leaves (
-        employee_id, leave_type, start_date, end_date, 
-        total_days, days_count, reason, notes, status, created_by, applied_by, created_at
+        employee_id, leave_type_id, leave_type, start_date, end_date,
+        total_days, days_count, half_day, leave_hours, is_paid,
+        reason, contact_during_leave, handover_to, document_path,
+        status, created_by, applied_by, created_at
     ) VALUES (
-        ?, ?, ?, ?, 
-        ?, ?, ?, ?, 'pending', ?, ?, NOW()
+        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?,
+        'pending', ?, ?, NOW()
     )";
 
     $stmt = $pdo->prepare($query);
     $stmt->execute([
         $employee_id,
+        (int)$type['type_id'],
         $leave_type,
         $start_date,
         $end_date,
         $total_days,
         $total_days,
+        $half_day,
+        $leave_hours,
+        $is_paid,
         $reason,
-        $notes,
+        $contact_during_leave,
+        $handover_to,
+        $document_path,
         $_SESSION['user_id'],
         $_SESSION['user_id']
     ]);
