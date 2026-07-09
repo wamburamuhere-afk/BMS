@@ -765,7 +765,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                         data-requires-doc="<?= (int)$type['requires_document'] ?>"
                                         data-is-paid="<?= (int)$type['is_paid'] ?>">
                                     <?= safe_output($type['type_name']) ?>
-                                    (Max: <?= (int)$type['max_days_per_year'] ?> days/year)
+                                    (Max: <?= (int)$type['max_days_per_year'] ?> days/year, <?= (int)$type['max_consecutive_days'] ?> consecutive)
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -792,18 +792,11 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-4 mb-3">
                             <label for="apply_half_day" class="form-label">Half Day</label>
-                            <select class="form-select" id="apply_half_day" name="half_day" onchange="toggleLeaveHours('apply'); calculateDays();">
+                            <select class="form-select" id="apply_half_day" name="half_day" onchange="calculateDays();">
                                 <option value="none">No</option>
                                 <option value="first_half">First Half</option>
                                 <option value="second_half">Second Half</option>
-                                <option value="other">➕ Other (specify)…</option>
                             </select>
-                        </div>
-                        <div class="col-md-4 mb-3 d-none" id="apply_leave_hours_div">
-                            <label for="apply_leave_hours" class="form-label">Hours of Leave <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" id="apply_leave_hours" name="leave_hours"
-                                   step="0.5" min="0.5" max="<?= WORKING_DAY_HOURS ?>" placeholder="e.g. 3.5">
-                            <small class="text-muted">Less than a full day (max <?= WORKING_DAY_HOURS ?> hours).</small>
                         </div>
                         <div class="col-md-12 mb-3">
                             <label for="apply_reason" class="form-label">Reason for Leave <span class="text-danger">*</span></label>
@@ -950,7 +943,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                         data-requires-doc="<?= (int)$type['requires_document'] ?>"
                                         data-is-paid="<?= (int)$type['is_paid'] ?>">
                                     <?= safe_output($type['type_name']) ?>
-                                    (Max: <?= (int)$type['max_days_per_year'] ?> days/year)
+                                    (Max: <?= (int)$type['max_days_per_year'] ?> days/year, <?= (int)$type['max_consecutive_days'] ?> consecutive)
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -977,18 +970,11 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-4 mb-3">
                             <label for="edit_half_day" class="form-label">Half Day</label>
-                            <select class="form-select" id="edit_half_day" name="half_day" onchange="toggleLeaveHours('edit'); calculateDays();">
+                            <select class="form-select" id="edit_half_day" name="half_day" onchange="calculateDays();">
                                 <option value="none">No</option>
                                 <option value="first_half">First Half</option>
                                 <option value="second_half">Second Half</option>
-                                <option value="other">➕ Other (specify)…</option>
                             </select>
-                        </div>
-                        <div class="col-md-4 mb-3 d-none" id="edit_leave_hours_div">
-                            <label for="edit_leave_hours" class="form-label">Hours of Leave <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" id="edit_leave_hours" name="leave_hours"
-                                   step="0.5" min="0.5" max="<?= WORKING_DAY_HOURS ?>" placeholder="e.g. 3.5">
-                            <small class="text-muted">Less than a full day (max <?= WORKING_DAY_HOURS ?> hours).</small>
                         </div>
                         <div class="col-12 mb-3">
                             <label for="edit_reason" class="form-label">Reason for Leave <span class="text-danger">*</span></label>
@@ -1307,22 +1293,6 @@ function updateLeaveTypeInfo(prefix) {
     if (prefix === 'apply') updateLeaveBalance();
 }
 
-// Half Day → "Other (specify)" reveals the hours input, mirroring the
-// swap-in-place "Other" pattern used elsewhere in the HR forms.
-function toggleLeaveHours(prefix) {
-    const val = $('#' + prefix + '_half_day').val();
-    const $div = $('#' + prefix + '_leave_hours_div');
-    const $inp = $('#' + prefix + '_leave_hours');
-
-    if (val === 'other') {
-        $div.removeClass('d-none');
-        $inp.attr('required', true);
-    } else {
-        $div.addClass('d-none');
-        $inp.attr('required', false).val('').removeClass('is-invalid');
-    }
-}
-
 function clearFilters() {
     window.location.href = 'leaves.php';
 }
@@ -1442,12 +1412,10 @@ function bulkExportApplications() {
     document.body.removeChild(form);
 }
 
-const WORKING_DAY_HOURS = <?= (int)WORKING_DAY_HOURS ?>;
-
 // Days consumed, mirroring core/leave_rules.php::leaveDaysFor() so the figure the
 // user sees matches the one the server stores. 'none' is a real value now, so it
 // must be compared explicitly — a truthy test would dock half a day from every leave.
-function leaveDaysFor(startDate, endDate, halfDay, leaveHours) {
+function leaveDaysFor(startDate, endDate, halfDay) {
     const start = new Date(startDate);
     const end   = new Date(endDate);
     if (end < start) return null;
@@ -1457,11 +1425,6 @@ function leaveDaysFor(startDate, endDate, halfDay, leaveHours) {
     if (halfDay === 'first_half' || halfDay === 'second_half') {
         return Math.max(0.5, diffDays - 0.5);
     }
-    if (halfDay === 'other') {
-        const h = parseFloat(leaveHours);
-        if (!h || h <= 0) return diffDays - 1;
-        return Math.round(((diffDays - 1) + (h / WORKING_DAY_HOURS)) * 100) / 100;
-    }
     return diffDays;
 }
 
@@ -1470,7 +1433,7 @@ function calculateDays() {
     const endDate = $('#apply_end_date').val();
 
     if (startDate && endDate) {
-        const totalDays = leaveDaysFor(startDate, endDate, $('#apply_half_day').val(), $('#apply_leave_hours').val());
+        const totalDays = leaveDaysFor(startDate, endDate, $('#apply_half_day').val());
         if (totalDays === null) {
             Swal.fire({
                 icon: 'warning',
@@ -1490,7 +1453,7 @@ function calculateDays() {
     const editStart = $('#edit_start_date').val();
     const editEnd = $('#edit_end_date').val();
     if (editStart && editEnd) {
-        const d = leaveDaysFor(editStart, editEnd, $('#edit_half_day').val(), $('#edit_leave_hours').val());
+        const d = leaveDaysFor(editStart, editEnd, $('#edit_half_day').val());
         $('#edit_total_days').val(d === null ? 0 : d);
     }
 }
@@ -1613,8 +1576,6 @@ function editLeave(leaveId) {
                 $('#edit_end_date').val(response.data.end_date);
                 $('#edit_total_days').val(response.data.total_days);
                 $('#edit_half_day').val(response.data.half_day || 'none');
-                $('#edit_leave_hours').val(response.data.leave_hours || '');
-                toggleLeaveHours('edit');
                 $('#edit_reason').val(response.data.reason);
                 $('#edit_contact_during_leave').val(response.data.contact_during_leave || '');
                 $('#edit_handover_to').val(response.data.handover_to || '').trigger('change');

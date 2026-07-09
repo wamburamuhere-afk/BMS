@@ -236,6 +236,7 @@ require_once 'header.php';
     }
 
     /* ── Print: same shape as the other print views ── */
+    @page { size: auto; margin: 15mm; }
     @media print {
         * {
             -webkit-print-color-adjust: exact !important;
@@ -245,7 +246,14 @@ require_once 'header.php';
 
         .navbar, .sidebar, .btn, .btn-group, .dropdown, .modal, footer { display: none !important; }
 
-        .leave-dashboard { background: #fff !important; padding: 0 !important; }
+        .leave-dashboard {
+            background: #fff !important;
+            padding: 0 !important;
+            /* Screen-only hero sizing — min-height:100vh reserved a full blank
+               page before any content, pushing the whole card to page 2. */
+            min-height: 0 !important;
+            margin: 0 !important;
+        }
         .premium-card {
             box-shadow: none !important;
             border: 1px solid #dee2e6 !important;
@@ -254,6 +262,10 @@ require_once 'header.php';
         }
         .detail-header { background: #fff !important; color: #000 !important; }
         .stat-mini-card { border: 1px solid #dee2e6 !important; box-shadow: none !important; }
+        /* The -3rem overlap onto the header is a screen-only hero effect; with
+           .leave-dashboard's own offset gone above, keeping it would pull the
+           stat cards up over the header text instead. */
+        .stats-container { margin-top: 1rem !important; }
     }
 </style>
 <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
@@ -373,9 +385,6 @@ require_once 'header.php';
                             switch ($leave['half_day'] ?? 'none') {
                                 case 'first_half':  echo 'First Half'; break;
                                 case 'second_half': echo 'Second Half'; break;
-                                case 'other':
-                                    echo safe_output(rtrim(rtrim(number_format((float)$leave['leave_hours'], 2), '0'), '.')) . ' hour(s)';
-                                    break;
                                 default: echo '<span class="text-muted">No</span>';
                             }
                             ?>

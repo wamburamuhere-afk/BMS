@@ -1307,6 +1307,9 @@ $(document).ready(function() {
         $el.select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: placeholder });
     });
 
+    // Designation filter narrows to whatever Department filter is selected.
+    $('#departmentFilter').on('change', rebuildDesignationFilterOptions);
+
     // Modal selects — initialize when modal opens
     $('#addEmployeeModal').on('shown.bs.modal', function() {
         initEmpSelect2($(this), $(this));
@@ -1999,6 +2002,30 @@ $(document).ready(function() {
     });
 });
 
+// Narrow the Designation *filter* to the selected Department filter — mirrors
+// rebuildDesignationOptions() used on the Add/Edit form, against the same
+// window.EMP_DESIGNATIONS dataset (no round-trip needed).
+function rebuildDesignationFilterOptions() {
+    var $sel = $('#designationFilter');
+    var deptNum = parseInt($('#departmentFilter').val(), 10);
+    var current = String($sel.val() || '');
+
+    var html = '<option value="">All Designations</option>';
+    var currentStillValid = false;
+    window.EMP_DESIGNATIONS.forEach(function (d) {
+        if (isNaN(deptNum) || d.dept === deptNum) {
+            var sel = (String(d.id) === current) ? ' selected' : '';
+            if (sel) currentStillValid = true;
+            html += '<option value="' + d.id + '"' + sel + '>' + $('<div>').text(d.name).html() + '</option>';
+        }
+    });
+
+    if ($sel.hasClass('select2-hidden-accessible')) { $sel.select2('destroy'); }
+    $sel.html(html);
+    if (!currentStillValid) { $sel.val(''); }
+    $sel.select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'All Designations' });
+}
+
 function applyFilters() {
     const table = $('#employeesTable').DataTable();
     
@@ -2068,7 +2095,8 @@ function clearFilters() {
     $('#designationFilter').val('');
     $('#employmentTypeFilter').val('');
     $('#searchEmployees').val('');
-    
+    rebuildDesignationFilterOptions(); // department cleared — restore full designation list
+
     const table = $('#employeesTable').DataTable();
     table.search('').columns().search('').draw();
 

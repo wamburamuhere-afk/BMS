@@ -9,8 +9,7 @@
  * client-side hint: the server accepted whatever was posted.
  */
 
-// A standard working day. "Half Day → Other (specify)" accepts fewer hours than
-// this; anything equal to or beyond it is a full day and must be booked as one.
+// A standard working day, used by leaveDaysFor()'s half-day calculations.
 if (!defined('WORKING_DAY_HOURS')) {
     define('WORKING_DAY_HOURS', 8);
 }
@@ -38,43 +37,30 @@ if (!function_exists('leaveTypeForApply')) {
 
 if (!function_exists('normaliseHalfDay')) {
     /**
-     * Validate the Half Day selection and its hours.
+     * Validate the Half Day selection.
      *
      * @return array{half_day:string, leave_hours:?float}
      */
     function normaliseHalfDay(array $post): array
     {
-        $allowed  = ['none', 'first_half', 'second_half', 'other'];
+        $allowed  = ['none', 'first_half', 'second_half'];
         $half_day = $post['half_day'] ?? 'none';
         if ($half_day === '') $half_day = 'none';
         if (!in_array($half_day, $allowed, true)) {
             throw new InvalidArgumentException('Invalid half-day selection.');
         }
 
-        if ($half_day !== 'other') {
-            return ['half_day' => $half_day, 'leave_hours' => null];
-        }
-
-        $hours = filter_var($post['leave_hours'] ?? null, FILTER_VALIDATE_FLOAT);
-        if ($hours === false) {
-            throw new InvalidArgumentException('Please specify how many hours of leave are being taken.');
-        }
-        if ($hours < 0.5) {
-            throw new InvalidArgumentException('Hours of leave must be at least 0.5.');
-        }
-        if ($hours >= WORKING_DAY_HOURS) {
-            throw new InvalidArgumentException(
-                'Hours of leave must be less than a full working day (' . WORKING_DAY_HOURS . ' hours). Book a full day instead.'
-            );
-        }
-        return ['half_day' => 'other', 'leave_hours' => round($hours, 2)];
+        return ['half_day' => $half_day, 'leave_hours' => null];
     }
 }
 
 if (!function_exists('leaveDaysFor')) {
     /**
      * Days actually consumed by this leave, given the half-day selection.
-     * 'other' converts the specified hours into a fraction of a working day.
+     *
+     * @param ?float $leave_hours  Unused — kept in the signature for call-site
+     *                             compatibility (leaves.leave_hours column and its
+     *                             callers still exist, always null now).
      */
     function leaveDaysFor(string $start_date, string $end_date, string $half_day, ?float $leave_hours): float
     {
@@ -87,9 +73,6 @@ if (!function_exists('leaveDaysFor')) {
 
         if ($half_day === 'first_half' || $half_day === 'second_half') {
             return max(0.5, $days - 0.5);
-        }
-        if ($half_day === 'other' && $leave_hours !== null) {
-            return round(($days - 1) + ($leave_hours / WORKING_DAY_HOURS), 2);
         }
         return (float)$days;
     }
