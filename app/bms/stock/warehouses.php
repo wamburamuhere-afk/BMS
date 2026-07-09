@@ -55,6 +55,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = "Warehouse code '{$warehouse_code}' already exists. Please use a different code.";
             }
         }
+        // Hiding the option in the dropdown is not a control — a tampered POST
+        // could still attach the warehouse to a project outside the user's scope.
+        if ($project_id !== null && !userCan('project', (int)$project_id)) {
+            $errors[] = "Access denied: that project is not in your assigned scope.";
+        }
 
         if (empty($errors)) {
             try {
@@ -166,6 +171,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($check_stmt->fetch()) {
                 $errors[] = "Warehouse code '{$warehouse_code}' already exists. Please use a different code.";
             }
+        }
+        // Gate the record being edited: a warehouse on someone else's project is
+        // not editable, even if its id is guessed and POSTed directly.
+        $cur_stmt = $pdo->prepare("SELECT project_id FROM warehouses WHERE warehouse_id = ?");
+        $cur_stmt->execute([$warehouse_id]);
+        $current_project_id = $cur_stmt->fetchColumn();
+        if ($current_project_id !== false && $current_project_id !== null
+            && !userCan('project', (int)$current_project_id)) {
+            $errors[] = "Access denied: this warehouse belongs to a project not in your scope.";
+        }
+        // Gate the project being assigned — hiding the option is not a control.
+        if ($project_id !== null && !userCan('project', (int)$project_id)) {
+            $errors[] = "Access denied: that project is not in your assigned scope.";
         }
 
         if (empty($errors)) {
