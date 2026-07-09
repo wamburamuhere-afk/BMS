@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-07-09 (fix) — Leaves: Handover To / Contact During Leave now save on edit
+
+**`api/update_leave.php`** UPDATE statement never included `handover_to` or
+`contact_during_leave` — the create path (`api/apply_leave.php`) already saved
+both correctly, and `leave_details.php` already displayed them correctly, but
+editing an existing leave silently dropped whatever the user typed/changed in
+those two fields (the SQL simply never touched the columns). Added both to the
+SET clause and bound params, mirroring how `apply_leave.php` reads and
+sanitises them (`contact_during_leave` trimmed-or-null, `handover_to` cast to
+int-or-null). Verified live in a rolled-back transaction: the new UPDATE
+persists `contact_during_leave`/`handover_to` on a throwaway pending leave;
+no data changed.
+
 ## 2026-07-09 (fix) — Leaves: show max consecutive days on the Leave Type picker
 
 **`app/bms/pos/leaves.php`** apply/edit Leave Type `<select>` labels only
