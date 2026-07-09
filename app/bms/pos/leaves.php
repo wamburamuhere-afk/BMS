@@ -864,7 +864,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 <div class="modal fade" id="bulkLeaveModal" tabindex="-1" aria-labelledby="bulkLeaveModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-info text-white">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="bulkLeaveModalLabel">
                     <i class="bi bi-upload"></i> Bulk Leave Import
                 </h5>
@@ -927,11 +927,11 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 <div class="modal fade" id="editLeaveModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="editLeaveModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="editLeaveModalLabel">
                     <i class="bi bi-pencil"></i> Edit Leave Application
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="editLeaveForm">
                 <div class="modal-body">

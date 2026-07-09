@@ -209,6 +209,32 @@ foreach (['api/apply_leave.php', 'api/my_leave_apply.php', 'api/import_leaves.ph
 leaveTypeIdForEnum($pdo, 'annual') === 1 ? ok("leaveTypeIdForEnum('annual') resolves to Annual Leave") : bad('enum→id resolution is wrong');
 leaveTypeIdForEnum($pdo, 'other') === null ? ok("leaveTypeIdForEnum('other') is null (renders as an em dash)") : bad("'other' unexpectedly resolved");
 
+// ── UI standard (.claude/ui-constants.md §UI-1) ───────────────────────────
+head('UI standard — blue scale, no green/amber chrome');
+
+$detailsSrc = @file_get_contents(dirname(__DIR__) . '/app/bms/pos/leave_details.php') ?: '';
+foreach (['#198754' => 'green gradient/accent', '#157347' => 'dark green', '#d1e7dd' => 'green background',
+          'btn-success' => 'green button', 'btn-outline-success' => 'green outline button',
+          'btn-warning' => 'amber button', '#ffc107' => 'amber confirm'] as $needle => $what) {
+    strpos($detailsSrc, $needle) === false
+        ? ok("leave_details.php has no $what")
+        : bad("leave_details.php still uses $what ($needle)");
+}
+
+$leavesSrc = @file_get_contents(dirname(__DIR__) . '/app/bms/pos/leaves.php') ?: '';
+preg_match_all('/modal-header bg-(\w+)/', $leavesSrc, $mh);
+$offStandard = array_values(array_diff(array_unique($mh[1]), ['primary']));
+empty($offStandard)
+    ? ok('every modal header in leaves.php is bg-primary')
+    : bad('off-standard modal header(s): bg-' . implode(', bg-', $offStandard));
+
+// The old print page is still routed; it must resolve the type through the FK,
+// or it prints 'Other' for types with no ENUM member.
+$appSrc = @file_get_contents(dirname(__DIR__) . '/app/bms/pos/leave_application.php') ?: '';
+strpos($appSrc, 'lt.type_id = l.leave_type_id') !== false
+    ? ok('leave_application.php resolves the type through the FK')
+    : bad('leave_application.php still prints the raw ENUM');
+
 // ── Cleanup ───────────────────────────────────────────────────────────────
 head('Cleanup');
 foreach ($cleanupLeaves as $id) $pdo->exec("DELETE FROM leaves WHERE leave_id = $id");

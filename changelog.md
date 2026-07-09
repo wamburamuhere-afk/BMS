@@ -54,12 +54,29 @@ a print-only company header, matching the other print views.
 `leaveTypeIdForEnum()`, or the rows they create would have displayed as "—".
 `duplicate_leave.php` copies all columns and needed no change.
 
+**UI standard + dead-code sweep.** `leave_details.php` was still on a green palette
+(`#198754` gradient, `btn-outline-success` print, `btn-success` approve,
+`btn-warning` cancel, `#d1e7dd` backgrounds) — now the blue scale from
+`.claude/ui-constants.md` §UI-1: white page, `#e7f0ff`/`#b6ccfe` stat cards,
+`btn-primary` approve, `btn-secondary` cancel, red reserved for reject. Two modal
+headers in `leaves.php` (`bg-info`, `bg-warning`) are now `bg-primary`, and the
+edit modal's close button gets `btn-close-white` so it stays visible on blue.
+
+`leave_application.php` — the standalone print page `printExport()` used to open —
+is still routed (`roots.php`) and permission-mapped (`core/permissions.php`), so it
+was **kept, not deleted**, and fixed: it printed the raw ENUM, which showed "Other"
+for any type without an ENUM member and an empty string for the legacy rows. It now
+resolves the type through the FK and renders an em dash when unresolved.
+
 Verified by driving the real endpoints: a Compassionate-type leave (impossible
 before), 3.5-hour leave stored as 0.44 days, yearly and consecutive caps refused,
 an inactive type refused, notes preserved across an edit, and a used type
 deactivated rather than deleted. All probe rows were removed and the database
 restored to 27 leaves / 7 types.
-Tests: `tests/test_leaves_upgrade_cli.php` (44 checks), mutation-verified.
+Tests: `tests/test_leaves_upgrade_cli.php` (53 checks), mutation-verified.
+
+Deferred to its own PR (Phase 6): dropping the `leaves.leave_type` ENUM once
+`api/export_leaves.php` — the last reader — is migrated to `leave_type_id`.
 
 ## 2026-07-09 (feat) — Employee wizard Step 5: drop Bank Branch, allow many named documents
 

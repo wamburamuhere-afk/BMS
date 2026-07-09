@@ -75,14 +75,15 @@ require_once 'header.php';
 
 <style>
     :root {
-        --primary-gradient: linear-gradient(45deg, #198754, #157347);
+        /* Blue scale per .claude/ui-constants.md §UI-1 — primary is #0d6efd. */
+        --primary-gradient: linear-gradient(45deg, #0d6efd, #0a58ca);
         --glass-bg: rgba(255, 255, 255, 0.95);
         --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
         --border-radius: 24px;
     }
 
     .leave-dashboard {
-        background: #d1e7dd;
+        background: #fff;   /* §UI-1: page background is white */
         min-height: 100vh;
         margin: -1.5rem -1.5rem 0; /* Negate container padding */
         padding: 2rem;
@@ -138,11 +139,11 @@ require_once 'header.php';
     }
 
     .stat-mini-card {
-        background: #d1e7dd;
+        background: #e7f0ff;   /* §UI-1: stat card background */
         padding: 1.5rem;
         border-radius: 20px;
         box-shadow: 0 8px 20px rgba(0,0,0,0.05);
-        border: 1px solid rgba(0,0,0,0.02);
+        border: 1px solid #b6ccfe;
         display: flex;
         align-items: center;
         transition: transform 0.3s ease;
@@ -159,9 +160,9 @@ require_once 'header.php';
         justify-content: center;
         font-size: 1.5rem;
         margin-right: 1.25rem;
-        background: #d1e7dd !important;
-        color: #157347 !important;
-        border: 1px solid #157347;
+        background: #e7f0ff !important;
+        color: #0a58ca !important;
+        border: 1px solid #b6ccfe;
     }
 
     .info-section {
@@ -205,7 +206,7 @@ require_once 'header.php';
         background: #ffffff;
         padding: 2rem;
         border-radius: 18px;
-        border-left: 6px solid #198754;
+        border-left: 6px solid #0d6efd;
         font-size: 1.05rem;
         color: #334155;
         line-height: 1.6;
@@ -287,7 +288,7 @@ require_once 'header.php';
                 <p class="lead opacity-75 mb-0">Leave Application Details</p>
                 <div class="mt-4">
                     <span class="badge bg-light text-dark py-2 px-3 rounded-pill fw-bold border">
-                        <i class="bi bi-calendar-range me-2 text-success"></i>
+                        <i class="bi bi-calendar-range me-2 text-primary"></i>
                         <?= date('d M Y', strtotime($leave['start_date'])) ?> — <?= date('d M Y', strtotime($leave['end_date'])) ?>
                     </span>
                 </div>
@@ -435,7 +436,7 @@ require_once 'header.php';
                         <h5 class="section-title">Approval Details</h5>
                         <div class="audit-trail">
                             <div class="d-flex align-items-center mb-2">
-                                <i class="bi bi-shield-check text-success fs-4 me-3"></i>
+                                <i class="bi bi-shield-check text-primary fs-4 me-3"></i>
                                 <div>
                                     <div class="fw-bold"><?= $leave['approved_by_name'] ?></div>
                                     <div class="text-muted small"><?= date('d M Y, H:i', strtotime($leave['updated_at'])) ?></div>
@@ -464,12 +465,12 @@ require_once 'header.php';
                         </a>
                     </div>
                     <div class="d-flex gap-2">
-                        <button onclick="printExport(<?= $leave['leave_id'] ?>)" class="btn btn-outline-success btn-premium">
+                        <button onclick="printExport(<?= $leave['leave_id'] ?>)" class="btn btn-outline-primary btn-premium">
                             <i class="bi bi-printer"></i> PRINT
                         </button>
                         
                         <?php if($leave['status'] == 'pending'): ?>
-                            <button onclick="handleAction('approve', <?= $leave['leave_id'] ?>)" class="btn btn-success btn-premium">
+                            <button onclick="handleAction('approve', <?= $leave['leave_id'] ?>)" class="btn btn-primary btn-premium">
                                 <i class="bi bi-check2-circle"></i> Approve Leave
                             </button>
                             <button onclick="handleAction('reject', <?= $leave['leave_id'] ?>)" class="btn btn-danger btn-premium">
@@ -477,7 +478,7 @@ require_once 'header.php';
                             </button>
                         <?php elseif($leave['status'] == 'approved'): ?>
                             <!-- Only show cancel if the leave hasn't started yet or is ongoing -->
-                            <button onclick="handleAction('cancel', <?= $leave['leave_id'] ?>)" class="btn btn-warning btn-premium">
+                            <button onclick="handleAction('cancel', <?= $leave['leave_id'] ?>)" class="btn btn-secondary btn-premium">
                                 <i class="bi bi-slash-circle"></i> Cancel Leave
                             </button>
                         <?php endif; ?>
@@ -504,15 +505,15 @@ function handleAction(action, id) {
     let title = 'Are you sure?';
     let text = `Do you want to ${action} this leave application?`;
     let icon = 'question';
-    let confirmBtnColor = '#4f46e5';
+    let confirmBtnColor = '#0d6efd';
 
     if(action === 'reject') {
         icon = 'warning';
-        confirmBtnColor = '#dc3545';
+        confirmBtnColor = '#dc3545';   // reject/void stays red per §UI-1
     } else if(action === 'approve') {
-        confirmBtnColor = '#198754';
+        confirmBtnColor = '#0d6efd';
     } else if(action === 'cancel') {
-        confirmBtnColor = '#ffc107';
+        confirmBtnColor = '#6c757d';
     }
 
     Swal.fire({
