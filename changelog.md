@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-07-09 (fix) — POS: Hold Sale no longer falsely reports "No items to hold"
+
+**`app/bms/pos/pos_scripts_new.php::holdSale()`** sends the hold payload as a
+raw JSON body (`contentType: 'application/json'`). PHP only populates
+`$_POST` for form-encoded/multipart bodies, so **`api/pos/hold_sale.php`**'s
+`$_POST['items']` (and every other field it read — `customer_id`,
+`reference`, `subtotal`, `tax`) was always empty/null/0 regardless of what
+was actually sent, not just `items`. `empty($items)` was therefore always
+true, throwing "No items to hold" on every hold attempt no matter the cart
+contents — present since the initial commit, not a regression. Fixed by
+reading the raw body once via `json_decode(file_get_contents('php://input'),
+true)` and extracting all fields from it. Fixing only the reported `items`
+symptom would have left `customer_id`/`subtotal`/`tax` silently wrong on
+every held sale even after the visible error went away — same root cause,
+same fix. Verified with a direct before/after simulation of both parsing
+paths against a realistic payload: old path always yields empty
+items/null/0, new path correctly extracts a 2-item cart, customer_id=5,
+subtotal=4500.
+
 ## 2026-07-09 (fix) — POS: receipt header shows the real company name
 
 **`api/pos/print_receipt.php`** hardcoded `$company_name = "BUSINESS
