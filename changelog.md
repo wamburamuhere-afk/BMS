@@ -23,6 +23,42 @@ NULL/unused now — no schema change needed since nothing ever wrote to them).
 Updated `tests/test_leaves_upgrade_cli.php`'s Half Day section to assert the new
 rejection behavior instead of the old acceptance behavior. All 49 checks pass.
 
+## 2026-07-09 (fix) — Employees: Designation filter now cascades from Department filter
+
+**`app/bms/pos/employees.php`** list-page filters. `#departmentFilter` and
+`#designationFilter` were two independent, statically-rendered `<select>`s —
+picking a department never narrowed the designation options, even though the
+exact same cascade already existed for the Add/Edit employee *form*
+(`window.EMP_DESIGNATIONS` + `rebuildDesignationOptions()`, both already in
+this file). Added `rebuildDesignationFilterOptions()`, bound to
+`#departmentFilter`'s `change` event, which rebuilds `#designationFilter`
+from the same `window.EMP_DESIGNATIONS` dataset (client-side, no new
+endpoint) and re-inits Select2. `clearFilters()` now also calls it so
+clearing the department restores the full designation list instead of
+leaving it narrowed. Verified live: 5 departments / 5 designations, one
+designation per department, confirming the cascade actually narrows 5→1
+rather than being a no-op on this dataset.
+
+## 2026-07-09 (fix) — Employees: project is now genuinely optional on edit
+
+**`api/update_employee.php`** bound `$_POST['project_id']` straight into the
+`UPDATE` params via a generic `isset()`-driven loop. Leaving the Project
+dropdown blank submits `project_id=''`, which `isset()` treats as present, so
+the raw empty string hit the nullable `int` column. On a server with strict
+`sql_mode` this throws `SQLSTATE[HY000]: 1366`; here (non-strict) it silently
+wrote `project_id = 0` instead of `NULL` — worse, since scope filters
+(`scopeFilterSqlNullable`) treat `NULL` as company-wide but `0` matches no
+project, so the employee would silently disappear from every project-scoped
+view. Pulled `project_id` out of the generic loop and gave it explicit
+optional-int handling (mirrors the existing `reporting_to_id` pattern in the
+same file): `''` now coerces to `NULL` before binding, on both the main
+`UPDATE` and the `hrSaveExtraDocuments()` call that previously received the
+same raw value. `api/add_employee.php` already handled this correctly on
+create — edit now matches. Verified against the live employees table (rolled
+back): the old bind path and the new coercion were both exercised directly
+against MySQL 8.4.7 in a transaction, confirmed, then rolled back with no
+data changed.
+
 ## 2026-07-09 (feat) — Leaves: manageable leave types, hourly leave, standalone details page
 
 **The leaves module was structurally disconnected.** `leaves.leave_type` was an
