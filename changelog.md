@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-07-09 (fix) — Leaves: show max consecutive days on the Leave Type picker
+
+**`app/bms/pos/leaves.php`** apply/edit Leave Type `<select>` labels only
+showed `(Max: N days/year)` — the per-request consecutive-day cap
+(`max_consecutive_days`) was already fetched into a `data-max-consecutive`
+attribute but never rendered as visible text, so a user picking start/end
+dates only learned the consecutive limit after being rejected on submit.
+Added it to the label: `(Max: N days/year, M consecutive)`. Server-side
+enforcement of both limits, and the per-employee Days Remaining/Used/Annual
+Limit balance widget, already existed (`core/leave_rules.php
+assertLeaveWithinTypeLimits()`, `api/get_leave_balance.php`) — this was a
+display-only gap, not a missing enforcement one.
+
 ## 2026-07-09 (feat) — Leaves: manageable leave types, hourly leave, standalone details page
 
 **The leaves module was structurally disconnected.** `leaves.leave_type` was an
