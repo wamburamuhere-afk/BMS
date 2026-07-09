@@ -728,7 +728,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="payment_frequency" class="form-label">Payment Frequency</label>
-                                    <select class="form-select select2-static" id="payment_frequency" name="payment_frequency" onchange="togglePaymentFrequencyOther(this.value)">
+                                    <select class="form-select select2-static" id="payment_frequency" name="payment_frequency">
                                         <option value="monthly" selected>Monthly</option>
                                         <option value="biweekly">Bi-Weekly</option>
                                         <option value="weekly">Weekly</option>
@@ -736,8 +736,9 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                         <option value="hourly">Hourly</option>
                                         <option value="other">➕ Other (specify)…</option>
                                     </select>
-                                    <div id="payment_frequency_other_div" class="mt-2 d-none">
-                                        <input type="text" class="form-control" id="payment_frequency_other" name="payment_frequency_other" placeholder="e.g. 10 days, 3 months">
+                                    <div id="payment_frequency_other_box" class="input-group mt-2 d-none">
+                                        <input type="text" class="form-control" id="payment_frequency_other" name="payment_frequency_other" placeholder="e.g. 10 days, 3 months — it will be saved">
+                                        <button type="button" class="btn btn-outline-secondary" id="payment_frequency_other_back" title="Back to list"><i class="bi bi-arrow-left"></i></button>
                                     </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
@@ -1302,6 +1303,7 @@ $(document).ready(function() {
         rebuildDesignationOptions(deptVal, $('#designation_id').val());
         toggleEmpOther('department_id', 'department_other_box', 'department_other', deptVal === 'other');
         toggleEmpOther('employment_type_id', 'employment_type_other_box', 'employment_type_other', $('#employment_type_id').val() === 'other');
+        toggleEmpOther('payment_frequency', 'payment_frequency_other_box', 'payment_frequency_other', $('#payment_frequency').val() === 'other');
         // Reporting To — department-scoped (leader/assistant, else dept employees).
         loadReportingToOptions(deptVal, window._editReportingToId || '', window._editReportingToName || '', $(this));
         window._editReportingToId = ''; window._editReportingToName = '';
@@ -1342,6 +1344,16 @@ $(document).ready(function() {
         $sel.val('');
         if ($sel.hasClass('select2-hidden-accessible')) { $sel.trigger('change.select2'); }
         toggleEmpOther('employment_type_id', 'employment_type_other_box', 'employment_type_other', false);
+    });
+    // Payment Frequency "Other (specify)" — same swap-in-place mechanism.
+    $(document).on('change', '#payment_frequency', function() {
+        toggleEmpOther('payment_frequency', 'payment_frequency_other_box', 'payment_frequency_other', $(this).val() === 'other');
+    });
+    $(document).on('click', '#payment_frequency_other_back', function() {
+        var $sel = $('#payment_frequency');
+        $sel.val('monthly');
+        if ($sel.hasClass('select2-hidden-accessible')) { $sel.trigger('change.select2'); }
+        toggleEmpOther('payment_frequency', 'payment_frequency_other_box', 'payment_frequency_other', false);
     });
 
     // Initialize DataTable with server-side processing
@@ -1565,8 +1577,7 @@ $(document).ready(function() {
         $('#add-employee-message').html('');
         employeeLocationCascade.setValues({ country: 'Tanzania' }); // back to defaults
         $('#addEmployeeForm [type="submit"]').prop('disabled', false).html('<i class="bi bi-check-circle"></i> Save Employee');
-        $('#payment_frequency_other_div').addClass('d-none');
-        $('#payment_frequency_other').val('');
+        toggleEmpOther('payment_frequency', 'payment_frequency_other_box', 'payment_frequency_other', false);
         $('#employeeTabs .nav-link:first').tab('show');
         if ($('#reporting_to_id').hasClass('select2-hidden-accessible')) {
             $('#reporting_to_id').empty().val(null).trigger('change');
@@ -1583,8 +1594,7 @@ $(document).ready(function() {
     $('#editEmployeeModal').on('hidden.bs.modal', function() {
         $('#editEmployeeForm')[0].reset();
         $('#edit-employee-message').html('');
-        $('#payment_frequency_other_div').addClass('d-none');
-        $('#payment_frequency_other').val('');
+        toggleEmpOther('payment_frequency', 'payment_frequency_other_box', 'payment_frequency_other', false);
         $('#editEmployeeForm [type="submit"]').prop('disabled', false).html('<i class="bi bi-check-circle"></i> Update Employee');
 });
 });
@@ -1622,18 +1632,9 @@ $('#importEmployeesModal').on('show.bs.modal', function() {
     });
 });
 
-// Define showStep BEFORE it is used
-window.togglePaymentFrequencyOther = function(val) {
-    const otherDiv = $('#payment_frequency_other_div');
-    const otherInput = $('#payment_frequency_other');
-    if (val === 'other') {
-        otherDiv.removeClass('d-none');
-        otherInput.attr('required', true).focus();
-    } else {
-        otherDiv.addClass('d-none');
-        otherInput.attr('required', false).val('');
-    }
-};
+// Payment Frequency "Other (specify)" now uses the same swap-in-place mechanism
+// as Department/Designation/Employment Type (toggleEmpOther) — the dropdown is
+// replaced by the text input with a back arrow, not a separate box below.
 
 window.toggleDocUpload = function(docType) {
     const mapping = {
@@ -1884,10 +1885,11 @@ $(document).ready(function() {
             $('#intro_letter_file, #app_letter_file, #other_doc_file').attr('required', false);
             $('.existing-doc-link').remove();
 
-            // Reset Department/Designation/Employment-Type "Other (specify)" state
+            // Reset Department/Designation/Employment-Type/Payment-Frequency "Other" state
             toggleEmpOther('department_id', 'department_other_box', 'department_other', false);
             toggleEmpOther('designation_id', 'designation_other_box', 'designation_other', false);
             toggleEmpOther('employment_type_id', 'employment_type_other_box', 'employment_type_other', false);
+            toggleEmpOther('payment_frequency', 'payment_frequency_other_box', 'payment_frequency_other', false);
         }
         window.currentStep = 0;
         window.showStep(0);
@@ -2024,16 +2026,16 @@ function editEmployee(employeeId) {
                 $('#probation_end_date').val(emp.probation_end_date || '');
                 $('#contract_end_date').val(emp.contract_end_date || '');
                 
-                // Handle Payment Frequency (including "Other")
+                // Handle Payment Frequency (including "Other"). The shown.bs.modal
+                // handler runs toggleEmpOther afterwards to swap the dropdown for the
+                // input when the value is a custom (non-standard) frequency.
                 const standardFrequencies = ['monthly', 'biweekly', 'weekly', 'daily', 'hourly'];
                 if (emp.payment_frequency && !standardFrequencies.includes(emp.payment_frequency)) {
                     $('#payment_frequency').val('other');
-                    $('#payment_frequency_other_div').removeClass('d-none');
-                    $('#payment_frequency_other').val(emp.payment_frequency).attr('required', true);
+                    $('#payment_frequency_other').val(emp.payment_frequency);
                 } else {
                     $('#payment_frequency').val(emp.payment_frequency || 'monthly');
-                    $('#payment_frequency_other_div').addClass('d-none');
-                    $('#payment_frequency_other').val('').attr('required', false);
+                    $('#payment_frequency_other').val('');
                 }
 
                 $('#payment_method').val(emp.payment_method || 'bank');

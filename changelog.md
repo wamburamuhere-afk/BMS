@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-07-08 (ux) — Payment Frequency "Other" swaps in place (like Department)
+
+Payment Frequency "➕ Other (specify)…" now uses the same `toggleEmpOther`
+swap-in-place mechanism as Department/Designation/Employment Type: choosing it
+hides the dropdown and replaces it with the text input + a back arrow, instead of
+a separate box below. Removed `payment_frequency_other_div` +
+`togglePaymentFrequencyOther()`; wired change/back/reset/edit-populate to
+`toggleEmpOther`. Server handling (`payment_frequency_other`) unchanged.
+
 ## 2026-07-08 (fix) — Employee wizard: Select2 options no longer hidden behind footer
 
 In the Add/Edit Employee wizard the footer (Back/Cancel/Next) has `z-index:2000`;
