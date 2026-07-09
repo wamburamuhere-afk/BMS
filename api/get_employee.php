@@ -47,6 +47,11 @@ try {
             'description' => "Viewed/Fetched full details for employee: {$employee['first_name']} {$employee['last_name']} (ID: $id) for editing"
         ]);
         
+        // Wizard Step 5 lists the employee's existing additional documents so the
+        // user can see, keep or remove them.
+        require_once __DIR__ . '/../core/employee_extra_documents.php';
+        $employee['extra_docs'] = hrFetchExtraDocuments($pdo, $id);
+
         echo json_encode(['success' => true, 'data' => $employee]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Employee not found']);

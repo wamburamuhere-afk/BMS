@@ -1,5 +1,44 @@
 # BMS Changelog
 
+## 2026-07-09 (feat) — Employee wizard Step 5: drop Bank Branch, allow many named documents
+
+**Bank Branch removed from the wizard.** `app/bms/pos/employees.php` no longer
+renders the `bank_branch` input, and the edit-populate line that filled it is gone.
+The column and its 20 existing values are untouched: `update_employee.php` only
+writes a field when `isset($_POST[$field])`, so omitting the input preserves the
+stored value rather than nulling it. `employee_details.php` and
+`create_project_staff.php` still read/write it.
+
+**"Others" is now repeatable.** Ticking *Others* under "Additional / Optional
+Documents" opens a panel where each document gets a **name** and a **file**, with
+"Add another document" for as many as needed. The old design allowed exactly one
+extra document, stored flat on `employees.other_doc_name` plus a path inside the
+`documents` JSON blob — which cannot express "several named documents".
+
+Each extra document is now its own row in `employee_documents` (doc type `Other`,
+resolved by name, never a hard-coded id) — the table already built for HR
+compliance in Tier 2 and previously unused by the wizard (0 rows). They surface
+automatically in the Documents section of `employee_details.php`, which already
+reads that table.
+
+New `core/employee_extra_documents.php` is shared by `add_employee.php` and
+`update_employee.php` so create and update cannot drift: `hrSaveExtraDocuments()`,
+`hrDeleteExtraDocuments()` (soft-delete, verified against the owning employee so a
+tampered `removed_extra_doc_ids[]` cannot touch another employee's document),
+`hrFetchExtraDocuments()`, `hrOtherDocTypeId()`. `get_employee.php` now returns
+`extra_docs` so the edit wizard lists what is on file, each with a Remove button.
+
+Uploads follow security.md §19 (extension + real MIME via `finfo` + 10MB cap +
+random filename). Files are moved before the caller's transaction commits, so a
+rejection on a later row now unlinks the already-moved files — otherwise a rolled
+back save leaked orphans into `uploads/employee_docs/`.
+
+Verified against the live app: a real multipart POST through Apache saved two named
+documents in one request; a good file followed by PHP-disguised-as-PDF was rejected,
+the transaction rolled back, and no orphan file remained. All probe rows, uploaded
+files and the temporary endpoint were removed afterwards.
+Tests: `tests/test_employee_extra_documents_cli.php` (14 checks).
+
 ## 2026-07-08 (security) — Warehouse project scope: edit-modal leak + unguarded writes
 
 `ajax_get_warehouse.php` rebuilt the warehouse edit modal server-side and queried

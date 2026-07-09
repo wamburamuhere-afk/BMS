@@ -5,6 +5,7 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../core/actor_account.php';
 require_once __DIR__ . '/../core/code_generator.php';
 require_once __DIR__ . '/../core/hr_lookups.php';
+require_once __DIR__ . '/../core/employee_extra_documents.php';
 
 header('Content-Type: application/json');
 
@@ -240,6 +241,15 @@ try {
     ]);
 
     $employee_id = $pdo->lastInsertId();
+
+    // Wizard Step 5 — repeatable "Additional / Optional Documents". Each named
+    // upload becomes its own employee_documents row (type 'Other'). Inside the
+    // same transaction: a bad file must not leave a half-created employee.
+    hrSaveExtraDocuments($pdo, (int)$employee_id, [
+        'first_name' => $_POST['first_name'] ?? '',
+        'last_name'  => $_POST['last_name'] ?? '',
+        'project_id' => $_POST['project_id'] ?? null,
+    ], (int)$_SESSION['user_id']);
 
     $empFullName = trim(
         $_POST['first_name'] . ' ' .
