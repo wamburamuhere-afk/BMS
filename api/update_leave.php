@@ -5,6 +5,7 @@ ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/debug_leave.log');
 
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/leave_rules.php';
 
 ob_clean();
 header('Content-Type: application/json');
@@ -48,64 +49,64 @@ try {
         throw new Exception("Only pending leave applications can be updated");
     }
 
-    $required_fields = ['leave_type', 'start_date', 'end_date', 'total_days', 'reason'];
+    $required_fields = ['leave_type_id', 'start_date', 'end_date', 'reason'];
     foreach ($required_fields as $field) {
         if (empty($_POST[$field])) {
             throw new Exception("Field '$field' is required.");
         }
     }
 
-    $leave_type_input = trim($_POST['leave_type']);
     $start_date = trim($_POST['start_date']);
-    $end_date = trim($_POST['end_date']);
+    $end_date   = trim($_POST['end_date']);
+    $reason     = trim($_POST['reason']);
 
-    // Map leave_type to DB ENUM values
-    $type_map = [
-        'Annual Leave' => 'annual',
-        'Sick Leave' => 'sick',
-        'Maternity Leave' => 'maternity',
-        'Paternity Leave' => 'paternity',
-        'Study Leave' => 'study',
-        'Unpaid Leave' => 'unpaid',
-        'Compassionate Leave' => 'other',
-        'Emergency Leave' => 'other',
-        'Other' => 'other'
-    ];
-    
-    $leave_type = isset($type_map[$leave_type_input]) ? $type_map[$leave_type_input] : $leave_type_input;
-    // Basic validation against ENUM
-    $valid_enums = ['annual', 'sick', 'maternity', 'paternity', 'study', 'unpaid', 'other'];
-    if (!in_array($leave_type, $valid_enums)) {
-        // Try lowercase first word
-        $leave_type = strtolower(explode(' ', $leave_type_input)[0]);
-        if (!in_array($leave_type, $valid_enums)) {
-            $leave_type = 'other';
-        }
-    }
-    $total_days = floatval($_POST['total_days']);
-    $reason = trim($_POST['reason']);
-    $notes = trim($_POST['notes'] ?? '');
+    // The leave type is now a real FK. The legacy ENUM is dual-written for the
+    // readers still on it (leave_reports, export_leaves, project_view).
+    $type       = leaveTypeForApply($pdo, $_POST['leave_type_id']);
+    $leave_type = legacyLeaveTypeEnum($type);
 
-    $query = "UPDATE leaves SET 
-        leave_type = ?, 
-        start_date = ?, 
-        end_date = ?, 
-        total_days = ?, 
+    $hd          = normaliseHalfDay($_POST);
+    $half_day    = $hd['half_day'];
+    $leave_hours = $hd['leave_hours'];
+
+    // Days are computed server-side from the dates + half-day, never trusted from
+    // the posted total_days, and then checked against the type's limits.
+    $total_days = leaveDaysFor($start_date, $end_date, $half_day, $leave_hours);
+
+    $emp = $pdo->prepare("SELECT employee_id FROM leaves WHERE leave_id = ?");
+    $emp->execute([$leave_id]);
+    $employee_id = (int)$emp->fetchColumn();
+    assertLeaveWithinTypeLimits($pdo, $type, $employee_id, $start_date, $total_days, $leave_id);
+
+    // `notes` is deliberately NOT updated. The Additional Notes field was removed
+    // from the form, so it is no longer posted; writing `notes = ?` here would
+    // blank the notes stored on 26 of the 27 existing leave records.
+    $query = "UPDATE leaves SET
+        leave_type_id = ?,
+        leave_type = ?,
+        start_date = ?,
+        end_date = ?,
+        total_days = ?,
         days_count = ?,
-        reason = ?, 
-        notes = ?,
+        half_day = ?,
+        leave_hours = ?,
+        is_paid = ?,
+        reason = ?,
         updated_at = NOW()
     WHERE leave_id = ?";
 
     $stmt = $pdo->prepare($query);
     $stmt->execute([
+        (int)$type['type_id'],
         $leave_type,
         $start_date,
         $end_date,
         $total_days,
         $total_days,
+        $half_day,
+        $leave_hours,
+        (int)$type['is_paid'],
         $reason,
-        $notes,
         $leave_id
     ]);
 

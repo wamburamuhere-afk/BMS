@@ -1,5 +1,66 @@
 # BMS Changelog
 
+## 2026-07-09 (feat) — Leaves: manageable leave types, hourly leave, standalone details page
+
+**The leaves module was structurally disconnected.** `leaves.leave_type` was an
+`ENUM('annual','sick',…)` with no link to the `leave_types` table, and
+`leaves.php` joined them on `l.leave_type = lt.type_name` — comparing `'annual'`
+to `'Annual Leave'`, a condition that **matched 0 of 27 rows**. `apply_leave.php`
+mapped the posted name back onto the ENUM and fell back to `'other'`, so a new
+leave type could never be stored against the leaves that used it. `half_day` and
+`is_paid` were read from `$_POST` and silently discarded — neither column existed
+nor appeared in the INSERT — as were `contact_during_leave` and `handover_to`.
+
+**Phase 1 — schema.** `2026_07_09_leaves_type_fk.php` adds `leave_type_id`
+(FK → `leave_types`, `ON DELETE RESTRICT`), `half_day`, `leave_hours` and an
+`is_paid` **snapshot**, then backfills from the ENUM by matching the first word of
+`type_name`. 11 rows resolved; the 15 rows whose ENUM was `''` (non-strict
+`sql_mode` coerced invalid values) and the 1 `'other'` row keep `leave_type_id`
+NULL and render as an em dash rather than being guessed at. The ENUM is retained
+and dual-written, because `leave_reports.php`, `export_leaves.php` and
+`project_view.php` still read it. `2026_07_09_leaves_contact_handover.php` adds the
+two discarded columns. `2026_07_09_leaves_total_days_decimal.php` widens
+`total_days` INT → DECIMAL(5,2): a 3.5-hour leave computes to 0.44 days, which INT
+truncated to 0 — and `total_days` is what the list badge and summary cards show.
+
+**Phase 2 — Leave Types page.** New `app/bms/pos/leave_types.php` with add / edit /
+delete, each type's maximum days per year, maximum consecutive days, notice period,
+carry-over and a professional Paid/Unpaid radio pair with explanatory helper text.
+It is **deliberately absent from the header nav**, reachable only from the "Manage
+leave types & maximum days" link now rendered beneath the Leave Type field on both
+the Apply and Edit leave modals. New `leave_types` permission key (default-deny).
+Delete is safe: a type with leaves booked against it is **deactivated** (hidden from
+the form, history keeps resolving); an unused type is removed outright.
+
+**Phase 3 — leave form.** The Leave Type select now posts `leave_type_id`. The
+Paid/Unpaid selector is removed — payment treatment belongs to the type and is shown
+as a read-only badge, then snapshotted onto the leave. Half Day gains **"Other
+(specify)"**, revealing an *Hours of Leave* input (0.5 → under a full 8-hour day).
+The Additional Notes field is removed; `update_leave.php` **no longer writes the
+`notes` column**, because 26 of 27 leaves carry notes and `notes = ?` with an
+unposted field would have blanked every one of them on the next edit.
+`max_days_per_year` and `max_consecutive_days` are now enforced **server-side** via
+new `core/leave_rules.php` (they were a client-side hint only).
+
+**Phase 4 — leave_details.php.** Actions ▸ View now opens the standalone page
+instead of a modal (the modal markup and its JS are removed). The page shows every
+field the form captures — including the half-day/hours, payment treatment,
+entitlement, contact during leave, handover colleague and supporting document — and
+prints via the shared `includes/print_footer_css.php` / `print_footer_html.php` with
+a print-only company header, matching the other print views.
+
+**Re-scout:** `my_leave_apply.php`, `import_leaves.php` and
+`operations/save_project_leave.php` also insert leaves; each now carries the FK via
+`leaveTypeIdForEnum()`, or the rows they create would have displayed as "—".
+`duplicate_leave.php` copies all columns and needed no change.
+
+Verified by driving the real endpoints: a Compassionate-type leave (impossible
+before), 3.5-hour leave stored as 0.44 days, yearly and consecutive caps refused,
+an inactive type refused, notes preserved across an edit, and a used type
+deactivated rather than deleted. All probe rows were removed and the database
+restored to 27 leaves / 7 types.
+Tests: `tests/test_leaves_upgrade_cli.php` (44 checks), mutation-verified.
+
 ## 2026-07-09 (feat) — Employee wizard Step 5: drop Bank Branch, allow many named documents
 
 **Bank Branch removed from the wizard.** `app/bms/pos/employees.php` no longer

@@ -2,6 +2,7 @@
 // api/operations/save_project_leave.php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/leave_rules.php';
 
 global $pdo;
 
@@ -76,8 +77,10 @@ try {
     }
 
     if ($leave_id) {
-        $sql = "UPDATE leaves SET employee_id=?, leave_type=?, start_date=?, end_date=?, total_days=?, days_count=?, reason=?, status=?, notes=?, updated_at=NOW()";
-        $params = [$employee_id, $leave_type, $start_date, $end_date, $total_days, $total_days, $reason, $status, $notes];
+        // leave_type_id must move with leave_type, or the row keeps pointing at the
+        // previous type on the list and detail pages.
+        $sql = "UPDATE leaves SET employee_id=?, leave_type_id=?, leave_type=?, start_date=?, end_date=?, total_days=?, days_count=?, reason=?, status=?, notes=?, updated_at=NOW()";
+        $params = [$employee_id, leaveTypeIdForEnum($pdo, $leave_type), $leave_type, $start_date, $end_date, $total_days, $total_days, $reason, $status, $notes];
         if ($document_path) { $sql .= ', document_path=?'; $params[] = $document_path; }
         $sql .= ' WHERE leave_id=?';
         $params[] = $leave_id;
@@ -88,10 +91,13 @@ try {
 
         echo json_encode(['success' => true, 'message' => 'Leave updated successfully']);
     } else {
-        $sql = "INSERT INTO leaves (employee_id, leave_type, start_date, end_date, total_days, days_count, reason, status, notes, document_path, applied_by, created_by, created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,NOW())";
+        // Carry the leave_types FK alongside the legacy ENUM, or the row shows "—"
+        // on the leaves list and the detail page.
+        $sql = "INSERT INTO leaves (employee_id, leave_type_id, leave_type, start_date, end_date, total_days, days_count, reason, status, notes, document_path, applied_by, created_by, created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())";
         $pdo->prepare($sql)->execute([
-            $employee_id, $leave_type, $start_date, $end_date, $total_days, $total_days,
+            $employee_id, leaveTypeIdForEnum($pdo, $leave_type), $leave_type,
+            $start_date, $end_date, $total_days, $total_days,
             $reason, $status, $notes, $document_path,
             $_SESSION['user_id'], $_SESSION['user_id']
         ]);

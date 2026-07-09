@@ -32,14 +32,23 @@ $stmt = $pdo->prepare("
         d.department_name,
         u1.username as applied_by_name,
         u2.username as approved_by_name,
+        lt.type_name AS official_type,
         lt.requires_document,
-        lt.color as type_color
+        lt.max_days_per_year,
+        lt.is_paid AS type_is_paid,
+        lt.color as type_color,
+        CONCAT_WS(' ', h.first_name, h.last_name) AS handover_name,
+        h.employee_number AS handover_number
     FROM leaves l
     LEFT JOIN employees e ON l.employee_id = e.employee_id
     LEFT JOIN departments d ON e.department_id = d.department_id
     LEFT JOIN users u1 ON l.applied_by = u1.user_id
     LEFT JOIN users u2 ON l.approved_by = u2.user_id
-    LEFT JOIN leave_types lt ON l.leave_type = lt.type_name
+    -- Joined on the FK. The old condition was `l.leave_type = lt.type_name`,
+    -- comparing the ENUM 'annual' to 'Annual Leave' — it never matched, so the
+    -- type's rules were never available on this page.
+    LEFT JOIN leave_types lt ON lt.type_id = l.leave_type_id
+    LEFT JOIN employees h ON h.employee_id = l.handover_to
     WHERE l.leave_id = ?
 ");
 $stmt->execute([$leave_id]);
@@ -56,6 +65,9 @@ if (!empty($leave_project_id) && function_exists('userCan') && !userCan('project
     header("Location: leaves.php?error=Access+denied:+this+leave+is+not+in+your+project+scope");
     exit();
 }
+
+// Company identity for the print header (same source as leaves.php).
+$c_name = getSetting('company_name', 'BMS');
 
 $page_title = "Leave Details - LEV-" . $leave['leave_id'];
 require_once 'header.php';
@@ -221,10 +233,41 @@ require_once 'header.php';
         transform: translateY(-2px);
         box-shadow: 0 10px 20px rgba(0,0,0,0.1);
     }
+
+    /* ── Print: same shape as the other print views ── */
+    @media print {
+        * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        body { background: #fff !important; padding: 0 !important; margin: 0 !important; }
+
+        .navbar, .sidebar, .btn, .btn-group, .dropdown, .modal, footer { display: none !important; }
+
+        .leave-dashboard { background: #fff !important; padding: 0 !important; }
+        .premium-card {
+            box-shadow: none !important;
+            border: 1px solid #dee2e6 !important;
+            border-radius: 0 !important;
+            page-break-inside: avoid;
+        }
+        .detail-header { background: #fff !important; color: #000 !important; }
+        .stat-mini-card { border: 1px solid #dee2e6 !important; box-shadow: none !important; }
+    }
 </style>
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 
 <div class="leave-dashboard">
     <div class="container-fluid">
+
+        <!-- Print-only header (mirrors leaves.php) -->
+        <div class="d-none d-print-block text-center mb-1" id="printHeader" style="margin-top: 15px !important;">
+            <h4 style="color:#333;font-weight:700;margin:2px 0;font-size:12pt;letter-spacing:1px;"><?= safe_output($c_name) ?></h4>
+            <h2 style="color:#333;font-weight:700;text-transform:uppercase;margin:2px 0;font-size:15pt;letter-spacing:2px;">LEAVE APPLICATION</h2>
+            <p class="text-muted mb-1" style="font-size:9pt;">Reference: <span class="fw-bold text-dark">LEV-<?= (int)$leave['leave_id'] ?></span></p>
+            <div style="border-bottom:3px solid #0d6efd;width:100px;margin:10px auto;"></div>
+        </div>
+
         <!-- Main Card -->
         <div class="premium-card">
             <!-- Header -->
@@ -267,7 +310,7 @@ require_once 'header.php';
                     </div>
                     <div>
                         <div class="info-label">Leave Type</div>
-                        <h4 class="mb-0 fw-bold text-capitalize"><?= $leave['leave_type'] ?></h4>
+                        <h4 class="mb-0 fw-bold"><?= safe_output($leave['official_type'] ?? '', '—') ?></h4>
                     </div>
                 </div>
                 <div class="stat-mini-card">
@@ -303,9 +346,83 @@ require_once 'header.php';
                     </div>
                 </div>
 
+                <!-- Leave terms — every field captured on the application form -->
+                <div class="row g-4 mb-5">
+                    <div class="col-md-6 col-lg-3">
+                        <div class="info-label">Payment Treatment</div>
+                        <div class="info-value">
+                            <?php
+                            // The leave's OWN snapshot, not the type's current setting: a
+                            // type re-classified later must not rewrite this record.
+                            $paid = $leave['is_paid'];
+                            if ($paid === null) {
+                                echo '<span class="text-muted">—</span>';
+                            } else {
+                                $isPaid = (int)$paid === 1;
+                                echo '<span class="badge" style="background:' . ($isPaid ? '#0d6efd' : '#6c757d') . ';color:#fff;">'
+                                   . ($isPaid ? 'Paid Leave' : 'Unpaid Leave') . '</span>';
+                            }
+                            ?>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <div class="info-label">Half Day</div>
+                        <div class="info-value">
+                            <?php
+                            switch ($leave['half_day'] ?? 'none') {
+                                case 'first_half':  echo 'First Half'; break;
+                                case 'second_half': echo 'Second Half'; break;
+                                case 'other':
+                                    echo safe_output(rtrim(rtrim(number_format((float)$leave['leave_hours'], 2), '0'), '.')) . ' hour(s)';
+                                    break;
+                                default: echo '<span class="text-muted">No</span>';
+                            }
+                            ?>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <div class="info-label">Entitlement (this type)</div>
+                        <div class="info-value">
+                            <?= $leave['max_days_per_year'] !== null
+                                ? (int)$leave['max_days_per_year'] . ' days/year'
+                                : '<span class="text-muted">—</span>' ?>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <div class="info-label">Supporting Document</div>
+                        <div class="info-value">
+                            <?php if (!empty($leave['document_path'])): ?>
+                                <a href="<?= getUrl($leave['document_path']) ?>" target="_blank" rel="noopener" class="d-print-none">
+                                    <i class="bi bi-paperclip me-1"></i>View document
+                                </a>
+                                <span class="d-none d-print-inline">Attached</span>
+                            <?php elseif ((int)($leave['requires_document'] ?? 0) === 1): ?>
+                                <span class="text-danger">Required — not attached</span>
+                            <?php else: ?>
+                                <span class="text-muted">—</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <div class="info-label">Contact During Leave</div>
+                        <div class="info-value"><?= safe_output($leave['contact_during_leave'] ?? '', '—') ?></div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <div class="info-label">Handover To</div>
+                        <div class="info-value">
+                            <?php if (!empty($leave['handover_name'])): ?>
+                                <?= safe_output($leave['handover_name']) ?>
+                                <div class="text-muted small"><?= safe_output($leave['handover_number'] ?? '') ?></div>
+                            <?php else: ?>
+                                <span class="text-muted">—</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Reason Section -->
                 <div class="mb-5">
-                    <h5 class="section-title">Reason & Justification</h5>
+                    <h5 class="section-title">Reason &amp; Justification</h5>
                     <div class="reason-box">
                         <?= nl2br(htmlspecialchars($leave['reason'])) ?>
                     </div>
@@ -340,7 +457,7 @@ require_once 'header.php';
                 </div>
 
                 <!-- Actions -->
-                <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center border-top pt-4">
+                <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center border-top pt-4 d-print-none">
                     <div>
                         <a href="leaves.php" class="btn btn-outline-secondary btn-premium">
                             <i class="bi bi-arrow-left"></i> Back to List
@@ -378,7 +495,9 @@ $(document).ready(function() {
 
 function printExport(id) {
     logReportAction('Printed Leave Application', 'User generated a printed/PDF export for leave application ID: ' + id);
-    window.open(`leave_application.php?id=${id}`, '_blank');
+    // Print THIS page, so the printout matches the record on screen and uses the
+    // same shared print header/footer as every other print view.
+    window.print();
 }
 
 function handleAction(action, id) {
@@ -457,4 +576,5 @@ function processAction(action, id, notes) {
 }
 </script>
 
+<?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 <?php includeFooter(); ?>

@@ -618,6 +618,10 @@ $routes = [
     'employees.php' => POS_DIR . '/employees.php',
     'leaves' => POS_DIR . '/leaves.php',
     'leaves.php' => POS_DIR . '/leaves.php',
+    // Reached only from the link under the Leave Type field — intentionally absent
+    // from the header nav.
+    'leave_types' => POS_DIR . '/leave_types.php',
+    'leave_types.php' => POS_DIR . '/leave_types.php',
     'payroll' => POS_DIR . '/payroll.php',
     'payroll.php' => POS_DIR . '/payroll.php',
     'salary_components' => POS_DIR . '/salary_components.php',
