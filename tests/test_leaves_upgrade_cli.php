@@ -115,28 +115,22 @@ if ($newTypeId) {
         : bad("the leave resolved to '" . var_export($row, true) . "'");
 }
 
-// ── Half day / hours ──────────────────────────────────────────────────────
-head('Half Day → Other (specify) hours');
+// ── Half day ──────────────────────────────────────────────────────────────
+// The hourly-leave feature (Half Day = "Other (specify)…") was removed —
+// never used in production (0 rows), and it looked like the free-text
+// "Other" pattern from employee registration but was actually a numeric
+// hours field, which confused users. 'other' is no longer a valid selection.
+head('Half Day — "Other (specify)" is no longer offered');
 
 $m = threw(fn() => normaliseHalfDay(['half_day' => 'other']));
-$m && str_contains($m, 'how many hours') ? ok("'other' without hours is rejected") : bad("expected an hours error, got: " . var_export($m, true));
-
-$m = threw(fn() => normaliseHalfDay(['half_day' => 'other', 'leave_hours' => WORKING_DAY_HOURS]));
-$m && str_contains($m, 'less than a full working day') ? ok('a full working day is rejected') : bad("expected a full-day error, got: " . var_export($m, true));
-
-$m = threw(fn() => normaliseHalfDay(['half_day' => 'other', 'leave_hours' => 0.2]));
-$m && str_contains($m, 'at least 0.5') ? ok('under half an hour is rejected') : bad("expected a minimum error, got: " . var_export($m, true));
-
-$hd = normaliseHalfDay(['half_day' => 'other', 'leave_hours' => 3.5]);
-($hd['half_day'] === 'other' && abs($hd['leave_hours'] - 3.5) < 0.001) ? ok('3.5 hours accepted') : bad('3.5 hours not accepted');
+$m && str_contains($m, 'Invalid half-day selection') ? ok("'other' is rejected as an invalid half-day selection") : bad("expected a rejection, got: " . var_export($m, true));
 
 $hd = normaliseHalfDay(['half_day' => 'none', 'leave_hours' => 3.5]);
-$hd['leave_hours'] === null ? ok("hours are cleared when half_day is not 'other'") : bad('stale hours kept');
+$hd['leave_hours'] === null ? ok('leave_hours is always null now (feature removed)') : bad('stale hours kept');
 
 // 'none' must not silently dock half a day.
 abs(leaveDaysFor('2030-01-01', '2030-01-03', 'none', null) - 3.0) < 0.001 ? ok("half_day='none' consumes full days") : bad("half_day='none' altered the day count");
 abs(leaveDaysFor('2030-01-01', '2030-01-03', 'first_half', null) - 2.5) < 0.001 ? ok('first_half consumes 2.5 of 3 days') : bad('first_half maths wrong');
-abs(leaveDaysFor('2030-01-01', '2030-01-01', 'other', 3.5) - round(3.5 / WORKING_DAY_HOURS, 2)) < 0.001 ? ok('a 3.5h single-day leave is a fraction of a day') : bad('hours→days maths wrong');
 
 // ── Server-side limits ────────────────────────────────────────────────────
 head('Type limits are enforced server-side');
@@ -183,7 +177,7 @@ $formSrc = @file_get_contents(dirname(__DIR__) . '/app/bms/pos/leaves.php') ?: '
 strpos($formSrc, 'name="notes"') === false ? ok('the Additional Notes field is gone from the form') : bad('the Additional Notes field is still present');
 strpos($formSrc, 'name="is_paid"') === false ? ok('the Paid/Unpaid selector is gone from the leave form') : bad('the Paid/Unpaid selector is still on the leave form');
 strpos($formSrc, 'name="leave_type_id"') !== false ? ok('the leave form posts leave_type_id') : bad('the leave form does not post leave_type_id');
-strpos($formSrc, 'Other (specify)') !== false ? ok('Half Day offers “Other (specify)”') : bad('Half Day is missing “Other (specify)”');
+strpos($formSrc, 'Other (specify)') === false ? ok('Half Day no longer offers "Other (specify)" (hourly leave removed)') : bad('Half Day still offers "Other (specify)"');
 strpos($formSrc, "getUrl('leave_types')") !== false ? ok('the leave form links to the leave types page') : bad('the manage-leave-types link is missing');
 
 // ── The management page must not be in the header nav ─────────────────────

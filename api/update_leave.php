@@ -59,6 +59,8 @@ try {
     $start_date = trim($_POST['start_date']);
     $end_date   = trim($_POST['end_date']);
     $reason     = trim($_POST['reason']);
+    $contact_during_leave = trim($_POST['contact_during_leave'] ?? '') ?: null;
+    $handover_to = !empty($_POST['handover_to']) ? intval($_POST['handover_to']) : null;
 
     // The leave type is now a real FK. The legacy ENUM is dual-written for the
     // readers still on it (leave_reports, export_leaves, project_view).
@@ -92,6 +94,8 @@ try {
         leave_hours = ?,
         is_paid = ?,
         reason = ?,
+        contact_during_leave = ?,
+        handover_to = ?,
         updated_at = NOW()
     WHERE leave_id = ?";
 
@@ -107,6 +111,8 @@ try {
         $leave_hours,
         (int)$type['is_paid'],
         $reason,
+        $contact_during_leave,
+        $handover_to,
         $leave_id
     ]);
 
