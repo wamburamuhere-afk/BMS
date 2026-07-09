@@ -43,8 +43,8 @@ $stmt = $pdo->prepare("SELECT * FROM pos_sale_items WHERE sale_id = ? ORDER BY s
 $stmt->execute([$sale_id]);
 $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Company info (you can fetch from settings table)
-$company_name = "BUSINESS MANAGEMENT SYSTEM";
+// Company info
+$company_name = getSetting('company_name', 'BUSINESS MANAGEMENT SYSTEM');
 $company_address = "Dar es Salaam, Tanzania";
 $company_phone = "+255 123 456 789";
 $company_tin = "123-456-789";
