@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-07-09 (fix) — Leaves: removed "Half Day → Other (specify)" (hourly leave)
+
+**`app/bms/pos/leaves.php`** Half Day dropdown's "➕ Other (specify)…" option
+looked like the free-text "Other" pattern used elsewhere in HR forms (Department,
+Designation, Employment Type on employee registration — pick "Other", type a
+value, it's remembered). It wasn't: selecting it revealed a numeric "Hours of
+Leave" input instead, part of the hourly-leave feature built in the immediately
+preceding commit. Confirmed live: **zero rows** in `leaves` ever used
+`half_day='other'` or set `leave_hours` — the feature was never actually used,
+and its UI was actively confusing users expecting the employee-registration
+mechanism. Removed per explicit decision to drop it rather than reimplement the
+free-text pattern.
+
+Removed: the "Other" option and Hours-of-Leave input from both the apply and
+edit modals; `toggleLeaveHours()` and its onchange wiring; the JS and PHP
+`leaveDaysFor()` hour-fraction branches; `normaliseHalfDay()`'s hours validation
+(now only accepts `none` / `first_half` / `second_half`, rejects `other`
+outright); the `leave_details.php` display case for it. Left untouched: the
+`leaves.leave_hours` column and `WORKING_DAY_HOURS` constant (harmless, always
+NULL/unused now — no schema change needed since nothing ever wrote to them).
+Updated `tests/test_leaves_upgrade_cli.php`'s Half Day section to assert the new
+rejection behavior instead of the old acceptance behavior. All 49 checks pass.
+
 ## 2026-07-09 (fix) — Employees: Designation filter now cascades from Department filter
 
 **`app/bms/pos/employees.php`** list-page filters. `#departmentFilter` and

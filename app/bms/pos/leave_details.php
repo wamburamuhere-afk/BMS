@@ -373,9 +373,6 @@ require_once 'header.php';
                             switch ($leave['half_day'] ?? 'none') {
                                 case 'first_half':  echo 'First Half'; break;
                                 case 'second_half': echo 'Second Half'; break;
-                                case 'other':
-                                    echo safe_output(rtrim(rtrim(number_format((float)$leave['leave_hours'], 2), '0'), '.')) . ' hour(s)';
-                                    break;
                                 default: echo '<span class="text-muted">No</span>';
                             }
                             ?>
