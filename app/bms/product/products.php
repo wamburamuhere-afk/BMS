@@ -178,19 +178,15 @@ if ($low_stock === 'yes') {
     $conditions[] = "p.min_stock_level > 0";
 }
 
-// Project scope: NULL = global (visible to all); set = only users assigned to that project
-if (empty($_SESSION['scope']['is_admin'])) {
-    $sp_ids = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
-    if (empty($sp_ids)) {
-        $conditions[] = '0';
-    } else {
-        $conditions[] = "(p.project_id IS NULL OR p.project_id IN (" . implode(',', $sp_ids) . "))";
-    }
-}
+// Project scope: NULL = global (visible to all); set = only users assigned to that project.
+// Carries its own leading AND, so it is appended to each query rather than pushed
+// into $conditions (which are joined with " AND ").
+$scope_sql = scopeFilterSqlNullable('project', 'p');
 
 if (!empty($conditions)) {
     $query .= " AND " . implode(" AND ", $conditions);
 }
+$query .= $scope_sql;
 
 // Group by product
 $query .= " GROUP BY p.product_id";
@@ -234,6 +230,7 @@ $count_query .= " WHERE 1=1";
 if (!empty($conditions)) {
     $count_query .= " AND " . implode(" AND ", $conditions);
 }
+$count_query .= $scope_sql;
 
 // Execute count query
 $count_stmt = $pdo->prepare($count_query);
@@ -318,6 +315,7 @@ $stats_query .= " WHERE 1=1";
 if (!empty($conditions)) {
     $stats_query .= " AND " . implode(" AND ", $conditions);
 }
+$stats_query .= $scope_sql;
 
 // Reuse the $params from before
 $stats_stmt = $pdo->prepare($stats_query);
