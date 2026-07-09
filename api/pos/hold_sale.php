@@ -20,13 +20,18 @@ if (!canCreate('pos')) {
 try {
     global $pdo;
 
+    // The client sends this as a raw JSON body (contentType: 'application/json'),
+    // which PHP never populates $_POST for — every field below was silently null/0
+    // regardless of what was actually sent, not just 'items'.
+    $body = json_decode(file_get_contents('php://input'), true) ?: [];
+
     $user_id = $_SESSION['user_id'];
-    $customer_id = $_POST['customer_id'] ?? null;
-    $reference = $_POST['reference'] ?? null;
-    $items = json_decode($_POST['items'] ?? '[]', true);
-    $subtotal = floatval($_POST['subtotal'] ?? 0);
-    $tax = floatval($_POST['tax'] ?? 0);
-    
+    $customer_id = $body['customer_id'] ?? null;
+    $reference = $body['reference'] ?? null;
+    $items = $body['items'] ?? [];
+    $subtotal = floatval($body['subtotal'] ?? 0);
+    $tax = floatval($body['tax'] ?? 0);
+
     if (empty($items)) {
         throw new Exception("No items to hold");
     }
