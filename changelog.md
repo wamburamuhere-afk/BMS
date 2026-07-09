@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-07-09 (fix) — Employees: Designation filter now cascades from Department filter
+
+**`app/bms/pos/employees.php`** list-page filters. `#departmentFilter` and
+`#designationFilter` were two independent, statically-rendered `<select>`s —
+picking a department never narrowed the designation options, even though the
+exact same cascade already existed for the Add/Edit employee *form*
+(`window.EMP_DESIGNATIONS` + `rebuildDesignationOptions()`, both already in
+this file). Added `rebuildDesignationFilterOptions()`, bound to
+`#departmentFilter`'s `change` event, which rebuilds `#designationFilter`
+from the same `window.EMP_DESIGNATIONS` dataset (client-side, no new
+endpoint) and re-inits Select2. `clearFilters()` now also calls it so
+clearing the department restores the full designation list instead of
+leaving it narrowed. Verified live: 5 departments / 5 designations, one
+designation per department, confirming the cascade actually narrows 5→1
+rather than being a no-op on this dataset.
+
 ## 2026-07-09 (fix) — Employees: project is now genuinely optional on edit
 
 **`api/update_employee.php`** bound `$_POST['project_id']` straight into the
