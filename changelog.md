@@ -17,6 +17,14 @@ own leading `AND`, so it cannot be pushed into `$conditions` (joined with `AND`)
 without emitting `AND AND`. Verified live: zero-project non-admin 0 → 15 rows,
 admin unchanged at 15, no dangling `AND`.
 
+Tests: added `tests/test_products_scope_visibility_cli.php`, which renders the
+real page as a genuine zero-project non-admin (child process) and asserts the row
+count, rather than grepping the source. Confirmed it fails against the old file
+(`page returned 0 products despite 15 global product(s)`) and passes against the
+fix. Updated `tests/test_scope_enforcement_cli.php` to expect the helper marker on
+products.php instead of the removed inline literal — the old grep-only guard
+passed for six weeks while the page rendered empty.
+
 Note: `app/bms/product/services.php:68` still carries the identical `'0'` bug and
 is not fixed here.
 

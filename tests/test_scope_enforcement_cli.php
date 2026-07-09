@@ -79,8 +79,8 @@ $list_checks = [
     ],
     [
         'app/bms/product/products.php',
-        'Products list — project scope in $conditions',
-        ['project_id IS NULL OR p.project_id IN'],
+        'Products list — project scope via helper',
+        ["scopeFilterSqlNullable('project'"],
     ],
     [
         'app/bms/product/services.php',
@@ -201,7 +201,7 @@ $order_checks = [
     ['app/bms/customer/customers.php',         "canView('customers')",  'scopeFilterSqlNullable'],
     ['app/bms/Suppliers/suppliers.php',         'autoEnforcePermission', 'supplier_scope_sql'],
     ['app/bms/operations/sub_contractors.php',  'canView(',              'sc_scope_sql'],
-    ['app/bms/product/products.php',            'requireViewPermission', 'project_id IS NULL'],
+    ['app/bms/product/products.php',            'requireViewPermission', 'scopeFilterSqlNullable'],
     ['app/bms/product/services.php',            'requireViewPermission', 'project_id IS NULL'],
     ['app/bms/pos/employees.php',               'autoEnforcePermission', 'scopeFilterSqlNullable'],
     ['app/bms/stock/warehouses.php',            'autoEnforcePermission', 'scopeFilterSqlNullable'],
