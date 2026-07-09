@@ -1,5 +1,37 @@
 # BMS Changelog
 
+## 2026-07-08 (fix) — Products list blank for non-admins with no projects
+
+`app/bms/product/products.php` hand-rolled its project-scope filter and pushed a
+literal `'0'` condition when a non-admin had no assigned projects, so the WHERE
+clause became `1=1 AND 0` and the page returned nothing — hiding even the global
+(`project_id IS NULL`) catalogue that the same file's comments promise are
+"visible to all". The block was written on 2026-05-25 (`6535a6c`); commit
+`75b5229` on 2026-06-01 later changed `scopeFilterSqlNullable()` to show
+company-wide untagged rows to non-admins with no projects, but products.php never
+picked that up because it never called the helper.
+
+Replaced the inline block with `scopeFilterSqlNullable('project', 'p')` and
+appended the fragment to all three queries (list, count, stats) — it carries its
+own leading `AND`, so it cannot be pushed into `$conditions` (joined with `AND`)
+without emitting `AND AND`. Verified live: zero-project non-admin 0 → 15 rows,
+admin unchanged at 15, no dangling `AND`.
+
+Tests: added `tests/test_products_scope_visibility_cli.php`, which renders the
+real page as a genuine zero-project non-admin (child process) and asserts the row
+count, rather than grepping the source. Confirmed it fails against the old file
+(`page returned 0 products despite 15 global product(s)`) and passes against the
+fix. Updated `tests/test_scope_enforcement_cli.php` to expect the helper marker on
+products.php instead of the removed inline literal — the old grep-only guard
+passed for six weeks while the page rendered empty.
+
+`app/bms/product/services.php` carried a character-for-character copy of the same
+block (same May commit) and was fixed identically — its scope fragment appended to
+its list and count queries, before the `ORDER BY`. A zero-project non-admin now
+sees the 1 global service instead of a blank page; the 5 project-tagged services
+stay hidden. (Those 5 are why assigning a project changed nothing on the products
+page — every project-tagged row in `products` is a service.)
+
 ## 2026-07-08 (ux) — Payment Frequency "Other" swaps in place (like Department)
 
 Payment Frequency "➕ Other (specify)…" now uses the same `toggleEmpOther`
