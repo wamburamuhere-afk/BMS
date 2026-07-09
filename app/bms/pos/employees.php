@@ -2382,6 +2382,15 @@ function downloadTemplate() {
 </script>
 
 <style>
+/* Wizard footer (Back/Cancel/Next) carries z-index:2000; without this the open
+   Select2 option list paints BELOW it, so the footer bar hides/blocks the lower
+   options. Select2 appends its open dropdown into the modal (dropdownParent), so
+   lifting the open dropdown above the footer keeps every option visible and
+   clickable. Select2 also auto-flips the list upward when a field sits close to
+   the footer and there isn't room below. */
+#addEmployeeModal .select2-container--open { z-index: 2100 !important; }
+#addEmployeeModal .select2-dropdown { z-index: 2100 !important; }
+
 .card.custom-stat-card {
     background-color: #d1e7dd !important;
     border-color: #badbcc !important;

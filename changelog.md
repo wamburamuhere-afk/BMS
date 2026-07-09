@@ -9,6 +9,15 @@ a separate box below. Removed `payment_frequency_other_div` +
 `togglePaymentFrequencyOther()`; wired change/back/reset/edit-populate to
 `toggleEmpOther`. Server handling (`payment_frequency_other`) unchanged.
 
+## 2026-07-08 (fix) — Employee wizard: Select2 options no longer hidden behind footer
+
+In the Add/Edit Employee wizard the footer (Back/Cancel/Next) has `z-index:2000`;
+open Select2 dropdowns painted below it, so the bar covered/blocked the lower
+options. Added scoped CSS lifting the open Select2 dropdown above the footer
+(`#addEmployeeModal .select2-container--open / .select2-dropdown { z-index:2100 }`)
+so every option stays visible and clickable (Select2 already auto-flips the list
+upward when a field sits near the footer).
+
 ## 2026-07-08 (ux) — Payment Frequency: relabel "Other (Manual Entry)" → "Other (specify)"
 
 Step 3 Payment Frequency already had a free-text "Other" option; renamed its label
