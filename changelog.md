@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-07-09 (fix) — POS: receipt header shows the real company name
+
+**`api/pos/print_receipt.php`** hardcoded `$company_name = "BUSINESS
+MANAGEMENT SYSTEM"` — a stub left from the initial commit, never wired to
+`system_settings`, unlike every other print module in the codebase (petty
+cash, stock transfer, stock adjustment) which already reads it via
+`getSetting('company_name', ...)`. Replaced with the same call. Verified
+live: resolves to the real configured name, "BEJUNDAS FINANCIAL SERVICES
+LTD", instead of the placeholder. `$company_address`/`$company_phone`/
+`$company_tin` are still hardcoded placeholders on the same line — out of
+scope here (user asked specifically about the company name), flagged as a
+possible follow-up.
+
 ## 2026-07-09 (fix) — Leaves: print leave_details.php starting from page 1
 
 **`app/bms/pos/leave_details.php`** on-screen `.leave-dashboard` has
