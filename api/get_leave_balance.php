@@ -20,6 +20,18 @@ if (!isset($_SESSION['user_id'])) {
 $employee_id = isset($_GET['employee_id']) ? intval($_GET['employee_id']) : 0;
 $leave_type = isset($_GET['leave_type']) ? trim($_GET['leave_type']) : '';
 
+// The leave form now identifies the type by its FK. Resolve it to the type_name
+// the balance engine expects. `leave_type` is still accepted for other callers.
+$leave_type_id = isset($_GET['leave_type_id']) ? intval($_GET['leave_type_id']) : 0;
+if ($leave_type_id > 0) {
+    $nameStmt = $pdo->prepare("SELECT type_name FROM leave_types WHERE type_id = ? AND status = 'active'");
+    $nameStmt->execute([$leave_type_id]);
+    $resolved = $nameStmt->fetchColumn();
+    if ($resolved !== false) {
+        $leave_type = $resolved;
+    }
+}
+
 if (!$employee_id || !$leave_type) {
     echo json_encode(['success' => false, 'message' => 'Missing required parameters']);
     exit();

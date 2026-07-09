@@ -5,6 +5,7 @@ ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/debug_leave.log');
 
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/leave_rules.php';
 
 ob_clean();
 header('Content-Type: application/json');
@@ -68,14 +69,17 @@ try {
 
             $results['total_rows']++;
 
+            // Carry the leave_types FK alongside the legacy ENUM, or imported rows
+            // show "—" on the leaves list and the detail page.
             $query = "INSERT INTO leaves (
-                employee_id, leave_type, start_date, end_date, 
+                employee_id, leave_type_id, leave_type, start_date, end_date,
                 total_days, reason, status, created_by, applied_by, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, NOW())";
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, NOW())";
 
             $stmt = $pdo->prepare($query);
             $stmt->execute([
                 $employee_id,
+                leaveTypeIdForEnum($pdo, $leave_type),
                 $leave_type,
                 $start_date,
                 $end_date,

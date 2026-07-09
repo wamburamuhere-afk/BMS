@@ -2,9 +2,21 @@
 // scope-audit: skip — HR leaves page has multiple complex queries; individual record access gated via assertScopeForEmployeeRecord; read-side bulk scope deferred to Phase G-2
 // Include roots configuration
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/leave_rules.php';   // WORKING_DAY_HOURS + shared limits
 
 // Enforce permission BEFORE any output
 autoEnforcePermission('leaves');
+
+/**
+ * Display label for a leave's type. `official_type` comes from the leave_types
+ * join on the FK. Rows created before the FK existed (an empty ENUM, or 'other'
+ * with no matching type) have no type and render as an em dash rather than a
+ * misleading guess.
+ */
+function leaveTypeLabel(array $leave): string {
+    $name = trim((string)($leave['official_type'] ?? ''));
+    return $name !== '' ? $name : '—';
+}
 
 // Fetch company settings for print header
 $c_name = getSetting('company_name', 'BMS');
@@ -26,7 +38,9 @@ $current_date = date('Y-m-d');
 $selected_start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
 $selected_end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
 $selected_status = isset($_GET['status']) ? $_GET['status'] : '';
-$selected_type = isset($_GET['type']) ? $_GET['type'] : '';
+// Filter by leave_types.type_id. It used to carry type_name and be compared to the
+// `leave_type` ENUM ('annual' vs 'Annual Leave'), so the filter never matched.
+$selected_type = isset($_GET['type']) && $_GET['type'] !== '' ? (int)$_GET['type'] : '';
 $selected_department = isset($_GET['department']) ? (int)$_GET['department'] : null;
 $selected_employee = isset($_GET['employee']) ? (int)$_GET['employee'] : null;
 
@@ -67,7 +81,7 @@ if ($selected_status) {
 }
 
 if ($selected_type) {
-    $stats_query .= " AND leave_type = ?";
+    $stats_query .= " AND leave_type_id = ?";
     $stats_params[] = $selected_type;
 }
 
@@ -221,7 +235,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                             <select class="form-select select2-static" id="type" name="type">
                                 <option value="">All Types</option>
                                 <?php foreach ($leave_types as $type): ?>
-                                <option value="<?= $type['type_name'] ?>" <?= ($selected_type == $type['type_name']) ? 'selected' : '' ?>>
+                                <option value="<?= (int)$type['type_id'] ?>" <?= ((int)$selected_type === (int)$type['type_id']) ? 'selected' : '' ?>>
                                     <?= safe_output($type['type_name']) ?>
                                 </option>
                                 <?php endforeach; ?>
@@ -350,7 +364,10 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                 LEFT JOIN employees e ON l.employee_id = e.employee_id
                 LEFT JOIN departments d ON e.department_id = d.department_id
                 LEFT JOIN users u1 ON l.applied_by = u1.user_id
-                LEFT JOIN leave_types lt ON l.leave_type = lt.type_name
+                -- Joined on the FK, not on `l.leave_type = lt.type_name`: the ENUM
+                -- holds 'annual' while type_name holds 'Annual Leave', so the old
+                -- condition matched no rows at all.
+                LEFT JOIN leave_types lt ON lt.type_id = l.leave_type_id
                 WHERE l.start_date BETWEEN ? AND ?
             ";
             
@@ -362,7 +379,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
             }
             
             if ($selected_type) {
-                $leaves_query .= " AND l.leave_type = ?";
+                $leaves_query .= " AND l.leave_type_id = ?";
                 $leaves_params[] = $selected_type;
             }
             
@@ -432,7 +449,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                 <td>
                                     <div class="fw-bold text-wrap" style="max-width: 150px;"><?= safe_output($leave['first_name'] . ' ' . $leave['last_name']) ?></div>
                                     <div class="d-md-none mt-1">
-                                        <span class="badge bg-secondary" style="font-size: 0.6rem;"><?= safe_output($leave['leave_type']) ?></span>
+                                        <span class="badge bg-secondary" style="font-size: 0.6rem;"><?= safe_output(leaveTypeLabel($leave)) ?></span>
                                         <?php
                                         $status_class = [
                                             'pending' => 'bg-warning',
@@ -449,12 +466,8 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                     <small><?= safe_output($leave['department_name']) ?></small>
                                 </td>
                                 <td class="d-none d-md-table-cell">
-                                    <span class="badge bg-secondary text-wrap" style="font-size: 0.7rem; text-transform: capitalize;">
-                                        <?php 
-                                            $lt_display = $leave['leave_type'];
-                                            if(!str_contains(strtolower($lt_display), 'leave')) $lt_display .= ' Leave';
-                                            echo safe_output($lt_display);
-                                        ?>
+                                    <span class="badge bg-secondary text-wrap" style="font-size: 0.7rem;">
+                                        <?= safe_output(leaveTypeLabel($leave)) ?>
                                     </span>
                                 </td>
                                 <td class="d-none d-md-table-cell">
@@ -504,7 +517,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                                 <div class="col-6 border-bottom pb-1"><small class="text-muted d-block">Dept</small><?= safe_output($leave['department_name']) ?></div>
                                                 <div class="col-6 border-bottom pb-1">
                                                     <small class="text-muted d-block">Type</small>
-                                                    <span class="badge bg-secondary text-capitalize"><?= safe_output($leave['leave_type']) ?></span>
+                                                    <span class="badge bg-secondary"><?= safe_output(leaveTypeLabel($leave)) ?></span>
                                                 </div>
                                                 <div class="col-6 border-bottom pb-1"><small class="text-muted d-block">Days</small><span class="badge bg-info"><?= $leave['total_days'] ?> Days</span></div>
                                                 <div class="col-6 border-bottom pb-1">
@@ -558,7 +571,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                     <span class="badge bg-<?= $sc ?>"><?= ucfirst($leave['status']) ?></span>
                                 </div>
                                 <div class="card-body py-2 px-3" style="font-size:0.8rem;">
-                                    <div class="mb-1"><i class="bi bi-tag text-muted me-1"></i><?= safe_output($leave['leave_type']) ?></div>
+                                    <div class="mb-1"><i class="bi bi-tag text-muted me-1"></i><?= safe_output(leaveTypeLabel($leave)) ?></div>
                                     <div class="mb-1"><i class="bi bi-building text-muted me-1"></i><?= safe_output($leave['department_name'] ?? '—') ?></div>
                                     <div class="mb-1"><i class="bi bi-calendar-range text-muted me-1"></i><?= date('d M', strtotime($leave['start_date'])) ?> – <?= date('d M Y', strtotime($leave['end_date'])) ?></div>
                                     <div><span class="badge bg-info"><?= $leave['total_days'] ?> day<?= $leave['total_days'] != 1 ? 's' : '' ?></span></div>
@@ -743,17 +756,27 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="apply_leave_type" class="form-label">Leave Type <span class="text-danger">*</span></label>
-                            <select class="form-select select2-static" id="apply_leave_type" name="leave_type" required onchange="updateLeaveTypeInfo()">
+                            <select class="form-select select2-static" id="apply_leave_type" name="leave_type_id" required onchange="updateLeaveTypeInfo()">
                                 <option value="">Select Type</option>
                                 <?php foreach ($leave_types as $type): ?>
-                                <option value="<?= $type['type_name'] ?>" 
-                                        data-max-days="<?= $type['max_days_per_year'] ?>"
-                                        data-requires-doc="<?= $type['requires_document'] ?>">
-                                    <?= safe_output($type['type_name']) ?> 
-                                    (Max: <?= $type['max_days_per_year'] ?> days/year)
+                                <option value="<?= (int)$type['type_id'] ?>"
+                                        data-max-days="<?= (int)$type['max_days_per_year'] ?>"
+                                        data-max-consecutive="<?= (int)$type['max_consecutive_days'] ?>"
+                                        data-requires-doc="<?= (int)$type['requires_document'] ?>"
+                                        data-is-paid="<?= (int)$type['is_paid'] ?>">
+                                    <?= safe_output($type['type_name']) ?>
+                                    (Max: <?= (int)$type['max_days_per_year'] ?> days/year)
                                 </option>
                                 <?php endforeach; ?>
                             </select>
+                            <div id="apply_paid_badge" class="mt-1"></div>
+                            <?php if (isAdmin() || canView('leave_types')): ?>
+                            <small class="d-block mt-1">
+                                <a href="<?= getUrl('leave_types') ?>" target="_blank" rel="noopener">
+                                    <i class="bi bi-gear me-1"></i>Manage leave types &amp; maximum days
+                                </a>
+                            </small>
+                            <?php endif; ?>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="apply_start_date" class="form-label">Start Date <span class="text-danger">*</span></label>
@@ -769,26 +792,22 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-4 mb-3">
                             <label for="apply_half_day" class="form-label">Half Day</label>
-                            <select class="form-select" id="apply_half_day" name="half_day" onchange="calculateDays()">
-                                <option value="">No</option>
+                            <select class="form-select" id="apply_half_day" name="half_day" onchange="toggleLeaveHours('apply'); calculateDays();">
+                                <option value="none">No</option>
                                 <option value="first_half">First Half</option>
                                 <option value="second_half">Second Half</option>
+                                <option value="other">➕ Other (specify)…</option>
                             </select>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label for="apply_is_paid" class="form-label">Leave Type</label>
-                            <select class="form-select" id="apply_is_paid" name="is_paid">
-                                <option value="1">Paid Leave</option>
-                                <option value="0">Unpaid Leave</option>
-                            </select>
+                        <div class="col-md-4 mb-3 d-none" id="apply_leave_hours_div">
+                            <label for="apply_leave_hours" class="form-label">Hours of Leave <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="apply_leave_hours" name="leave_hours"
+                                   step="0.5" min="0.5" max="<?= WORKING_DAY_HOURS ?>" placeholder="e.g. 3.5">
+                            <small class="text-muted">Less than a full day (max <?= WORKING_DAY_HOURS ?> hours).</small>
                         </div>
                         <div class="col-md-12 mb-3">
                             <label for="apply_reason" class="form-label">Reason for Leave <span class="text-danger">*</span></label>
                             <textarea class="form-control" id="apply_reason" name="reason" rows="3" required placeholder="Please provide a reason for your leave"></textarea>
-                        </div>
-                        <div class="col-md-12 mb-3">
-                            <label for="apply_notes" class="form-label">Additional Notes</label>
-                            <textarea class="form-control" id="apply_notes" name="notes" rows="2" placeholder="Any additional information or notes"></textarea>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="apply_contact_during_leave" class="form-label">Contact During Leave</label>
@@ -845,7 +864,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 <div class="modal fade" id="bulkLeaveModal" tabindex="-1" aria-labelledby="bulkLeaveModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-info text-white">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="bulkLeaveModalLabel">
                     <i class="bi bi-upload"></i> Bulk Leave Import
                 </h5>
@@ -903,39 +922,16 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 <?php endif; ?>
 
 <!-- View Leave Modal -->
-<div class="modal fade" id="viewLeaveModal" tabindex="-1" aria-labelledby="viewLeaveModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="viewLeaveModalLabel">
-                    <i class="bi bi-info-circle"></i> Leave Details
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-0" id="viewLeaveDetails">
-                <!-- Data will be loaded here via AJAX -->
-                <div class="p-5 text-center">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Edit Leave Modal -->
 <div class="modal fade" id="editLeaveModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="editLeaveModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="editLeaveModalLabel">
                     <i class="bi bi-pencil"></i> Edit Leave Application
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="editLeaveForm">
                 <div class="modal-body">
@@ -945,14 +941,27 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="edit_leave_type" class="form-label">Leave Type <span class="text-danger">*</span></label>
-                            <select class="form-select select2-static" id="edit_leave_type" name="leave_type" required>
+                            <select class="form-select select2-static" id="edit_leave_type" name="leave_type_id" required onchange="updateLeaveTypeInfo('edit')">
                                 <option value="">Select Type</option>
                                 <?php foreach ($leave_types as $type): ?>
-                                <option value="<?= $type['type_name'] ?>">
+                                <option value="<?= (int)$type['type_id'] ?>"
+                                        data-max-days="<?= (int)$type['max_days_per_year'] ?>"
+                                        data-max-consecutive="<?= (int)$type['max_consecutive_days'] ?>"
+                                        data-requires-doc="<?= (int)$type['requires_document'] ?>"
+                                        data-is-paid="<?= (int)$type['is_paid'] ?>">
                                     <?= safe_output($type['type_name']) ?>
+                                    (Max: <?= (int)$type['max_days_per_year'] ?> days/year)
                                 </option>
                                 <?php endforeach; ?>
                             </select>
+                            <div id="edit_paid_badge" class="mt-1"></div>
+                            <?php if (isAdmin() || canView('leave_types')): ?>
+                            <small class="d-block mt-1">
+                                <a href="<?= getUrl('leave_types') ?>" target="_blank" rel="noopener">
+                                    <i class="bi bi-gear me-1"></i>Manage leave types &amp; maximum days
+                                </a>
+                            </small>
+                            <?php endif; ?>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="edit_start_date" class="form-label">Start Date <span class="text-danger">*</span></label>
@@ -968,26 +977,22 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-4 mb-3">
                             <label for="edit_half_day" class="form-label">Half Day</label>
-                            <select class="form-select select2-static" id="edit_half_day" name="half_day">
-                                <option value="">No</option>
+                            <select class="form-select" id="edit_half_day" name="half_day" onchange="toggleLeaveHours('edit'); calculateDays();">
+                                <option value="none">No</option>
                                 <option value="first_half">First Half</option>
                                 <option value="second_half">Second Half</option>
+                                <option value="other">➕ Other (specify)…</option>
                             </select>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label for="edit_is_paid" class="form-label">Leave Type</label>
-                            <select class="form-select select2-static" id="edit_is_paid" name="is_paid">
-                                <option value="1">Paid Leave</option>
-                                <option value="0">Unpaid Leave</option>
-                            </select>
+                        <div class="col-md-4 mb-3 d-none" id="edit_leave_hours_div">
+                            <label for="edit_leave_hours" class="form-label">Hours of Leave <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="edit_leave_hours" name="leave_hours"
+                                   step="0.5" min="0.5" max="<?= WORKING_DAY_HOURS ?>" placeholder="e.g. 3.5">
+                            <small class="text-muted">Less than a full day (max <?= WORKING_DAY_HOURS ?> hours).</small>
                         </div>
                         <div class="col-12 mb-3">
                             <label for="edit_reason" class="form-label">Reason for Leave <span class="text-danger">*</span></label>
                             <textarea class="form-control" id="edit_reason" name="reason" rows="3" required></textarea>
-                        </div>
-                        <div class="col-12 mb-3">
-                            <label for="edit_notes" class="form-label">Additional Notes</label>
-                            <textarea class="form-control" id="edit_notes" name="notes" rows="2"></textarea>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="edit_contact_during_leave" class="form-label">Contact During Leave</label>
@@ -1268,19 +1273,54 @@ $(document).ready(function() {
     });
 });
 
-function updateLeaveTypeInfo() {
-    logReportAction('Selected Leave Type', 'User selected leave type: ' + $('#apply_leave_type').val());
-    console.log("Updating leave type info...");
-    const selectedOption = $('#apply_leave_type').find(':selected');
-    const requiresDoc = selectedOption.data('requires-doc') == 1;
-    
-    if (requiresDoc) {
-        $('#documentSection').show();
-    } else {
-        $('#documentSection').hide();
+// prefix: 'apply' (default) or 'edit'. The select carries the type's rules as
+// data-* attributes, so the form can show them without another round trip.
+function updateLeaveTypeInfo(prefix) {
+    prefix = prefix || 'apply';
+    const $sel = $('#' + prefix + '_leave_type');
+    logReportAction('Selected Leave Type', 'User selected leave type id: ' + $sel.val());
+
+    const opt = $sel.find(':selected');
+    const requiresDoc = opt.data('requires-doc') == 1;
+    const isPaid      = opt.data('is-paid');
+
+    if (prefix === 'apply') {
+        requiresDoc ? $('#documentSection').show() : $('#documentSection').hide();
     }
-    
-    updateLeaveBalance();
+
+    // Paid/unpaid is a property of the type, not a choice on this form.
+    const $badge = $('#' + prefix + '_paid_badge').empty();
+    if ($sel.val()) {
+        const paid = String(isPaid) === '1';
+        $badge.append(
+            $('<span>')
+                .addClass('badge')
+                .css({ background: paid ? '#0d6efd' : '#6c757d', color: '#fff' })
+                .text(paid ? 'Paid Leave' : 'Unpaid Leave')
+        ).append(
+            $('<small>').addClass('text-muted ms-2').text(
+                paid ? 'Salary is paid for these days.' : 'Salary is not paid for these days.'
+            )
+        );
+    }
+
+    if (prefix === 'apply') updateLeaveBalance();
+}
+
+// Half Day → "Other (specify)" reveals the hours input, mirroring the
+// swap-in-place "Other" pattern used elsewhere in the HR forms.
+function toggleLeaveHours(prefix) {
+    const val = $('#' + prefix + '_half_day').val();
+    const $div = $('#' + prefix + '_leave_hours_div');
+    const $inp = $('#' + prefix + '_leave_hours');
+
+    if (val === 'other') {
+        $div.removeClass('d-none');
+        $inp.attr('required', true);
+    } else {
+        $div.addClass('d-none');
+        $inp.attr('required', false).val('').removeClass('is-invalid');
+    }
 }
 
 function clearFilters() {
@@ -1402,16 +1442,36 @@ function bulkExportApplications() {
     document.body.removeChild(form);
 }
 
+const WORKING_DAY_HOURS = <?= (int)WORKING_DAY_HOURS ?>;
+
+// Days consumed, mirroring core/leave_rules.php::leaveDaysFor() so the figure the
+// user sees matches the one the server stores. 'none' is a real value now, so it
+// must be compared explicitly — a truthy test would dock half a day from every leave.
+function leaveDaysFor(startDate, endDate, halfDay, leaveHours) {
+    const start = new Date(startDate);
+    const end   = new Date(endDate);
+    if (end < start) return null;
+
+    const diffDays = Math.round((end - start) / 86400000) + 1;
+
+    if (halfDay === 'first_half' || halfDay === 'second_half') {
+        return Math.max(0.5, diffDays - 0.5);
+    }
+    if (halfDay === 'other') {
+        const h = parseFloat(leaveHours);
+        if (!h || h <= 0) return diffDays - 1;
+        return Math.round(((diffDays - 1) + (h / WORKING_DAY_HOURS)) * 100) / 100;
+    }
+    return diffDays;
+}
+
 function calculateDays() {
     const startDate = $('#apply_start_date').val();
     const endDate = $('#apply_end_date').val();
-    const halfDay = $('#apply_half_day').val();
-    
+
     if (startDate && endDate) {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        
-        if (end < start) {
+        const totalDays = leaveDaysFor(startDate, endDate, $('#apply_half_day').val(), $('#apply_leave_hours').val());
+        if (totalDays === null) {
             Swal.fire({
                 icon: 'warning',
                 title: 'Invalid Date Range',
@@ -1422,19 +1482,6 @@ function calculateDays() {
             $('#apply_end_date').val('');
             return;
         }
-
-        // Calculate difference in days
-        const diffTime = Math.abs(end - start);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Include both start and end dates
-        
-        let totalDays = diffDays;
-        
-        // Adjust for half day
-        if (halfDay) {
-            totalDays = diffDays - 0.5;
-            if (totalDays < 0) totalDays = 0;
-        }
-        
         $('#apply_total_days').val(totalDays);
         updateLeaveBalance();
     }
@@ -1443,30 +1490,23 @@ function calculateDays() {
     const editStart = $('#edit_start_date').val();
     const editEnd = $('#edit_end_date').val();
     if (editStart && editEnd) {
-        const start = new Date(editStart);
-        const end = new Date(editEnd);
-        if (end >= start) {
-            const diffTime = Math.abs(end - start);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-            $('#edit_total_days').val(diffDays);
-        } else {
-            $('#edit_total_days').val(0);
-        }
+        const d = leaveDaysFor(editStart, editEnd, $('#edit_half_day').val(), $('#edit_leave_hours').val());
+        $('#edit_total_days').val(d === null ? 0 : d);
     }
 }
 
 function updateLeaveBalance() {
     const employeeId = $('#apply_employee_id').val();
-    const leaveType = $('#apply_leave_type').val();
+    const leaveTypeId = $('#apply_leave_type').val();   // now the leave_types FK
     const totalDays = parseFloat($('#apply_total_days').val()) || 0;
-    
-    if (employeeId && leaveType) {
+
+    if (employeeId && leaveTypeId) {
         $.ajax({
             url: APP_URL + '/api/get_leave_balance.php',
             type: 'GET',
-            data: { 
+            data: {
                 employee_id: employeeId,
-                leave_type: leaveType
+                leave_type_id: leaveTypeId
             },
             dataType: 'json',
             success: function(response) {
@@ -1537,78 +1577,13 @@ function updateLeaveBalance() {
     }
 }
 
+// Actions ▸ View now opens the standalone leave_details.php page instead of the
+// old in-page modal, so the record can be printed with the shared header/footer.
+// Every caller (table row, desktop button, mobile card, ?open_leave= deep link)
+// routes through here.
 function viewLeave(leaveId) {
-    $.ajax({
-        url: APP_URL + '/api/get_leave.php',
-        type: 'GET',
-        data: { id: leaveId },
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                let data = response.data;
-                let statusBadge = '';
-                if(data.status == 'pending') statusBadge = '<span class="badge bg-warning text-dark">PENDING</span>';
-                else if(data.status == 'approved') statusBadge = '<span class="badge bg-success">APPROVED</span>';
-                else if(data.status == 'rejected') statusBadge = '<span class="badge bg-danger">REJECTED</span>';
-                else statusBadge = '<span class="badge bg-secondary">' + data.status.toUpperCase() + '</span>';
-
-                let html = `
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-sm mb-0" style="font-size: 0.85rem;">
-                            <tr class="bg-light">
-                                <th width="35%">Employee Name</th>
-                                <td>${data.first_name} ${data.last_name}</td>
-                            </tr>
-                            <tr>
-                                <th>Department</th>
-                                <td>${data.department_name}</td>
-                            </tr>
-                            <tr>
-                                <th>Leave Type</th>
-                                <td class="fw-bold text-primary">${data.leave_type_display || data.leave_type || '-'}</td>
-                            </tr>
-                            <tr>
-                                <th>Start Date</th>
-                                <td>${data.start_date}</td>
-                            </tr>
-                            <tr>
-                                <th>End Date</th>
-                                <td>${data.end_date}</td>
-                            </tr>
-                            <tr>
-                                <th>Duration</th>
-                                <td><span class="badge bg-info text-dark">${data.total_days} Days</span></td>
-                            </tr>
-                            <tr>
-                                <th>Current Status</th>
-                                <td>${statusBadge}</td>
-                            </tr>
-                            <tr>
-                                <th>Applied By</th>
-                                <td>${data.applied_by_name || '-'}</td>
-                            </tr>
-                            <tr class="table-info">
-                                <th>Reason For Leave</th>
-                                <td style="white-space: normal;">${data.reason}</td>
-                            </tr>
-                            <tr>
-                                <th>Notes/Remarks</th>
-                                <td style="white-space: normal;">${data.notes || '-'}</td>
-                            </tr>
-                        </table>
-                    </div>
-                `;
-                $('#viewLeaveDetails').html(html);
-                logReportAction('Viewed Leave Details', 'User viewed full details for leave ID: ' + leaveId);
-                $('#viewLeaveModal').modal('show');
-            } else {
-                Swal.fire('Error', response.message, 'error');
-            }
-        },
-        error: function() {
-            Swal.fire('Error', 'Could not load leave details.', 'error');
-        }
-    });
+    logReportAction('Viewed Leave Details', 'User opened leave details page for leave ID: ' + leaveId);
+    window.location.href = APP_URL + '/leave_details?id=' + encodeURIComponent(leaveId);
 }
 
 // Deep-link from the dashboard "System requires your attention" panel:
@@ -1630,23 +1605,17 @@ function editLeave(leaveId) {
                 // Populate edit form
                 $('#edit_leave_id').val(response.data.leave_id);
                 
-                // Smart mapping for select value
-                let lType = response.data.leave_type;
-                if(lType === 'annual') lType = 'Annual Leave';
-                else if(lType === 'sick') lType = 'Sick Leave';
-                else if(lType === 'maternity') lType = 'Maternity Leave';
-                else if(lType === 'paternity') lType = 'Paternity Leave';
-                else if(lType === 'study') lType = 'Study Leave';
-                else if(lType === 'unpaid') lType = 'Unpaid Leave';
-                
-                $('#edit_leave_type').val(lType).trigger('change');
+                // The leave type is a real FK now — no name-guessing needed.
+                $('#edit_leave_type').val(response.data.leave_type_id || '').trigger('change');
+                updateLeaveTypeInfo('edit');
+
                 $('#edit_start_date').val(response.data.start_date);
                 $('#edit_end_date').val(response.data.end_date);
                 $('#edit_total_days').val(response.data.total_days);
-                $('#edit_half_day').val(response.data.half_day || '').trigger('change');
-                $('#edit_is_paid').val(response.data.is_paid ?? 1).trigger('change');
+                $('#edit_half_day').val(response.data.half_day || 'none');
+                $('#edit_leave_hours').val(response.data.leave_hours || '');
+                toggleLeaveHours('edit');
                 $('#edit_reason').val(response.data.reason);
-                $('#edit_notes').val(response.data.notes || '');
                 $('#edit_contact_during_leave').val(response.data.contact_during_leave || '');
                 $('#edit_handover_to').val(response.data.handover_to || '').trigger('change');
                 
