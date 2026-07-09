@@ -3,10 +3,15 @@
 require_once __DIR__ . '/roots.php';
 
 // Check if user is logged in
-file_put_contents(__DIR__ . '/debug_ajax.log', date('Y-m-d H:i:s') . " - ID: " . ($_GET['id'] ?? 'none') . "\n", FILE_APPEND);
 if (!isset($_SESSION['user_id'])) {
     http_response_code(403);
     exit('Unauthorized');
+}
+
+// This endpoint renders the warehouse EDIT form — gate it on the edit verb.
+if (!canEdit('warehouses')) {
+    http_response_code(403);
+    exit('Permission denied');
 }
 
 $warehouse_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
@@ -16,14 +21,30 @@ if ($warehouse_id <= 0) {
     exit('Invalid Warehouse ID');
 }
 
+// Row-level gate: a warehouse tied to a project outside the caller's scope is
+// not theirs to open. Plain-text 403 (this endpoint returns HTML, not JSON).
+assertScopeForRecordHtml('warehouses', 'warehouse_id', $warehouse_id);
+
 try {
     $stmt = $pdo->prepare("SELECT * FROM warehouses WHERE warehouse_id = ?");
     $stmt->execute([$warehouse_id]);
     $warehouse = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // Fetch active projects for selection
-    $projects_stmt = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name ASC");
-    $all_projects = $projects_stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Fetch active projects for selection — admins see all; non-admins see only
+    // their assigned projects. Mirrors app/bms/stock/warehouses.php.
+    if (isAdmin()) {
+        $all_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+        if (empty($assigned)) {
+            $all_projects = [];
+        } else {
+            $ph = implode(',', array_fill(0, count($assigned), '?'));
+            $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name ASC");
+            $pstmt->execute($assigned);
+            $all_projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+    }
 
     if (!$warehouse) {
         http_response_code(404);
