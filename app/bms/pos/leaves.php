@@ -765,7 +765,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                         data-requires-doc="<?= (int)$type['requires_document'] ?>"
                                         data-is-paid="<?= (int)$type['is_paid'] ?>">
                                     <?= safe_output($type['type_name']) ?>
-                                    (Max: <?= (int)$type['max_days_per_year'] ?> days/year)
+                                    (Max: <?= (int)$type['max_days_per_year'] ?> days/year, <?= (int)$type['max_consecutive_days'] ?> consecutive)
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -943,7 +943,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                         data-requires-doc="<?= (int)$type['requires_document'] ?>"
                                         data-is-paid="<?= (int)$type['is_paid'] ?>">
                                     <?= safe_output($type['type_name']) ?>
-                                    (Max: <?= (int)$type['max_days_per_year'] ?> days/year)
+                                    (Max: <?= (int)$type['max_days_per_year'] ?> days/year, <?= (int)$type['max_consecutive_days'] ?> consecutive)
                                 </option>
                                 <?php endforeach; ?>
                             </select>
