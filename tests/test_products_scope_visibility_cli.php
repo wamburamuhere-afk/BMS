@@ -1,12 +1,13 @@
 <?php
 /**
- * BMS — Products list project-scope VISIBILITY guard (behavioural)
+ * BMS — Products/Services list project-scope VISIBILITY guard (behavioural)
  *
  * The sibling guard (test_scope_enforcement_cli.php) greps the source for a
- * scope marker. That is necessary but not sufficient: products.php once carried
- * a hand-rolled block that pushed a literal '0' condition for non-admins with no
- * projects, producing `WHERE 1=1 AND 0` and a totally blank page — including the
- * global (project_id IS NULL) catalogue. The grep guard passed the whole time.
+ * scope marker. That is necessary but not sufficient: products.php and
+ * services.php each carried a hand-rolled block that pushed a literal '0'
+ * condition for non-admins with no projects, producing `... AND 0` and a totally
+ * blank page — including the global (project_id IS NULL) catalogue that both
+ * pages' comments promise are visible to all. The grep guard passed the whole time.
  *
  * This test asserts the SQL the page actually builds, and the row counts it
  * actually returns, for each scope state. Read-only: no writes, no fixtures.
@@ -18,13 +19,18 @@
  */
 
 // ── Child mode ────────────────────────────────────────────────────────────
-// Renders the real products.php as a real non-admin with zero projects and
-// reports what the page actually produced. Runs in its own process because the
-// page bootstraps a session, emits a full HTML document, and may exit() on a
-// permission redirect. Parent consumes the JSON on the last line.
+// Renders the real products.php / services.php as a real non-admin with zero
+// projects and reports what the page actually produced. Runs in its own process
+// because the page bootstraps a session, emits a full HTML document, and may
+// exit() on a permission redirect. Parent consumes the JSON on the last line.
+//
+//   argv: --render-child <user_id> <products|services>
 if (($argv[1] ?? '') === '--render-child') {
+    // Underscore-prefixed: the included page uses $page for pagination and would
+    // otherwise clobber it before we read it back.
+    $__page = ($argv[3] ?? 'products') === 'services' ? 'services' : 'products';
     $_SERVER['REQUEST_METHOD'] = 'GET';
-    $_SERVER['REQUEST_URI']    = '/bms/products';
+    $_SERVER['REQUEST_URI']    = "/bms/$__page";
     $_SERVER['SCRIPT_NAME']    = '/bms/index.php';
     $_SERVER['HTTP_HOST']      = 'localhost';
     require_once dirname(__DIR__) . '/roots.php';
@@ -39,15 +45,17 @@ if (($argv[1] ?? '') === '--render-child') {
     loadUserScope($uid);
 
     ob_start();
-    include dirname(__DIR__) . '/app/bms/product/products.php';
+    include dirname(__DIR__) . "/app/bms/product/$__page.php";
     ob_end_clean();
 
-    $tagged = count(array_filter($products, fn($p) => $p['project_id'] !== null));
+    // products.php exposes $products; services.php exposes $all_nip_services.
+    $rows = $__page === 'services' ? $all_nip_services : $products;
+    $tagged = count(array_filter($rows, fn($r) => $r['project_id'] !== null));
     file_put_contents('php://stdout', "\n__RESULT__" . json_encode([
         'is_admin'    => $_SESSION['scope']['is_admin'],
         'projects'    => $_SESSION['scope']['projects'],
         'total_count' => (int)$total_count,
-        'rows'        => count($products),
+        'rows'        => count($rows),
         'tagged'      => $tagged,
     ]) . "\n");
     exit(0);
@@ -145,8 +153,9 @@ preg_match('/^\s*AND\s/', $frag)
     ? ok('fragment carries its own leading AND (must NOT be pushed into $conditions)')
     : bad("fragment lacks a leading AND: '$frag'");
 
-head('END-TO-END — render the real page as a zero-project non-admin');
-// Pick a real non-admin who has products view permission and no project assignments.
+head('END-TO-END — render the real pages as a zero-project non-admin');
+// Pick a real non-admin who has products view permission (services.php shares the
+// same page_key) and no project assignments.
 $candidate = $pdo->query("
     SELECT u.user_id
     FROM users u
@@ -158,42 +167,58 @@ $candidate = $pdo->query("
     LIMIT 1
 ")->fetchColumn();
 
+// Each page's own base filters, so the expected count is derived independently.
+$expected_globals = [
+    'products' => $globals,
+    'services' => (int)$pdo->query(
+        "SELECT COUNT(*) FROM products WHERE project_id IS NULL AND is_service = 1 AND status = 'active'"
+    )->fetchColumn(),
+];
+
 if ($candidate === false || $candidate === null) {
     echo "  \033[33m—\033[0m skipped: no zero-project non-admin with products view permission\n";
 } else {
     $devnull = DIRECTORY_SEPARATOR === '\\' ? 'NUL' : '/dev/null';
-    $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' --render-child ' . (int)$candidate . " 2>$devnull";
-    $out = shell_exec($cmd) ?: '';
-    if (!preg_match('/__RESULT__(\{.*\})/', $out, $m)) {
-        bad('could not render products.php (no result from child process)');
-    } else {
+    foreach (['products', 'services'] as $page) {
+        $want = $expected_globals[$page];
+        $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__)
+             . ' --render-child ' . (int)$candidate . ' ' . $page . " 2>$devnull";
+        $out = shell_exec($cmd) ?: '';
+        if (!preg_match('/__RESULT__(\{.*\})/', $out, $m)) {
+            bad("could not render $page.php (no result from child process)");
+            continue;
+        }
         $r = json_decode($m[1], true);
         $r['is_admin'] === false && $r['projects'] === []
-            ? ok("rendered as a genuine zero-project non-admin (user $candidate)")
-            : bad('child did not run with a zero-project non-admin scope');
+            ? ok("$page.php rendered as a genuine zero-project non-admin (user $candidate)")
+            : bad("$page.php: child did not run with a zero-project non-admin scope");
 
-        // THE regression: the page used to build `WHERE 1=1 AND 0` and return nothing.
-        if ($globals > 0) {
+        // THE regression: the page used to build `... AND 0` and return nothing.
+        if ($want > 0) {
             $r['total_count'] > 0
-                ? ok("page returned {$r['total_count']} product(s), not a blank list")
-                : bad("REGRESSION: page returned 0 products despite $globals global product(s)");
+                ? ok("$page.php returned {$r['total_count']} row(s), not a blank list")
+                : bad("REGRESSION: $page.php returned 0 rows despite $want global row(s)");
+        } else {
+            echo "  \033[33m—\033[0m $page.php: skipped blank-page check (no global rows in this DB)\n";
         }
-        $r['total_count'] === $globals
-            ? ok("page total_count ($globals) equals the global catalogue")
-            : bad("page total_count = {$r['total_count']}, expected $globals");
+
+        $r['total_count'] === $want
+            ? ok("$page.php total_count ($want) equals its global catalogue")
+            : bad("$page.php total_count = {$r['total_count']}, expected $want");
 
         $r['tagged'] === 0
-            ? ok('page leaked no project-tagged products')
-            : bad("page leaked {$r['tagged']} project-tagged product(s)");
+            ? ok("$page.php leaked no project-tagged rows")
+            : bad("$page.php leaked {$r['tagged']} project-tagged row(s)");
     }
 }
 
-head('Source — the hand-rolled deny block is gone');
-$srcFile = dirname(__DIR__) . '/app/bms/product/products.php';
-$src = @file_get_contents($srcFile) ?: '';
-strpos($src, "\$conditions[] = '0';") === false
-    ? ok("products.php no longer pushes a literal '0' condition")
-    : bad("products.php still contains \$conditions[] = '0';");
+head('Source — the hand-rolled deny block is gone from both pages');
+foreach (['products', 'services'] as $page) {
+    $src = @file_get_contents(dirname(__DIR__) . "/app/bms/product/$page.php") ?: '';
+    strpos($src, "\$conditions[] = '0';") === false
+        ? ok("$page.php no longer pushes a literal '0' condition")
+        : bad("$page.php still contains \$conditions[] = '0';");
+}
 
 echo "\n\033[1m═══ Result ═══\033[0m\n";
 if ($failures === 0) {

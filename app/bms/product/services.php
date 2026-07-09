@@ -61,19 +61,15 @@ if ($category_id > 0) {
     $params[':category'] = $category_id;
 }
 
-// Project scope: NULL = global (visible to all); set = only users assigned to that project
-if (empty($_SESSION['scope']['is_admin'])) {
-    $sp_ids = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
-    if (empty($sp_ids)) {
-        $conditions[] = '0';
-    } else {
-        $conditions[] = "(p.project_id IS NULL OR p.project_id IN (" . implode(',', $sp_ids) . "))";
-    }
-}
+// Project scope: NULL = global (visible to all); set = only users assigned to that project.
+// Carries its own leading AND, so it is appended to each query rather than pushed
+// into $conditions (which are joined with " AND ").
+$scope_sql = scopeFilterSqlNullable('project', 'p');
 
 if (!empty($conditions)) {
     $query .= " AND " . implode(" AND ", $conditions);
 }
+$query .= $scope_sql;
 $query .= " ORDER BY p.product_name ASC LIMIT :limit OFFSET :offset";
 
 // Count query
@@ -81,6 +77,7 @@ $count_query = "SELECT COUNT(*) as total FROM products p WHERE p.is_service = 1"
 if (!empty($conditions)) {
     $count_query .= " AND " . implode(" AND ", $conditions);
 }
+$count_query .= $scope_sql;
 $count_stmt = $pdo->prepare($count_query);
 foreach ($params as $k => $v) { $count_stmt->bindValue($k, $v); }
 $count_stmt->execute();

@@ -25,8 +25,12 @@ fix. Updated `tests/test_scope_enforcement_cli.php` to expect the helper marker 
 products.php instead of the removed inline literal — the old grep-only guard
 passed for six weeks while the page rendered empty.
 
-Note: `app/bms/product/services.php:68` still carries the identical `'0'` bug and
-is not fixed here.
+`app/bms/product/services.php` carried a character-for-character copy of the same
+block (same May commit) and was fixed identically — its scope fragment appended to
+its list and count queries, before the `ORDER BY`. A zero-project non-admin now
+sees the 1 global service instead of a blank page; the 5 project-tagged services
+stay hidden. (Those 5 are why assigning a project changed nothing on the products
+page — every project-tagged row in `products` is a service.)
 
 ## 2026-07-08 (ux) — Payment Frequency "Other" swaps in place (like Department)
 
