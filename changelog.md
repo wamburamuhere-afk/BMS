@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-07-08 (security) — Warehouse project scope: edit-modal leak + unguarded writes
+
+`ajax_get_warehouse.php` rebuilt the warehouse edit modal server-side and queried
+**every** active project with no scope filter, so a non-admin with zero assigned
+projects saw all 4 projects in the "Project (Optional)" dropdown. It also checked
+only `isset($_SESSION['user_id'])` — no `canEdit('warehouses')` and no row-level
+gate, so any logged-in user could fetch the edit form for any warehouse id. Added
+the permission check, `assertScopeForRecordHtml('warehouses', ...)`, and a scoped
+project query mirroring `warehouses.php`. Removed the `debug_ajax.log` write that
+fired on every request.
+
+The write handlers took `$_POST['project_id']` straight into the INSERT/UPDATE
+with no validation. Verified exploitable on `origin/develop`: a non-admin scoped
+to project 16 created a warehouse attached to project 19, and renamed warehouse 15
+(project 19) to "HACKED" while reassigning it to project 16. Both `add_warehouse`
+and `update_warehouse` now reject an out-of-scope `project_id` via
+`userCan('project', ...)`, and `update_warehouse` additionally gates the *existing*
+warehouse's project so a guessed id cannot be edited.
+
+Note: the Add modal in `warehouses.php` was already scoped correctly. If it still
+lists projects for a user whose assignments were just removed, that is scope-cache
+staleness — `header.php:68` calls `loadUserScope()` only when `$_SESSION['scope']`
+is unset, and `refreshScopeCache()` is a no-op for any user other than the one
+currently logged in, so their session keeps the old projects until they re-login.
+Not fixed here; needs a scope-version design.
+
 ## 2026-07-08 (ux) — Payment Frequency "Other" swaps in place (like Department)
 
 Payment Frequency "➕ Other (specify)…" now uses the same `toggleEmpOther`
