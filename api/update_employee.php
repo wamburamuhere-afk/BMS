@@ -4,6 +4,7 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../core/code_generator.php';
 require_once __DIR__ . '/../core/hr_lookups.php';
+require_once __DIR__ . '/../core/employee_extra_documents.php';
 
 header('Content-Type: application/json');
 
@@ -234,6 +235,15 @@ try {
     $sql = "UPDATE employees SET " . implode(', ', $update_fields) . " WHERE employee_id = ?";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($update_params);
+
+    // Wizard Step 5 — repeatable "Additional / Optional Documents". Removals are
+    // soft-deletes verified against THIS employee; additions become new rows.
+    hrDeleteExtraDocuments($pdo, (int)$employee_id, (int)$_SESSION['user_id']);
+    hrSaveExtraDocuments($pdo, (int)$employee_id, [
+        'first_name' => $_POST['first_name'] ?? '',
+        'last_name'  => $_POST['last_name'] ?? '',
+        'project_id' => $_POST['project_id'] ?? null,
+    ], (int)$_SESSION['user_id']);
 
     logActivity($pdo, $_SESSION['user_id'], 'Edit employee', "User edited employee: {$_POST['first_name']} {$_POST['last_name']} (ID $employee_id)");
 

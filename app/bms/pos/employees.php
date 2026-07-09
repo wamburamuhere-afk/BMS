@@ -883,10 +883,6 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     <input type="text" class="form-control" id="bank_account" name="bank_account" placeholder="Bank account number">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="bank_branch" class="form-label">Bank Branch</label>
-                                    <input type="text" class="form-control" id="bank_branch" name="bank_branch" placeholder="Bank branch">
-                                </div>
-                                <div class="col-md-6 mb-3">
                                     <label for="mobile_money" class="form-label">Mobile Money Number</label>
                                     <input type="text" class="form-control" id="mobile_money" name="mobile_money" placeholder="Mobile money number">
                                 </div>
@@ -942,12 +938,30 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                         </div>
                                         <div class="col-md-4">
                                             <div class="form-check mb-2">
-                                                <input class="form-check-input" type="checkbox" id="other_doc_attached" name="documents[]" value="other_doc" onchange="toggleDocUpload('other_doc')">
+                                                <input class="form-check-input" type="checkbox" id="other_doc_attached" onchange="toggleOtherDocs()">
                                                 <label class="form-check-label" for="other_doc_attached">Others</label>
                                             </div>
-                                            <div id="other_doc_upload_div" class="d-none">
-                                                <input type="text" class="form-control form-control-sm mb-1" id="other_doc_name" name="other_doc_name" placeholder="Document Name (e.g. Guarantee)">
-                                                <input type="file" class="form-control form-control-sm" id="other_doc_file" name="other_doc_file">
+                                        </div>
+
+                                        <!-- Others: repeatable name + file rows -->
+                                        <div class="col-12 d-none" id="other_doc_upload_div">
+                                            <div class="card border-primary">
+                                                <div class="card-body p-3">
+                                                    <div class="small text-muted mb-2">
+                                                        <i class="bi bi-info-circle text-primary me-1"></i>
+                                                        Name each document so it can be identified later. Add as many as you need.
+                                                    </div>
+
+                                                    <!-- Documents already on file (edit mode) -->
+                                                    <div id="existing_extra_docs" class="mb-2"></div>
+
+                                                    <!-- New rows -->
+                                                    <div id="extra_docs_rows"></div>
+
+                                                    <button type="button" class="btn btn-sm btn-outline-primary mt-1" id="add_extra_doc_btn" onclick="addExtraDocRow()">
+                                                        <i class="bi bi-plus-circle me-1"></i> Add another document
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1639,23 +1653,103 @@ $('#importEmployeesModal').on('show.bs.modal', function() {
 window.toggleDocUpload = function(docType) {
     const mapping = {
         'intro_letter': '#intro_letter_attached',
-        'app_letter': '#app_letter_attached',
-        'other_doc': '#other_doc_attached'
+        'app_letter': '#app_letter_attached'
     };
-    
+
     const isChecked = $(mapping[docType]).is(':checked');
     const uploadDiv = $('#' + docType + '_upload_div');
     const fileInput = $('#' + docType + '_file');
-    
+
     if (isChecked) {
         uploadDiv.removeClass('d-none');
         fileInput.attr('required', true);
-        if (docType === 'other_doc') $('#other_doc_name').attr('required', true);
     } else {
         uploadDiv.addClass('d-none');
         fileInput.attr('required', false).val('').removeClass('is-invalid');
-        if (docType === 'other_doc') $('#other_doc_name').attr('required', false).val('');
     }
+};
+
+// ── Additional / Optional Documents ("Others") ───────────────────────────────
+// Repeatable name + file pairs. Posted as extra_doc_name[] / extra_doc_file[];
+// removals of already-saved rows are posted as removed_extra_doc_ids[].
+window.extraDocRowSeq = 0;
+
+window.toggleOtherDocs = function() {
+    const on = $('#other_doc_attached').is(':checked');
+    $('#other_doc_upload_div').toggleClass('d-none', !on);
+
+    if (on) {
+        // Give the user something to type into straight away.
+        if ($('#extra_docs_rows').children().length === 0 && $('#existing_extra_docs').children().length === 0) {
+            addExtraDocRow();
+        }
+    } else {
+        // Unticking discards only the NEW rows — already-saved documents stay,
+        // and are removed explicitly via their own Remove button.
+        $('#extra_docs_rows').empty();
+    }
+};
+
+window.addExtraDocRow = function() {
+    const i = window.extraDocRowSeq++;
+    const row = `
+        <div class="row g-2 align-items-start mb-2 extra-doc-row" id="extra_doc_row_${i}">
+            <div class="col-md-5">
+                <input type="text" class="form-control form-control-sm" name="extra_doc_name[]"
+                       placeholder="Document name (e.g. Guarantee Letter)" aria-label="Document name">
+            </div>
+            <div class="col-md-6">
+                <input type="file" class="form-control form-control-sm" name="extra_doc_file[]"
+                       accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif" aria-label="Document file">
+            </div>
+            <div class="col-md-1 d-grid">
+                <button type="button" class="btn btn-sm btn-outline-danger" title="Remove this row"
+                        onclick="removeExtraDocRow(${i})"><i class="bi bi-trash"></i></button>
+            </div>
+        </div>`;
+    $('#extra_docs_rows').append(row);
+};
+
+window.removeExtraDocRow = function(i) {
+    $('#extra_doc_row_' + i).remove();
+};
+
+// Edit mode — render documents already on file, each with a Remove button that
+// queues a soft-delete rather than deleting immediately. Names come from user
+// input, so they are inserted as text, never interpolated into markup.
+window.renderExistingExtraDocs = function(docs) {
+    const box = $('#existing_extra_docs').empty();
+    if (!docs || !docs.length) return;
+
+    box.append('<div class="small fw-bold mb-1">Documents on file</div>');
+
+    docs.forEach(d => {
+        const $row = $('<div>')
+            .addClass('d-flex align-items-center justify-content-between border rounded px-2 py-1 mb-1')
+            .attr('id', 'existing_doc_' + d.emp_doc_id);
+
+        const $left = $('<div>').addClass('text-truncate')
+            .append($('<i>').addClass('bi bi-file-earmark-check text-primary me-1'))
+            .append($('<a>').attr({ href: APP_URL + '/' + d.file_path, target: '_blank' }).text(d.document_name))
+            .append($('<span>').addClass('text-muted small ms-1').text(d.original_filename || ''));
+
+        const $btn = $('<button>')
+            .attr({ type: 'button', title: 'Remove this document' })
+            .addClass('btn btn-sm btn-outline-danger ms-2')
+            .append($('<i>').addClass('bi bi-trash'))
+            .on('click', () => markExtraDocRemoved(d.emp_doc_id));
+
+        box.append($row.append($left, $btn));
+    });
+};
+
+window.markExtraDocRemoved = function(id) {
+    $('#existing_doc_' + id).remove();
+    // Queued on the wizard form; the server soft-deletes it on save, after
+    // verifying it belongs to this employee.
+    $('#addEmployeeForm').append(
+        `<input type="hidden" name="removed_extra_doc_ids[]" value="${id}">`
+    );
 };
 
 window.showStep = function(n) {
@@ -1880,9 +1974,13 @@ $(document).ready(function() {
             
             // Reset Documents Wizards
             $('#intro_letter_upload_div, #app_letter_upload_div, #other_doc_upload_div').addClass('d-none');
-            $('#cv_file, #id_file, #certificates_file, #intro_letter_file, #app_letter_file, #other_doc_file').val('').removeClass('is-invalid');
+            $('#cv_file, #id_file, #certificates_file, #intro_letter_file, #app_letter_file').val('').removeClass('is-invalid');
             $('#cv_file, #id_file, #certificates_file').attr('required', true);
-            $('#intro_letter_file, #app_letter_file, #other_doc_file').attr('required', false);
+            $('#intro_letter_file, #app_letter_file').attr('required', false);
+            $('#other_doc_attached').prop('checked', false);
+            $('#extra_docs_rows').empty();
+            $('#existing_extra_docs').empty();
+            $('#addEmployeeForm input[name="removed_extra_doc_ids[]"]').remove();
             $('.existing-doc-link').remove();
 
             // Reset Department/Designation/Employment-Type/Payment-Frequency "Other" state
@@ -2088,20 +2186,29 @@ function editEmployee(employeeId) {
                 // Step 4: Bank & Documents
                 $('#bank_name').val(emp.bank_name || '');
                 $('#bank_account').val(emp.bank_account || '');
-                $('#bank_branch').val(emp.bank_branch || '');
                 $('#mobile_money').val(emp.mobile_money || '');
                 $('#additional_notes').val(emp.additional_notes || '');
                 
                 // --- Reset Documents Section ---
                 $('#intro_letter_attached, #app_letter_attached, #other_doc_attached').prop('checked', false);
                 $('#intro_letter_upload_div, #app_letter_upload_div, #other_doc_upload_div').addClass('d-none');
-                $('#cv_file, #id_file, #certificates_file, #intro_letter_file, #app_letter_file, #other_doc_file').attr('required', false).val('');
-                $('#other_doc_name').val('');
+                $('#cv_file, #id_file, #certificates_file, #intro_letter_file, #app_letter_file').attr('required', false).val('');
+                $('#extra_docs_rows').empty();
+                $('#existing_extra_docs').empty();
+                $('#addEmployeeForm input[name="removed_extra_doc_ids[]"]').remove();
                 $('.existing-doc-link').remove();
 
                 // --- Populate Documents Section ---
                 // Mandatory docs are always visible now, but in edit mode we only require them if not already there
                 $('#cv_file, #id_file, #certificates_file').attr('required', false);
+
+                // Additional documents already on file — reveal the section so the
+                // user can see what exists before adding more.
+                if (emp.extra_docs && emp.extra_docs.length) {
+                    $('#other_doc_attached').prop('checked', true);
+                    $('#other_doc_upload_div').removeClass('d-none');
+                    renderExistingExtraDocs(emp.extra_docs);
+                }
 
                 if (emp.documents) {
                     try {
@@ -2117,14 +2224,12 @@ function editEmployee(employeeId) {
                         if (docs.certificates) $('#certificates_file').closest('.col-md-4').append(`<div class="existing-doc-link mt-1 small"><i class="bi bi-file-earmark-check text-success"></i> <a href="${APP_URL}/${docs.certificates}" target="_blank">Current Certificates</a></div>`);
                         else $('#certificates_file').attr('required', true);
 
-                        // Handle optional displays
+                        // Handle optional displays. 'other_doc' is no longer a
+                        // single slot — extra documents are their own rows now.
                         const optionalMappings = {
                             'intro_letter': { check: '#intro_letter_attached', div: '#intro_letter_upload_div', input: '#intro_letter_file' },
-                            'app_letter': { check: '#app_letter_attached', div: '#app_letter_upload_div', input: '#app_letter_file' },
-                            'other_doc': { check: '#other_doc_attached', div: '#other_doc_upload_div', input: '#other_doc_file', name: '#other_doc_name' }
+                            'app_letter': { check: '#app_letter_attached', div: '#app_letter_upload_div', input: '#app_letter_file' }
                         };
-
-                        if (emp.other_doc_name) $('#other_doc_name').val(emp.other_doc_name);
 
                         for (const key in docs) {
                             if (docs[key] && optionalMappings[key]) {
