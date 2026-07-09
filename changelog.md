@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-07-09 (fix) — Employees: project is now genuinely optional on edit
+
+**`api/update_employee.php`** bound `$_POST['project_id']` straight into the
+`UPDATE` params via a generic `isset()`-driven loop. Leaving the Project
+dropdown blank submits `project_id=''`, which `isset()` treats as present, so
+the raw empty string hit the nullable `int` column. On a server with strict
+`sql_mode` this throws `SQLSTATE[HY000]: 1366`; here (non-strict) it silently
+wrote `project_id = 0` instead of `NULL` — worse, since scope filters
+(`scopeFilterSqlNullable`) treat `NULL` as company-wide but `0` matches no
+project, so the employee would silently disappear from every project-scoped
+view. Pulled `project_id` out of the generic loop and gave it explicit
+optional-int handling (mirrors the existing `reporting_to_id` pattern in the
+same file): `''` now coerces to `NULL` before binding, on both the main
+`UPDATE` and the `hrSaveExtraDocuments()` call that previously received the
+same raw value. `api/add_employee.php` already handled this correctly on
+create — edit now matches. Verified against the live employees table (rolled
+back): the old bind path and the new coercion were both exercised directly
+against MySQL 8.4.7 in a transaction, confirmed, then rolled back with no
+data changed.
+
 ## 2026-07-09 (feat) — Leaves: manageable leave types, hourly leave, standalone details page
 
 **The leaves module was structurally disconnected.** `leaves.leave_type` was an
