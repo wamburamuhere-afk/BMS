@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-07-08 (fix) — Products list blank for non-admins with no projects
+
+`app/bms/product/products.php` hand-rolled its project-scope filter and pushed a
+literal `'0'` condition when a non-admin had no assigned projects, so the WHERE
+clause became `1=1 AND 0` and the page returned nothing — hiding even the global
+(`project_id IS NULL`) catalogue that the same file's comments promise are
+"visible to all". The block was written on 2026-05-25 (`6535a6c`); commit
+`75b5229` on 2026-06-01 later changed `scopeFilterSqlNullable()` to show
+company-wide untagged rows to non-admins with no projects, but products.php never
+picked that up because it never called the helper.
+
+Replaced the inline block with `scopeFilterSqlNullable('project', 'p')` and
+appended the fragment to all three queries (list, count, stats) — it carries its
+own leading `AND`, so it cannot be pushed into `$conditions` (joined with `AND`)
+without emitting `AND AND`. Verified live: zero-project non-admin 0 → 15 rows,
+admin unchanged at 15, no dangling `AND`.
+
+Note: `app/bms/product/services.php:68` still carries the identical `'0'` bug and
+is not fixed here.
+
 ## 2026-07-08 (ux) — Payment Frequency "Other" swaps in place (like Department)
 
 Payment Frequency "➕ Other (specify)…" now uses the same `toggleEmpOther`
