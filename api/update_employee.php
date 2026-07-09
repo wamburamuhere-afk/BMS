@@ -204,7 +204,7 @@ try {
         'tax_id', 'social_security_number', 'emergency_contact',
         'emergency_contact_relationship', 'emergency_contact_phone', 'emergency_contact_postal_address',
         'emergency_contact_physical_address', 'emergency_contact_email',
-        'benefits', 'notes', 'documents', 'other_doc_name', 'project_id'
+        'benefits', 'notes', 'documents', 'other_doc_name'
     ];
 
     $update_fields = [];
@@ -222,6 +222,17 @@ try {
     if ($reporting_to_id_present) {
         $update_fields[] = "reporting_to_id = ?";
         $update_params[] = $new_reporting_to_id;
+    }
+
+    // project_id is optional — an unselected <select> submits '', which isset()
+    // treats as present, so bind it explicitly and coerce '' to NULL (avoids
+    // SQLSTATE 1366 on the nullable int column).
+    $project_id_present = array_key_exists('project_id', $_POST);
+    $new_project_id = ($project_id_present && trim((string)$_POST['project_id']) !== '')
+        ? (int)$_POST['project_id'] : null;
+    if ($project_id_present) {
+        $update_fields[] = "project_id = ?";
+        $update_params[] = $new_project_id;
     }
 
     if (empty($update_fields)) {
@@ -242,7 +253,7 @@ try {
     hrSaveExtraDocuments($pdo, (int)$employee_id, [
         'first_name' => $_POST['first_name'] ?? '',
         'last_name'  => $_POST['last_name'] ?? '',
-        'project_id' => $_POST['project_id'] ?? null,
+        'project_id' => $new_project_id,
     ], (int)$_SESSION['user_id']);
 
     logActivity($pdo, $_SESSION['user_id'], 'Edit employee', "User edited employee: {$_POST['first_name']} {$_POST['last_name']} (ID $employee_id)");
