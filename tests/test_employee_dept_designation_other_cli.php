@@ -95,6 +95,9 @@ $src = file_get_contents($root . '/app/bms/pos/employees.php');
 (strpos($src, 'function rebuildDesignationOptions') !== false) ? ok('rebuildDesignationOptions() present') : no('cascade JS missing');
 (strpos($src, "value=\"other\">➕ Other (specify)") !== false) ? ok('"Other (specify)" option present') : no('Other option markup missing');
 (strpos($src, 'id="employment_type_other"') !== false) ? ok('employment type "Other" input present') : no('employment type Other input missing');
+// Payment Frequency now uses the swap-in-place box (not the old below-input div)
+(strpos($src, 'id="payment_frequency_other_box"') !== false) ? ok('payment frequency swap-box present') : no('payment frequency box missing');
+(strpos($src, 'payment_frequency_other_div') === false) ? ok('old payment-frequency below-input div removed') : no('old payment_frequency_other_div still present');
 
 // ── cleanup ──────────────────────────────────────────────────────────────
 section('cleanup');
