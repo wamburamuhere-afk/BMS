@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-07-09 (fix) — Leaves: print leave_details.php starting from page 1
+
+**`app/bms/pos/leave_details.php`** on-screen `.leave-dashboard` has
+`min-height: 100vh` and a negative margin (part of the screen "hero" layout).
+The `@media print` block reset only `background`/`padding` for it — never
+`min-height`/`margin` — so the browser reserved a full blank page's worth of
+height before the non-breakable `.premium-card` (`page-break-inside: avoid`),
+pushing the entire card onto page 2 and leaving page 1 blank. Reset both to
+`0` in print. Also neutralised `.stats-container`'s `-3rem` overlap (a
+screen-only hero effect that would otherwise pull the stat cards up over the
+header text once the dashboard's own offset is gone) and added `@page {
+size: auto; margin: 15mm; }`, matching the same module's `leaves.php` print
+margin convention (`leave_details.php` had no `@page` rule at all before).
+No content was removed — layout-only. Could not visually confirm in-browser
+this session; flagged for manual print-preview check.
+
 ## 2026-07-09 (fix) — Leaves: Handover To / Contact During Leave now save on edit
 
 **`api/update_leave.php`** UPDATE statement never included `handover_to` or
