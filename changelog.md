@@ -16,6 +16,91 @@ margin convention (`leave_details.php` had no `@page` rule at all before).
 No content was removed — layout-only. Could not visually confirm in-browser
 this session; flagged for manual print-preview check.
 
+## 2026-07-09 (fix) — Leaves: Handover To / Contact During Leave now save on edit
+
+**`api/update_leave.php`** UPDATE statement never included `handover_to` or
+`contact_during_leave` — the create path (`api/apply_leave.php`) already saved
+both correctly, and `leave_details.php` already displayed them correctly, but
+editing an existing leave silently dropped whatever the user typed/changed in
+those two fields (the SQL simply never touched the columns). Added both to the
+SET clause and bound params, mirroring how `apply_leave.php` reads and
+sanitises them (`contact_during_leave` trimmed-or-null, `handover_to` cast to
+int-or-null). Verified live in a rolled-back transaction: the new UPDATE
+persists `contact_during_leave`/`handover_to` on a throwaway pending leave;
+no data changed.
+
+## 2026-07-09 (fix) — Leaves: show max consecutive days on the Leave Type picker
+
+**`app/bms/pos/leaves.php`** apply/edit Leave Type `<select>` labels only
+showed `(Max: N days/year)` — the per-request consecutive-day cap
+(`max_consecutive_days`) was already fetched into a `data-max-consecutive`
+attribute but never rendered as visible text, so a user picking start/end
+dates only learned the consecutive limit after being rejected on submit.
+Added it to the label: `(Max: N days/year, M consecutive)`. Server-side
+enforcement of both limits, and the per-employee Days Remaining/Used/Annual
+Limit balance widget, already existed (`core/leave_rules.php
+assertLeaveWithinTypeLimits()`, `api/get_leave_balance.php`) — this was a
+display-only gap, not a missing enforcement one.
+
+## 2026-07-09 (fix) — Leaves: removed "Half Day → Other (specify)" (hourly leave)
+
+**`app/bms/pos/leaves.php`** Half Day dropdown's "➕ Other (specify)…" option
+looked like the free-text "Other" pattern used elsewhere in HR forms (Department,
+Designation, Employment Type on employee registration — pick "Other", type a
+value, it's remembered). It wasn't: selecting it revealed a numeric "Hours of
+Leave" input instead, part of the hourly-leave feature built in the immediately
+preceding commit. Confirmed live: **zero rows** in `leaves` ever used
+`half_day='other'` or set `leave_hours` — the feature was never actually used,
+and its UI was actively confusing users expecting the employee-registration
+mechanism. Removed per explicit decision to drop it rather than reimplement the
+free-text pattern.
+
+Removed: the "Other" option and Hours-of-Leave input from both the apply and
+edit modals; `toggleLeaveHours()` and its onchange wiring; the JS and PHP
+`leaveDaysFor()` hour-fraction branches; `normaliseHalfDay()`'s hours validation
+(now only accepts `none` / `first_half` / `second_half`, rejects `other`
+outright); the `leave_details.php` display case for it. Left untouched: the
+`leaves.leave_hours` column and `WORKING_DAY_HOURS` constant (harmless, always
+NULL/unused now — no schema change needed since nothing ever wrote to them).
+Updated `tests/test_leaves_upgrade_cli.php`'s Half Day section to assert the new
+rejection behavior instead of the old acceptance behavior. All 49 checks pass.
+
+## 2026-07-09 (fix) — Employees: Designation filter now cascades from Department filter
+
+**`app/bms/pos/employees.php`** list-page filters. `#departmentFilter` and
+`#designationFilter` were two independent, statically-rendered `<select>`s —
+picking a department never narrowed the designation options, even though the
+exact same cascade already existed for the Add/Edit employee *form*
+(`window.EMP_DESIGNATIONS` + `rebuildDesignationOptions()`, both already in
+this file). Added `rebuildDesignationFilterOptions()`, bound to
+`#departmentFilter`'s `change` event, which rebuilds `#designationFilter`
+from the same `window.EMP_DESIGNATIONS` dataset (client-side, no new
+endpoint) and re-inits Select2. `clearFilters()` now also calls it so
+clearing the department restores the full designation list instead of
+leaving it narrowed. Verified live: 5 departments / 5 designations, one
+designation per department, confirming the cascade actually narrows 5→1
+rather than being a no-op on this dataset.
+
+## 2026-07-09 (fix) — Employees: project is now genuinely optional on edit
+
+**`api/update_employee.php`** bound `$_POST['project_id']` straight into the
+`UPDATE` params via a generic `isset()`-driven loop. Leaving the Project
+dropdown blank submits `project_id=''`, which `isset()` treats as present, so
+the raw empty string hit the nullable `int` column. On a server with strict
+`sql_mode` this throws `SQLSTATE[HY000]: 1366`; here (non-strict) it silently
+wrote `project_id = 0` instead of `NULL` — worse, since scope filters
+(`scopeFilterSqlNullable`) treat `NULL` as company-wide but `0` matches no
+project, so the employee would silently disappear from every project-scoped
+view. Pulled `project_id` out of the generic loop and gave it explicit
+optional-int handling (mirrors the existing `reporting_to_id` pattern in the
+same file): `''` now coerces to `NULL` before binding, on both the main
+`UPDATE` and the `hrSaveExtraDocuments()` call that previously received the
+same raw value. `api/add_employee.php` already handled this correctly on
+create — edit now matches. Verified against the live employees table (rolled
+back): the old bind path and the new coercion were both exercised directly
+against MySQL 8.4.7 in a transaction, confirmed, then rolled back with no
+data changed.
+
 ## 2026-07-09 (feat) — Leaves: manageable leave types, hourly leave, standalone details page
 
 **The leaves module was structurally disconnected.** `leaves.leave_type` was an
