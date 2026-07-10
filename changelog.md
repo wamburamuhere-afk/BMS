@@ -1,5 +1,38 @@
 # BMS Changelog
 
+## 2026-07-10 (fix) — POS: Hold Sale / Complete Sale crashed with a raw SQL error when no shift was open
+
+**Reported directly:** clicking Hold Sale produced a raw
+`SQLSTATE[23000]: Integrity constraint violation: 1048 Column 'shift_id'
+cannot be null` error dialog.
+
+**Root cause:** `pos_held_sales.shift_id` (and `pos_sales.shift_id`) are
+both `NOT NULL` columns — every held or completed sale must belong to a
+specific cash-register shift, for cash-reconciliation purposes. Both
+`api/pos/hold_sale.php` and `api/pos/process_sale.php` looked up the
+cashier's active shift and, if none was open, silently passed `null`
+straight into the insert instead of validating first — the exact same bug
+in both files. Nothing on the POS screen actually blocks adding items to
+cart or clicking Hold/Complete Sale when no shift is open (only a small
+"No active shift" label and a "Start Shift" button are shown in the
+header), so this was reachable in normal use, not just a hypothetical edge
+case.
+
+This is a **newly surfaced**, not newly introduced, bug: the earlier
+Hold Sale fix (JSON-body parsing, shipped this session) always threw "No
+items to hold" before ever reaching the database insert, which
+accidentally masked this deeper, pre-existing defect. Fixing the first bug
+is what let the cashier reach the second one.
+
+**Fix:** both endpoints now check for an active shift and, if none exists,
+return a clear message ("Please start a cash register shift before
+holding/completing a sale.") — shown via the app's normal styled popup,
+not a raw database error — instead of ever reaching the insert. `process_sale.php`'s
+fix mirrors the validation style already used in the same function for
+missing items/warehouse. Verified live in a rolled-back transaction: with
+no active shift, both endpoints now correctly stop before the insert; with
+an active shift, both resolve `shift_id` and proceed normally, unchanged.
+
 ## 2026-07-10 (fix) — App-wide sweep: every remaining black table header fixed
 
 Follow-up to the Inactive Employees header fix — user asked to check the
