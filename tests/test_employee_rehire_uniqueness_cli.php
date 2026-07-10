@@ -117,11 +117,11 @@ ok(($rActive['success'] ?? null) === false, '1. Duplicate email vs ACTIVE employ
 ok(isset($rActive['message']) && stripos($rActive['message'], 'already exists') !== false,
    '1b. …with the uniqueness error (got: "' . ($rActive['message'] ?? '') . '")');
 
-// 2. Soft-delete the base employee (mirrors delete_employee.php)
-$pdo->prepare("UPDATE employees SET status='terminated', employment_status='terminated' WHERE employee_id=?")
+// 2. Inactivate the base employee (mirrors api/inactivate_employee.php)
+$pdo->prepare("UPDATE employees SET status='inactive', employment_status='terminated' WHERE employee_id=?")
     ->execute([$baseId]);
 $status = $pdo->query("SELECT status FROM employees WHERE employee_id=$baseId")->fetchColumn();
-ok($status === 'terminated', '2. Base employee soft-deleted (status=terminated)');
+ok($status === 'inactive', '2. Base employee inactivated (status=inactive)');
 
 // 3. THE FIX — the same email now passes the uniqueness check and reaches the NEXT gate
 $rRehire = call('add_employee', $payload, $adminSession);
@@ -134,8 +134,8 @@ ok(stripos($msg, 'compulsory') !== false || stripos($msg, 'document') !== false 
 // 4. Direct view of the data the fixed check relies on
 $all    = (int)$pdo->query("SELECT COUNT(*) FROM employees WHERE email=" . $pdo->quote($email))->fetchColumn();
 $active = (int)$pdo->query("SELECT COUNT(*) FROM employees WHERE email=" . $pdo->quote($email) .
-                           " AND (status IS NULL OR status NOT IN ('terminated','deleted'))")->fetchColumn();
-ok($all === 1,    "4. One row holds the email (the terminated base), got $all");
+                           " AND (status IS NULL OR status = 'active')")->fetchColumn();
+ok($all === 1,    "4. One row holds the email (the inactive base), got $all");
 ok($active === 0, "4b. Zero ACTIVE rows hold it — so the fixed check allows the re-hire, got $active");
 
 // ── cleanup

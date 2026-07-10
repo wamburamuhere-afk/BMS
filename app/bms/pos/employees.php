@@ -16,7 +16,6 @@ logActivity($pdo, $_SESSION['user_id'], 'View employees', 'User viewed the emplo
 
 // Permission flags for UI elements
 $can_edit_employees = isAdmin() || canEdit('employees');
-$can_delete_employees = isAdmin() || canDelete('employees');
 
 // ── Project context (clean deep-link from Project Details) ───────────────────
 // Arriving as ?project=<id>&back=<tab> pre-selects & locks the project, shows a
@@ -85,7 +84,7 @@ $query = "
     LEFT JOIN payroll p ON e.employee_id = p.employee_id
     LEFT JOIN users u1 ON e.created_by = u1.user_id
     LEFT JOIN users u2 ON e.updated_by = u2.user_id
-    WHERE e.status != 'terminated'" . scopeFilterSqlNullable('project', 'e') . "
+    WHERE e.status = 'active'" . scopeFilterSqlNullable('project', 'e') . "
     GROUP BY e.employee_id
     ORDER BY e.first_name, e.last_name ASC
 ";
@@ -2375,31 +2374,46 @@ function updateStatus(employeeId, status) {
     });
 }
 
-function confirmDelete(employeeId) {
-    // Log intent to delete
-
-
+function confirmInactivate(employeeId, employeeName) {
+    var safeName = $('<div>').text(employeeName).html();
     Swal.fire({
-        title: 'Delete Employee?',
-        text: 'Are you sure you want to delete this employee? This action cannot be undone.',
+        title: 'Inactivate Employee?',
+        html:
+            '<p class="text-start mb-3">This deactivates <strong>' + safeName + '</strong> everywhere ' +
+            '(attendance, leave, payroll, reporting). Nothing is deleted — every past record stays intact, ' +
+            'and they can be reactivated later from Inactive Employees.</p>' +
+            '<div class="text-start mb-2">' +
+            '  <label class="form-label small fw-bold">Reason</label>' +
+            '  <select id="inactivate_outcome" class="form-select form-select-sm mb-2">' +
+            '    <option value="terminated">Contract Terminated</option>' +
+            '    <option value="resigned">Resigned</option>' +
+            '    <option value="failed_probation">Failed Probation</option>' +
+            '  </select>' +
+            '  <textarea id="inactivate_reason" class="form-control form-control-sm" rows="2" placeholder="Optional note..."></textarea>' +
+            '</div>',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
         cancelButtonColor: '#aaa',
-        confirmButtonText: 'Yes, delete them!'
+        confirmButtonText: 'Yes, inactivate',
+        focusConfirm: false,
+        preConfirm: () => ({
+            outcome: document.getElementById('inactivate_outcome').value,
+            reason: document.getElementById('inactivate_reason').value
+        })
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
-                url: APP_URL + '/api/delete_employee',
+                url: APP_URL + '/api/inactivate_employee',
                 method: 'POST',
-                data: { employee_id: employeeId },
+                data: { employee_id: employeeId, outcome: result.value.outcome, reason: result.value.reason },
                 dataType: 'json',
                 success: function(response) {
                     if (response.success) {
                         Swal.fire({
                             icon: 'success',
                             title: 'Success!',
-                            text: 'Employee record has been deleted.',
+                            text: 'Employee has been inactivated.',
                             confirmButtonText: 'OK',
                             confirmButtonColor: '#28a745'
                         }).then(() => {
@@ -2408,7 +2422,7 @@ function confirmDelete(employeeId) {
                     } else {
                         Swal.fire({
                             icon: 'error',
-                            title: 'Delete Failed',
+                            title: 'Inactivate Failed',
                             text: response.message
                         });
                     }
@@ -2418,7 +2432,7 @@ function confirmDelete(employeeId) {
                     Swal.fire({
                         icon: 'error',
                         title: 'Server Error',
-                        text: 'Error deleting employee. Please try again.'
+                        text: 'Error inactivating employee. Please try again.'
                     });
                 }
             });

@@ -659,6 +659,8 @@ $routes = [
     'api/log_audit.php' => API_DIR . '/log_audit.php',
     'api/delete_employee' => API_DIR . '/delete_employee.php',
     'api/delete_employee.php' => API_DIR . '/delete_employee.php',
+    'api/inactivate_employee' => API_DIR . '/inactivate_employee.php',
+    'api/inactivate_employee.php' => API_DIR . '/inactivate_employee.php',
     'api/update_employee' => API_DIR . '/update_employee.php',
     'api/update_employee.php' => API_DIR . '/update_employee.php',
 

@@ -15956,7 +15956,7 @@ function renderProjectStaff(staff) {
                             <li><a class="dropdown-item py-2" href="payroll?employee=${s.employee_id}"><i class="bi bi-cash-coin text-success me-2"></i>Payroll</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item py-2 text-warning" href="javascript:void(0)" onclick="unassignStaff(${s.employee_id}, '${name}')"><i class="bi bi-person-dash me-2"></i>Remove from Project</a></li>
-                            <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteProjectStaff(${s.employee_id}, '${name}')"><i class="bi bi-trash me-2"></i>Delete Staff</a></li>
+                            <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteProjectStaff(${s.employee_id}, '${name}')"><i class="bi bi-slash-circle me-2"></i>Inactivate Staff</a></li>
                         </ul>
                     </div>
                 </td>
@@ -15997,26 +15997,48 @@ function unassignStaff(id, name) {
     });
 }
 
-// Permanently delete a staff member (same action as the external HR > Staff list).
+// Inactivate a staff member (same action as the external HR > Employees list).
+// Non-destructive: nothing is deleted, and they can be reactivated later from
+// Inactive Employees. Affects the whole system, not just this project.
 function deleteProjectStaff(id, name) {
+    var safeName = $('<div>').text(name).html();
     Swal.fire({
-        title: 'Delete Staff?',
-        text: `This will delete (terminate) ${name} from the whole system, not just this project. This cannot be undone.`,
-        icon: 'error',
+        title: 'Inactivate Staff?',
+        html:
+            '<p class="text-start mb-3">This deactivates <strong>' + safeName + '</strong> everywhere in the system ' +
+            '(attendance, leave, payroll, reporting), not just this project. Nothing is deleted — every past record ' +
+            'stays intact, and they can be reactivated later from Inactive Employees.</p>' +
+            '<div class="text-start mb-2">' +
+            '  <label class="form-label small fw-bold">Reason</label>' +
+            '  <select id="pv_inactivate_outcome" class="form-select form-select-sm mb-2">' +
+            '    <option value="terminated">Contract Terminated</option>' +
+            '    <option value="resigned">Resigned</option>' +
+            '    <option value="failed_probation">Failed Probation</option>' +
+            '  </select>' +
+            '  <textarea id="pv_inactivate_reason" class="form-control form-control-sm" rows="2" placeholder="Optional note..."></textarea>' +
+            '</div>',
+        icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
         cancelButtonColor: '#aaa',
-        confirmButtonText: 'Yes, delete'
+        confirmButtonText: 'Yes, inactivate',
+        focusConfirm: false,
+        preConfirm: () => ({
+            outcome: document.getElementById('pv_inactivate_outcome').value,
+            reason: document.getElementById('pv_inactivate_reason').value
+        })
     }).then((result) => {
         if (result.isConfirmed) {
-            $.post(APP_URL + '/api/delete_employee.php', {
-                employee_id: id
+            $.post(APP_URL + '/api/inactivate_employee', {
+                employee_id: id,
+                outcome: result.value.outcome,
+                reason: result.value.reason
             }, function(res) {
                 if (res.success) {
-                    Swal.fire('Deleted!', res.message || 'Staff member deleted.', 'success');
+                    Swal.fire('Inactivated!', res.message || 'Staff member inactivated.', 'success');
                     loadProjectDetails();
                 } else {
-                    Swal.fire('Error', res.message || 'Delete failed.', 'error');
+                    Swal.fire('Error', res.message || 'Inactivate failed.', 'error');
                 }
             }, 'json');
         }
