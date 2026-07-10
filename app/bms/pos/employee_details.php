@@ -1259,6 +1259,80 @@ $sr_status_badge = [
             </div>
             <?php endif; ?>
 
+            <!-- Full Attendance History (all records, since day one) — attendance.php's
+                 capture/history view only lists active employees, so this is the only
+                 place to review an inactive employee's attendance log at all. -->
+            <?php
+                $attCountStmt = $pdo->prepare("SELECT COUNT(*) FROM attendance WHERE employee_id = ?");
+                $attCountStmt->execute([$employee_id]);
+                $attTotal = (int)$attCountStmt->fetchColumn();
+                $attLimit = 200;
+                $stmt_att = $pdo->prepare("
+                    SELECT attendance_date, check_in_time, check_out_time, total_hours, overtime_hours, status
+                      FROM attendance
+                     WHERE employee_id = ?
+                  ORDER BY attendance_date DESC
+                     LIMIT $attLimit
+                ");
+                $stmt_att->execute([$employee_id]);
+                $all_attendance = $stmt_att->fetchAll(PDO::FETCH_ASSOC);
+                $attStatusBadge = function ($s) {
+                    $map = [
+                        'present'  => 'background:#0d6efd;color:#fff;',
+                        'late'     => 'background:#cfe2ff;color:#084298;',
+                        'half_day' => 'background:#bfdbfe;color:#1e3a8a;',
+                        'absent'   => 'background:#dc3545;color:#fff;',
+                        'leave'    => 'background:#6c757d;color:#fff;',
+                        'holiday'  => 'background:#e9ecef;color:#495057;',
+                        'weekend'  => 'background:#e9ecef;color:#495057;',
+                    ];
+                    $st = $map[$s] ?? 'background:#e9ecef;color:#495057;';
+                    return '<span class="badge" style="' . $st . 'padding:5px 10px;border-radius:20px;">' . ucfirst(str_replace('_', ' ', $s ?: '—')) . '</span>';
+                };
+            ?>
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-calendar-check text-primary me-2"></i>Attendance History</h5>
+                    <span class="small text-muted">
+                        <?= $attTotal ?> record(s) total<?= $attTotal > $attLimit ? " · showing most recent $attLimit" : '' ?>
+                    </span>
+                </div>
+                <div class="table-responsive" style="max-height:420px;overflow:auto;">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light" style="position:sticky;top:0;z-index:1;">
+                            <tr>
+                                <th class="ps-3">S/NO</th>
+                                <th>Date</th>
+                                <th>Check In</th>
+                                <th>Check Out</th>
+                                <th class="text-end">Hours</th>
+                                <th class="text-end">Overtime</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            if (count($all_attendance) > 0):
+                                $sn = 1;
+                                foreach ($all_attendance as $att):
+                            ?>
+                            <tr>
+                                <td class="ps-3"><?= $sn++ ?></td>
+                                <td><?= date('d M Y', strtotime($att['attendance_date'])) ?></td>
+                                <td><?= !empty($att['check_in_time']) ? date('h:i A', strtotime($att['check_in_time'])) : '<span class="text-muted">—</span>' ?></td>
+                                <td><?= !empty($att['check_out_time']) ? date('h:i A', strtotime($att['check_out_time'])) : '<span class="text-muted">—</span>' ?></td>
+                                <td class="text-end"><?= number_format((float)($att['total_hours'] ?? 0), 2) ?></td>
+                                <td class="text-end text-muted"><?= number_format((float)($att['overtime_hours'] ?? 0), 2) ?></td>
+                                <td><?= $attStatusBadge($att['status']) ?></td>
+                            </tr>
+                            <?php endforeach; else: ?>
+                            <tr><td colspan="7" class="text-center text-muted py-3">No attendance records found.</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Full Payroll & Payment History (all records, since day one) -->
             <?php
                 $stmt_pay = $pdo->prepare("

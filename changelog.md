@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-07-10 (feat) — Employees: close the two real historical-visibility gaps (Phase 4)
+
+Final phase of `employee_inactivation_plan.md`. Nothing was ever actually
+losing data — no hard delete exists anywhere — but two views made an
+inactive employee's history effectively unreachable in the UI.
+
+**Attendance — genuinely had no fix but this one.** `attendance.php` (the
+only attendance view in the app) only ever iterates active employees, even
+via its `?employee=` deep link, so there was **no page anywhere** that could
+show an inactive employee's attendance log — only an aggregate "total
+present" count on their profile. Added a full **Attendance History** table
+to `app/bms/pos/employee_details.php` (mirrors the existing Payroll History
+table there), most recent 200 records with a running total count, reachable
+regardless of employee status since this page has no status gate at all.
+Verified live in the browser on employee #3 (inactive): both Attendance
+History (3 records) and Payroll History (2 records) render correctly on the
+same profile.
+
+**Payroll — the list page hid an inactive employee's entire history, not
+just the current period.** `api/get_payrolls.php` is employee-driven
+(`LEFT JOIN payroll`, so unprocessed employees still show up) and hardcoded
+`e.status = 'active'`, so once inactivated an employee's payroll rows
+disappeared from `payroll.php` for every past period, not just because they
+don't need a new run. Added an opt-in **"Include Inactive"** checkbox —
+unchecked by default (no behavior change for normal payroll runs); when
+checked, inactive employees appear for lookup but their row's gear menu
+shows "Inactive — cannot process" instead of the Process action. Backend
+defense-in-depth unchanged: `api/process_payroll.php`'s own candidate query
+still hardcodes `status = 'active'` regardless of what's requested (Phase 3),
+so an inactive employee could never actually be run even via a crafted
+request. Verified live in the browser: toggling the checkbox moved the
+DataTable from 19→24 records (exactly the 19 active + 5 inactive), and the
+inactive row's action menu correctly showed the disabled state.
+
 ## 2026-07-10 (feat) — Employees: lock down every operational picker (Phase 3)
 
 Closes the actual gap the whole plan exists for — an inactive employee could
