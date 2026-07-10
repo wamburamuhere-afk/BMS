@@ -91,7 +91,7 @@ $unpaid_types = $active_types - $paid_types;
 
     <div id="tableView">
         <table id="leaveTypesTable" class="table table-hover align-middle w-100">
-            <thead class="table-dark">
+            <thead class="table-light">
                 <tr>
                     <th>#</th>
                     <th>Leave Type</th>

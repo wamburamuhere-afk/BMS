@@ -232,7 +232,7 @@ $export_qs = http_build_query(array_filter([
     <div id="tableView" class="card border-0 shadow-sm">
         <div class="card-body p-2">
             <table id="leadsTable" class="table table-hover align-middle w-100">
-                <thead class="table-dark">
+                <thead class="table-light">
                     <tr>
                         <?php if ($can_bulk): ?><th style="width:36px"><input type="checkbox" id="selectAll" class="form-check-input" title="Select all"></th><?php endif; ?>
                         <th>Code</th>
