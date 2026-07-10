@@ -1,5 +1,60 @@
 # BMS Changelog
 
+## 2026-07-10 (chore) — Remove the Loans / Microfinance lending module (hide & unwire, data kept)
+
+The company does not do lending, so the half-built Loans module was removed —
+carefully, with a documented before/after safety check, and **without deleting
+any data**.
+
+**Impact analysis first (nothing touched until confirmed safe):**
+- Loans posts **zero** journal entries — completely disconnected from the
+  financial ledger, so Balance Sheet / P&L / Trial Balance are unaffected.
+- Payroll has **no** loan deductions — unaffected.
+- No other table has a foreign key into any loan table — self-contained.
+- None of the loan pages (nor the loan-only SMS Alerts page) are in the live
+  navigation — they were reachable only by direct URL ("available but not
+  active").
+- The **"Bank Loans" account (2-2100)** in the chart of accounts is a *different
+  concept* (money the company borrowed, a Balance-Sheet liability) and was left
+  fully intact.
+
+**Removed (all dead/unused, none in the active menus):**
+- Loan pages: `app/bms/loans/loan_application.php`, `loan_details.php`;
+  `app/constant/reports/loan_performance.php`, `loan_portfolio.php`;
+  `app/constant/document/loan_documents.php`.
+- Loan-only API files: `api/document/get_loan_documents.php`,
+  `update_loan_document.php`, `get_collateral_documents.php`,
+  `upload_signed_document.php`; `api/reports/get_loan_portfolio.php`.
+- The loan-only **SMS Alerts** page (`app/constant/communication/sms_alerts.php`)
+  — 1,524 lines whose sole purpose was loan-repayment reminders; 0 rows of data.
+- All **63 loan routes** + the `LOANS_DIR` define + a fall-through switch case in
+  `roots.php`, and the dead `get_microfinance_stats()` function + a no-op loan
+  merge in `app/dashboard.php` (both computed values that were never displayed).
+
+**Deliberately NOT touched (kept, per instruction not to disturb anything active):**
+- **All 12 loan database tables and their 1,661 rows** (104 loans, 113
+  disbursements, 71 collateral, 1,361 schedule rows) — kept **dormant** in the
+  database, fully reversible, preserved for any future audit/legal need.
+- The **Business Type = "Microfinance/Lending"** setting and the
+  Customers/Suppliers `!= 'microfinance'` conditionals — left as-is so the live
+  UI behaves exactly as before. *(Note for follow-up: switching Business Type to
+  Retail in Settings would restore the POS/Invoice/"New Order" shortcuts that
+  microfinance mode currently hides — a beneficial change, left to the owner's
+  discretion.)*
+- The general SMS plumbing (`sms_templates.php`, Message Center, gateway config)
+  — only 2 harmless "Loan Related" dropdown options remain, left untouched.
+- The loan `permissions` keys — harmless orphans, left to avoid touching the live
+  roles system.
+
+**Before/after safety proof** (`tests/verify_loan_removal_cli.php`, kept as a
+record): loan data **1,661 rows → 1,661 rows (identical)**; ledger loan entries
+0 → 0; Trial Balance still balances; Bank Loans account intact; loan-named routes
+**63 → 0**; and — importantly — the removal *reduced* the number of dead routes
+in the system (204 → 164) and created **zero** new broken routes (one missed
+`sms_alerts` route was caught by the harness and removed). Verified live in the
+browser: the dashboard renders identically with no errors, `/loan_application`
+now returns 404, and the Communication module (SMS Templates) still loads fine.
+
 ## 2026-07-10 (fix) — Employees: Inactivate link was silently missing from every row (Sentry-caught regression)
 
 **Caught by Sentry in production:** `ErrorException: Warning: Undefined

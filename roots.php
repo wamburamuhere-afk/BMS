@@ -46,7 +46,6 @@ define('SALES_DIR', BMS_DIR . '/sales');
 define('STOCK_DIR', BMS_DIR . '/stock');
 define('BANKING_DIR', BMS_DIR . '/banking');
 define('GRN_DIR', BMS_DIR . '/grn');
-define('LOANS_DIR', BMS_DIR . '/loans');
 define('OPERATIONS_DIR', BMS_DIR . '/operations');
 define('TENDERS_DIR', BMS_DIR . '/tenders');
 define('CRM_DIR',     BMS_DIR . '/crm');
@@ -115,7 +114,6 @@ $routes = [
     'dashboard'      => ROOT_DIR . '/app/dashboard.php',
     'activity_log'   => ROOT_DIR . '/app/activity_log.php',
     'profile'        => PROFILE_DIR . '/profile.php',
-    'loan-dashboard' => ROOT_DIR . '/app/loan-dashboard.php',
     'unauthorized'   => ROOT_DIR . '/unauthorized.php',
 
     // ========================================================================
@@ -955,28 +953,9 @@ $routes = [
 
 
     // ========================================================================
-    // LOANS MODULE (Planned)
     // ========================================================================
-    'loans' => COMING_SOON_FILE,
-    'loans.php' => COMING_SOON_FILE,
-    'loans/application' => LOANS_DIR . '/loan_application.php',
-    'loan_application' => LOANS_DIR . '/loan_application.php',
-    'loan_application.php' => LOANS_DIR . '/loan_application.php',
-    'loans/details' => LOANS_DIR . '/loan_details.php',
-    'loan_details' => LOANS_DIR . '/loan_details.php',
-    'loan_details.php' => LOANS_DIR . '/loan_details.php',
-    'loans/overdue' => COMING_SOON_FILE,
-    'overdue_loans' => COMING_SOON_FILE,
-    'overdue_loans.php' => COMING_SOON_FILE,
-    'loans/payments' => COMING_SOON_FILE,
     'payment_processing' => COMING_SOON_FILE,
     'payment_processing.php' => COMING_SOON_FILE,
-    'loans/products' => COMING_SOON_FILE,
-    'loan_products' => COMING_SOON_FILE,
-    'loan_products.php' => COMING_SOON_FILE,
-    'loans/schedules' => COMING_SOON_FILE,
-    'loan_schedules' => COMING_SOON_FILE,
-    'loan_schedules.php' => COMING_SOON_FILE,
     
     // Collections
     'collections_dashboard' => COMING_SOON_FILE,
@@ -996,8 +975,6 @@ $routes = [
     'document_workflow.php' => DOCUMENT_DIR . '/document_workflow.php',
     'e_signatures' => DOCUMENT_DIR . '/e_signatures.php',
     'e_signatures.php' => DOCUMENT_DIR . '/e_signatures.php',
-    'loan_documents' => DOCUMENT_DIR . '/loan_documents.php',
-    'loan_documents.php' => DOCUMENT_DIR . '/loan_documents.php',
     'preview_template' => DOCUMENT_DIR . '/preview_template.php',
     'preview_template.php' => DOCUMENT_DIR . '/preview_template.php',
     'select_document_add_esignature' => DOCUMENT_DIR . '/select_document_add_esignature.php',
@@ -1055,8 +1032,6 @@ $routes = [
     'reports/delinquency_report' => REPORTS_DIR . '/ar_aging.php',
     'reports/financial_statements' => REPORTS_DIR . '/financial_statements.php',
     'reports/income_statement' => INVOICE_DIR . '/income_statement.php',
-    'reports/loan_performance' => COMING_SOON_FILE,
-    'reports/loan_trends' => COMING_SOON_FILE,
     'reports/market_analysis' => COMING_SOON_FILE,
     'reports/performance_dashboard' => COMING_SOON_FILE,
     'reports/portfolio_analysis' => COMING_SOON_FILE,
@@ -1084,7 +1059,6 @@ $routes = [
     'communication/lead_generation' => COMMUNICATION_DIR . '/lead_generation.php',
     'communication/message_center' => COMMUNICATION_DIR . '/message_center.php',
     'communication/notification_center' => COMMUNICATION_DIR . '/notification_center.php',
-    'communication/sms_alerts' => COMMUNICATION_DIR . '/sms_alerts.php',
     'communication/sms_templates' => COMMUNICATION_DIR . '/sms_templates.php',
 
     // Comms Aliases
@@ -1176,39 +1150,27 @@ $routes = [
     'ajax/search_customers' => AJAX_DIR . '/search_customers.php',
     'ajax/update_customer_document' => AJAX_DIR . '/update_customer_document.php',
 
-    // Loans Related
     'ajax/add_collection_strategy' => AJAX_DIR . '/add_collection_strategy.php',
     'ajax/add_guarantor' => AJAX_DIR . '/add_guarantor.php',
     'ajax/add_strategy_template' => AJAX_DIR . '/add_strategy_template.php',
-    'ajax/apply_loan' => AJAX_DIR . '/apply_loan.php',
-    'ajax/assign_loans_to_strategy' => AJAX_DIR . '/assign_loans_to_strategy.php',
     'ajax/calculate_penalties' => AJAX_DIR . '/calculate_penalties.php',
     'ajax/delete_collateral_document' => AJAX_DIR . '/delete_collateral_document.php',
     'ajax/delete_payment' => AJAX_DIR . '/delete_payment.php',
-    'ajax/edit_loan' => AJAX_DIR . '/edit_loan.php',
     'ajax/export_strategies' => AJAX_DIR . '/export_strategies.php',
-    'ajax/get_available_loans' => AJAX_DIR . '/get_available_loans.php',
     'ajax/get_collateral_attachments' => AJAX_DIR . '/get_collateral_attachments.php',
     'ajax/get_collateral_details' => AJAX_DIR . '/get_collateral_details.php',
     'ajax/get_collateral_documents' => AJAX_DIR . '/get_collateral_documents.php',
     'ajax/get_collaterals' => AJAX_DIR . '/get_collaterals.php',
-    'ajax/get_loan_details_bulk' => AJAX_DIR . '/get_loan_details_bulk.php',
-    'ajax/get_loans_for_collateral' => AJAX_DIR . '/get_loans_for_collateral.php',
     'ajax/get_payment_details' => AJAX_DIR . '/get_payment_details.php',
     'ajax/get_receipt' => AJAX_DIR . '/get_receipt.php',
     'ajax/get_schedule_details' => AJAX_DIR . '/get_schedule_details.php',
     'ajax/get_schedule_details_bulk' => AJAX_DIR . '/get_schedule_details_bulk.php',
     'ajax/get_strategy_details' => AJAX_DIR . '/get_strategy_details.php',
-    'ajax/loan_collaterals_details' => ROOT_DIR . '/app/planned/loan_collaterals_details.php',
     'ajax/record_overdue_payment' => AJAX_DIR . '/record_overdue_payment.php',
     'ajax/record_payment' => AJAX_DIR . '/record_payment.php',
     'ajax/save_collateral' => AJAX_DIR . '/save_collateral.php',
     'ajax/search_guarantors' => AJAX_DIR . '/search_guarantors.php',
-    'ajax/search_loan_officers' => AJAX_DIR . '/search_loan_officers.php',
-    'ajax/search_loans' => AJAX_DIR . '/search_loans.php',
-    'ajax/undo_loan_status.php' => API_DIR . '/undo_loan_status.php',
     'ajax/update_collateral_status' => AJAX_DIR . '/update_collateral_status.php',
-    'ajax/update_loan_document' => AJAX_DIR . '/update_loan_document.php',
     'ajax/update_penalty' => AJAX_DIR . '/update_penalty.php',
     'ajax/update_risk_level' => AJAX_DIR . '/update_risk_level.php',
     'ajax/update_strategy_status' => AJAX_DIR . '/update_strategy_status.php',
@@ -1216,7 +1178,6 @@ $routes = [
     'ajax/upload_collateral_doc' => AJAX_DIR . '/upload_collateral_doc.php',
     'ajax/upload_disbursement_doc' => AJAX_DIR . '/upload_disbursement_doc.php',
     'ajax/upload_kyc' => AJAX_DIR . '/upload_kyc.php',
-    'ajax/upload_loan_doc' => AJAX_DIR . '/upload_loan_doc.php',
     'ajax/upload_profile_doc' => AJAX_DIR . '/upload_profile_doc.php',
 
     // Communication Related
@@ -1236,7 +1197,6 @@ $routes = [
     'ajax/setup_email_templates' => API_DIR . '/setup_email_templates.php',
     'ajax/setup_sms_templates' => API_DIR . '/setup_sms_templates.php',
     'ajax/update_feedback_status' => API_DIR . '/update_feedback_status.php',
-    'ajax/update_loan_status' => AJAX_DIR . '/update_loan_status.php',
 
     // Documents Related
     'ajax/apply_signature' => AJAX_DIR . '/apply_signature.php',
@@ -1529,14 +1489,9 @@ $routes = [
     'customer_payments' => BMS_DIR . '/customer/customer_payments.php',
 
     // ========================================================================
-    // API ENDPOINTS - LOANS
     // ========================================================================
-    'api/activate_loan' => API_DIR . '/activate_loan.php',
     'api/add_guarantor' => AJAX_DIR . '/add_guarantor.php',
     'api/add_guarantor.php' => AJAX_DIR . '/add_guarantor.php',
-    'api/approve_loan' => API_DIR . '/approve_loan.php',
-    'api/apply_loan' => AJAX_DIR . '/apply_loan.php',
-    'api/apply_loan.php' => AJAX_DIR . '/apply_loan.php',
     'api/calculate_penalties' => AJAX_DIR . '/calculate_penalties.php',
     'api/collateral_verification' => API_DIR . '/collateral_verification.php',
     'api/credit_check' => API_DIR . '/credit_check.php',
@@ -1546,17 +1501,12 @@ $routes = [
     'api/delete_product.php' => API_DIR . '/delete_product.php',
     'api/update_product_alerts' => API_DIR . '/update_product_alerts.php',
     'api/update_product_alerts.php' => API_DIR . '/update_product_alerts.php',
-    'api/disburse_loan' => API_DIR . '/disburse_loan.php',
-    'api/disburse_loan.php' => API_DIR . '/disburse_loan.php',
     'api/escalate_cases' => API_DIR . '/escalate_cases.php',
     'api/export_payments' => API_DIR . '/export_payments.php',
     'api/fetch_districts' => API_DIR . '/fetch_districts.php',
     'api/fetch_regions' => API_DIR . '/fetch_regions.php',
     'api/fix_schema' => API_DIR . '/fix_schema.php',
     'api/fix_schema_v2' => API_DIR . '/fix_schema_v2.php',
-    'api/generate_loan_contract' => API_DIR . '/generate_loan_contract.php',
-    'api/generate_loan_pdf' => API_DIR . '/generate_loan_pdf.php',
-    'api/generate_loan_portfolio_report' => API_DIR . '/generate_loan_portfolio_report.php',
     'api/generate_repayment_schedule' => API_DIR . '/generate_repayment_schedule.php',
     'api/generate_schedules' => API_DIR . '/generate_schedules.php',
     'api/get_collateral_attachments' => API_DIR . '/get_collateral_attachments.php',
@@ -1564,49 +1514,31 @@ $routes = [
     'api/get_collateral_documents' => API_DIR . '/get_collateral_documents.php',
     'api/get_collaterals' => API_DIR . '/get_collaterals.php',
     'api/get_contact_history' => API_DIR . '/get_contact_history.php',
-    'api/get_loan_details' => API_DIR . '/get_loan_details.php',
-    'api/get_loan_details.php' => API_DIR . '/get_loan_details.php',
-    'api/get_loan_documents' => API_DIR . '/get_loan_documents.php',
-    'api/get_loan_officers' => API_DIR . '/get_loan_officers.php',
-    'api/get_loan_products' => API_DIR . '/get_loan_products.php',
-    'api/get_loans' => API_DIR . '/get_loans.php',
-    'api/get_loans.php' => API_DIR . '/get_loans.php',
-    'api/get_loans_for_collateral' => API_DIR . '/get_loans_for_collateral.php',
     'api/get_transactions' => API_DIR . '/get_transactions.php',
     'api/save_transaction' => API_DIR . '/save_transaction.php',
     'api/search_customers' => API_DIR . '/search_customers.php',
     'api/search_guarantors' => API_DIR . '/search_guarantors.php',
-    'api/search_loan_officers' => API_DIR . '/search_loan_officers.php',
-    'api/get_loans_without_schedules' => API_DIR . '/get_loans_without_schedules.php',
-    'api/get_overdue_loans' => API_DIR . '/get_overdue_loans.php',
     'api/get_payment_details' => API_DIR . '/get_payment_details.php',
     'api/get_processes' => API_DIR . '/get_processes.php',
     'api/get_product_details' => API_DIR . '/get_product_details.php',
     'api/get_products' => API_DIR . '/get_products.php',
     'api/get_receipt' => AJAX_DIR . '/get_receipt.php',
     'api/get_schedules' => API_DIR . '/get_schedules.php',
-    'api/loan_collaterals_details' => COMING_SOON_FILE,
-    'api/loan_settlement' => API_DIR . '/loan_settlement.php',
-    'api/loan_topup' => API_DIR . '/loan_topup.php',
     'api/log_contact' => API_DIR . '/log_contact.php',
     'api/mark_defaulted' => API_DIR . '/mark_defaulted.php',
     'api/mark_repaid' => API_DIR . '/mark_repaid.php',
     'api/process_bulk_payment' => API_DIR . '/process_bulk_payment.php',
     'api/record_payment' => AJAX_DIR . '/record_payment.php',
-    'api/reject_loan' => API_DIR . '/reject_loan.php',
     'api/reschedule_payment' => API_DIR . '/reschedule_payment.php',
     'api/reverse_payment' => API_DIR . '/reverse_payment.php',
     'api/risk_assessment' => API_DIR . '/risk_assessment.php',
     'api/save_collateral' => API_DIR . '/save_collateral.php',
     'api/save_product' => API_DIR . '/save_product.php',
-    'api/undo_loan_status' => API_DIR . '/undo_loan_status.php',
     'api/update_collateral_status' => API_DIR . '/update_collateral_status.php',
     'api/update_guarantor' => API_DIR . '/update_guarantor.php',
-    'api/update_loan_document' => AJAX_DIR . '/update_loan_document.php',
     'api/update_penalty' => AJAX_DIR . '/update_penalty.php',
     'api/upload_collateral_doc' => AJAX_DIR . '/upload_collateral_doc.php',
     'api/upload_disbursement_doc' => AJAX_DIR . '/upload_disbursement_doc.php',
-    'api/upload_loan_doc' => AJAX_DIR . '/upload_loan_doc.php',
 
     // ========================================================================
     // API ENDPOINTS - REPORTS
@@ -1948,7 +1880,6 @@ function getRelativeRoot($module = '') {
         case 'profile':
         case 'resources':
         case 'users':
-        case 'loan':
         case 'payroll':
             return '../../../';
         default:
