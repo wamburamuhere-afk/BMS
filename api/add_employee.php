@@ -56,14 +56,14 @@ try {
     $employee_code = !empty($_POST['employee_code']) ? trim($_POST['employee_code']) : $employee_number;
 
     // Check if employee_code, employee_number or email already exists among
-    // ACTIVE staff only. A "deleted" employee is soft-deleted (delete_employee.php
-    // sets status='terminated'), so the row lingers in the table. Counting those
-    // rows blocked re-hiring someone with the same email — excluding soft-deleted
-    // rows lets a re-hire reuse the details while still blocking live duplicates.
+    // ACTIVE staff only. An inactivated employee (api/inactivate_employee.php
+    // sets status='inactive') lingers in the table, so counting those rows
+    // blocked re-hiring someone with the same email — excluding inactive rows
+    // lets a re-hire reuse the details while still blocking live duplicates.
     $stmt = $pdo->prepare(
         "SELECT COUNT(*) FROM employees
           WHERE (employee_code = ? OR employee_number = ? OR email = ?)
-            AND (status IS NULL OR status NOT IN ('terminated', 'deleted'))"
+            AND (status IS NULL OR status = 'active')"
     );
     $stmt->execute([$employee_code, $employee_number, $_POST['email']]);
     if ($stmt->fetchColumn() > 0) {

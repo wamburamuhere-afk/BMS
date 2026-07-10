@@ -73,7 +73,7 @@ try {
         LEFT JOIN (
             SELECT employee_id, COUNT(*) as payrolls_count FROM payroll GROUP BY employee_id
         ) p ON e.employee_id = p.employee_id
-        WHERE e.status != 'terminated'
+        WHERE e.status = 'active'
         $scopeE
     ";
     
@@ -97,7 +97,7 @@ try {
     
     // 1. Get total records (scope-aware: respect project assignment)
     $scopeTotal = function_exists('scopeFilterSqlNullable') ? scopeFilterSqlNullable('project', 'employees') : '';
-    $stmtTotal = $pdo->query("SELECT COUNT(*) as total FROM employees WHERE status != 'terminated' $scopeTotal");
+    $stmtTotal = $pdo->query("SELECT COUNT(*) as total FROM employees WHERE status = 'active' $scopeTotal");
     $totalRecords = $stmtTotal->fetch(PDO::FETCH_ASSOC)['total'];
     
     // 2. Get filtered records count
@@ -202,12 +202,23 @@ try {
                             <i class='bi bi-file-earmark-text text-primary me-2'></i> View Account
                         </a>
                     </li>
-                     <li><hr class='dropdown-divider'></li>
-                    <li>
-                        <a class='dropdown-item py-2 text-danger' href='#' onclick='confirmDelete({$emp['employee_id']}); return false;'>
-                            <i class='bi bi-trash me-2'></i> Delete
-                        </a>
-                    </li>
+        ";
+
+        // Inactivate is a status change, not a delete — same authorization
+        // boundary as the old Delete action had (canDelete('employees')).
+        $canInactivate = isAdmin() || canDelete('employees');
+        if ($canInactivate && $emp['status'] === 'active') {
+            $empNameJs = addslashes(trim($emp['first_name'] . ' ' . $emp['last_name']));
+            $actions .= "
+                <li><hr class='dropdown-divider'></li>
+                <li>
+                    <a class='dropdown-item py-2 text-danger' href='#' onclick=\"confirmInactivate({$emp['employee_id']}, '{$empNameJs}'); return false;\">
+                        <i class='bi bi-person-dash me-2'></i> Inactivate
+                    </a>
+                </li>
+            ";
+        }
+        $actions .= "
                 </ul>
             </div>
         ";

@@ -1,5 +1,91 @@
 # BMS Changelog
 
+## 2026-07-09 (feat) — Employees: replace Delete with Inactivate (Phase 1 of inactivation plan)
+
+**New `core/employee_status.php`** — `inactivateEmployee()`/`reactivateEmployee()`,
+shared helpers for the quick, direct action (plan decision D1 — distinct
+from `core/lifecycle_effects.php`'s approval-driven event effects). Never
+deletes any row; verified live in a rolled-back transaction that inactivating
+an employee touches zero rows in `payroll`, `attendance`, `leaves`, or
+`employee_lifecycle_events`.
+
+**New `api/inactivate_employee.php`** replaces `api/delete_employee.php` in
+the UI — takes a reason (Contract Terminated / Resigned / Failed Probation,
+D4: just a label, not a separate mechanism) + optional note, sets
+`status='inactive'` (never `'terminated'` — that value is retired per
+Phase 0/D2) and the matching `employment_status`. Same authorization
+boundary as the old Delete action (`canDelete('employees')`).
+
+**`api/delete_employee.php`** is kept only as a backward-compatible wrapper
+around the same shared helper (in case anything still calls it directly) —
+it no longer writes the retired `'terminated'` status value either.
+
+**UI changes:**
+- `app/bms/pos/employees.php` — row-action "Delete" replaced with
+  "Inactivate" (SweetAlert prompts for reason + note); the link is now
+  properly permission-gated in `api/get_employees.php` (previously rendered
+  unconditionally — `$can_delete_employees` was computed but never used,
+  removed as dead code). Both the main employee directory query
+  (`employees.php`) and the DataTable source (`get_employees.php`, 2 queries)
+  now filter `status = 'active'` instead of `!= 'terminated'`, so an
+  inactivated employee disappears from the list immediately — verified live:
+  active count drops from 19→18 on inactivate, back to 19 on reactivate.
+- `app/bms/operations/project_view.php` — the project staff list had its own
+  separate "Delete Staff" action calling the same old endpoint with the same
+  "cannot be undone" framing; updated to "Inactivate Staff" with the same
+  reason/note prompt, now calling `api/inactivate_employee.php`, for
+  consistency with the main employees list.
+- `api/add_employee.php` — the re-hire uniqueness check (added 2026-07-06)
+  excluded `status IN ('terminated','deleted')`; simplified to
+  `status IS NULL OR status = 'active'` (the single canonical gate going
+  forward), and now also lets a re-hire reuse an *inactivated* (not just the
+  old terminated-only) employee's email/code.
+- `tests/test_employee_rehire_uniqueness_cli.php` updated to mirror the new
+  model (inactivate instead of the old direct `status='terminated'` SQL);
+  all 8 checks still pass, as do the 28 HR-lifecycle-workflow, 14
+  project-payroll-posting, and 17 vendor-account-employee checks (no
+  regressions from the Phase 0 migration).
+
+Phases 2-5 (new `inactive_employees.php` + Reactivate, lock down every
+remaining operational employee picker, close payroll/attendance history
+gaps, tests) tracked in `employee_inactivation_plan.md`.
+
+## 2026-07-09 (feat) — Employees: unify the status model (Phase 0 of inactivation plan)
+
+**Root cause found while scouting a "don't delete employees, inactivate them"
+request:** `employees` carries two independent lifecycle columns that never
+synced each other. `status` ENUM('active','inactive','terminated') was only
+ever written by the list-page "Delete" action (`api/delete_employee.php`,
+sets `'terminated'`). `employment_status` ENUM('active','probation','contract',
+'on_leave','terminated','resigned') is written separately by
+`api/update_employee_status.php` and by the **already-built, professional**
+HR Action → Termination/Resignation approval workflow
+(`core/lifecycle_effects.php`). That workflow never touched `status` — so an
+employee terminated "the proper way," with approval and an audit trail,
+still had `status='active'` and remained fully pickable everywhere in the
+system (attendance, leave applicant/handover, payroll, reporting-to) that
+gates on `status` rather than `employment_status`. `status='inactive'` has
+existed in the schema the whole time and was never used anywhere — the
+ready-made hook for a real fix.
+
+**Phase 0 (foundation, this change):**
+- `core/lifecycle_effects.php` — approved termination/resignation events now
+  also set `status='inactive'` alongside the existing `employment_status`
+  write, so the HR Action workflow actually deactivates the employee
+  everywhere, not just on their profile badge. Verified live (rolled back):
+  applying a termination effect now sets `status=inactive,
+  employment_status=terminated` together.
+- `migrations/2026_07_09_employees_status_unify_inactive.php` — backfills
+  existing `status='terminated'` rows to `'inactive'` (decision D2: collapse
+  'terminated' out of `status`; the *reason* lives in `employment_status` +
+  reason text, not as a second status bucket). Run live: 5 rows migrated (19
+  active / 5 inactive after); confirmed idempotent on a second run (0 rows
+  affected).
+- Full plan for Phases 1-5 (replace Delete with Inactivate, new
+  `inactive_employees.php` + Reactivate, lock down every operational
+  employee picker system-wide, close two historical-visibility gaps in
+  payroll/attendance views, tests) in `employee_inactivation_plan.md`.
+
 ## 2026-07-09 (fix) — POS: Hold Sale no longer falsely reports "No items to hold"
 
 **`app/bms/pos/pos_scripts_new.php::holdSale()`** sends the hold payload as a
