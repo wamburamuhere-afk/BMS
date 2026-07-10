@@ -76,12 +76,16 @@ try {
         throw new Exception("A warehouse must be selected for the sale.");
     }
     
-    // Check for active shift
+    // Check for active shift — pos_sales.shift_id is NOT NULL, so this must be
+    // validated before the insert, not silently passed through as null.
     $stmt = $pdo->prepare("SELECT shift_id FROM cash_register_shifts WHERE user_id = ? AND status = 'active' LIMIT 1");
     $stmt->execute([$user_id]);
     $shift = $stmt->fetch(PDO::FETCH_ASSOC);
     $shift_id = $shift['shift_id'] ?? null;
-    
+    if (!$shift_id) {
+        throw new Exception("Please start a cash register shift before completing a sale.");
+    }
+
     // Insert sale
     $stmt = $pdo->prepare("
         INSERT INTO pos_sales (
