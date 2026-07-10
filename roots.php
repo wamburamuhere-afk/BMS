@@ -616,6 +616,10 @@ $routes = [
     'attendance.php' => POS_DIR . '/attendance.php',
     'employees' => POS_DIR . '/employees.php',
     'employees.php' => POS_DIR . '/employees.php',
+    // Reached only from the "Inactive Employees" link on the Employees page —
+    // intentionally absent from the header nav (mirrors leave_types.php below).
+    'inactive_employees' => POS_DIR . '/inactive_employees.php',
+    'inactive_employees.php' => POS_DIR . '/inactive_employees.php',
     'leaves' => POS_DIR . '/leaves.php',
     'leaves.php' => POS_DIR . '/leaves.php',
     // Reached only from the link under the Leave Type field — intentionally absent
@@ -659,6 +663,10 @@ $routes = [
     'api/log_audit.php' => API_DIR . '/log_audit.php',
     'api/delete_employee' => API_DIR . '/delete_employee.php',
     'api/delete_employee.php' => API_DIR . '/delete_employee.php',
+    'api/inactivate_employee' => API_DIR . '/inactivate_employee.php',
+    'api/inactivate_employee.php' => API_DIR . '/inactivate_employee.php',
+    'api/reactivate_employee' => API_DIR . '/reactivate_employee.php',
+    'api/reactivate_employee.php' => API_DIR . '/reactivate_employee.php',
     'api/update_employee' => API_DIR . '/update_employee.php',
     'api/update_employee.php' => API_DIR . '/update_employee.php',
 

@@ -1,13 +1,5 @@
 <?php
-/**
- * API: Delete Employee — DEPRECATED, kept only for backward compatibility.
- *
- * Superseded by api/inactivate_employee.php (employee_inactivation_plan.md,
- * Phase 1). No UI in the app calls this endpoint anymore — both callers
- * (employees.php, project_view.php) now use Inactivate. This wrapper is kept
- * so any stray caller still gets the current, correct behavior (status =
- * 'inactive') instead of resurrecting the retired 'terminated' status value.
- */
+// API: Inactivate Employee — soft, reversible (see employee_inactivation_plan.md)
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../core/employee_status.php';
@@ -19,11 +11,20 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// Same authorization boundary the old Delete action used.
 if (!canDelete('employees')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to delete employees']);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to inactivate employees']);
     exit();
 }
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'message' => 'Method not allowed']);
+    exit();
+}
+
+csrf_check();
 
 try {
     $employee_id = intval($_POST['employee_id'] ?? 0);
@@ -31,6 +32,13 @@ try {
         throw new Exception("Employee ID is required");
     }
 
+    $outcome = $_POST['outcome'] ?? 'terminated';
+    if (!in_array($outcome, ['terminated', 'resigned', 'failed_probation'], true)) {
+        throw new Exception("Invalid reason selected.");
+    }
+    $reason = trim($_POST['reason'] ?? '');
+
+    // Phase D — project-scope gate
     if (function_exists('assertScopeForRecord')) {
         assertScopeForRecord('employees', 'employee_id', $employee_id);
     }
@@ -46,22 +54,25 @@ try {
     }
 
     $pdo->beginTransaction();
-    $result = inactivateEmployee($pdo, $employee_id, (int)$_SESSION['user_id'], 'terminated');
+    $result = inactivateEmployee($pdo, $employee_id, (int)$_SESSION['user_id'], $outcome, $reason);
 
     $emp_name = trim($emp['first_name'] . ' ' . $emp['last_name']) ?: ('employee #' . $employee_id);
-    logAudit($pdo, $_SESSION['user_id'], 'delete', [
-        'activity_type' => 'delete',
+    $reasonSuffix = $reason !== '' ? " — {$reason}" : '';
+    $outcomeLabel = ['terminated' => 'Contract Terminated', 'resigned' => 'Resigned', 'failed_probation' => 'Failed Probation'][$outcome];
+
+    logAudit($pdo, $_SESSION['user_id'], 'update_status', [
+        'activity_type' => 'status_change',
         'entity_type'   => 'employee',
         'entity_id'     => $employee_id,
-        'description'   => "Deleted (Inactivated) employee: {$emp_name}",
+        'description'   => "Inactivated employee: {$emp_name} ({$outcomeLabel}){$reasonSuffix}",
         'old_values'    => $result['old'],
         'new_values'    => $result['new'],
     ]);
-    logActivity($pdo, $_SESSION['user_id'], 'Delete employee',
-        "deleted (inactivated) employee \"{$emp_name}\" with id {$employee_id}");
+    logActivity($pdo, $_SESSION['user_id'], 'Inactivate employee',
+        "inactivated employee \"{$emp_name}\" ({$outcomeLabel}){$reasonSuffix}");
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'message' => 'Employee deleted successfully']);
+    echo json_encode(['success' => true, 'message' => 'Employee inactivated successfully.']);
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {

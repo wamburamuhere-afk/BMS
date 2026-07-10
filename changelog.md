@@ -1,5 +1,233 @@
 # BMS Changelog
 
+## 2026-07-10 (test) — Employees: consolidated inactivation test suite (Phase 5)
+
+**`tests/test_employee_inactivation_cli.php`** — end-to-end guard for all of
+Phases 0-4, closing out `employee_inactivation_plan.md`. Drives the real
+endpoints (`api/inactivate_employee.php`, `api/reactivate_employee.php`,
+`api/apply_leave.php`, `api/mark_attendance.php`) through subprocess
+runners with an admin session + CSRF token — the same pattern
+`test_department_leadership_cli.php` uses — not just the underlying helper
+functions, so a regression in permission checks, CSRF, or request handling
+would be caught too. `core/lifecycle_effects.php` is exercised in-process
+(no HTTP boundary needed) in its own rolled-back transaction.
+
+27 checks: the HR Action termination effect sets both `status` and
+`employment_status`; inactivate/reactivate round-trip through the real
+endpoints with correct status transitions and reason-note persistence;
+double-inactivate/double-reactivate are rejected; the canonical
+`status = 'active'` picker query excludes/includes the fixture correctly at
+each step; `apply_leave.php` and `mark_attendance.php` both reject the
+inactive fixture server-side; a payroll + attendance + leave row seeded for
+the fixture survive the full inactivate→reactivate round trip untouched;
+`employee_details.php`-style history queries and `get_payrolls.php`'s
+`include_inactive` toggle both behave correctly. Fully self-cleaning —
+restores the `employees` table to its starting row count.
+
+**Caught a real bug in the test itself while writing it**: the first draft's
+`ok()` helper only accepted one argument (copied from a different test
+file's convention) but was called everywhere as `ok($condition, $message)`
+— PHP silently accepted the extra argument and dropped it, so `$m` bound to
+the *condition* and printed `✅ 1` for every call regardless of whether the
+assertion actually passed. The helper never had a failure path at all.
+Fixed to the two-argument `ok($cond, $msg)` form (matching
+`test_employee_rehire_uniqueness_cli.php`'s convention) and verified the
+fix by deliberately forcing one assertion to fail, confirming it printed
+red/❌ and would exit 1, then reverting.
+
+All 6 relevant suites green: this new test (27), `test_hr_lifecycle_workflow_cli`
+(28), `test_leaves_upgrade_cli` (49), `test_project_payroll_posting_cli` (14),
+`test_vendor_account_button_employee_cli` (17), `test_employee_rehire_uniqueness_cli`
+(8) — 143 checks total, no regressions across the whole plan.
+
+## 2026-07-10 (feat) — Employees: close the two real historical-visibility gaps (Phase 4)
+
+Final phase of `employee_inactivation_plan.md`. Nothing was ever actually
+losing data — no hard delete exists anywhere — but two views made an
+inactive employee's history effectively unreachable in the UI.
+
+**Attendance — genuinely had no fix but this one.** `attendance.php` (the
+only attendance view in the app) only ever iterates active employees, even
+via its `?employee=` deep link, so there was **no page anywhere** that could
+show an inactive employee's attendance log — only an aggregate "total
+present" count on their profile. Added a full **Attendance History** table
+to `app/bms/pos/employee_details.php` (mirrors the existing Payroll History
+table there), most recent 200 records with a running total count, reachable
+regardless of employee status since this page has no status gate at all.
+Verified live in the browser on employee #3 (inactive): both Attendance
+History (3 records) and Payroll History (2 records) render correctly on the
+same profile.
+
+**Payroll — the list page hid an inactive employee's entire history, not
+just the current period.** `api/get_payrolls.php` is employee-driven
+(`LEFT JOIN payroll`, so unprocessed employees still show up) and hardcoded
+`e.status = 'active'`, so once inactivated an employee's payroll rows
+disappeared from `payroll.php` for every past period, not just because they
+don't need a new run. Added an opt-in **"Include Inactive"** checkbox —
+unchecked by default (no behavior change for normal payroll runs); when
+checked, inactive employees appear for lookup but their row's gear menu
+shows "Inactive — cannot process" instead of the Process action. Backend
+defense-in-depth unchanged: `api/process_payroll.php`'s own candidate query
+still hardcodes `status = 'active'` regardless of what's requested (Phase 3),
+so an inactive employee could never actually be run even via a crafted
+request. Verified live in the browser: toggling the checkbox moved the
+DataTable from 19→24 records (exactly the 19 active + 5 inactive), and the
+inactive row's action menu correctly showed the disabled state.
+
+## 2026-07-10 (feat) — Employees: lock down every operational picker (Phase 3)
+
+Closes the actual gap the whole plan exists for — an inactive employee could
+still be selected everywhere the system gates on `status` using a stale
+pattern instead of the single canonical `status = 'active'` (Phase 0). Some
+pickers were already correct by accident once Phase 0 collapsed the model
+(`leaves.php`'s applicant/handover select, `attendance.php`'s capture list,
+both payroll candidate queries, the expenses "Paid To" picker) — verified,
+left untouched. Fixed the rest:
+
+**Reporting-To / manager pickers** (`api/get_reporting_to_options.php` both
+branches, `api/update_reporting_line.php`, `api/add_employee.php`,
+`api/update_employee.php`, `api/get_org_chart.php`,
+`api/account/search_employees.php`) — were checking `!= 'deleted'` (a value
+that was never real) or `!= 'terminated'` (retired in Phase 0), so an
+employee inactivated via the *proper* HR Action workflow still showed up as
+a manager/leadership candidate.
+
+**Project-scoped payroll** (`api/operations/preview_project_payroll.php`,
+`.../process_project_payroll.php`, `.../get_project.php`,
+`.../get_unassigned_staff.php`) — same stale `!= 'terminated'` pattern.
+
+**Server-side enforcement, not just UI filtering** — new
+`assertEmployeeActive()` in `core/employee_status.php`: the write endpoints
+behind these pickers (`api/apply_leave.php`, `api/update_leave.php` — both
+the applicant and the Handover-To contact, `api/my_leave_apply.php`,
+`api/mark_attendance.php`, `api/bulk_mark_attendance.php`,
+`api/quick_mark_attendance.php`) previously trusted whatever `employee_id`
+was posted with zero status re-check — a crafted/direct POST bypassed the
+dropdown filter entirely. All six now reject an inactive employee
+server-side, not just hide them from the UI. `bulk_mark_attendance.php`
+folds the check into its existing per-employee try/catch so one inactive ID
+in a batch is reported as a per-row error, not an aborted batch.
+
+Verified live (rolled back): inactivating an employee mid-transaction proves
+`assertEmployeeActive()` throws for them and passes for a still-active peer,
+and that both the org-chart-style and reporting-to-style queries now
+correctly exclude them. No regressions — `test_hr_lifecycle_workflow_cli`
+(28), `test_leaves_upgrade_cli` (49), `test_project_payroll_posting_cli`
+(14), `test_vendor_account_button_employee_cli` (17), and
+`test_employee_rehire_uniqueness_cli` (8) all still pass.
+
+## 2026-07-10 (feat) — Employees: Inactive Employees page + Reactivate (Phase 2)
+
+**New `app/bms/pos/inactive_employees.php`** — lists every `status != 'active'`
+employee with department, designation, reason (Terminated/Resigned badge),
+the free-text note captured on inactivation, who did it and when. Reachable
+via a new "Inactive Employees" button on the main Employees page (not in the
+header nav, same pattern as `leave_types.php`). Follows the blue UI standard
+(§UI-1/2/5/7) — gear-dropdown actions, DataTable, mobile card view.
+
+**New `api/reactivate_employee.php`** + `reactivateEmployee()` in
+`core/employee_status.php` — restores `status`/`employment_status` to
+`'active'` and clears the inactivation reason (plan decision D3: auto-set,
+no prompt). Same authorization boundary as inactivating
+(`canDelete('employees')`).
+
+**`migrations/2026_07_09_employees_inactivation_reason.php`** adds
+`employees.inactivation_reason` (nullable varchar) — the free-text note typed
+on the Inactivate confirmation was previously only captured in the audit log
+description, not queryable for a list page. `inactivateEmployee()` now writes
+it; `reactivateEmployee()` clears it.
+
+Verified live end-to-end in the browser: Inactivate → Reactivate round-trip
+on a live employee correctly moves them between the Employees directory
+(19 ↔ 20 active) and Inactive Employees (5 ↔ 4), with the confirmation
+dialogs showing the correct escaped employee name throughout.
+
+## 2026-07-09 (feat) — Employees: replace Delete with Inactivate (Phase 1 of inactivation plan)
+
+**New `core/employee_status.php`** — `inactivateEmployee()`/`reactivateEmployee()`,
+shared helpers for the quick, direct action (plan decision D1 — distinct
+from `core/lifecycle_effects.php`'s approval-driven event effects). Never
+deletes any row; verified live in a rolled-back transaction that inactivating
+an employee touches zero rows in `payroll`, `attendance`, `leaves`, or
+`employee_lifecycle_events`.
+
+**New `api/inactivate_employee.php`** replaces `api/delete_employee.php` in
+the UI — takes a reason (Contract Terminated / Resigned / Failed Probation,
+D4: just a label, not a separate mechanism) + optional note, sets
+`status='inactive'` (never `'terminated'` — that value is retired per
+Phase 0/D2) and the matching `employment_status`. Same authorization
+boundary as the old Delete action (`canDelete('employees')`).
+
+**`api/delete_employee.php`** is kept only as a backward-compatible wrapper
+around the same shared helper (in case anything still calls it directly) —
+it no longer writes the retired `'terminated'` status value either.
+
+**UI changes:**
+- `app/bms/pos/employees.php` — row-action "Delete" replaced with
+  "Inactivate" (SweetAlert prompts for reason + note); the link is now
+  properly permission-gated in `api/get_employees.php` (previously rendered
+  unconditionally — `$can_delete_employees` was computed but never used,
+  removed as dead code). Both the main employee directory query
+  (`employees.php`) and the DataTable source (`get_employees.php`, 2 queries)
+  now filter `status = 'active'` instead of `!= 'terminated'`, so an
+  inactivated employee disappears from the list immediately — verified live:
+  active count drops from 19→18 on inactivate, back to 19 on reactivate.
+- `app/bms/operations/project_view.php` — the project staff list had its own
+  separate "Delete Staff" action calling the same old endpoint with the same
+  "cannot be undone" framing; updated to "Inactivate Staff" with the same
+  reason/note prompt, now calling `api/inactivate_employee.php`, for
+  consistency with the main employees list.
+- `api/add_employee.php` — the re-hire uniqueness check (added 2026-07-06)
+  excluded `status IN ('terminated','deleted')`; simplified to
+  `status IS NULL OR status = 'active'` (the single canonical gate going
+  forward), and now also lets a re-hire reuse an *inactivated* (not just the
+  old terminated-only) employee's email/code.
+- `tests/test_employee_rehire_uniqueness_cli.php` updated to mirror the new
+  model (inactivate instead of the old direct `status='terminated'` SQL);
+  all 8 checks still pass, as do the 28 HR-lifecycle-workflow, 14
+  project-payroll-posting, and 17 vendor-account-employee checks (no
+  regressions from the Phase 0 migration).
+
+Phases 2-5 (new `inactive_employees.php` + Reactivate, lock down every
+remaining operational employee picker, close payroll/attendance history
+gaps, tests) tracked in `employee_inactivation_plan.md`.
+
+## 2026-07-09 (feat) — Employees: unify the status model (Phase 0 of inactivation plan)
+
+**Root cause found while scouting a "don't delete employees, inactivate them"
+request:** `employees` carries two independent lifecycle columns that never
+synced each other. `status` ENUM('active','inactive','terminated') was only
+ever written by the list-page "Delete" action (`api/delete_employee.php`,
+sets `'terminated'`). `employment_status` ENUM('active','probation','contract',
+'on_leave','terminated','resigned') is written separately by
+`api/update_employee_status.php` and by the **already-built, professional**
+HR Action → Termination/Resignation approval workflow
+(`core/lifecycle_effects.php`). That workflow never touched `status` — so an
+employee terminated "the proper way," with approval and an audit trail,
+still had `status='active'` and remained fully pickable everywhere in the
+system (attendance, leave applicant/handover, payroll, reporting-to) that
+gates on `status` rather than `employment_status`. `status='inactive'` has
+existed in the schema the whole time and was never used anywhere — the
+ready-made hook for a real fix.
+
+**Phase 0 (foundation, this change):**
+- `core/lifecycle_effects.php` — approved termination/resignation events now
+  also set `status='inactive'` alongside the existing `employment_status`
+  write, so the HR Action workflow actually deactivates the employee
+  everywhere, not just on their profile badge. Verified live (rolled back):
+  applying a termination effect now sets `status=inactive,
+  employment_status=terminated` together.
+- `migrations/2026_07_09_employees_status_unify_inactive.php` — backfills
+  existing `status='terminated'` rows to `'inactive'` (decision D2: collapse
+  'terminated' out of `status`; the *reason* lives in `employment_status` +
+  reason text, not as a second status bucket). Run live: 5 rows migrated (19
+  active / 5 inactive after); confirmed idempotent on a second run (0 rows
+  affected).
+- Full plan for Phases 1-5 (replace Delete with Inactivate, new
+  `inactive_employees.php` + Reactivate, lock down every operational
+  employee picker system-wide, close two historical-visibility gaps in
+  payroll/attendance views, tests) in `employee_inactivation_plan.md`.
+
 ## 2026-07-09 (fix) — POS: Hold Sale no longer falsely reports "No items to hold"
 
 **`app/bms/pos/pos_scripts_new.php::holdSale()`** sends the hold payload as a

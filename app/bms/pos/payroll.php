@@ -201,6 +201,14 @@ $selected_status = $_GET['status'] ?? '';
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="include_inactive">
+                        <label class="form-check-label small text-muted" for="include_inactive" title="Look up an inactivated employee's historical payroll — they can never be selected for a new payroll run">
+                            Include Inactive
+                        </label>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -460,6 +468,7 @@ $(document).ready(function() {
                 d.period = $('#period_picker').val();
                 d.department = $('#dept_filter').val();
                 d.search_query = $('#payroll_search').val();
+                d.include_inactive = $('#include_inactive').is(':checked') ? 1 : 0;
             },
             dataSrc: function(json) {
                 if (json.stats) {
@@ -572,7 +581,13 @@ $(document).ready(function() {
                     `;
 
                     if (status === 'unprocessed') {
-                        actions += `<li><a class="dropdown-item py-2" href="#" onclick="processSingle(${row.employee_id}, '${$('#period_picker').val()}')"><i class="bi bi-lightning-charge me-2 text-primary"></i>Process</a></li>`;
+                        // Inactive employees can be looked up (Include Inactive) but never
+                        // selected for a new payroll run.
+                        if (row.employee_status && row.employee_status !== 'active') {
+                            actions += `<li><span class="dropdown-item py-2 text-muted disabled"><i class="bi bi-slash-circle me-2"></i>Inactive — cannot process</span></li>`;
+                        } else {
+                            actions += `<li><a class="dropdown-item py-2" href="#" onclick="processSingle(${row.employee_id}, '${$('#period_picker').val()}')"><i class="bi bi-lightning-charge me-2 text-primary"></i>Process</a></li>`;
+                        }
                     } else if (status === 'voided') {
                         actions += `<li><a class="dropdown-item py-2" href="payroll_details?id=${data}"><i class="bi bi-eye me-2 text-secondary"></i>View (Voided)</a></li>`;
                     } else {
@@ -598,7 +613,7 @@ $(document).ready(function() {
         lengthChange: false // Controlled by custom selector
     });
 
-    $('#period_picker, #dept_filter').on('change', () => {
+    $('#period_picker, #dept_filter, #include_inactive').on('change', () => {
         const period = $('#period_picker').val();
         const dept = $('#dept_filter option:selected').text();
         table.ajax.reload();

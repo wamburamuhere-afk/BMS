@@ -29,7 +29,7 @@ try {
         FROM employees e
         LEFT JOIN designations des ON des.designation_id = e.designation_id
         LEFT JOIN departments d ON d.department_id = e.department_id
-        WHERE (e.status IS NULL OR e.status != 'deleted') $scope
+        WHERE e.status = 'active' $scope
         ORDER BY e.first_name, e.last_name
     ");
     echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);

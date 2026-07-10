@@ -5,6 +5,7 @@
 // The resulting application appears in the existing approval screens unchanged.
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../core/employee_status.php';
 
 header('Content-Type: application/json');
 
@@ -18,6 +19,8 @@ $eid = (int)($pdo->query("SELECT employee_id FROM users WHERE user_id = " . (int
 if (!$eid) { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Your account is not linked to an employee record']); exit; }
 
 try {
+    assertEmployeeActive($pdo, $eid);
+
     $leave_type_input = trim($_POST['leave_type'] ?? '');
     $start = trim($_POST['start_date'] ?? '');
     $end = trim($_POST['end_date'] ?? '');

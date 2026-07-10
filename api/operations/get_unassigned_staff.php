@@ -11,7 +11,7 @@ try {
         FROM employees e
         LEFT JOIN designations ds ON e.designation_id = ds.designation_id
         WHERE (e.project_id IS NULL OR e.project_id = 0) 
-        AND e.status != 'terminated'
+        AND e.status = 'active'
         ORDER BY e.first_name, e.last_name ASC
     ");
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);

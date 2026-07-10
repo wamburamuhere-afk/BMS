@@ -1,13 +1,5 @@
 <?php
-/**
- * API: Delete Employee — DEPRECATED, kept only for backward compatibility.
- *
- * Superseded by api/inactivate_employee.php (employee_inactivation_plan.md,
- * Phase 1). No UI in the app calls this endpoint anymore — both callers
- * (employees.php, project_view.php) now use Inactivate. This wrapper is kept
- * so any stray caller still gets the current, correct behavior (status =
- * 'inactive') instead of resurrecting the retired 'terminated' status value.
- */
+// API: Reactivate Employee (employee_inactivation_plan.md, Phase 2)
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../core/employee_status.php';
@@ -19,11 +11,20 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// Same authorization boundary as inactivating.
 if (!canDelete('employees')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to delete employees']);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to reactivate employees']);
     exit();
 }
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'message' => 'Method not allowed']);
+    exit();
+}
+
+csrf_check();
 
 try {
     $employee_id = intval($_POST['employee_id'] ?? 0);
@@ -31,6 +32,7 @@ try {
         throw new Exception("Employee ID is required");
     }
 
+    // Phase D — project-scope gate
     if (function_exists('assertScopeForRecord')) {
         assertScopeForRecord('employees', 'employee_id', $employee_id);
     }
@@ -41,27 +43,27 @@ try {
     if (!$emp) {
         throw new Exception("Employee not found.");
     }
-    if ($emp['status'] !== 'active') {
-        throw new Exception("This employee is already inactive.");
+    if ($emp['status'] === 'active') {
+        throw new Exception("This employee is already active.");
     }
 
     $pdo->beginTransaction();
-    $result = inactivateEmployee($pdo, $employee_id, (int)$_SESSION['user_id'], 'terminated');
+    $result = reactivateEmployee($pdo, $employee_id, (int)$_SESSION['user_id']);
 
     $emp_name = trim($emp['first_name'] . ' ' . $emp['last_name']) ?: ('employee #' . $employee_id);
-    logAudit($pdo, $_SESSION['user_id'], 'delete', [
-        'activity_type' => 'delete',
+    logAudit($pdo, $_SESSION['user_id'], 'update_status', [
+        'activity_type' => 'status_change',
         'entity_type'   => 'employee',
         'entity_id'     => $employee_id,
-        'description'   => "Deleted (Inactivated) employee: {$emp_name}",
+        'description'   => "Reactivated employee: {$emp_name}",
         'old_values'    => $result['old'],
         'new_values'    => $result['new'],
     ]);
-    logActivity($pdo, $_SESSION['user_id'], 'Delete employee',
-        "deleted (inactivated) employee \"{$emp_name}\" with id {$employee_id}");
+    logActivity($pdo, $_SESSION['user_id'], 'Reactivate employee',
+        "reactivated employee \"{$emp_name}\"");
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'message' => 'Employee deleted successfully']);
+    echo json_encode(['success' => true, 'message' => 'Employee reactivated successfully.']);
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {

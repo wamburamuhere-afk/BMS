@@ -26,6 +26,12 @@ try {
     $period = isset($_GET['period']) ? $_GET['period'] : date('Y-m');
     $status_filter = isset($_GET['status']) ? $_GET['status'] : '';
     $department_filter = isset($_GET['department']) ? intval($_GET['department']) : 0;
+    // Employee_inactivation_plan.md Phase 4 — this list is employee-driven
+    // (LEFT JOIN payroll), so hardcoding status='active' hid an inactivated
+    // employee's ENTIRE payroll history, for every period, from this page —
+    // even though the rows themselves were never touched. Opt-in only: an
+    // inactive employee never needs payroll RUN, just occasionally looked up.
+    $include_inactive = isset($_GET['include_inactive']) && $_GET['include_inactive'] == '1';
     
     // Columns for sorting mapping (must match payroll.php 11-column layout)
     $columns = [
@@ -49,7 +55,7 @@ try {
     // Base Query Logic: Active Employees LEFT JOIN Payroll
     // This ensures we show Unprocessed employees
     
-    $where_sql = "e.status = 'active'";
+    $where_sql = $include_inactive ? "1=1" : "e.status = 'active'";
     // Phase D — project-scope filter on the employee (nullable: global employees visible)
     if (function_exists('scopeFilterSqlNullable')) {
         $where_sql .= scopeFilterSqlNullable('project', 'e');
@@ -91,9 +97,10 @@ try {
         $params[] = $term;
     }
 
-    // 1. Get Total Records (Active Employees) — scope-aware
+    // 1. Get Total Records (Active Employees, or all if Include Inactive is on) — scope-aware
     $scopeTotal = function_exists('scopeFilterSqlNullable') ? scopeFilterSqlNullable('project', 'employees') : '';
-    $total_stmt = $pdo->query("SELECT COUNT(*) FROM employees WHERE status = 'active' $scopeTotal");
+    $totalWhere = $include_inactive ? '1=1' : "status = 'active'";
+    $total_stmt = $pdo->query("SELECT COUNT(*) FROM employees WHERE $totalWhere $scopeTotal");
     $recordsTotal = $total_stmt->fetchColumn();
 
     // 2. Get Filtered Records logic requires full joins
@@ -164,6 +171,7 @@ try {
             e.employee_number,
             e.department_id,
             e.basic_salary as emp_basic_salary,
+            e.status as employee_status,
             d.department_name
         FROM employees e
         LEFT JOIN payroll p ON e.employee_id = p.employee_id AND p.payroll_period = ?

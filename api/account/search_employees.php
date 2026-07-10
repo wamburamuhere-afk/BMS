@@ -38,7 +38,7 @@ try {
                CONCAT(first_name, ' ', last_name) AS name,
                employee_number
           FROM employees
-         WHERE status != 'terminated'" .
+         WHERE status = 'active'" .
          ($q !== '' ? " AND (first_name LIKE ? OR last_name LIKE ? OR employee_number LIKE ?)" : "") . "
                $scope
          ORDER BY first_name ASC, last_name ASC

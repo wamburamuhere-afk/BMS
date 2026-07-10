@@ -2,6 +2,7 @@
 // File: api/mark_attendance.php
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/attendance_payroll.php';   // Plan H2 — overtime calc
+require_once __DIR__ . '/../core/employee_status.php';
 
 header('Content-Type: application/json');
 
@@ -43,6 +44,7 @@ try {
     if (function_exists('assertScopeForEmployee')) {
         assertScopeForEmployee($employee_id);
     }
+    assertEmployeeActive($pdo, $employee_id);
 
     $attendance_date = trim($_POST['attendance_date']);
     $status = trim($_POST['status']);
