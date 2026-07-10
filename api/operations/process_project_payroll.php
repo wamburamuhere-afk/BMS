@@ -50,7 +50,7 @@ try {
     $month = intval($parts[1]);
 
     // Get staff for this project (with optional department/status filters)
-    $where  = "e.project_id = ? AND e.status != 'terminated'";
+    $where  = "e.project_id = ? AND e.status = 'active'";
     $params = [$project_id];
     if ($department_id) { $where .= " AND e.department_id = ?"; $params[] = $department_id; }
     if ($employment_status) { $where .= " AND e.employment_status = ?"; $params[] = $employment_status; }

@@ -44,6 +44,33 @@ if (!function_exists('inactivateEmployee')) {
     }
 }
 
+if (!function_exists('assertEmployeeActive')) {
+    /**
+     * Phase 3 — server-side enforcement. UI dropdowns already exclude
+     * inactive employees, but that's not a safe boundary on its own (a
+     * crafted/direct POST bypasses it entirely) — every write endpoint that
+     * acts FOR or ON BEHALF OF an employee (marking their attendance,
+     * applying for their leave, naming them as a handover contact) must
+     * re-check status itself.
+     *
+     * @param string $label  used in the error message, e.g. "Employee" or
+     *                       "Handover contact"
+     * @throws InvalidArgumentException if not found or not active
+     */
+    function assertEmployeeActive(PDO $pdo, int $employee_id, string $label = 'Employee'): void
+    {
+        $stmt = $pdo->prepare("SELECT status FROM employees WHERE employee_id = ?");
+        $stmt->execute([$employee_id]);
+        $status = $stmt->fetchColumn();
+        if ($status === false) {
+            throw new InvalidArgumentException("$label not found.");
+        }
+        if ($status !== 'active') {
+            throw new InvalidArgumentException("$label is inactive and cannot be selected for this action.");
+        }
+    }
+}
+
 if (!function_exists('reactivateEmployee')) {
     /**
      * D3: auto-sets both fields to 'active', no prompt for the new

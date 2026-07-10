@@ -6,6 +6,7 @@ ini_set('error_log', __DIR__ . '/debug_leave.log');
 
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/leave_rules.php';
+require_once __DIR__ . '/../core/employee_status.php';
 
 ob_clean();
 header('Content-Type: application/json');
@@ -61,6 +62,9 @@ try {
     $reason     = trim($_POST['reason']);
     $contact_during_leave = trim($_POST['contact_during_leave'] ?? '') ?: null;
     $handover_to = !empty($_POST['handover_to']) ? intval($_POST['handover_to']) : null;
+    if ($handover_to !== null && function_exists('assertEmployeeActive')) {
+        assertEmployeeActive($pdo, $handover_to, 'Handover contact');
+    }
 
     // The leave type is now a real FK. The legacy ENUM is dual-written for the
     // readers still on it (leave_reports, export_leaves, project_view).

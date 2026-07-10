@@ -460,7 +460,7 @@ try {
         FROM employees e
         LEFT JOIN departments d ON e.department_id = d.department_id
         LEFT JOIN designations des ON e.designation_id = des.designation_id
-        WHERE e.project_id = ? AND e.status != 'terminated'
+        WHERE e.project_id = ? AND e.status = 'active'
         ORDER BY e.first_name, e.last_name ASC
     ");
     $stmt->execute([$id]);

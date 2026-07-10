@@ -1,6 +1,7 @@
 <?php
 // File: api/quick_mark_attendance.php
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/employee_status.php';
 
 header('Content-Type: application/json');
 
@@ -37,6 +38,7 @@ try {
     if (function_exists('assertScopeForEmployee')) {
         assertScopeForEmployee($employee_id);
     }
+    assertEmployeeActive($pdo, $employee_id);
 
     // Calculate total hours if times provided
     $total_hours = 0;
