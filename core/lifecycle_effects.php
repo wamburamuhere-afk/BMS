@@ -94,14 +94,20 @@ if (!function_exists('applyLifecycleEffectRow')) {
 
             case 'resignation':
                 $sets[] = "employment_status = 'resigned'";
+                $sets[] = "status = 'inactive'";
                 $old['employment_status'] = null;   // filled by caller if known
                 $new['employment_status'] = 'resigned';
+                $old['status'] = null;
+                $new['status'] = 'inactive';
                 break;
 
             case 'termination':
                 $sets[] = "employment_status = 'terminated'";
+                $sets[] = "status = 'inactive'";
                 $old['employment_status'] = null;
                 $new['employment_status'] = 'terminated';
+                $old['status'] = null;
+                $new['status'] = 'inactive';
                 break;
 
             // award / warning / complaint — record only, no employee change
@@ -113,11 +119,15 @@ if (!function_exists('applyLifecycleEffectRow')) {
             return ['changed' => false, 'old' => [], 'new' => []];
         }
 
-        // Resolve the real old employment_status for the audit trail
+        // Resolve the real old employment_status (+ status, when also changing) for the audit trail
         if (array_key_exists('employment_status', $new)) {
-            $cur = $pdo->prepare("SELECT employment_status FROM employees WHERE employee_id = ?");
+            $cur = $pdo->prepare("SELECT employment_status, status FROM employees WHERE employee_id = ?");
             $cur->execute([$employee_id]);
-            $old['employment_status'] = $cur->fetchColumn();
+            $row = $cur->fetch(PDO::FETCH_ASSOC) ?: [];
+            $old['employment_status'] = $row['employment_status'] ?? null;
+            if (array_key_exists('status', $new)) {
+                $old['status'] = $row['status'] ?? null;
+            }
         }
 
         $vals[] = $actor;

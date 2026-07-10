@@ -1,5 +1,41 @@
 # BMS Changelog
 
+## 2026-07-09 (feat) — Employees: unify the status model (Phase 0 of inactivation plan)
+
+**Root cause found while scouting a "don't delete employees, inactivate them"
+request:** `employees` carries two independent lifecycle columns that never
+synced each other. `status` ENUM('active','inactive','terminated') was only
+ever written by the list-page "Delete" action (`api/delete_employee.php`,
+sets `'terminated'`). `employment_status` ENUM('active','probation','contract',
+'on_leave','terminated','resigned') is written separately by
+`api/update_employee_status.php` and by the **already-built, professional**
+HR Action → Termination/Resignation approval workflow
+(`core/lifecycle_effects.php`). That workflow never touched `status` — so an
+employee terminated "the proper way," with approval and an audit trail,
+still had `status='active'` and remained fully pickable everywhere in the
+system (attendance, leave applicant/handover, payroll, reporting-to) that
+gates on `status` rather than `employment_status`. `status='inactive'` has
+existed in the schema the whole time and was never used anywhere — the
+ready-made hook for a real fix.
+
+**Phase 0 (foundation, this change):**
+- `core/lifecycle_effects.php` — approved termination/resignation events now
+  also set `status='inactive'` alongside the existing `employment_status`
+  write, so the HR Action workflow actually deactivates the employee
+  everywhere, not just on their profile badge. Verified live (rolled back):
+  applying a termination effect now sets `status=inactive,
+  employment_status=terminated` together.
+- `migrations/2026_07_09_employees_status_unify_inactive.php` — backfills
+  existing `status='terminated'` rows to `'inactive'` (decision D2: collapse
+  'terminated' out of `status`; the *reason* lives in `employment_status` +
+  reason text, not as a second status bucket). Run live: 5 rows migrated (19
+  active / 5 inactive after); confirmed idempotent on a second run (0 rows
+  affected).
+- Full plan for Phases 1-5 (replace Delete with Inactivate, new
+  `inactive_employees.php` + Reactivate, lock down every operational
+  employee picker system-wide, close two historical-visibility gaps in
+  payroll/attendance views, tests) in `employee_inactivation_plan.md`.
+
 ## 2026-07-09 (fix) — POS: Hold Sale no longer falsely reports "No items to hold"
 
 **`app/bms/pos/pos_scripts_new.php::holdSale()`** sends the hold payload as a
