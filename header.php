@@ -1010,9 +1010,6 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('email_templates')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('email_templates') ?>"><i class="bi bi-envelope"></i> Email</a></li>
                                 <?php endif; ?>
-                                <?php if(canView('sms_templates')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('sms_templates') ?>"><i class="bi bi-chat-text"></i> SMS</a></li>
-                                <?php endif; ?>
                                 <?php if(canView('notification_center')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('notification_center') ?>"><i class="bi bi-bell"></i> Notifications</a></li>
                                 <?php endif; ?>
