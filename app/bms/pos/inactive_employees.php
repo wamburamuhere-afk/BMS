@@ -75,54 +75,29 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
     #tableView { display: block !important; padding: 0 !important; width: 100% !important; }
     #cardView { display: none !important; }
 
-    /* ── Undo DataTables scrollX for print ──────────────────────────────────
-       With scrollX:true DataTables splits the grid into TWO tables (a header
-       table in .dataTables_scrollHead and a body table in .dataTables_scrollBody)
-       with pixel-fixed widths and an overflow-x box. On paper that makes the
-       headings sit out of line with their columns and clips anything scrolled
-       off-screen. Collapse it back into one full-width table for printing. */
+    /* The .table-responsive wrapper scrolls on screen; on paper it must not be a
+       scroll box, or the table is clipped and the scrollbar itself gets printed.
+       (Any leftover DataTables scroll wrappers are neutralised too, defensively.) */
+    #tableView, .table-responsive,
     .dataTables_scroll, .dataTables_scrollHead, .dataTables_scrollBody,
-    .dataTables_scrollHeadInner {
+    .dataTables_scrollHeadInner, .dataTables_wrapper {
         overflow: visible !important;
+        overflow-x: visible !important;
         width: 100% !important;
+        max-width: 100% !important;
         height: auto !important;
         max-height: none !important;
         border: 0 !important;
     }
-    /* The header table lives in its own wrapper — hide it and let the body
-       table print its real <thead> instead, so headings and cells share one
-       table and therefore one set of column widths. */
-    .dataTables_scrollHead { display: none !important; }
-    .dataTables_scrollBody > table > thead {
-        display: table-header-group !important;
-        visibility: visible !important;
-    }
-    /* DataTables collapses the body table's duplicate header: each <th> label is
-       wrapped in a div.dataTables_sizing pinned to height:0. Restore both, or the
-       column headings print blank and appear "out of line" with their data. */
-    .dataTables_scrollBody > table > thead th {
-        height: auto !important;
-        padding: 6px 8px !important;
-        border-bottom: 1px solid #dee2e6 !important;
-        background: #f8f9fa !important;
-        font-weight: 600 !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-    }
-    .dataTables_scrollBody > table > thead th .dataTables_sizing {
-        height: auto !important;
-        display: block !important;
-        overflow: visible !important;
-    }
-    /* Sorting arrows are meaningless on paper */
-    .dataTables_scrollBody > table > thead th::before,
-    .dataTables_scrollBody > table > thead th::after { display: none !important; }
 
-    /* Both tables carry inline pixel widths from scrollX — override them.
-       table-layout:fixed + percentage widths is what makes the 8 columns fit
+    /* Sorting arrows are meaningless on paper */
+    #inactiveTable thead th::before,
+    #inactiveTable thead th::after { display: none !important; }
+
+    /* table-layout:fixed + percentage widths is what makes the 8 columns fit
        PORTRAIT as well as landscape: 'auto' lets long text (e.g. "Human
        Resources Department") push columns off the right edge of the paper. */
-    #inactiveTable, .dataTables_scrollBody table, .dataTables_scrollHead table {
+    #inactiveTable {
         width: 100% !important;
         max-width: 100% !important;
         table-layout: fixed !important;
@@ -137,13 +112,18 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
         overflow-wrap: break-word !important;
         overflow: visible !important;
         vertical-align: middle !important;
-        /* scrollX writes inline pixel widths on every cell — neutralise them
+        /* DataTables may write inline pixel widths on cells — neutralise them
            so the percentage column widths below actually apply. */
-        width: auto !important;
         min-width: 0 !important;
         max-width: none !important;
     }
-    #inactiveTable thead th { text-transform: uppercase !important; }
+    #inactiveTable thead th {
+        text-transform: uppercase !important;
+        font-weight: bold !important;
+        background-color: #f2f2f2 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
 
     /* Percentage widths so the layout adapts to Portrait *and* Landscape.
        8 printed columns (Actions is excluded from print) = 100%. */
@@ -257,8 +237,8 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
         </div>
     </div>
 
-    <div id="tableView">
-        <table id="inactiveTable" class="table table-hover align-middle w-100">
+    <div id="tableView" class="table-responsive">
+        <table id="inactiveTable" class="table table-hover align-middle" style="width: 100% !important;">
             <thead class="table-light">
                 <tr>
                     <th>Employee #</th>
@@ -322,8 +302,11 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#inactiveTable')) {
         $('#inactiveTable').DataTable({
+            // NOTE: no scrollX. scrollX:true splits the grid into two tables inside
+            // an overflow-x box, which prints as a clipped table with a scrollbar on
+            // the paper. The .table-responsive wrapper scrolls on screen instead and
+            // simply disappears in print — this is what suppliers.php does.
             responsive: false,
-            scrollX: true,
             pageLength: 25,
             order: [[7, 'desc']],
             dom: 'rtipB',
