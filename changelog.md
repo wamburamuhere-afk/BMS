@@ -19,10 +19,12 @@ app. Verified live on two of the four (Leave Types, CRM Leads) — clean
 white header, consistent styling; the other two use the identical class
 swap and lint clean.
 
-**Not changed — flagged for a decision:** `app/constant/accounts/budget_details.php:378`
-also has `table-dark`, but on a `<tfoot>` "Total Expenses" summary row, not
-a column heading — a different design choice (bold emphasis on a grand
-total), not the same defect. Left as-is pending explicit confirmation.
+**Update — user confirmed, now fixed too:** `app/constant/accounts/budget_details.php:378`'s
+`table-dark` on the `<tfoot>` "Total Expenses" row changed to `table-light`
+as well, for the same reason as everywhere else — the bold text (`<strong>`)
+already carries the emphasis, the black background was the only thing not
+matching. Verified live on the Labor Wages budget (5 real expense rows,
+Total Expenses TSh 12,582,579,100.00) — clean white row, bold total intact.
 
 ## 2026-07-10 (fix) — Inactive Employees: table header was black, doesn't match the rest of the app
 
