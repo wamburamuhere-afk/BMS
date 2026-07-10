@@ -1,5 +1,45 @@
 # BMS Changelog
 
+## 2026-07-10 (test) — Employees: consolidated inactivation test suite (Phase 5)
+
+**`tests/test_employee_inactivation_cli.php`** — end-to-end guard for all of
+Phases 0-4, closing out `employee_inactivation_plan.md`. Drives the real
+endpoints (`api/inactivate_employee.php`, `api/reactivate_employee.php`,
+`api/apply_leave.php`, `api/mark_attendance.php`) through subprocess
+runners with an admin session + CSRF token — the same pattern
+`test_department_leadership_cli.php` uses — not just the underlying helper
+functions, so a regression in permission checks, CSRF, or request handling
+would be caught too. `core/lifecycle_effects.php` is exercised in-process
+(no HTTP boundary needed) in its own rolled-back transaction.
+
+27 checks: the HR Action termination effect sets both `status` and
+`employment_status`; inactivate/reactivate round-trip through the real
+endpoints with correct status transitions and reason-note persistence;
+double-inactivate/double-reactivate are rejected; the canonical
+`status = 'active'` picker query excludes/includes the fixture correctly at
+each step; `apply_leave.php` and `mark_attendance.php` both reject the
+inactive fixture server-side; a payroll + attendance + leave row seeded for
+the fixture survive the full inactivate→reactivate round trip untouched;
+`employee_details.php`-style history queries and `get_payrolls.php`'s
+`include_inactive` toggle both behave correctly. Fully self-cleaning —
+restores the `employees` table to its starting row count.
+
+**Caught a real bug in the test itself while writing it**: the first draft's
+`ok()` helper only accepted one argument (copied from a different test
+file's convention) but was called everywhere as `ok($condition, $message)`
+— PHP silently accepted the extra argument and dropped it, so `$m` bound to
+the *condition* and printed `✅ 1` for every call regardless of whether the
+assertion actually passed. The helper never had a failure path at all.
+Fixed to the two-argument `ok($cond, $msg)` form (matching
+`test_employee_rehire_uniqueness_cli.php`'s convention) and verified the
+fix by deliberately forcing one assertion to fail, confirming it printed
+red/❌ and would exit 1, then reverting.
+
+All 6 relevant suites green: this new test (27), `test_hr_lifecycle_workflow_cli`
+(28), `test_leaves_upgrade_cli` (49), `test_project_payroll_posting_cli` (14),
+`test_vendor_account_button_employee_cli` (17), `test_employee_rehire_uniqueness_cli`
+(8) — 143 checks total, no regressions across the whole plan.
+
 ## 2026-07-10 (feat) — Employees: close the two real historical-visibility gaps (Phase 4)
 
 Final phase of `employee_inactivation_plan.md`. Nothing was ever actually
