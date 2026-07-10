@@ -54,6 +54,42 @@ in the system (204 → 164) and created **zero** new broken routes (one missed
 `sms_alerts` route was caught by the harness and removed). Verified live in the
 browser: the dashboard renders identically with no errors, `/loan_application`
 now returns 404, and the Communication module (SMS Templates) still loads fine.
+## 2026-07-10 (chore) — Remove the non-functional SMS Templates feature (light-touch, data kept)
+
+SMS in BMS was a **half-built feature wired to nothing** — you could write SMS
+templates and configure a gateway, but nothing in real operations ever sent a
+text. The notification engine (`core/notify.php`) even flags SMS as an
+*"unsupported channel … land here later."* The only thing that ever used the
+SMS templates was the loan SMS Alerts page (already removed). So the visible
+"SMS" menu item was pure clutter.
+
+**Investigated first** and found SMS is more entangled than loans: two of its
+APIs are used by **active Settings pages** — `save_sms_template.php` by
+Notification Settings and `test_sms_config.php` by System Settings (which hosts
+a whole SMS-gateway config section). So a full rip-out would break those live
+pages.
+
+**Light-touch removal (removes the visible feature, breaks nothing):**
+- Removed the **"SMS" item** from the Comms menu (`header.php`).
+- Removed the **SMS Templates page** (`app/constant/communication/sms_templates.php`)
+  and the two APIs used *only* by it (`api/get_sms_templates.php`,
+  `api/delete_sms_template.php`) + their routes; also cleared two pre-existing
+  dead `setup_sms_templates` routes.
+
+**Deliberately kept (in use by active pages, or harmless dormant data):**
+- `api/save_sms_template.php` (Notification Settings uses it) and
+  `api/test_sms_config.php` (System Settings uses it) — untouched, so those
+  Settings pages keep working.
+- The **SMS gateway config** in System Settings and Notification Settings — left
+  intact (removing it would disturb active Settings pages; it's harmless config).
+- All SMS **data kept dormant**: `sms_templates` (6 rows), `sms_gateway_settings`
+  (1 row), `sms_alerts` (0 rows) — fully reversible if SMS is ever finished
+  properly (e.g., overdue-invoice payment reminders).
+
+**Verified live in the browser:** SMS Templates page now 404s; the Comms menu
+keeps Messages/Email/Notifications/Campaigns/Leads (no SMS); System Settings and
+Notification Settings both load fine; broken-route count went 204 → 202 (two
+dead routes cleaned, zero new breaks).
 
 ## 2026-07-10 (fix) — Employees: Inactivate link was silently missing from every row (Sentry-caught regression)
 
