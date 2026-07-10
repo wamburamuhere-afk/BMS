@@ -181,6 +181,9 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                     <a href="<?= getUrl('employee_report') ?>" class="btn btn-outline-primary px-4 shadow-sm action-btn-premium flex-grow-1 flex-md-grow-0" style="font-weight: 600;">
                         <i class="bi bi-graph-up-arrow me-1"></i> Reports
                     </a>
+                    <a href="<?= getUrl('inactive_employees') ?>" class="btn btn-outline-secondary px-4 shadow-sm action-btn-premium flex-grow-1 flex-md-grow-0" style="font-weight: 600;">
+                        <i class="bi bi-person-x me-1"></i> Inactive Employees
+                    </a>
                 </div>
             </div>
         </div>

@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-07-10 (feat) — Employees: Inactive Employees page + Reactivate (Phase 2)
+
+**New `app/bms/pos/inactive_employees.php`** — lists every `status != 'active'`
+employee with department, designation, reason (Terminated/Resigned badge),
+the free-text note captured on inactivation, who did it and when. Reachable
+via a new "Inactive Employees" button on the main Employees page (not in the
+header nav, same pattern as `leave_types.php`). Follows the blue UI standard
+(§UI-1/2/5/7) — gear-dropdown actions, DataTable, mobile card view.
+
+**New `api/reactivate_employee.php`** + `reactivateEmployee()` in
+`core/employee_status.php` — restores `status`/`employment_status` to
+`'active'` and clears the inactivation reason (plan decision D3: auto-set,
+no prompt). Same authorization boundary as inactivating
+(`canDelete('employees')`).
+
+**`migrations/2026_07_09_employees_inactivation_reason.php`** adds
+`employees.inactivation_reason` (nullable varchar) — the free-text note typed
+on the Inactivate confirmation was previously only captured in the audit log
+description, not queryable for a list page. `inactivateEmployee()` now writes
+it; `reactivateEmployee()` clears it.
+
+Verified live end-to-end in the browser: Inactivate → Reactivate round-trip
+on a live employee correctly moves them between the Employees directory
+(19 ↔ 20 active) and Inactive Employees (5 ↔ 4), with the confirmation
+dialogs showing the correct escaped employee name throughout.
+
 ## 2026-07-09 (feat) — Employees: replace Delete with Inactivate (Phase 1 of inactivation plan)
 
 **New `core/employee_status.php`** — `inactivateEmployee()`/`reactivateEmployee()`,

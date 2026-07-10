@@ -1,5 +1,5 @@
 <?php
-// API: Inactivate Employee — soft, reversible (see employee_inactivation_plan.md)
+// API: Reactivate Employee (employee_inactivation_plan.md, Phase 2)
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../core/employee_status.php';
@@ -11,10 +11,10 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-// Same authorization boundary the old Delete action used.
+// Same authorization boundary as inactivating.
 if (!canDelete('employees')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to inactivate employees']);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to reactivate employees']);
     exit();
 }
 
@@ -32,12 +32,6 @@ try {
         throw new Exception("Employee ID is required");
     }
 
-    $outcome = $_POST['outcome'] ?? 'terminated';
-    if (!in_array($outcome, ['terminated', 'resigned', 'failed_probation'], true)) {
-        throw new Exception("Invalid reason selected.");
-    }
-    $reason = trim($_POST['reason'] ?? '');
-
     // Phase D — project-scope gate
     if (function_exists('assertScopeForRecord')) {
         assertScopeForRecord('employees', 'employee_id', $employee_id);
@@ -49,30 +43,27 @@ try {
     if (!$emp) {
         throw new Exception("Employee not found.");
     }
-    if ($emp['status'] !== 'active') {
-        throw new Exception("This employee is already inactive.");
+    if ($emp['status'] === 'active') {
+        throw new Exception("This employee is already active.");
     }
 
     $pdo->beginTransaction();
-    $result = inactivateEmployee($pdo, $employee_id, (int)$_SESSION['user_id'], $outcome, $reason);
+    $result = reactivateEmployee($pdo, $employee_id, (int)$_SESSION['user_id']);
 
     $emp_name = trim($emp['first_name'] . ' ' . $emp['last_name']) ?: ('employee #' . $employee_id);
-    $reasonSuffix = $reason !== '' ? " — {$reason}" : '';
-    $outcomeLabel = ['terminated' => 'Contract Terminated', 'resigned' => 'Resigned', 'failed_probation' => 'Failed Probation'][$outcome];
-
     logAudit($pdo, $_SESSION['user_id'], 'update_status', [
         'activity_type' => 'status_change',
         'entity_type'   => 'employee',
         'entity_id'     => $employee_id,
-        'description'   => "Inactivated employee: {$emp_name} ({$outcomeLabel}){$reasonSuffix}",
+        'description'   => "Reactivated employee: {$emp_name}",
         'old_values'    => $result['old'],
         'new_values'    => $result['new'],
     ]);
-    logActivity($pdo, $_SESSION['user_id'], 'Inactivate employee',
-        "inactivated employee \"{$emp_name}\" ({$outcomeLabel}){$reasonSuffix}");
+    logActivity($pdo, $_SESSION['user_id'], 'Reactivate employee',
+        "reactivated employee \"{$emp_name}\"");
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'message' => 'Employee inactivated successfully.']);
+    echo json_encode(['success' => true, 'message' => 'Employee reactivated successfully.']);
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {
