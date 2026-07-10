@@ -1,5 +1,55 @@
 # BMS Changelog
 
+## 2026-07-10 (fix) — Global print layout: kill "large gap / push to next page" and "extra blank page" across the app
+
+**File touched:** `assets/css/responsive.css` only (globally-loaded print stylesheet). Pure additions —
+nothing existing was deleted or edited; every new rule wins via a higher-specificity selector so it
+overrides regardless of source order. Reversible by deleting the added block.
+
+**Investigation before touching anything:** correlated the two symptoms ("large space then push to next
+page" and "trailing blank page with no data") against all ~119 pages with Print, comparing a clean page
+(`inactive_employees.php`) against broken ones (`print_customers.php`, `purchase_orders.php`, etc.) to
+find what differed. Found 3 real, independent root causes (a 4th suspected cause — `body{padding-bottom:
+4mm}` from `includes/print_footer_css.php` on ~45 pages — turned out to already be neutralized by an
+existing `html body { padding: 0 !important }` rule via specificity, so it needed no fix; not touched).
+
+**Root causes fixed (all as new rules inside the existing `@media print` block):**
+1. **Modals/offcanvas/SweetAlert2/Select2/tooltips/toasts stay in the DOM when closed** — hidden on
+   screen via opacity/transform, not removed, so they still occupy layout space when printed. ~35 pages
+   use modals. Added `display: none !important` for `.modal, .modal-backdrop, .offcanvas,
+   .offcanvas-backdrop, .swal2-container, .select2-container, .select2-dropdown, .tooltip, .popover,
+   .toast, .toast-container`. Verified first that no page prints a modal's own content (all 17
+   modal+print matches are standard add/edit forms) — safe to hide everywhere.
+2. **`min-height: 100vh` wrappers** (screen-only hero sizing) resolve to one full *printed* page in
+   print, reserving a blank page even when real content is short — confirmed root cause of
+   `purchase_orders.php`'s large-gap symptom. Fixed by name (grepped every `min-height: 100vh` in
+   `app/`, no wildcard): `.stock-adjustments-dashboard, .sales-returns-dashboard,
+   .sales-orders-dashboard, .quotations-dashboard, .lpo-dashboard, .rfq-view-page, .rfq-create-page,
+   .rfq-page, .purchase-orders-dashboard, .product-categories-dashboard, .details-dashboard,
+   .invoice-dashboard, #pos-container` + a general `html body { min-height: 0; height: auto }`.
+   `leave_details.php` already had its own page-scoped fix for `.leave-dashboard` — left alone.
+3. **Stacked bottom-space reservation** — `.container-fluid { padding-bottom: 1cm }` +
+   `body::after { height: 5mm }` (both pre-existing, meant to keep content clear of the fixed footer)
+   sit *inside* the content area on top of the `@page` bottom margin (1.5cm) that already exists for
+   that purpose. ~1.5cm of double-reserved space was enough on its own to tip a near-full page into a
+   trailing blank one. Zeroed both via `html .container-fluid { padding-bottom: 0 }` and
+   `html body::after { height: 0 }` — `@page` margin (the actual footer clearance) is untouched.
+
+**Not touched (explicitly, on purpose):** `.card { page-break-inside: avoid }` — 95/119 print pages
+depend on this; too high a blast radius to touch in this pass.
+
+**Verification status:** confirmed working, not just reasoned through. The Chrome extension can't
+capture real print previews (`window.print()` opens a native OS dialog that freezes browser automation —
+confirmed twice), so verification was done via headless Chrome CDP instead: reused the existing logged-in
+session cookie (no credentials entered by the agent), called `Page.printToPDF` directly against 9 pages
+in both portrait and landscape (18 renders) — `inactive_employees`, `print_customers`, `purchase_orders`,
+`suppliers`, `stock_adjustments`, `invoices`, `sales_orders`, `quotations`, `sales_returns` — covering
+every root-cause category above plus the clean baseline. Each resulting PDF's page objects were decompressed
+(zlib) and their content-stream byte size / draw-operator count measured directly — a page with near-zero
+content would show up unambiguously. Result: **zero blank pages and zero dead-space-gap pages across all
+18 renders.** Not tested: the other ~110 of 119 print-enabled pages (this fix lives in the one shared
+stylesheet all of them load, so it should generalize, but that's inference, not individual confirmation).
+
 ## 2026-07-10 (feat) — Inactive Employees: Copy / CSV / Print toolbar with shared print header & footer
 
 Added the same action toolbar `suppliers.php` has to
