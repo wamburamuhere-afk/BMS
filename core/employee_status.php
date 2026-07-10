@@ -15,29 +15,31 @@
 
 if (!function_exists('inactivateEmployee')) {
     /**
-     * @param string $outcome 'terminated' | 'resigned' | 'failed_probation'
-     *                        (failed_probation maps to employment_status
-     *                        'terminated' — D4: a reason, not a distinct
-     *                        mechanism)
+     * @param string  $outcome 'terminated' | 'resigned' | 'failed_probation'
+     *                         (failed_probation maps to employment_status
+     *                         'terminated' — D4: a reason, not a distinct
+     *                         mechanism)
+     * @param ?string $reason  free-text note, shown on inactive_employees.php
      * @return array{old: array, new: array} for audit logging
      */
-    function inactivateEmployee(PDO $pdo, int $employee_id, int $actor, string $outcome): array
+    function inactivateEmployee(PDO $pdo, int $employee_id, int $actor, string $outcome, ?string $reason = null): array
     {
         $employmentStatus = ($outcome === 'resigned') ? 'resigned' : 'terminated';
+        $reason = ($reason !== null && trim($reason) !== '') ? trim($reason) : null;
 
-        $cur = $pdo->prepare("SELECT status, employment_status FROM employees WHERE employee_id = ?");
+        $cur = $pdo->prepare("SELECT status, employment_status, inactivation_reason FROM employees WHERE employee_id = ?");
         $cur->execute([$employee_id]);
         $before = $cur->fetch(PDO::FETCH_ASSOC);
         if (!$before) {
             throw new InvalidArgumentException('Employee not found.');
         }
 
-        $pdo->prepare("UPDATE employees SET status = 'inactive', employment_status = ?, updated_by = ? WHERE employee_id = ?")
-            ->execute([$employmentStatus, $actor, $employee_id]);
+        $pdo->prepare("UPDATE employees SET status = 'inactive', employment_status = ?, inactivation_reason = ?, updated_by = ? WHERE employee_id = ?")
+            ->execute([$employmentStatus, $reason, $actor, $employee_id]);
 
         return [
-            'old' => ['status' => $before['status'], 'employment_status' => $before['employment_status']],
-            'new' => ['status' => 'inactive', 'employment_status' => $employmentStatus],
+            'old' => ['status' => $before['status'], 'employment_status' => $before['employment_status'], 'inactivation_reason' => $before['inactivation_reason']],
+            'new' => ['status' => 'inactive', 'employment_status' => $employmentStatus, 'inactivation_reason' => $reason],
         ];
     }
 }
@@ -58,7 +60,7 @@ if (!function_exists('reactivateEmployee')) {
             throw new InvalidArgumentException('Employee not found.');
         }
 
-        $pdo->prepare("UPDATE employees SET status = 'active', employment_status = 'active', updated_by = ? WHERE employee_id = ?")
+        $pdo->prepare("UPDATE employees SET status = 'active', employment_status = 'active', inactivation_reason = NULL, updated_by = ? WHERE employee_id = ?")
             ->execute([$actor, $employee_id]);
 
         return [
