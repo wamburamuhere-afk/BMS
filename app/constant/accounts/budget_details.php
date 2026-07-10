@@ -375,7 +375,7 @@ global $company_name, $company_logo;
                             <?php endforeach; ?>
                         </tbody>
                         <tfoot>
-                            <tr class="table-dark">
+                            <tr class="table-light">
                                 <td colspan="4"><strong>Total Expenses</strong></td>
                                 <td class="text-end"><strong><?= format_currency($total_expenses) ?></strong></td>
                                 <td colspan="4"></td>

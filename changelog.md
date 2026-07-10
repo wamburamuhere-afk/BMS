@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-07-10 (fix) — App-wide sweep: every remaining black table header fixed
+
+Follow-up to the Inactive Employees header fix — user asked to check the
+rest of the app for the same issue. Found `table-dark` (Bootstrap's solid
+black bar) on 10 column headers across 4 pages, none of them touched in
+today's session — pre-existing from earlier work:
+
+- `app/bms/pos/leave_types.php` — the Leave Types table.
+- `app/bms/crm/crm_leads.php` — the CRM Leads table.
+- `app/bms/crm/crm_campaigns.php` — the Campaigns table.
+- `app/bms/crm/crm_reports.php` — 7 report tables (Pipeline by Stage, Agent
+  Performance, Activities, Forecast, Lost Reasons, Campaign ROI, Lead
+  Source) — all rendered client-side from a JS template string.
+
+All changed to `table-light`, matching `payroll.php` and the rest of the
+app. Verified live on two of the four (Leave Types, CRM Leads) — clean
+white header, consistent styling; the other two use the identical class
+swap and lint clean.
+
+**Update — user confirmed, now fixed too:** `app/constant/accounts/budget_details.php:378`'s
+`table-dark` on the `<tfoot>` "Total Expenses" row changed to `table-light`
+as well, for the same reason as everywhere else — the bold text (`<strong>`)
+already carries the emphasis, the black background was the only thing not
+matching. Verified live on the Labor Wages budget (5 real expense rows,
+Total Expenses TSh 12,582,579,100.00) — clean white row, bold total intact.
+
 ## 2026-07-10 (fix) — Inactive Employees: table header was black, doesn't match the rest of the app
 
 `app/bms/pos/inactive_employees.php`'s table header used `table-dark`

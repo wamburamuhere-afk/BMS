@@ -128,7 +128,7 @@ function renderReport(report, res) {
                 </div>
                 <div class="col-lg-7">
                     <div class="table-responsive"><table class="table table-hover align-middle">
-                        <thead class="table-dark"><tr><th>Stage</th><th class="text-end">Leads</th><th class="text-end">Value (TZS)</th></tr></thead>
+                        <thead class="table-light"><tr><th>Stage</th><th class="text-end">Leads</th><th class="text-end">Value (TZS)</th></tr></thead>
                         <tbody>`;
             data.forEach(s => {
                 html += `<tr>
@@ -155,7 +155,7 @@ function renderReport(report, res) {
         case 'agent': {
             const data = res.data || [];
             html = `<div class="table-responsive"><table class="table table-hover align-middle">
-                <thead class="table-dark"><tr><th>Agent</th><th class="text-end">Leads</th><th class="text-end">Won</th><th class="text-end">Lost</th><th class="text-end">Win Rate</th><th class="text-end">Avg Won Value (TZS)</th><th class="text-end">Total Won (TZS)</th><th class="text-end">Activities</th></tr></thead>
+                <thead class="table-light"><tr><th>Agent</th><th class="text-end">Leads</th><th class="text-end">Won</th><th class="text-end">Lost</th><th class="text-end">Win Rate</th><th class="text-end">Avg Won Value (TZS)</th><th class="text-end">Total Won (TZS)</th><th class="text-end">Activities</th></tr></thead>
                 <tbody>`;
             if (!data.length) html += '<tr><td colspan="8" class="text-center text-muted py-4">No data.</td></tr>';
             data.forEach(a => {
@@ -179,7 +179,7 @@ function renderReport(report, res) {
             const data = res.data || [];
             const typeLabels = { call:'Call', email:'Email', meeting:'Meeting', note:'Note', task:'Task', site_visit:'Site Visit' };
             html = `<div class="table-responsive"><table class="table table-hover align-middle">
-                <thead class="table-dark"><tr><th>Type</th><th>Agent</th><th class="text-end">Total</th><th class="text-end">Done</th><th class="text-end">Pending</th><th class="text-end">Overdue</th></tr></thead>
+                <thead class="table-light"><tr><th>Type</th><th>Agent</th><th class="text-end">Total</th><th class="text-end">Done</th><th class="text-end">Pending</th><th class="text-end">Overdue</th></tr></thead>
                 <tbody>`;
             if (!data.length) html += '<tr><td colspan="6" class="text-center text-muted py-4">No activities in this period.</td></tr>';
             data.forEach(a => {
@@ -212,7 +212,7 @@ function renderReport(report, res) {
                 </div></div>
             </div>
             <div class="table-responsive"><table class="table table-hover align-middle">
-                <thead class="table-dark"><tr><th>Lead</th><th>Stage</th><th class="text-end">Value (TZS)</th><th class="text-end">Prob%</th><th class="text-end">Weighted (TZS)</th><th>Close Date</th><th>Assigned</th></tr></thead>
+                <thead class="table-light"><tr><th>Lead</th><th>Stage</th><th class="text-end">Value (TZS)</th><th class="text-end">Prob%</th><th class="text-end">Weighted (TZS)</th><th>Close Date</th><th>Assigned</th></tr></thead>
                 <tbody>`;
             if (!data.length) html += '<tr><td colspan="7" class="text-center text-muted py-4">No open leads with close dates in next 90 days.</td></tr>';
             data.forEach(r => {
@@ -245,7 +245,7 @@ function renderReport(report, res) {
                 </div></div>
             </div>
             <div class="table-responsive"><table class="table table-hover align-middle">
-                <thead class="table-dark"><tr><th>Lost Reason</th><th>Stage Lost At</th><th class="text-end">Count</th><th class="text-end">Value (TZS)</th></tr></thead>
+                <thead class="table-light"><tr><th>Lost Reason</th><th>Stage Lost At</th><th class="text-end">Count</th><th class="text-end">Value (TZS)</th></tr></thead>
                 <tbody>`;
             if (!lost.length) html += '<tr><td colspan="4" class="text-center text-muted py-4">No lost leads in this period.</td></tr>';
             lost.forEach(r => {
@@ -264,7 +264,7 @@ function renderReport(report, res) {
         case 'campaign': {
             const data = res.data || [];
             html = `<div class="table-responsive"><table class="table table-hover align-middle">
-                <thead class="table-dark"><tr><th>Campaign</th><th>Type</th><th class="text-end">Budget (TZS)</th><th class="text-end">Leads</th><th class="text-end">Converted</th><th class="text-end">Win Rate</th><th class="text-end">Won Value (TZS)</th><th class="text-end">ROI %</th></tr></thead>
+                <thead class="table-light"><tr><th>Campaign</th><th>Type</th><th class="text-end">Budget (TZS)</th><th class="text-end">Leads</th><th class="text-end">Converted</th><th class="text-end">Win Rate</th><th class="text-end">Won Value (TZS)</th><th class="text-end">ROI %</th></tr></thead>
                 <tbody>`;
             if (!data.length) html += '<tr><td colspan="8" class="text-center text-muted py-4">No campaign data.</td></tr>';
             data.forEach(c => {
@@ -290,7 +290,7 @@ function renderReport(report, res) {
             const sourceLabel = { website:'Website', referral:'Referral', walk_in:'Walk-in', phone_call:'Phone Call',
                 social_media:'Social Media', exhibition:'Exhibition', cold_call:'Cold Call', email_campaign:'Email Campaign', other:'Other' };
             html = `<div class="table-responsive"><table class="table table-hover align-middle">
-                <thead class="table-dark"><tr><th>Source</th><th class="text-end">Total Leads</th><th class="text-end">Won</th><th class="text-end">Converted</th><th class="text-end">Win Rate</th><th class="text-end">Avg Value (TZS)</th><th class="text-end">Won Value (TZS)</th></tr></thead>
+                <thead class="table-light"><tr><th>Source</th><th class="text-end">Total Leads</th><th class="text-end">Won</th><th class="text-end">Converted</th><th class="text-end">Win Rate</th><th class="text-end">Avg Value (TZS)</th><th class="text-end">Won Value (TZS)</th></tr></thead>
                 <tbody>`;
             if (!data.length) html += '<tr><td colspan="7" class="text-center text-muted py-4">No data.</td></tr>';
             data.forEach(s => {
