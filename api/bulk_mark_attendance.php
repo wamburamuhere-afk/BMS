@@ -1,6 +1,7 @@
 <?php
 // File: api/bulk_mark_attendance.php
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/employee_status.php';
 
 header('Content-Type: application/json');
 
@@ -85,7 +86,8 @@ try {
     foreach ($employee_ids as $employee_id) {
         try {
             $employee_id = intval($employee_id);
-            
+            assertEmployeeActive($pdo, $employee_id);
+
             // Check if attendance record already exists
             $check_stmt = $pdo->prepare("
                 SELECT attendance_id FROM attendance 

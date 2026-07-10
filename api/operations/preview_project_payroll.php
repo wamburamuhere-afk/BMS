@@ -34,7 +34,7 @@ try {
     $year  = intval($parts[0]);
     $month = intval($parts[1]);
 
-    $where  = "e.project_id = ? AND e.status != 'terminated'";
+    $where  = "e.project_id = ? AND e.status = 'active'";
     $params = [$project_id];
 
     if ($department_id) {

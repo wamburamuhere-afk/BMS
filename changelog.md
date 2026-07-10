@@ -1,5 +1,47 @@
 # BMS Changelog
 
+## 2026-07-10 (feat) — Employees: lock down every operational picker (Phase 3)
+
+Closes the actual gap the whole plan exists for — an inactive employee could
+still be selected everywhere the system gates on `status` using a stale
+pattern instead of the single canonical `status = 'active'` (Phase 0). Some
+pickers were already correct by accident once Phase 0 collapsed the model
+(`leaves.php`'s applicant/handover select, `attendance.php`'s capture list,
+both payroll candidate queries, the expenses "Paid To" picker) — verified,
+left untouched. Fixed the rest:
+
+**Reporting-To / manager pickers** (`api/get_reporting_to_options.php` both
+branches, `api/update_reporting_line.php`, `api/add_employee.php`,
+`api/update_employee.php`, `api/get_org_chart.php`,
+`api/account/search_employees.php`) — were checking `!= 'deleted'` (a value
+that was never real) or `!= 'terminated'` (retired in Phase 0), so an
+employee inactivated via the *proper* HR Action workflow still showed up as
+a manager/leadership candidate.
+
+**Project-scoped payroll** (`api/operations/preview_project_payroll.php`,
+`.../process_project_payroll.php`, `.../get_project.php`,
+`.../get_unassigned_staff.php`) — same stale `!= 'terminated'` pattern.
+
+**Server-side enforcement, not just UI filtering** — new
+`assertEmployeeActive()` in `core/employee_status.php`: the write endpoints
+behind these pickers (`api/apply_leave.php`, `api/update_leave.php` — both
+the applicant and the Handover-To contact, `api/my_leave_apply.php`,
+`api/mark_attendance.php`, `api/bulk_mark_attendance.php`,
+`api/quick_mark_attendance.php`) previously trusted whatever `employee_id`
+was posted with zero status re-check — a crafted/direct POST bypassed the
+dropdown filter entirely. All six now reject an inactive employee
+server-side, not just hide them from the UI. `bulk_mark_attendance.php`
+folds the check into its existing per-employee try/catch so one inactive ID
+in a batch is reported as a per-row error, not an aborted batch.
+
+Verified live (rolled back): inactivating an employee mid-transaction proves
+`assertEmployeeActive()` throws for them and passes for a still-active peer,
+and that both the org-chart-style and reporting-to-style queries now
+correctly exclude them. No regressions — `test_hr_lifecycle_workflow_cli`
+(28), `test_leaves_upgrade_cli` (49), `test_project_payroll_posting_cli`
+(14), `test_vendor_account_button_employee_cli` (17), and
+`test_employee_rehire_uniqueness_cli` (8) all still pass.
+
 ## 2026-07-10 (feat) — Employees: Inactive Employees page + Reactivate (Phase 2)
 
 **New `app/bms/pos/inactive_employees.php`** — lists every `status != 'active'`

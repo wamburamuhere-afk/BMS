@@ -179,7 +179,7 @@ try {
     if ($reporting_to_id_present) {
         $new_reporting_to_id = trim((string)$_POST['reporting_to_id']) !== '' ? (int)$_POST['reporting_to_id'] : null;
         if ($new_reporting_to_id !== null) {
-            $mgrStmt = $pdo->prepare("SELECT first_name, last_name FROM employees WHERE employee_id = ? AND (status IS NULL OR status != 'deleted')");
+            $mgrStmt = $pdo->prepare("SELECT first_name, last_name FROM employees WHERE employee_id = ? AND status = 'active'");
             $mgrStmt->execute([$new_reporting_to_id]);
             $mgrRow = $mgrStmt->fetch(PDO::FETCH_ASSOC);
             if (!$mgrRow) throw new Exception('Selected manager does not exist');

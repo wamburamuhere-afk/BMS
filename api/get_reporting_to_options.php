@@ -42,7 +42,7 @@ try {
             $ids[] = (int)$dept['assistant_manager_id']; $roles[(int)$dept['assistant_manager_id']] = 'Assistant Leader';
         }
         $in = implode(',', array_fill(0, count($ids), '?'));
-        $q = $pdo->prepare("SELECT employee_id, first_name, last_name FROM employees WHERE employee_id IN ($in)");
+        $q = $pdo->prepare("SELECT employee_id, first_name, last_name FROM employees WHERE employee_id IN ($in) AND status = 'active'");
         $q->execute($ids);
         $byId = [];
         foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $r) $byId[(int)$r['employee_id']] = $r;
@@ -61,7 +61,7 @@ try {
     $sql = "SELECT e.employee_id, e.first_name, e.last_name
             FROM employees e
             WHERE e.department_id = ?
-              AND (e.status IS NULL OR e.status != 'deleted')" . $scope . "
+              AND e.status = 'active'" . $scope . "
             ORDER BY e.first_name, e.last_name";
     $q = $pdo->prepare($sql);
     $q->execute([$department_id]);
