@@ -37,13 +37,32 @@ Confirmed with the owner before building.
 - Actions column excluded from print (`d-print-none` on its `th`/`td`), and a
   buffer `<tfoot>` reserves space so the fixed footer never overlaps rows.
 
-**Verified live in the browser:** Copy places all 8 data columns (no Actions) on
-the clipboard; CSV generates a correctly-quoted blob with the right headers;
-the print layout contains the shared company header ("BEJUNDAS FINANCIAL
-SERVICES LTD"), the report title, and the shared "Printed by…" footer; the
-print footer is hidden on screen; the gear menu (View Full Profile /
-Reactivate) still works; and the mobile-print guard correctly un-hides the
-table. No console errors.
+**Print-layout bugs found by inspecting the actual print rendering (reported by
+the owner, then reproduced and fixed):**
+- **Company logo + name printed twice.** `header.php` already calls
+  `renderPrintHeader()` globally for every page (guarded by
+  `BMS_SUPPRESS_PRINT_HEADER`). Calling it again on the page produced a second
+  header. Removed the page-level call — the global one is the single source.
+- **Column headings didn't line up with their data.** With `scrollX: true`,
+  DataTables splits the grid into two tables (header in
+  `.dataTables_scrollHead`, body in `.dataTables_scrollBody`) with pixel-fixed
+  widths (1638px vs 1641px) and an `overflow-x` box — so on paper the headings
+  detach from their columns and off-screen columns are clipped. Print CSS now
+  collapses it back to one full-width table. The body table's duplicate `<th>`
+  labels are wrapped by DataTables in a `div.dataTables_sizing` pinned to
+  `height: 0` (measured 0px → now 31.8px), which is why the headings printed
+  blank; both the `th` and that inner div are restored, and sort arrows hidden.
+- Report title was suppressed because Bootstrap's `.d-none` outranks
+  `.d-print-block`; forced visible. Summary card printed hugging the left edge;
+  now centred with its tint preserved.
+
+**Verified live in the browser (print rendering emulated, not assumed):** exactly
+one company header; "INACTIVE EMPLOYEES REPORT" + timestamp + rule visible;
+headings aligned with their columns; summary card centred; shared "Printed by…"
+footer present; Actions column excluded. On screen: toolbar, table and gear menu
+(View Full Profile / Reactivate) unchanged, print footer hidden. Copy places all
+8 data columns (no Actions) on the clipboard; CSV emits a correctly-quoted blob;
+mobile-print guard un-hides the table. No console errors.
 
 ## 2026-07-10 (chore) — Remove the Loans / Microfinance lending module (hide & unwire, data kept)
 

@@ -65,6 +65,59 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
     #tableView { display: block !important; padding: 0 !important; width: 100% !important; }
     #cardView { display: none !important; }
 
+    /* ── Undo DataTables scrollX for print ──────────────────────────────────
+       With scrollX:true DataTables splits the grid into TWO tables (a header
+       table in .dataTables_scrollHead and a body table in .dataTables_scrollBody)
+       with pixel-fixed widths and an overflow-x box. On paper that makes the
+       headings sit out of line with their columns and clips anything scrolled
+       off-screen. Collapse it back into one full-width table for printing. */
+    .dataTables_scroll, .dataTables_scrollHead, .dataTables_scrollBody,
+    .dataTables_scrollHeadInner {
+        overflow: visible !important;
+        width: 100% !important;
+        height: auto !important;
+        max-height: none !important;
+        border: 0 !important;
+    }
+    /* The header table lives in its own wrapper — hide it and let the body
+       table print its real <thead> instead, so headings and cells share one
+       table and therefore one set of column widths. */
+    .dataTables_scrollHead { display: none !important; }
+    .dataTables_scrollBody > table > thead {
+        display: table-header-group !important;
+        visibility: visible !important;
+    }
+    /* DataTables collapses the body table's duplicate header: each <th> label is
+       wrapped in a div.dataTables_sizing pinned to height:0. Restore both, or the
+       column headings print blank and appear "out of line" with their data. */
+    .dataTables_scrollBody > table > thead th {
+        height: auto !important;
+        padding: 6px 8px !important;
+        border-bottom: 1px solid #dee2e6 !important;
+        background: #f8f9fa !important;
+        font-weight: 600 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    .dataTables_scrollBody > table > thead th .dataTables_sizing {
+        height: auto !important;
+        display: block !important;
+        overflow: visible !important;
+    }
+    /* Sorting arrows are meaningless on paper */
+    .dataTables_scrollBody > table > thead th::before,
+    .dataTables_scrollBody > table > thead th::after { display: none !important; }
+
+    /* Both tables carry inline pixel widths from scrollX — override them. */
+    #inactiveTable, .dataTables_scrollBody table, .dataTables_scrollHead table {
+        width: 100% !important;
+        table-layout: auto !important;
+    }
+    #inactiveTable th, #inactiveTable td {
+        white-space: normal !important;   /* let long text wrap instead of clipping */
+        word-break: break-word !important;
+    }
+
     /* Buffer row repeats on every page so the fixed footer never overlaps content */
     .ie-print-buf { display: table-footer-group !important; }
     .ie-print-buf td { height: 1.2cm !important; border: none !important; }
@@ -75,9 +128,21 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
     }
     .badge { white-space: normal !important; display: inline-block !important; word-break: break-word !important; }
 
-    /* Report title block under the shared company header.
-       (bph-* classes are used but unstyled elsewhere in the app — styled here.) */
-    .ie-report-head { text-align: center; margin-bottom: 6mm; }
+    /* Summary card: centre it and keep its tint on paper (it prints as a
+       narrow left-hugging box otherwise, because of the Bootstrap grid). */
+    #print-stats-cards { justify-content: center !important; margin-bottom: 5mm !important; }
+    #print-stats-cards > [class*="col-"] { flex: 0 0 auto !important; max-width: 60mm !important; }
+    #print-stats-cards .card {
+        border: 1px solid #b6ccfe !important;
+        background: #e7f0ff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Report title block under the shared (global) company header.
+       (bph-* classes are used but unstyled elsewhere in the app — styled here.)
+       Forced visible: Bootstrap's .d-none otherwise wins over .d-print-block. */
+    .ie-report-head { display: block !important; text-align: center; margin-bottom: 6mm; }
     .ie-report-head .bph-title {
         font-size: 14pt; font-weight: 700; text-transform: uppercase;
         letter-spacing: 1px; color: #495057; margin: 2px 0;
@@ -92,9 +157,10 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 
 <div class="container-fluid mt-4">
     <?php
-        // Standardised company header (logo + name) from Admin > Company Profile.
-        // Single source: renderPrintHeader() in roots.php — never hardcoded here.
-        renderPrintHeader();
+        // NOTE: the company header (logo + name) is rendered GLOBALLY by header.php,
+        // which already calls renderPrintHeader() for every page. Do NOT call it
+        // again here — doing so prints the logo and company name twice.
+        // Only the report-specific title block belongs on this page.
     ?>
     <div class="ie-report-head d-none d-print-block">
         <h2 class="bph-title">Inactive Employees Report</h2>
