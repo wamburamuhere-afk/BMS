@@ -1,5 +1,50 @@
 # BMS Changelog
 
+## 2026-07-10 (feat) — Inactive Employees: Copy / CSV / Print toolbar with shared print header & footer
+
+Added the same action toolbar `suppliers.php` has to
+`app/bms/pos/inactive_employees.php`.
+
+**Buttons (Copy, CSV, Print).** Copy and CSV delegate to hidden DataTables
+buttons; both exclude the Actions column from the export. Print uses
+`window.print()` on the page itself (not a popup) so the shared header/footer
+are part of the printed output.
+
+**Import deliberately omitted** — importing staff belongs on the main Employees
+page (where it already exists); importing *into* a deactivated-staff archive
+would create active employees that then don't appear on this page at all.
+Confirmed with the owner before building.
+
+**Print header & footer come from ONE source, as required:**
+- Header: `renderPrintHeader()` in `roots.php` — pulls company name + logo from
+  Admin › Company Profile. Not hardcoded here (note: `suppliers.php` *does*
+  hardcode its own; this page uses the shared function properly).
+- Footer: `includes/print_footer_html.php` + `includes/print_footer_css.php` —
+  the same "Printed by … / Powered By BJP Technologies" block used by
+  `leave_details.php`, `invoice_print.php`, etc.
+
+**Fixes/details found while building:**
+- The shared `print_footer_css.php` styles `.print-footer` as always-visible
+  (fine for standalone print pages, wrong for a normal browsing page), so it
+  rendered on screen. Hidden on screen and re-shown in print **scoped to this
+  page only** — the shared file is untouched so no other print view changes.
+- The `bph-title` / `bph-sub` / `bph-bar` classes copied from `suppliers.php`
+  have **no CSS anywhere** in the app (dead there too). Styled them here under
+  a scoped `.ie-report-head` so the report title actually renders.
+- Print on mobile would have printed a blank page (the table is swapped for the
+  card view). `printTable()` now forces the table visible for the print and
+  restores the card view afterwards via the `afterprint` event.
+- Actions column excluded from print (`d-print-none` on its `th`/`td`), and a
+  buffer `<tfoot>` reserves space so the fixed footer never overlaps rows.
+
+**Verified live in the browser:** Copy places all 8 data columns (no Actions) on
+the clipboard; CSV generates a correctly-quoted blob with the right headers;
+the print layout contains the shared company header ("BEJUNDAS FINANCIAL
+SERVICES LTD"), the report title, and the shared "Printed by…" footer; the
+print footer is hidden on screen; the gear menu (View Full Profile /
+Reactivate) still works; and the mobile-print guard correctly un-hides the
+table. No console errors.
+
 ## 2026-07-10 (chore) — Remove the Loans / Microfinance lending module (hide & unwire, data kept)
 
 The company does not do lending, so the half-built Loans module was removed —
