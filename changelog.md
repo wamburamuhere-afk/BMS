@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-07-10 (fix) — Employees: Inactivate link was silently missing from every row (Sentry-caught regression)
+
+**Caught by Sentry in production:** `ErrorException: Warning: Undefined
+array key "status"` in `api/get_employees.php:210` — this codebase's error
+handler escalates PHP warnings to exceptions, which is what surfaced this
+as a reportable issue rather than a silent notice.
+
+**Root cause — a bug in the Phase 1 Inactivate rollout itself.** The
+DataTable row-data query (used to render every employee row and its action
+menu) selects an explicit column list that never included `e.status` —
+only `e.employment_status`. The Inactivate-link gate added in that same
+change (`if ($canInactivate && $emp['status'] === 'active')`) read a key
+that was never in the result set, so it was always `null`, and
+`null === 'active'` is always `false`. **Net effect: the Inactivate action
+has been completely missing from every row in the Employees list in
+production since that fix shipped** — not a cosmetic warning, a genuinely
+broken feature (silently, since the strict comparison just evaluated false
+rather than throwing before this error-escalation was noticed).
+
+**Fix:** added `e.status` to the SELECT list, and made the gate condition
+defensive (`($emp['status'] ?? null) === 'active'`) so a future query
+change can't silently reintroduce the same class of bug. Audited every
+other `$emp[...]` key read in this file against the SELECT list — no other
+gaps found. Verified live: active employees now correctly show Inactivate
+in their action menu; inactive employees correctly don't (confirmed both
+via direct query and in the browser).
+
 ## 2026-07-10 (fix) — POS: Hold Sale / Complete Sale crashed with a raw SQL error when no shift was open
 
 **Reported directly:** clicking Hold Sale produced a raw
