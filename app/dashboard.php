@@ -158,97 +158,6 @@ try {
 $user_metrics = get_user_metrics($pdo, $user_id, $user_role);
 
 // Helper functions
-function get_microfinance_stats($pdo, $start_date, $end_date, $user_id, $permissions) {
-    $stats = [];
-    
-    // Total Loan Portfolio
-    $stmt = $pdo->prepare("
-        SELECT 
-            COUNT(*) as total_loans,
-            SUM(amount) as total_portfolio,
-            SUM(balance) as total_outstanding,
-            SUM(total_paid) as total_repaid
-        FROM loans 
-        WHERE status IN ('active', 'approved', 'disbursed')
-    ");
-    $stmt->execute();
-    $stats['loan_portfolio'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    // Active Loans
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as active_loans,
-               SUM(balance) as active_outstanding
-        FROM loans 
-        WHERE status = 'active'
-    ");
-    $stmt->execute();
-    $stats['active_loans'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    // Overdue Loans
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as overdue_loans,
-               SUM(balance) as overdue_amount
-        FROM loans 
-        WHERE status = 'active' 
-        AND next_payment_date < CURDATE()
-    ");
-    $stmt->execute();
-    $stats['overdue_loans'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    // Today's Collections
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as payments_today,
-               SUM(amount) as amount_collected
-        FROM loan_repayments 
-        WHERE DATE(payment_date) = CURDATE()
-        AND status = 'completed'
-    ");
-    $stmt->execute();
-    $stats['today_collections'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    // Monthly Disbursements
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as loans_disbursed,
-               SUM(amount) as amount_disbursed
-        FROM loans 
-        WHERE status = 'disbursed'
-        AND DATE(disbursement_date) BETWEEN :start_date AND :end_date
-    ");
-    $stmt->execute(['start_date' => $start_date, 'end_date' => $end_date]);
-    $stats['monthly_disbursements'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    // Portfolio at Risk
-    $stmt = $pdo->prepare("
-        SELECT 
-            (SELECT SUM(balance) FROM loans WHERE status = 'active' AND next_payment_date < CURDATE()) / 
-            NULLIF((SELECT SUM(balance) FROM loans WHERE status = 'active'), 0) * 100 as par_rate
-    ");
-    $stmt->execute();
-    $stats['par_rate'] = $stmt->fetchColumn();
-    
-    // Loan Applications
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as pending_applications
-        FROM loan_applications 
-        WHERE status = 'pending'
-    ");
-    $stmt->execute();
-    $stats['pending_applications'] = $stmt->fetchColumn();
-    
-    // Customer Stats
-    $stmt = $pdo->prepare("
-        SELECT 
-            COUNT(*) as total_customers,
-            COUNT(CASE WHEN customer_type = 'borrower' THEN 1 END) as borrowers,
-            COUNT(CASE WHEN customer_type = 'saver' THEN 1 END) as savers
-        FROM customers 
-        WHERE status = 'active'
-    ");
-    $stmt->execute();
-    $stats['customers'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    return $stats;
-}
 
 function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions) {
     // Seed safe defaults so every key always exists even when a query is skipped
@@ -491,8 +400,6 @@ function get_pending_approvals($pdo, $permissions = []) {
         $purchase_approvals = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $approvals = array_merge($approvals, $purchase_approvals);
     }
-	$loan_approvals=[];
-    $approvals = array_merge($loan_approvals, $approvals);
     
     // Sort by timestamp
     usort($approvals, function($a, $b) {
@@ -2007,11 +1914,7 @@ $(document).keydown(function(e) {
     // Alt + N for new sale/invoice
     if (e.altKey && e.key === 'n') {
         e.preventDefault();
-        <?php if ($company_type != 'microfinance'): ?>
         window.location.href = 'pos';
-        <?php else: ?>
-        window.location.href = 'loan_application';
-        <?php endif; ?>
     }
     
     // Alt + R for reports
