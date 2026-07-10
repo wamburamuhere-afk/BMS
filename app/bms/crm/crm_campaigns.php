@@ -95,7 +95,7 @@ $statusBadge = [
     <div id="tableView" class="card border-0 shadow-sm">
         <div class="card-body p-2">
             <table id="campaignsTable" class="table table-hover align-middle w-100">
-                <thead class="table-dark">
+                <thead class="table-light">
                     <tr>
                         <th>Name</th>
                         <th>Type</th>
