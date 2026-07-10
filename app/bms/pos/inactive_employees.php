@@ -67,7 +67,7 @@ $reasonLabels = [
 
     <div id="tableView">
         <table id="inactiveTable" class="table table-hover align-middle w-100">
-            <thead class="table-dark">
+            <thead class="table-light">
                 <tr>
                     <th>Employee #</th>
                     <th>Name</th>

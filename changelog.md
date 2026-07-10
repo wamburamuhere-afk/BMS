@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-07-10 (fix) — Inactive Employees: table header was black, doesn't match the rest of the app
+
+`app/bms/pos/inactive_employees.php`'s table header used `table-dark`
+(Bootstrap's solid black bar), copied verbatim from `.claude/templates.md`'s
+generic New Page Template example — never actually the convention used
+elsewhere in this module. Every comparable table (`payroll.php`,
+`employee_details.php`'s new Attendance/Payroll History sections) uses
+`table-light`. Changed to match. Verified live — clean white header with
+dark text, consistent with the rest of the app.
+
 ## 2026-07-10 (test) — Employees: consolidated inactivation test suite (Phase 5)
 
 **`tests/test_employee_inactivation_cli.php`** — end-to-end guard for all of
