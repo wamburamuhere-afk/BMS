@@ -36,12 +36,16 @@ try {
         throw new Exception("No items to hold");
     }
     
-    // Get active shift
+    // Get active shift — pos_held_sales.shift_id is NOT NULL, so this must be
+    // validated before the insert, not silently passed through as null.
     $stmt = $pdo->prepare("SELECT shift_id FROM cash_register_shifts WHERE user_id = ? AND status = 'active' LIMIT 1");
     $stmt->execute([$user_id]);
     $shift = $stmt->fetch(PDO::FETCH_ASSOC);
     $shift_id = $shift['shift_id'] ?? null;
-    
+    if (!$shift_id) {
+        throw new Exception("Please start a cash register shift before holding a sale.");
+    }
+
     // Generate hold reference
     $hold_reference = $reference ?: 'HOLD-' . date('Ymd-His');
     
