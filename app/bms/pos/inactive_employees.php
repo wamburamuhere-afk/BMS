@@ -54,8 +54,18 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 @media print {
     .print-footer { display: flex !important; }
 
-    @page { size: auto; margin: 10mm 10mm 15mm 10mm; }
+    /* size:auto lets the user pick Portrait or Landscape; the table below is
+       built with percentage widths so it fits either without clipping. */
+    @page { size: auto; margin: 10mm 8mm 15mm 8mm; }
     body { padding-top: 0 !important; margin-top: 0 !important; background: #fff !important; }
+
+    /* Keep the shared company header compact so it doesn't dominate a portrait page */
+    .bms-print-header img { max-height: 50px !important; }
+    .bms-print-header .bph-company { font-size: 18pt !important; }
+
+    /* Nothing may overflow the paper width */
+    html, body, .container-fluid { max-width: 100% !important; overflow-x: hidden !important; }
+    .container-fluid { padding-left: 0 !important; padding-right: 0 !important; }
 
     /* Hide on-screen chrome so only the report prints */
     .navbar, .breadcrumb, .btn, .dropdown, .d-print-none,
@@ -108,14 +118,49 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
     .dataTables_scrollBody > table > thead th::before,
     .dataTables_scrollBody > table > thead th::after { display: none !important; }
 
-    /* Both tables carry inline pixel widths from scrollX — override them. */
+    /* Both tables carry inline pixel widths from scrollX — override them.
+       table-layout:fixed + percentage widths is what makes the 8 columns fit
+       PORTRAIT as well as landscape: 'auto' lets long text (e.g. "Human
+       Resources Department") push columns off the right edge of the paper. */
     #inactiveTable, .dataTables_scrollBody table, .dataTables_scrollHead table {
         width: 100% !important;
-        table-layout: auto !important;
+        max-width: 100% !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+        font-size: 7.5pt !important;
     }
     #inactiveTable th, #inactiveTable td {
-        white-space: normal !important;   /* let long text wrap instead of clipping */
-        word-break: break-word !important;
+        border: 1px solid #ccc !important;
+        padding: 4px 3px !important;
+        white-space: normal !important;   /* wrap instead of clipping */
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        overflow: visible !important;
+        vertical-align: middle !important;
+        /* scrollX writes inline pixel widths on every cell — neutralise them
+           so the percentage column widths below actually apply. */
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+    }
+    #inactiveTable thead th { text-transform: uppercase !important; }
+
+    /* Percentage widths so the layout adapts to Portrait *and* Landscape.
+       8 printed columns (Actions is excluded from print) = 100%. */
+    #inactiveTable th:nth-child(1), #inactiveTable td:nth-child(1) { width: 9%  !important; } /* Employee #     */
+    #inactiveTable th:nth-child(2), #inactiveTable td:nth-child(2) { width: 15% !important; } /* Name           */
+    #inactiveTable th:nth-child(3), #inactiveTable td:nth-child(3) { width: 16% !important; } /* Department     */
+    #inactiveTable th:nth-child(4), #inactiveTable td:nth-child(4) { width: 16% !important; } /* Designation    */
+    #inactiveTable th:nth-child(5), #inactiveTable td:nth-child(5) { width: 10% !important; } /* Reason         */
+    #inactiveTable th:nth-child(6), #inactiveTable td:nth-child(6) { width: 12% !important; } /* Note           */
+    #inactiveTable th:nth-child(7), #inactiveTable td:nth-child(7) { width: 11% !important; } /* Inactivated By */
+    #inactiveTable th:nth-child(8), #inactiveTable td:nth-child(8) { width: 11% !important; } /* Inactivated On */
+
+    /* Badge must not force a column wider than its share */
+    #inactiveTable td .badge {
+        font-size: 6.5pt !important;
+        padding: 2px 4px !important;
+        white-space: normal !important;
     }
 
     /* Buffer row repeats on every page so the fixed footer never overlaps content */

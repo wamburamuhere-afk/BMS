@@ -56,6 +56,18 @@ the owner, then reproduced and fixed):**
   `.d-print-block`; forced visible. Summary card printed hugging the left edge;
   now centred with its tint preserved.
 
+**Portrait clipping (reported by the owner).** The print table used
+`table-layout: auto`, so long values ("Human Resources Department") pushed the
+right-hand columns off the edge of a portrait page. Rebuilt using the same
+portrait-safe recipe `suppliers.php` uses: `table-layout: fixed`, 7.5pt type,
+tight padding, forced word-wrap, and **percentage** column widths (9/15/16/16/
+10/12/11/11 = exactly 100%) so the 8 printed columns adapt to Portrait *and*
+Landscape. scrollX also writes inline pixel widths onto every cell — those are
+neutralised (`width:auto; min-width:0; max-width:none`) or the percentages never
+apply. Logo capped at 50px and the page set to `overflow-x: hidden` so nothing
+can exceed the paper width. `@page { size: auto }` keeps the user's own
+orientation choice.
+
 **Verified live in the browser (print rendering emulated, not assumed):** exactly
 one company header; "INACTIVE EMPLOYEES REPORT" + timestamp + rule visible;
 headings aligned with their columns; summary card centred; shared "Printed by…"
@@ -63,6 +75,12 @@ footer present; Actions column excluded. On screen: toolbar, table and gear menu
 (View Full Profile / Reactivate) unchanged, print footer hidden. Copy places all
 8 data columns (no Actions) on the clipboard; CSV emits a correctly-quoted blob;
 mobile-print guard un-hides the table. No console errors.
+
+*Caveat on the portrait fix specifically:* the browser tool disconnected before
+this last change could be re-checked visually. Its correctness was verified
+statically (all 8 columns present, widths total exactly 100%, `table-layout:
+fixed`, wrap enabled, inline pixel widths overridden, no conflicting rules) —
+but the paper preview itself has not been re-inspected.
 
 ## 2026-07-10 (chore) — Remove the Loans / Microfinance lending module (hide & unwire, data kept)
 
