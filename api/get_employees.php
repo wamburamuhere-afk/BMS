@@ -115,6 +115,7 @@ try {
             e.last_name,
             e.middle_name,
             e.employment_status,
+            e.status,
             e.hire_date,
             d.department_name,
             des.designation_name,
@@ -207,7 +208,7 @@ try {
         // Inactivate is a status change, not a delete — same authorization
         // boundary as the old Delete action had (canDelete('employees')).
         $canInactivate = isAdmin() || canDelete('employees');
-        if ($canInactivate && $emp['status'] === 'active') {
+        if ($canInactivate && ($emp['status'] ?? null) === 'active') {
             $empNameJs = addslashes(trim($emp['first_name'] . ' ' . $emp['last_name']));
             $actions .= "
                 <li><hr class='dropdown-divider'></li>
