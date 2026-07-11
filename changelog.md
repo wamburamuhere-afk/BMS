@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-07-11 (fix) — Services: Product Name letter-wrapping, Project badge overlap
+
+**File:** `app/bms/product/services.php`
+
+Follow-up to the blank-print-body fix (below) — once the table became visible, two more print
+bugs surfaced:
+
+- **"FANITURE" (a normal 8-letter word) rendered one letter per line** in Product Name, and the
+  header wrapped awkwardly too. Root cause: DataTables' `columnDefs` bakes inline pixel widths onto
+  6 columns (`50px/110px/120px/120px/90px/80px`) plus one `35%` column, and under
+  `table-layout:fixed` that mixed-unit arithmetic doesn't hold up at print width — it starved
+  Product Name down to ~47px. Neutralised DataTables' inline widths for print
+  (`width/min-width/max-width` reset) and set all 7 printed columns to explicit percentages
+  instead (S/NO 5%, Item Code 12%, Product Name 28%, Project 15%, Selling Price 14%, Tax 13%,
+  Status 13%; Actions excluded via `d-print-none`).
+- **Project badge ("Upgrade of Transmission Line") overlapped Selling Price:** same root cause
+  already fixed on `sub_contractors.php` — Bootstrap's `.badge` sets its own `white-space: nowrap`
+  directly on the element, which a parent `td`'s `white-space: normal` doesn't override. Forced the
+  badge to wrap (`white-space: normal; word-break: break-word`) — scoped to this page's own
+  `<style>` block, no shared file touched.
+
+Verified programmatically: ran an automated per-row column-overlap check (compares each cell's
+right edge to the next cell's left edge) across all 6 rows — zero overlaps, both before-fix (caught
+the bug) and after-fix (confirmed clean). Visually confirmed "FANITURE" and all headers now render
+on one line.
+
+---
+
 ## 2026-07-11 (fix) — Services (Non-Inventory Products): print showed nothing in the body
 
 **File:** `app/bms/product/services.php`

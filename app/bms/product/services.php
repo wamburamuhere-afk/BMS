@@ -912,13 +912,48 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
     table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed !important; }
     th, td { border: 1px solid #dee2e6 !important; padding: 6px 4px !important; font-size: 9pt !important; word-wrap: break-word !important; vertical-align: middle !important; }
     th { background-color: #f8f9fa !important; color: black !important; }
-    .badge { border: 1px solid #000 !important; color: black !important; background: transparent !important; }
+    /* Bootstrap's .badge sets white-space:nowrap directly on the element,
+       which isn't inherited-overridden by the th/td white-space rule above
+       (an explicit rule on the badge itself wins). That let the Project
+       badge ("Upgrade of Transmission Line") ignore its column width and
+       visually run into Selling Price — same bug already fixed on
+       sub_contractors.php. */
+    .badge {
+        border: 1px solid #000 !important;
+        color: black !important;
+        background: transparent !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+        display: inline-block !important;
+        max-width: 100% !important;
+    }
     .container-fluid { width: 100% !important; max-width: none !important; padding: 0 !important; margin: 0 !important; }
     @page { margin: 1cm; size: auto; }
 
     .row > [class*="col-"] { float: left !important; width: 25% !important; }
     .card-body { padding: 10px !important; }
     .table-responsive table { table-layout: auto !important; }
+
+    /* "FANITURE" (a normal 8-letter word) was rendering one letter per line in
+       Product Name — DataTables' columnDefs bakes inline pixel widths onto 6
+       columns (50px/110px/120px/120px/90px/80px) plus one 35% column, and
+       under table-layout:fixed that arithmetic doesn't hold up at print width,
+       starving Product Name down to ~47px. Neutralise DataTables' inline
+       widths for print and size all 7 printed columns explicitly instead
+       (Actions is excluded via d-print-none). Sums to 100%. */
+    #servicesTable { table-layout: fixed !important; }
+    #servicesTable th, #servicesTable td {
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+    }
+    #servicesTable th:nth-child(1), #servicesTable td:nth-child(1) { width: 5%  !important; } /* S/NO */
+    #servicesTable th:nth-child(2), #servicesTable td:nth-child(2) { width: 12% !important; } /* Item Code */
+    #servicesTable th:nth-child(3), #servicesTable td:nth-child(3) { width: 28% !important; } /* Product Name */
+    #servicesTable th:nth-child(4), #servicesTable td:nth-child(4) { width: 15% !important; } /* Project */
+    #servicesTable th:nth-child(5), #servicesTable td:nth-child(5) { width: 14% !important; } /* Selling Price */
+    #servicesTable th:nth-child(6), #servicesTable td:nth-child(6) { width: 13% !important; } /* Tax */
+    #servicesTable th:nth-child(7), #servicesTable td:nth-child(7) { width: 13% !important; } /* Status */
 
     /* Hide DataTable controls — show only the raw table */
     .dataTables_length,
