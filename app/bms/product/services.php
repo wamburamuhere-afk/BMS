@@ -303,6 +303,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
             </div>
         </div>
     </div>
+    </div>
 
     <!-- Card View -->
     <div id="cardView" class="view-section">
