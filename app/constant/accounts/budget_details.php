@@ -174,7 +174,7 @@ global $company_name, $company_logo;
     </div>
 
     <!-- Budget Overview Card -->
-    <div class="card mb-4">
+    <div class="card mb-4 print-flow-card">
         <div class="card-header bg-primary text-white">
             <h5 class="mb-0">Budget Overview</h5>
         </div>
@@ -321,7 +321,7 @@ global $company_name, $company_logo;
         </div>
     </div>
 
-    <div class="card">
+    <div class="card print-flow-card">
         <div class="card-header bg-primary text-white">
             <div class="d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Expenses for this Period</h5>
@@ -787,6 +787,19 @@ function rejectBudget(budgetId) {
             margin-bottom: 20px !important;
             width: 100% !important;
             display: block !important;
+        }
+
+        /* Same fix as products.php: the shared responsive.css rule
+           `.card { page-break-inside: avoid }` applies to every .card on
+           every printed page (deliberately left untouched globally — most
+           print pages depend on it). If the Expenses table here grows long,
+           "never break inside this card" would push the whole card to the
+           next page instead of letting it flow, same bug as products.php
+           had. Scoped to just these two cards via .print-flow-card so no
+           other page's cards are affected. */
+        .print-flow-card {
+            page-break-inside: auto !important;
+            break-inside: auto !important;
         }
         .card-header {
             background-color: #f8f9fa !important;
