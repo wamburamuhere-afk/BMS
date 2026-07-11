@@ -2363,6 +2363,20 @@ function downloadCSV(csv, filename) {
 
     .card { border: none !important; box-shadow: none !important; }
     .card-body { padding: 0 !important; }
+
+    /* Table data wasn't starting on the first printed page — the shared
+       responsive.css rule `.card { page-break-inside: avoid }` applies to
+       every .card on every page (deliberately left alone globally; 95/119
+       print pages depend on it). Here the table's wrapping card is taller
+       than one printable page, so "never break inside it" pushed the whole
+       card to the top of page 2, leaving page 1 mostly blank below the
+       header/stats. Overridden for just this page's table card so it can
+       flow across pages like the table it contains; individual rows still
+       can't split (global `tr { page-break-inside: avoid }` is untouched). */
+    #tableView .card {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+    }
     
     /* Table Styling for Print */
     .table { 
