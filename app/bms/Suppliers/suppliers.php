@@ -390,12 +390,12 @@ if (isAdmin()) {
                         <thead>
                             <tr>
                                 <th class="align-middle text-center col-sno">S/NO</th>
-                                <th class="align-middle col-info">Supplier Code</th>
-                                <th class="align-middle col-info">Supplier Name</th>
-                                <th class="align-middle col-info">Contact Info</th>
-                                <th class="align-middle col-info">Address</th>
-                                <th class="align-middle col-info">Category</th>
-                                <th class="align-middle col-info">Project</th>
+                                <th class="align-middle col-info col-code">Supplier Code</th>
+                                <th class="align-middle col-info col-name">Supplier Name</th>
+                                <th class="align-middle col-info col-contact">Contact Info</th>
+                                <th class="align-middle col-info col-address">Address</th>
+                                <th class="align-middle col-info col-category">Category</th>
+                                <th class="align-middle col-info col-project">Project</th>
                                 <th class="text-center align-middle col-stat">Total Orders</th>
                                 <th class="text-center align-middle col-stat">Pending</th>
                                 <th class="text-center align-middle col-stat">Completed</th>
@@ -2198,11 +2198,42 @@ $(document).ready(function() {
         text-transform: uppercase !important;
     }
 
-    /* Standardized widths for print - Using percentages for Portrait/Landscape compatibility */
-    .col-sno   { width: 4% !important; }
-    .col-info  { width: 11.5% !important; }
-    .col-stat  { width: 6% !important; }
-    .col-status { width: 9% !important; }
+    /* Headers were breaking mid-word ("TOTAL" → "TOT"/"AL") — with 11 columns in Portrait,
+       even a single short word can be wider than its column at the body text size (7.5pt).
+       A smaller, tighter header font lets whole words fit and wrap cleanly at spaces instead
+       of fragmenting letter-by-letter. Data cells keep the normal 7.5pt from the `table` rule
+       below — only header labels need to shrink. */
+    #suppliersTable thead th {
+        font-size: 6.3pt !important;
+        line-height: 1.15 !important;
+        letter-spacing: 0 !important;
+        padding: 3px 2px !important;
+    }
+
+    /* Standardized widths for print - Using percentages for Portrait/Landscape compatibility.
+       .col-info used to be one flat 11.5% for all 6 of these columns regardless of what they
+       hold — too narrow for "S/NO" to fit on one line, and mismatched to each column's actual
+       content (e.g. Category badge vs. stacked Address+City). Sized individually instead;
+       the 3 .col-stat columns get a little extra room (their headers — TOTAL ORDERS, COMPLETED —
+       were the worst offenders for fragmenting), trimmed from Name/Contact/Address. Still sums
+       to 100%. */
+    .col-sno      { width: 5%  !important; }
+    .col-code     { width: 9%  !important; }
+    .col-name     { width: 13% !important; }
+    .col-contact  { width: 10% !important; }
+    .col-address  { width: 11% !important; }
+    .col-category { width: 8%  !important; }
+    .col-project  { width: 11% !important; }
+    .col-stat     { width: 8%  !important; }
+    .col-status   { width: 9%  !important; }
+
+    /* "S/NO" was still wrapping into "S/N" + "O" even at 5% width — its content
+       (a short header label + 1-4 digit row numbers) never needs to wrap, unlike
+       every other column here, so force it onto one line regardless of width. */
+    #suppliersTable th.col-sno,
+    #suppliersTable td:first-child {
+        white-space: nowrap !important;
+    }
 
     /* Ensure stats cards are well formatted in print */
     #print-stats-cards {
@@ -2227,8 +2258,33 @@ $(document).ready(function() {
     .bms-print-header img {
         max-height: 50px !important;
     }
-    .bms-print-header h1 { font-size: 18pt !important; }
-    .bms-print-header h2 { font-size: 12pt !important; }
+
+    /* Page-specific print title — .bph-title/.bph-sub/.bph-bar had no CSS anywhere in the
+       codebase, so they rendered as an oversized default <h2>, an unstyled <p>, and an empty,
+       invisible divider bar (no accent line at all). Styled to match the clean, simple heading
+       used on other report pages (bold uppercase title, muted subtitle, small colored bar). */
+    .bms-print-header .bph-title {
+        color: #000 !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
+        font-size: 14pt !important;
+        letter-spacing: 1px;
+        margin: 4px 0 !important;
+    }
+    .bms-print-header .bph-sub {
+        color: #6c757d !important;
+        font-size: 9pt !important;
+        margin: 2px 0 8px !important;
+    }
+    .bms-print-header .bph-bar {
+        width: 60px;
+        height: 3px;
+        background: #0d6efd !important;
+        margin: 4px auto 10px !important;
+        border-radius: 2px;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
 }
 
 /* Screen Styles */
