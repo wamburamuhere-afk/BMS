@@ -217,7 +217,7 @@ try {
         
         <div class="col-md-8">
             <!-- Accounts Panel -->
-            <div class="card">
+            <div class="card print-flow-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Accounts</h5>
                     <div>
@@ -707,7 +707,20 @@ try {
     .card-body {
         padding: 0 !important;
     }
-    
+
+    /* First page was showing no data — same root cause as products.php: the
+       shared responsive.css rule `.card { page-break-inside: avoid }` applies
+       to every .card on every printed page (deliberately left untouched
+       globally). This page's Accounts card can hold up to 50 rows and is
+       routinely taller than one printable page, so "never break inside it"
+       pushed the entire card to page 2, leaving page 1 with just the print
+       header. Scoped override via .print-flow-card so only this card is
+       affected — the shared rule and every other page stay untouched. */
+    .print-flow-card {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+    }
+
     /* Table Styling for Print */
     #accountsTable {
         width: 100% !important;
