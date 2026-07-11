@@ -150,8 +150,13 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
 #tableView { display: block; }
 #cardView { display: none; }
 
-/* Mobile View: Force Card View */
-@media (max-width: 768px) {
+/* Mobile View: Force Card View
+   Scoped to `screen` explicitly — without it, this media query also matches
+   print (Portrait A4's print width is commonly <=768px), and since it's
+   declared after the `@media print` block above with equal specificity
+   (#cardView, both !important), it was winning and showing card view
+   instead of the table on print. */
+@media screen and (max-width: 768px) {
     #tableView { display: none !important; }
     #cardView { display: block !important; }
     .btn-group.shadow-sm { display: none !important; } /* Hide toggle buttons on mobile */

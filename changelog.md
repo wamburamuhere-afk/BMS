@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-07-11 (fix) — Services: Card View printing instead of Table View in Portrait
+
+**File:** `app/bms/product/services.php`
+
+**Confirmed real, not a rendering glitch** — read the live stylesheet's actual parsed rules
+(`document.styleSheets`) to verify the exact mechanism:
+
+- Two competing rules targeted `#cardView`, both `!important`, both equal specificity (single ID
+  selector): `@media print { #cardView { display: none } }` (declared first) and
+  `@media (max-width: 768px) { #cardView { display: block } }` (declared **after** it, same
+  `<style>` block, intended as "mobile view").
+- The mobile rule was **never scoped to `screen`** — an un-typed media query matches *any* media,
+  including print. Portrait A4's print width is commonly ≤768px, so during a narrow/Portrait print
+  both rules matched simultaneously. With equal specificity and both `!important`, the rule
+  declared **later in the source wins** — and the "show card view" rule was declared after the
+  "hide card view for print" rule, so it won, printing the card grid instead of the table.
+- **Fix:** scoped the mobile rule to `@media screen and (max-width: 768px)`. Since `screen` and
+  `print` are mutually exclusive media types, this rule can now never match during print
+  regardless of paper width/orientation — structurally guaranteed, not just a specificity fix.
+
+Verified live via the parsed CSSOM: rule now reads `screen and (max-width: 768px)`. This confirms
+the general class of bug flagged earlier in this session (un-scoped `@media (max-width: …)` rules
+leaking into print) is a real, concrete issue — not hypothetical.
+
+---
+
 ## 2026-07-11 (fix) — Employees: first printed page showed no data
 
 **File:** `app/bms/pos/employees.php`
