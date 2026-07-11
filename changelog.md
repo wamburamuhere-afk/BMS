@@ -1,5 +1,41 @@
 # BMS Changelog
 
+## 2026-07-11 (fix) — Sub-Contractors: print layout, DataTable standard, and toolbar format
+
+**File:** `app/bms/operations/sub_contractors.php`
+
+- **DataTable deviated from the house standard** (`.claude/ui-constants.md` §UI-2): was
+  `responsive: true`, which conflicts with this page's own manual Table/Card view toggle. Changed
+  to `responsive: false`, added `lengthMenu`, and standard empty-table language.
+  Initially also added `scrollX: true` to match §UI-2 exactly — **reverted**: `scrollX` makes
+  DataTables clone the header row into a second, ID-less `<table>` for the scrolling header, while
+  `id="scTable"` stays only on the body table. The print column-width rules below only ever
+  matched that body table, so the *visible* header (the clone) and the data cells ended up with
+  independently-computed widths — headers and values drifted out of alignment, which is what
+  showed up as columns going missing or values overflowing their cell. Removed `scrollX`; the page
+  now uses a single real table, same as `invoices.php`.
+- **Print "breaks to the next page" in Landscape:** DataTables only keeps the *current page's*
+  rows in the DOM (25 at a time), so printing without first expanding the page length silently cut
+  off the rest of the list. `printTable()` now sets the page length to "All" immediately before
+  `window.print()` and restores it after. Also, if the user had left **Card View** active, the
+  un-print-friendly stacked cards would print instead of the table — print now always forces table
+  view via `#scCardGrid { display:none }`.
+- **Columns too thin in Portrait / stat cards off one row:** same fixes as the Invoices list —
+  `table-layout:fixed` + percentage column widths (S/NO 5% / Code 10% / Name 14% / Contact 16% /
+  Address 15% / Category 10% / Projects 15% / Status 15%), and `#print-stats-cards` forced to
+  4×25% so the stat cards never drop to 2-per-row.
+- **Toolbar rebuilt to match `customers.php`'s format:** replaced the old bare Print/Export
+  buttons with the same button-group style (Copy / CSV / Print, shadowed rounded group with
+  dividers) plus a `Show: N` page-length control and a live search box, in a new Actions Section
+  above the record card — matching `customers.php` exactly. No Import button was added (no
+  import feature exists for sub-contractors yet). `copyTable()`/`exportSC()` use the same
+  hand-rolled clipboard/CSV approach as `invoices.php` (no new CDN dependency).
+
+Verified live at simulated Portrait width (dev.bms.local/sub_contractors): stat cards one row,
+table fits without overflow or duplicate header, search/print/copy/CSV all functional.
+
+---
+
 ## 2026-07-11 (fix) — Invoices list: portrait print columns, stat cards, and boxed table on print
 
 **File:** `app/bms/invoice/invoices.php`
