@@ -1,5 +1,50 @@
 # BMS Changelog
 
+## 2026-07-11 (fix) — Services (Non-Inventory Products): print showed nothing in the body
+
+**File:** `app/bms/product/services.php`
+
+- **Root cause:** a genuinely missing `</div>` — the Filters card (`d-print-none`, correctly meant
+  to be screen-only) was 13 `<div>` opens vs. 12 `</div>` closes between lines 254-305, exactly one
+  short. The browser's lenient HTML parsing meant every subsequent element — Card View, and
+  critically the entire Table View (`#tableView` → `.card` → `#servicesTable`, all rows) — silently
+  became **descendants of the unclosed, `d-print-none` Filters card** instead of siblings after it.
+  On screen this was invisible (the filters card only hides via `d-print-none`, so its accidental
+  children still rendered normally). In print, hiding that one card took the entire table down with
+  it, matching "nothing shown in the body" exactly.
+- **Fix:** added the missing `</div>` right after the Filters card's actual content, so `#tableView`
+  is now a direct sibling of the Filters card again, not nested inside it.
+
+Verified live: before the fix, `#tableView`/`#servicesTable` measured `width:0, height:0` and their
+ancestor chain ran straight into the `display:none` Filters card. After the fix, the same DOM walk
+shows `#tableView`'s parent is `.container-fluid` directly, and a full print simulation renders the
+header, 4 stat cards, and all 6 product rows correctly.
+
+---
+
+## 2026-07-11 (fix) — Budget Details: preemptive fix for the same page-break bug as Products
+
+**File:** `app/constant/accounts/budget_details.php`
+
+- Same root cause identified on `products.php` (shared `.card { page-break-inside: avoid }` in
+  `assets/css/responsive.css` can push an oversized `.card` entirely to the next printed page):
+  this page has two `.card`-wrapped tables (Budget Overview, Expenses for this Period). If the
+  Expenses table grows long, it would hit the identical bug.
+- **Could not be visually reproduced or verified**: every budget in the current dev database has
+  zero linked expense records, so the Expenses table is empty/tiny — applied preemptively based on
+  the confirmed shared root cause, not a directly observed symptom on this page.
+- **Fix:** added a `.print-flow-card` marker class to both cards (additive only, no restructuring)
+  and scoped the override to that class: `page-break-inside: auto !important` for print. Does not
+  touch the shared `.card` rule, so no other page is affected.
+- Also checked: the print heading already uses inline styles (not the dead `.bph-*` classes found
+  on `suppliers.php`), and the page's one modal is already covered by the global modal-hiding fix
+  — neither needed changes.
+
+Verified the page still renders identically on screen (no visual regression from the added marker
+classes); true print pagination can't be confirmed without real expense data and a real print.
+
+---
+
 ## 2026-07-11 (fix) — Products: table data not starting on the first printed page
 
 **File:** `app/bms/product/products.php`
