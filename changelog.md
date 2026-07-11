@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-07-11 (fix) — Employees: first printed page showed no data
+
+**File:** `app/bms/pos/employees.php`
+
+- Same shared-rule cause fixed across every list/report page today: the global `responsive.css`
+  rule `.card { page-break-inside: avoid }` applies to every `.card` on every printed page. This
+  page's table card can grow tall with many employees, so "never break inside it" pushed the whole
+  card to page 2, leaving page 1 with just the header/stats.
+- **Fix:** added the same `.print-flow-card` marker class + scoped `page-break-inside: auto`
+  override used on `products.php`/`chart_of_accounts.php`/`bank_accounts.php`/
+  `account_details.php`/`petty_cash.php`. Shared rule and every other page's cards untouched.
+- Left the existing `tr { page-break-inside: avoid }` rule alone — that one is legitimate (stops a
+  single row splitting across a page break) and isn't the bug.
+
+Verified live: `getComputedStyle(card).pageBreakInside` confirmed `auto` (was `avoid`); no console
+errors; screen rendering unchanged.
+
+---
+
 ## 2026-07-11 (fix) — Account Details: ledger print — totals row cut off + repeating per page
 
 **File:** `app/constant/accounts/account_details.php`
