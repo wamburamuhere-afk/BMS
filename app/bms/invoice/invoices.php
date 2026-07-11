@@ -442,20 +442,6 @@ try {
             </div>
         </div>
     </div>
-    <!-- Report Footer Footer -->
-    <div class="d-none d-print-block mt-5 pt-4 border-top">
-        <div class="row">
-            <div class="col-4 text-center">
-                <div class="border-top mx-4 mt-4 pt-2 small text-muted">Prepared By</div>
-            </div>
-            <div class="col-4 text-center">
-                <div class="border-top mx-4 mt-4 pt-2 small text-muted">Management Review</div>
-            </div>
-            <div class="col-4 text-center">
-                <div class="border-top mx-4 mt-4 pt-2 small text-muted">Authorised Signature</div>
-            </div>
-        </div>
-    </div>
 </div>
 
 <script>

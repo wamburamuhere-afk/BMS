@@ -18,6 +18,8 @@
   targets Bootstrap's plain `.card`). Flattened `.main-card` for print (no border/shadow/radius,
   `overflow:visible`) and zeroed the `.invoice-dashboard` print padding, matching the plain look
   other report pages already have.
+- **Removed the "Prepared By / Management Review / Authorised Signature" signature block**
+  (print-only footer with 3 signature lines) — not wanted on this report.
 
 Verified live at simulated Portrait width (dev.bms.local/invoices): all 4 stat cards stay in one
 row, table columns render readable without clipping or squeezing, and the boxed/shadowed wrapper
