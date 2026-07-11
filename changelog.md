@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-07-11 (fix) — Chart of Accounts: first printed page showed no data
+
+**File:** `app/constant/accounts/chart_of_accounts.php`
+
+- **Root cause confirmed, same as `products.php`:** the shared `responsive.css` rule
+  `.card { page-break-inside: avoid }` applies to every `.card` on every printed page. This page's
+  Accounts card (`pageLength: 50`, up to 50 rows in the DOM per page) measured **2597px tall** —
+  roughly 2.7× a printable page's usable height. "Never break inside this card" forced the entire
+  card to the start of page 2, leaving page 1 with nothing but the print header.
+- **Fix:** added the same `.print-flow-card` marker class (already used on `budget_details.php`)
+  to the Accounts card and scoped the override to it — `page-break-inside: auto !important`.
+  The shared rule and every other page's cards are untouched.
+
+Verified live: before the fix, `getComputedStyle(card).pageBreakInside` was `avoid`; after, `auto`.
+Screen rendering confirmed unchanged (no regression from the added marker class). Also noted (not
+fixed, out of scope for this specific report): `#accountsTable` uses server-side DataTables — a
+real print only ever contains whatever page of up to 50 rows is currently loaded, not the full
+669-account chart. `printAccountsTable()` calls `window.print()` directly with no page-length
+expansion first, same category of issue already fixed via `page.len(-1)` on other pages.
+
+---
+
 ## 2026-07-11 (fix) — Services: Product Name letter-wrapping, Project badge overlap
 
 **File:** `app/bms/product/services.php`
