@@ -1492,9 +1492,24 @@ function exportSC() {
         word-wrap: break-word !important;
         overflow-wrap: break-word !important;
         vertical-align: middle !important;
+        /* Hard boundary — a cell's content (e.g. a long project-name badge)
+           must never visually spill into the next column. */
+        overflow: hidden !important;
     }
     #scTable th { background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; }
-    #scTable td .badge { font-size: 6.5pt !important; }
+    /* Bootstrap's .badge sets its own white-space:nowrap directly on the
+       element, which a parent td's white-space:normal does NOT override
+       (only inherited values cascade, and nowrap here isn't inherited — it's
+       an explicit rule on the badge itself). That's what let the Projects
+       badge ("Upgrade of Transmission Line +1") run into the Status column.
+       Force it to wrap and shrink to the cell like any other print text. */
+    #scTable td .badge {
+        font-size: 6.5pt !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+        display: inline-block !important;
+        max-width: 100% !important;
+    }
 
     /* Printed columns: S/NO, Code, Name, Contact Info, Address, Category,
        Projects, Status (Actions is excluded from print via d-print-none). */
