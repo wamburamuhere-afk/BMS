@@ -192,7 +192,54 @@ try {
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm">
+    <!-- Actions Section -->
+    <div class="row mb-4 d-print-none">
+        <div class="col-12">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="d-flex flex-wrap align-items-center gap-2 flex-grow-1">
+                    <!-- Action Buttons -->
+                    <div class="d-flex flex-wrap shadow-sm bg-white" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
+                        <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="copyBankTable()" style="background: #fff; color: #444; height: 38px;">
+                            <i class="bi bi-clipboard text-info me-1"></i> Copy
+                        </button>
+                        <div class="bg-light d-none d-sm-block" style="width: 1px; height: 38px;"></div>
+                        <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="exportBankTable()" style="background: #fff; color: #444; height: 38px;">
+                            <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> CSV
+                        </button>
+                        <div class="bg-light d-none d-sm-block" style="width: 1px; height: 38px;"></div>
+                        <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="printBankTable()" style="background: #fff; color: #444; height: 38px;">
+                            <i class="bi bi-printer text-primary me-1"></i> Print
+                        </button>
+                    </div>
+
+                    <!-- Toolbar -->
+                    <div class="d-flex align-items-center gap-2 flex-grow-1">
+                        <div class="d-flex align-items-center bg-white shadow-sm px-2 py-1" style="border: 1px solid #dee2e6; border-radius: 8px; height: 38px;">
+                            <span class="small text-muted me-2 text-nowrap">Show:</span>
+                            <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 45px; background: transparent;" onchange="$('#bankAccountsTable').DataTable().page.len(this.value).draw();">
+                                <option value="10" selected>10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="-1">All</option>
+                            </select>
+                        </div>
+                        <div class="input-group input-group-sm shadow-sm flex-grow-1" style="border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6; height: 38px; min-width: 150px; max-width: 350px;">
+                            <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
+                            <input type="text" class="form-control border-0" id="searchBankAccounts" placeholder="Search accounts..." onkeyup="$('#bankAccountsTable').DataTable().search(this.value).draw();">
+                        </div>
+                    </div>
+                </div>
+                <div class="d-none d-xl-block">
+                    <span class="badge bg-success-soft text-success border border-success px-3 py-2 fs-6 rounded-pill shadow-sm">
+                        <i class="bi bi-check-circle-fill me-1"></i> <?= count($bank_accounts) ?> records
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm print-flow-card">
         <div class="card-header bg-white border-bottom py-3">
             <h5 class="mb-0 fw-bold"><i class="bi bi-list-ul me-2"></i>All Bank & Cash Accounts</h5>
         </div>
@@ -647,21 +694,56 @@ $(document).ready(function() {
         $('#bankAccountsTable').DataTable({
             "order": [[ 0, "asc" ]],
             "pageLength": 10,
-            "responsive": true,
+            "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
+            "responsive": false,
             "destroy": true,
-            dom: 'Bfrtip',
-            buttons: [
-                {
-                    text: '<i class="bi bi-printer text-primary me-1"></i> Print List',
-                    className: 'btn btn-light border btn-sm mb-3 shadow-sm px-3',
-                    action: function (e, dt, node, config) {
-                        window.print();
-                    }
-                }
-            ]
+            dom: 'rtip'
         });
     }
 });
+
+function printBankTable() {
+    logReportAction('Printed Bank Accounts List', 'User printed the bank & cash accounts list');
+    const table = $('#bankAccountsTable').DataTable();
+    const originalLength = table.page.len();
+    // Show every row before printing — DataTables only keeps the current
+    // page's rows in the DOM, so printing without this would cut off the rest.
+    table.page.len(-1).draw(false);
+    setTimeout(function() {
+        window.print();
+        table.page.len(originalLength).draw(false);
+    }, 100);
+}
+
+function copyBankTable() {
+    const table = document.getElementById('bankAccountsTable');
+    const range = document.createRange();
+    range.selectNode(table);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    document.execCommand('copy');
+    window.getSelection().removeAllRanges();
+    logReportAction('Copied Bank Accounts List', 'User copied bank & cash accounts list to clipboard');
+    Swal.fire({ icon: 'success', title: 'Copied!', text: 'Table data copied to clipboard', timer: 1500, showConfirmButton: false });
+}
+
+function exportBankTable() {
+    const table = document.getElementById('bankAccountsTable');
+    const rows = Array.from(table.querySelectorAll('tr'));
+    const csvContent = rows.map(row => {
+        const cols = Array.from(row.querySelectorAll('th, td')).slice(0, -1); // Exclude Actions
+        return cols.map(col => `"${col.innerText.replace(/"/g, '""')}"`).join(',');
+    }).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', 'BankAccounts.csv');
+    document.body.appendChild(link);
+    logReportAction('Exported Bank Accounts', 'User exported bank & cash accounts list to CSV');
+    link.click();
+    document.body.removeChild(link);
+}
 
 function setBankFieldsLocked(isSystem) {
     const locked = isSystem && !BANK_IS_ADMIN;
@@ -809,6 +891,19 @@ function formatCurrency(amount) {
         margin: 0 !important;
         padding: 0 !important;
         background: white !important;
+    }
+
+    /* First page was leaving a gap / no data — same root cause already fixed
+       on products.php and chart_of_accounts.php: the shared responsive.css
+       rule `.card { page-break-inside: avoid }` applies to every .card on
+       every printed page. If this card's table grows tall, "never break
+       inside it" forces the whole card to the next page instead of letting
+       it start filling page 1. Scoped override via .print-flow-card so only
+       this card is affected — the shared rule and every other page's cards
+       stay untouched. */
+    .print-flow-card {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
     }
 
     .container-fluid {
