@@ -1,5 +1,71 @@
 # BMS Changelog
 
+## 2026-07-11 (fix) — Products: table data not starting on the first printed page
+
+**File:** `app/bms/product/products.php`
+
+- **Root cause:** the shared `assets/css/responsive.css` rule `p, .card, section { page-break-inside:
+  avoid !important }` applies to every `.card` on every printed page across the app (deliberately
+  left untouched in the earlier global print audit — 95/119 print pages depend on it, too high a
+  blast radius to change globally). On this page, the products table sits inside a `.card` that's
+  taller than one printable page. "Never break inside this card" forced the browser to push the
+  *entire* card to the start of page 2 instead of letting it start filling page 1 — leaving page 1
+  mostly blank below the header/stat cards.
+- **Fix:** page-scoped override, `#tableView .card { page-break-inside: auto; break-inside: auto }`,
+  so only this page's table-wrapping card can flow across pages. Individual rows still can't split
+  (the separate global `tr { page-break-inside: avoid }` rule is untouched) and the shared `.card`
+  rule itself is untouched for every other page.
+- **Verification note:** true multi-page print pagination (where page breaks actually fall) can
+  only be observed in a real browser print/print-preview — automated screenshots can't render it.
+  Please confirm on an actual print.
+
+---
+
+## 2026-07-11 (fix) — Suppliers: unprofessional print heading, S/NO wrapping, column widths
+
+**File:** `app/bms/Suppliers/suppliers.php`
+
+- **Print heading looked unprofessional vs. `print-customers.php`:** the heading markup
+  (`.bph-title` / `.bph-sub` / `.bph-bar`) had **zero CSS defined anywhere in the codebase** —
+  the title rendered as an unstyled default `<h2>`, the subtitle as a plain `<p>`, and the
+  intended accent bar as a completely empty, invisible `<div>` (no divider line at all). Styled
+  all three to match the clean look used elsewhere: bold black uppercase title, muted subtitle,
+  small blue accent bar.
+- **"S/NO" wrapping to "S/N" / "O", and every other header fragmenting mid-word** (e.g.
+  "TOTAL" → "TOT"/"AL"): 11 print columns in Portrait meant even a single short header word could
+  be wider than its column at the 7.5pt body font. Two changes, CSS-only (no columns
+  added/removed/merged, on-screen table untouched):
+  1. Split the one flat `.col-info: 11.5%` (shared by 6 very different columns — Code, Name,
+     Contact, Address, Category, Project) into 6 individually-sized classes matched to what each
+     actually holds: `.col-sno` 5%, `.col-code` 9%, `.col-name` 13%, `.col-contact` 10%,
+     `.col-address` 11%, `.col-category` 8%, `.col-project` 11%, `.col-stat` 8% (×3), `.col-status`
+     9% — sums to 100%. `white-space: nowrap` forced specifically on `.col-sno` (a short label +
+     1-4 digit numbers never needs to wrap, unlike every other column here).
+  2. Added a dedicated, smaller header font (`#suppliersTable thead th { font-size: 6.3pt }`,
+     tighter padding/line-height/letter-spacing) — separate from the 7.5pt body text — so whole
+     header words fit and wrap at spaces instead of fragmenting letter-by-letter.
+  Result: 10 of 11 headers now sit on one line; only "COMPLETED" (the single longest header word)
+  still wraps to 2 lines, matching how other pages already handle longer 2-word headers.
+- **Print heading looked unprofessional vs. `print-customers.php`:** the heading markup
+  (`.bph-title` / `.bph-sub` / `.bph-bar`) had **zero CSS defined anywhere in the codebase** —
+  the title rendered as an unstyled default `<h2>`, the subtitle as a plain `<p>`, and the
+  intended accent bar as a completely empty, invisible `<div>` (no divider line at all). Styled
+  all three to match the clean look used elsewhere: bold black uppercase title, muted subtitle,
+  small blue accent bar.
+- Investigated the reported "large font size" — the print table body font is already a compact
+  7.5pt; the actual issue was the unstyled heading (rendering at oversized browser-default sizes)
+  and the cramped, fragmenting headers, both fixed above.
+
+Verified live at simulated Portrait width (dev.bms.local/suppliers): heading renders with logo,
+company name, bold title, subtitle, and accent bar; headers no longer fragment mid-word; stat
+cards remain one row. Note: Bootstrap is CDN-loaded (cross-origin), so automated screenshot
+testing can't read its `d-none`/`d-print-block` rules to toggle print-only elements automatically —
+visibility was confirmed with a manual override for testing purposes only; the real browser print
+doesn't share this limitation. Also found (but left alone, pre-existing and unrelated): a
+DataTable Responsive-extension JS error on this page, reproduced even with all changes reverted.
+
+---
+
 ## 2026-07-11 (fix) — Sub-Contractors: print layout, DataTable standard, and toolbar format
 
 **File:** `app/bms/operations/sub_contractors.php`
