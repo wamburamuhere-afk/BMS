@@ -959,6 +959,100 @@ $period_entry_count = count($transactions);
         
         .table { width: 100% !important; }
         .table thead th { background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; }
+
+        /* First page was showing no ledger data — same root cause already
+           fixed on products.php/chart_of_accounts.php/bank_accounts.php: the
+           shared responsive.css rule `.card { page-break-inside: avoid }`
+           applies to every .card on every printed page. A long ledger easily
+           exceeds one page, so "never break inside it" pushed the whole card
+           to page 2. Scoped override so only the ledger card is affected. */
+        #glLedgerSection {
+            page-break-inside: auto !important;
+            break-inside: auto !important;
+        }
+
+        /* #ledgerTable is a DataTable using the Responsive extension
+           (responsive: { details: { type: 'column' } }) — at print's narrow
+           width it was hiding columns (Description/Debit/Credit had the
+           lowest responsivePriority) behind a "+" toggle instead of just
+           shrinking them, which is what made the table look broken. Disable
+           that for print: hide the toggle column entirely and force every
+           real column visible regardless of the class Responsive uses to
+           hide it. */
+        #ledgerTable th:first-child, #ledgerTable td:first-child { display: none !important; }
+        #ledgerTable th, #ledgerTable td { display: table-cell !important; }
+        #ledgerTable th:first-child, #ledgerTable td:first-child { display: none !important; }
+        #ledgerTable td.dtr-control::before, #ledgerTable th.dtr-control::before { display: none !important; }
+
+        /* Headers were wrapping mid-word ("REFERENCE" -> "REFERENC"/"E",
+           "CREDIT" -> "CR"/"EDIT") — same recipe already proven on
+           suppliers.php/services.php: a dedicated smaller header font (so
+           whole short words fit) plus table-layout:fixed with explicit
+           per-column percentages instead of relying on DataTables' own
+           (Responsive-managed) width calculations. */
+        #ledgerTable {
+            table-layout: fixed !important;
+            font-size: 8pt !important;
+        }
+        #ledgerTable thead th {
+            font-size: 6.5pt !important;
+            line-height: 1.15 !important;
+            padding: 4px 3px !important;
+        }
+        #ledgerTable th, #ledgerTable td {
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            width: auto !important;
+            min-width: 0 !important;
+            max-width: none !important;
+        }
+        /* Printed columns (control column hidden above): S/NO, Date,
+           Reference, Description, Contra Account, Debit, Credit, Balance.
+           Debit/Credit/Balance get a bit more room than before, trimmed
+           from Description/Contra Account which can wrap freely. */
+        #ledgerTable th:nth-child(2), #ledgerTable td:nth-child(2) { width: 5%  !important; }
+        #ledgerTable th:nth-child(3), #ledgerTable td:nth-child(3) { width: 10% !important; }
+        #ledgerTable th:nth-child(4), #ledgerTable td:nth-child(4) { width: 12% !important; }
+        #ledgerTable th:nth-child(5), #ledgerTable td:nth-child(5) { width: 17% !important; }
+        #ledgerTable th:nth-child(6), #ledgerTable td:nth-child(6) { width: 14% !important; }
+        #ledgerTable th:nth-child(7), #ledgerTable td:nth-child(7) { width: 13% !important; }
+        #ledgerTable th:nth-child(8), #ledgerTable td:nth-child(8) { width: 13% !important; }
+        #ledgerTable th:nth-child(9), #ledgerTable td:nth-child(9) { width: 16% !important; }
+
+        /* Money amounts (Debit/Credit/Balance) were wrapping mid-number
+           ("94,500.00" -> "94,50"/"0.00") — a number should never wrap, only
+           text columns (Description, Contra Account) legitimately need to.
+           Force these three onto one line regardless of column width. */
+        #ledgerTable td:nth-child(7),
+        #ledgerTable td:nth-child(8),
+        #ledgerTable td:nth-child(9) {
+            white-space: nowrap !important;
+        }
+
+        /* "Period Totals & Ending Balance" row (tfoot) appeared cut off in
+           half in Portrait — its Balance cell carries Bootstrap's .h5 class
+           (~20px), way bigger than the 8pt print font every other cell uses,
+           so at Portrait's narrower width it overflowed past the column /
+           page edge. Sized it down to fit like everything else, while
+           keeping it visually distinct (bold, colored, slightly larger than
+           the body rows) — flexible in both Portrait and Landscape since
+           it's still a plain percentage-width cell like the rest. */
+        #ledgerTable tfoot td {
+            font-size: 9pt !important;
+        }
+        #ledgerTable tfoot td.h5 {
+            font-size: 10pt !important;
+        }
+
+        /* tfoot defaults to table-footer-group, which browsers repeat on
+           EVERY printed page when a table spans more than one — so the
+           totals row was printing at the bottom of every page instead of
+           once at the true end of the data. table-row-group makes it flow
+           as a normal trailing row instead, printing exactly once wherever
+           the last row of data actually lands. */
+        #ledgerTable tfoot {
+            display: table-row-group !important;
+        }
     }
 </style>
 
