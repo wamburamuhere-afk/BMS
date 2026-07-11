@@ -16,8 +16,6 @@ if (get_setting('enable_projects') != '1') {
 }
 
 $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
-$company_name = get_setting('company_name') ?: 'Building Management System';
-$company_logo = get_setting('company_logo');
 ?>
 
 <style>
@@ -102,14 +100,8 @@ $company_logo = get_setting('company_logo');
     <p class="mb-0 fw-bold text-primary">Powered By BJP Technologies @ 2026, All Rights Reserved</p>
 </div>
 
-<!-- Print Only Header -->
+<!-- Print Only Header: company logo + name come from the global renderPrintHeader() in header.php; do NOT repeat them here or they print twice. -->
 <div class="header-section text-center mb-4 d-none d-print-block">
-    <?php if(!empty($company_logo)): ?>
-        <div class="mb-2">
-            <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
-        </div>
-    <?php endif; ?>
-    <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h1>
     <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">PROJECT MANAGEMENT LIST REPORT</h3>
     <div class="mx-auto bg-primary mb-3" style="width: 60px; height: 3px; border-radius: 2px;"></div>
     <div class="small fw-bold">Generated on: <?= date('M d, Y') ?></div>
