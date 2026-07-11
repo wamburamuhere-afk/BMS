@@ -1,5 +1,71 @@
 # BMS Changelog
 
+## 2026-07-11 (fix) — Account Details: ledger print — totals row cut off + repeating per page
+
+**File:** `app/constant/accounts/account_details.php`
+
+Follow-up to the ledger print fix above — two more issues in the "Period Totals & Ending Balance"
+row (`<tfoot>`):
+
+- **Balance value appeared cut in half in Portrait:** that cell carries Bootstrap's `.h5` class
+  (~20px), far bigger than the 8pt font every other print cell uses — at Portrait's narrower width
+  it overflowed past its column/the page edge. Sized the whole `tfoot` row down to 9pt (10pt for
+  the `.h5` Balance cell, kept slightly larger for emphasis but no longer oversized). It's still a
+  plain percentage-width cell like the rest of the table, so it stays flexible in both Portrait and
+  Landscape rather than being pinned to one orientation.
+- **Totals row printing at the bottom of every page instead of once at the end:** `<tfoot>`
+  defaults to `display: table-footer-group`, which browsers deliberately repeat on every printed
+  page when a table spans more than one — correct for a running footer, wrong for a one-time totals
+  row. Overridden to `display: table-row-group` so it flows as a normal trailing row instead,
+  printing exactly once wherever the last row of data actually lands.
+
+Verified live: `getComputedStyle(balanceCell).fontSize` confirmed `13.33px` (10pt, was ~20px) with
+`scrollWidth <= clientWidth` (no overflow); `getComputedStyle(tfoot).display` confirmed
+`table-row-group` (was the default `table-footer-group`). Visually confirmed on `account_id=17`.
+
+---
+
+## 2026-07-11 (fix) — Account Details: ledger print — page 1, Responsive columns, headers, amounts
+
+**File:** `app/constant/accounts/account_details.php`
+
+`#ledgerTable` (GL Ledger: S/NO, Date, Reference, Description, Contra Account, Debit, Credit,
+Balance) is a real DataTable, confirmed via its init (`$('#ledgerTable').DataTable({...})`) — it
+just wasn't obvious because it uses the Responsive extension's **column** mode
+(`responsive: { details: { type: 'column' } }`), which at narrow print width was hiding columns
+(Description/Debit/Credit had the lowest `responsivePriority`) behind a "+" toggle instead of
+letting them shrink — the actual cause of the broken/confusing look.
+
+- **First page showed no ledger data:** same shared-rule cause already fixed on
+  `products.php`/`chart_of_accounts.php`/`bank_accounts.php` — `.card { page-break-inside: avoid }`
+  pushed the whole ledger card to page 2 for any account with enough transactions to exceed one
+  page. Scoped `page-break-inside: auto` override on `#glLedgerSection` only.
+- **Responsive extension hiding columns for print:** disabled its hide/toggle behaviour for print
+  — the `.dtr-control` column is now hidden entirely, and every real column is forced visible
+  (`display: table-cell !important`) regardless of the class Responsive uses to hide it.
+- **Headers fragmenting mid-word** ("REFERENCE" → "REFERENC"/"E", "CREDIT" → "CR"/"EDIT"): same
+  recipe as `suppliers.php`/`services.php` — dedicated smaller header font (6.5pt vs 8pt body) +
+  `table-layout: fixed` with explicit per-column percentages instead of DataTables/Responsive's own
+  width math.
+- **Follow-up, reported after the above was confirmed working:** Debit/Credit/Balance amounts were
+  still wrapping mid-number ("94,500.00" → "94,50"/"0.00"). Forced `white-space: nowrap` on those
+  three columns specifically (numbers never need to wrap, unlike Description/Contra Account which
+  legitimately do) and gave them a little more width, trimmed from the text columns.
+
+**Investigation note:** testing `account_id=23` (2,456 ledger rows) made the whole dev site hang —
+`SHOW FULL PROCESSLIST` showed no DB-level lock, and PHP's `max_execution_time` is `0` (unlimited),
+so a slow/expensive computation on that page (not caused by this change) ran indefinitely and
+exhausted Apache's worker pool. Recovered by restarting the Apache service. Retested successfully
+against a smaller account (`account_id=17`, 26 rows) instead. **Flagging, not fixing**: this
+page likely has a real performance bug on accounts with thousands of ledger entries, separate from
+today's print-CSS work.
+
+Verified live: `getComputedStyle(cell).whiteSpace === 'nowrap'` and `scrollWidth === clientWidth`
+(no overflow) on Balance cells after the fix; visually confirmed every Debit/Credit/Balance value
+renders as a single line across 26 rows.
+
+---
+
 ## 2026-07-11 (fix) — Bank & Cash Accounts: print gap on page 1, toolbar format
 
 **File:** `app/constant/accounts/bank_accounts.php`
