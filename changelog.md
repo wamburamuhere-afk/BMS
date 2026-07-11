@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-07-11 (fix) — Bank & Cash Accounts: print gap on page 1, toolbar format
+
+**File:** `app/constant/accounts/bank_accounts.php`
+
+- **Gap left on the first printed page:** same root cause as `products.php`/`chart_of_accounts.php`
+  — the shared `.card { page-break-inside: avoid }` rule was pushing the whole Accounts card to
+  page 2 if its table grew tall. Added the same `.print-flow-card` marker class + scoped override
+  (`page-break-inside: auto`) used on those pages.
+- **Toolbar rebuilt to match `customers.php`'s format:** the only prior "toolbar" was a single
+  DataTables-generated button ("Print List", using the library's own default styling) with no
+  Copy/CSV/search/Show controls at all. Replaced with the same Copy / CSV / Print button-group +
+  `Show: N` + search box used on `customers.php`/`invoices.php`/`sub_contractors.php`/
+  `suppliers.php`. `copyBankTable()`/`exportBankTable()` use the same hand-rolled clipboard/CSV
+  approach as those pages (no new CDN dependency). `printBankTable()` now expands the table to
+  show all rows before `window.print()` and restores the page length after (the old single button
+  just called `window.print()` directly, so it would have silently cut off rows beyond the current
+  page).
+- Also brought the DataTable init in line with the house standard: `responsive: true` → `false`,
+  added `lengthMenu`, removed the now-unused `dom: 'Bfrtip'` + Buttons-extension config.
+
+Verified live: `getComputedStyle(card).pageBreakInside` confirmed `auto` after the fix; toolbar
+renders identically to `customers.php`'s; Copy/CSV/Print functions all present and callable; no
+console errors.
+
+---
+
 ## 2026-07-11 (fix) — Chart of Accounts: first printed page showed no data
 
 **File:** `app/constant/accounts/chart_of_accounts.php`
