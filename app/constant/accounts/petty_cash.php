@@ -267,7 +267,7 @@ try {
         </div>
     </div>
 
-    <div id="pcTableView" class="card border-0 shadow-sm">
+    <div id="pcTableView" class="card border-0 shadow-sm print-flow-card">
         <div class="card-header bg-white py-3 border-bottom d-print-none">
             <h5 class="mb-0 fw-bold">Transactions History</h5>
         </div>
@@ -716,7 +716,39 @@ try {
 
     function printPettyCash() {
         logReportAction('Printed Petty Cash List', 'User printed the petty cash transaction list');
-        window.print();
+        // This table is not a DataTable — it's a custom AJAX-paginated list
+        // (loadTransactions() fetches one page of `filter_limit` rows at a
+        // time), so printing without this would only ever show whichever
+        // page currently happens to be loaded. Temporarily fetch every row,
+        // print, then restore the normal paginated view.
+        const limitSelect = document.getElementById('filter_limit');
+        const originalLimit = limitSelect.value;
+        const originalPage = currentPage;
+        limitSelect.value = '100000';
+        loadAllTransactionsForPrint().then(function() {
+            window.print();
+            limitSelect.value = originalLimit;
+            loadTransactions(originalPage || 1);
+        });
+    }
+
+    function loadAllTransactionsForPrint() {
+        return new Promise(function(resolve) {
+            const from_date = document.getElementById('filter_from_date').value;
+            const to_date = document.getElementById('filter_to_date').value;
+            const expense_account_id = document.getElementById('filter_expense_account_id').value;
+            const type = document.getElementById('filter_type').value;
+            const search = document.getElementById('searchInput').value;
+            const fund = (document.getElementById('fund_selector') || {}).value || '';
+            const url = `<?= getUrl('api/petty_cash/get_transactions.php') ?>?page=1&limit=100000&search=${encodeURIComponent(search)}&from_date=${from_date}&to_date=${to_date}&expense_account_id=${expense_account_id}&type=${type}&fund_account_id=${fund}`;
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) renderTable(data.transactions);
+                    resolve();
+                })
+                .catch(() => resolve());
+        });
     }
 
     function exportExcel() {
@@ -1308,7 +1340,58 @@ document.getElementById('pettyAccountForm').addEventListener('submit', function 
     }
     .custom-stat-card .card-body { padding: 10px !important; }
     .stat-icon-circle { display: none !important; } /* Hide icons to save space on print */
-}
+
+    /* First page was showing no transaction data — same shared-rule cause
+       already fixed on products.php/chart_of_accounts.php/bank_accounts.php/
+       account_details.php: `.card { page-break-inside: avoid }` in the
+       global responsive.css pushed the whole table card to page 2 once it
+       grew tall enough. Scoped override so only this page's table card is
+       affected. */
+    .print-flow-card {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+    }
+
+    /* No print sizing existed for this table at all, so headers rendered at
+       normal body font-size and wrapped mid-word ("CATEGORY" -> "CATEGOR"/
+       "Y", "RECEIVED BY" -> "RECEIVED"/"BY"). Same recipe already proven on
+       suppliers.php/services.php/account_details.php: a dedicated smaller
+       header font (so whole words fit) + table-layout:fixed with explicit
+       per-column percentages, flexible in both Portrait and Landscape since
+       they're plain percentages, not fixed pixels. */
+    #transactionsTable {
+        table-layout: fixed !important;
+        width: 100% !important;
+        font-size: 8pt !important;
+    }
+    #transactionsTable thead th {
+        font-size: 6.5pt !important;
+        line-height: 1.15 !important;
+        padding: 4px 3px !important;
+    }
+    #transactionsTable th, #transactionsTable td {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        padding: 4px 5px !important;
+        border: 1px solid #dee2e6 !important;
+    }
+    /* Printed columns (attachment + Actions excluded via d-print-none):
+       S/NO, Date, Type, Description, Category, Reference, Received By,
+       User, Amount. */
+    #transactionsTable th:nth-child(1), #transactionsTable td:nth-child(1) { width: 4%  !important; }
+    #transactionsTable th:nth-child(2), #transactionsTable td:nth-child(2) { width: 9%  !important; }
+    #transactionsTable th:nth-child(3), #transactionsTable td:nth-child(3) { width: 8%  !important; }
+    #transactionsTable th:nth-child(4), #transactionsTable td:nth-child(4) { width: 20% !important; }
+    #transactionsTable th:nth-child(5), #transactionsTable td:nth-child(5) { width: 12% !important; }
+    #transactionsTable th:nth-child(6), #transactionsTable td:nth-child(6) { width: 13% !important; }
+    #transactionsTable th:nth-child(7), #transactionsTable td:nth-child(7) { width: 12% !important; }
+    #transactionsTable th:nth-child(8), #transactionsTable td:nth-child(8) { width: 10% !important; }
+    #transactionsTable th:nth-child(9), #transactionsTable td:nth-child(9) { width: 12% !important; }
+
+    /* Amount is a number — it must never wrap, unlike the text columns. */
+    #transactionsTable td:nth-child(9) {
+        white-space: nowrap !important;
+    }
 }
 </style>
 

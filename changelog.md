@@ -1,5 +1,40 @@
 # BMS Changelog
 
+## 2026-07-11 (fix) — Petty Cash: not a DataTable — print page 1, headers, incomplete data
+
+**File:** `app/constant/accounts/petty_cash.php`
+
+**Confirmed: `#transactionsTable` is NOT a DataTable.** Searched the whole file for `.DataTable(` —
+no match. It's a custom AJAX-paginated table: `loadTransactions(page)` fetches one page of
+`filter_limit` rows at a time from `api/petty_cash/get_transactions.php`, with hand-rolled
+`renderTable()`/`renderPagination()` — no DataTables library involved at all.
+
+- **First page showed no data:** same shared-rule cause fixed on every other page today —
+  `.card { page-break-inside: avoid }` in the global stylesheet pushed the whole table card to
+  page 2 once it grew tall. Added the same `.print-flow-card` marker + scoped override.
+- **Headers fragmenting mid-word** ("CATEGORY" → "CATEGOR"/"Y", "RECEIVED BY" → "RECEIVED"/"BY"):
+  this page had **no print sizing for the table at all** — headers rendered at normal body
+  font-size with no `table-layout:fixed`, no column widths. Added the same recipe proven on
+  `suppliers.php`/`services.php`/`account_details.php`: dedicated smaller header font +
+  `table-layout:fixed` with explicit per-column percentages (flexible in both Portrait and
+  Landscape — plain percentages, not fixed pixels). `white-space:nowrap` forced on Amount (a
+  number, never needs to wrap).
+- **Printing only ever showed the currently-loaded page of rows:** `printPettyCash()` called
+  `window.print()` directly with no expansion step — and since this isn't a DataTable, there's no
+  `.page.len(-1)` trick available. Added `loadAllTransactionsForPrint()`, which re-fetches with
+  `limit=100000` (the API has no dedicated "all" mode, but `LIMIT` beyond the actual row count
+  just returns everything) before printing, then restores the original page size/page afterward.
+- Also fixed a stray extra `}` immediately after the `@media print` block (harmless — nothing
+  followed it before `</style>` — but cleaned up while already in this exact block).
+
+Verified live: `getComputedStyle(card).pageBreakInside` confirmed `auto`; all 9 headers (S/NO,
+Date, Type, Description, Category, Reference, Received By, User, Amount) render on one line;
+Amount values don't wrap; `loadAllTransactionsForPrint()` confirmed loading all 130 transactions
+(matching the "Total Transactions" stat) before printing, then restored to the normal paginated
+view after.
+
+---
+
 ## 2026-07-11 (fix) — Services: Card View printing instead of Table View in Portrait
 
 **File:** `app/bms/product/services.php`
