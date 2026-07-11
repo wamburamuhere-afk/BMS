@@ -370,7 +370,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
     </div>
 
     <!-- Employees Table -->
-    <div class="card border-0 shadow-sm">
+    <div class="card border-0 shadow-sm print-flow-card">
         <div class="card-header bg-white py-3 border-bottom d-print-none">
             <h5 class="mb-0 fw-bold">Employees List</h5>
         </div>
@@ -2802,6 +2802,18 @@ function downloadTemplate() {
     
     tr {
         page-break-inside: avoid;
+    }
+
+    /* First page was showing no employee data — same shared-rule cause
+       fixed across every other list/report page: the global responsive.css
+       rule `.card { page-break-inside: avoid }` applies to every .card on
+       every printed page. This page's table card can grow tall with many
+       employees, so "never break inside it" pushed the whole card to page
+       2, leaving page 1 with just the header/stats. Scoped override so
+       only this page's table card is affected. */
+    .print-flow-card {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
     }
 
     .table th:last-child,
