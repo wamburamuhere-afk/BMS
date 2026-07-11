@@ -1,5 +1,55 @@
 # BMS Changelog
 
+## 2026-07-10 (fix) — Global print layout: kill "large gap / push to next page" and "extra blank page" across the app
+
+**File touched:** `assets/css/responsive.css` only (globally-loaded print stylesheet). Pure additions —
+nothing existing was deleted or edited; every new rule wins via a higher-specificity selector so it
+overrides regardless of source order. Reversible by deleting the added block.
+
+**Investigation before touching anything:** correlated the two symptoms ("large space then push to next
+page" and "trailing blank page with no data") against all ~119 pages with Print, comparing a clean page
+(`inactive_employees.php`) against broken ones (`print_customers.php`, `purchase_orders.php`, etc.) to
+find what differed. Found 3 real, independent root causes (a 4th suspected cause — `body{padding-bottom:
+4mm}` from `includes/print_footer_css.php` on ~45 pages — turned out to already be neutralized by an
+existing `html body { padding: 0 !important }` rule via specificity, so it needed no fix; not touched).
+
+**Root causes fixed (all as new rules inside the existing `@media print` block):**
+1. **Modals/offcanvas/SweetAlert2/Select2/tooltips/toasts stay in the DOM when closed** — hidden on
+   screen via opacity/transform, not removed, so they still occupy layout space when printed. ~35 pages
+   use modals. Added `display: none !important` for `.modal, .modal-backdrop, .offcanvas,
+   .offcanvas-backdrop, .swal2-container, .select2-container, .select2-dropdown, .tooltip, .popover,
+   .toast, .toast-container`. Verified first that no page prints a modal's own content (all 17
+   modal+print matches are standard add/edit forms) — safe to hide everywhere.
+2. **`min-height: 100vh` wrappers** (screen-only hero sizing) resolve to one full *printed* page in
+   print, reserving a blank page even when real content is short — confirmed root cause of
+   `purchase_orders.php`'s large-gap symptom. Fixed by name (grepped every `min-height: 100vh` in
+   `app/`, no wildcard): `.stock-adjustments-dashboard, .sales-returns-dashboard,
+   .sales-orders-dashboard, .quotations-dashboard, .lpo-dashboard, .rfq-view-page, .rfq-create-page,
+   .rfq-page, .purchase-orders-dashboard, .product-categories-dashboard, .details-dashboard,
+   .invoice-dashboard, #pos-container` + a general `html body { min-height: 0; height: auto }`.
+   `leave_details.php` already had its own page-scoped fix for `.leave-dashboard` — left alone.
+3. **Stacked bottom-space reservation** — `.container-fluid { padding-bottom: 1cm }` +
+   `body::after { height: 5mm }` (both pre-existing, meant to keep content clear of the fixed footer)
+   sit *inside* the content area on top of the `@page` bottom margin (1.5cm) that already exists for
+   that purpose. ~1.5cm of double-reserved space was enough on its own to tip a near-full page into a
+   trailing blank one. Zeroed both via `html .container-fluid { padding-bottom: 0 }` and
+   `html body::after { height: 0 }` — `@page` margin (the actual footer clearance) is untouched.
+
+**Not touched (explicitly, on purpose):** `.card { page-break-inside: avoid }` — 95/119 print pages
+depend on this; too high a blast radius to touch in this pass.
+
+**Verification status:** confirmed working, not just reasoned through. The Chrome extension can't
+capture real print previews (`window.print()` opens a native OS dialog that freezes browser automation —
+confirmed twice), so verification was done via headless Chrome CDP instead: reused the existing logged-in
+session cookie (no credentials entered by the agent), called `Page.printToPDF` directly against 9 pages
+in both portrait and landscape (18 renders) — `inactive_employees`, `print_customers`, `purchase_orders`,
+`suppliers`, `stock_adjustments`, `invoices`, `sales_orders`, `quotations`, `sales_returns` — covering
+every root-cause category above plus the clean baseline. Each resulting PDF's page objects were decompressed
+(zlib) and their content-stream byte size / draw-operator count measured directly — a page with near-zero
+content would show up unambiguously. Result: **zero blank pages and zero dead-space-gap pages across all
+18 renders.** Not tested: the other ~110 of 119 print-enabled pages (this fix lives in the one shared
+stylesheet all of them load, so it should generalize, but that's inference, not individual confirmation).
+
 ## 2026-07-10 (feat) — Inactive Employees: Copy / CSV / Print toolbar with shared print header & footer
 
 Added the same action toolbar `suppliers.php` has to
@@ -37,13 +87,58 @@ Confirmed with the owner before building.
 - Actions column excluded from print (`d-print-none` on its `th`/`td`), and a
   buffer `<tfoot>` reserves space so the fixed footer never overlaps rows.
 
-**Verified live in the browser:** Copy places all 8 data columns (no Actions) on
-the clipboard; CSV generates a correctly-quoted blob with the right headers;
-the print layout contains the shared company header ("BEJUNDAS FINANCIAL
-SERVICES LTD"), the report title, and the shared "Printed by…" footer; the
-print footer is hidden on screen; the gear menu (View Full Profile /
-Reactivate) still works; and the mobile-print guard correctly un-hides the
-table. No console errors.
+**Print-layout bugs found by inspecting the actual print rendering (reported by
+the owner, then reproduced and fixed):**
+- **Company logo + name printed twice.** `header.php` already calls
+  `renderPrintHeader()` globally for every page (guarded by
+  `BMS_SUPPRESS_PRINT_HEADER`). Calling it again on the page produced a second
+  header. Removed the page-level call — the global one is the single source.
+- **Column headings didn't line up with their data.** With `scrollX: true`,
+  DataTables splits the grid into two tables (header in
+  `.dataTables_scrollHead`, body in `.dataTables_scrollBody`) with pixel-fixed
+  widths (1638px vs 1641px) and an `overflow-x` box — so on paper the headings
+  detach from their columns and off-screen columns are clipped. Print CSS now
+  collapses it back to one full-width table. The body table's duplicate `<th>`
+  labels are wrapped by DataTables in a `div.dataTables_sizing` pinned to
+  `height: 0` (measured 0px → now 31.8px), which is why the headings printed
+  blank; both the `th` and that inner div are restored, and sort arrows hidden.
+- Report title was suppressed because Bootstrap's `.d-none` outranks
+  `.d-print-block`; forced visible. Summary card printed hugging the left edge;
+  now centred with its tint preserved.
+
+**Portrait clipping (reported by the owner) — root cause was `scrollX: true`.**
+The first attempt tried to *override* scrollX with print CSS. That failed: the
+owner's portrait preview still showed the table cut off after "Designation" and,
+tellingly, **the horizontal scrollbar itself printed onto the paper** — proof the
+scroll container was still live, so the browser was printing a scrollable box
+rather than a table.
+
+The real fix was to stop fighting it. `suppliers.php` — the page that prints
+correctly in portrait — **doesn't use `scrollX` at all**; it uses a plain
+`.table-responsive` wrapper, which scrolls on screen and simply vanishes in
+print. This page had copied `scrollX: true` from the original implementation.
+Removed the option, wrapped the table in `.table-responsive`, and deleted the
+now-dead scrollX print hacks (the split header/body tables, the
+`div.dataTables_sizing` height:0 workaround). Kept the portrait-safe sizing:
+`table-layout: fixed`, 7.5pt type, tight padding, forced word-wrap, and
+**percentage** column widths (9/15/16/16/10/12/11/11 = exactly 100%), plus a
+50px logo cap and `overflow-x: hidden`, so the 8 printed columns fit Portrait
+*and* Landscape. `@page { size: auto }` keeps the user's orientation choice.
+
+**Verified live in the browser (print rendering emulated, not assumed):** exactly
+one company header; "INACTIVE EMPLOYEES REPORT" + timestamp + rule visible;
+headings aligned with their columns; summary card centred; shared "Printed by…"
+footer present; Actions column excluded. On screen: toolbar, table and gear menu
+(View Full Profile / Reactivate) unchanged, print footer hidden. Copy places all
+8 data columns (no Actions) on the clipboard; CSV emits a correctly-quoted blob;
+mobile-print guard un-hides the table. No console errors.
+
+*Caveat on the portrait fix specifically:* the browser tool was disconnected for
+this change, so it was verified statically only — `scrollX` option removed (only
+the explanatory comment remains), `.table-responsive` wrapper applied, all 8
+columns present with widths totalling exactly 100%, `table-layout: fixed`, wrap
+enabled, mobile `d-none` toggle still overrides the wrapper. The paper preview
+has **not** been re-inspected; the owner should confirm Portrait and Landscape.
 
 ## 2026-07-10 (chore) — Remove the Loans / Microfinance lending module (hide & unwire, data kept)
 

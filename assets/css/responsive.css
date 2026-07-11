@@ -543,4 +543,68 @@ table thead th {
         height: 5mm;
     }
 
+    /* ═══════════════════════════════════════════════════════════
+       ADDED BLOCK — whole-app print audit (2026-07-10)
+       Every rule below is a pure ADD: nothing above this line was
+       deleted or edited. Each override wins via a higher-specificity
+       selector (e.g. "html .container-fluid" > ".container-fluid"),
+       so it takes effect regardless of where the original rule sits
+       in the cascade — fully reversible by deleting this block.
+       ═══════════════════════════════════════════════════════════ */
+
+    /* ─── ADDED: HIDE OVERLAY/POPUP UI THAT STAYS IN THE DOM ───
+       Bootstrap modals/offcanvas and SweetAlert2/Select2/tooltip/
+       popover/toast widgets are hidden on screen via opacity/transform,
+       not removed from the DOM — a closed one still occupies layout
+       space when printed. This was the root cause of the duplicate
+       "large blank gap" symptom on pages that use these widgets
+       (~35 pages use modals alone). Confirmed no page prints a modal's
+       own content — modals here are only used for add/edit forms.
+    */
+    .modal, .modal-backdrop, .offcanvas, .offcanvas-backdrop,
+    .swal2-container, .select2-container, .select2-dropdown,
+    .tooltip, .popover, .toast, .toast-container {
+        display: none !important;
+    }
+
+    /* ─── ADDED: CANCEL VIEWPORT-HEIGHT HERO SIZING ───
+       These wrapper classes/ids set min-height:100vh (screen-only, to
+       vertically center short pages). In print, 100vh resolves to one
+       full printed page, reserving a blank page even when the real
+       content is short (e.g. purchase_orders.php). Listed explicitly
+       from a grep of every "min-height: 100vh" in app/ — no wildcard.
+       leave_details.php already carries its own page-specific fix for
+       .leave-dashboard, so it is intentionally not repeated here.
+    */
+    html body { min-height: 0 !important; height: auto !important; }
+    .stock-adjustments-dashboard,
+    .sales-returns-dashboard,
+    .sales-orders-dashboard,
+    .quotations-dashboard,
+    .lpo-dashboard,
+    .rfq-view-page,
+    .rfq-create-page,
+    .rfq-page,
+    .purchase-orders-dashboard,
+    .product-categories-dashboard,
+    .details-dashboard,
+    .invoice-dashboard,
+    #pos-container {
+        min-height: 0 !important;
+    }
+
+    /* ─── ADDED: SHRINK THE STACKED BOTTOM-SPACE RESERVATION ───
+       @page already reserves 1.5cm at the bottom of every page for the
+       fixed footer. On top of that, .container-fluid above adds
+       padding-bottom:1cm and body::after above adds another 5mm — a
+       combined ~1.5cm reserved inside the content area, separate from
+       the @page margin. When real content lands just short of a page
+       boundary, this reservation alone is enough to tip it onto a
+       trailing blank page. The @page margin is left untouched (still
+       clears the footer); only the two extra in-content reservations
+       stacked on top of it are zeroed here.
+    */
+    html .container-fluid { padding-bottom: 0 !important; }
+    html body::after { height: 0 !important; }
+
 } /* end @media print */
