@@ -230,29 +230,29 @@ try {
     </div>
     
     <!-- Statistics Cards -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
+    <div class="row g-3 mb-4" id="invoiceStatsRow">
+        <div class="col-6 col-md-3 invoice-stat-col">
             <div class="card border-0 shadow-sm p-3 h-100" style="border-left:4px solid #0d6efd !important;">
                 <div class="small text-muted text-uppercase fw-bold mb-1"><i class="bi bi-receipt me-1"></i>Total Billed</div>
                 <div class="fs-6 fw-bold text-primary font-monospace" id="stat-total-billed">0.00</div>
                 <div class="small text-muted mt-1"><span id="stat-total-invoices">0</span> invoices</div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-3 invoice-stat-col">
             <div class="card border-0 shadow-sm p-3 h-100" style="border-left:4px solid #198754 !important;">
                 <div class="small text-muted text-uppercase fw-bold mb-1"><i class="bi bi-check-circle me-1"></i>Collected</div>
                 <div class="fs-6 fw-bold text-success font-monospace" id="stat-collected">0.00</div>
                 <div class="small text-muted mt-1"><span id="stat-paid">0</span> paid invoices</div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-3 invoice-stat-col">
             <div class="card border-0 shadow-sm p-3 h-100" style="border-left:4px solid #ffc107 !important;">
                 <div class="small text-muted text-uppercase fw-bold mb-1"><i class="bi bi-clock-history me-1"></i>Outstanding</div>
                 <div class="fs-6 fw-bold text-warning font-monospace" id="stat-outstanding">0.00</div>
                 <div class="small text-muted mt-1"><span id="stat-pending">0</span> pending/sent</div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-3 invoice-stat-col">
             <div class="card border-0 shadow-sm p-3 h-100" style="border-left:4px solid #dc3545 !important;">
                 <div class="small text-muted text-uppercase fw-bold mb-1"><i class="bi bi-exclamation-triangle me-1"></i>Overdue</div>
                 <div class="fs-6 fw-bold text-danger font-monospace" id="stat-overdue-amt">0.00</div>
@@ -439,20 +439,6 @@ try {
                         <!-- Data loaded via AJAX -->
                     </tbody>
                 </table>
-            </div>
-        </div>
-    </div>
-    <!-- Report Footer Footer -->
-    <div class="d-none d-print-block mt-5 pt-4 border-top">
-        <div class="row">
-            <div class="col-4 text-center">
-                <div class="border-top mx-4 mt-4 pt-2 small text-muted">Prepared By</div>
-            </div>
-            <div class="col-4 text-center">
-                <div class="border-top mx-4 mt-4 pt-2 small text-muted">Management Review</div>
-            </div>
-            <div class="col-4 text-center">
-                <div class="border-top mx-4 mt-4 pt-2 small text-muted">Authorised Signature</div>
             </div>
         </div>
     </div>
@@ -872,21 +858,84 @@ function exportExcel() {
 .dropdown-item:last-child { margin-bottom: 0; }
 
 @media print {
+    /* size:auto keeps the user's Portrait/Landscape choice; everything below
+       adapts via percentage widths so neither orientation clips or squeezes. */
+    @page { size: auto; }
+
     body { background: white !important; padding: 0 !important; }
-    .invoice-dashboard { background: white !important; padding: 20px !important; }
-    .stats-card, .custom-stat-card { 
-        box-shadow: none !important; 
+    .invoice-dashboard { background: white !important; padding: 0 !important; }
+
+    /* ─── Flatten the card "block" so it doesn't box/clip the table ───
+       .main-card carries rounded corners + drop-shadow + overflow:hidden for
+       screen only; the shared print reset targets Bootstrap's .card, not
+       this page-specific class, so it must be neutralised here. */
+    .main-card {
+        border: none !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        overflow: visible !important;
+        background: transparent !important;
+    }
+
+    .stats-card, .custom-stat-card {
+        box-shadow: none !important;
         border: 1px solid #d1e7dd !important;
         background-color: #f8fafc !important; /* Lighter for print */
     }
     .custom-stat-card h4, .custom-stat-card small { color: #000 !important; }
+
+    /* ─── Statistic cards always one row, Portrait or Landscape ───
+       Screen breakpoints (col-6/col-md-3) would otherwise drop to 2-per-row
+       when Portrait renders narrower than the md breakpoint. */
+    #invoiceStatsRow { flex-wrap: nowrap !important; }
+    #invoiceStatsRow .invoice-stat-col {
+        flex: 0 0 25% !important;
+        max-width: 25% !important;
+        width: 25% !important;
+        padding-left: 4px !important;
+        padding-right: 4px !important;
+    }
+    #invoiceStatsRow .card { padding: 6px !important; }
+    #invoiceStatsRow .fs-6 { font-size: 9pt !important; }
+    #invoiceStatsRow .small { font-size: 6.5pt !important; }
+
     .table-responsive { overflow: visible !important; }
-    table { width: 100% !important; border-collapse: collapse !important; }
-    th, td { border: 1px solid #dee2e6 !important; padding: 8px !important; }
-    th { background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; }
+
+    /* ─── Portrait-safe table: fixed layout + percentage widths ───
+       table-layout:auto let long values (customer/company names, status
+       badges) push right-hand columns past the paper edge in Portrait.
+       Fixed layout + widths that sum to 100% adapt to both orientations. */
+    #invoicesTable {
+        width: 100% !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+        font-size: 8pt !important;
+    }
+    #invoicesTable th, #invoicesTable td {
+        border: 1px solid #dee2e6 !important;
+        padding: 4px 5px !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        vertical-align: middle !important;
+    }
+    #invoicesTable th { background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; }
+    #invoicesTable td .badge, #invoicesTable td .progress { font-size: 6.5pt !important; }
+
+    <?php
+    // Printed columns: S/NO, Invoice#, Date, Customer, [Project], Type, Amount, Balance, Status
+    // (Actions + the hidden placeholder column are excluded from print via d-print-none.)
+    $inv_print_widths = $enable_projects
+        ? [4, 12, 10, 15, 10, 8, 12, 14, 15]   // + Project column, sums to 100
+        : [4, 14, 11, 20, 9, 14, 14, 14];       // no Project column, sums to 100
+    foreach ($inv_print_widths as $i => $w):
+    ?>
+    #invoicesTable th:nth-child(<?= $i + 1 ?>), #invoicesTable td:nth-child(<?= $i + 1 ?>) { width: <?= $w ?>% !important; }
+    <?php endforeach; ?>
+
     .badge-premium { border: 1px solid #666 !important; color: #000 !important; background: transparent !important; }
     .d-print-none { display: none !important; }
-    
+
     /* Hide DataTables clutter */
     .dataTables_length, .dataTables_filter, .dataTables_info, .dataTables_paginate {
         display: none !important;

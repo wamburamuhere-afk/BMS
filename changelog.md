@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-07-11 (fix) — Invoices list: portrait print columns, stat cards, and boxed table on print
+
+**File:** `app/bms/invoice/invoices.php`
+
+- **Columns too thin in Portrait print:** the print table used `table-layout:auto` with no
+  explicit widths, so Portrait's narrower page squeezed columns unevenly. Rebuilt with the same
+  portrait-safe recipe used on `inactive_employees.php`/`suppliers.php`: `table-layout:fixed`,
+  8pt type, tight padding, forced word-wrap, and percentage column widths (summing to 100%,
+  computed per-column in PHP so they still add up whether the Project column is on or off) that
+  adapt to Portrait and Landscape alike.
+- **Statistic cards dropped to 2-per-row on print:** the 4 cards used `col-6 col-md-3`, so a
+  Portrait page narrower than the `md` breakpoint wrapped them to 2 rows. Added a print-only rule
+  forcing all 4 to a fixed 25% width so they always render as one row.
+- **Table boxed/clipped on print:** the table sits inside a page-specific `.main-card` (rounded
+  corners, drop-shadow, `overflow:hidden`) that the shared print reset doesn't touch (it only
+  targets Bootstrap's plain `.card`). Flattened `.main-card` for print (no border/shadow/radius,
+  `overflow:visible`) and zeroed the `.invoice-dashboard` print padding, matching the plain look
+  other report pages already have.
+- **Removed the "Prepared By / Management Review / Authorised Signature" signature block**
+  (print-only footer with 3 signature lines) — not wanted on this report.
+
+Verified live at simulated Portrait width (dev.bms.local/invoices): all 4 stat cards stay in one
+row, table columns render readable without clipping or squeezing, and the boxed/shadowed wrapper
+around the table is gone.
+
+---
+
 ## 2026-07-10 (fix) — Double print header on Projects list
 
 **File:** `app/bms/operations/projects.php`
