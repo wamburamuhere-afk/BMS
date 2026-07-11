@@ -54,8 +54,18 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 @media print {
     .print-footer { display: flex !important; }
 
-    @page { size: auto; margin: 10mm 10mm 15mm 10mm; }
+    /* size:auto lets the user pick Portrait or Landscape; the table below is
+       built with percentage widths so it fits either without clipping. */
+    @page { size: auto; margin: 10mm 8mm 15mm 8mm; }
     body { padding-top: 0 !important; margin-top: 0 !important; background: #fff !important; }
+
+    /* Keep the shared company header compact so it doesn't dominate a portrait page */
+    .bms-print-header img { max-height: 50px !important; }
+    .bms-print-header .bph-company { font-size: 18pt !important; }
+
+    /* Nothing may overflow the paper width */
+    html, body, .container-fluid { max-width: 100% !important; overflow-x: hidden !important; }
+    .container-fluid { padding-left: 0 !important; padding-right: 0 !important; }
 
     /* Hide on-screen chrome so only the report prints */
     .navbar, .breadcrumb, .btn, .dropdown, .d-print-none,
@@ -64,6 +74,74 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 
     #tableView { display: block !important; padding: 0 !important; width: 100% !important; }
     #cardView { display: none !important; }
+
+    /* The .table-responsive wrapper scrolls on screen; on paper it must not be a
+       scroll box, or the table is clipped and the scrollbar itself gets printed.
+       (Any leftover DataTables scroll wrappers are neutralised too, defensively.) */
+    #tableView, .table-responsive,
+    .dataTables_scroll, .dataTables_scrollHead, .dataTables_scrollBody,
+    .dataTables_scrollHeadInner, .dataTables_wrapper {
+        overflow: visible !important;
+        overflow-x: visible !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        max-height: none !important;
+        border: 0 !important;
+    }
+
+    /* Sorting arrows are meaningless on paper */
+    #inactiveTable thead th::before,
+    #inactiveTable thead th::after { display: none !important; }
+
+    /* table-layout:fixed + percentage widths is what makes the 8 columns fit
+       PORTRAIT as well as landscape: 'auto' lets long text (e.g. "Human
+       Resources Department") push columns off the right edge of the paper. */
+    #inactiveTable {
+        width: 100% !important;
+        max-width: 100% !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+        font-size: 7.5pt !important;
+    }
+    #inactiveTable th, #inactiveTable td {
+        border: 1px solid #ccc !important;
+        padding: 4px 3px !important;
+        white-space: normal !important;   /* wrap instead of clipping */
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        overflow: visible !important;
+        vertical-align: middle !important;
+        /* DataTables may write inline pixel widths on cells — neutralise them
+           so the percentage column widths below actually apply. */
+        min-width: 0 !important;
+        max-width: none !important;
+    }
+    #inactiveTable thead th {
+        text-transform: uppercase !important;
+        font-weight: bold !important;
+        background-color: #f2f2f2 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Percentage widths so the layout adapts to Portrait *and* Landscape.
+       8 printed columns (Actions is excluded from print) = 100%. */
+    #inactiveTable th:nth-child(1), #inactiveTable td:nth-child(1) { width: 9%  !important; } /* Employee #     */
+    #inactiveTable th:nth-child(2), #inactiveTable td:nth-child(2) { width: 15% !important; } /* Name           */
+    #inactiveTable th:nth-child(3), #inactiveTable td:nth-child(3) { width: 16% !important; } /* Department     */
+    #inactiveTable th:nth-child(4), #inactiveTable td:nth-child(4) { width: 16% !important; } /* Designation    */
+    #inactiveTable th:nth-child(5), #inactiveTable td:nth-child(5) { width: 10% !important; } /* Reason         */
+    #inactiveTable th:nth-child(6), #inactiveTable td:nth-child(6) { width: 12% !important; } /* Note           */
+    #inactiveTable th:nth-child(7), #inactiveTable td:nth-child(7) { width: 11% !important; } /* Inactivated By */
+    #inactiveTable th:nth-child(8), #inactiveTable td:nth-child(8) { width: 11% !important; } /* Inactivated On */
+
+    /* Badge must not force a column wider than its share */
+    #inactiveTable td .badge {
+        font-size: 6.5pt !important;
+        padding: 2px 4px !important;
+        white-space: normal !important;
+    }
 
     /* Buffer row repeats on every page so the fixed footer never overlaps content */
     .ie-print-buf { display: table-footer-group !important; }
@@ -75,9 +153,21 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
     }
     .badge { white-space: normal !important; display: inline-block !important; word-break: break-word !important; }
 
-    /* Report title block under the shared company header.
-       (bph-* classes are used but unstyled elsewhere in the app — styled here.) */
-    .ie-report-head { text-align: center; margin-bottom: 6mm; }
+    /* Summary card: centre it and keep its tint on paper (it prints as a
+       narrow left-hugging box otherwise, because of the Bootstrap grid). */
+    #print-stats-cards { justify-content: center !important; margin-bottom: 5mm !important; }
+    #print-stats-cards > [class*="col-"] { flex: 0 0 auto !important; max-width: 60mm !important; }
+    #print-stats-cards .card {
+        border: 1px solid #b6ccfe !important;
+        background: #e7f0ff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Report title block under the shared (global) company header.
+       (bph-* classes are used but unstyled elsewhere in the app — styled here.)
+       Forced visible: Bootstrap's .d-none otherwise wins over .d-print-block. */
+    .ie-report-head { display: block !important; text-align: center; margin-bottom: 6mm; }
     .ie-report-head .bph-title {
         font-size: 14pt; font-weight: 700; text-transform: uppercase;
         letter-spacing: 1px; color: #495057; margin: 2px 0;
@@ -92,9 +182,10 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 
 <div class="container-fluid mt-4">
     <?php
-        // Standardised company header (logo + name) from Admin > Company Profile.
-        // Single source: renderPrintHeader() in roots.php — never hardcoded here.
-        renderPrintHeader();
+        // NOTE: the company header (logo + name) is rendered GLOBALLY by header.php,
+        // which already calls renderPrintHeader() for every page. Do NOT call it
+        // again here — doing so prints the logo and company name twice.
+        // Only the report-specific title block belongs on this page.
     ?>
     <div class="ie-report-head d-none d-print-block">
         <h2 class="bph-title">Inactive Employees Report</h2>
@@ -146,8 +237,8 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
         </div>
     </div>
 
-    <div id="tableView">
-        <table id="inactiveTable" class="table table-hover align-middle w-100">
+    <div id="tableView" class="table-responsive">
+        <table id="inactiveTable" class="table table-hover align-middle" style="width: 100% !important;">
             <thead class="table-light">
                 <tr>
                     <th>Employee #</th>
@@ -211,8 +302,11 @@ require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 $(document).ready(function () {
     if (!$.fn.DataTable.isDataTable('#inactiveTable')) {
         $('#inactiveTable').DataTable({
+            // NOTE: no scrollX. scrollX:true splits the grid into two tables inside
+            // an overflow-x box, which prints as a clipped table with a scrollbar on
+            // the paper. The .table-responsive wrapper scrolls on screen instead and
+            // simply disappears in print — this is what suppliers.php does.
             responsive: false,
-            scrollX: true,
             pageLength: 25,
             order: [[7, 'desc']],
             dom: 'rtipB',
