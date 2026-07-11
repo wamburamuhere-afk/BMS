@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-07-10 (fix) — Double print header on Projects list
+
+**File:** `app/bms/operations/projects.php`
+
+- **Duplicate company logo + name on print:** the page rendered its own logo + company name on
+  print, on top of the global `renderPrintHeader()` (already called from `header.php` on every
+  page) → logo/name appeared twice. Removed the in-file logo+name block; kept the page-specific
+  "PROJECT MANAGEMENT LIST REPORT" sub-header and "Generated on" line.
+- Removed the now-unused `$company_name` / `$company_logo` variables that only fed that block.
+
+---
+
 ## 2026-07-10 (fix) — Global print layout: kill "large gap / push to next page" and "extra blank page" across the app
 
 **File touched:** `assets/css/responsive.css` only (globally-loaded print stylesheet). Pure additions —
