@@ -264,15 +264,59 @@ if (!empty($_SESSION['scope']['is_admin'])) {
         </div>
     </div>
 
+    <!-- Actions Section -->
+    <div class="row mb-4 d-print-none">
+        <div class="col-12">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="d-flex flex-wrap align-items-center gap-2 flex-grow-1">
+                    <!-- Action Buttons -->
+                    <div class="d-flex flex-wrap shadow-sm bg-white" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
+                        <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="copyTable()" style="background: #fff; height: 38px;">
+                            <i class="bi bi-clipboard text-info me-1"></i> Copy
+                        </button>
+                        <div class="bg-light d-none d-sm-block" style="width: 1px; height: 38px;"></div>
+                        <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="exportSC()" style="background: #fff; height: 38px;">
+                            <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> CSV
+                        </button>
+                        <div class="bg-light d-none d-sm-block" style="width: 1px; height: 38px;"></div>
+                        <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="printTable()" style="background: #fff; height: 38px;">
+                            <i class="bi bi-printer text-primary me-1"></i> Print
+                        </button>
+                    </div>
+
+                    <!-- Toolbar -->
+                    <div class="d-flex align-items-center gap-2 flex-grow-1">
+                        <div class="d-flex align-items-center bg-white shadow-sm px-2 py-1" style="border: 1px solid #dee2e6; border-radius: 8px; height: 38px;">
+                            <span class="small text-muted me-2 text-nowrap">Show:</span>
+                            <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 45px; background: transparent;" onchange="$('#scTable').DataTable().page.len(this.value).draw();">
+                                <option value="10">10</option>
+                                <option value="25" selected>25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="-1">All</option>
+                            </select>
+                        </div>
+                        <div class="input-group input-group-sm shadow-sm flex-grow-1" style="border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6; height: 38px; min-width: 150px; max-width: 350px;">
+                            <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
+                            <input type="text" class="form-control border-0" id="searchSC" placeholder="Search sub-contractors..." onkeyup="$('#scTable').DataTable().search(this.value).draw();">
+                        </div>
+                    </div>
+                </div>
+                <div class="d-none d-xl-block">
+                    <span class="badge bg-success-soft text-success border border-success px-3 py-2 rounded-pill shadow-sm">
+                        <i class="bi bi-check-circle-fill me-1"></i> <?= $total_sc ?> records
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Record Section -->
     <div class="row">
         <div class="col-12">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <div class="d-flex gap-2 d-print-none">
-                        <button class="btn btn-outline-info btn-sm" onclick="printTable()"><i class="bi bi-printer"></i> Print</button>
-                        <button class="btn btn-outline-success btn-sm" onclick="exportSC()"><i class="bi bi-file-earmark-spreadsheet"></i> Export</button>
-                    </div>
+                    <h5 class="mb-0 fw-bold text-dark d-print-none">Sub-Contractor Records</h5>
                     <div class="btn-group shadow-sm d-none d-md-flex" role="group">
                         <button type="button" class="btn btn-primary btn-sm border" onclick="toggleSCView('table')" id="sc-btn-table" title="Table View"><i class="bi bi-table"></i></button>
                         <button type="button" class="btn btn-light btn-sm border" onclick="toggleSCView('card')" id="sc-btn-card" title="Card View"><i class="bi bi-grid"></i></button>
@@ -910,9 +954,11 @@ if (!empty($_SESSION['scope']['is_admin'])) {
 let addLocationCascade, editLocationCascade;
 $(document).ready(function() {
     $('#scTable').DataTable({
+        responsive: false,
         pageLength: 25,
-        responsive: true,
-        dom: 'rtip'
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
+        dom: 'rtip',
+        language: { emptyTable: 'No records found.', zeroRecords: 'No matching records.' }
     });
 
     // Location cascade (OOP location engine): defined dropdowns for Tanzania,
@@ -1319,10 +1365,47 @@ function updateStatusSC(id, status) {
     });
 }
 
-function printTable() { window.print(); }
+function printTable() {
+    logReportAction('Printed Sub-Contractors List', 'User printed the sub-contractors list');
+    const table = $('#scTable').DataTable();
+    const originalLength = table.page.len();
+    // Show every row before printing — DataTables only keeps the current page's
+    // rows in the DOM, so printing without this would silently cut off the rest.
+    table.page.len(-1).draw(false);
+    setTimeout(function() {
+        window.print();
+        table.page.len(originalLength).draw(false);
+    }, 100);
+}
+
+function copyTable() {
+    const table = document.getElementById('scTable');
+    const range = document.createRange();
+    range.selectNode(table);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    document.execCommand('copy');
+    window.getSelection().removeAllRanges();
+    logReportAction('Copied Sub-Contractors List', 'User copied sub-contractors list to clipboard');
+    Swal.fire({ icon: 'success', title: 'Copied!', text: 'Table data copied to clipboard', timer: 1500, showConfirmButton: false });
+}
+
 function exportSC() {
-    // Simple alert for now, can implement CSV export if needed
-    Swal.fire('Info', 'CSV Export will be available soon', 'info');
+    const table = document.getElementById('scTable');
+    const rows = Array.from(table.querySelectorAll('tr'));
+    const csvContent = rows.map(row => {
+        const cols = Array.from(row.querySelectorAll('th, td')).slice(0, -1); // Exclude Actions
+        return cols.map(col => `"${col.innerText.replace(/"/g, '""')}"`).join(',');
+    }).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', 'SubContractors.csv');
+    document.body.appendChild(link);
+    logReportAction('Exported Sub-Contractors', 'User exported sub-contractors list to CSV');
+    link.click();
+    document.body.removeChild(link);
 }
 </script>
 
@@ -1353,6 +1436,76 @@ function exportSC() {
 .bg-primary-soft { background-color: rgba(13, 110, 253, 0.1); }
 @media (max-width: 767px) {
     .navbar, .page-top-navbar { position: sticky; top: 0; z-index: 1020; }
+}
+
+@media print {
+    /* size:auto keeps the user's Portrait/Landscape choice; the widths below
+       adapt via percentages so neither orientation clips or squeezes. */
+    @page { size: auto; }
+
+    /* Whichever view the user left on screen, print always shows the table —
+       the un-print-friendly stacked cards were a likely cause of odd print
+       layouts when Card View was left active. */
+    #scCardGrid { display: none !important; }
+    #tableView { display: block !important; }
+
+    /* .table-responsive scrolls horizontally on screen; on paper it must not
+       clip the table. */
+    #tableView, .table-responsive {
+        overflow: visible !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* Sorting arrows are meaningless on paper */
+    #scTable thead th::before, #scTable thead th::after { display: none !important; }
+
+    /* ─── Statistic cards always one row, Portrait or Landscape ───
+       col-6 col-lg-3 drops to 2-per-row below the lg breakpoint, which both
+       Portrait and Landscape print widths are narrower than. */
+    #print-stats-cards { flex-wrap: nowrap !important; }
+    #print-stats-cards > div {
+        flex: 0 0 25% !important;
+        max-width: 25% !important;
+        width: 25% !important;
+        padding-left: 4px !important;
+        padding-right: 4px !important;
+    }
+    #print-stats-cards .card-body { padding: 6px !important; }
+    #print-stats-cards h4 { font-size: 9pt !important; }
+    #print-stats-cards p { font-size: 6.5pt !important; }
+
+    /* ─── Portrait-safe table: fixed layout + percentage widths ───
+       table-layout:auto let long values (address, contact info) push columns
+       past the paper edge in Portrait. Fixed layout + widths summing to 100%
+       adapt to both orientations. */
+    #scTable {
+        width: 100% !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+        font-size: 8pt !important;
+    }
+    #scTable th, #scTable td {
+        border: 1px solid #dee2e6 !important;
+        padding: 4px 5px !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        vertical-align: middle !important;
+    }
+    #scTable th { background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; }
+    #scTable td .badge { font-size: 6.5pt !important; }
+
+    /* Printed columns: S/NO, Code, Name, Contact Info, Address, Category,
+       Projects, Status (Actions is excluded from print via d-print-none). */
+    #scTable th:nth-child(1), #scTable td:nth-child(1) { width: 5%  !important; }
+    #scTable th:nth-child(2), #scTable td:nth-child(2) { width: 10% !important; }
+    #scTable th:nth-child(3), #scTable td:nth-child(3) { width: 14% !important; }
+    #scTable th:nth-child(4), #scTable td:nth-child(4) { width: 16% !important; }
+    #scTable th:nth-child(5), #scTable td:nth-child(5) { width: 15% !important; }
+    #scTable th:nth-child(6), #scTable td:nth-child(6) { width: 10% !important; }
+    #scTable th:nth-child(7), #scTable td:nth-child(7) { width: 15% !important; }
+    #scTable th:nth-child(8), #scTable td:nth-child(8) { width: 15% !important; }
 }
 </style>
 
