@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-07-11 (fix) — Purchase Orders: print page 1, oversized font, header wrapping
+
+**File:** `app/bms/purchase/purchase_orders.php`
+
+- **First page showed no data:** same shared-rule cause fixed across every list/report page today
+  — `.card { page-break-inside: avoid }` in the global stylesheet pushed the whole table card to
+  page 2 once it grew tall with many orders. Added the same `.print-flow-card` marker + scoped
+  override.
+- **Font too large / headers fragmenting** ("SUPPLIER" → "SUPPLIE"/"R"): this page had **no
+  table-layout or column sizing for print at all**, so the table inherited the full body
+  font-size. Added the same recipe proven on `invoices.php`/`suppliers.php`/`services.php`:
+  `table-layout: fixed` with a compact 8pt/7pt font (matching `print-customers.php`'s density)
+  and explicit per-column percentages — computed for both the with-Project and without-Project
+  column layouts (`$enable_projects`), flexible in both Portrait and Landscape since they're plain
+  percentages, not fixed pixels. Money (`text-end`) and S/NO forced to `nowrap`; Status badges
+  forced to wrap instead of overflowing.
+
+Verified live: `getComputedStyle(card).pageBreakInside` confirmed `auto`; all 7 headers render on
+one line; an automated per-row column-overlap check across all visible rows found zero overlaps.
+
+---
+
 ## 2026-07-11 (fix) — Petty Cash: not a DataTable — print page 1, headers, incomplete data
 
 **File:** `app/constant/accounts/petty_cash.php`
