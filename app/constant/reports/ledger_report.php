@@ -416,10 +416,10 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
                                     <?= htmlspecialchars((string)($e['description'] ?? '-')) ?>
                                 </td>
                                 <td class="text-end font-monospace py-1" style="font-size: 0.88rem;">
-                                    <?= $e['type'] === 'debit' ? format_currency($e['amount']) : '<span class="text-muted">—</span>' ?>
+                                    <?= $e['type'] === 'debit' ? number_format((float)$e['amount'], 2) : '<span class="text-muted">—</span>' ?>
                                 </td>
                                 <td class="text-end font-monospace py-1" style="font-size: 0.88rem;">
-                                    <?= $e['type'] === 'credit' ? format_currency($e['amount']) : '<span class="text-muted">—</span>' ?>
+                                    <?= $e['type'] === 'credit' ? number_format((float)$e['amount'], 2) : '<span class="text-muted">—</span>' ?>
                                 </td>
                                 <td class="text-end pe-4 font-monospace py-1" style="font-size: 0.88rem;">
                                     <?= htmlspecialchars(gl_balance_label($running_balance, $normalSide)) ?>
@@ -435,8 +435,8 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
                             <td class="py-2"></td>
                             <td class="py-2"></td>
                             <td class="py-2"></td>
-                            <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= format_currency($total_debit) ?></td>
-                            <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= format_currency($total_credit) ?></td>
+                            <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= number_format($total_debit, 2) ?></td>
+                            <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= number_format($total_credit, 2) ?></td>
                             <td class="text-end pe-4 py-2 font-monospace" style="font-size: 0.95rem;">
                                 <?= htmlspecialchars(gl_balance_label($closing_balance, $normalSide)) ?>
                             </td>
@@ -486,8 +486,8 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
                                 </td>
                                 <td class="text-muted py-1" style="font-size: 0.78rem;"><?= htmlspecialchars((string)($r['category'] ?? '—')) ?></td>
                                 <td class="text-end font-monospace py-1" style="font-size: 0.85rem;"><?= htmlspecialchars(gl_balance_label((float)$r['opening'], $side)) ?></td>
-                                <td class="text-end font-monospace py-1" style="font-size: 0.85rem;"><?= format_currency((float)$r['dr']) ?></td>
-                                <td class="text-end font-monospace py-1" style="font-size: 0.85rem;"><?= format_currency((float)$r['cr']) ?></td>
+                                <td class="text-end font-monospace py-1" style="font-size: 0.85rem;"><?= number_format((float)$r['dr'], 2) ?></td>
+                                <td class="text-end font-monospace py-1" style="font-size: 0.85rem;"><?= number_format((float)$r['cr'], 2) ?></td>
                                 <td class="text-end pe-4 font-monospace fw-semibold py-1" style="font-size: 0.88rem;"><?= htmlspecialchars(gl_balance_label($closing, $side)) ?></td>
                             </tr>
                         <?php endforeach; endif; ?>
@@ -500,9 +500,9 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
                             <td class="py-2"></td>
                             <td class="py-2"></td>
                             <td class="py-2"></td>
-                            <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= format_currency($total_debit) ?></td>
-                            <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= format_currency($total_credit) ?></td>
-                            <td class="text-end pe-4 py-2 font-monospace" style="font-size: 0.9rem;"><?= format_currency($net_change) ?></td>
+                            <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= number_format($total_debit, 2) ?></td>
+                            <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= number_format($total_credit, 2) ?></td>
+                            <td class="text-end pe-4 py-2 font-monospace" style="font-size: 0.9rem;"><?= number_format($net_change, 2) ?></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -649,26 +649,42 @@ function exportCSV() {
             word-wrap: break-word !important;
             width: auto !important;
         }
-        #ledgerTable th:nth-child(1), #ledgerTable td:nth-child(1) { width: 10% !important; }
-        #ledgerTable th:nth-child(2), #ledgerTable td:nth-child(2) { width: 16% !important; }
-        #ledgerTable th:nth-child(3), #ledgerTable td:nth-child(3) { width: 10% !important; }
-        #ledgerTable th:nth-child(4), #ledgerTable td:nth-child(4) { width: 24% !important; }
-        #ledgerTable th:nth-child(5), #ledgerTable td:nth-child(5) { width: 14% !important; }
-        #ledgerTable th:nth-child(6), #ledgerTable td:nth-child(6) { width: 13% !important; }
-        #ledgerTable th:nth-child(7), #ledgerTable td:nth-child(7) { width: 13% !important; }
+        /* Every data/footer cell carries its own inline font-size (0.78rem-1.0rem,
+           set on screen for visual hierarchy) — an inline style wins over a
+           plain ancestor rule, so the #ledgerTable font-size above never
+           actually reached these cells. That mismatch, combined with real
+           balances running into the billions, is what let amounts overflow
+           their column and visually spill into the next one. Target the
+           cells directly with !important (which DOES beat a non-important
+           inline style) and size money cells smaller still. */
+        #ledgerTable tbody td, #ledgerTable tfoot td {
+            font-size: 7.5pt !important;
+        }
+        #ledgerTable th:nth-child(1), #ledgerTable td:nth-child(1) { width: 8%  !important; }
+        #ledgerTable th:nth-child(2), #ledgerTable td:nth-child(2) { width: 12% !important; }
+        #ledgerTable th:nth-child(3), #ledgerTable td:nth-child(3) { width: 8%  !important; }
+        #ledgerTable th:nth-child(4), #ledgerTable td:nth-child(4) { width: 19% !important; }
+        #ledgerTable th:nth-child(5), #ledgerTable td:nth-child(5) { width: 18% !important; }
+        #ledgerTable th:nth-child(6), #ledgerTable td:nth-child(6) { width: 17% !important; }
+        #ledgerTable th:nth-child(7), #ledgerTable td:nth-child(7) { width: 18% !important; }
 
-        /* Money columns must never wrap onto a second line. Debit/Credit/
-           Balance are columns 5-7 in BOTH table variants; the "no account
-           selected" summary view also has a money value (Opening) in column
-           4, where the detail view has free-flowing Description text — so
-           that one column's nowrap rule is scoped to .gl-table-summary only. */
+        /* Money columns must never wrap onto a second line, and get the
+           smallest print font of all so genuinely large balances (billions,
+           plus the " Dr"/" Cr" suffix on Balance/Closing) still fit inside
+           their column instead of overflowing into the next one. Debit/
+           Credit/Balance are columns 5-7 in BOTH table variants; the "no
+           account selected" summary view also has a money value (Opening) in
+           column 4, where the detail view has free-flowing Description text
+           — so that one column's rules are scoped to .gl-table-summary only. */
         #ledgerTable td:nth-child(5),
         #ledgerTable td:nth-child(6),
         #ledgerTable td:nth-child(7) {
             white-space: nowrap !important;
+            font-size: 7pt !important;
         }
         #ledgerTable.gl-table-summary td:nth-child(4) {
             white-space: nowrap !important;
+            font-size: 7pt !important;
         }
 
         /* tfoot defaults to display:table-footer-group, which browsers

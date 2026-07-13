@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-07-13 (fix) — Ledger Report: money cells still bled into the next column on print
+
+**File:** `app/constant/reports/ledger_report.php`
+
+Follow-up to the same day's DataTable conversion — the digit-wrap fix wasn't actually taking effect:
+- **Root cause #1:** every Debit/Credit cell used `format_currency()`, which prepends a `"TSh "`
+  currency prefix — 4 extra characters on top of an already-tight column. Every other financial
+  report on this site (Cash Flow, Trial Balance, Balance Sheet) uses plain `number_format()` in its
+  dense grid for exactly this reason, reserving the currency prefix for standalone summary cards.
+  Switched every grid cell (body + both `tfoot` rows, both table variants) to `number_format()`;
+  left the 4 standalone summary cards untouched.
+- **Root cause #2:** the print CSS only set `font-size` on the `<table>` element and the `<thead>`
+  — every body/footer `<td>` carries its own inline `style="font-size:0.78rem-1.0rem"` (set for
+  on-screen visual hierarchy), and a plain ancestor rule can't beat an inline style. So cells were
+  actually rendering at their full on-screen font size on print, not the intended 8pt. Added
+  `!important` rules targeting `#ledgerTable tbody td` / `tfoot td` directly (which does beat a
+  non-important inline style), with money columns sized smaller still (7pt) since real balances run
+  into the billions and the Balance/Closing columns also carry a " Dr"/" Cr" suffix.
+- Rebalanced column widths to give the three money columns more room (16-18% each, up from 13-14%),
+  trimmed from the identifier columns (Date/Reference/Source or Code/Type).
+- Verified live via simulated print media across both table variants (summary + single-account
+  detail, all rows expanded): 0 of 161 cells overflow their column on the summary view (the one
+  flagged cell was a text label correctly wrapping within its own row height, not digits bleeding
+  into a neighbor), 0 of 12 money cells overflow on the detail view.
+
 ## 2026-07-13 (fix) — Create Document: duplicate document_code crash on save
 
 **File:** `api/document/save_created_document.php`
