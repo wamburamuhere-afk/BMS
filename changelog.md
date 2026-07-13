@@ -1,5 +1,66 @@
 # BMS Changelog
 
+## 2026-07-13 (fix) — Expenses: date off-by-one, project-expense modal broken save, missing Expense Type list
+
+**Files:** `app/constant/accounts/expenses.php`, `app/bms/operations/project_view.php`
+
+Four related bugs found while verifying the invoice/payroll pull-through removal (previous entry):
+
+- **Date off-by-one in the Expenses list/mobile-cards/print voucher:** `expense_date` is stored
+  correctly (verified in the DB — e.g. a record saved "today" shows `2026-07-13`), but the display
+  code did `new Date("2026-07-13")`, which JS parses as UTC midnight and then renders in the
+  browser's local timezone — shifting the displayed date back a day depending on the viewer's
+  timezone. `app/bms/operations/project_view.php`'s own `formatDate()` already had the correct fix
+  (append `T00:00:00` to force local-time parsing); applied the same pattern to the 3 spots in
+  `expenses.php` that lacked it (mobile card date, DataTable date column, print-voucher date).
+- **Project's own "Record Project Expense" / "Edit Expense Detail" modals (Projects › Project
+  Details › Finance › Expense tab) could never actually save:** neither modal collected a "Paid
+  From" (`bank_account_id`) field, but `api/account/add_expense.php` / `update_expense.php` both
+  unconditionally reject the request without one. Added the same required "Paid From" cash/bank
+  account dropdown used on the main Expenses page to both modals (pre-filled from the existing
+  record on Edit).
+- **Same invoice/payroll pull-through mechanism duplicated in the project modals** — removed it
+  there too (Invoice Reference / Payroll Reference blocks, the auto-fill-amount handlers, and the
+  `_projPendingInvoiceId`/`_projPendingPayrollId` edit-prefill), keeping the existing all-supplier/
+  all-employee/all-sub-contractor "Paid To" picker and a plain manually-entered Amount, consistent
+  with the main Expenses page.
+- **"Expense Type (optional)" never populated on the project page:** `loadExpenseSchema()` — the
+  function that fetches expense types and fills the `.expense-type-sel` dropdowns — was defined in
+  `project_view.php` but never called anywhere, so the select stayed stuck on the empty placeholder.
+  Added the missing call alongside the existing `loadProjectDetails()` call on page load.
+
+**Found while browser-testing the above before merge:** the new "Paid From" dropdowns were built
+from this file's pre-existing (unused) `$bank_accounts` query, which filters `account_type_id`
+against `%Asset%` — far broader than actual cash/bank accounts, so e.g. "Accumulated Depreciation"
+showed up as a payable-from account. Switched both dropdowns to the canonical `cashBankAccounts($pdo)`
+helper (same one the main Expenses page uses), which correctly restricts to leaf asset accounts
+flagged `is_bank` or `cash_flow_category = 'cash'`. Verified live: created a project expense end to
+end (Paid From, Expense Type, manual Amount, no invoice/payroll fields), confirmed it saved and
+appears in the project's Expense tab and the DB with the right `project_id`/`bank_account_id`,
+edited it, and confirmed the update persisted — then removed the test record.
+
+## 2026-07-13 (change) — Expenses: removed invoice/payroll pull-through from Add/Edit modal
+
+**File:** `app/constant/accounts/expenses.php`
+
+The "Paid to" section let a user pick Supplier/Staff/Sub-Contractor and then pull in that
+payee's **approved Invoice** or **unpaid Payroll** record, auto-filling the expense amount from
+its remaining balance. Per user direction, this conflated two different mechanisms: an ad-hoc
+company expense payment (e.g. reimbursing a supplier or paying an employee's transport) is not
+the same process as settling an invoice or processing payroll, and must not reach into those
+systems.
+
+- Removed the "Invoice Reference (Approved)" and "Payroll Reference (Unpaid)" blocks and their
+  `d-none` toggle wiring.
+- Removed the JS that called `api/account/get_payee_invoices.php` /
+  `api/account/get_employee_payrolls.php` on payee selection, the amount auto-fill/cap handlers
+  tied to those selections, and the `_pendingInvoiceId`/`_pendingPayrollId` edit-prefill logic.
+- Kept the existing "Paid to" payee dropdown as-is (all active suppliers / employees /
+  sub-contractors, searchable) for all three payee types.
+- `Amount` is now always a plain manually-entered field regardless of payee type.
+- Backend (`api/account/add_expense.php`, `update_expense.php`) untouched — `invoice_id`/
+  `payroll_id` remain optional nullable columns; the form simply no longer sends them.
+
 ## 2026-07-13 (fix) — Ledger Report: money cells still bled into the next column on print
 
 **File:** `app/constant/reports/ledger_report.php`
