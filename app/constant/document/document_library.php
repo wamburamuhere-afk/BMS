@@ -214,6 +214,9 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                         </div>
                         <div class="d-flex gap-2">
                             <?php if (canCreate('documents')): ?>
+                            <a href="<?= getUrl('create_document') ?>" class="btn btn-outline-primary shadow-sm px-4">
+                                <i class="bi bi-file-earmark-plus me-1"></i> Create Document
+                            </a>
                             <button type="button" class="btn btn-primary shadow-sm px-4" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal">
                                 <i class="bi bi-cloud-upload me-1"></i> Upload Document
                             </button>

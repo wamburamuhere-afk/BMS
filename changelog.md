@@ -1,5 +1,60 @@
 # BMS Changelog
 
+## 2026-07-13 (feat) — Create Document (Phase 1): write letters/memos in-app, hand off to existing e-signature wizard
+
+**New files:**
+- `app/constant/document/create_document.php` — A4-styled letter editor (Summernote rich-text body; auto
+  letterhead from company logo/name; auto sequential reference number via `nextCode($pdo, 'LTR')`,
+  e.g. `BFS-LTR-0001`; Recipient/Date/Category/Subject fields). Buttons: Save Draft, Save & Print,
+  Save & Sign.
+- `api/document/save_created_document.php` — persists the letter. Every save (draft or final) renders
+  the letter to a real PDF client-side (html2pdf.js) and uploads it, so a created document behaves
+  exactly like any other row in `documents` (previewable, downloadable, pickable from the existing
+  signing wizard) while `content` keeps the raw editable HTML so a draft can be reopened. The reference
+  code is allocated once, on first save, and reused on every re-save of the same letter.
+- `migrations/2026_07_13_documents_create_document.php` — adds `documents.content` (LONGTEXT) and
+  `documents.document_code` (VARCHAR(50) UNIQUE), both nullable; existing uploaded-file rows unaffected.
+
+**Design decision — no signer-selection step:** the boss's requirement was confirmed as one signature
+per document, always the creator's own (already-registered) signature from the existing e-signature
+module (`user_signatures` / `e_signatures.php`). "Save & Sign" hands straight into the existing,
+already-working `select_document_add_esignature.php` wizard (untouched — the user's fresh letter simply
+sorts to the top of its document list) rather than adding a new signer-picker.
+
+**Entry points added (both gated on the existing `canCreate('documents')` permission, no new
+permission key needed):**
+- Docs > Library — "Create Document" button, same row as "Upload Document" (`document_library.php`).
+- Project Details > Docs > Add Doc tab — "Create Document" button next to "Upload New Project
+  Document" (`project_view.php`); pre-links the new letter to the current project.
+
+**Stack decision (researched, no paid service):** Summernote (MIT-licensed jQuery/Bootstrap editor —
+avoids TinyMCE/CKEditor's GPL licensing risk in a commercial ERP) + html2pdf.js (already used
+elsewhere in this codebase, e.g. `cash_flow.php`) for the PDF, reusing the site's existing SHA-256
+hash-based signing/tamper-verification pipeline rather than a paid X.509 certificate service.
+
+**Three real bugs found and fixed during live verification (not caught by static review):**
+1. Summernote CDN pinned to `@0.8.18`, which does not ship a Bootstrap 5 build (`summernote-bs5.min.js`
+   only exists from `@0.9.1` onward) — the editor silently failed to initialize (`$(...).summernote is
+   not a function`). Fixed by pinning to `@0.9.1`.
+2. Re-saving an already-saved draft created a duplicate row and burned a second reference number
+   instead of updating in place — the `document_id` sent with each save was a PHP value baked in at
+   initial page load, never updated after the first save (only `history.replaceState` runs, no real
+   reload). Fixed by tracking it in a mutable JS variable (`currentDocumentId`) updated from the save
+   response.
+3. The "Back" link (when arriving from a project) used the wrong query param (`?project_id=`) for
+   `project_view.php`, which actually reads `?id=` — fixed.
+
+Verified live: editor loads and initializes cleanly; Save Draft creates a `source='created'` row with
+an allocated `document_code`, valid PDF (`%PDF-` header confirmed) written to `uploads/documents/`, and
+`content` populated; re-saving the same draft updates the existing row only (confirmed via direct DB
+query — one row, same code, `updated_at` refreshed, old PDF revision cleaned up); the new document
+appears correctly in the Document Library list; project-linking banner and Back-button both correct.
+
+**Not yet built (later phases, per the agreed plan):** QR code on the signed document linking to a
+public verification page; direct one-click hand-off into the signing wizard with the new document
+pre-selected (currently the user picks it from the top of the wizard's list — zero risk to the
+existing, working wizard).
+
 ## 2026-07-13 (feat/fix) — Ledger Report: converted to DataTable; fixed digit wrap, first-page blank, repeat-per-page totals
 
 **File:** `app/constant/reports/ledger_report.php`

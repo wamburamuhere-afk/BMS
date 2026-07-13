@@ -2697,8 +2697,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
                     <!-- Add Document Tab -->
                     <div class="tab-pane fade p-3 p-md-4" id="docs-add" role="tabpanel">
-                        <div class="mb-4">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-2">
                             <h5 class="fw-bold mb-0 text-center text-md-start text-primary"><i class="bi bi-cloud-upload me-2"></i>Upload New Project Document</h5>
+                            <a href="<?= getUrl('create_document') ?>?project_id=<?= (int)$project_id ?>" class="btn btn-outline-primary">
+                                <i class="bi bi-file-earmark-plus me-1"></i> Create Document
+                            </a>
                         </div>
                         <div class="card border-0 shadow-sm bg-light-soft" style="border-radius: 15px;">
                             <div class="card-body p-4">
