@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-07-13 (fix) — Expenses: date off-by-one, project-expense modal broken save, missing Expense Type list
+
+**Files:** `app/constant/accounts/expenses.php`, `app/bms/operations/project_view.php`
+
+Four related bugs found while verifying the invoice/payroll pull-through removal (previous entry):
+
+- **Date off-by-one in the Expenses list/mobile-cards/print voucher:** `expense_date` is stored
+  correctly (verified in the DB — e.g. a record saved "today" shows `2026-07-13`), but the display
+  code did `new Date("2026-07-13")`, which JS parses as UTC midnight and then renders in the
+  browser's local timezone — shifting the displayed date back a day depending on the viewer's
+  timezone. `app/bms/operations/project_view.php`'s own `formatDate()` already had the correct fix
+  (append `T00:00:00` to force local-time parsing); applied the same pattern to the 3 spots in
+  `expenses.php` that lacked it (mobile card date, DataTable date column, print-voucher date).
+- **Project's own "Record Project Expense" / "Edit Expense Detail" modals (Projects › Project
+  Details › Finance › Expense tab) could never actually save:** neither modal collected a "Paid
+  From" (`bank_account_id`) field, but `api/account/add_expense.php` / `update_expense.php` both
+  unconditionally reject the request without one. Added the same required "Paid From" cash/bank
+  account dropdown used on the main Expenses page to both modals (pre-filled from the existing
+  record on Edit).
+- **Same invoice/payroll pull-through mechanism duplicated in the project modals** — removed it
+  there too (Invoice Reference / Payroll Reference blocks, the auto-fill-amount handlers, and the
+  `_projPendingInvoiceId`/`_projPendingPayrollId` edit-prefill), keeping the existing all-supplier/
+  all-employee/all-sub-contractor "Paid To" picker and a plain manually-entered Amount, consistent
+  with the main Expenses page.
+- **"Expense Type (optional)" never populated on the project page:** `loadExpenseSchema()` — the
+  function that fetches expense types and fills the `.expense-type-sel` dropdowns — was defined in
+  `project_view.php` but never called anywhere, so the select stayed stuck on the empty placeholder.
+  Added the missing call alongside the existing `loadProjectDetails()` call on page load.
+
 ## 2026-07-13 (change) — Expenses: removed invoice/payroll pull-through from Add/Edit modal
 
 **File:** `app/constant/accounts/expenses.php`

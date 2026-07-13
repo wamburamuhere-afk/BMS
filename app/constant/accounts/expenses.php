@@ -639,7 +639,7 @@ $(document).ready(function() {
         const container = $('#mobile-expense-cards').empty().show();
         api.rows({ page: 'current' }).every(function() {
             const d = this.data();
-            const date = d.expense_date ? new Date(d.expense_date).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '-';
+            const date = d.expense_date ? new Date(d.expense_date.includes('T') ? d.expense_date : d.expense_date + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '-';
             const amount = typeof formatCurrency === 'function' ? formatCurrency(d.amount) : d.amount;
             const statusMap = { pending: 'warning', reviewed: 'primary', approved: 'success', paid: 'info', rejected: 'danger' };
             const statusBadge = `<span class="badge bg-${statusMap[d.status] || 'secondary'}">${(d.status||'').charAt(0).toUpperCase()+(d.status||'').slice(1)}</span>`;
@@ -727,7 +727,7 @@ $(document).ready(function() {
             { 
                 data: 'expense_date',
                 width: '110px',
-                render: data => `${new Date(data).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}`
+                render: data => `${new Date(data.includes('T') ? data : data + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}`
             },
             {
                 data: 'description',
@@ -1668,7 +1668,7 @@ function printVoucher(id) {
         const amtWords = numToWords(amount) + ' Only';
         const fmtAmt   = amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const voucherNo = 'PV-' + String(d.expense_id).padStart(5, '0');
-        const date = d.expense_date ? new Date(d.expense_date).toLocaleDateString('en-US', { day:'2-digit', month:'long', year:'numeric' }) : '-';
+        const date = d.expense_date ? new Date(d.expense_date.includes('T') ? d.expense_date : d.expense_date + 'T00:00:00').toLocaleDateString('en-US', { day:'2-digit', month:'long', year:'numeric' }) : '-';
         const paidTo = d.paid_to_name || d.vendor || '-';
         const printedBy = '<?= htmlspecialchars(($_SESSION["first_name"] ?? "") . " " . ($_SESSION["last_name"] ?? "")) ?>';
         const printedRole = '<?= htmlspecialchars($_SESSION["user_role"] ?? "User") ?>';
