@@ -214,6 +214,9 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
                         </div>
                         <div class="d-flex gap-2">
                             <?php if (canCreate('documents')): ?>
+                            <a href="<?= getUrl('create_document') ?>" class="btn btn-outline-primary shadow-sm px-4">
+                                <i class="bi bi-file-earmark-plus me-1"></i> Create Document
+                            </a>
                             <button type="button" class="btn btn-primary shadow-sm px-4" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal">
                                 <i class="bi bi-cloud-upload me-1"></i> Upload Document
                             </button>
@@ -521,7 +524,10 @@ $(document).ready(function() {
 
     const userPermissions = {
         canEdit: <?= canEdit('documents') ? 'true' : 'false' ?>,
-        canDelete: <?= canDelete('documents') ? 'true' : 'false' ?>
+        canCreate: <?= canCreate('documents') ? 'true' : 'false' ?>,
+        canDelete: <?= canDelete('documents') ? 'true' : 'false' ?>,
+        isAdmin: <?= isAdmin() ? 'true' : 'false' ?>,
+        currentUserId: <?= (int)($_SESSION['user_id'] ?? 0) ?>
     };
 
     const table = dtDocs = $('#documentsTable').DataTable({
@@ -617,12 +623,20 @@ $(document).ready(function() {
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item" href="${APP_URL}/document_library?action=download&document_id=${row.id}"><i class="bi bi-download"></i> Download</a></li>
                             <li><a class="dropdown-item" href="${APP_URL}/${row.file_path}" target="_blank" onclick="logReportAction('Viewed Document Online', 'User viewed document: ${escapeHtml(row.document_name).replace(/'/g, '&apos;')} in browser')"><i class="bi bi-eye"></i> View Online</a></li>`;
-                    
+
+                    // "Create Document" letters only — the creator (or an admin) can
+                    // reopen it for further editing, or duplicate it as a new draft.
+                    const ownsIt = row.source === 'created' && (String(row.uploaded_by) === String(userPermissions.currentUserId) || userPermissions.isAdmin);
+                    if (ownsIt && userPermissions.canCreate) {
+                        html += `<li><a class="dropdown-item" href="${APP_URL}/create_document?document_id=${row.id}"><i class="bi bi-pencil"></i> Edit</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="duplicateLibraryDocument(${row.id})"><i class="bi bi-files"></i> Duplicate</a></li>`;
+                    }
+
                     if (userPermissions.canDelete) {
                         html += `<li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item text-danger" href="#" onclick="confirmDelete(${row.id})"><i class="bi bi-trash"></i> Delete</a></li>`;
                     }
-                    
+
                     html += `</ul></div>`;
                     return html;
                 }
@@ -790,6 +804,32 @@ function confirmDelete(id) {
                 }
             });
         }
+    });
+}
+
+function duplicateLibraryDocument(id) {
+    Swal.fire({
+        title: 'Duplicate this document?',
+        text: 'Creates a new, separate draft with its own reference number — this one is left unchanged.',
+        icon: 'question', showCancelButton: true, confirmButtonText: 'Yes, duplicate'
+    }).then(function (r) {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: `${APP_URL}/api/document/duplicate_created_document.php`,
+            type: 'POST',
+            data: { document_id: id, _csrf: CSRF_TOKEN },
+            dataType: 'json',
+            success: function (res) {
+                if (res.success) {
+                    logReportAction('Duplicated Document', 'User duplicated document ID: ' + id + ' as ' + res.document_id);
+                    $('#documentsTable').DataTable().ajax.reload();
+                    Swal.fire({ icon: 'success', title: 'Duplicated', text: 'Reference: ' + res.document_code, timer: 1800, showConfirmButton: false });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not duplicate the document.' });
+                }
+            },
+            error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error while duplicating.' }); }
+        });
     });
 }
 

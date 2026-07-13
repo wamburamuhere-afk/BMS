@@ -979,6 +979,8 @@ $routes = [
     'preview_template.php' => DOCUMENT_DIR . '/preview_template.php',
     'select_document_add_esignature' => DOCUMENT_DIR . '/select_document_add_esignature.php',
     'select_document_add_esignature.php' => DOCUMENT_DIR . '/select_document_add_esignature.php',
+    'create_document' => DOCUMENT_DIR . '/create_document.php',
+    'create_document.php' => DOCUMENT_DIR . '/create_document.php',
 
     // Document aliases for common navigation patterns
     'library' => DOCUMENT_DIR . '/document_library.php',
