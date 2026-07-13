@@ -3996,41 +3996,23 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <input type="date" class="form-control" name="expense_date" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold text-dark">Allocation Source <span class="text-danger">*</span></label>
-                            <select class="form-select allocation-source-sel" name="allocation_source" required>
-                                <option value="">Select Source</option>
-                                <option value="budget">Project Budget Item</option>
-                                <option value="voucher">Payment Voucher (Link to existing)</option>
-                                <option value="general">General (No Project Map)</option>
+                            <label class="form-label fw-bold text-dark">Project Budget Item <span class="text-muted small fw-normal">(optional)</span></label>
+                            <select class="form-select budget-id-sel select2" name="budget_id" id="edit_ex_budget_id" onchange="editExOnBudgetChange(this.value)">
+                                <option value="">No specific budget item</option>
                             </select>
                         </div>
 
-                        <!-- Budget Selection Container -->
-                        <div class="col-12 budget-sel-cont" style="display: none;">
-                            <label class="form-label fw-bold text-primary">Target Budget Item *</label>
-                            <select class="form-select budget-id-sel select2" name="budget_id" id="edit_ex_budget_id" onchange="editExOnBudgetChange(this.value)">
-                                <option value="">Select Budget Item</option>
-                            </select>
-                            <div class="mt-2" id="edit_ex_budget_info_cont" style="display:none;">
-                                <div class="alert alert-indigo-light border-0 d-flex justify-content-between align-items-center mb-0 py-2" style="background-color: #f0f3ff; border-radius: 8px;">
-                                    <div class="small">
-                                        <i class="bi bi-info-circle-fill text-primary me-1"></i>
-                                        <span class="text-muted">Budget Allocated:</span> <strong id="edit_ex_budget_total">0.00</strong> |
-                                        <span class="text-muted">Spent So Far:</span> <strong id="edit_ex_budget_spent">0.00</strong>
-                                    </div>
-                                    <div class="text-primary fw-bold small">
-                                        REMAINING: <span id="edit_ex_budget_remaining" class="badge bg-primary">0.00 TZS</span>
-                                    </div>
+                        <div class="col-12" id="edit_ex_budget_info_cont" style="display:none;">
+                            <div class="alert alert-indigo-light border-0 d-flex justify-content-between align-items-center mb-0 py-2" style="background-color: #f0f3ff; border-radius: 8px;">
+                                <div class="small">
+                                    <i class="bi bi-info-circle-fill text-primary me-1"></i>
+                                    <span class="text-muted">Budget Allocated:</span> <strong id="edit_ex_budget_total">0.00</strong> |
+                                    <span class="text-muted">Spent So Far:</span> <strong id="edit_ex_budget_spent">0.00</strong>
+                                </div>
+                                <div class="text-primary fw-bold small">
+                                    REMAINING: <span id="edit_ex_budget_remaining" class="badge bg-primary">0.00 TZS</span>
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- Voucher Selection Container -->
-                        <div class="col-12 voucher-sel-cont" style="display: none;">
-                            <label class="form-label fw-bold text-success">Linked Payment Voucher *</label>
-                            <select class="form-select voucher-id-sel select2" name="voucher_id">
-                                <option value="">Select Payment Voucher</option>
-                            </select>
                         </div>
 
                         <div class="col-md-6">
@@ -4127,41 +4109,23 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <input type="date" class="form-control" name="expense_date" id="ex_expense_date" value="<?= date('Y-m-d') ?>" required>
                         </div>
                         <div class="col-md-6">
-                            <label for="ex_allocation_source" class="form-label fw-bold">Allocation Source <span class="text-danger">*</span></label>
-                            <select class="form-select allocation-source-sel" name="allocation_source" id="ex_allocation_source" required>
-                                <option value="">Select Source</option>
-                                <option value="budget">Project Budget Item</option>
-                                <option value="voucher">Payment Voucher (Link to existing)</option>
-                                <option value="general">General (No Project Map)</option>
+                            <label for="ex_budget_id" class="form-label fw-bold">Project Budget Item <span class="text-muted small fw-normal">(optional)</span></label>
+                            <select class="form-select budget-id-sel select2" name="budget_id" id="ex_budget_id" onchange="exOnBudgetChange(this.value)">
+                                <option value="">No specific budget item</option>
                             </select>
                         </div>
 
-                        <!-- Budget Selection Container -->
-                        <div class="col-12 budget-sel-cont" style="display: none;">
-                            <label for="ex_budget_id" class="form-label fw-bold text-primary">Target Budget Item *</label>
-                            <select class="form-select budget-id-sel select2" name="budget_id" id="ex_budget_id" onchange="exOnBudgetChange(this.value)">
-                                <option value="">Select Budget Item</option>
-                            </select>
-                            <div class="mt-2" id="ex_budget_info_cont" style="display:none;">
-                                <div class="alert alert-indigo-light border-0 d-flex justify-content-between align-items-center mb-0 py-2" style="background-color: #f0f3ff; border-radius: 8px;">
-                                    <div class="small">
-                                        <i class="bi bi-info-circle-fill text-primary me-1"></i>
-                                        <span class="text-muted">Budget Allocated:</span> <strong id="ex_budget_total">0.00</strong> |
-                                        <span class="text-muted">Spent So Far:</span> <strong id="ex_budget_spent">0.00</strong>
-                                    </div>
-                                    <div class="text-primary fw-bold small">
-                                        REMAINING: <span id="ex_budget_remaining" class="badge bg-primary">0.00 TZS</span>
-                                    </div>
+                        <div class="col-12" id="ex_budget_info_cont" style="display:none;">
+                            <div class="alert alert-indigo-light border-0 d-flex justify-content-between align-items-center mb-0 py-2" style="background-color: #f0f3ff; border-radius: 8px;">
+                                <div class="small">
+                                    <i class="bi bi-info-circle-fill text-primary me-1"></i>
+                                    <span class="text-muted">Budget Allocated:</span> <strong id="ex_budget_total">0.00</strong> |
+                                    <span class="text-muted">Spent So Far:</span> <strong id="ex_budget_spent">0.00</strong>
+                                </div>
+                                <div class="text-primary fw-bold small">
+                                    REMAINING: <span id="ex_budget_remaining" class="badge bg-primary">0.00 TZS</span>
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- Voucher Selection Container -->
-                        <div class="col-12 voucher-sel-cont" style="display: none;">
-                            <label for="ex_voucher_id" class="form-label fw-bold text-success">Linked Payment Voucher *</label>
-                            <select class="form-select voucher-id-sel select2" name="voucher_id" id="ex_voucher_id">
-                                <option value="">Select Payment Voucher</option>
-                            </select>
                         </div>
 
                         <div class="col-md-6">
@@ -11296,11 +11260,8 @@ function createExpense() {
 }
 
 function populateAllocationOptions($modal) {
-    const $budgetSel  = $modal.find('.budget-id-sel');
-    const $voucherSel = $modal.find('.voucher-id-sel');
-
-    $budgetSel.html('<option value="">Select Budget Item</option>');
-    $voucherSel.html('<option value="">Select Payment Voucher</option>');
+    const $budgetSel = $modal.find('.budget-id-sel');
+    $budgetSel.html('<option value="">No specific budget item</option>');
 
     if (projectData && projectData.budgets) {
         projectData.budgets.forEach(b => {
@@ -11309,12 +11270,6 @@ function populateAllocationOptions($modal) {
                 data-total="${b.allocated_amount}"
                 data-spent="${b.spent_amount}"
                 data-remain="${b.remaining_balance}">${b.category_name} (Avail: ${formatMoney(b.remaining_balance)} TZS)</option>`);
-        });
-    }
-
-    if (projectData && projectData.payment_vouchers) {
-        projectData.payment_vouchers.forEach(v => {
-            $voucherSel.append(`<option value="${v.id}" data-account="${v.expense_category_id}">PV#${v.voucher_number || v.id} - ${v.payee_name || 'N/A'} (${formatMoney(v.amount)} TZS)</option>`);
         });
     }
 }
@@ -11375,11 +11330,8 @@ $(document).on('input', '#ex_amount', function() {
 
 function checkExVariance() {
     const $valErr = $('#ex_amount_validation');
-    const source = $('.allocation-source-sel').val();
-    if (source !== 'budget') { $valErr.hide(); return; }
-
     const opt = $('.budget-id-sel option:selected');
-    if (!opt.val()) return;
+    if (!opt.val()) { $valErr.hide(); return; }
 
     const remain = parseFloat(opt.data('remain')) || 0;
     const inputAmount = parseFloat($('#ex_amount').val()) || 0;
@@ -11394,45 +11346,16 @@ function checkExVariance() {
     }
 }
 
-$(document).on('change', '.allocation-source-sel', function() {
-    const source = $(this).val();
-    const $modal = $(this).closest('.modal');
-    const $budgetCont = $modal.find('.budget-sel-cont');
-    const $voucherCont = $modal.find('.voucher-sel-cont');
-    const $budgetInput = $modal.find('.budget-id-sel');
-    const $voucherInput = $modal.find('.voucher-id-sel');
-    
-    if (source === 'budget') {
-        $budgetCont.show();
-        $voucherCont.hide();
-        $budgetInput.prop('required', true);
-        $voucherInput.prop('required', false).val('');
-    } else if (source === 'voucher') {
-        $budgetCont.hide();
-        $voucherCont.show();
-        $budgetInput.prop('required', false).val('');
-        $voucherInput.prop('required', true);
-    } else {
-        $budgetCont.hide();
-        $voucherCont.hide();
-        $budgetInput.prop('required', false).val('');
-        $voucherInput.prop('required', false).val('');
-    }
-});
-
-
-
 // Add Expense Form Submit (Modified to allow Over-Budget with confirmation)
 $(document).on('submit', '#addExpenseForm', function(e) {
     e.preventDefault();
-    
-    const source = $(this).find('.allocation-source-sel').val();
-    const inputAmount = parseFloat($('#ex_amount').val()) || 0;
 
-    if (source === 'budget') {
-        const opt = $(this).find('.budget-id-sel option:selected');
-        const remain = parseFloat(opt.data('remain')) || 0;
-        
+    const inputAmount = parseFloat($('#ex_amount').val()) || 0;
+    const budgetOpt = $(this).find('.budget-id-sel option:selected');
+
+    if (budgetOpt.val()) {
+        const remain = parseFloat(budgetOpt.data('remain')) || 0;
+
         if (inputAmount > (remain + 0.01)) {
             // It's over budget. Ask for confirmation but allow it (Price can increase)
             Swal.fire({
@@ -13394,18 +13317,10 @@ function editExpenseInline(encodedData) {
         setTimeout(() => preSelectCascade(e.categories[0].category_id, true), 250);
     }
 
-    // Allocation Source
+    // Project Budget Item (optional)
     populateAllocationOptions(modal);
-    if (e.budget_id) {
-        form.find('[name="allocation_source"]').val('budget').trigger('change');
-        form.find('[name="budget_id"]').val(e.budget_id);
-        setTimeout(() => editExOnBudgetChange(e.budget_id), 100);
-    } else if (e.voucher_id) {
-        form.find('[name="allocation_source"]').val('voucher').trigger('change');
-        form.find('[name="voucher_id"]').val(e.voucher_id);
-    } else {
-        form.find('[name="allocation_source"]').val('general').trigger('change');
-    }
+    form.find('[name="budget_id"]').val(e.budget_id || '');
+    if (e.budget_id) setTimeout(() => editExOnBudgetChange(e.budget_id), 100);
 
     // Paid To (unified)
     const paidToType = e.paid_to_type || '';

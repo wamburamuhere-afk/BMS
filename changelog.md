@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-07-13 (change) — Expenses: Allocation Source simplified to Budget-only, optional; scoped Budget added to external expenses
+
+**Files:** `app/bms/operations/project_view.php`, `app/constant/accounts/expenses.php`
+
+Follow-up discussion: a Payment Voucher already requires picking the expense it pays when it's
+created (`vc_expense_id`, required, on the "Create Payment Voucher" modal) — so an expense
+selecting a voucher as its own "Allocation Source" ran that relationship backwards and created two
+independent, unreconciled foreign keys pointing at each other. Agreed: Expense → Voucher is the only
+correct direction, and "Allocation Source" should be a budget-categorization concept only.
+
+- **Project's own Add/Edit Expense modals:** replaced the "Allocation Source" type-picker (Project
+  Budget Item / Payment Voucher / General) and its conditional Budget/Voucher containers with a
+  single, always-visible **"Project Budget Item (optional)"** dropdown — not required. Still lists
+  only that specific project's own budget items (unchanged scoping). Removed the Voucher branch
+  from this form entirely (the separate Create Payment Voucher modal, which correctly links a
+  voucher to its expense, is untouched).
+- **Main Expenses page** had no budget concept at all — added the same optional **"Budget"**
+  dropdown, but scoped to the form's own **Project** field: picking a project shows only that
+  project's budget items; leaving it blank shows only the company-wide budgets (`project_id IS
+  NULL`) — filtered live in the browser as the Project field changes, no extra request. Backend
+  already accepted `budget_id` as nullable on both create/update; only the UI was missing.
+- Verified live end to end (created + confirmed in DB + removed test rows) for both: a project
+  expense with `budget_id` set from that project's own budgets, and an external expense with
+  `project_id` + a matching `budget_id` picked from that project's list.
+- **Found, not fixed (flagged for a separate task):** 5 of project 16's budget rows have a
+  `category_id` that no longer exists in `expense_categories` (orphaned reference), so their label
+  shows blank/`null` instead of a category name — pre-existing data issue, unrelated to this change.
+
 ## 2026-07-13 (fix) — Expenses: date off-by-one, project-expense modal broken save, missing Expense Type list
 
 **Files:** `app/constant/accounts/expenses.php`, `app/bms/operations/project_view.php`
