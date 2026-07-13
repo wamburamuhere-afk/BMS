@@ -35,6 +35,7 @@ $fieldLabels = [
     'email'                 => 'a business email body',
     'sms'                   => 'a short SMS message (max ~300 chars)',
     'product_description'    => 'a product/service description',
+    'document_letter'      => 'the body of a formal business letter/memo — salutation through closing, no letterhead or subject line (those are separate fields)',
     'text'                  => 'business text',
 ];
 $what = $fieldLabels[$fieldType] ?? 'business text';

@@ -1,5 +1,192 @@
 # BMS Changelog
 
+## 2026-07-13 (fix) — Create Document: duplicate document_code crash on save
+
+**File:** `api/document/save_created_document.php`
+
+User-reported: `SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry 'BMS-LTR-0001'
+for key 'documents.document_code'` when saving a new letter.
+
+**Root cause:** `nextCode()` commits its own transaction the instant no outer one is already open — by
+design, so a rolled-back CALLER's insert also releases its number (see `core/code_generator.php`'s own
+docs). The new-letter INSERT path here called `nextCode()` without wrapping it in a transaction, so the
+allocated number was permanently committed even if the subsequent INSERT then failed — leaving a
+burned number with no document ever claiming it. In this instance the burn was triggered by an earlier
+debugging session's test-data cleanup, which reset the `LTR` sequence counter to 0 without accounting
+for a real document that had already claimed `BMS-LTR-0001` — the next real save then collided with it.
+
+**Fix:** wrapped `nextCode()` + the INSERT in one explicit transaction, so a failed insert now rolls
+back the allocated number too (matching the pattern `codeForEdit()` already uses elsewhere). Also
+cleans up the already-uploaded PDF file on failure, so a failed save can't leave an orphaned file
+behind either.
+
+**Verified live** by deliberately reproducing the exact failure (pre-inserting a row that claims the
+next sequence number, forcing a real collision): confirmed the sequence counter no longer advances
+past the last successful save when the insert fails — before the fix it would have permanently burned
+the number. Corrected the current environment's data: the one real user document ("doc 18",
+`BMS-LTR-0001`) is untouched, the sequence counter is now set to match it (so the next real save
+correctly gets `BMS-LTR-0002`), and all test/bait rows created during verification were removed.
+
+## 2026-07-13 (feat) — Create Document: AI-assisted drafting
+
+Fourth item from the WorkDo comparison — generate the letter body from a prompt instead of writing
+every word manually. BMS already had a full, provider-agnostic AI layer built (`core/ai_service.php`
+— OpenAI/Anthropic/Gemini, monthly cost cap, per-user rate limiting, usage logging) and a shared
+"Generate with AI" widget (`app/includes/ai_generate.php` + `api/ai/generate.php`) already used on
+other pages (invoices, quotations, expenses, etc.) — just not yet wired to a rich-text (Summernote)
+target, since it was silently unconfigured/disabled in this environment (no API key set yet).
+
+- **`api/ai/generate.php`** (shared, existing file): added a `document_letter` field type — "the body
+  of a formal business letter/memo — salutation through closing, no letterhead or subject line".
+- **`app/includes/ai_generate.php`** (shared, existing widget): the "Use this" write-back and the
+  "existing draft" read, previously assumed a plain `.value`-bearing `<textarea>`/`<input>`, which
+  doesn't work on a Summernote-managed `<div>`. Added `isSummernoteTarget()` / `readTargetText()` /
+  `writeTargetText()` helpers — a pure additive branch: Summernote-initialized targets get
+  `summernote('code', …)` get/set (HTML ↔ plain-text with paragraph breaks preserved on both
+  directions), everything else runs the exact original `.value` logic unchanged. Every other page
+  already using this widget is provably unaffected.
+- Create Document now renders the shared `✨ AI` button (`aiButton('letterBody', 'document_letter', …)`)
+  next to the Subject field — appears only when AI is enabled AND the user holds the existing
+  `ai_assistant` permission; silently absent otherwise, exactly like every other page using this
+  widget. No new permission key, no new API endpoint, no new modal — 100% reuse of what already
+  existed for other fields (invoice descriptions, quotation notes, emails, SMS).
+
+Verified live: with AI temporarily enabled (a test key, reverted afterward — this environment has no
+real provider key configured, so end-to-end generation against an actual model was not exercised),
+confirmed the button renders with the correct target/field-type, the modal opens, and both directions
+of the Summernote bridge work correctly — writing a mocked two-paragraph AI response produced clean
+`<p>` tags in the editor, and reading it back extracted the original plain text with paragraph breaks
+intact. Confirmed the button is silently absent again once AI was reverted to unconfigured, matching
+every other page's graceful-degradation behavior.
+
+## 2026-07-13 (feat) — Create Document: template-driven creation, access-level control, duplicate
+
+Three gaps identified from a WorkDo Dash SaaS feature comparison (scoped to document creation only),
+implemented in priority order.
+
+**1. Template-driven creation**
+- **New:** `api/document/get_letter_templates.php`, `api/document/save_letter_template.php`.
+- **Migration:** `2026_07_13_document_templates_content.php` — adds nullable `document_templates.content`.
+  Existing templates are all file-based (uploaded PDFs like loan agreements); they get `content = NULL`
+  and are unaffected — the new "Use Template" picker only lists rows `WHERE content IS NOT NULL`, so
+  the two template "flavors" (file-based vs. content-based) coexist in the same table without
+  interfering.
+- "Templates" dropdown on Create Document: **Use Template...** (search/pick from saved letter
+  templates, confirms before overwriting a non-empty draft) and **Save as Template...** (name +
+  category, reuses the existing `template_categories` taxonomy — "Letters" was already seeded there).
+  Both gated on the existing `document_templates` permission (`canView`/`canCreate`), not a new key.
+
+**2. Privacy/access-level control at creation**
+- Create Document now has an **Access** field (Private/Restricted/Public) — the `documents.access_level`
+  column already existed but Create Document silently hardcoded `'private'` instead of exposing it.
+  `save_created_document.php` now accepts and stores it on both insert and update.
+
+**3. Duplicate an existing document**
+- **New:** `api/document/duplicate_created_document.php` — clones a `source='created'` document into a
+  brand-new row: its own allocated reference number (`nextCode('LTR')`), its own physical copy of the
+  PDF file on disk, same content/category/access-level/project. The source document is left completely
+  untouched.
+- **Duplicate** button on Create Document (shown when editing an existing draft) and a **Duplicate**
+  action in the Document Library row menu (alongside a new **Edit** action — previously there was no
+  way back into a saved draft from the Library list at all once you navigated away). Both restricted to
+  the document's own creator or an admin, matching the same ownership check the save API already
+  enforces server-side.
+
+Verified live end-to-end: template save → picker list → load-with-confirm all work; Access field
+persists correctly (`private` confirmed in DB); duplicate produces a second row with a different
+physical file path but identical content/category/access-level, both files valid on disk; Document
+Library's row menu correctly shows Edit/Duplicate only for the document's own creator. All test data
+cleaned up afterward — the one real draft created by trying the feature ("doc 18", `BMS-LTR-0001`) was
+left untouched throughout.
+
+## 2026-07-13 (fix) — Create Document: polished editor toolbar + visible signature preview
+
+**File:** `app/constant/document/create_document.php`
+
+Follow-up to the same day's Create Document (Phase 1) — the editor looked bare-bones and the signature
+area showed only a text note, no visual.
+
+- **Toolbar expanded to a full, Word-like set**: font name + size, bold/italic/underline/strikethrough/
+  superscript/subscript, text color, paragraph (alignment + indent/outdent, via Summernote's built-in
+  paragraph dropdown) + line-height, tables, links/images/horizontal-rule, undo/redo, fullscreen/code
+  view/help — all Summernote's own built-in toolbar groups, no extra plugins. Previously only had
+  bold/italic/underline, font size, color, lists, and a link/picture insert.
+- **Editor restyled** to match BMS's card/shadow-sm language instead of the stock Summernote skin
+  (rounded corners, bordered toolbar strip) — plus a blue "Live Preview" label bar above the letter
+  paper so the whole thing reads as one polished module page, not a bare text box bolted onto a form.
+- **Signature area now shows something real**: if the creator has an active signature on file
+  (`user_signatures`, same table/query pattern as `get_user_signatures_list.php`), its image renders
+  inside a dashed signature-line box with a red "PREVIEW" watermark — makes clear this is not yet the
+  legally-applied signature (that still only happens through the audited
+  `select_document_add_esignature.php` wizard: consent, IP, hash, event log). If no signature is on
+  file yet, shows a "Set up your e-signature" link to `e_signatures.php` instead of a dead end at
+  Save & Sign.
+- `#letterBody` given an explicit `font-family: Arial` so the toolbar's font-name picker shows a real
+  selected font instead of the browser's raw computed value (was showing "system-ui").
+
+Verified live: fuller toolbar renders and initializes with no console errors; signature preview
+correctly pulls the creator's most recent active signature image (confirmed one real user draft,
+"doc 18" / `BMS-LTR-0001`, already exists from trying the feature — left untouched, not test data).
+Noted for the user as a data-quality aside (not a code issue): their admin account's *most recent*
+active signature is a stray full-page image (1054×1492, clearly not a signature) rather than one of
+their earlier drawn signatures (766×200, matches the signature-pad canvas) — worth deactivating via
+the E-Signatures page.
+
+## 2026-07-13 (feat) — Create Document (Phase 1): write letters/memos in-app, hand off to existing e-signature wizard
+
+**New files:**
+- `app/constant/document/create_document.php` — A4-styled letter editor (Summernote rich-text body; auto
+  letterhead from company logo/name; auto sequential reference number via `nextCode($pdo, 'LTR')`,
+  e.g. `BFS-LTR-0001`; Recipient/Date/Category/Subject fields). Buttons: Save Draft, Save & Print,
+  Save & Sign.
+- `api/document/save_created_document.php` — persists the letter. Every save (draft or final) renders
+  the letter to a real PDF client-side (html2pdf.js) and uploads it, so a created document behaves
+  exactly like any other row in `documents` (previewable, downloadable, pickable from the existing
+  signing wizard) while `content` keeps the raw editable HTML so a draft can be reopened. The reference
+  code is allocated once, on first save, and reused on every re-save of the same letter.
+- `migrations/2026_07_13_documents_create_document.php` — adds `documents.content` (LONGTEXT) and
+  `documents.document_code` (VARCHAR(50) UNIQUE), both nullable; existing uploaded-file rows unaffected.
+
+**Design decision — no signer-selection step:** the boss's requirement was confirmed as one signature
+per document, always the creator's own (already-registered) signature from the existing e-signature
+module (`user_signatures` / `e_signatures.php`). "Save & Sign" hands straight into the existing,
+already-working `select_document_add_esignature.php` wizard (untouched — the user's fresh letter simply
+sorts to the top of its document list) rather than adding a new signer-picker.
+
+**Entry points added (both gated on the existing `canCreate('documents')` permission, no new
+permission key needed):**
+- Docs > Library — "Create Document" button, same row as "Upload Document" (`document_library.php`).
+- Project Details > Docs > Add Doc tab — "Create Document" button next to "Upload New Project
+  Document" (`project_view.php`); pre-links the new letter to the current project.
+
+**Stack decision (researched, no paid service):** Summernote (MIT-licensed jQuery/Bootstrap editor —
+avoids TinyMCE/CKEditor's GPL licensing risk in a commercial ERP) + html2pdf.js (already used
+elsewhere in this codebase, e.g. `cash_flow.php`) for the PDF, reusing the site's existing SHA-256
+hash-based signing/tamper-verification pipeline rather than a paid X.509 certificate service.
+
+**Three real bugs found and fixed during live verification (not caught by static review):**
+1. Summernote CDN pinned to `@0.8.18`, which does not ship a Bootstrap 5 build (`summernote-bs5.min.js`
+   only exists from `@0.9.1` onward) — the editor silently failed to initialize (`$(...).summernote is
+   not a function`). Fixed by pinning to `@0.9.1`.
+2. Re-saving an already-saved draft created a duplicate row and burned a second reference number
+   instead of updating in place — the `document_id` sent with each save was a PHP value baked in at
+   initial page load, never updated after the first save (only `history.replaceState` runs, no real
+   reload). Fixed by tracking it in a mutable JS variable (`currentDocumentId`) updated from the save
+   response.
+3. The "Back" link (when arriving from a project) used the wrong query param (`?project_id=`) for
+   `project_view.php`, which actually reads `?id=` — fixed.
+
+Verified live: editor loads and initializes cleanly; Save Draft creates a `source='created'` row with
+an allocated `document_code`, valid PDF (`%PDF-` header confirmed) written to `uploads/documents/`, and
+`content` populated; re-saving the same draft updates the existing row only (confirmed via direct DB
+query — one row, same code, `updated_at` refreshed, old PDF revision cleaned up); the new document
+appears correctly in the Document Library list; project-linking banner and Back-button both correct.
+
+**Not yet built (later phases, per the agreed plan):** QR code on the signed document linking to a
+public verification page; direct one-click hand-off into the signing wizard with the new document
+pre-selected (currently the user picks it from the top of the wizard's list — zero risk to the
+existing, working wizard).
+
 ## 2026-07-13 (feat/fix) — Ledger Report: converted to DataTable; fixed digit wrap, first-page blank, repeat-per-page totals
 
 **File:** `app/constant/reports/ledger_report.php`

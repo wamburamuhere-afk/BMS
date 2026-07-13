@@ -96,6 +96,29 @@ if (!function_exists('aiGenerateModalOnce')) {
     document.getElementById('aiGenUse').classList.add('d-none');
     new bootstrap.Modal(document.getElementById('aiGenModal')).show();
   });
+  // Summernote-managed elements aren't plain form fields (no .value) — read/
+  // write them via the summernote('code', ...) API instead. Everything else
+  // (plain <textarea>/<input> targets, already used on invoices/quotations/
+  // expenses/etc.) is untouched.
+  function isSummernoteTarget(el){ return !!(el && window.jQuery && jQuery(el).data('summernote')); }
+  function readTargetText(el){
+    if (isSummernoteTarget(el)) {
+      return jQuery(el).summernote('code')
+        .replace(/<\/p>\s*<p>/gi, '\n\n').replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<[^>]+>/g, '').trim();
+    }
+    return el ? (el.value || '') : '';
+  }
+  function writeTargetText(el, text){
+    if (isSummernoteTarget(el)) {
+      const html = '<p>' + String(text).split(/\n\s*\n/).map(p => p.replace(/\n/g, '<br>')).join('</p><p>') + '</p>';
+      jQuery(el).summernote('code', html);
+    } else if (el) {
+      el.value = text;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+
   document.getElementById('aiGenRun').addEventListener('click', function(){
     const btn=this, orig=btn.innerHTML;
     const tgt=document.getElementById('aiGenTarget').value;
@@ -106,7 +129,7 @@ if (!function_exists('aiGenerateModalOnce')) {
         instruction: document.getElementById('aiGenInstruction').value,
         field_type: document.getElementById('aiGenFieldType').value,
         tone: document.getElementById('aiGenTone').value,
-        existing: existingEl ? (existingEl.value||'') : ''
+        existing: readTargetText(existingEl)
       },
       success:r=>{
         if(r.success){
@@ -122,7 +145,7 @@ if (!function_exists('aiGenerateModalOnce')) {
   document.getElementById('aiGenUse').addEventListener('click', function(){
     const tgt=document.getElementById('aiGenTarget').value;
     const el=document.getElementById(tgt);
-    if(el){ el.value=document.getElementById('aiGenResult').value; el.dispatchEvent(new Event('input',{bubbles:true})); }
+    writeTargetText(el, document.getElementById('aiGenResult').value);
     bootstrap.Modal.getInstance(document.getElementById('aiGenModal')).hide();
   });
 })();
