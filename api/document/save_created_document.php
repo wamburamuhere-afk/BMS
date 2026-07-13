@@ -40,6 +40,8 @@ try {
     $letter_date = trim((string)($_POST['letter_date'] ?? ''));
     $category_id = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
     $project_id  = !empty($_POST['project_id']) ? (int)$_POST['project_id'] : null;
+    $access_level = in_array(($_POST['access_level'] ?? ''), ['private', 'restricted', 'public'], true)
+        ? $_POST['access_level'] : 'private';
 
     if ($subject === '') {
         throw new Exception('Subject is required');
@@ -102,7 +104,7 @@ try {
             UPDATE documents SET
                 document_name = ?, description = ?, content = ?, file_path = ?,
                 original_filename = ?, file_size = ?, file_type = 'pdf',
-                category_id = ?, project_id = ?, issue_date = ?, updated_at = NOW()
+                category_id = ?, project_id = ?, issue_date = ?, access_level = ?, updated_at = NOW()
             WHERE id = ?
         ");
         $upd->execute([
@@ -115,6 +117,7 @@ try {
             $category_id,
             $project_id,
             $letter_date ?: null,
+            $access_level,
             $document_id,
         ]);
 
@@ -135,30 +138,48 @@ try {
         exit;
     }
 
-    // New letter — allocate its reference code once.
-    $document_code = nextCode($pdo, 'LTR');
+    // New letter — allocate its reference code and insert in ONE transaction.
+    // nextCode() commits its own tiny transaction the instant no outer one is
+    // open, so without this wrapper a failed INSERT below (e.g. a stray
+    // duplicate-key collision) would still permanently burn the allocated
+    // number with no document ever claiming it — exactly the gap nextCode()
+    // is designed to prevent. Wrapping both in the same transaction makes
+    // nextCode() share it instead, so a rolled-back insert also rolls back
+    // the number.
+    $pdo->beginTransaction();
+    try {
+        $document_code = nextCode($pdo, 'LTR');
 
-    $ins = $pdo->prepare("
-        INSERT INTO documents (
-            document_name, description, content, file_path, original_filename,
-            file_size, file_type, category_id, document_code, version,
-            issue_date, access_level, uploaded_by, project_id, source
-        ) VALUES (?, ?, ?, ?, ?, ?, 'pdf', ?, ?, '1.0', ?, 'private', ?, ?, 'created')
-    ");
-    $ins->execute([
-        $subject,
-        $recipient !== '' ? ('To: ' . $recipient) : null,
-        $content,
-        $db_path,
-        $subject . '.pdf',
-        $file['size'],
-        $category_id,
-        $document_code,
-        $letter_date ?: null,
-        $_SESSION['user_id'],
-        $project_id,
-    ]);
-    $document_id = (int)$pdo->lastInsertId();
+        $ins = $pdo->prepare("
+            INSERT INTO documents (
+                document_name, description, content, file_path, original_filename,
+                file_size, file_type, category_id, document_code, version,
+                issue_date, access_level, uploaded_by, project_id, source
+            ) VALUES (?, ?, ?, ?, ?, ?, 'pdf', ?, ?, '1.0', ?, ?, ?, ?, 'created')
+        ");
+        $ins->execute([
+            $subject,
+            $recipient !== '' ? ('To: ' . $recipient) : null,
+            $content,
+            $db_path,
+            $subject . '.pdf',
+            $file['size'],
+            $category_id,
+            $document_code,
+            $letter_date ?: null,
+            $access_level,
+            $_SESSION['user_id'],
+            $project_id,
+        ]);
+        $document_id = (int)$pdo->lastInsertId();
+        $pdo->commit();
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        // The uploaded PDF was already saved to disk before this transaction —
+        // clean it up so a failed save doesn't leave an orphaned file behind.
+        if (is_file($target)) @unlink($target);
+        throw $e;
+    }
 
     logAudit($pdo, $_SESSION['user_id'], 'create_document', [
         'activity_type' => 'create',

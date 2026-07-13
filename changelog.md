@@ -1,5 +1,104 @@
 # BMS Changelog
 
+## 2026-07-13 (fix) — Create Document: duplicate document_code crash on save
+
+**File:** `api/document/save_created_document.php`
+
+User-reported: `SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry 'BMS-LTR-0001'
+for key 'documents.document_code'` when saving a new letter.
+
+**Root cause:** `nextCode()` commits its own transaction the instant no outer one is already open — by
+design, so a rolled-back CALLER's insert also releases its number (see `core/code_generator.php`'s own
+docs). The new-letter INSERT path here called `nextCode()` without wrapping it in a transaction, so the
+allocated number was permanently committed even if the subsequent INSERT then failed — leaving a
+burned number with no document ever claiming it. In this instance the burn was triggered by an earlier
+debugging session's test-data cleanup, which reset the `LTR` sequence counter to 0 without accounting
+for a real document that had already claimed `BMS-LTR-0001` — the next real save then collided with it.
+
+**Fix:** wrapped `nextCode()` + the INSERT in one explicit transaction, so a failed insert now rolls
+back the allocated number too (matching the pattern `codeForEdit()` already uses elsewhere). Also
+cleans up the already-uploaded PDF file on failure, so a failed save can't leave an orphaned file
+behind either.
+
+**Verified live** by deliberately reproducing the exact failure (pre-inserting a row that claims the
+next sequence number, forcing a real collision): confirmed the sequence counter no longer advances
+past the last successful save when the insert fails — before the fix it would have permanently burned
+the number. Corrected the current environment's data: the one real user document ("doc 18",
+`BMS-LTR-0001`) is untouched, the sequence counter is now set to match it (so the next real save
+correctly gets `BMS-LTR-0002`), and all test/bait rows created during verification were removed.
+
+## 2026-07-13 (feat) — Create Document: AI-assisted drafting
+
+Fourth item from the WorkDo comparison — generate the letter body from a prompt instead of writing
+every word manually. BMS already had a full, provider-agnostic AI layer built (`core/ai_service.php`
+— OpenAI/Anthropic/Gemini, monthly cost cap, per-user rate limiting, usage logging) and a shared
+"Generate with AI" widget (`app/includes/ai_generate.php` + `api/ai/generate.php`) already used on
+other pages (invoices, quotations, expenses, etc.) — just not yet wired to a rich-text (Summernote)
+target, since it was silently unconfigured/disabled in this environment (no API key set yet).
+
+- **`api/ai/generate.php`** (shared, existing file): added a `document_letter` field type — "the body
+  of a formal business letter/memo — salutation through closing, no letterhead or subject line".
+- **`app/includes/ai_generate.php`** (shared, existing widget): the "Use this" write-back and the
+  "existing draft" read, previously assumed a plain `.value`-bearing `<textarea>`/`<input>`, which
+  doesn't work on a Summernote-managed `<div>`. Added `isSummernoteTarget()` / `readTargetText()` /
+  `writeTargetText()` helpers — a pure additive branch: Summernote-initialized targets get
+  `summernote('code', …)` get/set (HTML ↔ plain-text with paragraph breaks preserved on both
+  directions), everything else runs the exact original `.value` logic unchanged. Every other page
+  already using this widget is provably unaffected.
+- Create Document now renders the shared `✨ AI` button (`aiButton('letterBody', 'document_letter', …)`)
+  next to the Subject field — appears only when AI is enabled AND the user holds the existing
+  `ai_assistant` permission; silently absent otherwise, exactly like every other page using this
+  widget. No new permission key, no new API endpoint, no new modal — 100% reuse of what already
+  existed for other fields (invoice descriptions, quotation notes, emails, SMS).
+
+Verified live: with AI temporarily enabled (a test key, reverted afterward — this environment has no
+real provider key configured, so end-to-end generation against an actual model was not exercised),
+confirmed the button renders with the correct target/field-type, the modal opens, and both directions
+of the Summernote bridge work correctly — writing a mocked two-paragraph AI response produced clean
+`<p>` tags in the editor, and reading it back extracted the original plain text with paragraph breaks
+intact. Confirmed the button is silently absent again once AI was reverted to unconfigured, matching
+every other page's graceful-degradation behavior.
+
+## 2026-07-13 (feat) — Create Document: template-driven creation, access-level control, duplicate
+
+Three gaps identified from a WorkDo Dash SaaS feature comparison (scoped to document creation only),
+implemented in priority order.
+
+**1. Template-driven creation**
+- **New:** `api/document/get_letter_templates.php`, `api/document/save_letter_template.php`.
+- **Migration:** `2026_07_13_document_templates_content.php` — adds nullable `document_templates.content`.
+  Existing templates are all file-based (uploaded PDFs like loan agreements); they get `content = NULL`
+  and are unaffected — the new "Use Template" picker only lists rows `WHERE content IS NOT NULL`, so
+  the two template "flavors" (file-based vs. content-based) coexist in the same table without
+  interfering.
+- "Templates" dropdown on Create Document: **Use Template...** (search/pick from saved letter
+  templates, confirms before overwriting a non-empty draft) and **Save as Template...** (name +
+  category, reuses the existing `template_categories` taxonomy — "Letters" was already seeded there).
+  Both gated on the existing `document_templates` permission (`canView`/`canCreate`), not a new key.
+
+**2. Privacy/access-level control at creation**
+- Create Document now has an **Access** field (Private/Restricted/Public) — the `documents.access_level`
+  column already existed but Create Document silently hardcoded `'private'` instead of exposing it.
+  `save_created_document.php` now accepts and stores it on both insert and update.
+
+**3. Duplicate an existing document**
+- **New:** `api/document/duplicate_created_document.php` — clones a `source='created'` document into a
+  brand-new row: its own allocated reference number (`nextCode('LTR')`), its own physical copy of the
+  PDF file on disk, same content/category/access-level/project. The source document is left completely
+  untouched.
+- **Duplicate** button on Create Document (shown when editing an existing draft) and a **Duplicate**
+  action in the Document Library row menu (alongside a new **Edit** action — previously there was no
+  way back into a saved draft from the Library list at all once you navigated away). Both restricted to
+  the document's own creator or an admin, matching the same ownership check the save API already
+  enforces server-side.
+
+Verified live end-to-end: template save → picker list → load-with-confirm all work; Access field
+persists correctly (`private` confirmed in DB); duplicate produces a second row with a different
+physical file path but identical content/category/access-level, both files valid on disk; Document
+Library's row menu correctly shows Edit/Duplicate only for the document's own creator. All test data
+cleaned up afterward — the one real draft created by trying the feature ("doc 18", `BMS-LTR-0001`) was
+left untouched throughout.
+
 ## 2026-07-13 (fix) — Create Document: polished editor toolbar + visible signature preview
 
 **File:** `app/constant/document/create_document.php`

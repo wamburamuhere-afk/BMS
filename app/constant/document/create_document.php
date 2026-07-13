@@ -9,10 +9,16 @@
  * Only one signer is ever relevant here: the document's own creator — there is
  * no signer-selection step anywhere in this flow, by design.
  */
+// The letter-paper below renders its own proper letterhead (logo + company
+// name + Ref/date) — suppress the global print header (renderPrintHeader(),
+// fired from includeHeader()) so the printed document doesn't show the
+// company logo/name twice, same pattern as project_view.php.
+define('BMS_SUPPRESS_PRINT_HEADER', true);
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/code_generator.php';
 require_once __DIR__ . '/../../../core/project_scope.php';
+require_once __DIR__ . '/../../includes/ai_generate.php';
 
 includeHeader();
 
@@ -44,6 +50,9 @@ if ($document_id > 0) {
 }
 
 $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$template_categories = $pdo->query("SELECT * FROM template_categories ORDER BY category_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$can_manage_templates = canCreate('document_templates');
+$can_use_templates = canView('document_templates');
 
 $company_name = get_setting('company_name', 'Business Management System');
 $company_logo = get_setting('company_logo');
@@ -60,6 +69,8 @@ if (!empty($existing['description']) && strpos($existing['description'], 'To: ')
 $letter_date = $existing['issue_date'] ?? date('Y-m-d');
 $content     = $existing['content'] ?? '';
 $category_id = $existing['category_id'] ?? null;
+$access_level = in_array(($existing['access_level'] ?? ''), ['private', 'restricted', 'public'], true)
+    ? $existing['access_level'] : 'private';
 
 $signer_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
 $signer_role = $_SESSION['user_role'] ?? '';
@@ -94,15 +105,35 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
 ?>
 
 <div class="container-fluid mt-4 mb-5" id="createDocumentPage">
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2 d-print-none">
         <div>
             <h4 class="mb-0"><i class="bi bi-file-earmark-plus me-2 text-primary"></i>Create Document</h4>
             <p class="text-muted mb-0 small">Write a letter or memo — save as a draft, print it, or send it straight into e-signing.</p>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 flex-wrap">
             <a href="<?= $project_id ? getUrl('project_view') . '?id=' . (int)$project_id : getUrl('document_library') ?>" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left me-1"></i> Back
             </a>
+            <?php if ($can_use_templates || $can_manage_templates): ?>
+            <div class="dropdown">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-file-earmark-text me-1"></i> Templates
+                </button>
+                <ul class="dropdown-menu">
+                    <?php if ($can_use_templates): ?>
+                    <li><button type="button" class="dropdown-item" id="btnUseTemplate"><i class="bi bi-magic me-2"></i>Use Template...</button></li>
+                    <?php endif; ?>
+                    <?php if ($can_manage_templates): ?>
+                    <li><button type="button" class="dropdown-item" id="btnSaveTemplate"><i class="bi bi-bookmark-plus me-2"></i>Save as Template...</button></li>
+                    <?php endif; ?>
+                </ul>
+            </div>
+            <?php endif; ?>
+            <?php if ($existing): ?>
+            <button type="button" class="btn btn-outline-secondary" id="btnDuplicate">
+                <i class="bi bi-files me-1"></i> Duplicate
+            </button>
+            <?php endif; ?>
             <button type="button" class="btn btn-outline-primary" id="btnSaveDraft">
                 <i class="bi bi-save me-1"></i> Save Draft
             </button>
@@ -116,11 +147,11 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
     </div>
 
     <div class="row g-3 mb-3 d-print-none">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <label class="form-label small fw-bold">Recipient</label>
             <input type="text" class="form-control" id="f_recipient" value="<?= htmlspecialchars($recipient) ?>" placeholder="e.g. The Manager, ABC Ltd">
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
             <label class="form-label small fw-bold">Date</label>
             <input type="date" class="form-control" id="f_letter_date" value="<?= htmlspecialchars($letter_date) ?>">
         </div>
@@ -131,6 +162,14 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
                 <?php foreach ($categories as $cat): ?>
                     <option value="<?= (int)$cat['id'] ?>" <?= ((int)$category_id === (int)$cat['id']) ? 'selected' : '' ?>><?= htmlspecialchars($cat['category_name']) ?></option>
                 <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-bold">Access</label>
+            <select class="form-select" id="f_access_level">
+                <option value="private" <?= $access_level === 'private' ? 'selected' : '' ?>>Private</option>
+                <option value="restricted" <?= $access_level === 'restricted' ? 'selected' : '' ?>>Restricted</option>
+                <option value="public" <?= $access_level === 'public' ? 'selected' : '' ?>>Public</option>
             </select>
         </div>
         <div class="col-md-2">
@@ -149,6 +188,14 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
         <label class="form-label small fw-bold">Subject <span class="text-danger">*</span></label>
         <input type="text" class="form-control" id="f_subject" value="<?= htmlspecialchars($subject) ?>" placeholder="e.g. Notice of Meeting" required>
     </div>
+
+    <?php $ai_btn = aiButton('letterBody', 'document_letter', 'Generate letter with AI'); ?>
+    <?php if ($ai_btn !== ''): ?>
+    <div class="mb-2 d-print-none">
+        <?= $ai_btn ?>
+        <span class="text-muted small ms-1">Draft the letter body from a short instruction, then edit as needed.</span>
+    </div>
+    <?php endif; ?>
 
     <!-- A4-styled letter preview. Only #letterBody is the Summernote-editable
          region — the letterhead/ref/date/signature block are rendered from
@@ -199,6 +246,62 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
         </div>
     </div>
 </div>
+
+<?php if ($can_use_templates): ?>
+<!-- Use Template Modal -->
+<div class="modal fade" id="useTemplateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-magic me-1"></i> Use a Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="form-control mb-3" id="templatePickerSearch" placeholder="Search templates...">
+                <div id="templatePickerList" class="list-group" style="max-height: 50vh; overflow-y: auto;">
+                    <div class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm"></span> Loading templates...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if ($can_manage_templates): ?>
+<!-- Save as Template Modal -->
+<div class="modal fade" id="saveTemplateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-bookmark-plus me-1"></i> Save as Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="saveTemplateForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Template Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="tpl_name" required placeholder="e.g. Standard Notice of Meeting">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select class="form-select select2-static" id="tpl_category_id">
+                            <option value="">Select Category</option>
+                            <?php foreach ($template_categories as $tc): ?>
+                                <option value="<?= (int)$tc['id'] ?>"><?= htmlspecialchars($tc['category_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-text">Saves the current letter body only — not the recipient, subject, or reference number.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Template</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <link href="https://cdn.jsdelivr.net/npm/summernote@0.9.1/dist/summernote-bs5.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/summernote@0.9.1/dist/summernote-bs5.min.js"></script>
@@ -288,9 +391,49 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
 .letter-signoff-note { font-size: 8pt; margin-top: 4mm; }
 
 @media print {
-    .letter-paper { border: none; max-width: 100%; box-shadow: none !important; border-radius: 0; }
+    /* min-height:297mm gives a nice one-page WYSIWYG look on screen, but in
+       print it forces every letter to reserve a full A4 page of height
+       before any following content can continue — for a short letter this
+       is a large dead blank area; for a long one it's still wrong (it should
+       flow across exactly as many pages as the real content needs, not a
+       fixed count). Let height come from content alone. */
+    .letter-paper { border: none; max-width: 100%; box-shadow: none !important; border-radius: 0; min-height: 0; }
     .letter-paper-label { display: none !important; }
     #createDocumentPage .btn, #createDocumentPage .form-label, #createDocumentPage input, #createDocumentPage select { display: none !important; }
+
+    /* The letter body wraps Summernote's own toolbar chrome — has zero place
+       in a printed document. */
+    .note-toolbar, .note-statusbar { display: none !important; }
+
+    /* "Dear Sir/Madam..." was jumping whole onto page 2 with a large blank
+       gap left on page 1 below the subject line. Two compounding causes:
+       (1) Summernote's bs5 skin wraps the editable region in a Bootstrap
+       `.card` (`.note-editor.note-frame.card`) — the shared responsive.css
+       rule `.card { page-break-inside: avoid }` applies to every .card on
+       every printed page, so the browser treats the WHOLE editor as one
+       atomic, non-splittable block: if it doesn't fit the remaining space on
+       page 1, the entire thing relocates to page 2 rather than just flowing
+       across the boundary. (2) the editable area also carries an inline
+       height:320px + overflow-y:auto (Summernote's own screen-editing
+       scrollbox) — even with the page-break override below, a fixed/clipped
+       height still doesn't let content reflow naturally across pages. Both
+       need fixing together. */
+    #createDocumentPage .note-editor.note-frame {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+        border: none !important;
+        box-shadow: none !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+    #createDocumentPage .note-editing-area,
+    #createDocumentPage .note-editable {
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 0 !important;
+    }
 }
 </style>
 
@@ -337,7 +480,140 @@ $(document).ready(function () {
     $('#btnSaveDraft').on('click', function () { saveDocument('draft'); });
     $('#btnSavePrint').on('click', function () { saveDocument('print'); });
     $('#btnSaveSign').on('click', function () { saveDocument('sign'); });
+    $('#btnDuplicate').on('click', duplicateDocument);
+
+    // ── Use Template ──────────────────────────────────────────────
+    $('#btnUseTemplate').on('click', function () {
+        new bootstrap.Modal(document.getElementById('useTemplateModal')).show();
+    });
+    let templatesCache = null;
+    $('#useTemplateModal').on('shown.bs.modal', function () {
+        if (templatesCache) return; // already loaded this page session
+        $.getJSON('<?= buildUrl('api/document/get_letter_templates.php') ?>', function (res) {
+            if (!res.success) {
+                $('#templatePickerList').html('<div class="text-center text-danger py-4">' + (res.message || 'Could not load templates.') + '</div>');
+                return;
+            }
+            templatesCache = res.templates;
+            renderTemplateList(templatesCache);
+        }).fail(function () {
+            $('#templatePickerList').html('<div class="text-center text-danger py-4">Server error loading templates.</div>');
+        });
+    });
+    function renderTemplateList(templates) {
+        if (!templates.length) {
+            $('#templatePickerList').html('<div class="text-center text-muted py-4">No saved templates yet. Write a letter, then use "Save as Template" to create your first one.</div>');
+            return;
+        }
+        let html = '';
+        templates.forEach(function (t) {
+            html += `<button type="button" class="list-group-item list-group-item-action tpl-pick" data-id="${t.id}">
+                <div class="d-flex justify-content-between align-items-center">
+                    <strong>${safeOutput(t.template_name)}</strong>
+                    ${t.category_name ? `<span class="badge bg-primary-subtle text-primary">${safeOutput(t.category_name)}</span>` : ''}
+                </div>
+                <small class="text-muted">Used ${t.usage_count || 0} time(s)</small>
+            </button>`;
+        });
+        $('#templatePickerList').html(html);
+    }
+    $('#templatePickerSearch').on('input', function () {
+        if (!templatesCache) return;
+        const q = $(this).val().toLowerCase();
+        renderTemplateList(templatesCache.filter(t => t.template_name.toLowerCase().includes(q)));
+    });
+    $('#templatePickerList').on('click', '.tpl-pick', function () {
+        const id = $(this).data('id');
+        const tpl = templatesCache.find(t => String(t.id) === String(id));
+        if (!tpl) return;
+        const apply = function () {
+            $('#letterBody').summernote('code', tpl.content);
+            bootstrap.Modal.getInstance(document.getElementById('useTemplateModal')).hide();
+        };
+        if (!$('#letterBody').summernote('isEmpty')) {
+            Swal.fire({
+                title: 'Replace current letter body?',
+                text: 'This will overwrite what you\'ve already written with the template.',
+                icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, replace it'
+            }).then(function (r) { if (r.isConfirmed) apply(); });
+        } else {
+            apply();
+        }
+    });
+
+    // ── Save as Template ──────────────────────────────────────────
+    $('#btnSaveTemplate').on('click', function () {
+        if ($('#letterBody').summernote('isEmpty')) {
+            Swal.fire({ icon: 'warning', title: 'Empty letter', text: 'Write the letter body first, then save it as a template.' });
+            return;
+        }
+        new bootstrap.Modal(document.getElementById('saveTemplateModal')).show();
+    });
+    $('#saveTemplateModal').on('shown.bs.modal', function () {
+        if (!$('#tpl_category_id').hasClass('select2-hidden-accessible')) {
+            $('#tpl_category_id').select2({ theme: 'bootstrap-5', dropdownParent: $('#saveTemplateModal'), placeholder: 'Select...', allowClear: true, width: '100%' });
+        }
+    });
+    $('#saveTemplateForm').on('submit', function (e) {
+        e.preventDefault();
+        const btn = $(this).find('[type="submit"]');
+        const orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Saving...');
+        $.ajax({
+            url: '<?= buildUrl('api/document/save_letter_template.php') ?>',
+            type: 'POST',
+            data: {
+                template_name: $('#tpl_name').val(),
+                category_id: $('#tpl_category_id').val(),
+                content: $('#letterBody').summernote('code'),
+                _csrf: CSRF_TOKEN
+            },
+            dataType: 'json',
+            success: function (res) {
+                if (res.success) {
+                    templatesCache = null; // force reload next time the picker opens
+                    bootstrap.Modal.getInstance(document.getElementById('saveTemplateModal')).hide();
+                    Swal.fire({ icon: 'success', title: 'Template saved', timer: 1600, showConfirmButton: false });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not save the template.' });
+                }
+            },
+            error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error while saving the template.' }); },
+            complete: function () { btn.prop('disabled', false).html(orig); }
+        });
+    });
 });
+
+function safeOutput(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, function (m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+    });
+}
+
+function duplicateDocument() {
+    Swal.fire({
+        title: 'Duplicate this document?',
+        text: 'Creates a new, separate draft with its own reference number — this one is left unchanged.',
+        icon: 'question', showCancelButton: true, confirmButtonText: 'Yes, duplicate'
+    }).then(function (r) {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: '<?= buildUrl('api/document/duplicate_created_document.php') ?>',
+            type: 'POST',
+            data: { document_id: currentDocumentId, _csrf: CSRF_TOKEN },
+            dataType: 'json',
+            success: function (res) {
+                if (res.success) {
+                    window.location.href = '<?= buildUrl('create_document') ?>?document_id=' + res.document_id;
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not duplicate the document.' });
+                }
+            },
+            error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error while duplicating.' }); }
+        });
+    });
+}
 
 function saveDocument(mode) {
     const subject = $('#f_subject').val().trim();
@@ -373,6 +649,7 @@ function saveDocument(mode) {
         fd.append('recipient', $('#f_recipient').val().trim());
         fd.append('letter_date', $('#f_letter_date').val());
         fd.append('category_id', $('#f_category_id').val() || '');
+        fd.append('access_level', $('#f_access_level').val() || 'private');
         fd.append('project_id', '<?= (int)($project_id ?? 0) ?>');
         fd.append('content', $('#letterBody').summernote('code'));
         fd.append('_csrf', CSRF_TOKEN);
