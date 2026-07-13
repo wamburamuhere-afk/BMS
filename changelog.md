@@ -1,5 +1,41 @@
 # BMS Changelog
 
+## 2026-07-13 (feat/fix) — Ledger Report: converted to DataTable; fixed digit wrap, first-page blank, repeat-per-page totals
+
+**File:** `app/constant/reports/ledger_report.php`
+
+- **Table is now a DataTable** (`#ledgerTable`, both the single-account ledger view and the
+  no-account-selected summary view), matching the house standard: pagination, sortable columns,
+  Show:N, and the existing search box now drives `table.search()` instead of a manual jQuery
+  `.filter()`. `responsive` is deliberately left off — DataTables' Responsive extension hides
+  low-priority columns behind a "+" toggle at narrow widths, wrong for a ledger where every column
+  must always show, print included (same reasoning already documented on `account_details.php`).
+- **Digits wrapping mid-number on print:** added `table-layout: fixed` with explicit per-column
+  percentages plus a dedicated smaller print font, and forced `white-space: nowrap` on every
+  money column (Debit/Credit/Balance, or Opening/Debits/Credits/Closing in the summary view).
+- **First page blank / table not starting on page 1:** the wrapping `.card` can grow tall with many
+  ledger rows; the shared `.card { page-break-inside: avoid }` rule pushed it to page 2. Added the
+  `.print-flow-card` marker + scoped override (plus resetting the card's own inline
+  `overflow:hidden`), the same recipe used across every other report this week.
+- **"Period Totals" appearing on more than one page instead of only at the end:** both `<tfoot>`
+  blocks defaulted to `display: table-footer-group`, which browsers repeat at the bottom of every
+  printed page for a multi-page table. Overrode to `table-row-group` so it renders once, after the
+  last row of real data.
+- **Enabling DataTables required removing every `colspan` from the opening-balance row, the
+  "no entries" empty-state rows, and both `<tfoot>` rows** — DataTables maps one footer/body cell per
+  header column and miscounts colspan'd rows (same fix already proven on `account_details.php`,
+  documented inline there as "tn/18"). Replaced each with 7 explicit `<td>` cells (blank where a
+  value doesn't apply) so the column count always matches the 7-column header.
+- **Print button and CSV export updated for pagination:** printing now expands the table to show
+  every row first via `table.page.len(-1)`, prints, then restores the original page length (same
+  pattern as `bank_accounts.php`'s `printBankTable()`) — otherwise only the current page would have
+  printed. CSV export now reads via the DataTables API (`rows({search:'applied'})`) instead of the
+  raw DOM, so it also isn't limited to the current page.
+- Verified live: DataTable initializes cleanly on both view modes (summary: 22 rows single page;
+  detail: 2 rows including the opening-balance row) with no console errors, search correctly filters
+  via the DataTables API, and simulated print media confirms `table-layout:fixed`, zero wrapping on
+  every money cell in both `tfoot` rows, and `tfoot` display `table-row-group`.
+
 ## 2026-07-13 (fix) — Trial Balance: GRAND TOTAL repeated per page, wrapped digits, duplicate footer note
 
 **File:** `app/constant/reports/trial_balance.php`
