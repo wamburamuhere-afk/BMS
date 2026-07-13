@@ -524,20 +524,6 @@ if (!function_exists('renderExpenseCatRows')) {
                                 <option value="">Select...</option>
                             </select>
                         </div>
-                        <div class="col-md-6 d-none" id="invoice_id_block">
-                            <label class="form-label small fw-bold">Invoice Reference <small class="fw-normal text-muted">(Approved)</small></label>
-                            <select class="form-select" name="invoice_id" id="invoice_id_select">
-                                <option value="">— Select Invoice (optional) —</option>
-                            </select>
-                            <div class="form-text text-muted" id="invoice_id_hint"></div>
-                        </div>
-                        <div class="col-md-6 d-none" id="payroll_id_block">
-                            <label class="form-label small fw-bold">Payroll Reference <small class="fw-normal text-muted">(Unpaid)</small></label>
-                            <select class="form-select" name="payroll_id" id="payroll_id_select">
-                                <option value="">— Select Payroll (optional) —</option>
-                            </select>
-                            <div class="form-text text-muted" id="payroll_id_hint"></div>
-                        </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">Amount <span class="text-danger">*</span></label>
                             <input type="number" class="form-control" name="amount" id="expense_amount" step="0.01" min="0" required placeholder="0.00">
@@ -1086,18 +1072,6 @@ $(document).ready(function() {
         const $payeeSelect = $('#paid_to_id_select');
         if ($payeeSelect.data('select2')) $payeeSelect.select2('destroy');
         $payeeSelect.empty().append('<option value="">Select...</option>');
-        // Reset invoice dropdown
-        const $invSelect = $('#invoice_id_select');
-        if ($invSelect.data('select2')) $invSelect.select2('destroy');
-        $invSelect.empty().append('<option value="">— Select Invoice (optional) —</option>');
-        $('#invoice_id_hint').text('');
-        $('#invoice_id_block').addClass('d-none');
-        // Reset payroll dropdown
-        const $prlSelect = $('#payroll_id_select');
-        if ($prlSelect.data('select2')) $prlSelect.select2('destroy');
-        $prlSelect.empty().append('<option value="">— Select Payroll (optional) —</option>');
-        $('#payroll_id_hint').text('');
-        $('#payroll_id_block').addClass('d-none');
 
         // Reset categorization fields — also restore project block visibility
         $('#project_field_block').removeClass('d-none');
@@ -1161,8 +1135,6 @@ $(document).ready(function() {
 
         if ($select.data('select2')) $select.select2('destroy');
         $select.empty().append('<option value="">Select...</option>');
-        resetInvoiceBlock();
-        resetPayrollBlock();
 
         if (type && dataMap[type]) {
             dataMap[type].forEach(d => $select.append(`<option value="${d.id}">${d.name}</option>`));
@@ -1180,114 +1152,6 @@ $(document).ready(function() {
         }
     });
 
-    // When a payee is selected, load their approved invoices (supplier/sub_contractor) or approved payrolls (staff)
-    $('#paid_to_id_select').on('change', function() {
-        const payeeId   = $(this).val();
-        const payeeType = $('#paid_to_type').val();
-        resetInvoiceBlock();
-        resetPayrollBlock();
-        if (!payeeId) return;
-
-        if (['supplier', 'sub_contractor'].includes(payeeType)) {
-            const $invSelect = $('#invoice_id_select');
-            $invSelect.empty().append('<option value="">Loading...</option>');
-            $('#invoice_id_block').removeClass('d-none');
-
-            $.getJSON('<?= buildUrl('api/account/get_payee_invoices.php') ?>', { payee_type: payeeType, payee_id: payeeId }, function(res) {
-                $invSelect.empty().append('<option value="">— Select Invoice (optional) —</option>');
-                if (res.success && res.data.length) {
-                    res.data.forEach(inv => {
-                        $invSelect.append(`<option value="${inv.id}" data-amount="${inv.amount}" data-remaining="${inv.remaining}">${inv.label}</option>`);
-                    });
-                    $('#invoice_id_hint').text(res.data.length + ' invoice(s) available');
-                } else {
-                    $('#invoice_id_hint').text('No approved invoices for this payee');
-                }
-                if ($invSelect.data('select2')) $invSelect.select2('destroy');
-                $invSelect.select2({ theme: 'bootstrap-5', dropdownParent: $('#addExpenseModal'), placeholder: '— Select Invoice (optional) —', allowClear: true, width: '100%' });
-                if (_pendingInvoiceId) {
-                    $invSelect.val(_pendingInvoiceId).trigger('change.select2');
-                    _pendingInvoiceId = null;
-                }
-            }).fail(function() {
-                // Never leave the box stuck on "Loading…": on any HTTP/parse error
-                // resolve to a clear "Not available" and re-init Select2.
-                $invSelect.empty().append('<option value="">Not available</option>');
-                $('#invoice_id_hint').text('Could not load invoices for this payee');
-                if ($invSelect.data('select2')) $invSelect.select2('destroy');
-                $invSelect.select2({ theme: 'bootstrap-5', dropdownParent: $('#addExpenseModal'), placeholder: 'Not available', allowClear: true, width: '100%' });
-            });
-
-        } else if (payeeType === 'staff') {
-            const $prlSelect = $('#payroll_id_select');
-            $prlSelect.empty().append('<option value="">Loading...</option>');
-            $('#payroll_id_block').removeClass('d-none');
-
-            $.getJSON('<?= buildUrl('api/account/get_employee_payrolls.php') ?>', { employee_id: payeeId, current_payroll_id: _pendingPayrollId || 0 }, function(res) {
-                $prlSelect.empty().append('<option value="">— Select Payroll (optional) —</option>');
-                if (res.success && res.data.length) {
-                    res.data.forEach(p => {
-                        $prlSelect.append(`<option value="${p.id}" data-amount="${p.amount}" data-remaining="${p.remaining}">${p.label}</option>`);
-                    });
-                    $('#payroll_id_hint').text(res.data.length + ' payroll(s) available');
-                } else {
-                    $('#payroll_id_hint').text('No unpaid payroll records found for this staff');
-                }
-                if ($prlSelect.data('select2')) $prlSelect.select2('destroy');
-                $prlSelect.select2({ theme: 'bootstrap-5', dropdownParent: $('#addExpenseModal'), placeholder: '— Select Payroll (optional) —', allowClear: true, width: '100%' });
-                if (_pendingPayrollId) {
-                    $prlSelect.val(_pendingPayrollId).trigger('change.select2');
-                    _pendingPayrollId = null;
-                }
-            }).fail(function() {
-                // Never leave the box stuck on "Loading…": on any HTTP/parse error
-                // (e.g. an out-of-scope staff 403) resolve to a clear "Not available".
-                $prlSelect.empty().append('<option value="">Not available</option>');
-                $('#payroll_id_hint').text('Not available for this staff');
-                if ($prlSelect.data('select2')) $prlSelect.select2('destroy');
-                $prlSelect.select2({ theme: 'bootstrap-5', dropdownParent: $('#addExpenseModal'), placeholder: 'Not available', allowClear: true, width: '100%' });
-            });
-        }
-    });
-
-    // Auto-fill amount when invoice is selected; cap at remaining balance.
-    $('#invoice_id_select').on('change', function() {
-        const $opt      = $(this).find('option:selected');
-        const amount    = parseFloat($opt.data('amount')    || 0);
-        const remaining = parseFloat($opt.data('remaining') || 0);
-        const $amt      = $('#expense_amount');
-        if ($(this).val() && remaining > 0) {
-            $amt.val(remaining.toFixed(2)).attr('max', remaining);
-            if (amount > remaining) {
-                $('#invoice_id_hint').text(
-                    'TZS ' + remaining.toLocaleString() + ' remaining of '
-                    + amount.toLocaleString() + ' invoice total'
-                );
-            }
-        } else {
-            $amt.removeAttr('max');
-        }
-    });
-
-    // Auto-fill amount when payroll is selected; cap at remaining balance.
-    $('#payroll_id_select').on('change', function() {
-        const $opt      = $(this).find('option:selected');
-        const remaining = parseFloat($opt.data('remaining') || 0);
-        const net       = parseFloat($opt.data('amount')    || 0);
-        const $amt      = $('#expense_amount');
-        if ($(this).val() && remaining > 0) {
-            $amt.val(remaining.toFixed(2)).attr('max', remaining);
-            if (net > remaining) {
-                $('#payroll_id_hint').text(
-                    'TZS ' + remaining.toLocaleString() + ' remaining of '
-                    + net.toLocaleString() + ' net salary'
-                );
-            }
-        } else {
-            $amt.removeAttr('max');
-        }
-    });
-
     // Prevent accidental closes — only allow via the explicit close functions.
     // Guard only THIS modal's own hide event; nested modals (e.g. AI generate)
     // bubble hide.bs.modal up the DOM and must not be blocked here.
@@ -1296,24 +1160,6 @@ $(document).ready(function() {
         if (!_addExpenseCloseFlag) e.preventDefault();
         _addExpenseCloseFlag = false;
     });
-
-    function resetInvoiceBlock() {
-        const $invSelect = $('#invoice_id_select');
-        if ($invSelect.data('select2')) $invSelect.select2('destroy');
-        $invSelect.empty().append('<option value="">— Select Invoice (optional) —</option>');
-        $('#invoice_id_hint').text('');
-        $('#invoice_id_block').addClass('d-none');
-        $('#expense_amount').removeAttr('max');
-    }
-
-    function resetPayrollBlock() {
-        const $prlSelect = $('#payroll_id_select');
-        if ($prlSelect.data('select2')) $prlSelect.select2('destroy');
-        $prlSelect.empty().append('<option value="">— Select Payroll (optional) —</option>');
-        $('#payroll_id_hint').text('');
-        $('#payroll_id_block').addClass('d-none');
-        $('#expense_amount').removeAttr('max');
-    }
 });
 
 // ── Expense Categorization Logic (Dynamic) ──────────────────────────────
@@ -1624,8 +1470,6 @@ function populateCascadeForCategory(catId) {
 }
 
 let _addExpenseCloseFlag = false;
-let _pendingInvoiceId   = null;
-let _pendingPayrollId   = null;
 function closeAddExpenseModal() {
     _addExpenseCloseFlag = true;
     $('#addExpenseModal').modal('hide');
@@ -1750,15 +1594,11 @@ function editExpense(id) {
 
             // Populate Paid To (unified dropdown)
             if (data.paid_to_type) {
-                _pendingInvoiceId = data.invoice_id || null;
-                _pendingPayrollId = data.payroll_id || null;
                 $form.find('select[name="paid_to_type"]').val(data.paid_to_type).trigger('change');
                 setTimeout(() => {
                     $('#paid_to_id_select').val(data.paid_to_id).trigger('change');
                 }, 150);
             } else {
-                _pendingInvoiceId = null;
-                _pendingPayrollId = null;
                 $form.find('select[name="paid_to_type"]').val(null).trigger('change');
             }
 

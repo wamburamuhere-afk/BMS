@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-07-13 (change) — Expenses: removed invoice/payroll pull-through from Add/Edit modal
+
+**File:** `app/constant/accounts/expenses.php`
+
+The "Paid to" section let a user pick Supplier/Staff/Sub-Contractor and then pull in that
+payee's **approved Invoice** or **unpaid Payroll** record, auto-filling the expense amount from
+its remaining balance. Per user direction, this conflated two different mechanisms: an ad-hoc
+company expense payment (e.g. reimbursing a supplier or paying an employee's transport) is not
+the same process as settling an invoice or processing payroll, and must not reach into those
+systems.
+
+- Removed the "Invoice Reference (Approved)" and "Payroll Reference (Unpaid)" blocks and their
+  `d-none` toggle wiring.
+- Removed the JS that called `api/account/get_payee_invoices.php` /
+  `api/account/get_employee_payrolls.php` on payee selection, the amount auto-fill/cap handlers
+  tied to those selections, and the `_pendingInvoiceId`/`_pendingPayrollId` edit-prefill logic.
+- Kept the existing "Paid to" payee dropdown as-is (all active suppliers / employees /
+  sub-contractors, searchable) for all three payee types.
+- `Amount` is now always a plain manually-entered field regardless of payee type.
+- Backend (`api/account/add_expense.php`, `update_expense.php`) untouched — `invoice_id`/
+  `payroll_id` remain optional nullable columns; the form simply no longer sends them.
+
 ## 2026-07-13 (fix) — Ledger Report: money cells still bled into the next column on print
 
 **File:** `app/constant/reports/ledger_report.php`
