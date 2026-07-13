@@ -745,6 +745,14 @@ DataTable Responsive-extension JS error on this page, reproduced even with all c
   above the record card — matching `customers.php` exactly. No Import button was added (no
   import feature exists for sub-contractors yet). `copyTable()`/`exportSC()` use the same
   hand-rolled clipboard/CSV approach as `invoices.php` (no new CDN dependency).
+- **Projects column value spilling into the Status column:** Bootstrap's `.badge` class declares
+  its own `white-space: nowrap` directly on the element, which a parent `td`'s
+  `white-space: normal` does not override (that's an explicit rule on the badge itself, not an
+  inherited one). A long badge like "Upgrade of Transmission Line +1" therefore ignored the
+  column width and visually ran into Status. Forced `#scTable td .badge` to wrap
+  (`white-space: normal; word-break: break-word`) and added `overflow: hidden` on every
+  `#scTable td`/`th` as a hard per-column boundary so no cell's content can spill into its
+  neighbour.
 
 Verified live at simulated Portrait width (dev.bms.local/sub_contractors): stat cards one row,
 table fits without overflow or duplicate header, search/print/copy/CSV all functional.
