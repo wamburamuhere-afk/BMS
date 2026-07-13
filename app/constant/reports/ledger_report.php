@@ -256,7 +256,7 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
             <p class="text-muted mb-0">Detailed historical record of financial movements</p>
         </div>
         <div class="col-md-6 text-end">
-            <button class="btn btn-outline-primary shadow-sm px-4 fw-bold" onclick="window.print()">
+            <button class="btn btn-outline-primary shadow-sm px-4 fw-bold" onclick="printLedgerX()">
                 <i class="bi bi-printer-fill me-2"></i> Print Ledger
             </button>
             <button class="btn btn-dark shadow-sm px-4 fw-bold ms-2" onclick="exportCSV()">
@@ -344,7 +344,7 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
     <?php endif; ?>
 
     <!-- Ledger Table -->
-    <div class="card border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
+    <div class="card border-0 shadow-lg print-flow-card" style="border-radius: 15px; overflow: hidden;">
         <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
             
             <div class="d-print-none">
@@ -355,7 +355,7 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
             <div class="table-responsive">
                 <?php if ($account_id): ?>
                 <!-- Single-account T-ledger: date | ref | description | debit | credit | running balance -->
-                <table class="table align-middle mb-0 gl-table" id="ledgerTable">
+                <table class="table align-middle mb-0 gl-table gl-table-detail" id="ledgerTable">
                     <thead class="bg-light">
                         <tr style="font-size: 0.78rem;">
                             <th class="ps-4 py-2 text-muted text-uppercase">Date</th>
@@ -369,18 +369,28 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
                     </thead>
                     <tbody>
                         <?php $normalSide = $selected_account['normal_side'] ?? null; ?>
+                        <!-- 7 explicit cells (no colspan) so DataTables' per-row column
+                             count stays consistent with the 7-column header. -->
                         <tr class="table-light gl-opening-row">
                             <td class="ps-4 py-2" style="font-size: 0.85rem;"><?= htmlspecialchars(date('d M Y', strtotime($start_date))) ?></td>
-                            <td colspan="5" class="fst-italic text-muted py-2" style="font-size: 0.85rem;">
+                            <td class="py-2"></td>
+                            <td class="py-2"></td>
+                            <td class="fst-italic text-muted py-2" style="font-size: 0.85rem;">
                                 Opening Balance Brought Forward
                             </td>
+                            <td class="py-2"></td>
+                            <td class="py-2"></td>
                             <td class="text-end pe-4 fw-bold font-monospace py-2" style="font-size: 0.9rem;">
                                 <?= htmlspecialchars(gl_balance_label($opening_balance, $normalSide)) ?>
                             </td>
                         </tr>
 
                         <?php if (empty($entries)): ?>
-                            <tr><td colspan="7" class="text-center py-5 text-muted fst-italic">No posted entries in this period for this account.</td></tr>
+                            <tr>
+                                <td></td><td></td><td></td>
+                                <td class="text-center py-5 text-muted fst-italic">No posted entries in this period for this account.</td>
+                                <td></td><td></td><td></td>
+                            </tr>
                         <?php else:
                             $running_balance = $opening_balance;
                             foreach ($entries as $e):
@@ -417,9 +427,14 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
+                    <!-- 7 explicit cells per row (NO colspan): DataTables maps one
+                         footer cell per column and miscounts colspan'd footers. -->
                     <tfoot class="fw-bold">
                         <tr class="border-top border-2 border-dark">
-                            <td colspan="4" class="ps-4 py-2 text-uppercase" style="font-size: 0.88rem; letter-spacing: 0.5px;">Period Totals</td>
+                            <td class="ps-4 py-2 text-uppercase" style="font-size: 0.88rem; letter-spacing: 0.5px;">Period Totals</td>
+                            <td class="py-2"></td>
+                            <td class="py-2"></td>
+                            <td class="py-2"></td>
                             <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= format_currency($total_debit) ?></td>
                             <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= format_currency($total_credit) ?></td>
                             <td class="text-end pe-4 py-2 font-monospace" style="font-size: 0.95rem;">
@@ -427,7 +442,8 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
                             </td>
                         </tr>
                         <tr>
-                            <td colspan="6" class="ps-4 py-2 fst-italic text-muted" style="font-size: 0.82rem;">Closing Balance as of <?= htmlspecialchars(date('d M Y', strtotime($end_date))) ?></td>
+                            <td class="ps-4 py-2 fst-italic text-muted" style="font-size: 0.82rem;">Closing Balance as of <?= htmlspecialchars(date('d M Y', strtotime($end_date))) ?></td>
+                            <td></td><td></td><td></td><td></td><td></td>
                             <td class="text-end pe-4 py-2 font-monospace fw-bold <?= $closing_balance < 0 ? 'text-danger' : 'text-success' ?>" style="font-size: 1.0rem; border-top: 2px solid #0d6efd;">
                                 <?= htmlspecialchars(gl_balance_label($closing_balance, $normalSide)) ?>
                             </td>
@@ -436,7 +452,7 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
                 </table>
                 <?php else: ?>
                 <!-- No-account view: per-account summary (opening | debits | credits | closing) -->
-                <table class="table align-middle mb-0 gl-table" id="ledgerTable">
+                <table class="table align-middle mb-0 gl-table gl-table-summary" id="ledgerTable">
                     <thead class="bg-light">
                         <tr style="font-size: 0.78rem;">
                             <th class="ps-4 py-2 text-muted text-uppercase">Code</th>
@@ -450,7 +466,13 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
                     </thead>
                     <tbody>
                         <?php if (empty($summary_rows)): ?>
-                            <tr><td colspan="7" class="text-center py-5 text-muted fst-italic">No posted entries in this period across any account.</td></tr>
+                            <!-- 7 explicit cells (no colspan) so DataTables' per-row column
+                                 count stays consistent with the 7-column header. -->
+                            <tr>
+                                <td></td><td></td>
+                                <td class="text-center py-5 text-muted fst-italic">No posted entries in this period across any account.</td>
+                                <td></td><td></td><td></td><td></td>
+                            </tr>
                         <?php else: foreach ($summary_rows as $r):
                             $closing = (float)$r['opening'] + (float)$r['dr'] - (float)$r['cr'];
                             $side    = $r['normal_side'];
@@ -470,9 +492,14 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
+                    <!-- 7 explicit cells (NO colspan): DataTables maps one footer
+                         cell per column and miscounts colspan'd footers. -->
                     <tfoot class="fw-bold">
                         <tr class="border-top border-2 border-dark">
-                            <td colspan="4" class="ps-4 py-2 text-uppercase" style="font-size: 0.88rem; letter-spacing: 0.5px;">Period Totals</td>
+                            <td class="ps-4 py-2 text-uppercase" style="font-size: 0.88rem; letter-spacing: 0.5px;">Period Totals</td>
+                            <td class="py-2"></td>
+                            <td class="py-2"></td>
+                            <td class="py-2"></td>
                             <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= format_currency($total_debit) ?></td>
                             <td class="text-end font-monospace py-2" style="font-size: 0.9rem;"><?= format_currency($total_credit) ?></td>
                             <td class="text-end pe-4 py-2 font-monospace" style="font-size: 0.9rem;"><?= format_currency($net_change) ?></td>
@@ -487,30 +514,67 @@ function gl_balance_label(float $amount, ?string $normalSide): string {
 
 <script>
 $(document).ready(function(){
-    $('#ledgerSearch').on('keyup', function() {
-        var value = $(this).val().toLowerCase();
-        $("#ledgerTable tbody tr").filter(function() {
-            if($(this).hasClass('italic')) return true;
-            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
-        });
+    // DataTable init — pagination, sort, Show:N, matching the house standard
+    // used by every other list page (and the same proven print-safe pattern
+    // already shipped on account_details.php's ledger table). responsive is
+    // left off on purpose: DataTables' Responsive extension hides low-priority
+    // columns behind a "+" toggle at narrow widths, which is exactly wrong for
+    // a financial ledger where every column must always show, print included.
+    const table = $('#ledgerTable').DataTable({
+        responsive: false,
+        order: [],   // keep the original chronological order from SQL
+        pageLength: 25,
+        dom: 'rtip', // no default search box — #ledgerSearch drives table.search() below
+        language: {
+            lengthMenu: 'Show _MENU_',
+            info: 'Showing _START_ to _END_ of _TOTAL_ entries',
+            emptyTable: 'No records found.',
+            zeroRecords: 'No matching records.',
+            paginate: { first: 'First', last: 'Last', next: 'Next', previous: 'Previous' }
+        }
     });
+    window.ledgerReportTable = table;
+
+    $('#ledgerSearch').on('input', function () { table.search(this.value).draw(); });
 
     if(typeof logReportAction==='function') {
         logReportAction('Viewed Ledger Report', 'Generated ledger records for period <?= $start_date ?> to <?= $end_date ?>');
     }
 });
 
+// Print — DataTables only keeps the current page's rows in the DOM, so
+// printing without this would cut off every row past the first page.
+function printLedgerX() {
+    logReportAction && logReportAction('Printed Ledger Report', 'Printed ledger for period <?= $start_date ?> to <?= $end_date ?>');
+    const table = window.ledgerReportTable;
+    if (!table) { window.print(); return; }
+    const originalLength = table.page.len();
+    table.page.len(-1).draw(false);
+    setTimeout(function() {
+        window.print();
+        table.page.len(originalLength).draw(false);
+    }, 100);
+}
+
 function exportCSV() {
-    // Real client-side CSV export of the rendered ledger (respects the search
-    // filter — hidden rows are skipped). Replaces the old alert() stub.
+    // Client-side CSV export via the DataTable API — respects the active
+    // search filter but, unlike reading the DOM directly, is not limited to
+    // whichever page is currently displayed.
     var lines = [];
-    document.querySelectorAll('#ledgerTable tr').forEach(function (tr) {
-        if (tr.style.display === 'none') return;          // skip filtered-out rows
-        var cells = tr.querySelectorAll('th, td');
+    var headerCells = [];
+    $('#ledgerTable thead tr th').each(function () {
+        headerCells.push('"' + $(this).text().replace(/\s+/g, ' ').trim().replace(/"/g, '""') + '"');
+    });
+    lines.push(headerCells.join(','));
+
+    var table = window.ledgerReportTable;
+    var rows = table ? table.rows({ search: 'applied' }).nodes() : document.querySelectorAll('#ledgerTable tbody tr');
+    $(rows).each(function () {
+        var cells = $(this).find('td');
         if (!cells.length) return;
         var line = [];
-        cells.forEach(function (c) {
-            var t = (c.innerText || c.textContent || '').replace(/\s+/g, ' ').trim();
+        cells.each(function () {
+            var t = ($(this).text() || '').replace(/\s+/g, ' ').trim();
             line.push('"' + t.replace(/"/g, '""') + '"');
         });
         lines.push(line.join(','));
@@ -546,6 +610,79 @@ function exportCSV() {
         .table td { border: 1px solid #dee2e6 !important; }
         .container-fluid { padding: 0 !important; }
         .badge { color: #000 !important; border: 1px solid #ddd !important; background: transparent !important; }
+
+        /* DataTables' own pagination/length/info chrome — printLedgerX()
+           already expands the table to show every row before printing, so
+           none of this belongs on the page. */
+        .dataTables_info, .dataTables_paginate, .dataTables_length, .dataTables_filter {
+            display: none !important;
+        }
+
+        /* Table wasn't starting on the first printed page — the wrapping
+           .card can grow tall with many ledger rows, and the shared
+           responsive.css rule `.card { page-break-inside: avoid }` applies to
+           every .card on every printed page, pushing the whole card to page
+           2. Scoped override, plus resetting the card's own inline
+           overflow:hidden (a card allowed to span pages must not clip
+           content past its on-screen box height). */
+        .print-flow-card {
+            page-break-inside: auto !important;
+            break-inside: auto !important;
+            overflow: visible !important;
+        }
+
+        /* Digits wrapping mid-number — lock column widths with
+           table-layout:fixed (same recipe already proven on
+           suppliers.php/services.php/account_details.php) plus a dedicated
+           smaller print font so whole words/numbers fit. */
+        #ledgerTable {
+            table-layout: fixed !important;
+            font-size: 8pt !important;
+        }
+        #ledgerTable thead th {
+            font-size: 7pt !important;
+            line-height: 1.15 !important;
+            padding: 4px 3px !important;
+        }
+        #ledgerTable th, #ledgerTable td {
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            width: auto !important;
+        }
+        #ledgerTable th:nth-child(1), #ledgerTable td:nth-child(1) { width: 10% !important; }
+        #ledgerTable th:nth-child(2), #ledgerTable td:nth-child(2) { width: 16% !important; }
+        #ledgerTable th:nth-child(3), #ledgerTable td:nth-child(3) { width: 10% !important; }
+        #ledgerTable th:nth-child(4), #ledgerTable td:nth-child(4) { width: 24% !important; }
+        #ledgerTable th:nth-child(5), #ledgerTable td:nth-child(5) { width: 14% !important; }
+        #ledgerTable th:nth-child(6), #ledgerTable td:nth-child(6) { width: 13% !important; }
+        #ledgerTable th:nth-child(7), #ledgerTable td:nth-child(7) { width: 13% !important; }
+
+        /* Money columns must never wrap onto a second line. Debit/Credit/
+           Balance are columns 5-7 in BOTH table variants; the "no account
+           selected" summary view also has a money value (Opening) in column
+           4, where the detail view has free-flowing Description text — so
+           that one column's nowrap rule is scoped to .gl-table-summary only. */
+        #ledgerTable td:nth-child(5),
+        #ledgerTable td:nth-child(6),
+        #ledgerTable td:nth-child(7) {
+            white-space: nowrap !important;
+        }
+        #ledgerTable.gl-table-summary td:nth-child(4) {
+            white-space: nowrap !important;
+        }
+
+        /* tfoot defaults to display:table-footer-group, which browsers
+           repeat at the bottom of EVERY printed page when a table spans more
+           than one — so "Period Totals" was printing on every page instead
+           of once at the true end of the data. table-row-group makes it flow
+           as a normal trailing row instead. */
+        #ledgerTable tfoot {
+            display: table-row-group !important;
+        }
+        #ledgerTable tfoot td {
+            font-size: 8.5pt !important;
+            white-space: nowrap !important;
+        }
     }
     /* Canonical I/E Print margin — see i_e_print.md §1 */
     @page { margin: 10mm 8mm 16mm 8mm; }
