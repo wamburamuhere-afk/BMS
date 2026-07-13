@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-07-12 (fix) — Income Statement: first printed page showed no data
+
+**File:** `app/bms/invoice/income_statement.php`
+
+- **Not covered by `i_e_print.md`:** this page references that doc for its canonical `@page`
+  margin, but `i_e_print.md` only governs transactional documents (Quotation, Invoice, PO…) and
+  doesn't mention `page-break-inside` at all — `income_statement.php` isn't even in its compliance
+  map. The actual cause is the same shared-rule bug fixed across every list/report page today: the
+  global `responsive.css` rule `.card { page-break-inside: avoid }` applies to every `.card` on
+  every printed page. This report's table card (Statement of Profit or Loss) can grow tall with
+  many GL accounts, so "never break inside it" pushed the whole card to page 2, leaving page 1 with
+  just the summary/header.
+- **Fix:** added the same `.print-flow-card` marker class + scoped `page-break-inside: auto`
+  override used on every other page today. Also reset the card's inline `overflow: hidden` to
+  `visible` for print — a card now allowed to span pages must not clip content past its own
+  on-screen box height.
+
+Verified live: `getComputedStyle(card).pageBreakInside` confirmed `auto` (was `avoid`);
+`overflow` confirmed `visible` (was `hidden`); visually confirmed the table starts immediately
+after the header with no gap (21-row report).
+
+---
+
 ## 2026-07-11 (fix) — Purchase Orders: print page 1, oversized font, header wrapping
 
 **File:** `app/bms/purchase/purchase_orders.php`

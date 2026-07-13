@@ -160,7 +160,7 @@ $is_admin_user = isAdmin();
     </div>
 
     <!-- Detailed breakdown — structured P&L with server-side totals -->
-    <div class="card border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
+    <div class="card border-0 shadow-lg print-flow-card" style="border-radius: 15px; overflow: hidden;">
         <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
             <h5 class="mb-0 fw-bold">Statement of Profit or Loss</h5>
             <small class="text-muted" id="periodLabel"></small>
@@ -673,6 +673,22 @@ window.addEventListener('afterprint', function () {
     @media print {
         .d-print-none, #summaryCards { display: none !important; }
         .card { border: none !important; box-shadow: none !important; border-radius: 0 !important; }
+
+        /* Table wasn't starting on the first printed page — same shared-rule
+           cause fixed across every list/report page today: the global
+           responsive.css rule `.card { page-break-inside: avoid }` applies
+           to every .card on every printed page. This report's table card
+           can grow tall (many GL accounts), so "never break inside it"
+           pushed the whole card to page 2, leaving page 1 with just the
+           summary/header. overflow:hidden (inline on the card) is also
+           reset, since a card that's allowed to span pages must not clip
+           content past its own on-screen box height. */
+        .print-flow-card {
+            page-break-inside: auto !important;
+            break-inside: auto !important;
+            overflow: visible !important;
+        }
+
         .table { border: 1px solid #000 !important; }
         .table th { background-color: #f8f9fa !important; border: 1px solid #000 !important; -webkit-print-color-adjust: exact; }
         .table td { border: 1px solid #dee2e6 !important; }
