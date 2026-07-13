@@ -422,6 +422,25 @@ if (!function_exists('cf_fmt')) {
         page-break-inside: auto !important;
         break-inside: auto !important;
     }
+
+    /* Closing Cash & Bank Balance used Bootstrap's .fs-5 (~20px) for emphasis —
+       far larger than the rest of the 9pt print table, so its amount didn't fit
+       the column width and wrapped onto a second line. The taller row also
+       landed right at the page's bottom margin, colliding with the fixed print
+       footer on shorter screens/printers. Print gets its emphasis from
+       bold + shading only, not a screen-scale font jump; this fixes both
+       symptoms for direct and indirect methods alike (the row is method-agnostic
+       markup, rendered once regardless of which tab is active). */
+    .print-flow-card table.table .fs-5 {
+        font-size: 10.5pt !important;
+    }
+    .print-flow-card table.table {
+        table-layout: fixed !important;
+    }
+    .print-flow-card table.table td.text-end,
+    .print-flow-card table.table th.text-end {
+        white-space: nowrap !important;
+    }
 }
 </style>
 
