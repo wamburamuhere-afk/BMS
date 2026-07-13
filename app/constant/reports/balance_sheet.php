@@ -15,9 +15,9 @@ if (function_exists('autoEnforcePermission')) {
 
 // 1. Settings & Filters
 $as_of_date = $_GET['as_of_date'] ?? date('Y-m-d');
-// Presentation format: 'european' = horizontal/two-sided (default, existing) |
-// 'british' = vertical/report form (net current assets → capital employed).
-$format = (($_GET['format'] ?? 'european') === 'british') ? 'british' : 'european';
+// Presentation format: 'european' = horizontal/two-sided |
+// 'british' = vertical/report form (net current assets → capital employed) — now the default.
+$format = (($_GET['format'] ?? 'british') === 'european') ? 'european' : 'british';
 $company_name = get_setting('company_name') ?: 'Business Management System';
 $company_logo = get_setting('company_logo');
 
@@ -534,15 +534,15 @@ try {
                 <tr class="brit-total"><td class="fw-bold h6 mb-0">CAPITAL EMPLOYED</td><td></td><td class="text-end fw-bold h6 mb-0 double-underline"><?= format_accounting($b_capitalEmployed) ?></td></tr>
             </table>
 
-            <p class="text-center text-muted mt-3" style="font-size:0.8rem;">
+            <p class="text-center text-muted mt-3 d-print-none" style="font-size:0.8rem;">
                 <i class="bi bi-info-circle me-1"></i>Net Assets must equal Capital Employed
                 <?= abs($b_netAssets - $b_capitalEmployed) < 0.01 ? '<span class="text-success fw-bold">✓ balanced</span>' : '<span class="text-danger fw-bold">— check Trial Balance</span>' ?>
             </p>
         </div>
         <?php endif; ?>
 
-        <!-- Signature Lines -->
-        <div class="signature-section mt-5 px-4 pt-5">
+        <!-- Signature Lines — screen only; keeps the print report clean/smart (matches print-customers.php) -->
+        <div class="signature-section mt-5 px-4 pt-5 d-print-none">
             <div class="row">
                 <div class="col-4 text-center"><div class="sig-line"></div><p class="small text-uppercase mt-2">Prepared By</p></div>
                 <div class="col-4 text-center"><div class="sig-line"></div><p class="small text-uppercase mt-2">Verified By</p></div>
@@ -550,7 +550,9 @@ try {
             </div>
         </div>
 
-        <div class="footer-note mt-5 text-center text-muted x-small">
+        <!-- Screen-only note — the shared print_footer_html.php below already shows
+             "Printed by X on Y" on every printed page; this duplicated that. -->
+        <div class="footer-note mt-5 text-center text-muted x-small d-print-none">
             Printed on <?= date('d M Y, H:i') ?> | System ID: <?= session_id() ?>
         </div>
     </div>
@@ -601,6 +603,15 @@ try {
     @page { margin: 10mm 8mm 16mm 8mm; }
     .col-md-6 { width: 48%; float: left; }
     .row { display: block; }
+
+    /* Digits were wrapping across more than one line inside a cell — a
+       number should never break, so force every amount cell (European's
+       .text-end tds, British's same, and the double-underlined totals) onto
+       one line regardless of column width. */
+    .report-paper td.text-end,
+    .report-paper .total-amount {
+        white-space: nowrap !important;
+    }
 }
 </style>
 
