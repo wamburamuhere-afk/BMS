@@ -254,7 +254,7 @@ try {
     <!-- Views Container -->
     <div id="tableView" class="view-section">
         <!-- Table Card -->
-        <div class="card border-0 shadow-sm">
+        <div class="card border-0 shadow-sm print-flow-card">
             <div class="card-header bg-white border-bottom d-flex align-items-center py-2 px-3 d-print-none">
                 <span class="fw-bold text-muted small">Purchase Order Records</span>
                 <div class="btn-group shadow-sm ms-auto d-none d-md-flex" role="group">
@@ -780,16 +780,15 @@ function approveOrder(id, orderNumber) {
 
 @media print {
     body { background: white !important; padding: 0 !important; padding-top: 0 !important; }
-    .purchase-orders-dashboard { background: white !important; padding: 20px !important; }
-    .custom-stat-card { 
-        box-shadow: none !important; 
+    .purchase-orders-dashboard { background: white !important; padding: 0 !important; }
+    .custom-stat-card {
+        box-shadow: none !important;
         border: 1px solid #d1e7dd !important;
         background-color: #f8fafc !important;
     }
     .custom-stat-card h4, .custom-stat-card small { color: #000 !important; }
     .table-responsive { overflow: visible !important; }
-    table { width: 100% !important; border-collapse: collapse !important; }
-    th, td { border: 1px solid #dee2e6 !important; padding: 8px !important; }
+    th, td { border: 1px solid #dee2e6 !important; }
     th { background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; }
     .d-print-none { display: none !important; }
     .dataTables_length, .dataTables_info, .dataTables_paginate { display: none !important; }
@@ -797,6 +796,70 @@ function approveOrder(id, orderNumber) {
     /* Force Table View on Print */
     #tableView { display: block !important; }
     #cardView { display: none !important; }
+
+    /* First page was showing no data — same shared-rule cause fixed across
+       every list/report page: the global responsive.css rule
+       `.card { page-break-inside: avoid }` applies to every .card on every
+       printed page. This page's table card can grow tall with many
+       purchase orders, so "never break inside it" pushed the whole card to
+       page 2, leaving page 1 with just the header/stats. */
+    .print-flow-card {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+    }
+
+    /* Large font size + headers not fitting ("SUPPLIER" -> "SUPPLIE"/"R"):
+       no table-layout/column sizing existed for print at all, so the table
+       inherited the full body font-size. Same recipe already proven on
+       invoices.php/suppliers.php/services.php: table-layout:fixed with a
+       compact font (matching print-customers.php's density) + explicit
+       per-column percentages, flexible in both Portrait and Landscape since
+       they're plain percentages, not fixed pixels. */
+    #purchaseOrdersTable {
+        table-layout: fixed !important;
+        width: 100% !important;
+        font-size: 8pt !important;
+        border-collapse: collapse !important;
+    }
+    #purchaseOrdersTable th, #purchaseOrdersTable td {
+        padding: 5px 6px !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        vertical-align: middle !important;
+    }
+    #purchaseOrdersTable thead th {
+        font-size: 7pt !important;
+        line-height: 1.15 !important;
+        padding: 4px 3px !important;
+    }
+    /* Printed columns (Actions excluded via d-print-none): S/NO, Order #,
+       Supplier, [Project], Order Date, Total Amount, Status. */
+    <?php if ($enable_projects): ?>
+    #purchaseOrdersTable th:nth-child(1), #purchaseOrdersTable td:nth-child(1) { width: 5%  !important; }
+    #purchaseOrdersTable th:nth-child(2), #purchaseOrdersTable td:nth-child(2) { width: 13% !important; }
+    #purchaseOrdersTable th:nth-child(3), #purchaseOrdersTable td:nth-child(3) { width: 24% !important; }
+    #purchaseOrdersTable th:nth-child(4), #purchaseOrdersTable td:nth-child(4) { width: 13% !important; }
+    #purchaseOrdersTable th:nth-child(5), #purchaseOrdersTable td:nth-child(5) { width: 11% !important; }
+    #purchaseOrdersTable th:nth-child(6), #purchaseOrdersTable td:nth-child(6) { width: 20% !important; }
+    #purchaseOrdersTable th:nth-child(7), #purchaseOrdersTable td:nth-child(7) { width: 14% !important; }
+    <?php else: ?>
+    #purchaseOrdersTable th:nth-child(1), #purchaseOrdersTable td:nth-child(1) { width: 5%  !important; }
+    #purchaseOrdersTable th:nth-child(2), #purchaseOrdersTable td:nth-child(2) { width: 14% !important; }
+    #purchaseOrdersTable th:nth-child(3), #purchaseOrdersTable td:nth-child(3) { width: 28% !important; }
+    #purchaseOrdersTable th:nth-child(4), #purchaseOrdersTable td:nth-child(4) { width: 12% !important; }
+    #purchaseOrdersTable th:nth-child(5), #purchaseOrdersTable td:nth-child(5) { width: 23% !important; }
+    #purchaseOrdersTable th:nth-child(6), #purchaseOrdersTable td:nth-child(6) { width: 18% !important; }
+    <?php endif; ?>
+
+    /* Money and short text — never needs to wrap, unlike Supplier/Project. */
+    #purchaseOrdersTable td.text-end,
+    #purchaseOrdersTable td:nth-child(1) {
+        white-space: nowrap !important;
+    }
+    #purchaseOrdersTable .badge {
+        white-space: normal !important;
+        word-break: break-word !important;
+    }
 
     /* Print header styling */
     #printHeader h1 {
