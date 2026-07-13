@@ -1,5 +1,38 @@
 # BMS Changelog
 
+## 2026-07-13 (fix) — Create Document: polished editor toolbar + visible signature preview
+
+**File:** `app/constant/document/create_document.php`
+
+Follow-up to the same day's Create Document (Phase 1) — the editor looked bare-bones and the signature
+area showed only a text note, no visual.
+
+- **Toolbar expanded to a full, Word-like set**: font name + size, bold/italic/underline/strikethrough/
+  superscript/subscript, text color, paragraph (alignment + indent/outdent, via Summernote's built-in
+  paragraph dropdown) + line-height, tables, links/images/horizontal-rule, undo/redo, fullscreen/code
+  view/help — all Summernote's own built-in toolbar groups, no extra plugins. Previously only had
+  bold/italic/underline, font size, color, lists, and a link/picture insert.
+- **Editor restyled** to match BMS's card/shadow-sm language instead of the stock Summernote skin
+  (rounded corners, bordered toolbar strip) — plus a blue "Live Preview" label bar above the letter
+  paper so the whole thing reads as one polished module page, not a bare text box bolted onto a form.
+- **Signature area now shows something real**: if the creator has an active signature on file
+  (`user_signatures`, same table/query pattern as `get_user_signatures_list.php`), its image renders
+  inside a dashed signature-line box with a red "PREVIEW" watermark — makes clear this is not yet the
+  legally-applied signature (that still only happens through the audited
+  `select_document_add_esignature.php` wizard: consent, IP, hash, event log). If no signature is on
+  file yet, shows a "Set up your e-signature" link to `e_signatures.php` instead of a dead end at
+  Save & Sign.
+- `#letterBody` given an explicit `font-family: Arial` so the toolbar's font-name picker shows a real
+  selected font instead of the browser's raw computed value (was showing "system-ui").
+
+Verified live: fuller toolbar renders and initializes with no console errors; signature preview
+correctly pulls the creator's most recent active signature image (confirmed one real user draft,
+"doc 18" / `BMS-LTR-0001`, already exists from trying the feature — left untouched, not test data).
+Noted for the user as a data-quality aside (not a code issue): their admin account's *most recent*
+active signature is a stray full-page image (1054×1492, clearly not a signature) rather than one of
+their earlier drawn signatures (766×200, matches the signature-pad canvas) — worth deactivating via
+the E-Signatures page.
+
 ## 2026-07-13 (feat) — Create Document (Phase 1): write letters/memos in-app, hand off to existing e-signature wizard
 
 **New files:**

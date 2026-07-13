@@ -64,6 +64,22 @@ $category_id = $existing['category_id'] ?? null;
 $signer_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
 $signer_role = $_SESSION['user_role'] ?? '';
 
+// The creator's own on-file signature (drawn/uploaded/typed via e_signatures.php)
+// — shown here as a WATERMARKED PREVIEW ONLY, so the letter never looks blank
+// while it's still a draft. This is never the legally-applied signature: that
+// only happens through select_document_add_esignature.php, which is the one
+// place that records consent, IP, hash and the audit event log. Rendering it
+// here too would let a "signed-looking" PDF leave the building without ever
+// going through that audit trail.
+$sig_stmt = $pdo->prepare("
+    SELECT thumbnail_path, file_path FROM user_signatures
+    WHERE user_id = ? AND status = 'active'
+    ORDER BY created_at DESC LIMIT 1
+");
+$sig_stmt->execute([$_SESSION['user_id'] ?? 0]);
+$my_signature = $sig_stmt->fetch(PDO::FETCH_ASSOC);
+$signature_preview_path = $my_signature ? ($my_signature['thumbnail_path'] ?: $my_signature['file_path']) : null;
+
 $project_name = null;
 if ($project_id) {
     $pstmt = $pdo->prepare("SELECT project_name FROM projects WHERE project_id = ?");
@@ -138,6 +154,9 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
          region — the letterhead/ref/date/signature block are rendered from
          structured fields so they can never be accidentally edited/broken by
          the rich-text editor. -->
+    <div class="letter-paper-wrap d-print-none">
+        <div class="letter-paper-label"><i class="bi bi-eye"></i> Live Preview — this is exactly how the saved PDF will look</div>
+    </div>
     <div class="letter-paper mx-auto shadow-sm" id="letterPaper">
         <div class="letter-head text-center">
             <?php if ($company_logo): ?>
@@ -159,9 +178,24 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
         <div id="letterBody"><?= $content !== '' ? $content : $default_body ?></div>
 
         <div class="letter-signoff">
+            <div class="letter-signature-box">
+                <?php if ($signature_preview_path): ?>
+                    <img src="<?= htmlspecialchars(getUrl($signature_preview_path)) ?>" alt="Signature preview" class="letter-signature-img">
+                    <div class="letter-signature-watermark">PREVIEW</div>
+                <?php else: ?>
+                    <a href="<?= getUrl('e_signatures') ?>" class="letter-signature-cta d-print-none" target="_blank">
+                        <i class="bi bi-pen"></i> Set up your e-signature
+                    </a>
+                <?php endif; ?>
+            </div>
             <div class="letter-signoff-name"><?= htmlspecialchars($signer_name ?: 'Signed by') ?></div>
             <?php if ($signer_role): ?><div class="letter-signoff-role"><?= htmlspecialchars($signer_role) ?></div><?php endif; ?>
-            <div class="letter-signoff-note text-muted d-print-none"><i class="bi bi-info-circle me-1"></i>Signature is applied in the next step (Save &amp; Sign).</div>
+            <div class="letter-signoff-note text-muted d-print-none">
+                <i class="bi bi-info-circle me-1"></i>
+                <?= $signature_preview_path
+                    ? 'Preview only — your signature is legally applied (with audit trail) in the next step, Save &amp; Sign.'
+                    : 'No signature on file yet — add one to enable Save &amp; Sign.' ?>
+            </div>
         </div>
     </div>
 </div>
@@ -177,6 +211,21 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
     min-height: 297mm;
     padding: 20mm 18mm;
     border: 1px solid #dee2e6;
+    border-radius: 0 0 12px 12px;
+}
+.letter-paper-wrap { max-width: 210mm; margin: 0 auto; }
+.letter-paper-label {
+    background: #0d6efd;
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 8px 16px;
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 .letter-head { margin-bottom: 14mm; }
 .letter-logo { max-height: 70px; width: auto; display: block; margin: 0 auto 6px; }
@@ -184,16 +233,63 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
 .letter-meta { display: flex; justify-content: space-between; font-size: 10pt; color: #333; margin-bottom: 10mm; }
 .letter-recipient { font-size: 11pt; white-space: pre-line; margin-bottom: 6mm; min-height: 1em; }
 .letter-subject { font-size: 11pt; margin-bottom: 8mm; text-decoration: underline; }
-#letterBody { font-size: 11pt; line-height: 1.6; min-height: 60mm; }
+#letterBody { font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.6; min-height: 60mm; }
+
+/* Summernote ships its own generic skin — restyle it to match BMS's rounded,
+   shadow-sm card language instead of looking like a bare stock install. */
+.note-editor.note-frame {
+    border: 1px solid #dee2e6 !important;
+    border-radius: 8px !important;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.note-editor .note-toolbar {
+    background: #f8f9fa !important;
+    border-bottom: 1px solid #dee2e6 !important;
+    padding: 6px !important;
+}
+.note-editable { padding: 12px !important; }
+
 .letter-signoff { margin-top: 16mm; font-size: 11pt; }
-.letter-signoff-name { font-weight: 700; }
+.letter-signature-box {
+    position: relative;
+    width: 220px;
+    height: 80px;
+    border: 1px dashed #adb5bd;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 6px;
+    overflow: hidden;
+    background: #fbfbfb;
+}
+.letter-signature-img { max-height: 90%; max-width: 90%; object-fit: contain; opacity: 0.75; }
+.letter-signature-watermark {
+    position: absolute;
+    bottom: 4px;
+    right: 8px;
+    font-size: 7pt;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #dc3545;
+    opacity: 0.6;
+    transform: rotate(-8deg);
+}
+.letter-signature-cta {
+    font-size: 0.8rem;
+    color: #0d6efd;
+    text-decoration: none;
+    font-weight: 600;
+}
+.letter-signature-cta:hover { text-decoration: underline; }
+.letter-signoff-name { font-weight: 700; border-top: 1px solid #333; padding-top: 4px; display: inline-block; }
 .letter-signoff-role { color: #555; }
 .letter-signoff-note { font-size: 8pt; margin-top: 4mm; }
-.note-editor.note-frame { border: none !important; }
-.note-editable { padding: 0 !important; }
 
 @media print {
-    .letter-paper { border: none; max-width: 100%; box-shadow: none !important; }
+    .letter-paper { border: none; max-width: 100%; box-shadow: none !important; border-radius: 0; }
+    .letter-paper-label { display: none !important; }
     #createDocumentPage .btn, #createDocumentPage .form-label, #createDocumentPage input, #createDocumentPage select { display: none !important; }
 }
 </style>
@@ -213,14 +309,18 @@ $(document).ready(function () {
         height: 320,
         toolbar: [
             ['style', ['style']],
-            ['font', ['bold', 'italic', 'underline', 'clear']],
+            ['font', ['bold', 'italic', 'underline', 'strikethrough', 'superscript', 'subscript', 'clear']],
+            ['fontname', ['fontname']],
             ['fontsize', ['fontsize']],
             ['color', ['color']],
-            ['para', ['ul', 'ol', 'paragraph']],
+            ['para', ['ul', 'ol', 'paragraph', 'height']],
             ['table', ['table']],
-            ['insert', ['link', 'picture']],
-            ['view', ['undo', 'redo']]
-        ]
+            ['insert', ['link', 'picture', 'hr']],
+            ['history', ['undo', 'redo']],
+            ['view', ['fullscreen', 'codeview', 'help']]
+        ],
+        fontNames: ['Arial', 'Calibri', 'Georgia', 'Segoe UI', 'Times New Roman', 'Verdana'],
+        fontSizes: ['8', '9', '10', '11', '12', '14', '16', '18', '24', '32']
     });
 
     $('#f_recipient').on('input', function () {
