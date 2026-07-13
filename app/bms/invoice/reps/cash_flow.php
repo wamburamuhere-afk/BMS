@@ -80,18 +80,10 @@ if (!function_exists('cf_fmt')) {
 }
 ?>
 
-<!-- Print-only Header -->
+<!-- Print-only Header — company logo + name come from the global print header
+     (renderPrintHeader() in header.php, already output via includeHeader() in
+     cash_flow_gl.php); do NOT repeat them here or they print twice. -->
 <div class="d-none d-print-block text-center mb-4">
-    <?php
-    $c_name = getSetting('company_name', 'BMS');
-    $c_logo = getSetting('company_logo', '');
-    ?>
-    <?php if(!empty($c_logo)): ?>
-        <div class="mb-3">
-            <img src="<?= htmlspecialchars('../../../' . $c_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
-        </div>
-    <?php endif; ?>
-    <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;"><?= safe_output($c_name) ?></h1>
     <div class="mt-3">
         <h3 class="fw-bold text-primary text-uppercase">STATEMENT OF CASH FLOWS</h3>
         <h6 class="text-muted">
@@ -109,7 +101,7 @@ if (!function_exists('cf_fmt')) {
     </div>
 </div>
 
-<div class="card shadow-sm border-0 mb-4">
+<div class="card shadow-sm border-0 mb-4 print-flow-card">
     <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center d-print-none">
         <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-cash-stack me-2"></i> Cash Flow Statement</h5>
         <button class="btn btn-sm btn-outline-secondary" onclick="window.print()">
@@ -415,6 +407,23 @@ if (!function_exists('cf_fmt')) {
 
     <?php endif; ?>
 </div>
+
+<style>
+@media print {
+    /* Table wasn't starting on the first printed page — same shared-rule
+       cause fixed across every list/report page: the global responsive.css
+       rule `.card { page-break-inside: avoid }` applies to every .card on
+       every printed page. This report's card can grow tall with many line
+       items, so "never break inside it" pushed the whole card to page 2,
+       leaving page 1 with just the header. Scoped override so only this
+       page's card is affected — the shared rule and every other page stay
+       untouched. */
+    .print-flow-card {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+    }
+}
+</style>
 
 <script>
 $(document).ready(function() {
