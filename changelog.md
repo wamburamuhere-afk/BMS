@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-07-12 (fix) — Cash Flow: Closing Balance row wrapped digits / crowded the print footer
+
+**File:** `app/bms/invoice/reps/cash_flow.php`
+
+- **Digits wrapping onto a second line in the "Closing Cash & Bank Balance" row (Portrait):** that
+  row used Bootstrap's `.fs-5` (~20px) for emphasis, nearly double the rest of the print table's 9pt
+  font — the amount no longer fit its column width and wrapped. Same root-cause pattern as the
+  `.h5`-oversized-tfoot bug already fixed on `account_details.php`. Added a print-only override
+  shrinking `.fs-5` to 10.5pt inside `.print-flow-card`, plus `table-layout: fixed` and
+  `white-space: nowrap` on every `.text-end` cell so no amount cell can wrap regardless of column
+  width.
+- **Text appearing hidden behind the fixed print footer on smaller screens:** the oversized row was
+  also ~1.6x taller than a normal row, making it more likely to land right at the page's bottom
+  margin where the global fixed `.bms-print-footer` sits. Shrinking the row's font/height removes
+  that collision risk.
+- This row's markup is method-agnostic (rendered once regardless of the Direct/Indirect tab), so the
+  fix applies to both automatically — verified live for `method=direct` and `method=indirect` via
+  simulated print media (computed font-size dropped 20px → 14px, `white-space: nowrap` confirmed,
+  zero cells wrapping on either tab).
+
 ## 2026-07-12 (fix) — Cash Flow: duplicate print header, first page showed no data
 
 **Files:** `app/bms/invoice/reps/cash_flow.php` (content), `app/constant/reports/cash_flow_gl.php`
