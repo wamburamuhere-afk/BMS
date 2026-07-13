@@ -4060,6 +4060,17 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-md-6">
+                            <label for="edit_ex_bank_account_id" class="form-label fw-bold">Paid From <span class="text-danger">*</span></label>
+                            <select class="form-select select2" name="bank_account_id" id="edit_ex_bank_account_id" required>
+                                <option value="">Select account…</option>
+                                <?php foreach (cashBankAccounts($pdo) as $acc): ?>
+                                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars((!empty($acc['account_code']) ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text text-muted">The cash/bank account the money is paid from.</div>
+                        </div>
+
+                        <div class="col-md-6">
                             <label class="form-label fw-bold">Paid To Type</label>
                             <select class="form-select" name="paid_to_type" id="edit_ex_paid_to_type">
                                 <option value="">General / Other</option>
@@ -4074,20 +4085,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <select class="form-select" name="paid_to_id" id="edit_paid_to_id_select">
                                 <option value="">Select...</option>
                             </select>
-                        </div>
-                        <div class="col-md-6 d-none" id="proj_edit_invoice_id_block">
-                            <label class="form-label fw-bold">Invoice Reference <small class="fw-normal text-muted">(Approved)</small></label>
-                            <select class="form-select" name="invoice_id" id="proj_edit_invoice_id_select">
-                                <option value="">— Select Invoice (optional) —</option>
-                            </select>
-                            <div class="form-text text-muted" id="proj_edit_invoice_id_hint"></div>
-                        </div>
-                        <div class="col-md-6 d-none" id="proj_edit_payroll_id_block">
-                            <label class="form-label fw-bold">Payroll Reference <small class="fw-normal text-muted">(Approved, Unpaid)</small></label>
-                            <select class="form-select" name="payroll_id" id="proj_edit_payroll_id_select">
-                                <option value="">— Select Payroll (optional) —</option>
-                            </select>
-                            <div class="form-text text-muted" id="proj_edit_payroll_id_hint"></div>
                         </div>
 
                         <div class="col-12">
@@ -4195,6 +4192,17 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <div class="col-md-6">
+                            <label for="ex_bank_account_id" class="form-label fw-bold">Paid From <span class="text-danger">*</span></label>
+                            <select class="form-select select2" name="bank_account_id" id="ex_bank_account_id" required>
+                                <option value="">Select account…</option>
+                                <?php foreach (cashBankAccounts($pdo) as $acc): ?>
+                                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars((!empty($acc['account_code']) ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text text-muted">The cash/bank account the money is paid from.</div>
+                        </div>
+
+                        <div class="col-md-6">
                             <label for="ex_paid_to_type" class="form-label fw-bold">Paid To Type</label>
                             <select class="form-select" name="paid_to_type" id="ex_paid_to_type">
                                 <option value="">General / Other</option>
@@ -4209,20 +4217,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <select class="form-select" name="paid_to_id" id="proj_paid_to_id_select">
                                 <option value="">Select...</option>
                             </select>
-                        </div>
-                        <div class="col-md-6 d-none" id="proj_invoice_id_block">
-                            <label class="form-label fw-bold">Invoice Reference <small class="fw-normal text-muted">(Approved)</small></label>
-                            <select class="form-select" name="invoice_id" id="proj_invoice_id_select">
-                                <option value="">— Select Invoice (optional) —</option>
-                            </select>
-                            <div class="form-text text-muted" id="proj_invoice_id_hint"></div>
-                        </div>
-                        <div class="col-md-6 d-none" id="proj_payroll_id_block">
-                            <label class="form-label fw-bold">Payroll Reference <small class="fw-normal text-muted">(Approved, Unpaid)</small></label>
-                            <select class="form-select" name="payroll_id" id="proj_payroll_id_select">
-                                <option value="">— Select Payroll (optional) —</option>
-                            </select>
-                            <div class="form-text text-muted" id="proj_payroll_id_hint"></div>
                         </div>
 
                         <div class="col-12">
@@ -7795,6 +7789,7 @@ $(document).ready(function() {
     logReportAction('Viewed Project Details', 'User viewed full details for project ID: ' + projectId);
     if (projectId > 0) {
         loadProjectDetails();
+        loadExpenseSchema();
     } else {
         Swal.fire({
             icon: 'error',
@@ -11292,8 +11287,6 @@ function createExpense() {
     const $ps = $('#proj_paid_to_id_select');
     if ($ps.data('select2')) $ps.select2('destroy');
     $ps.empty().append('<option value="">Select...</option>');
-    resetProjInvoiceBlock(false);
-    resetProjPayrollBlock(false);
     // Reset category cascade
     $('#proj_add_cascade_container').find('.proj-cascade-sel').each(function() { if ($(this).data('select2')) $(this).select2('destroy'); });
     $('#proj_add_cascade_container').empty();
@@ -13393,6 +13386,7 @@ function editExpenseInline(encodedData) {
     form.find('[name="amount"]').val(e.amount);
     form.find('[name="description"]').val(e.description);
     form.find('[name="notes"]').val(e.notes || '');
+    $('#edit_ex_bank_account_id').val(e.bank_account_id || '').trigger('change');
     $('#edit_expense_type').val(e.type_id || '').trigger('change');
 
     // Preselect saved category in cascade (uses e.categories array from DB mapping)
@@ -13413,10 +13407,8 @@ function editExpenseInline(encodedData) {
         form.find('[name="allocation_source"]').val('general').trigger('change');
     }
 
-    // Paid To (unified) — preselect invoice/payroll via pending vars
+    // Paid To (unified)
     const paidToType = e.paid_to_type || '';
-    _projPendingInvoiceId = e.invoice_id || null;
-    _projPendingPayrollId = e.payroll_id || null;
     $('#edit_ex_paid_to_type').val(paidToType).trigger('change');
     if (paidToType && e.paid_to_id) {
         setTimeout(() => {
@@ -13426,85 +13418,6 @@ function editExpenseInline(encodedData) {
 
     modal.modal('show');
 }
-
-// Pending invoice/payroll IDs for async edit preselect
-let _projPendingInvoiceId = null;
-let _projPendingPayrollId = null;
-
-// Helper — reset invoice/payroll blocks
-function resetProjInvoiceBlock(isEdit) {
-    const $sel  = isEdit ? $('#proj_edit_invoice_id_select') : $('#proj_invoice_id_select');
-    const $blk  = isEdit ? $('#proj_edit_invoice_id_block') : $('#proj_invoice_id_block');
-    const $hint = isEdit ? $('#proj_edit_invoice_id_hint') : $('#proj_invoice_id_hint');
-    if ($sel.data('select2')) $sel.select2('destroy');
-    $sel.empty().append('<option value="">— Select Invoice (optional) —</option>');
-    $hint.text('');
-    $blk.addClass('d-none');
-}
-function resetProjPayrollBlock(isEdit) {
-    const $sel  = isEdit ? $('#proj_edit_payroll_id_select') : $('#proj_payroll_id_select');
-    const $blk  = isEdit ? $('#proj_edit_payroll_id_block') : $('#proj_payroll_id_block');
-    const $hint = isEdit ? $('#proj_edit_payroll_id_hint') : $('#proj_payroll_id_hint');
-    if ($sel.data('select2')) $sel.select2('destroy');
-    $sel.empty().append('<option value="">— Select Payroll (optional) —</option>');
-    $hint.text('');
-    $blk.addClass('d-none');
-}
-
-// Shared: load invoices or payrolls after payee selected
-function loadProjPayeeRef(payeeId, payeeType, isEdit) {
-    resetProjInvoiceBlock(isEdit);
-    resetProjPayrollBlock(isEdit);
-    if (!payeeId) return;
-
-    const modalSel = isEdit ? '#expenseActionModal' : '#addExpenseModal';
-
-    if (['supplier', 'sub_contractor'].includes(payeeType)) {
-        const $sel  = isEdit ? $('#proj_edit_invoice_id_select') : $('#proj_invoice_id_select');
-        const $blk  = isEdit ? $('#proj_edit_invoice_id_block') : $('#proj_invoice_id_block');
-        const $hint = isEdit ? $('#proj_edit_invoice_id_hint') : $('#proj_invoice_id_hint');
-        $sel.empty().append('<option value="">Loading...</option>');
-        $blk.removeClass('d-none');
-        $.getJSON('<?= buildUrl('api/account/get_payee_invoices.php') ?>', { payee_type: payeeType, payee_id: payeeId }, function(res) {
-            $sel.empty().append('<option value="">— Select Invoice (optional) —</option>');
-            if (res.success && res.data.length) {
-                res.data.forEach(inv => $sel.append(`<option value="${inv.id}" data-amount="${inv.amount}">${inv.label}</option>`));
-                $hint.text(res.data.length + ' approved invoice(s) available');
-            } else {
-                $hint.text('No approved invoices for this payee');
-            }
-            if ($sel.data('select2')) $sel.select2('destroy');
-            $sel.select2({ theme: 'bootstrap-5', dropdownParent: $(modalSel), placeholder: '— Select Invoice (optional) —', allowClear: true, width: '100%' });
-            if (isEdit && _projPendingInvoiceId) { $sel.val(_projPendingInvoiceId).trigger('change.select2'); _projPendingInvoiceId = null; }
-        });
-
-    } else if (payeeType === 'staff') {
-        const $sel  = isEdit ? $('#proj_edit_payroll_id_select') : $('#proj_payroll_id_select');
-        const $blk  = isEdit ? $('#proj_edit_payroll_id_block') : $('#proj_payroll_id_block');
-        const $hint = isEdit ? $('#proj_edit_payroll_id_hint') : $('#proj_payroll_id_hint');
-        $sel.empty().append('<option value="">Loading...</option>');
-        $blk.removeClass('d-none');
-        $.getJSON('<?= buildUrl('api/account/get_employee_payrolls.php') ?>', { employee_id: payeeId, current_payroll_id: _projPendingPayrollId || 0 }, function(res) {
-            $sel.empty().append('<option value="">— Select Payroll (optional) —</option>');
-            if (res.success && res.data.length) {
-                res.data.forEach(p => $sel.append(`<option value="${p.id}" data-amount="${p.amount}">${p.label}</option>`));
-                $hint.text(res.data.length + ' approved payroll(s) available');
-            } else {
-                $hint.text('No approved unpaid payrolls for this employee');
-            }
-            if ($sel.data('select2')) $sel.select2('destroy');
-            $sel.select2({ theme: 'bootstrap-5', dropdownParent: $(modalSel), placeholder: '— Select Payroll (optional) —', allowClear: true, width: '100%' });
-            if (isEdit && _projPendingPayrollId) { $sel.val(_projPendingPayrollId).trigger('change.select2'); _projPendingPayrollId = null; }
-        });
-    }
-}
-
-// Auto-fill amount on invoice/payroll selection
-$(document).on('change', '#proj_invoice_id_select, #proj_edit_invoice_id_select, #proj_payroll_id_select, #proj_edit_payroll_id_select', function() {
-    const amount = $(this).find('option:selected').data('amount');
-    const $amtField = $(this).closest('form').find('[name="amount"]');
-    if (amount) $amtField.val(parseFloat(amount).toFixed(2));
-});
 
 // Add Expense modal — unified paid-to dropdown (supplier/staff/sub_contractor)
 const projSubContractorsData = <?= json_encode(array_map(fn($s) => ['id' => $s['supplier_id'], 'name' => $s['supplier_name']], $sub_contractors)) ?>;
@@ -13520,8 +13433,6 @@ $('#ex_paid_to_type').on('change', function() {
 
     if ($select.data('select2')) $select.select2('destroy');
     $select.empty().append('<option value="">Select...</option>');
-    resetProjInvoiceBlock(false);
-    resetProjPayrollBlock(false);
 
     if (type && dataMap[type]) {
         dataMap[type].forEach(d => $select.append(`<option value="${d.id}">${d.name}</option>`));
@@ -13531,10 +13442,6 @@ $('#ex_paid_to_type').on('change', function() {
     } else {
         $block.addClass('d-none');
     }
-});
-
-$('#proj_paid_to_id_select').on('change', function() {
-    loadProjPayeeRef($(this).val(), $('#ex_paid_to_type').val(), false);
 });
 
 // Edit Expense modal — unified paid-to dropdown
@@ -13547,8 +13454,6 @@ $('#edit_ex_paid_to_type').on('change', function() {
 
     if ($select.data('select2')) $select.select2('destroy');
     $select.empty().append('<option value="">Select...</option>');
-    resetProjInvoiceBlock(true);
-    resetProjPayrollBlock(true);
 
     if (type && dataMap[type]) {
         dataMap[type].forEach(d => $select.append(`<option value="${d.id}">${d.name}</option>`));
@@ -13559,12 +13464,6 @@ $('#edit_ex_paid_to_type').on('change', function() {
         $block.addClass('d-none');
     }
 });
-
-$('#edit_paid_to_id_select').on('change', function() {
-    loadProjPayeeRef($(this).val(), $('#edit_ex_paid_to_type').val(), true);
-});
-
-
 
 $('#expenseActionForm').on('submit', function(e) {
     e.preventDefault();
