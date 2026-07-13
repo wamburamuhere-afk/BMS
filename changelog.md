@@ -29,6 +29,16 @@ Four related bugs found while verifying the invoice/payroll pull-through removal
   `project_view.php` but never called anywhere, so the select stayed stuck on the empty placeholder.
   Added the missing call alongside the existing `loadProjectDetails()` call on page load.
 
+**Found while browser-testing the above before merge:** the new "Paid From" dropdowns were built
+from this file's pre-existing (unused) `$bank_accounts` query, which filters `account_type_id`
+against `%Asset%` — far broader than actual cash/bank accounts, so e.g. "Accumulated Depreciation"
+showed up as a payable-from account. Switched both dropdowns to the canonical `cashBankAccounts($pdo)`
+helper (same one the main Expenses page uses), which correctly restricts to leaf asset accounts
+flagged `is_bank` or `cash_flow_category = 'cash'`. Verified live: created a project expense end to
+end (Paid From, Expense Type, manual Amount, no invoice/payroll fields), confirmed it saved and
+appears in the project's Expense tab and the DB with the right `project_id`/`bank_account_id`,
+edited it, and confirmed the update persisted — then removed the test record.
+
 ## 2026-07-13 (change) — Expenses: removed invoice/payroll pull-through from Add/Edit modal
 
 **File:** `app/constant/accounts/expenses.php`

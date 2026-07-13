@@ -4063,7 +4063,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <label for="edit_ex_bank_account_id" class="form-label fw-bold">Paid From <span class="text-danger">*</span></label>
                             <select class="form-select select2" name="bank_account_id" id="edit_ex_bank_account_id" required>
                                 <option value="">Select account…</option>
-                                <?php foreach ($bank_accounts as $acc): ?>
+                                <?php foreach (cashBankAccounts($pdo) as $acc): ?>
                                     <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars((!empty($acc['account_code']) ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
@@ -4195,7 +4195,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <label for="ex_bank_account_id" class="form-label fw-bold">Paid From <span class="text-danger">*</span></label>
                             <select class="form-select select2" name="bank_account_id" id="ex_bank_account_id" required>
                                 <option value="">Select account…</option>
-                                <?php foreach ($bank_accounts as $acc): ?>
+                                <?php foreach (cashBankAccounts($pdo) as $acc): ?>
                                     <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars((!empty($acc['account_code']) ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
