@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-07-12 (fix) — Cash Flow: duplicate print header, first page showed no data
+
+**Files:** `app/bms/invoice/reps/cash_flow.php` (content), `app/constant/reports/cash_flow_gl.php`
+(routed wrapper, unchanged — included for context)
+
+- **Duplicate logo + company name on print:** the routed page (`cash_flow_gl.php`) calls
+  `includeHeader()`, which already outputs the global `renderPrintHeader()` (logo + company name)
+  on every page — then `includes` this content file, which had its **own separate** local logo +
+  `<h1>` company name block, printing everything twice (exactly the pattern already fixed on
+  `invoices.php`, `projects.php`, and others). Removed the local logo/company-name block; kept the
+  page-specific "STATEMENT OF CASH FLOWS" title, date range, comparative period, and divider bar.
+- **First page showed no data:** same shared-rule cause fixed across every list/report page today
+  — `.card { page-break-inside: avoid }` in the global stylesheet pushed the whole report card to
+  page 2 once it grew tall with many line items. This file had **no `@media print` block at all**,
+  so added one with the same `.print-flow-card` marker + scoped override used elsewhere.
+
+Verified live: print-media simulation counted exactly 1 `<h1>` and 1 `<img>` inside print-only
+header blocks (was 2 each); `getComputedStyle(card).pageBreakInside` confirmed `auto`. Visually
+confirmed a single clean header followed immediately by the table, no gap.
+
+---
+
 ## 2026-07-12 (fix) — Balance Sheet: British format default, digit wrapping, print clutter
 
 **File:** `app/constant/reports/balance_sheet.php`
