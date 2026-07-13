@@ -1,5 +1,55 @@
 # BMS Changelog
 
+## 2026-07-12 (fix) — Balance Sheet: British format default, digit wrapping, print clutter
+
+**File:** `app/constant/reports/balance_sheet.php`
+
+- **British format is now the default** (was European). `$format` fallback changed from
+  `european` to `british` — `?format=european` still works explicitly; any other/missing value
+  now renders British (vertical/report form: Net Current Assets → Capital Employed). Screen and
+  print share the same `$format` variable (no separate print-only rendering path), so this default
+  applies to both.
+- **Digits wrapping across more than one line inside a cell:** a number should never break.
+  Forced `white-space: nowrap` on every amount cell (`.report-paper td.text-end` and
+  `.total-amount`) for print — covers both the European and British layouts.
+- **Removed from print** (kept on screen, hidden via `d-print-none` — matches the clean look of
+  `print-customers.php`):
+  - The "Net Assets must equal Capital Employed ✓ balanced" self-check line (screen-only sanity
+    check for the accountant, not meant for the printed document).
+  - The "Prepared By / Verified By / Approved By" signature block.
+  - The local "Printed on … | System ID: …" footer note — **this was a duplicate**: the page
+    already includes the shared `includes/print_footer_html.php`, which shows "Printed by
+    {name} — {role} on {date}" on every printed page; the local note was redundant.
+
+Verified live: format toggle confirmed `British` active with no `?format=` param; print-media
+simulation confirmed all three removed elements compute to `display: none`, and confirmed sample
+amount cells (including negative/parenthesized values) all show `white-space: nowrap`.
+
+---
+
+## 2026-07-12 (fix) — Income Statement: first printed page showed no data
+
+**File:** `app/bms/invoice/income_statement.php`
+
+- **Not covered by `i_e_print.md`:** this page references that doc for its canonical `@page`
+  margin, but `i_e_print.md` only governs transactional documents (Quotation, Invoice, PO…) and
+  doesn't mention `page-break-inside` at all — `income_statement.php` isn't even in its compliance
+  map. The actual cause is the same shared-rule bug fixed across every list/report page today: the
+  global `responsive.css` rule `.card { page-break-inside: avoid }` applies to every `.card` on
+  every printed page. This report's table card (Statement of Profit or Loss) can grow tall with
+  many GL accounts, so "never break inside it" pushed the whole card to page 2, leaving page 1 with
+  just the summary/header.
+- **Fix:** added the same `.print-flow-card` marker class + scoped `page-break-inside: auto`
+  override used on every other page today. Also reset the card's inline `overflow: hidden` to
+  `visible` for print — a card now allowed to span pages must not clip content past its own
+  on-screen box height.
+
+Verified live: `getComputedStyle(card).pageBreakInside` confirmed `auto` (was `avoid`);
+`overflow` confirmed `visible` (was `hidden`); visually confirmed the table starts immediately
+after the header with no gap (21-row report).
+
+---
+
 ## 2026-07-11 (fix) — Purchase Orders: print page 1, oversized font, header wrapping
 
 **File:** `app/bms/purchase/purchase_orders.php`
