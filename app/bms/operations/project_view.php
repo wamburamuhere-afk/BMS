@@ -4389,6 +4389,94 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
+<!-- Pay Voucher Modal — same fields/endpoint as payment_vouchers.php's #payVoucherModal -->
+<div class="modal fade" id="payVoucherModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-cash-coin me-2"></i>Record Payment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="payVoucherForm" autocomplete="off">
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="pay_voucher_id">
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+
+                    <div class="rounded p-3 mb-3" style="background:#e7f0ff;border:1px solid #b6ccfe;">
+                        <div class="d-flex justify-content-between small">
+                            <span class="text-muted">Voucher</span><strong id="pay_voucher_no">—</strong>
+                        </div>
+                        <div class="d-flex justify-content-between small">
+                            <span class="text-muted">Payee</span><strong id="pay_payee">—</strong>
+                        </div>
+                        <div class="d-flex justify-content-between small mt-1">
+                            <span class="text-muted">Total Amount</span><strong id="pay_amount">—</strong>
+                        </div>
+                        <div class="d-flex justify-content-between small">
+                            <span class="text-muted">Already Paid</span><strong class="text-success" id="pay_already_paid">—</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mt-1">
+                            <span class="text-muted fw-bold">Outstanding Balance</span>
+                            <strong class="text-danger fs-5" id="pay_balance_due">—</strong>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">Amount to Pay Now <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0">TZS</span>
+                            <input type="number" class="form-control border-start-0 fw-bold" name="payment_amount"
+                                   id="pay_payment_amount" step="0.01" min="0.01" required>
+                        </div>
+                        <small class="text-muted">Enter less than the balance to record a partial payment.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">Paid From (Bank/Cash) <span class="text-danger">*</span></label>
+                        <select class="form-select select2-static" name="paid_from_account_id" id="pay_paid_from" required>
+                            <option value="">Select cash/bank account…</option>
+                            <?php foreach (cashBankAccounts($pdo) as $cb): ?>
+                                <option value="<?= (int)$cb['account_id'] ?>"><?= htmlspecialchars(($cb['account_code'] ? $cb['account_code'] . ' — ' : '') . $cb['account_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted">The cash/bank account the money leaves from (Cr on the GL).</small>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-muted">Payment Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="payment_date" id="pay_date" value="<?= date('Y-m-d') ?>" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-muted">Method</label>
+                            <select class="form-select" name="payment_method" id="pay_method">
+                                <option value="cash">Cash</option>
+                                <option value="cheque">Cheque</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="mobile_money">Mobile Money</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small text-muted">Reference (Cheque/Txn No.)</label>
+                            <input type="text" class="form-control" name="payment_reference" id="pay_reference" placeholder="Optional">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold small text-muted">Payment Proof (optional)</label>
+                            <input type="file" class="form-control" name="attachment_file" accept=".pdf,.jpg,.jpeg,.png">
+                        </div>
+                    </div>
+                    <div class="alert alert-light border mt-3 mb-0 small text-muted">
+                        <i class="bi bi-info-circle me-1"></i> Posts <strong>Dr Accrued Expenses / Cr Bank</strong> to the GL for this payment amount.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Record Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- ═══════════════════════════════════════════════════
      PROC: ADD MATERIALS MODAL (Project-scoped, matches procurement>materials)
 ═══════════════════════════════════════════════════ -->
@@ -7780,6 +7868,18 @@ $(document).ready(function() {
         }
     });
 
+    $('#payVoucherModal').on('shown.bs.modal', function () {
+        if (!$('#pay_paid_from').hasClass('select2-hidden-accessible')) {
+            $('#pay_paid_from').select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#payVoucherModal'),
+                placeholder: 'Select cash/bank account…',
+                allowClear: true,
+                width: '100%'
+            });
+        }
+    });
+
     $('#editProjectModal').on('shown.bs.modal', function () {
         if (!$('#edit_customerSelect').hasClass('select2-hidden-accessible')) {
             $('#edit_customerSelect').select2({
@@ -9083,16 +9183,37 @@ function renderVouchersFull(vouchers) {
         return;
     }
 
-    const pvActions = (v) => `
-        <div class="dropdown">
+    const pvActions = (v) => {
+        const s = v.status;
+        let statusItems = '';
+        // Same state machine as api/account/update_voucher_status.php + external
+        // payment_vouchers.php's pvActions() — only offer transitions the backend
+        // actually accepts, instead of a free-choice dropdown that let you request
+        // an invalid move (e.g. pending -> approved) and get a hard error back.
+        if (s === 'pending' || s === 'draft') {
+            statusItems += `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="pvChangeStatus(${v.id}, 'reviewed', 'Mark as Reviewed?', 'This voucher will be marked as reviewed.')"><i class="bi bi-check2 text-info me-2"></i>Mark as Reviewed</a></li>`;
+        }
+        if (s === 'reviewed') {
+            statusItems += `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="pvChangeStatus(${v.id}, 'approved', 'Approve Voucher?', 'Approving will post the expense to the General Ledger.')"><i class="bi bi-check2-all text-success me-2"></i>Approve</a></li>`;
+            statusItems += `<li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="pvChangeStatus(${v.id}, 'cancelled', 'Cancel Voucher?', 'This cannot be undone. The voucher will be cancelled.')"><i class="bi bi-x-circle text-danger me-2"></i>Cancel Voucher</a></li>`;
+        }
+        if (s === 'approved' || s === 'partially_paid') {
+            statusItems += `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick='openPayVoucher(${JSON.stringify(v)})'><i class="bi bi-cash-coin text-primary me-2"></i>${s === 'partially_paid' ? 'Pay Remaining' : 'Pay Voucher'}</a></li>`;
+        }
+        const canDelete = (s === 'pending' || s === 'draft' || s === 'reviewed')
+            ? `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteVoucher(${v.id})"><i class="bi bi-trash me-2"></i>Delete</a></li>`
+            : '';
+
+        return `<div class="dropdown">
             <button class="btn btn-sm btn-outline-danger dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button>
             <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                 <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewVoucherDetails('${encodeURIComponent(JSON.stringify(v))}')"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
-                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeVoucherStatus(${v.id}, '${v.status}')"><i class="bi bi-arrow-repeat text-warning me-2"></i>Change Status</a></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteVoucher(${v.id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printVoucher(${v.id})"><i class="bi bi-printer text-primary me-2"></i>Print Voucher</a></li>
+                ${statusItems ? '<li><hr class="dropdown-divider"></li>' + statusItems : ''}
+                ${canDelete}
             </ul>
         </div>`;
+    };
 
     // Desktop: DataTable
     let html = '<div class="d-none d-lg-block"><table id="projVouchersDT" class="table table-hover align-middle border w-100"><thead class="table-light text-nowrap"><tr><th style="width:50px;">S/NO</th><th>Voucher Number</th><th>Payee</th><th>Date</th><th>Category</th><th>Amount</th><th>Status</th><th class="text-end d-print-none">Actions</th></tr></thead><tbody>';
@@ -11803,87 +11924,6 @@ function updateBudgetItemStatus(id, status) {
     }
 }
 
-function changeVoucherStatus(id, currentStatus) {
-    const statuses = {
-        'draft': 'Draft',
-        'approved': 'Approved',
-        'paid': 'Paid',
-        'cancelled': 'Cancelled'
-    };
-    
-    let optionsHtml = '';
-    for (let s in statuses) {
-        optionsHtml += `<option value="${s}" ${s === currentStatus ? 'selected' : ''}>${statuses[s]}</option>`;
-    }
-
-    Swal.fire({
-        title: 'Change Voucher Status',
-        html: `
-            <div class="text-start">
-                <label class="form-label fw-bold">Select New Status</label>
-                <select id="swal_voucher_status" class="form-select mb-3" onchange="toggleVoucherPaymentFields(this.value)">
-                    ${optionsHtml}
-                </select>
-                <div id="voucher_payment_fields" style="display: none;">
-                    <label class="form-label fw-bold small">Payment Reference #</label>
-                    <input type="text" id="swal_voucher_ref" class="form-control form-control-sm mb-2" placeholder="Cheque/TXN ID...">
-                    <label class="form-label fw-bold small">Upload Proof (Voucher/Receipt)</label>
-                    <input type="file" id="swal_voucher_file" class="form-control form-control-sm">
-                </div>
-            </div>
-        `,
-        showCancelButton: true,
-        confirmButtonText: 'Update Status',
-        didOpen: () => {
-            if (currentStatus === 'paid') toggleVoucherPaymentFields('paid');
-        },
-        preConfirm: () => {
-            const status = $('#swal_voucher_status').val();
-            const ref = $('#swal_voucher_ref').val();
-            const file = $('#swal_voucher_file')[0].files[0];
-            
-            if (status === 'paid' && !ref) {
-                Swal.showValidationMessage('Reference number is required for Paid status');
-                return false;
-            }
-            
-            return { status, ref, file };
-        }
-    }).then((result) => {
-        if (result.isConfirmed) {
-            const formData = new FormData();
-            formData.append('id', id);
-            formData.append('status', result.value.status);
-            formData.append('payment_reference', result.value.ref);
-            if (result.value.file) formData.append('attachment_file', result.value.file);
-            
-            $.ajax({
-                url: '/api/account/update_voucher_status.php',
-                type: 'POST',
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(res) {
-                    if (res.success) {
-                        Swal.fire('Success', res.message, 'success');
-                        loadProjectDetails();
-                    } else {
-                        Swal.fire('Error', res.message, 'error');
-                    }
-                }
-            });
-        }
-    });
-}
-
-function toggleVoucherPaymentFields(status) {
-    if (status === 'paid') {
-        $('#voucher_payment_fields').slideDown();
-    } else {
-        $('#voucher_payment_fields').slideUp();
-    }
-}
-
 function changeOrderStatus(id, currentStatus) {
     const statuses = ['draft', 'sent', 'approved', 'rejected', 'partially_invoiced', 'invoiced', 'cancelled'];
     let options = {};
@@ -13300,27 +13340,70 @@ function viewVoucherDetails(encodedData) {
     new bootstrap.Modal(document.getElementById('pvDetailsModal')).show();
 }
 
-function changeVoucherStatus(id, current) {
-    const statuses = { 'pending': 'Pending', 'approved': 'Approved', 'paid': 'Paid', 'rejected': 'Rejected' };
-    let options = '';
-    for (let k in statuses) options += `<option value="${k}" ${k === current ? 'selected' : ''}>${statuses[k]}</option>`;
-
+// Mirrors payment_vouchers.php's pvChangeStatus()/submitVoucherStatus() — only ever
+// called with a transition the state machine in update_voucher_status.php actually
+// allows (pvActions() above only renders the buttons valid for the voucher's current
+// status), so this never sends an invalid request the backend has to reject.
+function pvChangeStatus(id, newStatus, title, text) {
     Swal.fire({
-        title: 'Change Voucher Status',
-        html: `<select id="swal-pv-status" class="form-select mt-3">${options}</select>`,
+        title: title,
+        text: text,
+        icon: newStatus === 'cancelled' ? 'warning' : 'question',
         showCancelButton: true,
-        confirmButtonText: 'Update Status',
-        confirmButtonColor: '#28a745',
-        preConfirm: () => document.getElementById('swal-pv-status').value
+        confirmButtonColor: newStatus === 'cancelled' ? '#dc3545' : '#0d6efd',
+        confirmButtonText: newStatus === 'cancelled' ? 'Yes, Cancel' : 'Confirm',
+        cancelButtonText: 'Back'
     }).then((result) => {
-        if (result.isConfirmed) {
-            $.post('/api/account/update_voucher_status.php', { id: id, status: result.value }, res => {
-                if (res.success) showActionSuccess(res.message);
-                else Swal.fire('Error', res.message, 'error');
-            }, 'json');
-        }
+        if (!result.isConfirmed) return;
+        $.post('/api/account/update_voucher_status.php', { id: id, status: newStatus }, res => {
+            if (res.success) { showActionSuccess(res.message); loadProjectDetails(); }
+            else Swal.fire('Error', res.message, 'error');
+        }, 'json');
     });
 }
+
+// Mirrors payment_vouchers.php's openPayVoucher() — same Pay Voucher modal/fields,
+// same record_voucher_payment.php endpoint, so an approved project voucher can
+// actually be paid (previously there was no way to reach 'paid' from a project at all).
+function openPayVoucher(v) {
+    const balance = parseFloat(v.balance_due ?? v.amount) || 0;
+    const alreadyPaid = parseFloat(v.amount_paid ?? 0) || 0;
+    $('#pay_voucher_id').val(v.id);
+    $('#pay_voucher_no').text(v.voucher_number || ('#' + v.id));
+    $('#pay_payee').text(v.payee_name || '—');
+    $('#pay_amount').text(formatMoney(v.amount) + ' TZS');
+    $('#pay_already_paid').text(formatMoney(alreadyPaid) + ' TZS');
+    $('#pay_balance_due').text(formatMoney(balance) + ' TZS');
+    $('#pay_payment_amount').val(balance.toFixed(2)).attr('max', balance.toFixed(2));
+    $('#pay_reference').val(v.reference_number || '');
+    $('#pay_date').val(new Date().toISOString().split('T')[0]);
+    if (v.payment_method) $('#pay_method').val(v.payment_method);
+    $('#pay_paid_from').val('').trigger('change');
+    new bootstrap.Modal(document.getElementById('payVoucherModal')).show();
+}
+
+$(document).on('submit', '#payVoucherForm', function (e) {
+    e.preventDefault();
+    if (!$('#pay_paid_from').val()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Choose the Paid From account.' }); return; }
+    const $btn = $(this).find('[type="submit"]');
+    const orig = $btn.html();
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Recording…');
+    $.ajax({
+        url: '/api/account/record_voucher_payment.php',
+        type: 'POST', data: new FormData(this), contentType: false, processData: false, dataType: 'json',
+        success: function (res) {
+            if (res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('payVoucherModal')).hide();
+                Swal.fire({ icon: 'success', title: 'Payment Recorded', text: res.message, showConfirmButton: true })
+                    .then(() => loadProjectDetails());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not record payment.' });
+            }
+        },
+        error: function () { Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }); },
+        complete: function () { $btn.prop('disabled', false).html(orig); }
+    });
+});
 
 function deleteVoucher(id) {
     Swal.fire({
