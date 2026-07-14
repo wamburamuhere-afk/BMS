@@ -31,6 +31,8 @@ try {
     $stmt = $pdo->prepare("UPDATE document_templates SET usage_count = usage_count + 1 WHERE id = ? AND is_active = 1");
     $stmt->execute([$template_id]);
 
+    logActivity($pdo, $_SESSION['user_id'], "Used document template #$template_id to start a new letter");
+
     echo json_encode(['success' => true]);
 
 } catch (Exception $e) {

@@ -16,7 +16,7 @@ require_once __DIR__ . '/../../../roots.php';
 
 includeHeader();
 
-if (!canCreate('documents')) {
+if (!canView('documents') || !canCreate('documents')) {
     header("Location: " . getUrl('unauthorized'));
     exit();
 }
