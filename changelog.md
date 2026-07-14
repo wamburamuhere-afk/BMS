@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-07-14 (fix) — Project > Finance > Expenses "View Details" now opens the real Expense Voucher page
+
+**File:** `app/bms/operations/project_view.php`
+
+The project's own "View Details" action opened a bespoke, read-only modal (`#viewExpenseModal`)
+with no way to progress an expense's status — no Review / Approve / Reject / Mark Paid, no Print
+Voucher, no audit trail. The external Expenses page has always had a full dedicated page for this
+(`app/constant/accounts/expense_details.php`, routed as `expenses/details`) with the complete
+pending → reviewed → approved → paid workflow, Print Voucher, and an "Action History" trail — and
+that page already handles project-linked expenses (it joins `projects`, shows "Linked Project", and
+has a "Back to Project" button when `project_id` is set).
+
+Rather than rebuild that mechanism a second time inside the project view, "View Details" now links
+straight to the same `expenses/details.php?id=` page used externally — so a project expense gets the
+exact same voucher view, status workflow, and payment mechanism as one created from the main
+Expenses page. Removed the now-dead `#viewExpenseModal` markup and `viewExpenseDetails()` JS
+function (166 lines) from `project_view.php`.
+
+Verified live: ran `expense_details.php`'s exact SQL against a test project-linked expense (project
+join, payee resolution, status) — returns correctly; rolled back the test row. `assertScopeForRecordHtml()`
+on that page already gates access via the record's own `project_id`, so project-scoped users see
+the same access control they already had.
+
 ## 2026-07-14 (revert) — Expenses page: removed the optional "Budget" dropdown from Add/Edit Expense
 
 **File:** `app/constant/accounts/expenses.php`
