@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-07-14 (revert) — Expenses page: removed the optional "Budget" dropdown from Add/Edit Expense
+
+**File:** `app/constant/accounts/expenses.php`
+
+Reverts the "Main Expenses page" half of the 2026-07-13 Allocation Source simplification
+(PR #1279) — removes the optional "Budget" dropdown, its `$all_budgets` data fetch, the
+`populateExpenseBudgetOptions()` JS and its project-field-change wiring, and the edit-modal
+budget prefill. The project page's own Add/Edit Expense "Project Budget Item" dropdown
+(`app/bms/operations/project_view.php`) is untouched — this only affects the standalone
+Expenses page.
+
 ## 2026-07-14 (feat) — Post initial product stock to the GL; rename take-on equity account to "Opening Balance"
 
 **New files:** `migrations/2026_07_14_rename_opening_balance_equity_account.php`
