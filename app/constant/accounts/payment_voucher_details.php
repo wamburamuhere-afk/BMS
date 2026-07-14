@@ -14,7 +14,7 @@ autoEnforcePermission('payment_vouchers');
 
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($id > 0) {
-    header('Location: ' . getUrl('accounts/payment_voucher_print') . '?id=' . $id);
+    header('Location: ' . getUrl('payment_voucher_print') . '?id=' . $id);
     exit;
 }
 

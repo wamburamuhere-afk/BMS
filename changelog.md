@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-07-14 (fix) — Project > Finance > Vouchers "View Details" 404; voucher form now posts to GL like external
+
+**Files:** `app/bms/operations/project_view.php`, `app/constant/accounts/payment_voucher_details.php`
+
+**Root cause of "page not available":** `payment_voucher_details.php` (route `payment_voucher_view`) is a
+stub that forwards to the print page, but its redirect used an unregistered route key
+(`getUrl('accounts/payment_voucher_print')` — `roots.php` only registers the bare
+`payment_voucher_print`), so the redirect itself 404'd. Fixed the route key (one line). Externally
+this stub is rarely hit anyway — `payment_vouchers.php`'s real "View Details" opens an in-page modal
+(`#detailsModal`), it never navigates. `project_view.php`'s voucher rows linked straight at the broken
+stub via hardcoded (non-`getUrl()`) hrefs in two places — that's what the user was hitting.
+
+- **Added `#pvDetailsModal`** to `project_view.php` — a faithful port of the external `#detailsModal`
+  (same fields: status/method badges, date, reference, payee, category, amount, amount-in-words,
+  description, Prepared/Checked/Authorized-By, Payment History list for
+  approved/partially_paid/paid vouchers via the same `get_voucher_payments.php`, Print Voucher
+  button). Project name is filled from the current project since it's implicit here. Both broken
+  hrefs (`renderVouchers`, `renderVouchersFull`'s `pvActions`) now call the new `viewVoucherDetails()`
+  to open it, passing the voucher row already available in `projectData.payment_vouchers` — no extra
+  fetch needed.
+- **Found a real GL-posting gap while comparing the forms:** the project's Create Payment Voucher
+  form had no `expense_account_id` field (only the external form did), so every project-created
+  voucher saved with `expense_account_id = NULL`. `postVoucherAccrual()`'s guard
+  (`$v_amt > 0 && $v_exp > 0`) silently skipped posting for all of them — project vouchers never hit
+  the GL on approval. Added the identical "Expense Account" field to the project's form (same options,
+  same optional field, same helper text as external), pre-filled from the linked expense's own
+  account when one is picked (still freely editable) — Project selection stays implicit as requested,
+  only Expense Account was actually missing.
+
+Verified live: (1) simulated `postVoucherAccrual()` with the now-populated `expense_account_id` —
+confirmed `Dr Wages & Salaries / Cr Accrued Expenses` posts correctly (previously silently skipped);
+(2) `php -l` clean on both files; (3) `node --check` on the extracted `viewVoucherDetails()`/`printVoucher()`
+JS — clean. Rolled back all test data.
+
 ## 2026-07-14 (fix) — Quick Expense (create-as-paid) now recognises cost via the same accrual entry as the normal flow
 
 **File:** `api/account/add_expense.php`
