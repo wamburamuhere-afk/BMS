@@ -4267,6 +4267,21 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <input type="text" class="form-control" name="reference" id="vc_reference" placeholder="Check/Trans ID/Receipt #">
                         </div>
 
+                        <!-- Expense Account — same field as the external Payment Vouchers form.
+                             Required for GL posting on approval (postVoucherAccrual needs it);
+                             pre-filled from the linked expense's own account when one is picked,
+                             but freely editable, matching the external form's behaviour. -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Expense Account</label>
+                            <select class="form-select select2" name="expense_account_id" id="vc_expense_account_id">
+                                <option value="">Select expense account</option>
+                                <?php foreach ($expense_accounts as $ea): ?>
+                                <option value="<?= (int)$ea['account_id'] ?>"><?= htmlspecialchars($ea['account_code'] . ' — ' . $ea['account_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted">The cost is booked here (P&amp;L) when the voucher is approved.</small>
+                        </div>
+
                     </div>
                 </div>
                 <div class="modal-footer bg-light p-3 border-top">
@@ -4276,6 +4291,100 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Voucher Details Modal — same content/behaviour as payment_vouchers.php's #detailsModal -->
+<div class="modal fade" id="pvDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:20px;">
+            <div class="modal-header border-0 pb-0 pe-4 pt-4">
+                <div class="d-flex align-items-center">
+                    <div class="bg-primary bg-opacity-10 p-3 rounded-circle me-3">
+                        <i class="bi bi-file-earmark-text text-primary fs-4"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0">Payment Voucher Details</h5>
+                        <p class="text-muted small mb-0" id="pv_detail_voucher_no">#PV-00000</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 pt-2">
+                <div class="row g-4 mb-4">
+                    <div class="col-md-7">
+                        <div class="bg-light p-4 rounded-4 h-100">
+                            <label class="small text-muted text-uppercase fw-bold d-block mb-1">Status &amp; Method</label>
+                            <div class="d-flex gap-2 mb-3">
+                                <div id="pv_detail_status_badge"></div>
+                                <div id="pv_detail_method_badge"></div>
+                            </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <label class="small text-muted text-uppercase fw-bold d-block mb-1">Voucher Date</label>
+                                    <p class="fw-bold fs-6 mb-3" id="pv_detail_date"></p>
+                                </div>
+                                <div class="col-6">
+                                    <label class="small text-muted text-uppercase fw-bold d-block mb-1">Reference No.</label>
+                                    <p class="fw-bold mb-3" id="pv_detail_reference"></p>
+                                </div>
+                            </div>
+                            <label class="small text-muted text-uppercase fw-bold d-block mb-1">Payee (Pay To)</label>
+                            <p class="fw-bold mb-3 fs-5 text-dark" id="pv_detail_payee"></p>
+                            <label class="small text-muted text-uppercase fw-bold d-block mb-1">Expense Category</label>
+                            <p class="fw-bold mb-0" id="pv_detail_category"></p>
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="p-4 rounded-4 text-center h-100 d-flex flex-column justify-content-center" style="background:#e7f0ff;border:1px solid #b6ccfe;">
+                            <label class="small text-primary text-uppercase fw-bold d-block mb-2">Total Amount</label>
+                            <h2 class="fw-bold text-primary mb-2" id="pv_detail_amount" style="white-space:nowrap;line-height:1.2;">...</h2>
+                            <p id="pv_detail_words" class="text-muted small mb-0 border-top pt-2 mt-2" style="word-break:break-word;"></p>
+                            <div class="mt-3 text-start">
+                                <label class="small text-muted text-uppercase fw-bold d-block mb-1">Project</label>
+                                <p class="badge bg-white text-dark border w-100 py-2 mb-0" id="pv_detail_project"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-4 bg-light rounded-4">
+                    <label class="small text-muted text-uppercase fw-bold d-block mb-2">Description / Narration</label>
+                    <p class="mb-0 fs-6 text-dark lh-base" id="pv_detail_description" style="white-space:pre-wrap;font-style:italic;"></p>
+                </div>
+
+                <!-- Payment History -->
+                <div class="mt-3 p-4 bg-light rounded-4" id="pv_detail_payments_section" style="display:none;">
+                    <label class="small text-muted text-uppercase fw-bold d-block mb-2">
+                        <i class="bi bi-clock-history me-1"></i>Payment History
+                    </label>
+                    <div id="pv_detail_payments_list"></div>
+                </div>
+
+                <div class="mt-4 px-2">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="py-2 border-bottom mb-2"><small class="text-muted">Prepared By</small></div>
+                            <p class="fw-bold small mb-0" id="pv_detail_user">System</p>
+                        </div>
+                        <div class="col-4">
+                            <div class="py-2 border-bottom mb-2"><small class="text-muted">Checked By</small></div>
+                            <p class="small text-muted mb-0">________________</p>
+                        </div>
+                        <div class="col-4">
+                            <div class="py-2 border-bottom mb-2"><small class="text-muted">Authorized By</small></div>
+                            <p class="small text-muted mb-0">________________</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light py-3" style="border-bottom-left-radius:20px;border-bottom-right-radius:20px;">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary px-4 fw-bold" id="pv_detail_print_btn">
+                    <i class="bi bi-printer me-2"></i>Print Voucher
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -8959,7 +9068,7 @@ function renderVouchers(vouchers) {
             <td class="text-danger fw-bold">${formatMoney(v.amount)}</td>
             <td><span class="badge bg-${getStatusBadgeColor(v.status)}">${v.status}</span></td>
             <td class="text-end">
-                <a href="payment_voucher_view?id=${v.id}" class="btn btn-sm btn-light border"><i class="bi bi-eye"></i></a>
+                <a href="javascript:void(0)" onclick="viewVoucherDetails('${encodeURIComponent(JSON.stringify(v))}')" class="btn btn-sm btn-light border"><i class="bi bi-eye"></i></a>
             </td>
         </tr>`;
     });
@@ -8978,7 +9087,7 @@ function renderVouchersFull(vouchers) {
         <div class="dropdown">
             <button class="btn btn-sm btn-outline-danger dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button>
             <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                <li><a class="dropdown-item py-2" href="payment_voucher_view?id=${v.id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewVoucherDetails('${encodeURIComponent(JSON.stringify(v))}')"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
                 <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="changeVoucherStatus(${v.id}, '${v.status}')"><i class="bi bi-arrow-repeat text-warning me-2"></i>Change Status</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteVoucher(${v.id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
@@ -11053,7 +11162,7 @@ function createVoucher() {
         if (projectData.expenses && projectData.expenses.length > 0) {
             const $grp = $('<optgroup label="── Registered Project Expenses ──"></optgroup>');
             projectData.expenses.forEach(ex => {
-                $grp.append(`<option value="exp_${ex.expense_id}" data-type="expense" data-id="${ex.expense_id}" data-amount="${ex.amount}" data-cat="${ex.category_id || ''}">${ex.description || 'Unnamed Expense'} (${formatMoney(ex.amount)} TZS)</option>`);
+                $grp.append(`<option value="exp_${ex.expense_id}" data-type="expense" data-id="${ex.expense_id}" data-amount="${ex.amount}" data-cat="${ex.category_id || ''}" data-expaccount="${ex.expense_account_id || ''}">${ex.description || 'Unnamed Expense'} (${formatMoney(ex.amount)} TZS)</option>`);
             });
             $expSel.append($grp);
         }
@@ -11092,7 +11201,12 @@ function vcOnExpenseChange(val) {
     
     if (type === 'expense') {
         $catHidden.val(opt.data('cat'));
-        
+
+        // Pre-fill the Expense Account from the linked expense's own account —
+        // still freely editable, same as the external Payment Vouchers form.
+        const expAccount = opt.data('expaccount');
+        if (expAccount) $('#vc_expense_account_id').val(String(expAccount));
+
         // Calculate paid so far from projectData.payment_vouchers
         const paidSoFar = (projectData.payment_vouchers || [])
             .filter(v => v.expense_id == id && ['approved', 'paid'].includes(v.status))
@@ -13133,6 +13247,59 @@ function deletePurchase(id) {
 }
 
 // Voucher Actions
+function printVoucher(id) {
+    window.open('<?= getUrl('payment_voucher_print') ?>?id=' + id, '_blank').focus();
+}
+
+// Mirrors payment_vouchers.php's viewVoucherDetails() — same modal content/fields,
+// same Payment History fetch, so a project-linked voucher looks identical to one
+// viewed from the standalone Payment Vouchers page. `v` already carries every column
+// this needs (projectData.payment_vouchers is `pv.*` + category_name); project_name
+// isn't on the row since it's implicit here, so it's filled from the current project.
+function viewVoucherDetails(encodedData) {
+    const v = JSON.parse(decodeURIComponent(encodedData));
+
+    const dateStr = v.vouch_date ? formatDate(v.vouch_date) : 'N/A';
+    $('#pv_detail_voucher_no').text(v.voucher_number || ('#' + v.id));
+    $('#pv_detail_date').text(dateStr);
+    $('#pv_detail_status_badge').html(`<span class="badge bg-${getStatusBadgeColor(v.status)} text-uppercase px-3">${safeOutput(v.status)}</span>`);
+    $('#pv_detail_method_badge').html(`<span class="badge bg-light text-dark border text-uppercase px-3">${safeOutput((v.payment_method || '').replace(/_/g, ' '))}</span>`);
+    $('#pv_detail_payee').text(v.payee_name || 'N/A');
+    $('#pv_detail_category').text(v.expense_account_name || v.category_name || 'Uncategorized');
+    $('#pv_detail_amount').text(formatMoney(v.amount) + ' TZS');
+    $('#pv_detail_words').text(v.amount_in_words ? 'In Words: ' + v.amount_in_words : '');
+    $('#pv_detail_reference').text(v.reference_number || 'None');
+    $('#pv_detail_description').text(v.description || 'No description provided');
+    $('#pv_detail_user').text(v.prepared_by_name || v.username || 'System Admin');
+    $('#pv_detail_project').text((projectData && projectData.data && projectData.data.project_name) || 'N/A');
+    $('#pv_detail_print_btn').off('click').on('click', () => printVoucher(v.id));
+
+    $('#pv_detail_payments_section').hide();
+    if (['approved', 'partially_paid', 'paid'].includes(v.status)) {
+        $.getJSON('<?= buildUrl('api/account/get_voucher_payments.php') ?>', { voucher_id: v.id }, function(res) {
+            if (res.success && res.payments.length) {
+                let rows = res.payments.map((p, i) => `
+                    <div class="d-flex justify-content-between align-items-start py-2 ${i > 0 ? 'border-top' : ''}">
+                        <div>
+                            <div class="fw-bold small">${safeOutput(p.payment_date)}</div>
+                            <div class="text-muted" style="font-size:.75rem;">${safeOutput((p.payment_method || '').replace(/_/g, ' '))} ${p.reference_number ? '· ' + safeOutput(p.reference_number) : ''}</div>
+                            <div class="text-muted" style="font-size:.75rem;">${safeOutput(p.bank_code ? p.bank_code + ' — ' : '')}${safeOutput(p.bank_name || '—')}</div>
+                        </div>
+                        <strong class="text-primary">${formatMoney(p.amount)} TZS</strong>
+                    </div>`).join('');
+                rows += `<div class="d-flex justify-content-between border-top pt-2 mt-1">
+                            <strong class="small text-muted">Total Paid</strong>
+                            <strong class="text-success">${formatMoney(res.total_paid)} TZS</strong>
+                         </div>`;
+                $('#pv_detail_payments_list').html(rows);
+                $('#pv_detail_payments_section').show();
+            }
+        });
+    }
+
+    new bootstrap.Modal(document.getElementById('pvDetailsModal')).show();
+}
+
 function changeVoucherStatus(id, current) {
     const statuses = { 'pending': 'Pending', 'approved': 'Approved', 'paid': 'Paid', 'rejected': 'Rejected' };
     let options = '';
