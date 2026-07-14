@@ -1,5 +1,60 @@
 # BMS Changelog
 
+## 2026-07-14 (feat) — Post initial product stock to the GL; rename take-on equity account to "Opening Balance"
+
+**New files:** `migrations/2026_07_14_rename_opening_balance_equity_account.php`
+**Files:** `api/create_product.php`, `core/gl_accounts.php`
+
+Assigning an opening quantity to a warehouse at product-creation time previously only wrote to
+`stock_movements`/`product_stocks` — it never touched the ledger, so the Balance Sheet's Inventory
+figure and physical stock could diverge from the moment a product was created.
+
+- `api/create_product.php`: after `recordStockMovement()`, calls the existing
+  `postStockAdjustmentGl()` (`core/stock_posting.php`) for each warehouse with initial stock —
+  posts `Dr Inventory (1-1300) / Cr Opening Balance (3-9999)` for `quantity × cost_price`, same
+  convention as the manual Stock Adjustment feature. Silent no-op if either account isn't configured
+  or the line value is zero.
+- Renamed the take-on/opening-balance equity account (code `3-9999`) from "Historical Balancing" to
+  "Opening Balance" on the Chart of Accounts — clearer, standard terminology for the same concept.
+  Updated the matching doc-comment in `core/gl_accounts.php` (`takeOnEquityAccountId()`).
+- Verified end-to-end against the live DB: created a test product with 20 units initial stock,
+  confirmed the posted `journal_entries`/`journal_entry_items` rows (Dr 1-1300 / Cr 3-9999,
+  TZS 2,000 each side), then rolled back the test transaction.
+
+## 2026-07-14 (feat) — Create Document: type-driven letter formatting — letterhead toggle, recipient address, signature alignment
+
+**New files:** `app/constant/document/new_document.php`, `api/document/use_template.php`,
+`migrations/2026_07_14_documents_letterhead_toggle.php`, `migrations/2026_07_14_documents_signature_align.php`
+**Files:** `api/document/duplicate_created_document.php`, `api/document/get_letter_templates.php`,
+`api/document/save_created_document.php`, `app/bms/operations/project_view.php`,
+`app/constant/document/create_document.php`, `app/constant/document/document_library.php`, `roots.php`
+
+Delivers the "Part 3" item flagged as in-progress after the last report: making Create Document
+output adapt to the kind of letter being written, instead of one fixed layout for everything.
+
+- **New entry point `new_document.php`:** a two-step chooser (pick a template category, or start
+  blank) shown before the editor — both "Docs > Library > Create Document" and "Project > Docs >
+  Create Document" now land here first; either path still lands on the existing
+  `create_document.php` editor (blank, or pre-filled from the chosen template via `?template_id`).
+- **Letterhead toggle:** a document can opt out of the digital company header/sender-address block
+  entirely — for letters printed onto physical pre-printed letterhead paper, where reprinting it
+  digitally would duplicate it. Defaults on. New `documents.use_letterhead` column.
+- **Optional recipient address block:** a collapsible field under Recipient — not shown unless the
+  user adds one, since not every letter type (e.g. an internal memo) needs a full postal address.
+  New `documents.recipient_address` column.
+- **Signature position:** left/center/right, since full-block vs modified-block letter styles
+  genuinely sign in different places. New `documents.signature_align` column (default `left`).
+- Sender's address/phone/email/TIN/VRN moved into the letter's own address block (opposite the
+  recipient) instead of a separate footer strip, so it participates in the letterhead toggle.
+- Removed the direct "Save & Sign" shortcut button — signing now always goes through the existing,
+  audited Docs > E-Sign wizard (`select_document_add_esignature.php`), unchanged otherwise.
+- Both migrations are idempotent (`SHOW COLUMNS` guard) and additive-only; existing documents keep
+  today's rendering (`use_letterhead=1`, `signature_align='left'`, empty `recipient_address`).
+- `use_template.php` added to record `usage_count` when a template is picked from the new chooser
+  (previously only bumped from the "Use Template" picker inside the editor itself).
+
+PR: https://github.com/wamburamuhere-afk/BMS/pull/1278 (into `develop`, not yet merged).
+
 ## 2026-07-13 (change) — Expenses: Allocation Source simplified to Budget-only, optional; scoped Budget added to external expenses
 
 **Files:** `app/bms/operations/project_view.php`, `app/constant/accounts/expenses.php`

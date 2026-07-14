@@ -4,7 +4,12 @@
  * only uploading a file. Produces a real document row (source='created') that
  * behaves exactly like any other library document: previewable, downloadable,
  * and pickable from the existing e-signature wizard (select_document_add_esignature.php)
- * for the "Save & Sign" hand-off.
+ * when the user later chooses to sign it via Docs > E-Sign.
+ *
+ * New letters normally arrive here via new_document.php (the category/
+ * template chooser), which passes ?template_id and/or ?category_id to
+ * pre-fill this editor — but a bare hit with neither is still a fully valid
+ * blank-page start, so both stay optional.
  *
  * Only one signer is ever relevant here: the document's own creator — there is
  * no signer-selection step anywhere in this flow, by design.
@@ -49,13 +54,31 @@ if ($document_id > 0) {
     }
 }
 
+// Pre-fill from the category/template chooser (new_document.php) — only
+// meaningful for a brand new letter; an already-saved draft keeps its own
+// stored content/category regardless of what's in the URL.
+$prefill_template = null;
+if ($document_id === 0) {
+    $prefill_template_id = !empty($_GET['template_id']) ? (int)$_GET['template_id'] : 0;
+    if ($prefill_template_id > 0) {
+        $tpl_stmt = $pdo->prepare("SELECT id, content FROM document_templates WHERE id = ? AND content IS NOT NULL AND is_active = 1");
+        $tpl_stmt->execute([$prefill_template_id]);
+        $prefill_template = $tpl_stmt->fetch(PDO::FETCH_ASSOC);
+    }
+}
+
 $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $template_categories = $pdo->query("SELECT * FROM template_categories ORDER BY category_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $can_manage_templates = canCreate('document_templates');
 $can_use_templates = canView('document_templates');
 
-$company_name = get_setting('company_name', 'Business Management System');
-$company_logo = get_setting('company_logo');
+$company_name    = get_setting('company_name', 'Business Management System');
+$company_logo    = get_setting('company_logo');
+$company_address = get_setting('company_address', '');
+$company_phone   = get_setting('company_phone', '');
+$company_email   = get_setting('company_email', '');
+$company_tin     = get_setting('company_tin', '');
+$company_vrn     = get_setting('company_vrn', '');
 
 // Preview-only reference — the real, final code is allocated by nextCode()
 // on the server at first save so it's never burned by an abandoned draft.
@@ -67,10 +90,27 @@ if (!empty($existing['description']) && strpos($existing['description'], 'To: ')
     $recipient = substr($existing['description'], 4);
 }
 $letter_date = $existing['issue_date'] ?? date('Y-m-d');
-$content     = $existing['content'] ?? '';
+$content     = $existing['content'] ?? ($prefill_template['content'] ?? '');
+// Note: the wizard's category picker (new_document.php) works off
+// `template_categories` — a different taxonomy, with its own id space, from
+// this field's `document_categories` (which classifies the saved document
+// for filing, not its template). They don't correspond, so the wizard's
+// choice is deliberately NOT forced into this dropdown — the user still
+// picks the document's own filing category independently.
 $category_id = $existing['category_id'] ?? null;
 $access_level = in_array(($existing['access_level'] ?? ''), ['private', 'restricted', 'public'], true)
     ? $existing['access_level'] : 'private';
+// Defaults to ON so existing/new letters keep today's look unless a user
+// deliberately opts out (e.g. writing onto physical pre-printed letterhead
+// paper, where a digital header/footer would duplicate it).
+$use_letterhead    = !isset($existing['use_letterhead']) || (int)$existing['use_letterhead'] === 1;
+// Not every letter type needs a full recipient address block (an internal
+// memo doesn't) — this stays empty unless the user writes one in.
+$recipient_address = $existing['recipient_address'] ?? '';
+// Signature style genuinely differs by letter format (full-block vs
+// modified-block) — stays a per-letter choice rather than a fixed default.
+$signature_align = in_array(($existing['signature_align'] ?? ''), ['left', 'center', 'right'], true)
+    ? $existing['signature_align'] : 'left';
 
 $signer_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
 $signer_role = $_SESSION['user_role'] ?? '';
@@ -102,13 +142,24 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
     . '<p>&nbsp;</p>'
     . '<p>&nbsp;</p>'
     . '<p>Yours faithfully,</p>';
+
+// Sender info block (top-right, under the date) — one line per field, only
+// the ones actually filled in under Company Profile. Replaces the old
+// separate footer strip so postal/physical address, phone, email, TIN and
+// VRN appear exactly once, as part of the sender's own address block.
+$sender_lines = [];
+if ($company_address !== '') { $sender_lines[] = $company_address; }
+if ($company_phone !== '')   { $sender_lines[] = 'Tel: ' . $company_phone; }
+if ($company_email !== '')   { $sender_lines[] = $company_email; }
+if ($company_tin !== '')     { $sender_lines[] = 'TIN: ' . $company_tin; }
+if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
 ?>
 
 <div class="container-fluid mt-4 mb-5" id="createDocumentPage">
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2 d-print-none">
         <div>
             <h4 class="mb-0"><i class="bi bi-file-earmark-plus me-2 text-primary"></i>Create Document</h4>
-            <p class="text-muted mb-0 small">Write a letter or memo — save as a draft, print it, or send it straight into e-signing.</p>
+            <p class="text-muted mb-0 small">Write a letter or memo — save as a draft or print it. To e-sign it, use Docs &gt; E-Sign once saved.</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <a href="<?= $project_id ? getUrl('project_view') . '?id=' . (int)$project_id : getUrl('document_library') ?>" class="btn btn-outline-secondary">
@@ -137,19 +188,19 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
             <button type="button" class="btn btn-outline-primary" id="btnSaveDraft">
                 <i class="bi bi-save me-1"></i> Save Draft
             </button>
-            <button type="button" class="btn btn-outline-primary" id="btnSavePrint">
+            <button type="button" class="btn btn-primary" id="btnSavePrint">
                 <i class="bi bi-printer me-1"></i> Save &amp; Print
-            </button>
-            <button type="button" class="btn btn-primary" id="btnSaveSign">
-                <i class="bi bi-pen me-1"></i> Save &amp; Sign
             </button>
         </div>
     </div>
 
-    <div class="row g-3 mb-3 d-print-none">
+    <div class="row g-3 mb-2 d-print-none">
         <div class="col-md-3">
             <label class="form-label small fw-bold">Recipient</label>
             <input type="text" class="form-control" id="f_recipient" value="<?= htmlspecialchars($recipient) ?>" placeholder="e.g. The Manager, ABC Ltd">
+            <button type="button" class="btn btn-link btn-sm p-0 mt-1" id="btnToggleRecipientAddress">
+                <i class="bi bi-<?= $recipient_address !== '' ? 'dash' : 'plus' ?>-circle me-1"></i><span id="btnToggleRecipientAddressLabel"><?= $recipient_address !== '' ? 'Remove' : 'Add' ?> recipient address</span>
+            </button>
         </div>
         <div class="col-md-2">
             <label class="form-label small fw-bold">Date</label>
@@ -178,6 +229,34 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
         </div>
     </div>
 
+    <!-- Optional — not every letter type needs a full postal address (an
+         internal memo doesn't); hidden unless the user opts to add one. -->
+    <div class="row g-3 mb-3 d-print-none <?= $recipient_address === '' ? 'd-none' : '' ?>" id="recipientAddressRow">
+        <div class="col-md-6">
+            <label class="form-label small fw-bold">Recipient Address <span class="text-muted fw-normal">(optional — printed only if filled in)</span></label>
+            <textarea class="form-control" id="f_recipient_address" rows="2" placeholder="e.g. P.O. Box 123, Dar es Salaam"><?= htmlspecialchars($recipient_address) ?></textarea>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3 d-print-none align-items-start">
+        <div class="col-md-3">
+            <label class="form-label small fw-bold">Signature Position</label>
+            <select class="form-select" id="f_signature_align">
+                <option value="left" <?= $signature_align === 'left' ? 'selected' : '' ?>>Left</option>
+                <option value="center" <?= $signature_align === 'center' ? 'selected' : '' ?>>Center</option>
+                <option value="right" <?= $signature_align === 'right' ? 'selected' : '' ?>>Right</option>
+            </select>
+            <div class="form-text">Full-block letters sign left; modified-block often signs right.</div>
+        </div>
+        <div class="col-md-9">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="f_use_letterhead" <?= $use_letterhead ? 'checked' : '' ?>>
+                <label class="form-check-label small fw-bold" for="f_use_letterhead">Include letterhead (logo &amp; sender address)</label>
+                <div class="form-text">Turn off if printing onto physical pre-printed letterhead paper. The "Printed by" footer always stays &mdash; that's an audit line, not letterhead branding.</div>
+            </div>
+        </div>
+    </div>
+
     <?php if ($project_id): ?>
         <div class="alert alert-info py-2 px-3 mb-3 d-print-none" style="font-size: 0.85rem;">
             <i class="bi bi-diagram-3 me-1"></i> This document will be linked to project: <strong><?= htmlspecialchars($project_name ?? ('#' . $project_id)) ?></strong>
@@ -197,34 +276,62 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
     </div>
     <?php endif; ?>
 
-    <!-- A4-styled letter preview. Only #letterBody is the Summernote-editable
-         region — the letterhead/ref/date/signature block are rendered from
-         structured fields so they can never be accidentally edited/broken by
-         the rich-text editor. -->
-    <div class="letter-paper-wrap d-print-none">
-        <div class="letter-paper-label"><i class="bi bi-eye"></i> Live Preview — this is exactly how the saved PDF will look</div>
-    </div>
-    <div class="letter-paper mx-auto shadow-sm" id="letterPaper">
+    <!-- Wide editing canvas (fills the desktop like the rest of BMS) — purely
+         a screen backdrop. The A4-sized page inside it (#letterPaper) is what
+         actually gets captured into the PDF, so its own size/padding must
+         stay untouched here for print/PDF fidelity; only this outer canvas
+         gets wider. -->
+    <div class="letter-workspace">
+        <!-- A4-styled letter preview. Only #letterBody is the Summernote-editable
+             region — the letterhead/ref/date/signature block are rendered from
+             structured fields so they can never be accidentally edited/broken by
+             the rich-text editor. -->
+        <div class="letter-paper-wrap d-print-none">
+            <div class="letter-paper-label"><i class="bi bi-eye"></i> Live Preview — this is exactly how the saved PDF will look</div>
+        </div>
+        <!-- The Summernote toolbar mounts here — kept OUTSIDE the letter-paper
+             mockup (via the toolbarContainer option below) so it reads as an
+             editor control bar above the page, not as content printed inside it. -->
+        <div class="letter-toolbar-bar mx-auto d-print-none" id="letterToolbar"></div>
+        <div class="letter-paper mx-auto shadow-sm<?= $use_letterhead ? '' : ' no-letterhead' ?>" id="letterPaper">
         <div class="letter-head text-center">
             <?php if ($company_logo): ?>
                 <img src="<?= getUrl($company_logo) ?>" alt="Logo" class="letter-logo">
             <?php endif; ?>
             <div class="letter-company"><?= htmlspecialchars($company_name) ?></div>
         </div>
-        <div class="letter-meta">
-            <span>Ref: <strong id="letter-ref-display"><?= htmlspecialchars($document_code) ?></strong></span>
-            <span id="letter-date-display"><?= htmlspecialchars(date('d M Y', strtotime($letter_date))) ?></span>
+
+        <!-- Recipient (left) / sender + date (right) — standard business-letter
+             block layout. Never stack these under the signature; the
+             recipient's address always precedes the body, and the date
+             always sits directly under the sender's address, never floating
+             on its own. -->
+        <div class="letter-addr-row">
+            <div class="letter-addr-col letter-addr-recipient">
+                <div class="letter-recipient" id="letter-recipient-display">
+                    <?= $recipient !== '' ? nl2br(htmlspecialchars($recipient)) : '' ?>
+                </div>
+                <div class="letter-recipient-address <?= $recipient_address === '' ? 'd-none' : '' ?>" id="letter-recipient-address-display">
+                    <?= $recipient_address !== '' ? nl2br(htmlspecialchars($recipient_address)) : '' ?>
+                </div>
+            </div>
+            <div class="letter-addr-col letter-addr-sender">
+                <div class="letter-sender-info">
+                    <?php foreach ($sender_lines as $line): ?>
+                        <div><?= nl2br(htmlspecialchars($line)) ?></div>
+                    <?php endforeach; ?>
+                </div>
+                <div class="letter-date" id="letter-date-display"><?= htmlspecialchars(date('d M Y', strtotime($letter_date))) ?></div>
+            </div>
         </div>
-        <div class="letter-recipient" id="letter-recipient-display">
-            <?= $recipient !== '' ? nl2br(htmlspecialchars($recipient)) : '' ?>
-        </div>
+
         <div class="letter-subject">
             <strong>RE: <span id="letter-subject-display"><?= htmlspecialchars($subject ?: '(Subject)') ?></span></strong>
         </div>
 
         <div id="letterBody"><?= $content !== '' ? $content : $default_body ?></div>
 
-        <div class="letter-signoff">
+        <div class="letter-signoff align-<?= htmlspecialchars($signature_align) ?>" id="letterSignoff">
             <div class="letter-signature-box">
                 <?php if ($signature_preview_path): ?>
                     <img src="<?= htmlspecialchars(getUrl($signature_preview_path)) ?>" alt="Signature preview" class="letter-signature-img">
@@ -237,13 +344,16 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
             </div>
             <div class="letter-signoff-name"><?= htmlspecialchars($signer_name ?: 'Signed by') ?></div>
             <?php if ($signer_role): ?><div class="letter-signoff-role"><?= htmlspecialchars($signer_role) ?></div><?php endif; ?>
-            <div class="letter-signoff-note text-muted d-print-none">
-                <i class="bi bi-info-circle me-1"></i>
-                <?= $signature_preview_path
-                    ? 'Preview only — your signature is legally applied (with audit trail) in the next step, Save &amp; Sign.'
-                    : 'No signature on file yet — add one to enable Save &amp; Sign.' ?>
-            </div>
         </div>
+
+        <!-- Shared BMS print footer (i_e_print.md §3) — same "Printed by /
+             role / date" audit line + brand as every other print page.
+             Always present regardless of the letterhead toggle: it's an
+             audit trail, not company branding. -->
+        <div class="letter-footer-wrap" id="letterFooterWrap">
+            <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
+        </div>
+    </div>
     </div>
 </div>
 
@@ -308,6 +418,20 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <style>
+/* Canonical BMS print page margin (i_e_print.md §1) — the 16mm bottom band
+   is what reserves room for the shared footer below so it never overlaps
+   body text. Declared outside @media print so it applies globally. */
+@page { margin: 10mm 8mm 16mm 8mm; }
+
+/* Wide editing canvas — fills the desktop container like the rest of BMS
+   instead of leaving the A4 page floating in blank space. Only this
+   backdrop stretches; #letterPaper below keeps its own true A4 max-width so
+   what gets captured into the PDF is unaffected. */
+.letter-workspace {
+    background: #eef0f2;
+    border-radius: 12px;
+    padding: 24px;
+}
 .letter-paper {
     background: #fff;
     max-width: 210mm;
@@ -330,30 +454,100 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
     align-items: center;
     gap: 6px;
 }
+
+/* Editor ribbon — sits ABOVE the letter-paper page, like Word's ribbon above
+   a blank document. Summernote's toolbarContainer option mounts the real
+   toolbar into this box instead of inside #letterBody, so it never renders
+   as if it were part of the printed page. */
+.letter-toolbar-bar {
+    max-width: 210mm;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-bottom: none;
+}
+.letter-toolbar-bar .note-toolbar {
+    background: transparent !important;
+    border: none !important;
+}
 .letter-head { margin-bottom: 14mm; }
 .letter-logo { max-height: 70px; width: auto; display: block; margin: 0 auto 6px; }
 .letter-company { font-size: 16pt; font-weight: 800; color: #0d6efd; text-transform: uppercase; letter-spacing: 1px; }
-.letter-meta { display: flex; justify-content: space-between; font-size: 10pt; color: #333; margin-bottom: 10mm; }
-.letter-recipient { font-size: 11pt; white-space: pre-line; margin-bottom: 6mm; min-height: 1em; }
+
+/* Recipient (left) / sender + date (right) block — each field its own line,
+   never compacted together, matching how each is a separate setting. */
+.letter-addr-row { display: flex; justify-content: space-between; gap: 10mm; margin-bottom: 8mm; }
+.letter-addr-col { flex: 1 1 50%; font-size: 10pt; color: #333; }
+.letter-addr-recipient { text-align: left; }
+.letter-addr-sender { text-align: right; }
+.letter-recipient { font-size: 11pt; white-space: pre-line; min-height: 1em; }
+.letter-recipient-address { font-size: 10pt; color: #444; white-space: pre-line; margin-top: 1mm; }
+/* Sender info block — postal/physical address, phone, email, TIN, VRN, each
+   its own line, matching how each is its own separate Company Profile
+   setting. Only the fields actually filled in render (see $sender_lines). */
+.letter-sender-info div { white-space: pre-line; margin-top: 1mm; }
+.letter-date { margin-top: 1mm; }
+
 .letter-subject { font-size: 11pt; margin-bottom: 8mm; text-decoration: underline; }
 #letterBody { font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.6; min-height: 60mm; }
+/* Include letterhead = off: logo/company name and sender info hidden (a
+   physical pre-printed letterhead page already carries this) — but
+   recipient, date, and signoff stay, since those are correspondence
+   essentials regardless of letterhead paper. */
+.letter-paper.no-letterhead .letter-head,
+.letter-paper.no-letterhead .letter-sender-info { display: none !important; }
 
-/* Summernote ships its own generic skin — restyle it to match BMS's rounded,
-   shadow-sm card language instead of looking like a bare stock install. */
+/* The editable region now lives directly inside the letter-paper mockup with
+   no toolbar inside it (toolbarContainer moved that to #letterToolbar above),
+   so it should blend into the page like blank space to write in, not look
+   like a separate boxed widget. */
 .note-editor.note-frame {
-    border: 1px solid #dee2e6 !important;
-    border-radius: 8px !important;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    border: none !important;
+    box-shadow: none !important;
 }
-.note-editor .note-toolbar {
-    background: #f8f9fa !important;
-    border-bottom: 1px solid #dee2e6 !important;
-    padding: 6px !important;
-}
-.note-editable { padding: 12px !important; }
+.note-editable { padding: 0 !important; }
 
+/* Toolbar styling — targets the ribbon in #letterToolbar (see
+   .letter-toolbar-bar above), since toolbarContainer mounts it there instead
+   of inside .note-editor. */
+.letter-toolbar-bar .note-toolbar {
+    padding: 6px 8px !important;
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 4px;
+}
+.letter-toolbar-bar .note-toolbar .note-btn-group {
+    margin: 0 6px 0 0 !important;
+    padding-right: 6px;
+    border-right: 1px solid #dee2e6;
+}
+.letter-toolbar-bar .note-toolbar .note-btn-group:last-child { border-right: none; margin-right: 0 !important; }
+.letter-toolbar-bar .note-toolbar .note-btn,
+.letter-toolbar-bar .note-toolbar .note-dropdown-toggle {
+    padding: 4px 7px !important;
+    font-size: 0.82rem !important;
+}
+
+@media (max-width: 576px) {
+    .letter-toolbar-bar .note-toolbar {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+    .letter-toolbar-bar .note-toolbar .note-btn-group { flex: 0 0 auto; }
+}
+
+/* Signature position is a per-letter choice (see f_signature_align) — full-
+   block letter style signs left, modified-block often signs right; never
+   hardcode one. */
 .letter-signoff { margin-top: 16mm; font-size: 11pt; }
+.letter-signoff.align-left { text-align: left; }
+.letter-signoff.align-center { text-align: center; }
+.letter-signoff.align-right { text-align: right; }
+.letter-signoff.align-left .letter-signature-box { margin: 0 auto 6px 0; }
+.letter-signoff.align-center .letter-signature-box { margin: 0 auto 6px; }
+.letter-signoff.align-right .letter-signature-box { margin: 0 0 6px auto; }
 .letter-signature-box {
     position: relative;
     width: 220px;
@@ -388,7 +582,6 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
 .letter-signature-cta:hover { text-decoration: underline; }
 .letter-signoff-name { font-weight: 700; border-top: 1px solid #333; padding-top: 4px; display: inline-block; }
 .letter-signoff-role { color: #555; }
-.letter-signoff-note { font-size: 8pt; margin-top: 4mm; }
 
 @media print {
     /* min-height:297mm gives a nice one-page WYSIWYG look on screen, but in
@@ -398,8 +591,15 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
        flow across exactly as many pages as the real content needs, not a
        fixed count). Let height come from content alone. */
     .letter-paper { border: none; max-width: 100%; box-shadow: none !important; border-radius: 0; min-height: 0; }
+    /* The wide gray canvas is a screen-only editing affordance — strip it
+       back to plain white for an actual browser print (window.print()). */
+    .letter-workspace { background: none !important; padding: 0 !important; border-radius: 0 !important; }
     .letter-paper-label { display: none !important; }
     #createDocumentPage .btn, #createDocumentPage .form-label, #createDocumentPage input, #createDocumentPage select { display: none !important; }
+
+    /* Reveal the shared footer only for the native print dialog — it stays
+       hidden while editing. */
+    .letter-footer-wrap { display: block !important; }
 
     /* The letter body wraps Summernote's own toolbar chrome — has zero place
        in a printed document. */
@@ -435,7 +635,13 @@ $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) :
         padding: 0 !important;
     }
 }
+
+/* Shared footer content — hidden while editing, shown only for the native
+   browser print dialog (d-print-block) and briefly toggled visible via JS
+   right before html2pdf captures the page, so the saved PDF carries it too. */
+.letter-footer-wrap { display: none; }
 </style>
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 
 <script>
 // Mutable — starts from the page-load value but is updated after the first
@@ -450,15 +656,15 @@ $(document).ready(function () {
 
     $('#letterBody').summernote({
         height: 320,
+        toolbarContainer: '#letterToolbar',
         toolbar: [
             ['style', ['style']],
-            ['font', ['bold', 'italic', 'underline', 'strikethrough', 'superscript', 'subscript', 'clear']],
             ['fontname', ['fontname']],
             ['fontsize', ['fontsize']],
+            ['font', ['bold', 'italic', 'underline', 'strikethrough', 'superscript', 'subscript', 'clear']],
             ['color', ['color']],
             ['para', ['ul', 'ol', 'paragraph', 'height']],
-            ['table', ['table']],
-            ['insert', ['link', 'picture', 'hr']],
+            ['insert', ['table', 'link', 'picture', 'hr']],
             ['history', ['undo', 'redo']],
             ['view', ['fullscreen', 'codeview', 'help']]
         ],
@@ -477,9 +683,39 @@ $(document).ready(function () {
         $('#letter-date-display').text(isNaN(d) ? '' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }));
     });
 
+    // Recipient address — optional; not every letter type needs one, so it
+    // stays a collapsed extra field rather than a permanent fixture.
+    $('#btnToggleRecipientAddress').on('click', function () {
+        const $row = $('#recipientAddressRow');
+        const nowOpen = $row.hasClass('d-none');
+        $row.toggleClass('d-none', !nowOpen);
+        $(this).find('i').attr('class', 'bi bi-' + (nowOpen ? 'dash' : 'plus') + '-circle me-1');
+        $('#btnToggleRecipientAddressLabel').text((nowOpen ? 'Remove' : 'Add') + ' recipient address');
+        if (!nowOpen) { $('#f_recipient_address').val(''); $('#letter-recipient-address-display').addClass('d-none').empty(); }
+        else { $('#f_recipient_address').trigger('focus'); }
+    });
+    $('#f_recipient_address').on('input', function () {
+        const v = $(this).val();
+        $('#letter-recipient-address-display')
+            .toggleClass('d-none', v.trim() === '')
+            .html($('<div>').text(v).html().replace(/\n/g, '<br>'));
+    });
+
+    // Letterhead toggle — header + footer both follow the same switch, like
+    // the equivalent control in the sister vikundi project.
+    $('#f_use_letterhead').on('change', function () {
+        $('#letterPaper').toggleClass('no-letterhead', !this.checked);
+    });
+
+    // Signature position — full-block vs modified-block letter styles
+    // genuinely sign in different places, so this stays a live choice
+    // instead of a fixed default.
+    $('#f_signature_align').on('change', function () {
+        $('#letterSignoff').removeClass('align-left align-center align-right').addClass('align-' + this.value);
+    });
+
     $('#btnSaveDraft').on('click', function () { saveDocument('draft'); });
     $('#btnSavePrint').on('click', function () { saveDocument('print'); });
-    $('#btnSaveSign').on('click', function () { saveDocument('sign'); });
     $('#btnDuplicate').on('click', duplicateDocument);
 
     // ── Use Template ──────────────────────────────────────────────
@@ -626,7 +862,7 @@ function saveDocument(mode) {
         return;
     }
 
-    const $btn = mode === 'draft' ? $('#btnSaveDraft') : (mode === 'print' ? $('#btnSavePrint') : $('#btnSaveSign'));
+    const $btn = mode === 'draft' ? $('#btnSaveDraft') : $('#btnSavePrint');
     const orig = $btn.html();
     $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Saving...');
 
@@ -635,21 +871,38 @@ function saveDocument(mode) {
     // editable content, matching how every other document in the library
     // already behaves.
     const opt = {
-        margin: 0,
+        // Bottom margin reserved on EVERY page (not just the last) — the
+        // page div's own 20mm padding only covers the very start/end of the
+        // whole content flow, not each internal page-break slice, so
+        // without this the shared footer (revealed below) could land right
+        // on top of body text on interior pages.
+        margin: [0, 0, 15, 0],
         filename: subject + '.pdf',
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'avoid-all'] }
     };
 
+    const useLetterhead = $('#f_use_letterhead').is(':checked');
+
+    // The shared footer (#letterFooterWrap) is hidden while editing and only
+    // revealed for print — html2pdf captures the DOM as currently rendered
+    // on screen (it doesn't apply @media print styles), so it has to be
+    // shown right before capture and hidden again straight after.
+    $('#letterFooterWrap').css('display', 'block');
     html2pdf().set(opt).from(document.getElementById('letterPaper')).outputPdf('blob').then(function (blob) {
+        $('#letterFooterWrap').css('display', '');
         const fd = new FormData();
         fd.append('document_id', currentDocumentId);
         fd.append('subject', subject);
         fd.append('recipient', $('#f_recipient').val().trim());
+        fd.append('recipient_address', $('#f_recipient_address').val().trim());
         fd.append('letter_date', $('#f_letter_date').val());
         fd.append('category_id', $('#f_category_id').val() || '');
         fd.append('access_level', $('#f_access_level').val() || 'private');
+        fd.append('use_letterhead', useLetterhead ? '1' : '0');
+        fd.append('signature_align', $('#f_signature_align').val() || 'left');
         fd.append('project_id', '<?= (int)($project_id ?? 0) ?>');
         fd.append('content', $('#letterBody').summernote('code'));
         fd.append('_csrf', CSRF_TOKEN);
@@ -677,11 +930,9 @@ function saveDocument(mode) {
                             window.history.replaceState({}, '', url);
                             $btn.prop('disabled', false).html(orig);
                         });
-                } else if (mode === 'print') {
+                } else {
                     $btn.prop('disabled', false).html(orig);
                     window.print();
-                } else {
-                    window.location.href = '<?= buildUrl('select_document_add_esignature') ?>';
                 }
             },
             error: function () {
@@ -690,6 +941,7 @@ function saveDocument(mode) {
             }
         });
     }).catch(function () {
+        $('#letterFooterWrap').css('display', '');
         Swal.fire({ icon: 'error', title: 'Error', text: 'Could not generate the PDF.' });
         $btn.prop('disabled', false).html(orig);
     });

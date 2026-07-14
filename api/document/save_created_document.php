@@ -36,12 +36,16 @@ try {
     $document_id = intval($_POST['document_id'] ?? 0);
     $subject     = trim((string)($_POST['subject'] ?? ''));
     $recipient   = trim((string)($_POST['recipient'] ?? ''));
+    $recipient_address = trim((string)($_POST['recipient_address'] ?? ''));
     $content     = (string)($_POST['content'] ?? '');
     $letter_date = trim((string)($_POST['letter_date'] ?? ''));
     $category_id = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
     $project_id  = !empty($_POST['project_id']) ? (int)$_POST['project_id'] : null;
     $access_level = in_array(($_POST['access_level'] ?? ''), ['private', 'restricted', 'public'], true)
         ? $_POST['access_level'] : 'private';
+    $use_letterhead = ($_POST['use_letterhead'] ?? '1') === '1' ? 1 : 0;
+    $signature_align = in_array(($_POST['signature_align'] ?? ''), ['left', 'center', 'right'], true)
+        ? $_POST['signature_align'] : 'left';
 
     if ($subject === '') {
         throw new Exception('Subject is required');
@@ -104,7 +108,8 @@ try {
             UPDATE documents SET
                 document_name = ?, description = ?, content = ?, file_path = ?,
                 original_filename = ?, file_size = ?, file_type = 'pdf',
-                category_id = ?, project_id = ?, issue_date = ?, access_level = ?, updated_at = NOW()
+                category_id = ?, project_id = ?, issue_date = ?, access_level = ?,
+                use_letterhead = ?, recipient_address = ?, signature_align = ?, updated_at = NOW()
             WHERE id = ?
         ");
         $upd->execute([
@@ -118,6 +123,9 @@ try {
             $project_id,
             $letter_date ?: null,
             $access_level,
+            $use_letterhead,
+            $recipient_address !== '' ? $recipient_address : null,
+            $signature_align,
             $document_id,
         ]);
 
@@ -154,8 +162,9 @@ try {
             INSERT INTO documents (
                 document_name, description, content, file_path, original_filename,
                 file_size, file_type, category_id, document_code, version,
-                issue_date, access_level, uploaded_by, project_id, source
-            ) VALUES (?, ?, ?, ?, ?, ?, 'pdf', ?, ?, '1.0', ?, ?, ?, ?, 'created')
+                issue_date, access_level, uploaded_by, project_id, source,
+                use_letterhead, recipient_address, signature_align
+            ) VALUES (?, ?, ?, ?, ?, ?, 'pdf', ?, ?, '1.0', ?, ?, ?, ?, 'created', ?, ?, ?)
         ");
         $ins->execute([
             $subject,
@@ -170,6 +179,9 @@ try {
             $access_level,
             $_SESSION['user_id'],
             $project_id,
+            $use_letterhead,
+            $recipient_address !== '' ? $recipient_address : null,
+            $signature_align,
         ]);
         $document_id = (int)$pdo->lastInsertId();
         $pdo->commit();
