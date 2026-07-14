@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-07-14 (fix) — Quick Expense (create-as-paid) now recognises cost via the same accrual entry as the normal flow
+
+**File:** `api/account/add_expense.php`
+
+The normal expense lifecycle (`pending → approved → paid`) recognises the cost on the P&L at
+**approval** via `postExpenseAccrual()` (Dr Expense / Cr Accrued Expenses `2-1500`), then clears
+that liability at **payment** (Dr Accrued Expenses / Cr Bank). The "Quick Expense" create-as-paid
+shortcut bypassed both steps and posted a single direct `Dr Expense / Cr Bank` leg instead — same
+net financial effect, but a different `entity_type` (`books_transaction` only, no
+`expense_accrual` row) and no accrual-entity trail, so anything querying "all accrual entries for
+this expense" would silently miss Quick-Expense rows.
+
+Quick Expense now posts the identical two-step sequence: `postExpenseAccrual()` first (Dr Expense /
+Cr Accrued Expenses, dated `expense_date` — same as the normal flow), then settles it via
+`postOutflow()` pointed at the Accrued Expenses account instead of the raw expense account (Dr
+Accrued Expenses / Cr Bank). Falls back to the old direct posting only if the Accrued Expenses
+account isn't configured (`accruedExpensesAccountId()` returns null) — never throws. Also fixed the
+success-notification's ledger summary to show the real settlement account (Accrued Expenses) instead
+of always showing the raw expense account.
+
+Verified live: posted a test Quick Expense (789.00) through the fixed sequence and confirmed both
+journal entries — `expense_accrual` (Dr Wages & Salaries / Cr Accrued Expenses) then
+`books_transaction` (Dr Accrued Expenses / Cr Cash Drawer), both `status='posted'`, Accrued Expenses
+netting to zero — then rolled back the test transaction.
+
 ## 2026-07-14 (fix) — Project > Finance > Expenses "View Details" now opens the real Expense Voucher page
 
 **File:** `app/bms/operations/project_view.php`
