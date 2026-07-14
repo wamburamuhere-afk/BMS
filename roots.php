@@ -981,6 +981,8 @@ $routes = [
     'select_document_add_esignature.php' => DOCUMENT_DIR . '/select_document_add_esignature.php',
     'create_document' => DOCUMENT_DIR . '/create_document.php',
     'create_document.php' => DOCUMENT_DIR . '/create_document.php',
+    'new_document' => DOCUMENT_DIR . '/new_document.php',
+    'new_document.php' => DOCUMENT_DIR . '/new_document.php',
 
     // Document aliases for common navigation patterns
     'library' => DOCUMENT_DIR . '/document_library.php',
