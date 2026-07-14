@@ -19,13 +19,23 @@ try {
         throw new Exception('Access denied');
     }
 
-    $stmt = $pdo->query("
-        SELECT dt.id, dt.template_name, dt.content, dt.usage_count, tc.category_name
+    $category_id = !empty($_GET['category_id']) ? (int)$_GET['category_id'] : null;
+
+    $sql = "
+        SELECT dt.id, dt.template_name, dt.content, dt.usage_count, dt.category_id, tc.category_name
         FROM document_templates dt
         LEFT JOIN template_categories tc ON tc.id = dt.category_id
         WHERE dt.content IS NOT NULL AND dt.is_active = 1
-        ORDER BY dt.template_name ASC
-    ");
+    ";
+    $params = [];
+    if ($category_id !== null) {
+        $sql .= " AND dt.category_id = ?";
+        $params[] = $category_id;
+    }
+    $sql .= " ORDER BY dt.template_name ASC";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $templates = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode(['success' => true, 'templates' => $templates]);
