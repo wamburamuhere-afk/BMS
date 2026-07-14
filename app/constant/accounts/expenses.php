@@ -47,6 +47,19 @@ $suppliers       = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers
 $employees       = $pdo->query("SELECT employee_id, first_name, last_name FROM employees WHERE status = 'active' ORDER BY first_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $sub_contractors = $pdo->query("SELECT supplier_id, supplier_name FROM sub_contractors WHERE status = 'active' ORDER BY supplier_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
+// Budget items for the optional "Budget" field — both project-tagged and
+// company-wide (project_id IS NULL) budgets. Fetched once; the browser filters
+// by the form's own Project field (that project's budgets, or the untagged
+// ones when no project is picked) so no extra request is needed on change.
+$budgetScope = scopeFilterSqlNullable('project', 'b');
+$all_budgets = $pdo->query("
+    SELECT b.budget_id, b.project_id, b.budget_year, b.budget_month, b.allocated_amount, ec.name AS category_name
+    FROM budgets b
+    LEFT JOIN expense_categories ec ON b.category_id = ec.id
+    WHERE 1=1 $budgetScope
+    ORDER BY b.budget_year DESC, b.budget_month DESC
+")->fetchAll(PDO::FETCH_ASSOC);
+
 // Fetch company logo and settings for print
 $c_logo = getSetting('company_logo', '');
 $c_name = getSetting('company_name', 'BMS');
@@ -549,6 +562,13 @@ if (!function_exists('renderExpenseCatRows')) {
                             </select>
                         </div>
                         <?php endif; ?>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Budget <span class="text-muted fw-normal">(optional)</span></label>
+                            <select class="form-select select2-static" name="budget_id" id="expense_budget_id">
+                                <option value="">No specific budget item</option>
+                            </select>
+                            <div class="form-text text-muted" id="expense_budget_hint"></div>
+                        </div>
                         <!-- Description / Context -->
                         <div class="col-12">
                             <div class="d-flex justify-content-between align-items-center">
@@ -610,6 +630,36 @@ $(document).ready(function() {
     const suppliersData      = <?= json_encode(array_map(fn($s) => ['id' => $s['supplier_id'], 'name' => $s['supplier_name']], $suppliers)) ?>;
     const staffData          = <?= json_encode(array_map(fn($e) => ['id' => $e['employee_id'], 'name' => trim($e['first_name'] . ' ' . $e['last_name'])], $employees)) ?>;
     const subContractorsData = <?= json_encode(array_map(fn($s) => ['id' => $s['supplier_id'], 'name' => $s['supplier_name']], $sub_contractors)) ?>;
+    const allBudgetsData     = <?= json_encode($all_budgets) ?>;
+    const budgetMonthNames   = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // Budget list depends on the form's own Project field: a project selected
+    // shows only THAT project's budgets; no project selected shows only the
+    // company-wide (unlinked) budgets. Always optional.
+    function populateExpenseBudgetOptions(projectId) {
+        const $sel = $('#expense_budget_id');
+        if ($sel.data('select2')) $sel.select2('destroy');
+        $sel.empty().append('<option value="">No specific budget item</option>');
+
+        const filtered = allBudgetsData.filter(b => projectId ? String(b.project_id) === String(projectId) : !b.project_id);
+        filtered.forEach(b => {
+            const period = (budgetMonthNames[b.budget_month] || '') + ' ' + b.budget_year;
+            const amount = parseFloat(b.allocated_amount || 0).toLocaleString();
+            $sel.append(`<option value="${b.budget_id}">${b.category_name || 'Uncategorised'} — ${period} (Allocated: ${amount} TZS)</option>`);
+        });
+
+        $('#expense_budget_hint').text(
+            projectId
+                ? (filtered.length ? filtered.length + ' budget item(s) for this project' : 'No budget items for this project')
+                : (filtered.length ? filtered.length + ' company-wide budget item(s)' : 'No company-wide budget items')
+        );
+
+        $sel.select2({ theme: 'bootstrap-5', dropdownParent: $('#addExpenseModal'), placeholder: 'No specific budget item', allowClear: true, width: '100%' });
+    }
+
+    $(document).on('change', 'select[name="project_id"]', function() {
+        populateExpenseBudgetOptions($(this).val());
+    });
 
     // Initialize Select2 Static
     function initSelect2() {
@@ -627,6 +677,7 @@ $(document).ready(function() {
         });
     }
     initSelect2();
+    populateExpenseBudgetOptions('');
 
     // Custom mobile card renderer
     function renderMobileCards(api) {
@@ -1615,6 +1666,10 @@ function editExpense(id) {
             } else {
                 $form.find('select[name="project_id"]').val('').trigger('change');
             }
+            // Populate Budget (options were just re-scoped by the project_id change above)
+            setTimeout(() => {
+                $('#expense_budget_id').val(data.budget_id || '').trigger('change');
+            }, 100);
 
             // Populate breakdown items if available
             $('#breakdown-body').empty();
