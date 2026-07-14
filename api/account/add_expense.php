@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../helpers/transaction_helper.php';
 require_once __DIR__ . '/../../core/payment_source.php';
 require_once __DIR__ . '/../../core/bank_register.php';
+require_once __DIR__ . '/../../core/expense_posting.php';
 
 header('Content-Type: application/json');
 
@@ -116,18 +117,30 @@ try {
         }
 
         // GAP 1 (pending path) still holds: create defers the posting for pending expenses.
-        // Direct-pay path: when status=paid is requested (e.g. Quick Expense), post
-        // Dr Expense / Cr Bank immediately via postOutflow — same engine as the manual
-        // paid transition in update_expense_status.php.
+        // Direct-pay path: when status=paid is requested (e.g. Quick Expense), post the
+        // SAME two-step accrual-then-settle sequence as the manual pending→approved→paid
+        // flow (update_expense_status.php) instead of a single Dr Expense / Cr Bank leg —
+        // so P&L recognition (the accrual entry) always lands on expense_date regardless
+        // of which path an expense was entered through. Falls back to the old direct
+        // posting only if the Accrued Expenses account isn't configured.
         if ($status === 'paid') {
             $ref  = 'EXP-' . $expense_id;
             $desc = 'Expense #' . $expense_id . ': ' . substr($description, 0, 100);
 
+            $accr = postExpenseAccrual($pdo, (int)$expense_id, $expense_account_id, $amount,
+                $expense_date, $project_id, (int)$created_by, $ref, $description);
+
+            $settle_debit = $expense_account_id;
+            if (!empty($accr['posted'])) {
+                $accruedAcc = accruedExpensesAccountId($pdo);
+                if ($accruedAcc) $settle_debit = (int)$accruedAcc;
+            }
+
             $txnId = postOutflow(
                 $pdo,
                 'expense',
-                $bank_account_id,    // Cr — cash/bank account (money leaves here)
-                $expense_account_id, // Dr — expense GL account (cost recognised here)
+                $bank_account_id, // Cr — cash/bank account (money leaves here)
+                $settle_debit,    // Dr — Accrued Expenses (settling the accrual) or Expense (fallback)
                 $amount,
                 $expense_date,
                 $ref,
@@ -179,14 +192,14 @@ try {
                 "SELECT account_id, CONCAT(COALESCE(NULLIF(account_code,''),'?'), ' — ', account_name) AS label
                    FROM accounts WHERE account_id IN (?, ?)"
             );
-            $accLookup->execute([$expense_account_id, $bank_account_id]);
+            $accLookup->execute([$settle_debit, $bank_account_id]);
             $accMap = [];
             foreach ($accLookup->fetchAll(PDO::FETCH_ASSOC) as $row) {
                 $accMap[(int)$row['account_id']] = $row['label'];
             }
             $ledger = [
-                'dr' => $accMap[$expense_account_id] ?? 'Expense Account',
-                'cr' => $accMap[$bank_account_id]    ?? 'Bank/Cash Account',
+                'dr' => $accMap[$settle_debit]    ?? 'Expense Account',
+                'cr' => $accMap[$bank_account_id] ?? 'Bank/Cash Account',
                 'amount' => number_format($amount, 2),
             ];
         }
