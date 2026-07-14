@@ -11,6 +11,25 @@ budget prefill. The project page's own Add/Edit Expense "Project Budget Item" dr
 (`app/bms/operations/project_view.php`) is untouched — this only affects the standalone
 Expenses page.
 
+## 2026-07-14 (revert) — Project > Finance > Expenses: removed "Project Budget Item" from Add/Edit modal
+
+**File:** `app/bms/operations/project_view.php`
+
+Companion to the Expenses-page Budget-dropdown removal — drops the "Project Budget Item (optional)"
+field (and its Allocated/Spent/Remaining info panel, over-budget variance warning, and budget-overrun
+confirmation dialog) from both the Add Expense and Edit Expense modals inside a project's own
+Finance > Expenses tab. Also made "Expense Type" required in both modals to match the external
+Expenses page (previously optional here). The "Allocation Source" column and the read-only
+View Expense Details panel are untouched — they still carry real meaning for Payment-Voucher-linked
+and historical budget-tagged expenses, only the ability to *pick* a budget item on the form is gone.
+
+Verified live: `api/operations/get_project.php` already lists a project's expenses via
+`WHERE e.project_id = ?` with no source restriction, so an expense created externally (main
+Expenses page) with this project selected already surfaces under the project's own Expense tab —
+same pattern as Invoices/Purchase Orders. No backend change was needed for that; confirmed by
+inserting a test expense with only `project_id` set (no budget_id) and re-running the exact
+scoping query, then rolling back.
+
 ## 2026-07-14 (feat) — Post initial product stock to the GL; rename take-on equity account to "Opening Balance"
 
 **New files:** `migrations/2026_07_14_rename_opening_balance_equity_account.php`
