@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-07-14 (feat) — Create Document: type-driven letter formatting — letterhead toggle, recipient address, signature alignment
+
+**New files:** `app/constant/document/new_document.php`, `api/document/use_template.php`,
+`migrations/2026_07_14_documents_letterhead_toggle.php`, `migrations/2026_07_14_documents_signature_align.php`
+**Files:** `api/document/duplicate_created_document.php`, `api/document/get_letter_templates.php`,
+`api/document/save_created_document.php`, `app/bms/operations/project_view.php`,
+`app/constant/document/create_document.php`, `app/constant/document/document_library.php`, `roots.php`
+
+Delivers the "Part 3" item flagged as in-progress after the last report: making Create Document
+output adapt to the kind of letter being written, instead of one fixed layout for everything.
+
+- **New entry point `new_document.php`:** a two-step chooser (pick a template category, or start
+  blank) shown before the editor — both "Docs > Library > Create Document" and "Project > Docs >
+  Create Document" now land here first; either path still lands on the existing
+  `create_document.php` editor (blank, or pre-filled from the chosen template via `?template_id`).
+- **Letterhead toggle:** a document can opt out of the digital company header/sender-address block
+  entirely — for letters printed onto physical pre-printed letterhead paper, where reprinting it
+  digitally would duplicate it. Defaults on. New `documents.use_letterhead` column.
+- **Optional recipient address block:** a collapsible field under Recipient — not shown unless the
+  user adds one, since not every letter type (e.g. an internal memo) needs a full postal address.
+  New `documents.recipient_address` column.
+- **Signature position:** left/center/right, since full-block vs modified-block letter styles
+  genuinely sign in different places. New `documents.signature_align` column (default `left`).
+- Sender's address/phone/email/TIN/VRN moved into the letter's own address block (opposite the
+  recipient) instead of a separate footer strip, so it participates in the letterhead toggle.
+- Removed the direct "Save & Sign" shortcut button — signing now always goes through the existing,
+  audited Docs > E-Sign wizard (`select_document_add_esignature.php`), unchanged otherwise.
+- Both migrations are idempotent (`SHOW COLUMNS` guard) and additive-only; existing documents keep
+  today's rendering (`use_letterhead=1`, `signature_align='left'`, empty `recipient_address`).
+- `use_template.php` added to record `usage_count` when a template is picked from the new chooser
+  (previously only bumped from the "Use Template" picker inside the editor itself).
+
+PR: https://github.com/wamburamuhere-afk/BMS/pull/1278 (into `develop`, not yet merged).
+
 ## 2026-07-13 (fix) — Expenses: date off-by-one, project-expense modal broken save, missing Expense Type list
 
 **Files:** `app/constant/accounts/expenses.php`, `app/bms/operations/project_view.php`
