@@ -5375,88 +5375,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
-<!-- View Expense Details Modal -->
-<div class="modal fade" id="viewExpenseModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
-            <div class="modal-header border-0 pb-0">
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4 pt-0">
-                <div class="text-center mb-4">
-                    <div class="bg-primary-soft text-primary rounded-circle mx-auto mb-3" style="width: 64px; height: 64px; display: flex; align-items: center; justify-content: center;">
-                        <i class="bi bi-wallet2 fs-2"></i>
-                    </div>
-                    <h4 class="fw-bold mb-1" id="ve_description">Expense Details</h4>
-                    <span class="badge" id="ve_status_badge">Status</span>
-                </div>
-
-                <div class="card bg-light border-0 mb-4" style="border-radius: 12px;">
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-6">
-                                <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.7rem;">Date</small>
-                                <strong id="ve_date" class="text-dark fs-6">N/A</strong>
-                            </div>
-                            <div class="col-6 text-end">
-                                <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.7rem;">Amount</small>
-                                <strong id="ve_amount" class="text-danger fs-5">0.00 TZS</strong>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="list-group list-group-flush mb-3 small">
-
-                    <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3">
-                        <span class="text-muted"><i class="bi bi-layers me-2"></i>Expense Type</span>
-                        <span class="fw-bold text-dark" id="ve_expense_type">N/A</span>
-                    </div>
-                    <!-- Categories (Multi-select Tags) -->
-                    <div class="list-group-item d-flex justify-content-between align-items-start bg-transparent px-0 py-3" id="ve_categories_row" style="display:none;">
-                        <span class="text-muted"><i class="bi bi-tags me-2"></i>Categories</span>
-                        <div id="ve_categories_cont" class="d-flex flex-wrap gap-1 justify-content-end" style="max-width: 70%;">
-                            <!-- Tags will be injected here -->
-                        </div>
-                    </div>
-                    <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3">
-                        <span class="text-muted"><i class="bi bi-person me-2"></i>Paid To</span>
-                        <span class="fw-bold text-dark" id="ve_paid_to">N/A</span>
-                    </div>
-                    <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3">
-                        <span class="text-muted"><i class="bi bi-link-45deg me-2 text-primary"></i>Allocation Source</span>
-                        <div id="ve_allocation">N/A</div>
-                    </div>
-                    <div id="ve_pv_row" class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3" style="display:none;">
-                        <span class="text-muted"><i class="bi bi-receipt-cutoff me-2"></i>Linked Voucher</span>
-                        <span class="fw-bold text-primary" id="ve_pv_number">N/A</span>
-                    </div>
-                </div>
-
-                <div id="ve_notes_cont" class="mb-3" style="display:none;">
-                    <small class="text-muted text-uppercase fw-bold" style="font-size:0.7rem;">Notes</small>
-                    <p id="ve_notes" class="small mb-0 mt-1 text-dark"></p>
-                </div>
-
-
-
-                <div id="ve_budget_variance_cont" class="alert alert-warning border-0 p-3 mb-0" style="display:none; border-radius: 12px;">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-info-circle-fill me-2 fs-5"></i>
-                        <div>
-                            <small class="d-block text-uppercase fw-bold opacity-75" style="font-size: 0.6rem;">Budget Performance</small>
-                            <span id="ve_variance_text" class="small">Calculated Variance...</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer border-0 p-4 pt-0">
-                <button type="button" class="btn btn-light w-100 py-2 fw-bold" style="border-radius: 10px;" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Add Budget Item Modal -->
 <div class="modal fade" id="addBudgetItemModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -9691,7 +9609,7 @@ function renderExpenses(expenses) {
         return `<div class="dropdown">
             <button class="btn btn-light btn-sm dropdown-toggle shadow-sm border" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-gear-fill text-primary"></i></button>
             <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                <li><a class="dropdown-item" href="javascript:void(0)" onclick="viewExpenseDetails('${dataObj}')"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
+                <li><a class="dropdown-item" href="<?= getUrl('expenses/details') ?>?id=${e.expense_id}"><i class="bi bi-eye text-primary me-2"></i>View Details</a></li>
                 <li><a class="dropdown-item" href="javascript:void(0)" onclick="editExpenseInline('${dataObj}')"><i class="bi bi-pencil text-info me-2"></i>Edit Detail</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteExpenseInline(${e.expense_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>
@@ -13059,91 +12977,6 @@ function deleteOrder(id) {
 }
 
 // Expense Actions
-function viewExpenseDetails(encodedData) {
-    const e = JSON.parse(decodeURIComponent(encodedData));
-    const modal = $('#viewExpenseModal');
-
-    $('#ve_description').text(e.description || 'N/A');
-    $('#ve_date').text(formatDate(e.expense_date));
-    $('#ve_amount').text(formatMoney(e.amount) + ' TZS');
-
-
-    // Expense Type & Category
-    let typeDisplay = e.type_name || e.expense_type || 'N/A';
-    $('#ve_expense_type').text(typeDisplay);
-
-    // Categories (Multi-select support)
-    const $catRow = $('#ve_categories_row');
-    const $catCont = $('#ve_categories_cont');
-    $catCont.empty();
-
-    if (e.categories && Array.isArray(e.categories) && e.categories.length > 0) {
-        e.categories.forEach(cat => {
-            $catCont.append(`<span class="badge bg-info-soft text-info border border-info px-2 py-1" style="font-size: 0.7rem;">${cat.category_name || cat.name}</span>`);
-        });
-        $catRow.show();
-    } else if (e.category_name) {
-        // Fallback for legacy or pre-fetched single category
-        $catCont.append(`<span class="badge bg-info-soft text-info border border-info px-2 py-1" style="font-size: 0.7rem;">${e.category_name}</span>`);
-        $catRow.show();
-    } else {
-        $catRow.hide();
-    }
-
-    // Paid To
-    let paidToText = 'N/A';
-    if (e.paid_to_type && e.paid_to_id) {
-        const typeLabel = { supplier: 'Supplier', staff: 'Staff', sub_contractor: 'Sub Contractor' }[e.paid_to_type] || e.paid_to_type;
-        const payeeName = e.payee_name || '';
-        paidToText = payeeName ? `${typeLabel}: ${payeeName}` : typeLabel;
-    }
-    $('#ve_paid_to').text(paidToText);
-
-    // Status Badge
-    const statusColor = getStatusBadgeColor(e.status);
-    $('#ve_status_badge').text(e.status.toUpperCase())
-        .removeClass().addClass(`badge bg-${statusColor}`);
-
-    // Notes
-    if (e.notes) {
-        $('#ve_notes').text(e.notes);
-        $('#ve_notes_cont').show();
-    } else {
-        $('#ve_notes_cont').hide();
-    }
-
-
-
-    // Allocation Source Info
-    let allocationHtml = '<span class="fw-bold text-muted">General (Unallocated)</span>';
-    $('#ve_budget_variance_cont').hide();
-    $('#ve_pv_row').hide();
-
-    if (e.budget_id) {
-        allocationHtml = `<div class="text-primary fw-bold"><i class="bi bi-piggy-bank me-1"></i>Project Budget Item</div>`;
-        const budget = (projectData.budgets || []).find(b => b.budget_id == e.budget_id);
-        if (budget) {
-            allocationHtml = `<div class="text-primary fw-bold"><i class="bi bi-piggy-bank me-1"></i>Budget: ${budget.category_name}</div>`;
-            const variance = budget.allocated_amount - budget.spent_amount;
-            const varianceText = variance < 0
-                ? `<span class="text-danger fw-bold"><i class="bi bi-graph-down-arrow me-1"></i> Market Price Overrun: ${formatMoney(Math.abs(variance))} TZS over budget.</span>`
-                : `<span class="text-success fw-bold"><i class="bi bi-graph-up-arrow me-1"></i> Savings: ${formatMoney(variance)} TZS remaining in budget item.</span>`;
-            $('#ve_variance_text').html(varianceText);
-            $('#ve_budget_variance_cont').show();
-        }
-    } else if (e.voucher_id) {
-        allocationHtml = `<div class="text-warning fw-bold"><i class="bi bi-wallet2 me-1"></i>Direct Voucher Link</div>`;
-    }
-
-    if (e.voucher_number || e.voucher_id) {
-        $('#ve_pv_number').text(e.voucher_number ? `PV#${e.voucher_number}` : `PV Link ID: ${e.voucher_id}`);
-        $('#ve_pv_row').show();
-    }
-
-    $('#ve_allocation').html(allocationHtml);
-    modal.modal('show');
-}
-
 function editExpenseInline(encodedData) {
     const e = JSON.parse(decodeURIComponent(encodedData));
     const modal = $('#expenseActionModal');
