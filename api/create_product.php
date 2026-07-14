@@ -4,6 +4,7 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/stock_ledger.php';
+require_once __DIR__ . '/../core/stock_posting.php';
 global $pdo;
 
 // Check if user is logged in and has permission
@@ -170,9 +171,9 @@ try {
                     ON DUPLICATE KEY UPDATE stock_quantity = stock_quantity + VALUES(stock_quantity)
                 ");
                 $stock_stmt->execute([$product_id, $warehouse_id, $quantity]);
-                
+
                 // Record stock movement
-                recordStockMovement($pdo, [
+                $movement_id = recordStockMovement($pdo, [
                     'product_id'     => $product_id,
                     'movement_type'  => 'adjustment_in',
                     'quantity'       => $quantity,
@@ -186,6 +187,20 @@ try {
                     'notes'          => 'Initial product stock',
                     'created_by'     => $user_id,
                 ]);
+
+                // GL posting: Dr Inventory / Cr Opening Balance (take-on equity) —
+                // same pattern as manual stock adjustments (core/stock_posting.php).
+                postStockAdjustmentGl(
+                    $pdo,
+                    $movement_id,
+                    (float)$quantity,
+                    'adjustment_in',
+                    (float)$product_data['cost_price'],
+                    null,
+                    $user_id,
+                    date('Y-m-d'),
+                    $product_data['sku'] ?? ('PROD-' . $product_id)
+                );
             }
         }
     }
