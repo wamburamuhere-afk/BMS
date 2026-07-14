@@ -301,7 +301,7 @@ if (!function_exists('disposalLossAccountId')) {
 if (!function_exists('takeOnEquityAccountId')) {
     /**
      * Take-on / opening-balance equity for capitalising an already-owned asset
-     * onto the books: setting → code 3-9999 (Historical Balancing) → first equity leaf.
+     * onto the books: setting → code 3-9999 (Opening Balance) → first equity leaf.
      */
     function takeOnEquityAccountId(PDO $pdo): ?int
     {

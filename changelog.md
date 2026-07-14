@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-07-14 (feat) — Post initial product stock to the GL; rename take-on equity account to "Opening Balance"
+
+**New files:** `migrations/2026_07_14_rename_opening_balance_equity_account.php`
+**Files:** `api/create_product.php`, `core/gl_accounts.php`
+
+Assigning an opening quantity to a warehouse at product-creation time previously only wrote to
+`stock_movements`/`product_stocks` — it never touched the ledger, so the Balance Sheet's Inventory
+figure and physical stock could diverge from the moment a product was created.
+
+- `api/create_product.php`: after `recordStockMovement()`, calls the existing
+  `postStockAdjustmentGl()` (`core/stock_posting.php`) for each warehouse with initial stock —
+  posts `Dr Inventory (1-1300) / Cr Opening Balance (3-9999)` for `quantity × cost_price`, same
+  convention as the manual Stock Adjustment feature. Silent no-op if either account isn't configured
+  or the line value is zero.
+- Renamed the take-on/opening-balance equity account (code `3-9999`) from "Historical Balancing" to
+  "Opening Balance" on the Chart of Accounts — clearer, standard terminology for the same concept.
+  Updated the matching doc-comment in `core/gl_accounts.php` (`takeOnEquityAccountId()`).
+- Verified end-to-end against the live DB: created a test product with 20 units initial stock,
+  confirmed the posted `journal_entries`/`journal_entry_items` rows (Dr 1-1300 / Cr 3-9999,
+  TZS 2,000 each side), then rolled back the test transaction.
+
 ## 2026-07-14 (feat) — Create Document: type-driven letter formatting — letterhead toggle, recipient address, signature alignment
 
 **New files:** `app/constant/document/new_document.php`, `api/document/use_template.php`,
