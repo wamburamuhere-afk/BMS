@@ -3996,29 +3996,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <input type="date" class="form-control" name="expense_date" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold text-dark">Project Budget Item <span class="text-muted small fw-normal">(optional)</span></label>
-                            <select class="form-select budget-id-sel select2" name="budget_id" id="edit_ex_budget_id" onchange="editExOnBudgetChange(this.value)">
-                                <option value="">No specific budget item</option>
-                            </select>
-                        </div>
-
-                        <div class="col-12" id="edit_ex_budget_info_cont" style="display:none;">
-                            <div class="alert alert-indigo-light border-0 d-flex justify-content-between align-items-center mb-0 py-2" style="background-color: #f0f3ff; border-radius: 8px;">
-                                <div class="small">
-                                    <i class="bi bi-info-circle-fill text-primary me-1"></i>
-                                    <span class="text-muted">Budget Allocated:</span> <strong id="edit_ex_budget_total">0.00</strong> |
-                                    <span class="text-muted">Spent So Far:</span> <strong id="edit_ex_budget_spent">0.00</strong>
-                                </div>
-                                <div class="text-primary fw-bold small">
-                                    REMAINING: <span id="edit_ex_budget_remaining" class="badge bg-primary">0.00 TZS</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">Expense Type <span class="text-muted small fw-normal">(optional)</span></label>
+                            <label class="form-label fw-bold">Expense Type <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <select class="form-select expense-type-sel" name="expense_type" id="edit_expense_type">
+                                <select class="form-select expense-type-sel" name="expense_type" id="edit_expense_type" required>
                                     <option value="">Select Type</option>
                                 </select>
                                 <button type="button" class="btn btn-outline-primary" onclick="openExpenseConfigModal()" title="Manage Types & Categories">
@@ -4109,29 +4089,9 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <input type="date" class="form-control" name="expense_date" id="ex_expense_date" value="<?= date('Y-m-d') ?>" required>
                         </div>
                         <div class="col-md-6">
-                            <label for="ex_budget_id" class="form-label fw-bold">Project Budget Item <span class="text-muted small fw-normal">(optional)</span></label>
-                            <select class="form-select budget-id-sel select2" name="budget_id" id="ex_budget_id" onchange="exOnBudgetChange(this.value)">
-                                <option value="">No specific budget item</option>
-                            </select>
-                        </div>
-
-                        <div class="col-12" id="ex_budget_info_cont" style="display:none;">
-                            <div class="alert alert-indigo-light border-0 d-flex justify-content-between align-items-center mb-0 py-2" style="background-color: #f0f3ff; border-radius: 8px;">
-                                <div class="small">
-                                    <i class="bi bi-info-circle-fill text-primary me-1"></i>
-                                    <span class="text-muted">Budget Allocated:</span> <strong id="ex_budget_total">0.00</strong> |
-                                    <span class="text-muted">Spent So Far:</span> <strong id="ex_budget_spent">0.00</strong>
-                                </div>
-                                <div class="text-primary fw-bold small">
-                                    REMAINING: <span id="ex_budget_remaining" class="badge bg-primary">0.00 TZS</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">Expense Type <span class="text-muted small fw-normal">(optional)</span></label>
+                            <label class="form-label fw-bold">Expense Type <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <select class="form-select expense-type-sel" name="expense_type" id="ex_expense_type">
+                                <select class="form-select expense-type-sel" name="expense_type" id="ex_expense_type" required>
                                     <option value="">Select Type</option>
                                 </select>
                                 <button type="button" class="btn btn-outline-primary" onclick="openExpenseConfigModal()" title="Manage Types & Categories">
@@ -4152,7 +4112,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <span class="input-group-text bg-light fw-bold text-primary">TZS</span>
                                 <input type="number" class="form-control fw-bold border-primary" name="amount" id="ex_amount" step="0.01" required placeholder="0.00">
                             </div>
-                            <small id="ex_amount_validation" class="text-danger fw-bold small mt-1 d-block" style="display:none;"></small>
                         </div>
 
                         <div class="col-md-6">
@@ -11241,7 +11200,6 @@ function vcOnExpenseChange(val) {
 
 function createExpense() {
     $('#addExpenseForm')[0].reset();
-    populateAllocationOptions($('#addExpenseModal'));
     // Reset breakdown
     $('#breakdown-body').empty();
     $('#breakdown-grand-total').text('0.00');
@@ -11259,121 +11217,8 @@ function createExpense() {
     $('#addExpenseModal').modal('show');
 }
 
-function populateAllocationOptions($modal) {
-    const $budgetSel = $modal.find('.budget-id-sel');
-    $budgetSel.html('<option value="">No specific budget item</option>');
-
-    if (projectData && projectData.budgets) {
-        projectData.budgets.forEach(b => {
-            $budgetSel.append(`<option value="${b.budget_id}"
-                data-account="${b.category_id}"
-                data-total="${b.allocated_amount}"
-                data-spent="${b.spent_amount}"
-                data-remain="${b.remaining_balance}">${b.category_name} (Avail: ${formatMoney(b.remaining_balance)} TZS)</option>`);
-        });
-    }
-}
-
-function exOnBudgetChange(id) {
-    const $info = $('#ex_budget_info_cont');
-    const $valErr = $('#ex_amount_validation');
-    $info.hide();
-    $valErr.hide();
-    
-    if (!id) return;
-
-    const opt = $('.budget-id-sel option:selected');
-    const total = parseFloat(opt.data('total')) || 0;
-    const spent = parseFloat(opt.data('spent')) || 0;
-    const remain = parseFloat(opt.data('remain')) || 0;
-    
-    $('#ex_budget_total').text(formatMoney(total));
-    $('#ex_budget_spent').text(formatMoney(spent));
-    $('#ex_budget_remaining')
-        .text(formatMoney(Math.abs(remain)) + ' TZS' + (remain < 0 ? ' (OVER)' : ''))
-        .removeClass('bg-primary bg-danger')
-        .addClass(remain < 0 ? 'bg-danger' : 'bg-primary');
-    
-    // Auto-fill price from budget context if empty
-    if (!$('#ex_amount').val() || $('#ex_amount').val() == 0) {
-        if (remain > 0) $('#ex_amount').val(remain.toFixed(2));
-    }
-    
-    $info.show();
-    checkExVariance();
-}
-
-function editExOnBudgetChange(id) {
-    const $info = $('#edit_ex_budget_info_cont');
-    $info.hide();
-    if (!id) return;
-    const opt = $('#edit_ex_budget_id option:selected');
-    const total  = parseFloat(opt.data('total'))  || 0;
-    const spent  = parseFloat(opt.data('spent'))  || 0;
-    const remain = parseFloat(opt.data('remain')) || 0;
-    $('#edit_ex_budget_total').text(formatMoney(total));
-    $('#edit_ex_budget_spent').text(formatMoney(spent));
-    $('#edit_ex_budget_remaining')
-        .text(formatMoney(Math.abs(remain)) + ' TZS' + (remain < 0 ? ' (OVER)' : ''))
-        .removeClass('bg-primary bg-danger')
-        .addClass(remain < 0 ? 'bg-danger' : 'bg-primary');
-    if (!$('#edit_ex_amount').val() || $('#edit_ex_amount').val() == 0) {
-        if (remain > 0) $('#edit_ex_amount').val(remain.toFixed(2));
-    }
-    $info.show();
-}
-
-// Real-time Variance Check as user types
-$(document).on('input', '#ex_amount', function() {
-    checkExVariance();
-});
-
-function checkExVariance() {
-    const $valErr = $('#ex_amount_validation');
-    const opt = $('.budget-id-sel option:selected');
-    if (!opt.val()) { $valErr.hide(); return; }
-
-    const remain = parseFloat(opt.data('remain')) || 0;
-    const inputAmount = parseFloat($('#ex_amount').val()) || 0;
-    const variance = remain - inputAmount;
-
-    if (variance < -0.01) {
-        $valErr.html(`<i class="bi bi-exclamation-triangle-fill"></i> MARKET PRICE OVERRUN: This will exceed the budget item by <strong>${formatMoney(Math.abs(variance))} TZS</strong>.`).removeClass('text-success').addClass('text-danger').show();
-    } else if (inputAmount > 0) {
-        $valErr.html(`<i class="bi bi-check-circle-fill"></i> SAVINGS: This is within budget. Resulting balance will be <strong>${formatMoney(variance)} TZS</strong>.`).removeClass('text-danger').addClass('text-success').show();
-    } else {
-        $valErr.hide();
-    }
-}
-
-// Add Expense Form Submit (Modified to allow Over-Budget with confirmation)
 $(document).on('submit', '#addExpenseForm', function(e) {
     e.preventDefault();
-
-    const inputAmount = parseFloat($('#ex_amount').val()) || 0;
-    const budgetOpt = $(this).find('.budget-id-sel option:selected');
-
-    if (budgetOpt.val()) {
-        const remain = parseFloat(budgetOpt.data('remain')) || 0;
-
-        if (inputAmount > (remain + 0.01)) {
-            // It's over budget. Ask for confirmation but allow it (Price can increase)
-            Swal.fire({
-                title: 'Market Price Variance',
-                html: `This expense exceeds the budget by <b>${formatMoney(inputAmount - remain)} TZS</b> due to market fluctuations. Proceed?`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes, record overrun',
-                cancelButtonText: 'Cancel'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    submitExpenseForm($(this));
-                }
-            });
-            return;
-        }
-    }
-    
     submitExpenseForm($(this));
 });
 
@@ -13316,11 +13161,6 @@ function editExpenseInline(encodedData) {
     if (e.categories && e.categories.length) {
         setTimeout(() => preSelectCascade(e.categories[0].category_id, true), 250);
     }
-
-    // Project Budget Item (optional)
-    populateAllocationOptions(modal);
-    form.find('[name="budget_id"]').val(e.budget_id || '');
-    if (e.budget_id) setTimeout(() => editExOnBudgetChange(e.budget_id), 100);
 
     // Paid To (unified)
     const paidToType = e.paid_to_type || '';
