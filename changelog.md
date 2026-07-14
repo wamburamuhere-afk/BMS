@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-07-14 (fix) — Project > Finance > Vouchers: "Change Status" offered invalid transitions; no Pay flow existed
+
+**File:** `app/bms/operations/project_view.php`
+
+Found while live-testing the previous voucher fix: the gear-menu's "Change Status" opened a free-choice
+dropdown (`pending`/`approved`/`paid`/`rejected`, regardless of the voucher's actual current status),
+but `api/account/update_voucher_status.php`'s real state machine only allows
+`pending/draft → reviewed → approved/cancelled` (payment is a separate flow). Picking anything else
+threw "Cannot move a voucher from 'pending' to 'approved'." — exactly the error a user hit going
+pending → straight to approved, the most natural first click.
+
+Root cause was structural, not a typo: **two duplicate `changeVoucherStatus()` functions** existed in
+the file (an older one with a `draft/approved/paid/cancelled` dropdown + payment-proof fields, and a
+newer one with a `pending/approved/paid/rejected` dropdown — `rejected` isn't even a real status, and
+`paid` isn't handled by this endpoint at all). Being declared twice, only the second silently won at
+runtime; both were wrong in different ways.
+
+- Removed both dead/broken `changeVoucherStatus()` definitions and the orphaned
+  `toggleVoucherPaymentFields()` helper.
+- Replaced the single generic "Change Status" gear-menu item with **conditional actions matching
+  `payment_vouchers.php`'s `pvActions()` exactly** — "Mark as Reviewed" (pending/draft), "Approve" /
+  "Cancel Voucher" (reviewed), "Pay Voucher" (approved/partially_paid) — so the UI can never again
+  offer a transition the backend will reject. Added "Print Voucher" to the menu too, matching external.
+  `pvChangeStatus()` posts to the same `update_voucher_status.php`.
+- **Added the missing Pay Voucher flow** (`#payVoucherModal`, `openPayVoucher()`, the `payVoucherForm`
+  submit handler) — ported from the external page, same fields, same `record_voucher_payment.php`
+  endpoint. Previously there was no way to reach `paid` on a project voucher at all once approved.
+
+Verified live: simulated the full corrected lifecycle (pending → reviewed → approved, with GL posting
+confirmed at approval) using the exact transition map the UI now encodes; confirmed a direct
+pending → approved attempt is still correctly rejected by the backend (proving the fix is the UI no
+longer *offering* that invalid jump, not a backend change). `php -l` and `node --check` clean. Rolled
+back all test data.
+
 ## 2026-07-14 (fix) — Project > Finance > Vouchers "View Details" 404; voucher form now posts to GL like external
 
 **Files:** `app/bms/operations/project_view.php`, `app/constant/accounts/payment_voucher_details.php`
