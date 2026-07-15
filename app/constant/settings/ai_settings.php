@@ -80,8 +80,9 @@ $providers = [
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Model</label>
-                                <input type="text" class="form-control" id="ai_model" name="ai_model" value="<?= htmlspecialchars($model) ?>" placeholder="e.g. gpt-4o-mini">
-                                <div class="form-text">The model id for your provider.</div>
+                                <select class="form-select" id="ai_model_select"></select>
+                                <input type="text" class="form-control mt-2 d-none" id="ai_model" name="ai_model" value="<?= htmlspecialchars($model) ?>" placeholder="e.g. gpt-4o-mini">
+                                <div class="form-text">Options are filtered to the selected Provider so they can never mismatch (that mismatch — e.g. an OpenAI model id with Gemini selected — is exactly what breaks generation). Pick "Custom / other model…" to type any model id, e.g. for OpenRouter.</div>
                             </div>
                         </div>
 
@@ -187,6 +188,67 @@ $providers = [
 <script>
 $(function () {
     if ($.fn.select2) $('#ai_provider').select2({ theme: 'bootstrap-5', width: '100%', minimumResultsForSearch: Infinity });
+
+    // Model choices filtered to the selected Provider — this is what actually
+    // fixes the "Provider says Gemini, Model still says gpt-4o-mini" class of
+    // bug: that combination isn't a config typo the admin has to catch by
+    // reading an error message, it's now not selectable in the first place.
+    // OpenRouter has no curated list ("any model via base URL"), so it stays
+    // free text, same as the "Custom / other model…" escape hatch below.
+    const MODELS_BY_PROVIDER = {
+        openai:     ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+        anthropic:  ['claude-haiku-4-5', 'claude-sonnet-4-5', 'claude-opus-4-5'],
+        gemini:     ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+        openrouter: []
+    };
+    const CUSTOM_VALUE = '__custom__';
+    const savedModel = <?= json_encode($model) ?>;
+
+    function populateModelSelect(provider, selectedModel) {
+        const $sel = $('#ai_model_select');
+        const $txt = $('#ai_model');
+        const list = MODELS_BY_PROVIDER[provider] || [];
+
+        if (list.length === 0) {
+            $sel.hide().empty();
+            $txt.removeClass('d-none').val(selectedModel || '');
+            return;
+        }
+
+        $sel.show().empty();
+        list.forEach(m => $sel.append(`<option value="${m}">${m}</option>`));
+        $sel.append(`<option value="${CUSTOM_VALUE}">Custom / other model…</option>`);
+
+        if (selectedModel && list.includes(selectedModel)) {
+            $sel.val(selectedModel);
+            $txt.addClass('d-none');
+        } else {
+            // Saved model isn't in this provider's list — most likely exactly
+            // the stale-mismatch case this fix exists for. Surface it as
+            // Custom (with the real saved value visible) instead of silently
+            // swapping it for something the admin didn't choose.
+            $sel.val(CUSTOM_VALUE);
+            $txt.removeClass('d-none').val(selectedModel || '');
+        }
+        $txt.val($sel.val() === CUSTOM_VALUE ? $txt.val() : $sel.val());
+    }
+
+    $('#ai_model_select').on('change', function () {
+        if ($(this).val() === CUSTOM_VALUE) {
+            $('#ai_model').removeClass('d-none').val('').trigger('focus');
+        } else {
+            $('#ai_model').addClass('d-none').val($(this).val());
+        }
+    });
+
+    $('#ai_provider').on('change', function () {
+        // Switching provider always resets to that provider's first model —
+        // never carries over a model id that belongs to the old provider.
+        const list = MODELS_BY_PROVIDER[$(this).val()] || [];
+        populateModelSelect($(this).val(), list[0] || '');
+    });
+
+    populateModelSelect($('#ai_provider').val(), savedModel);
 
     $('#btnToggleKey').on('click', function () {
         const f = document.getElementById('ai_api_key');

@@ -30,6 +30,127 @@ Verified: rendered Create Document and confirmed the modal carries the new dismi
 attributes and button ids in the actual output; the updated click-handler logic was run standalone
 through Node against a mocked successful response with no exceptions. `php -l` clean.
 
+## 2026-07-15 (change) — Project Docs: "Create Doc" is now its own menu item, not embedded inside "Add Doc"
+
+**File:** `app/bms/operations/project_view.php`
+
+The Docs dropdown had two items — "Docs Library" and "Add Doc" — but "Create Document" (the link to
+the in-app letter editor, `new_document.php`) lived buried inside the "Add Doc" tab's own content,
+sharing space with the file-upload form. Moved it out to be its own top-level entry in the Docs
+dropdown, positioned below "Add Doc", renamed to "Create Doc" — same destination
+(`new_document.php?project_id=X`), just promoted to a direct menu item instead of a button embedded
+in the upload tab. The "Add Doc" tab now only contains the file-upload form, as its name implies.
+
+## 2026-07-15 — Delivery Note print: proper Customer box for outbound/customer DNs
+
+**File:** `api/account/print_delivery_note.php`
+
+Follow-up to `dn_outbound.php` becoming Sales-side / Customer-only (see PR #1315): the print template
+still only knew about a Supplier/Sub-Contractor "vendor" — a customer outbound DN printed with a
+`supplier_name` field that was simply `NULL`, showing "Local Inventory" instead of the actual
+customer. Added a `customers` JOIN and a proper Customer info box (name, company, postal address,
+address, phone, email, TIN/VRN) styled identically to `print_sales_order.php`'s own Customer box,
+shown whenever `dn_type = 'outbound' AND party_type = 'customer'`. Inbound (received-from-supplier)
+printouts and the 3 pre-existing legacy outbound supplier/sub-contractor DNs are untouched — they
+still print their vendor exactly as before; this was a deliberate scope decision to avoid breaking
+that unrelated, working flow. Verified live: DN #30 (customer, MICHAEL) resolves to the new Customer
+box; DN #24 (legacy supplier) still resolves to the existing vendor box.
+
+## 2026-07-15 — Create Invoice: pre-select the Warehouse when arriving from an approved Sales Order
+
+**File:** `app/bms/invoice/invoice_create.php`
+
+Follow-up to the SQLSTATE[HY093] hotfix above: the SO→Invoice link now carries the sales order id
+correctly, but the Warehouse dropdown still opened blank and the user had to reselect the same
+warehouse they'd already picked on the Sales Order (or Delivery Note). `renderWarehouseOptions()`
+was already built to accept a `$selectedId` to mark an option `selected`, and `$order`/`$delivery`
+are fetched with `SELECT *` so `warehouse_id` was already sitting on both — it just wasn't passed
+through. Added a `$prefill_warehouse_id` (SO's `warehouse_id`, falling back to the DN's) and wired
+it into `renderWarehouseOptions()`. The dropdown now opens with the right warehouse pre-selected by
+default, same as Project already did, while staying fully editable if the user needs to change it.
+Verified live: SO #62 (warehouse_id=14, project_id=16) renders `<option value="14" ... selected>`.
+
+## 2026-07-15 — Outbound Delivery Note becomes Sales-side / Customer-only, with optional SO/LPO link
+
+**Files:** `app/bms/grn/dn_outbound.php`, `api/create_dn.php`, `api/approve_dn.php`, `app/bms/sales/sales_order_view.php`
+
+`dn_outbound.php` was a generic "Send To: Supplier / Sub-Contractor" procurement form; Customer only
+ever appeared pre-locked, and only when arriving via a required Customer LPO (`?lpo_id=`). There was
+also no way to create an outbound DN from a Sales Order at all, even though the DB already carried
+everything needed for it (`deliveries.order_id`, `sales_order_items.quantity_delivered`,
+`delivery_items.order_item_id`, `sales_orders.total_delivered` — all sitting unused). Per feedback,
+this page is now the **Sales-side delivery note creator — Customer only**:
+
+- The "Send To" type selector is gone. A fresh DN always creates `party_type = 'customer'`; the form
+  is a single Customer field, same shape as `sales_order_create.php`'s own customer picker
+  (`$all_customers`, project-scoped like the old supplier list, feeds a select2 dropdown).
+- A Sales Order or Customer LPO link is **optional**, never required — `api/create_dn.php` validates
+  a reference only if one is actually supplied.
+- Arriving via `?order=<sales_order_id>` (new "Create Delivery Note" button on `sales_order_view.php`,
+  approved/processing/shipped) or `?lpo_id=` **locks** the customer and prefills remaining-to-deliver
+  items as a convenience shortcut — `sales_order_items.quantity - quantity_delivered` for the SO path
+  (simpler than the LPO block's live-sum approach, since that column is now the maintained source of
+  truth). Each SO-sourced item row carries its `order_item_id` through to submit, validated
+  server-side to actually belong to that SO.
+- `api/approve_dn.php`: on approval of an SO-linked outbound DN, bumps
+  `sales_order_items.quantity_delivered` per delivered line, recomputes `sales_orders.total_delivered`
+  from the items (source of truth), and advances `sales_orders.status` to `delivered` — forward-only,
+  never regresses — once every line is fully delivered. Mirrors the existing Customer-LPO fulfillment
+  block right above it.
+- Supplier / Sub-Contractor sends are a procurement concern and no longer created here. The 3
+  pre-existing legacy records of that kind (verified live against the DB) remain viewable/editable —
+  their party renders read-only via `$is_legacy_procurement_edit` — rather than being broken or
+  silently reassigned.
+
+Every new/changed SQL statement (2 INSERTs, 2 UPDATEs) was verified with a live, rolled-back
+transaction against the local DB, and the full SO-prefill lookup was dry-run against a real approved
+SO (customer + remaining-quantity item resolved correctly).
+
+## 2026-07-15 (hotfix) — Create Invoice: SQLSTATE[HY093] on save + SO→Invoice link dropped the order id
+
+**Files:** `api/account/save_invoice.php`, `app/bms/sales/sales_orders.php`
+
+Two bugs in the Sales Order → Invoice flow, reported by user after approving a Sales Order and
+clicking "Create Invoice":
+
+1. `save_invoice.php`'s new-invoice `INSERT INTO invoices` VALUES clause was missing one `?`
+   placeholder — the literal `0` (meant for `paid_amount`) had slid one slot early into
+   `grand_total`'s place, leaving 19 placeholders for 20 bound values. Every new invoice save hit
+   `SQLSTATE[HY093]: Invalid parameter number`, regardless of warehouse/sales-order selection.
+   Added the missing `?` so `grand_total` gets its own placeholder again. Verified with a live
+   (rolled-back) INSERT against the local DB.
+2. The "Create Invoice" action on the Sales Orders **list** page linked to
+   `invoice_create?id=<sales_order_id>`, but `invoice_create.php` only reads `$_GET['order']` — so
+   the sales order, its items, and the warehouse never pre-filled. Changed the link to
+   `?order=<sales_order_id>` to match (the Sales Order *view* page's link was already correct).
+
+## 2026-07-15 (fix) — AI Settings: Model is now filtered to the selected Provider, not free text
+
+**File:** `app/constant/settings/ai_settings.php`
+
+Root-caused why "Generate with AI" on Create Document appeared to "just close with nothing to
+show": AI Settings had a free-text Model field completely independent of the Provider dropdown, so
+switching Provider (e.g. to Gemini) silently left a stale model id from the previous provider (e.g.
+`gpt-4o-mini`, an OpenAI model) in place. The save succeeded, `aiConfigured()` correctly reported
+"configured", the button correctly rendered — but every actual generation request failed at the
+provider with "model not found," which surfaced to the user as the result just... not appearing.
+
+Replaced the free-text Model input with a `<select>` populated from the currently selected Provider
+(OpenAI / Anthropic / Gemini's known model ids), so this mismatch is no longer something you can
+type your way into — the invalid combination is simply not selectable. Includes a "Custom / other
+model…" option (reveals the original text input) for anything not in the curated list, and
+OpenRouter — "any model via base URL" — always stays free text since it has no fixed model set.
+Switching Provider always resets Model to that provider's first option, so nothing carries over
+silently.
+
+Also corrected the live mismatched setting directly (provider was `gemini`, model was still
+`gpt-4o-mini`) so generation is unblocked immediately, not just protected going forward.
+
+Verified live end-to-end through the real production code path: called `api/ai/generate.php`
+directly with `field_type=document_letter` (the exact request Create Document's "Generate with AI"
+sends) — received real generated letter text back from the configured Gemini model. No mock, no
+stub — an actual round trip to the provider.
+
 ## 2026-07-15 (hotfix) — Project Details: "Failed to load project data" on every project — regression from PR #1302
 
 **File:** `api/operations/get_project.php`

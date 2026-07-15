@@ -877,7 +877,7 @@ function initTable() {
 
                     // Conversion: only an approved SO can produce an invoice
                     if (canEdit && (isApproved || row.status === 'processing' || row.status === 'partially_delivered')) {
-                        actions += `<li><a class="dropdown-item py-2" href="invoice_create?id=${row.sales_order_id}"><i class="bi bi-receipt text-success me-2"></i> Create Invoice</a></li>`;
+                        actions += `<li><a class="dropdown-item py-2" href="invoice_create?order=${row.sales_order_id}"><i class="bi bi-receipt text-success me-2"></i> Create Invoice</a></li>`;
                     }
 
                     if (canEditNow && ['pending', 'reviewed', 'approved', 'processing'].includes(row.status)) {
