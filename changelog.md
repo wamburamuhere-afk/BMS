@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-07-15 (fix) — Create Document: a Blank letter now starts as a truly blank canvas
+
+**File:** `app/constant/document/create_document.php`
+
+Two related fixes, both scoped to this one file:
+
+- **"Include letterhead" now defaults OFF for a fresh Blank letter** (no template picked, no existing
+  record) — previously it defaulted ON for every new letter regardless of how it was started. Starting
+  from a template still defaults ON (templates assume the professional letterhead look), and an
+  existing saved draft keeps whatever it was last set to either way.
+- **Turning letterhead off now hides the entire top structure, not just logo/sender.** The
+  `.no-letterhead` CSS rule previously only hid the company logo/name and the sender address block —
+  the recipient block, date, and subject line still rendered as fixed slots. Extended it to also hide
+  `.letter-addr-row` (recipient + sender + date) and `.letter-subject`, so with letterhead off the
+  page is genuinely blank from the top down to the body — the user writes everything themselves. Only
+  the editable body and the signature block remain; the signature's own left/center/right alignment
+  control is untouched.
+- The now-pointless "Customize sender address for this letter" toggle (customizing something that's
+  hidden) is itself hidden whenever letterhead is off, and re-appears if the user switches letterhead
+  back on.
+
+Verified: `use_letterhead` default resolves correctly across all four states (blank/template/existing-on/
+existing-off), `php -l` clean, the one JS snippet actually changed checked in isolation with `node --check`.
+
 ## 2026-07-15 (fix) — Login: failed-login error now uses SweetAlert2, not a native browser alert()
 
 **File:** `login.php`
