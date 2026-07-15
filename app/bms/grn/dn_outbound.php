@@ -143,6 +143,18 @@ if ($so_id > 0) {
 
 $has_project = $project_id > 0;
 
+// Warehouse + delivery address prefill from whichever source document (SO or
+// LPO) this DN was opened from — "everything already on the source should
+// carry over" — while staying fully editable, same as Project already does.
+$prefill_warehouse_id = 0;
+$prefill_delivery_address = '';
+if ($so) {
+    $prefill_warehouse_id = (int)($so['warehouse_id'] ?? 0);
+    $prefill_delivery_address = $so['shipping_address'] ?? '';
+} elseif ($lpo) {
+    $prefill_warehouse_id = (int)($lpo['warehouse_id'] ?? 0);
+}
+
 // ── LISTS — scoped by project for non-admins ─────────────────
 $_dno_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
 
@@ -302,8 +314,15 @@ $return_url = getUrl('delivery_notes') . '?type=outbound';
 
     <form id="dnForm">
         <?php if ($is_edit): ?><input type="hidden" name="delivery_id" value="<?= $edit_id ?>"><?php endif; ?>
-        <?php if ($lpo): ?><input type="hidden" name="customer_lpo_id" value="<?= $lpo_id ?>"><?php elseif ($is_edit && !empty($dn['customer_lpo_id'])): ?><input type="hidden" name="customer_lpo_id" value="<?= (int)$dn['customer_lpo_id'] ?>"><?php endif; ?>
-        <?php if ($so): ?><input type="hidden" name="order_id" value="<?= $so_id ?>"><?php elseif ($is_edit && !empty($dn['order_id'])): ?><input type="hidden" name="order_id" value="<?= (int)$dn['order_id'] ?>"><?php endif; ?>
+        <?php
+        $cur_lpo_ref = $lpo ? $lpo_id : (($is_edit && !empty($dn['customer_lpo_id'])) ? (int)$dn['customer_lpo_id'] : '');
+        $cur_order_ref = $so ? $so_id : (($is_edit && !empty($dn['order_id'])) ? (int)$dn['order_id'] : '');
+        ?>
+        <!-- Live single source of truth for the optional SO/LPO reference — set
+             once server-side when locked/editing, updated by the "Sales Order
+             (Optional)" / "Customer LPO (Optional)" dropdowns otherwise. -->
+        <input type="hidden" id="dn_customer_lpo_id_field" value="<?= $cur_lpo_ref ?>">
+        <input type="hidden" id="dn_order_id_field" value="<?= $cur_order_ref ?>">
 
         <div class="row g-4">
             <div class="col-lg-8">
@@ -352,6 +371,19 @@ $return_url = getUrl('delivery_notes') . '?type=outbound';
                                 <label class="form-label fw-semibold">Customer <span class="text-danger">*</span></label>
                                 <select class="form-select" name="party_id" id="dn_party_id" required></select>
                             </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Sales Order <span class="text-muted small">(Optional)</span></label>
+                                <select class="form-select" id="dn_source_order_id" disabled>
+                                    <option value="">-- Select Customer first --</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Customer LPO <span class="text-muted small">(Optional)</span></label>
+                                <select class="form-select" id="dn_source_lpo_id" disabled>
+                                    <option value="">-- Select Customer first --</option>
+                                </select>
+                            </div>
                             <?php endif; ?>
 
                             <div class="col-md-6">
@@ -384,7 +416,7 @@ $return_url = getUrl('delivery_notes') . '?type=outbound';
                             </div>
                             <div class="col-12">
                                 <label class="form-label fw-semibold">Delivery Address</label>
-                                <input type="text" class="form-control" name="delivery_address" value="<?= $dn ? safe_output($dn['delivery_address']) : '' ?>" placeholder="Destination address">
+                                <input type="text" class="form-control" id="dn_delivery_address" name="delivery_address" value="<?= $dn ? safe_output($dn['delivery_address']) : safe_output($prefill_delivery_address) ?>" placeholder="Destination address">
                             </div>
                             <div class="col-12">
                                 <label class="form-label fw-semibold">Notes</label>
@@ -521,7 +553,7 @@ const ALL_CUSTOMERS = <?= json_encode(array_values(array_map(fn($c) => [
 const CUR_PARTY_ID   = <?= (int)$cur_party_id ?>;
 const PARTY_LOCKED   = <?= $party_field_locked ? 'true' : 'false' ?>;
 const IS_EDIT        = <?= $is_edit ? 'true' : 'false' ?>;
-const PRESET_WH      = <?= (int)($dn['warehouse_id'] ?? 0) ?>;
+const PRESET_WH      = <?= (int)($dn['warehouse_id'] ?? $prefill_warehouse_id) ?>;
 const LPO_ITEMS      = <?= json_encode(array_values($lpo_items)) ?>;
 const SO_ITEMS        = <?= json_encode(array_values($so_items)) ?>;
 
@@ -603,6 +635,81 @@ function deleteAttachment(id) {
     });
 }
 
+// ── Optional Sales Order / Customer LPO reference (free customer pick only) ──
+// Neither is required — both just offer to prefill items/warehouse/project/
+// delivery address from whichever source the user optionally picks, mirroring
+// the ?order=/?lpo_id= URL-arrival flow but reachable from a fresh page load.
+function populateDnSources(customerId) {
+    const $so = $('#dn_source_order_id');
+    const $lpo = $('#dn_source_lpo_id');
+    if (!customerId) {
+        $so.html('<option value="">-- Select Customer first --</option>').prop('disabled', true);
+        $lpo.html('<option value="">-- Select Customer first --</option>').prop('disabled', true);
+        return;
+    }
+    $so.prop('disabled', true).html('<option value="">Loading...</option>');
+    $lpo.prop('disabled', true).html('<option value="">Loading...</option>');
+    $.getJSON('<?= buildUrl("api/get_customer_dn_sources.php") ?>', { customer_id: customerId }, function (res) {
+        if (!res.success) return;
+        $so.prop('disabled', false).html('<option value="">-- None --</option>');
+        res.data.sales_orders.forEach(function (o) {
+            $so.append($('<option>').val(o.sales_order_id).text(o.order_number + ' (' + o.order_date + ')'));
+        });
+        $lpo.prop('disabled', false).html('<option value="">-- None --</option>');
+        res.data.lpos.forEach(function (l) {
+            $lpo.append($('<option>').val(l.lpo_id).text(l.lpo_number + ' (' + l.issue_date + ')'));
+        });
+    }).fail(function () {
+        $so.prop('disabled', false).html('<option value="">-- None --</option>');
+        $lpo.prop('disabled', false).html('<option value="">-- None --</option>');
+    });
+}
+
+function loadDnSourcePrefill(type, id) {
+    if (!id) {
+        if (type === 'order') $('#dn_order_id_field').val('');
+        else $('#dn_customer_lpo_id_field').val('');
+        return;
+    }
+    Swal.fire({ title: 'Loading reference...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    $.getJSON('<?= buildUrl("api/get_dn_source_prefill.php") ?>', { type: type, id: id }, function (res) {
+        Swal.close();
+        if (!res.success) { Swal.fire({ icon: 'error', title: 'Error', text: res.message }); return; }
+        const d = res.data;
+
+        // A DN traces to one source at a time — picking one clears the other.
+        if (type === 'order') {
+            $('#dn_order_id_field').val(id);
+            $('#dn_customer_lpo_id_field').val('');
+            $('#dn_source_lpo_id').val('');
+        } else {
+            $('#dn_customer_lpo_id_field').val(id);
+            $('#dn_order_id_field').val('');
+            $('#dn_source_order_id').val('');
+        }
+
+        // Prefill whatever the source has — still freely editable afterward.
+        if (d.project_id) { PROJECT_ID = d.project_id; $('#dn_project_id').val(d.project_id).trigger('change.select2'); rebuildWarehouses(); }
+        if (d.warehouse_id) { $('#dn_warehouse_id').val(d.warehouse_id).trigger('change.select2'); loadWarehouseStock(); }
+        if (d.delivery_address) { $('#dn_delivery_address').val(d.delivery_address); }
+
+        $('#dnItemsBody').empty();
+        d.items.forEach(function (it) {
+            addDNItem(it.product_id, it.product_name, it.remaining, it.unit, 0, it.order_item_id || 0);
+        });
+        if (d.items.length === 0) {
+            addDNItem();
+            Swal.fire({
+                icon: 'warning', toast: true, position: 'top-end', showConfirmButton: false, timer: 4000,
+                title: 'No remaining items', text: 'Everything on this reference has already been delivered.'
+            });
+        }
+    }).fail(function () {
+        Swal.close();
+        Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load reference details.' });
+    });
+}
+
 $(document).ready(function () {
     $('#dn_project_id').select2({ theme: 'bootstrap-5', placeholder: '-- No Project (General) --', allowClear: true, width: '100%' });
 
@@ -613,8 +720,13 @@ $(document).ready(function () {
     addAttachmentRow(); // start with one empty attachment row
     toggleAttachmentRequirement();
 
+    if (!PARTY_LOCKED && CUR_PARTY_ID > 0) populateDnSources(CUR_PARTY_ID);
+
     $('#dn_project_id').on('change', function () { PROJECT_ID = parseInt($(this).val()) || 0; rebuildWarehouses(); toggleAttachmentRequirement(); });
     $('#dn_warehouse_id').on('change', function () { if (!isInitialLoad) loadWarehouseStock(); });
+    $('#dn_party_id').on('change', function () { if (!isInitialLoad && !PARTY_LOCKED) populateDnSources($(this).val()); });
+    $('#dn_source_order_id').on('change', function () { loadDnSourcePrefill('order', $(this).val()); });
+    $('#dn_source_lpo_id').on('change', function () { loadDnSourcePrefill('lpo', $(this).val()); });
 
     if (PRESET_WH > 0) { $('#dn_warehouse_id').val(PRESET_WH).trigger('change.select2'); loadWarehouseStock(); }
 
@@ -846,8 +958,10 @@ function submitDN(status) {
     fd.append('items', JSON.stringify(items));
     fd.append('status', status);
     <?php if ($is_edit): ?>fd.append('delivery_id', '<?= $edit_id ?>');<?php endif; ?>
-    <?php if ($lpo): ?>fd.append('customer_lpo_id', '<?= $lpo_id ?>');<?php elseif ($is_edit && !empty($dn['customer_lpo_id'])): ?>fd.append('customer_lpo_id', '<?= (int)$dn['customer_lpo_id'] ?>');<?php endif; ?>
-    <?php if ($so): ?>fd.append('order_id', '<?= $so_id ?>');<?php elseif ($is_edit && !empty($dn['order_id'])): ?>fd.append('order_id', '<?= (int)$dn['order_id'] ?>');<?php endif; ?>
+    const curLpoRef = $('#dn_customer_lpo_id_field').val();
+    const curOrderRef = $('#dn_order_id_field').val();
+    if (curLpoRef)   fd.append('customer_lpo_id', curLpoRef);
+    if (curOrderRef) fd.append('order_id', curOrderRef);
 
     // Named attachment rows — append file + name in parallel
     let fileCount = 0;

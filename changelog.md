@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-07-15 — DN(Outbound): optional in-form Sales Order / Customer LPO reference, scoped to this page only
+
+**Files:** `app/bms/grn/dn_outbound.php` (only existing file touched)
+**New:** `api/get_customer_dn_sources.php`, `api/get_dn_source_prefill.php`
+
+Previously the only way to link an outbound DN to a Sales Order or Customer LPO was arriving via a
+URL (`?order=`/`?lpo_id=` from those pages' own "Create Delivery Note" buttons) — there was no way to
+pick either from inside the form itself on a fresh page load. Added, strictly scoped to this one page:
+
+- Two new dropdowns in the free-customer-pick flow — **"Sales Order (Optional)"** and **"Customer LPO
+  (Optional)"** — populated once a Customer is chosen (`api/get_customer_dn_sources.php`, same
+  eligibility rules as the existing URL-arrival paths: SO status approved/processing/shipped, LPO
+  status approved/partially_fulfilled). Neither is required.
+- Picking either (`api/get_dn_source_prefill.php`) loads its remaining-to-deliver items and prefills
+  Project, Warehouse, and Delivery Address from that source document — still freely editable
+  afterward, no new fields beyond the two dropdowns. The two are mutually exclusive per pick (choosing
+  one clears the other), matching how the existing URL-arrival logic already treats them.
+- **Fixed a real prefill gap along the way:** the existing URL-arrival paths (`?order=`/`?lpo_id=`)
+  only ever prefilled Customer and Project — Warehouse and Delivery Address were left blank even
+  though the source Sales Order/LPO already carries them. Both paths now prefill identically.
+- A short-lived version of this also added a structured `sales_orders.customer_lpo_id` link and
+  editing of Sales Order/Quotation forms — reverted per feedback: SO already correctly references its
+  LPO conceptually (SO is the child document), but that link belongs to the Sales Order forms, not
+  here, and wasn't asked for. This change touches nothing outside `dn_outbound.php` plus the two new
+  endpoint files it calls.
+
+Verified: full customer → list-sources → pick-SO → prefill flow simulated end-to-end against real
+data (SO #62, customer #7) — prefill correctly resolves customer/project/warehouse and matches the
+originally-selected customer. `tests/test_dn_cli.php` (80 assertions) passes.
+
 ## 2026-07-15 — Delivery Notes list: Sales (Outbound) and Purchases (Inbound) entry points fully separated
 
 **Files:** `app/bms/grn/delivery_notes.php`, `app/bms/grn/dn_outbound.php`, `app/bms/grn/dn_view.php`
