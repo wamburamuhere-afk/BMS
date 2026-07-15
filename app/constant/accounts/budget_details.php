@@ -137,6 +137,18 @@ global $company_name, $company_logo;
                     <button type="button" class="btn btn-primary shadow-sm" onclick="printReport()">
                         <i class="bi bi-printer"></i> Print Report
                     </button>
+                    <?php
+                    $enable_projects = 0;
+                    try {
+                        $stmt_ep = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'enable_projects'");
+                        $stmt_ep->execute();
+                        $enable_projects = $stmt_ep->fetchColumn() ?: 0;
+                    } catch (Exception $e) {}
+                    if ($enable_projects && !empty($budget['project_id'])): ?>
+                    <a href="<?= getUrl('project_view') ?>?id=<?= $budget['project_id'] ?>" class="btn btn-outline-primary">
+                        <i class="bi bi-kanban"></i> Back to Project
+                    </a>
+                    <?php endif; ?>
                     <a href="<?= getUrl('budget') ?>?year=<?= $year ?>&month=<?= $month ?>" class="btn btn-outline-secondary">
                         <i class="bi bi-arrow-left"></i> Back to Budget
                     </a>
