@@ -58,6 +58,7 @@ if ($document_id > 0) {
 // meaningful for a brand new letter; an already-saved draft keeps its own
 // stored content/category regardless of what's in the URL.
 $prefill_template = null;
+$prefill_template_id = 0;
 if ($document_id === 0) {
     $prefill_template_id = !empty($_GET['template_id']) ? (int)$_GET['template_id'] : 0;
     if ($prefill_template_id > 0) {
@@ -100,10 +101,13 @@ $content     = $existing['content'] ?? ($prefill_template['content'] ?? '');
 $category_id = $existing['category_id'] ?? null;
 $access_level = in_array(($existing['access_level'] ?? ''), ['private', 'restricted', 'public'], true)
     ? $existing['access_level'] : 'private';
-// Defaults to ON so existing/new letters keep today's look unless a user
-// deliberately opts out (e.g. writing onto physical pre-printed letterhead
-// paper, where a digital header/footer would duplicate it).
-$use_letterhead    = !isset($existing['use_letterhead']) || (int)$existing['use_letterhead'] === 1;
+// A saved draft keeps whatever it was last set to. A brand-new letter started
+// from a template defaults ON (templates assume the professional letterhead
+// look). A brand-new BLANK letter (no template, no existing record) defaults
+// OFF — a truly blank canvas the user builds up from scratch, per feedback.
+$use_letterhead = isset($existing['use_letterhead'])
+    ? ((int)$existing['use_letterhead'] === 1)
+    : ($prefill_template_id > 0);
 // Not every letter type needs a full recipient address block (an internal
 // memo doesn't) — this stays empty unless the user writes one in.
 $recipient_address = $existing['recipient_address'] ?? '';
@@ -259,7 +263,7 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
                 <label class="form-check-label small fw-bold" for="f_use_letterhead">Include letterhead (logo &amp; sender address)</label>
                 <div class="form-text">Turn off if printing onto physical pre-printed letterhead paper. The "Printed by" footer always stays &mdash; that's an audit line, not letterhead branding.</div>
             </div>
-            <div class="form-check form-switch mt-2">
+            <div class="form-check form-switch mt-2" id="customSenderToggleWrap" style="<?= $use_letterhead ? '' : 'display:none;' ?>">
                 <input class="form-check-input" type="checkbox" id="f_custom_sender" <?= $custom_sender_info !== null ? 'checked' : '' ?>>
                 <label class="form-check-label small fw-bold" for="f_custom_sender">Customize sender address for this letter</label>
                 <div class="form-text">Off = always follows Company Profile automatically. On = write/format your own sender address just for this letter, using its own small toolbar — the rest of Company Profile stays unaffected.</div>
@@ -523,12 +527,16 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
 
 .letter-subject { font-size: 11pt; margin-bottom: 8mm; text-decoration: underline; }
 #letterBody { font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.6; min-height: 60mm; }
-/* Include letterhead = off: logo/company name and sender info hidden (a
-   physical pre-printed letterhead page already carries this) — but
-   recipient, date, and signoff stay, since those are correspondence
-   essentials regardless of letterhead paper. */
+/* Include letterhead = off: a truly blank canvas, per feedback — logo,
+   company name, sender address, recipient block, date, and the subject line
+   are ALL hidden (not just logo/sender), so the user builds everything from
+   scratch straight into the body, top included. Only the body and the
+   signature block remain — signature stays because it's still needed
+   regardless of letterhead paper, and its alignment (left/center/right)
+   stays freely adjustable exactly as before. */
 .letter-paper.no-letterhead .letter-head,
-.letter-paper.no-letterhead .letter-sender-info { display: none !important; }
+.letter-paper.no-letterhead .letter-addr-row,
+.letter-paper.no-letterhead .letter-subject { display: none !important; }
 
 /* The editable region now lives directly inside the letter-paper mockup with
    no toolbar inside it (toolbarContainer moved that to #letterToolbar above),
@@ -767,6 +775,9 @@ $(document).ready(function () {
     // the equivalent control in the sister vikundi project.
     $('#f_use_letterhead').on('change', function () {
         $('#letterPaper').toggleClass('no-letterhead', !this.checked);
+        // Customizing a sender address that's hidden (letterhead off) has no
+        // visible effect — hide that control too so it can't confuse anyone.
+        $('#customSenderToggleWrap').toggle(this.checked);
     });
 
     // Customize sender address — off (default) always mirrors Company
