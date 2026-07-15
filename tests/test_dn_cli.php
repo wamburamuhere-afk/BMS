@@ -2,8 +2,10 @@
 /**
  * Delivery Note — CLI Test Suite
  * Validates the Record (inbound) vs Create (outbound) Delivery Note design:
- * manual DN number + named multi-attachments for inbound, auto number for
- * outbound, supplier/sub-contractor selection, separate list tabs.
+ * manual DN number + supplier/sub-contractor selection + mandatory named
+ * multi-attachments for inbound; auto number + Sales-side/Customer-only party
+ * + optional (Project-conditional) named multi-attachments for outbound;
+ * separate list tabs.
  * Exit 0 = all pass | Exit 1 = one or more failures (blocks git push)
  */
 
@@ -88,12 +90,13 @@ has($create, 'attachment_file[]',         'dn_create.php: attachment file field 
 has($create, 'Add Attachment',            'dn_create.php: "Add Attachment" button present');
 hasNot($create, 'bg-success',             'dn_create.php: no green theme (uses blue)');
 
-// ── 5. Create DN (outbound) — auto number, no attachment ─────────────────────
+// ── 5. Create DN (outbound) — auto number, Sales-side/Customer-only,
+//    optional reference-document attachment (mandatory only with no Project) ─
 section('5. Create DN form (outbound)');
 has($outbound, "fd.append('dn_type', 'outbound')", 'dn_outbound.php: submits dn_type=outbound');
-has($outbound, 'name="party_type"',       'dn_outbound.php: supplier/sub-contractor toggle present');
+has($outbound, 'name="party_type"',       'dn_outbound.php: party_type field present (Customer-only — see $party_field_locked)');
 has($outbound, 'Generated automatically', 'dn_outbound.php: DN number shown as auto-generated');
-hasNot($outbound, 'attachment_file[]',    'dn_outbound.php: no attachment upload (not required)');
+has($outbound, 'attachment_file[]',       'dn_outbound.php: reference-document attachment upload present (optional / Project-conditional)');
 
 // ── 6. Create API handles both directions ────────────────────────────────────
 section('6. create_dn.php — direction-aware');
