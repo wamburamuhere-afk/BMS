@@ -213,7 +213,9 @@ try {
 
     // Inject variance for each budget
     foreach ($budgets as &$b) {
-        $b['variance'] = $b['allocated_amount'] - $b['spent_amount'];
+        // The subquery above is now aliased to actual_amount (not spent_amount) so
+        // it overrides the stale stored column — this must read the same key.
+        $b['variance'] = $b['allocated_amount'] - $b['actual_amount'];
         // remaining_balance can now be negative (over-budget)
         $b['remaining_balance'] = $b['variance'];
     }
