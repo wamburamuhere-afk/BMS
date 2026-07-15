@@ -221,7 +221,29 @@ if ($company_logo && strpos($company_logo, 'http') !== 0) {
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
+        // Same SweetAlert2 defaults used across the rest of the system —
+        // green confirm button everywhere, including error alerts.
+        const originalSwalFire = Swal.fire.bind(Swal);
+        Swal.fire = function(...args) {
+            if (args.length === 1 && typeof args[0] === 'object') {
+                const options = { ...args[0] };
+                if (!options.confirmButtonColor) options.confirmButtonColor = '#28a745';
+                if (!options.confirmButtonText) options.confirmButtonText = 'OK';
+                return originalSwalFire(options);
+            }
+            if (typeof args[0] === 'string') {
+                const options = { title: args[0] };
+                if (args[1]) options.text = args[1];
+                if (args[2]) options.icon = args[2];
+                options.confirmButtonColor = '#28a745';
+                options.confirmButtonText = 'OK';
+                return originalSwalFire(options);
+            }
+            return originalSwalFire(...args);
+        };
+
         $(document).ready(function() {
             // Toggle password visibility
             $('#togglePassword').click(function() {
@@ -245,13 +267,13 @@ if ($company_logo && strpos($company_logo, 'http') !== 0) {
                         if (response.success) {
                             window.location.href = 'dashboard';
                         } else {
-                            alert('Login failed: ' + response.message);
+                            Swal.fire('Login Failed', response.message || 'Invalid username or password.', 'error');
                             $('.btn-login').html('Login');
                             $('.btn-login').prop('disabled', false);
                         }
                     },
                     error: function() {
-                        alert('Error connecting to server');
+                        Swal.fire('Error', 'Unable to connect to the server. Please try again.', 'error');
                         $('.btn-login').html('Login');
                         $('.btn-login').prop('disabled', false);
                     }
