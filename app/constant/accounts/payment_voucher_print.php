@@ -21,10 +21,12 @@ assertScopeForRecordHtml('payment_vouchers', 'id', $id);
 global $pdo;
 $stmt = $pdo->prepare("
     SELECT pv.*, u.username as prepared_by_name, u2.username as approved_by_name,
+           u3.username as reviewed_by_name,
            ea.account_name AS expense_account_name
     FROM payment_vouchers pv
     LEFT JOIN users u ON pv.prepared_by = u.user_id
     LEFT JOIN users u2 ON pv.approved_by = u2.user_id
+    LEFT JOIN users u3 ON pv.reviewed_by = u3.user_id
     LEFT JOIN accounts ea ON pv.expense_account_id = ea.account_id
     WHERE pv.id = ?
 ");
@@ -34,6 +36,17 @@ $v = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$v) {
     die("Voucher Not Found");
 }
+
+// Canonical Created/Reviewed/Approved By signature row (includes/workflow_signature_row.php)
+// — same component Invoice/Purchase Order print pages use, so the signature block matches
+// exactly. Payment vouchers don't track a role per approver or e-signature images yet, so
+// those keys are left blank/null — the component renders that gracefully (name only, no image).
+$wf = [
+    'created_by_name'  => $v['prepared_by_name'] ?? '',
+    'reviewed_by_name' => $v['reviewed_by_name'] ?? '',
+    'approved_by_name' => $v['approved_by_name'] ?? '',
+    '__include_css'    => true,
+];
 
 // Fetch Company Settings
 $comp = ['name'=>'Business Management System','email'=>'','phone'=>'','address'=>'','postal_address'=>'','website'=>'','tin'=>'','vrn'=>'','logo'=>''];
@@ -107,7 +120,7 @@ $hasPayment      = $hasBankTransfer || $hasMobile || $hasCheque;
             gap: 14px;
         }
         .company-addr-row img {
-            max-height: 70px;
+            max-height: 60px;
             width: auto;
             flex-shrink: 0;
             object-fit: contain;
@@ -127,7 +140,7 @@ $hasPayment      = $hasBankTransfer || $hasMobile || $hasCheque;
             -webkit-print-color-adjust: exact;
             padding: 16px 22px;
             border-radius: 8px;
-            min-width: 240px;
+            min-width: 220px;
         }
         .doc-title-box h2 {
             margin: 0 0 10px 0;
@@ -217,22 +230,8 @@ $hasPayment      = $hasBankTransfer || $hasMobile || $hasCheque;
         }
         .description-section p { font-size: 12px; color: #2c3e50; min-height: 60px; line-height: 1.6; }
 
-        /* ── SIGNATURE ── */
-        .signature-box {
-            margin-top: 50px;
-            display: flex;
-            justify-content: space-between;
-            gap: 20px;
-        }
-        .sig-block { flex: 1; text-align: center; }
-        .signature-line {
-            padding-top: 8px;
-            font-size: 11px;
-            color: #1a252f;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-        .sig-name { font-size: 10px; color: #7f8c8d; margin-top: 3px; }
+        /* ── SIGNATURE ── canonical .signature-box/.signature-line CSS comes from
+             includes/workflow_signature_row.php (__include_css => true above) ── */
 
         /* ── BANK DETAILS ── */
         .bank-details { flex: 1; background: #f4f6f8; padding: 14px 16px; border-radius: 6px; border-left: 4px solid #3498db; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
@@ -318,7 +317,6 @@ $hasPayment      = $hasBankTransfer || $hasMobile || $hasCheque;
             <p><strong>Reference No:</strong> <?= htmlspecialchars($v['reference_number'] ?: 'N/A') ?></p>
             <hr style="margin: 8px 0; border: none; border-top: 1px solid #dee2e6;">
             <p><strong>Prepared By:</strong> <?= htmlspecialchars($v['prepared_by_name'] ?? 'Staff') ?></p>
-            <p><strong>Approved By:</strong> <?= htmlspecialchars($v['approved_by_name'] ?? 'Authorized Manager') ?></p>
         </div>
     </div>
 
@@ -369,21 +367,8 @@ $hasPayment      = $hasBankTransfer || $hasMobile || $hasCheque;
     </div>
     <?php endif; ?>
 
-    <!-- SIGNATURES -->
-    <div class="signature-box">
-        <div class="sig-block">
-            <div class="signature-line">Prepared By</div>
-            <div class="sig-name"><?= htmlspecialchars((string)($v['prepared_by_name'] ?? '')) ?></div>
-        </div>
-        <div class="sig-block">
-            <div class="signature-line">Approved By</div>
-            <div class="sig-name"><?= htmlspecialchars((string)($v['approved_by_name'] ?? 'Not Approved')) ?></div>
-        </div>
-        <div class="sig-block">
-            <div class="signature-line">Receiver's Signature</div>
-            <div class="sig-name"><?= htmlspecialchars((string)($v['payee_name'] ?? '')) ?></div>
-        </div>
-    </div>
+    <!-- SIGNATURES — same canonical Created/Reviewed/Approved By row as Invoice/PO -->
+    <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 

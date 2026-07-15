@@ -1,5 +1,40 @@
 # BMS Changelog
 
+## 2026-07-14 (fix) — Payment Voucher print: "Approved By" always blank, signature block didn't match Invoice/PO
+
+**Files:** `app/constant/accounts/payment_voucher_print.php`, `api/account/update_voucher_status.php`
+**New file:** `migrations/2026_07_14_payment_vouchers_reviewed_by.php`
+
+Found while acting on a report that the printed voucher's footer looked wrong and its layout didn't
+match Invoice/Purchase Order prints. Two real bugs, plus a layout mismatch:
+
+- **`update_voucher_status.php` never set `approved_by`** on the approve transition (only `status`
+  was updated) — so the print page's "Approved By" always fell back to "Not Approved" even on a
+  genuinely approved voucher, regardless of who approved it. There was also no `reviewed_by` tracking
+  at all, unlike every other approval-workflow table in this codebase (`purchase_orders`, `invoices`,
+  etc., which all stamp `approved_by`/`reviewed_by`). Added `payment_vouchers.reviewed_by`
+  (idempotent migration) and now stamp both `reviewed_by` and `approved_by` with the acting user on
+  their respective transitions.
+- **Signature block replaced** with the canonical `includes/workflow_signature_row.php` component —
+  the same "Created By / Reviewed By / Approved By" row Invoice and Purchase Order prints already use
+  (also gets e-signature image support for free if that's ever wired up for vouchers). Removed the
+  voucher's own bespoke `.signature-box`/`.sig-block` CSS ("Prepared By / Approved By / Receiver's
+  Signature") now superseded by the shared component.
+- **Removed the duplicate "Approved By:" line** from the "Payment Details" info box — it duplicated
+  the (previously broken) signature-row value; "Prepared By:" stays there as requested.
+- **Header sizing aligned with Invoice/PO**: logo `max-height` 70px → 60px, title-box `min-width`
+  240px → 220px, giving the company address block the same breathing room Invoice/PO give theirs.
+
+Verified live: rendered the actual print page via PHP (bypassing the browser, which wasn't available
+this session) — output is warning-free, the signature row shows the three canonical labels with only
+one real "Approved By" occurrence (the duplicate is gone), and a full status-transition simulation
+confirmed `reviewed_by`/`approved_by` now populate with the real acting user instead of staying null.
+Noted for the record: a voucher with Bank Transfer + Mobile Money + Cheque details all configured
+renders a notably longer "Payment/Bank Details" section than Invoice/PO ever show, which is the most
+likely cause of content crowding near the print footer on data-heavy vouchers — flagged for the user
+to confirm against an actual print preview, since this couldn't be visually verified without browser
+access.
+
 ## 2026-07-14 (fix) — Project > Finance > Vouchers: "Change Status" offered invalid transitions; no Pay flow existed
 
 **File:** `app/bms/operations/project_view.php`
