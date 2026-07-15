@@ -162,6 +162,16 @@ if (isAdmin()) {
 require_once ROOT_DIR . '/core/warehouse_scope.php';
 $warehouses = warehousesForSelect($pdo);
 
+// Pre-select the warehouse the source document already committed to — the
+// user picked it once (on the SO or DN); don't make them pick it again.
+// Still just a default: the dropdown stays fully editable.
+$prefill_warehouse_id = 0;
+if ($order && !empty($order['warehouse_id'])) {
+    $prefill_warehouse_id = (int)$order['warehouse_id'];
+} elseif ($delivery && !empty($delivery['warehouse_id'])) {
+    $prefill_warehouse_id = (int)$delivery['warehouse_id'];
+}
+
 // Get projects if enabled
 $enable_projects = 0;
 try {
@@ -367,7 +377,7 @@ function generate_invoice_number() {
                         <label class="form-label small fw-bold">Warehouse <span class="text-danger" id="warehouse_required_mark">*</span></label>
                         <select class="form-select" id="warehouse_id" name="warehouse_id" required>
                             <option value="">Select Warehouse</option>
-                            <?= renderWarehouseOptions($warehouses) ?>
+                            <?= renderWarehouseOptions($warehouses, $prefill_warehouse_id) ?>
                         </select>
                         <div class="form-text">Stock for inventory items is checked against this warehouse. Not needed for Service Invoices.</div>
                     </div>
