@@ -111,6 +111,11 @@ $recipient_address = $existing['recipient_address'] ?? '';
 // modified-block) — stays a per-letter choice rather than a fixed default.
 $signature_align = in_array(($existing['signature_align'] ?? ''), ['left', 'center', 'right'], true)
     ? $existing['signature_align'] : 'left';
+// NULL = always follow Company Profile automatically (default, unchanged
+// behaviour). Non-null = this specific letter overrides it with its own
+// freely-written/formatted sender address.
+$custom_sender_info = (isset($existing['custom_sender_info']) && $existing['custom_sender_info'] !== null && $existing['custom_sender_info'] !== '')
+    ? $existing['custom_sender_info'] : null;
 
 $signer_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
 $signer_role = $_SESSION['user_role'] ?? '';
@@ -254,6 +259,11 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
                 <label class="form-check-label small fw-bold" for="f_use_letterhead">Include letterhead (logo &amp; sender address)</label>
                 <div class="form-text">Turn off if printing onto physical pre-printed letterhead paper. The "Printed by" footer always stays &mdash; that's an audit line, not letterhead branding.</div>
             </div>
+            <div class="form-check form-switch mt-2">
+                <input class="form-check-input" type="checkbox" id="f_custom_sender" <?= $custom_sender_info !== null ? 'checked' : '' ?>>
+                <label class="form-check-label small fw-bold" for="f_custom_sender">Customize sender address for this letter</label>
+                <div class="form-text">Off = always follows Company Profile automatically. On = write/format your own sender address just for this letter, using its own small toolbar — the rest of Company Profile stays unaffected.</div>
+            </div>
         </div>
     </div>
 
@@ -319,10 +329,20 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
                 </div>
             </div>
             <div class="letter-addr-col letter-addr-sender">
-                <div class="letter-sender-info">
+                <!-- Auto mode (default): follows Company Profile, read-only here.
+                     Custom mode (opt-in via f_custom_sender): freely editable, its
+                     own small Summernote toolbar — never shares #letterToolbar with
+                     the letter body, so the two editors can't fight over one ribbon.
+                     html2pdf captures the live screen DOM (it ignores @media print),
+                     so the toolbar chrome is hidden via JS right before each save,
+                     the same established pattern #letterFooterWrap already uses. -->
+                <div class="letter-sender-info" id="senderInfoAuto" style="<?= $custom_sender_info !== null ? 'display:none;' : '' ?>">
                     <?php foreach ($sender_lines as $line): ?>
                         <div><?= nl2br(htmlspecialchars($line)) ?></div>
                     <?php endforeach; ?>
+                </div>
+                <div id="senderInfoCustomWrap" style="<?= $custom_sender_info !== null ? '' : 'display:none;' ?>">
+                    <div id="senderInfoCustom"><?= $custom_sender_info !== null ? $custom_sender_info : '<div>' . implode('</div><div>', array_map('htmlspecialchars', $sender_lines)) . '</div>' ?></div>
                 </div>
                 <div class="letter-date" id="letter-date-display"><?= htmlspecialchars(date('d M Y', strtotime($letter_date))) ?></div>
             </div>
@@ -491,6 +511,14 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
    its own line, matching how each is its own separate Company Profile
    setting. Only the fields actually filled in render (see $sender_lines). */
 .letter-sender-info div { white-space: pre-line; margin-top: 1mm; }
+/* Custom sender editor — match the auto block's typography so switching
+   between the two modes doesn't visibly jump in size/colour. The generic
+   .note-editor.note-frame / .note-editable rules already strip Summernote's
+   default border/shadow/padding (see the letterBody rules below), so only
+   font sizing needs restating here. */
+#senderInfoCustomWrap { text-align: right; }
+#senderInfoCustomWrap .note-editable { font-size: 10pt; color: #333; }
+#senderInfoCustomWrap .note-toolbar { justify-content: flex-end; }
 .letter-date { margin-top: 1mm; }
 
 .letter-subject { font-size: 11pt; margin-bottom: 8mm; text-decoration: underline; }
@@ -678,6 +706,34 @@ $(document).ready(function () {
         fontSizes: ['8', '9', '10', '11', '12', '14', '16', '18', '24', '32']
     });
 
+    // Custom sender-address editor — deliberately its OWN Summernote instance
+    // with its own small inline toolbar (no toolbarContainer redirect), never
+    // sharing #letterToolbar with the letter body. Two instances pointed at
+    // the same external toolbar would fight over it; a small dedicated
+    // toolbar, scoped to what an address block actually needs, is the robust
+    // choice. Initialized lazily (only when custom mode is actually turned
+    // on) rather than on page load, since Summernote initializing on a
+    // display:none element is a known source of layout/rendering quirks.
+    let senderCustomInited = false;
+    function initSenderCustomEditor() {
+        if (senderCustomInited) return;
+        senderCustomInited = true;
+        $('#senderInfoCustom').summernote({
+            height: 90,
+            toolbar: [
+                ['font', ['bold', 'italic', 'underline', 'clear']],
+                ['para', ['ul']],
+                ['history', ['undo', 'redo']]
+            ]
+        });
+    }
+    if (<?= $custom_sender_info !== null ? 'true' : 'false' ?>) {
+        // Reopening a draft that already has a custom override — the block
+        // is visible from the very first paint, so init immediately instead
+        // of waiting for a toggle event that won't fire.
+        initSenderCustomEditor();
+    }
+
     $('#f_recipient').on('input', function () {
         $('#letter-recipient-display').html($('<div>').text($(this).val()).html().replace(/\n/g, '<br>'));
     });
@@ -711,6 +767,22 @@ $(document).ready(function () {
     // the equivalent control in the sister vikundi project.
     $('#f_use_letterhead').on('change', function () {
         $('#letterPaper').toggleClass('no-letterhead', !this.checked);
+    });
+
+    // Customize sender address — off (default) always mirrors Company
+    // Profile; on lets this one letter override it freely. Switching on
+    // starts from whatever is currently showing (either the saved custom
+    // text from a previous save, or today's Company Profile lines) rather
+    // than a blank box, since "customize" means edit-what's-there, not
+    // start over.
+    $('#f_custom_sender').on('change', function () {
+        const on = this.checked;
+        initSenderCustomEditor();
+        $('#senderInfoAuto').toggle(!on);
+        // Toggle the wrapper DIV we control, not Summernote's own generated
+        // markup — its exact DOM shape (which element it hides/replaces) is
+        // an implementation detail this code shouldn't have to know.
+        $('#senderInfoCustomWrap').toggle(on);
     });
 
     // Signature position — full-block vs modified-block letter styles
@@ -891,14 +963,19 @@ function saveDocument(mode) {
     };
 
     const useLetterhead = $('#f_use_letterhead').is(':checked');
+    const useCustomSender = $('#f_custom_sender').is(':checked');
 
     // The shared footer (#letterFooterWrap) is hidden while editing and only
     // revealed for print — html2pdf captures the DOM as currently rendered
     // on screen (it doesn't apply @media print styles), so it has to be
-    // shown right before capture and hidden again straight after.
+    // shown right before capture and hidden again straight after. Same
+    // reasoning applies to the custom sender editor's own toolbar — it must
+    // never appear in the printed PDF, only its text content should.
     $('#letterFooterWrap').css('display', 'block');
+    $('#senderInfoCustomWrap .note-toolbar').css('display', 'none');
     html2pdf().set(opt).from(document.getElementById('letterPaper')).outputPdf('blob').then(function (blob) {
         $('#letterFooterWrap').css('display', '');
+        $('#senderInfoCustomWrap .note-toolbar').css('display', '');
         const fd = new FormData();
         fd.append('document_id', currentDocumentId);
         fd.append('subject', subject);
@@ -911,6 +988,8 @@ function saveDocument(mode) {
         fd.append('signature_align', $('#f_signature_align').val() || 'left');
         fd.append('project_id', '<?= (int)($project_id ?? 0) ?>');
         fd.append('content', $('#letterBody').summernote('code'));
+        fd.append('use_custom_sender', useCustomSender ? '1' : '0');
+        fd.append('custom_sender_info', senderCustomInited ? $('#senderInfoCustom').summernote('code') : '');
         fd.append('_csrf', CSRF_TOKEN);
         fd.append('pdf_file', blob, subject + '.pdf');
 
