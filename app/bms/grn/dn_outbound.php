@@ -29,7 +29,7 @@ $project_id = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
 $is_edit    = $edit_id > 0;
 
 // ── LOAD DN (edit mode) ──────────────────────────────────────
-$dn = null; $dn_items = [];
+$dn = null; $dn_items = []; $dn_attachments = [];
 if ($is_edit) {
     $stmt = $pdo->prepare("SELECT * FROM deliveries WHERE delivery_id = ?");
     $stmt->execute([$edit_id]);
@@ -39,6 +39,9 @@ if ($is_edit) {
         $stmt2 = $pdo->prepare("SELECT di.*, p.product_name, p.sku, p.unit FROM delivery_items di LEFT JOIN products p ON di.product_id = p.product_id WHERE di.delivery_id = ? ORDER BY di.delivery_item_id");
         $stmt2->execute([$edit_id]);
         $dn_items = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+        $att = $pdo->prepare("SELECT * FROM delivery_attachments WHERE delivery_id = ? ORDER BY attachment_id");
+        $att->execute([$edit_id]);
+        $dn_attachments = $att->fetchAll(PDO::FETCH_ASSOC);
     }
 }
 
@@ -422,6 +425,39 @@ $return_url = getUrl('delivery_notes');
                         </div>
                     </div>
                 </div>
+
+                <!-- Reference document (Customer PO, Sales Order copy, etc.) — optional
+                     multi-file, named, same mechanism as the inbound Record DN form.
+                     Required only when this DN has no Project (see toggleAttachmentRequirement()). -->
+                <div class="card shadow-sm border-0 mt-4">
+                    <div class="card-header bg-light py-3">
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-paperclip me-2 text-primary"></i>Reference Document <span id="attRequiredMark" class="text-danger d-none">*</span></h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <?php if ($is_edit && $dn_attachments): ?>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted text-uppercase">Existing Attachments</label>
+                            <?php foreach ($dn_attachments as $a): ?>
+                            <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-1" id="att-<?= $a['attachment_id'] ?>">
+                                <a href="<?= getUrl($a['file_path']) ?>" target="_blank" class="text-decoration-none small text-truncate">
+                                    <i class="bi bi-file-earmark-text text-primary me-1"></i><?= safe_output($a['file_name']) ?>
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteAttachment(<?= $a['attachment_id'] ?>)"><i class="bi bi-trash"></i></button>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
+
+                        <label class="form-label fw-semibold">Upload named copies of the Customer PO / Sales Order / other reference</label>
+                        <div id="attachmentRows"></div>
+                        <button type="button" class="btn btn-outline-primary btn-sm mt-1" onclick="addAttachmentRow()">
+                            <i class="bi bi-plus-circle me-1"></i> Add Attachment
+                        </button>
+                        <div><small class="text-muted">Each attachment needs a name and a file. PDF, image or Word. Max 10MB each.
+                            <span id="attHelpText">Optional when this DN is linked to a Project.</span>
+                        </small></div>
+                    </div>
+                </div>
             </div>
 
             <div class="col-lg-4">
@@ -470,6 +506,7 @@ $return_url = getUrl('delivery_notes');
 let PROJECT_ID = <?= $project_id ?>;
 let warehouseStock = [];
 let isInitialLoad = true;
+let attachmentRowSeq = 0;
 
 const ALL_WAREHOUSES = <?= json_encode(array_values(array_map(fn($w) => [
     'id' => (int)$w['warehouse_id'],
@@ -515,6 +552,57 @@ function rebuildParty(preserve) {
     $sel.trigger('change.select2');
 }
 
+// ── Reference-document attachment rows (name + file) ──────────
+// Required only when this DN has no Project — a Project has its own separate
+// procedure/controls, per the boss's instruction; otherwise stays optional.
+function toggleAttachmentRequirement() {
+    const required = !PROJECT_ID;
+    $('#attRequiredMark').toggleClass('d-none', !required);
+    $('#attHelpText').text(required
+        ? 'Required — this DN has no Project, so at least one attachment is needed.'
+        : 'Optional when this DN is linked to a Project.');
+}
+
+function addAttachmentRow(name) {
+    attachmentRowSeq++;
+    const id = 'attrow_' + attachmentRowSeq;
+    const html = `
+    <div class="row g-2 mb-2 attachment-row align-items-center" id="${id}">
+        <div class="col-12 col-md-5">
+            <input type="text" class="form-control form-control-sm att-name" name="attachment_name[]"
+                placeholder="Attachment name (e.g. Customer PO)" value="${name || ''}">
+        </div>
+        <div class="col-9 col-md-6">
+            <input type="file" class="form-control form-control-sm att-file" name="attachment_file[]"
+                accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx">
+        </div>
+        <div class="col-3 col-md-1 text-end">
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeAttachmentRow('${id}')"><i class="bi bi-trash"></i></button>
+        </div>
+    </div>`;
+    $('#attachmentRows').append(html);
+}
+function removeAttachmentRow(id) {
+    $('#' + id).remove();
+    if ($('#attachmentRows .attachment-row').length === 0) addAttachmentRow();
+}
+function deleteAttachment(id) {
+    Swal.fire({
+        title: 'Remove attachment?', icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, remove', cancelButtonText: 'Cancel'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl("api/delete_dn_attachment.php") ?>', { attachment_id: id }, function (res) {
+            if (res.success) {
+                $('#att-' + id).remove();
+                Swal.fire({ icon: 'success', title: 'Removed', timer: 1200, showConfirmButton: false });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }
+        }, 'json').fail(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Network error.' }));
+    });
+}
+
 $(document).ready(function () {
     $('#dn_project_id').select2({ theme: 'bootstrap-5', placeholder: '-- No Project (General) --', allowClear: true, width: '100%' });
 
@@ -522,7 +610,10 @@ $(document).ready(function () {
     rebuildParty(false);
     if (CUR_PARTY_ID > 0) $('#dn_party_id').val(CUR_PARTY_ID).trigger('change.select2');
 
-    $('#dn_project_id').on('change', function () { PROJECT_ID = parseInt($(this).val()) || 0; rebuildWarehouses(); });
+    addAttachmentRow(); // start with one empty attachment row
+    toggleAttachmentRequirement();
+
+    $('#dn_project_id').on('change', function () { PROJECT_ID = parseInt($(this).val()) || 0; rebuildWarehouses(); toggleAttachmentRequirement(); });
     $('#dn_warehouse_id').on('change', function () { if (!isInitialLoad) loadWarehouseStock(); });
 
     if (PRESET_WH > 0) { $('#dn_warehouse_id').val(PRESET_WH).trigger('change.select2'); loadWarehouseStock(); }
@@ -757,6 +848,22 @@ function submitDN(status) {
     <?php if ($is_edit): ?>fd.append('delivery_id', '<?= $edit_id ?>');<?php endif; ?>
     <?php if ($lpo): ?>fd.append('customer_lpo_id', '<?= $lpo_id ?>');<?php elseif ($is_edit && !empty($dn['customer_lpo_id'])): ?>fd.append('customer_lpo_id', '<?= (int)$dn['customer_lpo_id'] ?>');<?php endif; ?>
     <?php if ($so): ?>fd.append('order_id', '<?= $so_id ?>');<?php elseif ($is_edit && !empty($dn['order_id'])): ?>fd.append('order_id', '<?= (int)$dn['order_id'] ?>');<?php endif; ?>
+
+    // Named attachment rows — append file + name in parallel
+    let fileCount = 0;
+    $('#attachmentRows .attachment-row').each(function () {
+        const fileInput = $(this).find('.att-file')[0];
+        const nameVal = $(this).find('.att-name').val().trim();
+        if (fileInput && fileInput.files.length > 0) {
+            fd.append('attachment_file[]', fileInput.files[0]);
+            fd.append('attachment_name[]', nameVal);
+            fileCount++;
+        }
+    });
+    if (!PROJECT_ID && !IS_EDIT && fileCount === 0) {
+        Swal.fire({ icon: 'warning', title: 'Attachment Required', text: 'This DN has no Project, so at least one reference-document attachment is required.' });
+        return;
+    }
 
     Swal.fire({ title: 'Saving...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     $.ajax({
