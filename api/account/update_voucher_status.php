@@ -54,8 +54,19 @@ try {
     $v->execute([$voucher_id]);
     $vrow = $v->fetch(PDO::FETCH_ASSOC) ?: [];
 
-    $pdo->prepare("UPDATE payment_vouchers SET status = ? WHERE id = ?")
-        ->execute([$status, $voucher_id]);
+    // Stamp who reviewed/approved it — mirrors prepared_by, which is set at create.
+    // Previously only `status` was updated here, so the print page's "Approved By"
+    // always read blank/"Not Approved" even after a voucher was actually approved.
+    if ($status === 'reviewed') {
+        $pdo->prepare("UPDATE payment_vouchers SET status = ?, reviewed_by = ? WHERE id = ?")
+            ->execute([$status, (int)$_SESSION['user_id'], $voucher_id]);
+    } elseif ($status === 'approved') {
+        $pdo->prepare("UPDATE payment_vouchers SET status = ?, approved_by = ? WHERE id = ?")
+            ->execute([$status, (int)$_SESSION['user_id'], $voucher_id]);
+    } else {
+        $pdo->prepare("UPDATE payment_vouchers SET status = ? WHERE id = ?")
+            ->execute([$status, $voucher_id]);
+    }
 
     $v_amt  = (float)($vrow['amount'] ?? 0);
     $v_exp  = (int)($vrow['expense_account_id'] ?? 0);
