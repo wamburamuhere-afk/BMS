@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-07-15 (feat) — Create Document: professional template engine (merge variables, full-structure templates, one category taxonomy)
+
+**New:** `core/document_merge.php`, `migrations/2026_07_15_document_templates_structure.php`,
+`migrations/2026_07_15_unify_template_categories.php`
+**Files:** `app/constant/document/create_document.php`, `app/constant/document/new_document.php`,
+`app/constant/document/document_templates.php`, `api/document/save_created_document.php`,
+`api/document/save_letter_template.php`, `api/document/get_letter_templates.php`, `api/get_templates.php`
+
+After analysing WorkDo's letter builder (its `OfferLetter::replaceVariable()` merge engine), fixed the
+three things that made BMS's Create Document look implemented but not professional. Delivered in three
+phases:
+
+- **Phase 1 — Merge variables (the core gap).** Templates can now contain `{{tokens}}`
+  (`{{company_name}}`, `{{recipient}}`, `{{date}}`, `{{document_code}}`, `{{project_name}}`, sender,
+  contract number, …) that **auto-fill from real data** when a letter is created — previously picking a
+  template just dumped static HTML into the body and every name/date/reference had to be retyped by
+  hand. `core/document_merge.php` is the shared token list + resolver (double-brace syntax, so it can't
+  collide with a lone brace). An "Insert Variable" dropdown lets template authors drop tokens in; the
+  client resolves them for the preview/PDF and the server re-resolves at save as the authoritative
+  safety pass, so a stored body never persists a raw token.
+- **Phase 2 — Templates carry the whole letter.** "Save as Template" previously stored only the body,
+  throwing away subject, recipient, letterhead choice and signature alignment. Added those columns
+  (nullable migration), captured them on save (tokens kept intact so they auto-fill afresh each reuse),
+  and restored them on use — both the in-editor picker and the `?template_id` prefill path.
+- **Phase 3 — One category taxonomy.** Retired the redundant `template_categories` table and filed
+  templates under the same curated `document_categories` the rest of the system uses, so a document is
+  classified once, not twice. The 8 template groups were **mapped** into the canonical 5 (not
+  bulk-imported), keeping the filing taxonomy clean and the curated-5 invariant
+  (`test_document_categories_cli`, 26/26) intact.
+
+Verified: PHP and JS resolvers produce identical output (executed both against the same sample);
+structured-template round-trip confirmed live; both migrations idempotent; the document-categories and
+document-expiry regression suites pass.
+
 ## 2026-07-15 (fix) — Create Document: a Blank letter now starts as a truly blank canvas
 
 **File:** `app/constant/document/create_document.php`

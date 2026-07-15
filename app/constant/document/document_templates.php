@@ -21,7 +21,7 @@ $template_id = isset($_GET['template_id']) ? (int)$_GET['template_id'] : 0;
 // Note: In a real system, these would call API endpoints.
 // For now, we'll keep the logic in-page but use the new UI.
 
-$categories = $pdo->query("SELECT * FROM template_categories ORDER BY category_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <div class="container-fluid mt-4">
