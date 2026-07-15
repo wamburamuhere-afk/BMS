@@ -62,14 +62,15 @@ $prefill_template_id = 0;
 if ($document_id === 0) {
     $prefill_template_id = !empty($_GET['template_id']) ? (int)$_GET['template_id'] : 0;
     if ($prefill_template_id > 0) {
-        $tpl_stmt = $pdo->prepare("SELECT id, content FROM document_templates WHERE id = ? AND content IS NOT NULL AND is_active = 1");
+        $tpl_stmt = $pdo->prepare("SELECT id, content, subject, recipient, recipient_address, use_letterhead, signature_align FROM document_templates WHERE id = ? AND content IS NOT NULL AND is_active = 1");
         $tpl_stmt->execute([$prefill_template_id]);
         $prefill_template = $tpl_stmt->fetch(PDO::FETCH_ASSOC);
     }
 }
 
+// One category list for everything now — the document's filing category, the
+// template chooser, and the "Save as Template" picker all use document_categories.
 $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_name ASC")->fetchAll(PDO::FETCH_ASSOC);
-$template_categories = $pdo->query("SELECT * FROM template_categories ORDER BY category_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $can_manage_templates = canCreate('document_templates');
 $can_use_templates = canView('document_templates');
 
@@ -85,36 +86,43 @@ $company_vrn     = get_setting('company_vrn', '');
 // on the server at first save so it's never burned by an abandoned draft.
 $document_code = $existing['document_code'] ?? peekNextCode($pdo, 'LTR');
 
-$subject     = $existing['document_name'] ?? '';
+$subject     = $existing['document_name'] ?? ($prefill_template['subject'] ?? '');
 $recipient   = '';
 if (!empty($existing['description']) && strpos($existing['description'], 'To: ') === 0) {
     $recipient = substr($existing['description'], 4);
+} elseif (!$existing && !empty($prefill_template['recipient'])) {
+    $recipient = $prefill_template['recipient'];
 }
 $letter_date = $existing['issue_date'] ?? date('Y-m-d');
 $content     = $existing['content'] ?? ($prefill_template['content'] ?? '');
-// Note: the wizard's category picker (new_document.php) works off
-// `template_categories` — a different taxonomy, with its own id space, from
-// this field's `document_categories` (which classifies the saved document
-// for filing, not its template). They don't correspond, so the wizard's
-// choice is deliberately NOT forced into this dropdown — the user still
-// picks the document's own filing category independently.
-$category_id = $existing['category_id'] ?? null;
+// The wizard's category picker (new_document.php) and this filing field now
+// share ONE taxonomy (document_categories). When starting fresh from a chosen
+// category, pre-select it here so the user doesn't classify twice.
+$wizard_category_id = (!$existing && !empty($_GET['category_id'])) ? (int)$_GET['category_id'] : null;
+$category_id = $existing['category_id'] ?? $wizard_category_id;
 $access_level = in_array(($existing['access_level'] ?? ''), ['private', 'restricted', 'public'], true)
     ? $existing['access_level'] : 'private';
-// A saved draft keeps whatever it was last set to. A brand-new letter started
-// from a template defaults ON (templates assume the professional letterhead
-// look). A brand-new BLANK letter (no template, no existing record) defaults
-// OFF — a truly blank canvas the user builds up from scratch, per feedback.
-$use_letterhead = isset($existing['use_letterhead'])
-    ? ((int)$existing['use_letterhead'] === 1)
-    : ($prefill_template_id > 0);
+// A saved draft keeps whatever it was last set to. A brand-new letter from a
+// template honours the template's own letterhead choice if it stored one, else
+// defaults ON (templates assume the professional letterhead look). A brand-new
+// BLANK letter (no template, no existing record) defaults OFF — a truly blank
+// canvas the user builds up from scratch, per feedback.
+if (isset($existing['use_letterhead'])) {
+    $use_letterhead = (int)$existing['use_letterhead'] === 1;
+} elseif ($prefill_template && $prefill_template['use_letterhead'] !== null) {
+    $use_letterhead = (int)$prefill_template['use_letterhead'] === 1;
+} else {
+    $use_letterhead = ($prefill_template_id > 0);
+}
 // Not every letter type needs a full recipient address block (an internal
-// memo doesn't) — this stays empty unless the user writes one in.
-$recipient_address = $existing['recipient_address'] ?? '';
+// memo doesn't) — this stays empty unless the user (or the template) sets one.
+$recipient_address = $existing['recipient_address'] ?? ($prefill_template['recipient_address'] ?? '');
 // Signature style genuinely differs by letter format (full-block vs
-// modified-block) — stays a per-letter choice rather than a fixed default.
+// modified-block) — a per-letter choice; honours the template's if it stored one.
 $signature_align = in_array(($existing['signature_align'] ?? ''), ['left', 'center', 'right'], true)
-    ? $existing['signature_align'] : 'left';
+    ? $existing['signature_align']
+    : (in_array(($prefill_template['signature_align'] ?? ''), ['left', 'center', 'right'], true)
+        ? $prefill_template['signature_align'] : 'left');
 // NULL = always follow Company Profile automatically (default, unchanged
 // behaviour). Non-null = this specific letter overrides it with its own
 // freely-written/formatted sender address.
@@ -141,11 +149,20 @@ $my_signature = $sig_stmt->fetch(PDO::FETCH_ASSOC);
 $signature_preview_path = $my_signature ? ($my_signature['thumbnail_path'] ?: $my_signature['file_path']) : null;
 
 $project_name = null;
+$project_contract_number = null;
 if ($project_id) {
-    $pstmt = $pdo->prepare("SELECT project_name FROM projects WHERE project_id = ?");
+    $pstmt = $pdo->prepare("SELECT project_name, contract_number FROM projects WHERE project_id = ?");
     $pstmt->execute([$project_id]);
-    $project_name = $pstmt->fetchColumn() ?: null;
+    if ($prow = $pstmt->fetch(PDO::FETCH_ASSOC)) {
+        $project_name = $prow['project_name'] ?: null;
+        $project_contract_number = $prow['contract_number'] ?: null;
+    }
 }
+
+// Merge-variable support — the token list + labels come from the shared
+// resolver so the "Insert Variable" UI and the server safety-pass stay in sync.
+require_once ROOT_DIR . '/core/document_merge.php';
+$merge_variables = documentMergeVariables();
 
 $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) : 'Sir/Madam') . ',</p>'
     . '<p>&nbsp;</p>'
@@ -189,6 +206,22 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
                 </ul>
             </div>
             <?php endif; ?>
+            <!-- Insert Variable — drops a {{token}} at the cursor. On a template
+                 these auto-fill from real data (company, recipient, date, etc.)
+                 whenever the template is used to create a letter. -->
+            <div class="dropdown">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Insert an auto-filling merge variable">
+                    <i class="bi bi-braces me-1"></i> Insert Variable
+                </button>
+                <ul class="dropdown-menu" style="max-height:320px; overflow-y:auto;">
+                    <li><h6 class="dropdown-header">Auto-fills when the letter is created</h6></li>
+                    <?php foreach ($merge_variables as $token => $label): ?>
+                    <li><button type="button" class="dropdown-item insert-var-btn" data-token="<?= htmlspecialchars($token) ?>">
+                        <?= htmlspecialchars($label) ?> <code class="text-muted ms-1">{{<?= htmlspecialchars($token) ?>}}</code>
+                    </button></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
             <?php if ($existing): ?>
             <button type="button" class="btn btn-outline-secondary" id="btnDuplicate">
                 <i class="bi bi-files me-1"></i> Duplicate
@@ -423,7 +456,7 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
                         <label class="form-label">Category</label>
                         <select class="form-select select2-static" id="tpl_category_id">
                             <option value="">Select Category</option>
-                            <?php foreach ($template_categories as $tc): ?>
+                            <?php foreach ($categories as $tc): ?>
                                 <option value="<?= (int)$tc['id'] ?>"><?= htmlspecialchars($tc['category_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
@@ -807,6 +840,13 @@ $(document).ready(function () {
     $('#btnSavePrint').on('click', function () { saveDocument('print'); });
     $('#btnDuplicate').on('click', duplicateDocument);
 
+    // Insert Variable — drop a {{token}} at the cursor in the letter body.
+    $('.insert-var-btn').on('click', function () {
+        const token = '{{' + $(this).data('token') + '}}';
+        $('#letterBody').summernote('focus');
+        $('#letterBody').summernote('insertText', token);
+    });
+
     // ── Use Template ──────────────────────────────────────────────
     $('#btnUseTemplate').on('click', function () {
         new bootstrap.Modal(document.getElementById('useTemplateModal')).show();
@@ -847,12 +887,34 @@ $(document).ready(function () {
         const q = $(this).val().toLowerCase();
         renderTemplateList(templatesCache.filter(t => t.template_name.toLowerCase().includes(q)));
     });
+    // Restore a template's full structure — body (tokens kept intact so they
+    // auto-fill afresh at save) plus subject, recipient, letterhead and
+    // signature alignment — so reusing a template reproduces the whole letter,
+    // not just its body. Fields the template didn't store (NULL) are left as-is.
+    window.applyTemplate = function (tpl) {
+        $('#letterBody').summernote('code', tpl.content || '');
+        if (tpl.subject != null && tpl.subject !== '')   { $('#f_subject').val(tpl.subject).trigger('input'); }
+        if (tpl.recipient != null && tpl.recipient !== '') { $('#f_recipient').val(tpl.recipient).trigger('input'); }
+        if (tpl.recipient_address != null && tpl.recipient_address !== '') {
+            $('#recipientAddressRow').removeClass('d-none');
+            $('#btnToggleRecipientAddress').find('i').attr('class', 'bi bi-dash-circle me-1');
+            $('#btnToggleRecipientAddressLabel').text('Remove recipient address');
+            $('#f_recipient_address').val(tpl.recipient_address).trigger('input');
+        }
+        if (tpl.use_letterhead != null && tpl.use_letterhead !== '') {
+            $('#f_use_letterhead').prop('checked', String(tpl.use_letterhead) === '1').trigger('change');
+        }
+        if (tpl.signature_align != null && tpl.signature_align !== '') {
+            $('#f_signature_align').val(tpl.signature_align).trigger('change');
+        }
+    };
+
     $('#templatePickerList').on('click', '.tpl-pick', function () {
         const id = $(this).data('id');
         const tpl = templatesCache.find(t => String(t.id) === String(id));
         if (!tpl) return;
         const apply = function () {
-            $('#letterBody').summernote('code', tpl.content);
+            applyTemplate(tpl);
             bootstrap.Modal.getInstance(document.getElementById('useTemplateModal')).hide();
         };
         if (!$('#letterBody').summernote('isEmpty')) {
@@ -890,7 +952,15 @@ $(document).ready(function () {
             data: {
                 template_name: $('#tpl_name').val(),
                 category_id: $('#tpl_category_id').val(),
+                // Body is stored WITH any {{tokens}} intact (not resolved) so
+                // the template stays reusable; the structural fields are
+                // captured too, so reusing it reproduces the whole letter.
                 content: $('#letterBody').summernote('code'),
+                subject: $('#f_subject').val().trim(),
+                recipient: $('#f_recipient').val().trim(),
+                recipient_address: $('#f_recipient_address').val().trim(),
+                use_letterhead: $('#f_use_letterhead').is(':checked') ? '1' : '0',
+                signature_align: $('#f_signature_align').val(),
                 _csrf: CSRF_TOKEN
             },
             dataType: 'json',
@@ -940,6 +1010,44 @@ function duplicateDocument() {
     });
 }
 
+// ── Merge-variable resolver (mirror of core/document_merge.php) ──────────────
+// Company/static values come from PHP; recipient/subject/date read live from
+// their fields at resolve time. A recognised token → its value (may be empty);
+// an unrecognised {{x}} is left as typed. The server re-runs this at save as
+// the authoritative safety pass, so the two must agree on token names.
+function currentMergeValues() {
+    const dateVal = $('#f_letter_date').val();
+    let dateOut = '';
+    if (dateVal) {
+        const d = new Date(dateVal);
+        if (!isNaN(d)) dateOut = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    return {
+        company_name:    <?= json_encode($company_name) ?>,
+        company_address: <?= json_encode($company_address) ?>,
+        company_phone:   <?= json_encode($company_phone) ?>,
+        company_email:   <?= json_encode($company_email) ?>,
+        company_tin:     <?= json_encode($company_tin) ?>,
+        company_vrn:     <?= json_encode($company_vrn) ?>,
+        document_code:   <?= json_encode($document_code) ?>,
+        subject:            $('#f_subject').val().trim(),
+        recipient:          $('#f_recipient').val().trim(),
+        recipient_address:  $('#f_recipient_address').val().trim(),
+        date:               dateOut,
+        sender_name:     <?= json_encode($signer_name) ?>,
+        sender_role:     <?= json_encode($signer_role) ?>,
+        project_name:    <?= json_encode($project_name ?? '') ?>,
+        contract_number: <?= json_encode($project_contract_number ?? '') ?>
+    };
+}
+function resolveMergeTokens(html) {
+    if (!html || html.indexOf('{{') === -1) return html;
+    const v = currentMergeValues();
+    return html.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, function (m, key) {
+        return Object.prototype.hasOwnProperty.call(v, key) ? (v[key] || '') : m;
+    });
+}
+
 function saveDocument(mode) {
     const subject = $('#f_subject').val().trim();
     if (!subject) {
@@ -950,6 +1058,10 @@ function saveDocument(mode) {
         Swal.fire({ icon: 'warning', title: 'Empty letter', text: 'Please write the letter body before saving.' });
         return;
     }
+
+    // Resolve any {{tokens}} into real values before rendering the PDF and
+    // storing — idempotent, so running it on already-resolved text is a no-op.
+    $('#letterBody').summernote('code', resolveMergeTokens($('#letterBody').summernote('code')));
 
     const $btn = mode === 'draft' ? $('#btnSaveDraft') : $('#btnSavePrint');
     const orig = $btn.html();

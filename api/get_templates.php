@@ -15,7 +15,7 @@ try {
 
     $query = "SELECT t.*, c.category_name, u.username as created_by_name 
               FROM document_templates t
-              LEFT JOIN template_categories c ON t.category_id = c.id
+              LEFT JOIN document_categories c ON t.category_id = c.id
               LEFT JOIN users u ON t.created_by = u.user_id
               WHERE 1=1";
     $params = [];
@@ -60,7 +60,7 @@ try {
         'totalTemplates' => intval($total),
         'activeTemplates' => intval($pdo->query("SELECT COUNT(*) FROM document_templates WHERE is_active = 1")->fetchColumn()),
         'totalUsage' => intval($pdo->query("SELECT SUM(usage_count) FROM document_templates")->fetchColumn()),
-        'categoriesCount' => intval($pdo->query("SELECT COUNT(*) FROM template_categories")->fetchColumn())
+        'categoriesCount' => intval($pdo->query("SELECT COUNT(*) FROM document_categories")->fetchColumn())
     ];
 
     echo json_encode([
