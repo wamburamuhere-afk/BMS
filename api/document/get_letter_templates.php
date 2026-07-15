@@ -25,7 +25,7 @@ try {
         SELECT dt.id, dt.template_name, dt.content, dt.usage_count, dt.category_id, tc.category_name,
                dt.subject, dt.recipient, dt.recipient_address, dt.use_letterhead, dt.signature_align
         FROM document_templates dt
-        LEFT JOIN template_categories tc ON tc.id = dt.category_id
+        LEFT JOIN document_categories tc ON tc.id = dt.category_id
         WHERE dt.content IS NOT NULL AND dt.is_active = 1
     ";
     $params = [];

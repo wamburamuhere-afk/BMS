@@ -31,7 +31,7 @@ if ($project_id !== null && !userCan('project', $project_id)) {
 // active) template are worth showing — an empty category is a dead click.
 $categories = $pdo->query("
     SELECT tc.id, tc.category_name, COUNT(dt.id) AS template_count
-    FROM template_categories tc
+    FROM document_categories tc
     JOIN document_templates dt ON dt.category_id = tc.id AND dt.content IS NOT NULL AND dt.is_active = 1
     GROUP BY tc.id, tc.category_name
     ORDER BY tc.category_name ASC

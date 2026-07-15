@@ -68,8 +68,9 @@ if ($document_id === 0) {
     }
 }
 
+// One category list for everything now — the document's filing category, the
+// template chooser, and the "Save as Template" picker all use document_categories.
 $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_name ASC")->fetchAll(PDO::FETCH_ASSOC);
-$template_categories = $pdo->query("SELECT * FROM template_categories ORDER BY category_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $can_manage_templates = canCreate('document_templates');
 $can_use_templates = canView('document_templates');
 
@@ -94,13 +95,11 @@ if (!empty($existing['description']) && strpos($existing['description'], 'To: ')
 }
 $letter_date = $existing['issue_date'] ?? date('Y-m-d');
 $content     = $existing['content'] ?? ($prefill_template['content'] ?? '');
-// Note: the wizard's category picker (new_document.php) works off
-// `template_categories` — a different taxonomy, with its own id space, from
-// this field's `document_categories` (which classifies the saved document
-// for filing, not its template). They don't correspond, so the wizard's
-// choice is deliberately NOT forced into this dropdown — the user still
-// picks the document's own filing category independently.
-$category_id = $existing['category_id'] ?? null;
+// The wizard's category picker (new_document.php) and this filing field now
+// share ONE taxonomy (document_categories). When starting fresh from a chosen
+// category, pre-select it here so the user doesn't classify twice.
+$wizard_category_id = (!$existing && !empty($_GET['category_id'])) ? (int)$_GET['category_id'] : null;
+$category_id = $existing['category_id'] ?? $wizard_category_id;
 $access_level = in_array(($existing['access_level'] ?? ''), ['private', 'restricted', 'public'], true)
     ? $existing['access_level'] : 'private';
 // A saved draft keeps whatever it was last set to. A brand-new letter from a
@@ -457,7 +456,7 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
                         <label class="form-label">Category</label>
                         <select class="form-select select2-static" id="tpl_category_id">
                             <option value="">Select Category</option>
-                            <?php foreach ($template_categories as $tc): ?>
+                            <?php foreach ($categories as $tc): ?>
                                 <option value="<?= (int)$tc['id'] ?>"><?= htmlspecialchars($tc['category_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
