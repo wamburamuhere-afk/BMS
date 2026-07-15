@@ -1,6 +1,48 @@
 # BMS Changelog
 
-## 2026-07-15 — Create Document: optional custom sender address override per letter
+## 2026-07-15 (test) — tests/test_dn_cli.php: update stale outbound-attachment assertion
+
+**File:** `tests/test_dn_cli.php`
+
+CI regression guard for the PR above — `hasNot($outbound, 'attachment_file[]', ...)` asserted the
+*old* behavior (outbound DN has no attachment mechanism at all), which the PR intentionally changes.
+Flipped to `has(...)`, updated the label and section/file doc-comments to describe the new intended
+shape (Sales-side/Customer-only party, optional-unless-no-Project attachment). Verified locally: all
+80 assertions in this suite pass, plus a full local run of every other CI-gated regression suite
+(e-signatures, document expiry, e-signatures wizard, sub-contractor details, quotations, quotation
+customer-box, document categories, CSRF redeclaration, print CSS standard, stock_movements ENUM
+safety) — all green, none affected by this session's changes.
+
+## 2026-07-15 — Outbound DN: optional reference-document attachments (mandatory without a Project) + linked Invoice status
+
+**Files:** `app/bms/grn/dn_outbound.php`, `api/create_dn.php`, `app/bms/grn/dn_view.php`, `api/account/print_delivery_note.php`
+
+Two of the boss's four DN requirements from this cycle (the physical "Received By" signature and the
+free/optional Customer selection were already delivered in earlier changes this session):
+
+- **Reference-document attachments on outbound DN.** `dn_outbound.php` had zero attachment mechanism
+  at all ("No attachment is required"), while the inbound Record DN form (`dn_create.php`) already had
+  a full named, multi-file upload UI. The backend (`dn_save_attachments()`/`dn_collect_attachment_pairs()`
+  in `api/dn_attachment_helper.php`, plus `api/update_dn.php` and `api/delete_dn_attachment.php`) was
+  already fully generic — the only inbound-only gate was in `api/create_dn.php`. Ported the identical
+  UI (existing-files list + delete, "Add Attachment" rows) into `dn_outbound.php`, and loosened
+  `create_dn.php`'s gate so outbound files actually persist (previously collected via
+  `dn_collect_attachment_pairs()` then silently discarded).
+  **Mandatoriness is Project-conditional, per instruction:** optional when the DN is linked to a
+  Project (a Project has its own separate controls); **required** (at least one attachment) when it
+  has none — enforced both client-side (`toggleAttachmentRequirement()`, live on Project change) and
+  server-side in `create_dn.php`.
+- **Linked Invoice status.** `invoices.delivery_id` already exists and is populated — `dn_view.php`'s
+  own "Create Invoice" button already writes it (`invoice_create.php?delivery=<id>`), so no new
+  linkage was needed. Added a lookup by `delivery_id` (excluding cancelled) and display: a "Linked
+  Invoice" info box on `dn_view.php` (number + status badge, same color convention as
+  `invoice_view.php`) and an "Invoice: NUMBER — STATUS" line on `print_delivery_note.php`'s
+  Destination/Warehouse box, shown only when one exists.
+
+Verified live: the invoice lookup resolves correctly against real data (DN #28 → its actual overdue
+invoice); the Project-conditional mandatory check confirmed correct across all five
+inbound/outbound × project/no-project × with/without-attachment combinations; all four files lint
+clean.
 
 **Files:** `migrations/2026_07_15_documents_custom_sender_info.php`, `app/constant/document/create_document.php`,
 `api/document/save_created_document.php`, `api/document/duplicate_created_document.php`

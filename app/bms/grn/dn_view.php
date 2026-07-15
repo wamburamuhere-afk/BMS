@@ -57,6 +57,14 @@ $att_stmt = $pdo->prepare("SELECT * FROM delivery_attachments WHERE delivery_id 
 $att_stmt->execute([$delivery_id]);
 $attachments = $att_stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Linked Invoice (outbound customer DNs — created via the "Create Invoice"
+// button above, which stamps invoices.delivery_id back to this DN). Boss's
+// requirement: show whether it's Paid or just Approved.
+$linked_invoice = null;
+$inv_stmt = $pdo->prepare("SELECT invoice_id, invoice_number, status, grand_total FROM invoices WHERE delivery_id = ? AND status != 'cancelled' ORDER BY invoice_date DESC LIMIT 1");
+$inv_stmt->execute([$delivery_id]);
+$linked_invoice = $inv_stmt->fetch(PDO::FETCH_ASSOC);
+
 $is_inbound  = ($dn['dn_type'] ?? 'inbound') !== 'outbound';
 $is_subcon   = ($dn['party_type'] ?? 'supplier') === 'subcontractor';
 $is_customer = ($dn['party_type'] ?? 'supplier') === 'customer';
@@ -249,6 +257,25 @@ $wf = [
                                 <a href="<?= getUrl('lpo_view') ?>?id=<?= (int)$dn['customer_lpo_id'] ?>" class="fw-bold text-decoration-none">
                                     <i class="bi bi-file-earmark-text me-1"></i><?= safe_output($dn['lpo_number']) ?>
                                 </a>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                        <?php if ($linked_invoice): ?>
+                        <?php
+                        $inv_status_colors = [
+                            'paid' => 'success', 'partial' => 'primary', 'sent' => 'info',
+                            'overdue' => 'danger', 'draft' => 'secondary', 'pending' => 'warning',
+                            'reviewed' => 'info', 'approved' => 'info', 'cancelled' => 'secondary',
+                        ];
+                        $inv_badge = $inv_status_colors[$linked_invoice['status']] ?? 'secondary';
+                        ?>
+                        <div class="col-sm-6">
+                            <div class="border rounded p-3 bg-light h-100">
+                                <div class="text-muted small text-uppercase fw-bold mb-1">Linked Invoice</div>
+                                <a href="<?= getUrl('invoice_view') ?>?id=<?= (int)$linked_invoice['invoice_id'] ?>" class="fw-bold text-decoration-none">
+                                    <i class="bi bi-receipt me-1"></i><?= safe_output($linked_invoice['invoice_number']) ?>
+                                </a>
+                                <span class="badge bg-<?= $inv_badge ?> ms-1"><?= strtoupper($linked_invoice['status']) ?></span>
                             </div>
                         </div>
                         <?php endif; ?>

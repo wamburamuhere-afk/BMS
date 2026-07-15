@@ -139,10 +139,16 @@ try {
     }
     unset($item);
 
-    // Inbound requires at least one attachment (scan of the supplier's DN)
+    // Inbound always requires at least one attachment (scan of the supplier's
+    // DN). Outbound only requires one when there's no Project on the DN — a
+    // Project has its own separate controls/procedure (boss's instruction);
+    // otherwise the reference-document attachment stays optional.
     $att_pairs = dn_collect_attachment_pairs();
     if ($dn_type === 'inbound' && count($att_pairs) === 0) {
         throw new Exception("Please attach at least one scan of the supplier's Delivery Note.");
+    }
+    if ($dn_type === 'outbound' && !$project_id && count($att_pairs) === 0) {
+        throw new Exception('This Delivery Note has no Project, so at least one reference-document attachment is required.');
     }
 
     // Internal reference number — company-prefixed sequential (BFS-DN-0001).
@@ -202,10 +208,9 @@ try {
         // only occur once the canonical three_approval.md gate is passed.
     }
 
-    // Attachments — only for inbound Record DNs
-    if ($dn_type === 'inbound') {
-        dn_save_attachments($pdo, $delivery_id, $att_pairs, $user_id, $project_id ?: null);
-    }
+    // Attachments — required for inbound, optional (project-conditional) for
+    // outbound; dn_save_attachments() itself is a no-op when $att_pairs is empty.
+    dn_save_attachments($pdo, $delivery_id, $att_pairs, $user_id, $project_id ?: null);
 
     logActivity($pdo, $user_id, 'Create delivery note', "User created a new delivery note: $dn_number (ID $delivery_id)");
 
