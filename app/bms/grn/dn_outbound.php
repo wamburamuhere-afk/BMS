@@ -173,8 +173,11 @@ if (isAdmin()) {
     $all_customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' AND project_id IS NULL ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// Currently-selected party (edit mode)
-$cur_party_type = 'supplier';
+// Currently-selected party. Fresh creates default to Customer — the primary
+// outbound use case (matches sales_order_create.php landing straight on a
+// customer picker) — while edit mode and an SO/LPO-driven arrival override
+// this below with the record's/link's actual party.
+$cur_party_type = 'customer';
 $cur_party_id   = 0;
 if ($dn) {
     $cur_party_type = in_array($dn['party_type'], ['subcontractor', 'customer'], true) ? $dn['party_type'] : 'supplier';

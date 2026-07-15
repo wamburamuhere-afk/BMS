@@ -13,6 +13,9 @@ already carried everything needed for it (`deliveries.order_id`, `sales_order_it
 - **Customer is now a normal, freely-selectable "Send To" option**, same as Supplier/Sub-Contractor —
   no source document required. `$all_customers` (project-scoped, same pattern as suppliers) feeds a
   select2 dropdown; `rebuildParty()` on the client handles all three party types generically now.
+- **Fresh (non-edit, non-locked) creates now default to Customer**, not Supplier — matching
+  `sales_order_create.php` landing straight on a customer picker, since sending to a customer is the
+  primary outbound use case. Edit mode and an SO/LPO-driven arrival still set the actual party.
 - A Sales Order or Customer LPO link is **optional**, never required, for a customer DN.
   `api/create_dn.php` validates a reference only if one is actually supplied.
 - Arriving via `?order=<sales_order_id>` (new "Create Delivery Note" button on `sales_order_view.php`,
