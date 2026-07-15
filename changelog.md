@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-07-14 (fix) — Budget: creating/renaming to a new Budget Name always threw a 500 ("Server error occurred")
+
+**Files:** `api/account/add_budget.php`, `api/account/update_budget.php`
+
+Reported immediately after the project-Budget parity fix: creating a budget inside a project with a
+brand-new Budget Name failed with "Server error occurred". Reproduced directly (bypassing the
+browser) and confirmed it's a **pre-existing bug affecting both the external and project Budget
+forms equally** — unrelated to the parity fix that surfaced it. Root cause:
+`expense_categories.type_id` is `NOT NULL` with no default, but both `add_budget.php`'s and
+`update_budget.php`'s "auto-create category from typed name" path (used whenever the Budget Name
+doesn't already match an existing category) omitted `type_id` entirely from the `INSERT`. MySQL
+coerced the missing value to `0`, which isn't a real `expense_types` row, so every such insert threw
+a foreign-key-constraint violation (500) — any budget with a genuinely new name, from either form,
+has always hit this.
+
+Fixed by resolving a sensible default (`type_id` of the first active `expense_types` row — currently
+"Operating") and supplying it explicitly, same pattern already used correctly elsewhere in the
+codebase (`api/finance/manage_expense_schema.php`).
+
+Verified live: re-ran the exact request that previously threw the FK violation — now returns
+`{"success":true,...}` and the auto-created category carries a valid `type_id`. Verified the same fix
+in `update_budget.php`'s identical code path. Both rolled back after confirming.
+
 ## 2026-07-14 (fix) — Project Budget: "Actual Amount" always read 0, status badge never reflected real spending
 
 **Files:** `api/operations/get_project.php`, `app/bms/operations/project_view.php`
