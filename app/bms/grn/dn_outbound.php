@@ -1,8 +1,12 @@
 <?php
 // File: app/bms/grn/dn_outbound.php
 // scope-audit: skip — outbound DN create form; no prior record to scope; Phase G-2
-// CREATE a Delivery Note — OUTBOUND: goods sent TO a Supplier / Sub-Contractor
-// ("DN ya kupeleka nje"). The DN number is generated automatically; no attachment.
+// CREATE a Delivery Note — OUTBOUND, Sales side: goods sent TO a Customer
+// ("DN ya kupeleka nje"), optionally linked to a Sales Order or Customer LPO.
+// The DN number is generated automatically; no attachment. Supplier /
+// Sub-Contractor sends are a procurement concern and not created here — a
+// handful of pre-existing records of that kind remain editable (read-only
+// party) for backward compatibility; see $is_legacy_procurement_edit below.
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('dn');
 
@@ -144,32 +148,22 @@ $_dno_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', 
 require_once ROOT_DIR . '/core/warehouse_scope.php';
 $all_warehouses = warehousesForSelect($pdo);
 
+// Customer is the only "Send To" this page creates (Sales side). Supplier /
+// Sub-Contractor is a procurement concern and no longer offered here — see
+// $is_legacy_procurement_edit below for the handful of pre-existing records.
 if (isAdmin()) {
-    $all_projects   = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
-    $all_suppliers  = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+    $all_projects  = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+    $all_customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
 } elseif (!empty($_dno_assigned)) {
     $_dno_ph = implode(',', array_fill(0, count($_dno_assigned), '?'));
     $_dno_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($_dno_ph) ORDER BY project_name");
     $_dno_pstmt->execute($_dno_assigned);
     $all_projects = $_dno_pstmt->fetchAll(PDO::FETCH_ASSOC);
-    $_dno_sstmt = $pdo->prepare("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_dno_ph)) ORDER BY supplier_name");
-    $_dno_sstmt->execute($_dno_assigned);
-    $all_suppliers = $_dno_sstmt->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $all_projects   = [];
-    $all_suppliers  = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' AND project_id IS NULL ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
-}
-$all_subs = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM sub_contractors WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
-
-// Customers — free "Send To" option, not just locked-from-source. Scoped the
-// same way as suppliers above.
-if (isAdmin()) {
-    $all_customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
-} elseif (!empty($_dno_assigned)) {
     $_dno_cstmt = $pdo->prepare("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_dno_ph)) ORDER BY customer_name");
     $_dno_cstmt->execute($_dno_assigned);
     $all_customers = $_dno_cstmt->fetchAll(PDO::FETCH_ASSOC);
 } else {
+    $all_projects  = [];
     $all_customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' AND project_id IS NULL ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
 }
 
@@ -216,11 +210,34 @@ if ($cur_party_type === 'customer') {
 // actually driven by a Sales Order or LPO link (create flow: arrived via
 // ?order=/?lpo_id=; edit flow: the existing DN carries that reference).
 // Otherwise — including a fresh "Customer" pick with no source document —
-// it's a normal, freely-editable select, same as Supplier/Sub-Contractor.
+// it's a normal, freely-editable select.
 $party_locked_via_source = ($cur_party_type === 'customer') && (
     ($so && $so_customer) || ($lpo && $lpo_customer) ||
     ($is_edit && (!empty($dn['customer_lpo_id']) || !empty($dn['order_id'])))
 );
+
+// This page is Sales-side / Customer-only now — Supplier / Sub-Contractor is
+// a procurement concern handled elsewhere. A handful of DNs created before
+// this change still carry those party types; keep them viewable/editable
+// (items, dates, etc.) with their party shown read-only, rather than break
+// or silently reassign them.
+$is_legacy_procurement_edit = $is_edit && in_array($cur_party_type, ['supplier', 'subcontractor'], true);
+$legacy_party_name = null;
+if ($is_legacy_procurement_edit) {
+    $lpstmt = ($cur_party_type === 'subcontractor')
+        ? $pdo->prepare("SELECT supplier_name, company_name FROM sub_contractors WHERE supplier_id = ?")
+        : $pdo->prepare("SELECT supplier_name, company_name FROM suppliers WHERE supplier_id = ?");
+    $lpstmt->execute([$cur_party_id]);
+    $lp = $lpstmt->fetch(PDO::FETCH_ASSOC);
+    if ($lp) {
+        $legacy_party_name = $lp['supplier_name'] . (!empty($lp['company_name']) ? ' (' . $lp['company_name'] . ')' : '');
+    }
+}
+
+// Any field that renders as a locked/read-only display (SO/LPO-locked
+// customer, or a legacy supplier/sub-contractor edit) has no dropdown for
+// the client to rebuild.
+$party_field_locked = $party_locked_via_source || $is_legacy_procurement_edit;
 
 $return_url = getUrl('delivery_notes');
 ?>
@@ -245,7 +262,7 @@ $return_url = getUrl('delivery_notes');
                 <?= $is_edit ? 'Edit Outbound Delivery Note' : 'Create Delivery Note' ?>
                 <span class="badge bg-primary-subtle text-primary border border-primary ms-1" style="font-size:.65rem;">OUTBOUND</span>
             </h4>
-            <p class="text-muted small mb-0">Goods <strong>sent to</strong> a supplier, sub-contractor, or customer — optionally linked to a Sales Order or LPO — the DN number is generated automatically.</p>
+            <p class="text-muted small mb-0">Goods <strong>sent to a customer</strong> — optionally linked to a Sales Order or LPO — the DN number is generated automatically.</p>
         </div>
         <a href="<?= $return_url ?>" class="btn btn-outline-secondary btn-sm flex-shrink-0">
             <i class="bi bi-arrow-left me-1"></i> Back
@@ -305,7 +322,16 @@ $return_url = getUrl('delivery_notes');
 
                             <hr class="my-1">
 
-                            <?php if ($party_locked_via_source): ?>
+                            <?php if ($is_legacy_procurement_edit): ?>
+                            <!-- LEGACY read-only party — DN predates this page going Customer-only -->
+                            <input type="hidden" name="party_type" id="dn_party_type" value="<?= $cur_party_type ?>">
+                            <input type="hidden" name="party_id" id="dn_party_id" value="<?= $cur_party_id ?>">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Send To</label>
+                                <div class="form-control bg-light fw-bold"><i class="bi bi-truck me-1"></i> <?= safe_output($legacy_party_name) ?></div>
+                                <small class="text-muted"><?= $cur_party_type === 'subcontractor' ? 'Sub-Contractor' : 'Supplier' ?> — legacy record, this page now only creates customer deliveries.</small>
+                            </div>
+                            <?php elseif ($party_locked_via_source): ?>
                             <!-- LOCKED CUSTOMER PARTY (from Sales Order or Customer LPO) -->
                             <input type="hidden" name="party_type" id="dn_party_type" value="customer">
                             <input type="hidden" name="party_id" id="dn_party_id" value="<?= $cur_party_id ?>">
@@ -316,20 +342,11 @@ $return_url = getUrl('delivery_notes');
                                 <small class="text-muted">Customer — locked from the linked <?= $locked_via ?>.</small>
                             </div>
                             <?php else: ?>
-                            <!-- PARTY TYPE (dropdown) — Supplier / Sub-Contractor / Customer, all freely
-                                 selectable. A Sales Order or LPO link is optional, never required. -->
+                            <!-- FREE CUSTOMER PICK — the only party this page creates. A Sales Order or
+                                 LPO link is optional, never required. -->
+                            <input type="hidden" name="party_type" id="dn_party_type" value="customer">
                             <div class="col-md-6">
-                                <label class="form-label fw-semibold">Send To <span class="text-danger">*</span></label>
-                                <select class="form-select" name="party_type" id="dn_party_type">
-                                    <option value="supplier" <?= $cur_party_type === 'supplier' ? 'selected' : '' ?>>Supplier</option>
-                                    <option value="subcontractor" <?= $cur_party_type === 'subcontractor' ? 'selected' : '' ?>>Sub-Contractor</option>
-                                    <option value="customer" <?= $cur_party_type === 'customer' ? 'selected' : '' ?>>Customer</option>
-                                </select>
-                            </div>
-
-                            <!-- SPECIFIC PARTY -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold" id="partyLabel">Select Supplier <span class="text-danger">*</span></label>
+                                <label class="form-label fw-semibold">Customer <span class="text-danger">*</span></label>
                                 <select class="form-select" name="party_id" id="dn_party_id" required></select>
                             </div>
                             <?php endif; ?>
@@ -459,22 +476,13 @@ const ALL_WAREHOUSES = <?= json_encode(array_values(array_map(fn($w) => [
     'text' => $w['warehouse_name'] . (!empty($w['location']) ? ' — ' . $w['location'] : ''),
     'project_id' => (int)$w['project_id'],
 ], $all_warehouses))) ?>;
-const ALL_SUPPLIERS = <?= json_encode(array_values(array_map(fn($s) => [
-    'id' => (int)$s['supplier_id'],
-    'text' => $s['supplier_name'] . (!empty($s['company_name']) ? ' (' . $s['company_name'] . ')' : ''),
-], $all_suppliers))) ?>;
-const ALL_SUBCONTRACTORS = <?= json_encode(array_values(array_map(fn($s) => [
-    'id' => (int)$s['supplier_id'],
-    'text' => $s['supplier_name'] . (!empty($s['company_name']) ? ' (' . $s['company_name'] . ')' : ''),
-], $all_subs))) ?>;
 const ALL_CUSTOMERS = <?= json_encode(array_values(array_map(fn($c) => [
     'id' => (int)$c['customer_id'],
     'text' => $c['customer_name'] . (!empty($c['company_name']) ? ' (' . $c['company_name'] . ')' : ''),
 ], $all_customers))) ?>;
 
-const CUR_PARTY_TYPE = '<?= $cur_party_type ?>';
 const CUR_PARTY_ID   = <?= (int)$cur_party_id ?>;
-const PARTY_LOCKED   = <?= $party_locked_via_source ? 'true' : 'false' ?>;
+const PARTY_LOCKED   = <?= $party_field_locked ? 'true' : 'false' ?>;
 const IS_EDIT        = <?= $is_edit ? 'true' : 'false' ?>;
 const PRESET_WH      = <?= (int)($dn['warehouse_id'] ?? 0) ?>;
 const LPO_ITEMS      = <?= json_encode(array_values($lpo_items)) ?>;
@@ -497,22 +505,13 @@ function rebuildWarehouses() {
     $sel.trigger('change.select2');
 }
 
-function partyListFor(type) {
-    if (type === 'subcontractor') return { list: ALL_SUBCONTRACTORS, label: 'Select Sub-Contractor', placeholder: '-- Select Sub-Contractor --' };
-    if (type === 'customer')      return { list: ALL_CUSTOMERS,      label: 'Select Customer',       placeholder: '-- Select Customer --' };
-    return { list: ALL_SUPPLIERS, label: 'Select Supplier', placeholder: '-- Select Supplier --' };
-}
-
 function rebuildParty(preserve) {
-    if (PARTY_LOCKED) return; // locked customer field (from SO/LPO) — no dropdown to rebuild
-    const type = $('#dn_party_type').val();
-    const { list, label, placeholder } = partyListFor(type);
-    $('#partyLabel').html(label + ' <span class="text-danger">*</span>');
+    if (PARTY_LOCKED) return; // locked (SO/LPO) or legacy read-only party — no dropdown to rebuild
     const $sel = $('#dn_party_id');
     const current = preserve ? $sel.val() : null;
-    initS2($sel, placeholder);
-    $sel.empty().append($('<option>').val('').text(placeholder));
-    list.forEach(s => $sel.append($('<option>').val(s.id).text(s.text).prop('selected', s.id == current)));
+    initS2($sel, '-- Select Customer --');
+    $sel.empty().append($('<option>').val('').text('-- Select Customer --'));
+    ALL_CUSTOMERS.forEach(s => $sel.append($('<option>').val(s.id).text(s.text).prop('selected', s.id == current)));
     $sel.trigger('change.select2');
 }
 
@@ -520,13 +519,11 @@ $(document).ready(function () {
     $('#dn_project_id').select2({ theme: 'bootstrap-5', placeholder: '-- No Project (General) --', allowClear: true, width: '100%' });
 
     rebuildWarehouses();
-    $('#dn_party_type').val(CUR_PARTY_TYPE);
     rebuildParty(false);
     if (CUR_PARTY_ID > 0) $('#dn_party_id').val(CUR_PARTY_ID).trigger('change.select2');
 
     $('#dn_project_id').on('change', function () { PROJECT_ID = parseInt($(this).val()) || 0; rebuildWarehouses(); });
     $('#dn_warehouse_id').on('change', function () { if (!isInitialLoad) loadWarehouseStock(); });
-    $('#dn_party_type').on('change', function () { rebuildParty(false); });
 
     if (PRESET_WH > 0) { $('#dn_warehouse_id').val(PRESET_WH).trigger('change.select2'); loadWarehouseStock(); }
 
