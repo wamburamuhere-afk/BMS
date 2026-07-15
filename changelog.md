@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-07-15 (fix) — Login: failed-login error now uses SweetAlert2, not a native browser alert()
+
+**File:** `login.php`
+
+Reported: a failed login ("Invalid username or password") showed the browser's own native `alert()`
+dialog ("bejus.bjptechnologies.co.tz says...") instead of the SweetAlert2 modal used everywhere else
+in the system. `login.php` is a standalone pre-auth page that doesn't include `header.php` (where
+SweetAlert2 and its global "green confirm button" override normally come from), so it never had
+either. Added the SweetAlert2 CDN include plus the identical override snippet from `header.php`
+(green confirm button on every alert, including errors, for visual consistency with the rest of the
+app), and replaced both native `alert()` calls (failed login, and the network-error fallback) with
+`Swal.fire(...)`. Verified: no `alert(` calls remain in the file, `php -l` clean, and the inline JS
+block passes `node --check`.
+
 ## 2026-07-15 — DN(Outbound): optional in-form Sales Order / Customer LPO reference, scoped to this page only
 
 **Files:** `app/bms/grn/dn_outbound.php` (only existing file touched)
