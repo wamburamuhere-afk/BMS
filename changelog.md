@@ -1,5 +1,38 @@
 # BMS Changelog
 
+## 2026-07-14 (fix) — Project Budget: missing Year/Month fields silently reset period; View Details/actions didn't match external
+
+**Files:** `app/bms/operations/project_view.php`, `app/constant/accounts/budget_details.php`
+
+Same parity pass already done for Expenses and Payment Vouchers, now for Budgets. Found two real bugs
+plus the requested field/action-menu mismatches:
+
+- **Real bug: no Year/Month fields on the project's Add/Edit Budget form at all.** `add_budget.php`/
+  `update_budget.php` both fall back to `date('Y')`/`date('n')` (today) when those POST fields are
+  absent — so every project-created budget silently defaulted to the current month, and **every edit
+  of an existing budget silently moved it to today's period**, regardless of what period it was
+  actually meant for. Added the same Year/Month selects the external `budget.php` form has (`col-md-6`
+  pair, same year range/month labels), defaulted to the current period on create, correctly populated
+  from the record on edit. Live-verified: stored a test budget with `budget_year=2025, budget_month=3`
+  and confirmed the value round-trips exactly instead of collapsing to today's date.
+- **"View Details" now opens the real full page** (`budget_details.php` via `budget/details`) instead
+  of a bespoke local modal (`#viewBudgetDetailModal`, removed along with its dead `viewBudgetItem()`
+  JS) — same page, same mechanism, same buttons as the external Budget list, exactly as requested.
+- **Added "Back to Project"** to `budget_details.php` (same conditional pattern as
+  `expense_details.php`: shown only when `enable_projects` is on and the budget has a `project_id`) —
+  it had no project-context awareness at all before, unlike Expenses' details page.
+- **Gear-menu actions now match `budget.php`'s exactly, per status**: added the missing **"Pay"**
+  action (shown only when `status === 'approved'`, same as external — it links to the same
+  View Details page, where "paying" happens via Quick Add Expense, matching external's actual
+  mechanism rather than a separate payment flow). Fixed Approve/Reject to only show when
+  `status === 'pending'` (previously showed from any non-approved/non-rejected status, which could
+  offer Approve on a `paid` or `draft` budget).
+
+Verified live: rendered `budget_details.php` for a real project-linked budget — "Back to Project"
+link present with the correct project id, no new warnings. `php -l` clean. Extracted and ran the new
+gear-menu JS through Node — confirmed the exact expected menu (View Details, Edit, Pay + divider,
+Delete) for an `approved` budget with no stray Approve/Reject.
+
 ## 2026-07-14 (fix) — Payment Voucher print: "Approved By" always blank, signature block didn't match Invoice/PO
 
 **Files:** `app/constant/accounts/payment_voucher_print.php`, `api/account/update_voucher_status.php`
