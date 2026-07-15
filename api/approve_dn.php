@@ -29,7 +29,7 @@ try {
 
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare("SELECT delivery_number, status, warehouse_id, dn_type, supplier_id, subcontractor_id, party_type, purchase_order_id, project_id, customer_lpo_id FROM deliveries WHERE delivery_id = ? FOR UPDATE");
+    $stmt = $pdo->prepare("SELECT delivery_number, status, warehouse_id, dn_type, supplier_id, subcontractor_id, party_type, purchase_order_id, project_id, customer_lpo_id, order_id FROM deliveries WHERE delivery_id = ? FOR UPDATE");
     $stmt->execute([$delivery_id]);
     $dn = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$dn) throw new Exception("Delivery Note not found");
@@ -174,6 +174,36 @@ try {
                     WHERE lpo_id = ? AND status IN ('approved', 'partially_fulfilled')
                 ")->execute([$newLpoStatus, $lpoId]);
             }
+        }
+    }
+
+    // Auto-track delivery against the linked Sales Order. Bumps each line's
+    // quantity_delivered by exactly what this DN's rows are linked to (so
+    // re-approving a different DN never double-counts), recomputes the SO's
+    // total_delivered from its items (source of truth), and advances status
+    // to 'delivered' — forward-only — once every line is fully delivered.
+    if (!empty($dn['order_id']) && (($dn['dn_type'] ?? 'outbound') === 'outbound')) {
+        $orderId = (int)$dn['order_id'];
+
+        $dnLines = $pdo->prepare("SELECT order_item_id, quantity_delivered AS qty FROM delivery_items WHERE delivery_id = ? AND order_item_id IS NOT NULL");
+        $dnLines->execute([$delivery_id]);
+        $bumpSoItem = $pdo->prepare("UPDATE sales_order_items SET quantity_delivered = quantity_delivered + ? WHERE order_item_id = ? AND order_id = ?");
+        foreach ($dnLines->fetchAll(PDO::FETCH_ASSOC) as $ln) {
+            $bumpSoItem->execute([(float)$ln['qty'], (int)$ln['order_item_id'], $orderId]);
+        }
+
+        $sumStmt = $pdo->prepare("SELECT COALESCE(SUM(quantity_delivered),0) AS delivered, COALESCE(SUM(quantity),0) AS ordered FROM sales_order_items WHERE order_id = ?");
+        $sumStmt->execute([$orderId]);
+        $sums = $sumStmt->fetch(PDO::FETCH_ASSOC);
+
+        $pdo->prepare("UPDATE sales_orders SET total_delivered = ? WHERE sales_order_id = ?")
+            ->execute([(float)$sums['delivered'], $orderId]);
+
+        if ((float)$sums['delivered'] > 0 && (float)$sums['delivered'] >= (float)$sums['ordered']) {
+            $pdo->prepare("
+                UPDATE sales_orders SET status = 'delivered'
+                WHERE sales_order_id = ? AND status IN ('approved', 'processing', 'shipped')
+            ")->execute([$orderId]);
         }
     }
 
