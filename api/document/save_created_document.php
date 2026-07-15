@@ -16,6 +16,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/code_generator.php';
 require_once __DIR__ . '/../../core/project_scope.php';
+require_once __DIR__ . '/../../core/document_merge.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -66,6 +67,28 @@ try {
         throw new Exception('Access denied: this project is not in your assigned scope.');
     }
 
+    // Authoritative safety pass — the client already resolves merge tokens for
+    // the preview and the rendered PDF, but resolve again here so the stored
+    // body never persists a raw {{token}} (e.g. if a field was filled after a
+    // template was applied). Company values come from settings automatically;
+    // project name/contract are looked up when the letter is project-linked.
+    $merge_ctx = [
+        'subject'           => $subject,
+        'recipient'         => $recipient,
+        'recipient_address' => $recipient_address,
+        'date'              => $letter_date !== '' ? date('d M Y', strtotime($letter_date)) : date('d M Y'),
+        'sender_name'       => trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')),
+        'sender_role'       => $_SESSION['user_role'] ?? '',
+    ];
+    if ($project_id !== null) {
+        $pr = $pdo->prepare("SELECT project_name, contract_number FROM projects WHERE project_id = ?");
+        $pr->execute([$project_id]);
+        if ($prow = $pr->fetch(PDO::FETCH_ASSOC)) {
+            $merge_ctx['project_name']    = $prow['project_name'] ?? '';
+            $merge_ctx['contract_number'] = $prow['contract_number'] ?? '';
+        }
+    }
+
     // The rendered PDF (letterhead + body, generated client-side).
     if (!isset($_FILES['pdf_file']) || $_FILES['pdf_file']['error'] !== UPLOAD_ERR_OK) {
         throw new Exception('The document PDF could not be generated for upload');
@@ -111,6 +134,10 @@ try {
         }
 
         $old_path = $existing['file_path'];
+
+        // Resolve any leftover merge tokens now that we know the document code.
+        $merge_ctx['document_code'] = $existing['document_code'] ?? '';
+        $content = resolveDocumentVariables($content, $merge_ctx);
 
         $upd = $pdo->prepare("
             UPDATE documents SET
@@ -167,6 +194,10 @@ try {
     $pdo->beginTransaction();
     try {
         $document_code = nextCode($pdo, 'LTR');
+
+        // Resolve any leftover merge tokens now that the document code exists.
+        $merge_ctx['document_code'] = $document_code;
+        $content = resolveDocumentVariables($content, $merge_ctx);
 
         $ins = $pdo->prepare("
             INSERT INTO documents (

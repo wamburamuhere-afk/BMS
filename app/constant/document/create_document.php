@@ -141,11 +141,20 @@ $my_signature = $sig_stmt->fetch(PDO::FETCH_ASSOC);
 $signature_preview_path = $my_signature ? ($my_signature['thumbnail_path'] ?: $my_signature['file_path']) : null;
 
 $project_name = null;
+$project_contract_number = null;
 if ($project_id) {
-    $pstmt = $pdo->prepare("SELECT project_name FROM projects WHERE project_id = ?");
+    $pstmt = $pdo->prepare("SELECT project_name, contract_number FROM projects WHERE project_id = ?");
     $pstmt->execute([$project_id]);
-    $project_name = $pstmt->fetchColumn() ?: null;
+    if ($prow = $pstmt->fetch(PDO::FETCH_ASSOC)) {
+        $project_name = $prow['project_name'] ?: null;
+        $project_contract_number = $prow['contract_number'] ?: null;
+    }
 }
+
+// Merge-variable support — the token list + labels come from the shared
+// resolver so the "Insert Variable" UI and the server safety-pass stay in sync.
+require_once ROOT_DIR . '/core/document_merge.php';
+$merge_variables = documentMergeVariables();
 
 $default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) : 'Sir/Madam') . ',</p>'
     . '<p>&nbsp;</p>'
@@ -189,6 +198,22 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
                 </ul>
             </div>
             <?php endif; ?>
+            <!-- Insert Variable — drops a {{token}} at the cursor. On a template
+                 these auto-fill from real data (company, recipient, date, etc.)
+                 whenever the template is used to create a letter. -->
+            <div class="dropdown">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Insert an auto-filling merge variable">
+                    <i class="bi bi-braces me-1"></i> Insert Variable
+                </button>
+                <ul class="dropdown-menu" style="max-height:320px; overflow-y:auto;">
+                    <li><h6 class="dropdown-header">Auto-fills when the letter is created</h6></li>
+                    <?php foreach ($merge_variables as $token => $label): ?>
+                    <li><button type="button" class="dropdown-item insert-var-btn" data-token="<?= htmlspecialchars($token) ?>">
+                        <?= htmlspecialchars($label) ?> <code class="text-muted ms-1">{{<?= htmlspecialchars($token) ?>}}</code>
+                    </button></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
             <?php if ($existing): ?>
             <button type="button" class="btn btn-outline-secondary" id="btnDuplicate">
                 <i class="bi bi-files me-1"></i> Duplicate
@@ -807,6 +832,13 @@ $(document).ready(function () {
     $('#btnSavePrint').on('click', function () { saveDocument('print'); });
     $('#btnDuplicate').on('click', duplicateDocument);
 
+    // Insert Variable — drop a {{token}} at the cursor in the letter body.
+    $('.insert-var-btn').on('click', function () {
+        const token = '{{' + $(this).data('token') + '}}';
+        $('#letterBody').summernote('focus');
+        $('#letterBody').summernote('insertText', token);
+    });
+
     // ── Use Template ──────────────────────────────────────────────
     $('#btnUseTemplate').on('click', function () {
         new bootstrap.Modal(document.getElementById('useTemplateModal')).show();
@@ -852,7 +884,9 @@ $(document).ready(function () {
         const tpl = templatesCache.find(t => String(t.id) === String(id));
         if (!tpl) return;
         const apply = function () {
-            $('#letterBody').summernote('code', tpl.content);
+            // Resolve the template's {{tokens}} against the current field values
+            // so the body lands as real text, not placeholders.
+            $('#letterBody').summernote('code', resolveMergeTokens(tpl.content));
             bootstrap.Modal.getInstance(document.getElementById('useTemplateModal')).hide();
         };
         if (!$('#letterBody').summernote('isEmpty')) {
@@ -940,6 +974,44 @@ function duplicateDocument() {
     });
 }
 
+// ── Merge-variable resolver (mirror of core/document_merge.php) ──────────────
+// Company/static values come from PHP; recipient/subject/date read live from
+// their fields at resolve time. A recognised token → its value (may be empty);
+// an unrecognised {{x}} is left as typed. The server re-runs this at save as
+// the authoritative safety pass, so the two must agree on token names.
+function currentMergeValues() {
+    const dateVal = $('#f_letter_date').val();
+    let dateOut = '';
+    if (dateVal) {
+        const d = new Date(dateVal);
+        if (!isNaN(d)) dateOut = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    return {
+        company_name:    <?= json_encode($company_name) ?>,
+        company_address: <?= json_encode($company_address) ?>,
+        company_phone:   <?= json_encode($company_phone) ?>,
+        company_email:   <?= json_encode($company_email) ?>,
+        company_tin:     <?= json_encode($company_tin) ?>,
+        company_vrn:     <?= json_encode($company_vrn) ?>,
+        document_code:   <?= json_encode($document_code) ?>,
+        subject:            $('#f_subject').val().trim(),
+        recipient:          $('#f_recipient').val().trim(),
+        recipient_address:  $('#f_recipient_address').val().trim(),
+        date:               dateOut,
+        sender_name:     <?= json_encode($signer_name) ?>,
+        sender_role:     <?= json_encode($signer_role) ?>,
+        project_name:    <?= json_encode($project_name ?? '') ?>,
+        contract_number: <?= json_encode($project_contract_number ?? '') ?>
+    };
+}
+function resolveMergeTokens(html) {
+    if (!html || html.indexOf('{{') === -1) return html;
+    const v = currentMergeValues();
+    return html.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, function (m, key) {
+        return Object.prototype.hasOwnProperty.call(v, key) ? (v[key] || '') : m;
+    });
+}
+
 function saveDocument(mode) {
     const subject = $('#f_subject').val().trim();
     if (!subject) {
@@ -950,6 +1022,10 @@ function saveDocument(mode) {
         Swal.fire({ icon: 'warning', title: 'Empty letter', text: 'Please write the letter body before saving.' });
         return;
     }
+
+    // Resolve any {{tokens}} into real values before rendering the PDF and
+    // storing — idempotent, so running it on already-resolved text is a no-op.
+    $('#letterBody').summernote('code', resolveMergeTokens($('#letterBody').summernote('code')));
 
     const $btn = mode === 'draft' ? $('#btnSaveDraft') : $('#btnSavePrint');
     const orig = $btn.html();
