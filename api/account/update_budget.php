@@ -46,8 +46,12 @@ try {
         if ($existing) {
             $category_id = $existing;
         } else {
-            $ins = $pdo->prepare("INSERT INTO expense_categories (name, status, created_at, updated_at) VALUES (?, 'active', NOW(), NOW())");
-            $ins->execute([trim($budget_name)]);
+            // expense_categories.type_id is NOT NULL with no default — omitting it here
+            // always threw a FK-constraint 500 (MySQL coerces the missing NOT NULL int to
+            // 0, which isn't a real expense_types row). Fall back to the first active type.
+            $default_type_id = (int)($pdo->query("SELECT id FROM expense_types WHERE status = 'active' ORDER BY id ASC LIMIT 1")->fetchColumn() ?: 0);
+            $ins = $pdo->prepare("INSERT INTO expense_categories (name, type_id, status, created_at, updated_at) VALUES (?, ?, 'active', NOW(), NOW())");
+            $ins->execute([trim($budget_name), $default_type_id]);
             $category_id = $pdo->lastInsertId();
         }
     }
