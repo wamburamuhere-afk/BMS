@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-07-15 — Delivery Note print: proper Customer box for outbound/customer DNs
+
+**File:** `api/account/print_delivery_note.php`
+
+Follow-up to `dn_outbound.php` becoming Sales-side / Customer-only (see PR #1315): the print template
+still only knew about a Supplier/Sub-Contractor "vendor" — a customer outbound DN printed with a
+`supplier_name` field that was simply `NULL`, showing "Local Inventory" instead of the actual
+customer. Added a `customers` JOIN and a proper Customer info box (name, company, postal address,
+address, phone, email, TIN/VRN) styled identically to `print_sales_order.php`'s own Customer box,
+shown whenever `dn_type = 'outbound' AND party_type = 'customer'`. Inbound (received-from-supplier)
+printouts and the 3 pre-existing legacy outbound supplier/sub-contractor DNs are untouched — they
+still print their vendor exactly as before; this was a deliberate scope decision to avoid breaking
+that unrelated, working flow. Verified live: DN #30 (customer, MICHAEL) resolves to the new Customer
+box; DN #24 (legacy supplier) still resolves to the existing vendor box.
+
 ## 2026-07-15 — Outbound Delivery Note becomes Sales-side / Customer-only, with optional SO/LPO link
 
 **Files:** `app/bms/grn/dn_outbound.php`, `api/create_dn.php`, `api/approve_dn.php`, `app/bms/sales/sales_order_view.php`
