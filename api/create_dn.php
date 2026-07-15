@@ -50,12 +50,12 @@ try {
     }
     if (empty($items)) throw new Exception('At least one item is required.');
 
-    // A customer-party outbound DN must be linked to an approved/partially-fulfilled LPO
-    // or an approved/processing/shipped Sales Order.
+    // A customer-party outbound DN may optionally reference an approved/
+    // partially-fulfilled LPO and/or an approved/processing/shipped Sales
+    // Order — neither is required; a customer can be picked freely with no
+    // source document, same as Supplier/Sub-Contractor. If a reference IS
+    // given, it must actually check out.
     if ($party_type === 'customer') {
-        if (!$customer_lpo_id && !$order_id) {
-            throw new Exception('A Customer LPO or Sales Order reference is required for customer delivery notes.');
-        }
         if ($customer_lpo_id) {
             $lpoChk = $pdo->prepare("SELECT customer_id, status FROM customer_lpos WHERE lpo_id = ? AND status != 'deleted'");
             $lpoChk->execute([$customer_lpo_id]);
