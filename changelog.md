@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-07-14 (change) — Create Document: editor toolbar now spans the full content width
+
+**File:** `app/constant/document/create_document.php`
+
+The Summernote editor toolbar (`#letterToolbar`) was constrained to `max-width: 210mm` — the same
+width as the printed A4 page it sits above — so on any normal desktop screen it wrapped its buttons
+across 3 cramped rows inside a narrow box, instead of laying out in one row like the same toolbar
+pattern in the sister vikundi project.
+
+Moved the toolbar div to sit **outside** `.letter-workspace` (previously nested inside its 24px
+padding) and changed its width from `max-width: 210mm` to `width: 100%`, so it spans the full content
+area at the top of the page, above the (still A4-width, print-fidelity-preserving) letter preview
+canvas. No toolbar buttons, Summernote config, or `toolbarContainer` wiring were touched — same
+`id="letterToolbar"` target, same button set, purely a container width/position change.
+
+Verified: rendered the page via PHP CLI and parsed the output with `DOMDocument` — confirmed the
+toolbar renders as a sibling immediately before `.letter-workspace` (not nested inside it, not
+duplicated), `php -l` clean.
+
 ## 2026-07-14 (fix) — Budget: creating/renaming to a new Budget Name always threw a 500 ("Server error occurred")
 
 **Files:** `api/account/add_budget.php`, `api/account/update_budget.php`
