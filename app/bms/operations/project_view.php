@@ -70,6 +70,19 @@ $hr_leave_types      = $pdo->query("SELECT type_name, max_days_per_year, require
 // Fetch Expense Categories for the Add Budget Modal
 $category_items = $pdo->query("SELECT id AS category_id, name AS category_name FROM expense_categories WHERE status = 'active' ORDER BY (CASE WHEN name = 'Other' THEN 1 ELSE 0 END), name")->fetchAll(PDO::FETCH_ASSOC);
 
+// Year/Month options for the Add Budget Modal — same range/labels as the external
+// budget.php form (app/constant/accounts/budget.php).
+$budget_months = [
+    1 => 'January', 2 => 'February', 3 => 'March',    4 => 'April',
+    5 => 'May',     6 => 'June',     7 => 'July',      8 => 'August',
+    9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'
+];
+$budget_current_year = (int)date('Y');
+$budget_years = [];
+for ($y = $budget_current_year - 2; $y <= $budget_current_year + 3; $y++) { $budget_years[$y] = $y; }
+$budget_selected_year  = $budget_current_year;
+$budget_selected_month = (int)date('n');
+
 // Fetch Expense Accounts for the Edit Expense Modal
 $expense_accounts = $pdo->query("SELECT account_id, account_name, account_code FROM accounts WHERE status = 'active' AND account_type_id IN (SELECT type_id FROM account_types WHERE type_name LIKE '%expense%') ORDER BY account_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -5592,6 +5605,22 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 <input type="hidden" name="budget_is_service_value" id="proj_budget_is_service_value" value="0">
                 <div class="modal-body p-4">
                     <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Year <span class="text-danger">*</span></label>
+                            <select class="form-select" name="budget_year" id="proj_budget_year" required>
+                                <?php foreach ($budget_years as $y => $yLabel): ?>
+                                <option value="<?= $y ?>" <?= $y == $budget_selected_year ? 'selected' : '' ?>><?= $yLabel ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Month <span class="text-danger">*</span></label>
+                            <select class="form-select" name="budget_month" id="proj_budget_month" required>
+                                <?php foreach ($budget_months as $m => $mLabel): ?>
+                                <option value="<?= $m ?>" <?= $m == $budget_selected_month ? 'selected' : '' ?>><?= $mLabel ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
                         <div class="col-12">
                             <label class="form-label fw-bold">Budget Name <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" name="category_other" id="budget_category_name" placeholder="Enter budget name" required>
@@ -5669,96 +5698,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                     </button>
                 </div>
             </form>
-        </div>
-    </div>
-</div>
-
-<!-- Budget Detail View Modal -->
-<div class="modal fade" id="viewBudgetDetailModal" tabindex="-1" aria-labelledby="viewBudgetDetailModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-primary text-white p-4" id="vbdHeader">
-                <div>
-                    <h5 class="modal-title fw-bold mb-1" id="viewBudgetDetailModalLabel"><i class="bi bi-pie-chart-fill me-2"></i><span id="vbdTitle">Budget Details</span></h5>
-                    <div id="vbdBadges" class="d-flex gap-2 flex-wrap mt-1"></div>
-                </div>
-                <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <!-- Status Banner -->
-                <div id="vbdStatusBanner" class="alert d-flex align-items-center gap-2 mb-4" role="alert"></div>
-
-                <!-- Progress Bar -->
-                <div class="mb-4">
-                    <div class="d-flex justify-content-between mb-1">
-                        <span class="small fw-bold">Budget Utilization</span>
-                        <span class="small fw-bold" id="vbdUtilPct">0%</span>
-                    </div>
-                    <div class="progress" style="height: 18px; border-radius: 9px;">
-                        <div class="progress-bar" id="vbdProgressBar" role="progressbar" style="width:0%"></div>
-                    </div>
-                    <div class="mt-1">
-                        <small class="text-muted" id="vbdProgressMeta"></small>
-                    </div>
-                </div>
-
-                <!-- Overview Row -->
-                <div class="row g-3 mb-4">
-                    <div class="col-md-4">
-                        <div class="p-3 border rounded bg-light h-100">
-                            <small class="text-muted d-block text-uppercase fw-bold mb-1" style="font-size:0.65rem;">Budget Name</small>
-                            <strong class="fs-6" id="vbdName">—</strong>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="p-3 border rounded bg-light h-100">
-                            <small class="text-muted d-block text-uppercase fw-bold mb-1" style="font-size:0.65rem;">Period</small>
-                            <strong class="fs-6" id="vbdPeriod">—</strong>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="p-3 border rounded bg-light h-100">
-                            <small class="text-muted d-block text-uppercase fw-bold mb-1" style="font-size:0.65rem;">Created By</small>
-                            <strong class="fs-6" id="vbdCreatedBy">—</strong>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Items Breakdown -->
-                <div class="mb-4">
-                    <h6 class="fw-bold text-primary mb-3"><i class="bi bi-list-nested me-2"></i>Planned Items Breakdown</h6>
-                    <div class="table-responsive border rounded bg-white shadow-sm" id="vbdItemsWrap">
-                        <p class="p-3 text-muted small mb-0">No items recorded.</p>
-                    </div>
-                </div>
-
-                <!-- Notes -->
-                <div class="mb-3" id="vbdNotesWrap" style="display:none;">
-                    <h6 class="fw-bold mb-2"><i class="bi bi-sticky me-2"></i>Notes</h6>
-                    <div class="alert alert-info py-2 px-3" id="vbdNotes"></div>
-                </div>
-
-                <!-- Attachment -->
-                <div class="mb-1" id="vbdAttWrap" style="display:none;">
-                    <h6 class="fw-bold mb-2"><i class="bi bi-paperclip me-2"></i>Attachment</h6>
-                    <div class="d-flex align-items-center gap-3 p-3 border rounded bg-light">
-                        <i class="bi bi-file-earmark-text fs-4 text-primary"></i>
-                        <div class="flex-grow-1">
-                            <div class="fw-bold small" id="vbdAttName"></div>
-                            <small class="text-muted">Attached document</small>
-                        </div>
-                        <a href="#" target="_blank" id="vbdAttLink" class="btn btn-sm btn-primary">
-                            <i class="bi bi-download me-1"></i> Download
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer bg-light p-3" id="vbdFooter">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-outline-primary" id="vbdEditBtn" onclick=""><i class="bi bi-pencil me-1"></i> Edit</button>
-                <button type="button" class="btn btn-warning" id="vbdRejectBtn" onclick="" style="display:none;"><i class="bi bi-x-circle me-1"></i> Reject</button>
-                <button type="button" class="btn btn-success" id="vbdApproveBtn" onclick="" style="display:none;"><i class="bi bi-check-circle me-1"></i> Approve</button>
-            </div>
         </div>
     </div>
 </div>
@@ -9975,10 +9914,17 @@ function renderBudgets(budgets, paginationInfo) {
         }
 
         window._budgetBreakdowns[b.budget_id] = subTableHtml;
-        const _bActions = `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewBudgetItem('${dataObj}')"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
+        // Same state machine + menu layout as budget.php's gear menu: View Details is a
+        // real page link (not a local modal), Pay only appears when approved (and points
+        // at the same page — "paying" happens there via Quick Add Expense, same as
+        // external), Approve/Reject only appear while pending (was previously gated on
+        // "not yet approved/rejected", which incorrectly offered them from any status).
+        const _bDetailsUrl = '<?= getUrl('budget/details') ?>?category_id=' + b.category_id + '&year=' + b.budget_year + '&month=' + b.budget_month;
+        const _bActions = `<li><a class="dropdown-item py-2" href="${_bDetailsUrl}"><i class="bi bi-eye text-info me-2"></i>View Details</a></li>
                         <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="editBudgetItem('${dataObj}')"><i class="bi bi-pencil text-primary me-2"></i>Edit Detail</a></li>
-                        ${b.status !== 'approved' ? `<li><a class="dropdown-item py-2 text-success" href="javascript:void(0)" onclick="updateBudgetItemStatus(${b.budget_id}, 'approved')"><i class="bi bi-check-circle me-2"></i>Approve</a></li>` : ''}
-                        ${b.status !== 'rejected' && b.status !== 'paid' ? `<li><a class="dropdown-item py-2 text-warning" href="javascript:void(0)" onclick="updateBudgetItemStatus(${b.budget_id}, 'rejected')"><i class="bi bi-x-circle me-2"></i>Reject</a></li>` : ''}
+                        ${b.status === 'approved' ? `<li><a class="dropdown-item py-2 text-success" href="${_bDetailsUrl}"><i class="bi bi-cash-coin me-2"></i>Pay</a></li><li><hr class="dropdown-divider"></li>` : ''}
+                        ${b.status === 'pending' ? `<li><a class="dropdown-item py-2 text-success" href="javascript:void(0)" onclick="updateBudgetItemStatus(${b.budget_id}, 'approved')"><i class="bi bi-check-circle me-2"></i>Approve</a></li>
+                        <li><a class="dropdown-item py-2 text-warning" href="javascript:void(0)" onclick="updateBudgetItemStatus(${b.budget_id}, 'rejected')"><i class="bi bi-x-circle me-2"></i>Reject</a></li>` : ''}
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteBudgetItem(${b.budget_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>`;
         const _bStatus = `<span class="badge bg-${getStatusBadgeColor(b.status)}">${b.status}</span>${b.rejection_reason ? `<div class="mt-1"><small class="${b.status === 'rejected' ? 'text-danger' : 'text-muted'} fw-bold" style="font-size:0.7rem;" title="${b.rejection_reason}"><i class="bi bi-info-circle me-1"></i>${b.status === 'rejected' ? 'View Reason' : 'Was Rejected'}</small></div>` : ''}`;
@@ -11421,6 +11367,13 @@ function createBudgetItem() {
     $('#addBudgetForm')[0].reset();
     $('#budget_id_field').val('');
 
+    // Default to the current period — was previously not present at all, so
+    // update_budget.php/add_budget.php silently fell back to today's date on
+    // every create AND every edit (see editBudgetItem below for the edit fix).
+    const _now = new Date();
+    $('#proj_budget_year').val(String(_now.getFullYear()));
+    $('#proj_budget_month').val(String(_now.getMonth() + 1));
+
     // Reset breakdown table
     $('#budgetBreakdownTable tbody').empty();
     addBudgetLineItem(); // Add one default row
@@ -11594,145 +11547,6 @@ $(document).on('change', '#budget_status_field', function() {
     }
 });
 
-function viewBudgetItem(encodedData) {
-    const d = JSON.parse(decodeURIComponent(encodedData));
-
-    // Parse line items — handle wrapper format
-    let items = [];
-    let isServiceView = false;
-    try {
-        const parsed = typeof d.line_items === 'string' ? JSON.parse(d.line_items) : (d.line_items || []);
-        if (Array.isArray(parsed)) {
-            items = parsed;
-        } else if (parsed && typeof parsed === 'object') {
-            isServiceView = parsed.is_service == 1;
-            items = parsed.items || [];
-        }
-    } catch(e) { items = []; }
-
-    const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    const allocated = parseFloat(d.allocated_amount) || 0;
-    const actual = parseFloat(d.actual_amount) || 0;
-    const variance = allocated - actual;
-    const utilPct = allocated > 0 ? Math.min((actual / allocated) * 100, 100) : 0;
-    const utilColor = utilPct > 100 ? 'bg-danger' : utilPct > 80 ? 'bg-warning' : 'bg-success';
-
-    // Header
-    $('#vbdTitle').text(d.category_name || 'Budget Details');
-    const typeBadge = isServiceView
-        ? `<span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">Non-Inventory</span>`
-        : `<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">Inventory</span>`;
-    const statusColors = { draft:'secondary', pending:'warning', approved:'success', rejected:'danger', paid:'primary' };
-    const sc = statusColors[d.status] || 'secondary';
-    $('#vbdBadges').html(`<span class="badge bg-${sc}">${d.status.toUpperCase()}</span> ${typeBadge}`);
-
-    // Status banner
-    const banners = {
-        draft:    { cls:'alert-secondary', icon:'bi-pencil-square',     msg:'This budget is a <strong>Draft</strong>. It needs to be reviewed and approved before it becomes active.' },
-        pending:  { cls:'alert-warning',   icon:'bi-hourglass-split',   msg:'This budget is <strong>Pending Approval</strong>. Awaiting review by an authorized manager.' },
-        approved: { cls:'alert-success',   icon:'bi-check-circle-fill', msg:'This budget has been <strong>Approved</strong> and is now active.' },
-        rejected: { cls:'alert-danger',    icon:'bi-x-circle-fill',     msg:'This budget has been <strong>Rejected</strong>.' + (d.rejection_reason ? ' Reason: <em>' + d.rejection_reason + '</em>' : '') },
-        paid:     { cls:'alert-primary',   icon:'bi-cash-stack',        msg:'This budget has been <strong>Paid/Closed</strong>.' }
-    };
-    const bn = banners[d.status] || banners.draft;
-    $('#vbdStatusBanner').attr('class', 'alert d-flex align-items-center gap-2 mb-4 ' + bn.cls)
-        .html(`<i class="bi ${bn.icon} fs-5"></i><div>${bn.msg}</div>`);
-
-    // Progress bar
-    $('#vbdUtilPct').text((actual / (allocated || 1) * 100).toFixed(1) + '%');
-    $('#vbdProgressBar').attr('class', 'progress-bar ' + utilColor).css('width', utilPct + '%');
-    $('#vbdProgressMeta').html(`Spent: <strong>${formatMoney(actual)}</strong> &nbsp;|&nbsp; Allocated: <strong>${formatMoney(allocated)}</strong> &nbsp;|&nbsp; Remaining: <strong class="${variance >= 0 ? 'text-success' : 'text-danger'}">${formatMoney(variance)}</strong>`);
-
-    // Overview
-    $('#vbdName').text(d.category_name || '—');
-    $('#vbdPeriod').text((monthNames[d.budget_month] || '—') + ' ' + (d.budget_year || ''));
-    $('#vbdCreatedBy').text(d.created_by_name || '—');
-
-    // Items table — all 7 columns always visible
-    if (items.length > 0) {
-        let tbl = `<table class="table table-sm table-striped mb-0 align-middle">
-            <thead class="bg-light">
-                <tr>
-                    <th class="ps-3" style="width:45px;">#</th>
-                    <th>Description</th>
-                    <th class="text-center" style="width:90px;">Units</th>
-                    <th class="text-center" style="width:70px;">Qty</th>
-                    <th class="text-end" style="width:120px;">Price (TSh)</th>
-                    <th class="text-end" style="width:75px;">Tax %</th>
-                    <th class="text-end pe-3" style="width:130px;">Total (TSh)</th>
-                </tr>
-            </thead>
-            <tbody>`;
-        items.forEach((it, idx) => {
-            const taxRate = parseFloat(it.tax_rate || 0);
-            const rowTotal = (parseFloat(it.qty) || 0) * (parseFloat(it.price) || 0) * (1 + taxRate / 100);
-            tbl += `<tr>
-                <td class="ps-3 text-muted">${idx + 1}</td>
-                <td class="fw-medium">${it.desc || '—'}</td>
-                <td class="text-center"><span class="badge bg-light text-dark border">${it.units || '—'}</span></td>
-                <td class="text-center fw-bold">${parseFloat(it.qty || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                <td class="text-end">${parseFloat(it.price || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                <td class="text-end">${taxRate > 0 ? taxRate.toFixed(2) + '%' : '<span class="text-muted">—</span>'}</td>
-                <td class="text-end pe-3 fw-bold text-primary">${rowTotal.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-            </tr>`;
-        });
-        tbl += `</tbody>
-            <tfoot class="table-light fw-bold">
-                <tr>
-                    <td colspan="6" class="ps-3">Grand Total Planned Amount</td>
-                    <td class="text-end pe-3 text-primary">${formatMoney(allocated)}</td>
-                </tr>
-            </tfoot>
-        </table>`;
-        $('#vbdItemsWrap').html(tbl);
-    } else {
-        $('#vbdItemsWrap').html('<p class="p-3 text-muted small mb-0"><i class="bi bi-info-circle me-1"></i>No line items recorded.</p>');
-    }
-
-    // Payment reference (if paid)
-    if (d.status === 'paid' && d.payment_reference) {
-        const payRef = `<div class="alert alert-success d-flex justify-content-between align-items-center py-2 px-3 mt-3">
-            <div><small class="d-block text-uppercase fw-bold" style="font-size:0.65rem;">Payment Reference</small><strong class="small">${d.payment_reference}</strong></div>
-            ${d.attachment ? `<a href="/${d.attachment}" target="_blank" class="btn btn-sm btn-success"><i class="bi bi-file-earmark-check me-1"></i>View Proof</a>` : ''}
-        </div>`;
-        $('#vbdItemsWrap').append(payRef);
-    }
-
-    // Notes
-    if (d.notes) {
-        $('#vbdNotes').html(d.notes.replace(/\n/g, '<br>'));
-        $('#vbdNotesWrap').show();
-    } else {
-        $('#vbdNotesWrap').hide();
-    }
-
-    // Attachment
-    if (d.attachment) {
-        $('#vbdAttName').text(d.attachment.split('/').pop());
-        $('#vbdAttLink').attr('href', '/' + d.attachment);
-        $('#vbdAttWrap').show();
-    } else {
-        $('#vbdAttWrap').hide();
-    }
-
-    // Footer buttons
-    const editFn = `$('#viewBudgetDetailModal').modal('hide'); setTimeout(function(){ editBudgetItem('${encodedData}'); }, 400);`;
-    $('#vbdEditBtn').attr('onclick', editFn);
-
-    if (d.status !== 'approved' && d.status !== 'paid') {
-        $('#vbdApproveBtn').show().attr('onclick', `$('#viewBudgetDetailModal').modal('hide'); setTimeout(function(){ updateBudgetItemStatus(${d.budget_id}, 'approved'); }, 400);`);
-    } else {
-        $('#vbdApproveBtn').hide();
-    }
-    if (d.status !== 'rejected' && d.status !== 'paid') {
-        $('#vbdRejectBtn').show().attr('onclick', `$('#viewBudgetDetailModal').modal('hide'); setTimeout(function(){ updateBudgetItemStatus(${d.budget_id}, 'rejected'); }, 400);`);
-    } else {
-        $('#vbdRejectBtn').hide();
-    }
-
-    $('#viewBudgetDetailModal').modal('show');
-}
-
 function editBudgetItem(encodedData) {
     const data = JSON.parse(decodeURIComponent(encodedData));
     const form = $('#addBudgetForm');
@@ -11740,6 +11554,10 @@ function editBudgetItem(encodedData) {
     // Fill basic fields
     $('#budget_id_field').val(data.budget_id);
     form.find('[name="category_other"]').val(data.category_name);
+    // Previously missing entirely — without these, update_budget.php fell back to
+    // today's date on every edit, silently moving the budget to the current period.
+    if (data.budget_year)  $('#proj_budget_year').val(String(data.budget_year));
+    if (data.budget_month) $('#proj_budget_month').val(String(data.budget_month));
     form.find('[name="status"]').val(data.status).trigger('change');
     form.find('[name="notes"]').val(data.notes);
     form.find('[name="payment_reference"]').val(data.payment_reference || '');
