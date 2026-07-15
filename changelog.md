@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-07-15 (fix) — AI Settings: Model is now filtered to the selected Provider, not free text
+
+**File:** `app/constant/settings/ai_settings.php`
+
+Root-caused why "Generate with AI" on Create Document appeared to "just close with nothing to
+show": AI Settings had a free-text Model field completely independent of the Provider dropdown, so
+switching Provider (e.g. to Gemini) silently left a stale model id from the previous provider (e.g.
+`gpt-4o-mini`, an OpenAI model) in place. The save succeeded, `aiConfigured()` correctly reported
+"configured", the button correctly rendered — but every actual generation request failed at the
+provider with "model not found," which surfaced to the user as the result just... not appearing.
+
+Replaced the free-text Model input with a `<select>` populated from the currently selected Provider
+(OpenAI / Anthropic / Gemini's known model ids), so this mismatch is no longer something you can
+type your way into — the invalid combination is simply not selectable. Includes a "Custom / other
+model…" option (reveals the original text input) for anything not in the curated list, and
+OpenRouter — "any model via base URL" — always stays free text since it has no fixed model set.
+Switching Provider always resets Model to that provider's first option, so nothing carries over
+silently.
+
+Also corrected the live mismatched setting directly (provider was `gemini`, model was still
+`gpt-4o-mini`) so generation is unblocked immediately, not just protected going forward.
+
+Verified live end-to-end through the real production code path: called `api/ai/generate.php`
+directly with `field_type=document_letter` (the exact request Create Document's "Generate with AI"
+sends) — received real generated letter text back from the configured Gemini model. No mock, no
+stub — an actual round trip to the provider.
+
 ## 2026-07-15 (hotfix) — Project Details: "Failed to load project data" on every project — regression from PR #1302
 
 **File:** `api/operations/get_project.php`
