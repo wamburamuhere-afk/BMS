@@ -26,6 +26,15 @@ try {
     $template_name = trim((string)($_POST['template_name'] ?? ''));
     $category_id   = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
     $content       = (string)($_POST['content'] ?? '');
+    // Structural fields — captured with any {{tokens}} intact (NOT resolved),
+    // so the template reproduces the whole letter, not just its body, and its
+    // tokens auto-fill afresh each time it's reused.
+    $subject           = trim((string)($_POST['subject'] ?? ''));
+    $recipient         = trim((string)($_POST['recipient'] ?? ''));
+    $recipient_address = trim((string)($_POST['recipient_address'] ?? ''));
+    $use_letterhead    = isset($_POST['use_letterhead']) ? (($_POST['use_letterhead'] === '1') ? 1 : 0) : null;
+    $signature_align   = in_array(($_POST['signature_align'] ?? ''), ['left', 'center', 'right'], true)
+        ? $_POST['signature_align'] : null;
 
     if ($template_name === '') {
         throw new Exception('Template name is required');
@@ -35,10 +44,19 @@ try {
     }
 
     $stmt = $pdo->prepare("
-        INSERT INTO document_templates (template_name, category_id, content, is_active, created_by)
-        VALUES (?, ?, ?, 1, ?)
+        INSERT INTO document_templates
+            (template_name, category_id, content, subject, recipient, recipient_address,
+             use_letterhead, signature_align, is_active, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
     ");
-    $stmt->execute([$template_name, $category_id, $content, $_SESSION['user_id']]);
+    $stmt->execute([
+        $template_name, $category_id, $content,
+        $subject !== '' ? $subject : null,
+        $recipient !== '' ? $recipient : null,
+        $recipient_address !== '' ? $recipient_address : null,
+        $use_letterhead, $signature_align,
+        $_SESSION['user_id'],
+    ]);
     $template_id = (int)$pdo->lastInsertId();
 
     logActivity($pdo, $_SESSION['user_id'], "Saved letter template: '$template_name'");

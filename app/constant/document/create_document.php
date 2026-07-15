@@ -62,7 +62,7 @@ $prefill_template_id = 0;
 if ($document_id === 0) {
     $prefill_template_id = !empty($_GET['template_id']) ? (int)$_GET['template_id'] : 0;
     if ($prefill_template_id > 0) {
-        $tpl_stmt = $pdo->prepare("SELECT id, content FROM document_templates WHERE id = ? AND content IS NOT NULL AND is_active = 1");
+        $tpl_stmt = $pdo->prepare("SELECT id, content, subject, recipient, recipient_address, use_letterhead, signature_align FROM document_templates WHERE id = ? AND content IS NOT NULL AND is_active = 1");
         $tpl_stmt->execute([$prefill_template_id]);
         $prefill_template = $tpl_stmt->fetch(PDO::FETCH_ASSOC);
     }
@@ -85,10 +85,12 @@ $company_vrn     = get_setting('company_vrn', '');
 // on the server at first save so it's never burned by an abandoned draft.
 $document_code = $existing['document_code'] ?? peekNextCode($pdo, 'LTR');
 
-$subject     = $existing['document_name'] ?? '';
+$subject     = $existing['document_name'] ?? ($prefill_template['subject'] ?? '');
 $recipient   = '';
 if (!empty($existing['description']) && strpos($existing['description'], 'To: ') === 0) {
     $recipient = substr($existing['description'], 4);
+} elseif (!$existing && !empty($prefill_template['recipient'])) {
+    $recipient = $prefill_template['recipient'];
 }
 $letter_date = $existing['issue_date'] ?? date('Y-m-d');
 $content     = $existing['content'] ?? ($prefill_template['content'] ?? '');
@@ -101,20 +103,27 @@ $content     = $existing['content'] ?? ($prefill_template['content'] ?? '');
 $category_id = $existing['category_id'] ?? null;
 $access_level = in_array(($existing['access_level'] ?? ''), ['private', 'restricted', 'public'], true)
     ? $existing['access_level'] : 'private';
-// A saved draft keeps whatever it was last set to. A brand-new letter started
-// from a template defaults ON (templates assume the professional letterhead
-// look). A brand-new BLANK letter (no template, no existing record) defaults
-// OFF — a truly blank canvas the user builds up from scratch, per feedback.
-$use_letterhead = isset($existing['use_letterhead'])
-    ? ((int)$existing['use_letterhead'] === 1)
-    : ($prefill_template_id > 0);
+// A saved draft keeps whatever it was last set to. A brand-new letter from a
+// template honours the template's own letterhead choice if it stored one, else
+// defaults ON (templates assume the professional letterhead look). A brand-new
+// BLANK letter (no template, no existing record) defaults OFF — a truly blank
+// canvas the user builds up from scratch, per feedback.
+if (isset($existing['use_letterhead'])) {
+    $use_letterhead = (int)$existing['use_letterhead'] === 1;
+} elseif ($prefill_template && $prefill_template['use_letterhead'] !== null) {
+    $use_letterhead = (int)$prefill_template['use_letterhead'] === 1;
+} else {
+    $use_letterhead = ($prefill_template_id > 0);
+}
 // Not every letter type needs a full recipient address block (an internal
-// memo doesn't) — this stays empty unless the user writes one in.
-$recipient_address = $existing['recipient_address'] ?? '';
+// memo doesn't) — this stays empty unless the user (or the template) sets one.
+$recipient_address = $existing['recipient_address'] ?? ($prefill_template['recipient_address'] ?? '');
 // Signature style genuinely differs by letter format (full-block vs
-// modified-block) — stays a per-letter choice rather than a fixed default.
+// modified-block) — a per-letter choice; honours the template's if it stored one.
 $signature_align = in_array(($existing['signature_align'] ?? ''), ['left', 'center', 'right'], true)
-    ? $existing['signature_align'] : 'left';
+    ? $existing['signature_align']
+    : (in_array(($prefill_template['signature_align'] ?? ''), ['left', 'center', 'right'], true)
+        ? $prefill_template['signature_align'] : 'left');
 // NULL = always follow Company Profile automatically (default, unchanged
 // behaviour). Non-null = this specific letter overrides it with its own
 // freely-written/formatted sender address.
@@ -879,14 +888,34 @@ $(document).ready(function () {
         const q = $(this).val().toLowerCase();
         renderTemplateList(templatesCache.filter(t => t.template_name.toLowerCase().includes(q)));
     });
+    // Restore a template's full structure — body (tokens kept intact so they
+    // auto-fill afresh at save) plus subject, recipient, letterhead and
+    // signature alignment — so reusing a template reproduces the whole letter,
+    // not just its body. Fields the template didn't store (NULL) are left as-is.
+    window.applyTemplate = function (tpl) {
+        $('#letterBody').summernote('code', tpl.content || '');
+        if (tpl.subject != null && tpl.subject !== '')   { $('#f_subject').val(tpl.subject).trigger('input'); }
+        if (tpl.recipient != null && tpl.recipient !== '') { $('#f_recipient').val(tpl.recipient).trigger('input'); }
+        if (tpl.recipient_address != null && tpl.recipient_address !== '') {
+            $('#recipientAddressRow').removeClass('d-none');
+            $('#btnToggleRecipientAddress').find('i').attr('class', 'bi bi-dash-circle me-1');
+            $('#btnToggleRecipientAddressLabel').text('Remove recipient address');
+            $('#f_recipient_address').val(tpl.recipient_address).trigger('input');
+        }
+        if (tpl.use_letterhead != null && tpl.use_letterhead !== '') {
+            $('#f_use_letterhead').prop('checked', String(tpl.use_letterhead) === '1').trigger('change');
+        }
+        if (tpl.signature_align != null && tpl.signature_align !== '') {
+            $('#f_signature_align').val(tpl.signature_align).trigger('change');
+        }
+    };
+
     $('#templatePickerList').on('click', '.tpl-pick', function () {
         const id = $(this).data('id');
         const tpl = templatesCache.find(t => String(t.id) === String(id));
         if (!tpl) return;
         const apply = function () {
-            // Resolve the template's {{tokens}} against the current field values
-            // so the body lands as real text, not placeholders.
-            $('#letterBody').summernote('code', resolveMergeTokens(tpl.content));
+            applyTemplate(tpl);
             bootstrap.Modal.getInstance(document.getElementById('useTemplateModal')).hide();
         };
         if (!$('#letterBody').summernote('isEmpty')) {
@@ -924,7 +953,15 @@ $(document).ready(function () {
             data: {
                 template_name: $('#tpl_name').val(),
                 category_id: $('#tpl_category_id').val(),
+                // Body is stored WITH any {{tokens}} intact (not resolved) so
+                // the template stays reusable; the structural fields are
+                // captured too, so reusing it reproduces the whole letter.
                 content: $('#letterBody').summernote('code'),
+                subject: $('#f_subject').val().trim(),
+                recipient: $('#f_recipient').val().trim(),
+                recipient_address: $('#f_recipient_address').val().trim(),
+                use_letterhead: $('#f_use_letterhead').is(':checked') ? '1' : '0',
+                signature_align: $('#f_signature_align').val(),
                 _csrf: CSRF_TOKEN
             },
             dataType: 'json',
