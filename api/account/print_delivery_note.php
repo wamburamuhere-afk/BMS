@@ -14,7 +14,7 @@ assertScopeForRecordHtml('deliveries', 'delivery_id', $id);
 
 global $pdo;
 
-// Fetch DN details with full supplier and warehouse info
+// Fetch DN details with supplier, customer, and warehouse info
 $stmt = $pdo->prepare("
     SELECT d.*,
            COALESCE(s.supplier_name, sc.supplier_name)       as supplier_name,
@@ -25,6 +25,10 @@ $stmt = $pdo->prepare("
            COALESCE(s.tax_id, sc.tax_id)                     as s_tin,
            COALESCE(s.vat_number, sc.vat_number)             as s_vrn,
            COALESCE(s.postal_address, sc.postal_address)     as s_postal_address,
+           c.customer_name, c.company_name as customer_company,
+           c.phone as c_phone, c.email as c_email, c.address as c_address,
+           c.postal_address as c_postal_address,
+           c.tax_id as c_tin, c.vat_number as c_vrn,
            w.warehouse_name, w.location as warehouse_location,
            p.project_name, p.contract_number as project_contract_no,
            u.username as created_by_username,
@@ -37,6 +41,7 @@ $stmt = $pdo->prepare("
     FROM deliveries d
     LEFT JOIN suppliers s        ON d.supplier_id      = s.supplier_id
     LEFT JOIN sub_contractors sc ON d.subcontractor_id = sc.supplier_id
+    LEFT JOIN customers c        ON d.customer_id      = c.customer_id
     LEFT JOIN warehouses w       ON d.warehouse_id     = w.warehouse_id
     LEFT JOIN projects p         ON d.project_id       = p.project_id
     LEFT JOIN users u            ON d.created_by       = u.user_id
@@ -47,10 +52,14 @@ $dn = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$dn) die("Delivery Note not found");
 
-// Direction-aware labels — the print layout/style is identical for both
-$is_inbound  = ($dn['dn_type'] ?? 'inbound') !== 'outbound';
-$party_label = (($dn['party_type'] ?? 'supplier') === 'subcontractor') ? 'Sub-Contractor' : 'Supplier';
-$dn_no       = $is_inbound ? ($dn['dn_number'] ?: $dn['delivery_number']) : $dn['delivery_number'];
+// Direction-aware labels — the print layout/style is identical for both.
+// Outbound is Sales-side / Customer-only now (dn_outbound.php); a handful of
+// pre-existing outbound DNs still carry a Supplier/Sub-Contractor party — the
+// vendor box below still serves those and all inbound (received-from) DNs.
+$is_inbound     = ($dn['dn_type'] ?? 'inbound') !== 'outbound';
+$is_to_customer = (!$is_inbound && ($dn['party_type'] ?? '') === 'customer');
+$party_label    = (($dn['party_type'] ?? 'supplier') === 'subcontractor') ? 'Sub-Contractor' : 'Supplier';
+$dn_no          = $is_inbound ? ($dn['dn_number'] ?: $dn['delivery_number']) : $dn['delivery_number'];
 
 // Fetch Items
 $stmtItems = $pdo->prepare("
@@ -333,15 +342,43 @@ $wf = [
         </div>
     </div>
 
-    <!-- VENDOR + DN INFO -->
+    <!-- CUSTOMER / VENDOR + DN INFO -->
     <div class="details-grid">
+        <?php if ($is_to_customer): ?>
+        <div class="box">
+            <h3>Customer</h3>
+            <p><strong><?= htmlspecialchars($dn['customer_name'] ?: 'N/A') ?></strong></p>
+            <?php if (!empty($dn['customer_company'])): ?>
+            <p><?= htmlspecialchars($dn['customer_company']) ?></p>
+            <?php endif; ?>
+            <?php if (!empty($dn['c_postal_address'])): ?>
+            <p>P.O. Box <?= htmlspecialchars($dn['c_postal_address']) ?></p>
+            <?php endif; ?>
+            <?php if (!empty($dn['c_address'])): ?>
+            <p><?= htmlspecialchars($dn['c_address']) ?></p>
+            <?php endif; ?>
+            <?php if (!empty($dn['c_phone'])): ?>
+            <p><?= htmlspecialchars($dn['c_phone']) ?></p>
+            <?php endif; ?>
+            <?php if (!empty($dn['c_email'])): ?>
+            <p><?= htmlspecialchars($dn['c_email']) ?></p>
+            <?php endif; ?>
+            <?php
+            $c_tv = [];
+            if (!empty($dn['c_tin'])) $c_tv[] = 'TIN: ' . htmlspecialchars($dn['c_tin']);
+            if (!empty($dn['c_vrn'])) $c_tv[] = 'VRN: ' . htmlspecialchars($dn['c_vrn']);
+            if ($c_tv): ?>
+            <p><?= implode(' | ', $c_tv) ?></p>
+            <?php endif; ?>
+        </div>
+        <?php else: ?>
         <div class="box">
             <h3><?= $is_inbound ? 'Received From' : 'Sent To' ?> (<?= $party_label ?>)</h3>
             <p><strong><?= htmlspecialchars($dn['supplier_name'] ?: 'Local Inventory') ?></strong></p>
             <?php if (!empty($dn['supplier_company'])): ?>
             <p><?= htmlspecialchars($dn['supplier_company']) ?></p>
             <?php endif; ?>
-            
+
             <?php if (!empty($dn['s_postal_address'])): ?>
             <p><?= htmlspecialchars($dn['s_postal_address']) ?></p>
             <?php endif; ?>
@@ -359,6 +396,7 @@ $wf = [
             <p><?= implode(' | ', $s_tv) ?></p>
             <?php endif; ?>
         </div>
+        <?php endif; ?>
         <div class="box">
             <h3>Destination / Warehouse</h3>
             <p><strong>Warehouse:</strong> <?= htmlspecialchars($dn['warehouse_name'] ?: 'N/A') ?></p>

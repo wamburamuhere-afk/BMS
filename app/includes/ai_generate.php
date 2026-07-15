@@ -48,12 +48,12 @@ if (!function_exists('aiGenerateModalOnce')) {
         $done = true;
         $url = buildUrl('api/ai/generate.php');
         ob_start(); ?>
-<div class="modal fade" id="aiGenModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="aiGenModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header bg-primary text-white">
         <h5 class="modal-title"><i class="bi bi-stars me-1"></i> Generate with AI</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" id="aiGenCloseX"></button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="aiGenTarget"><input type="hidden" id="aiGenFieldType">
@@ -76,7 +76,7 @@ if (!function_exists('aiGenerateModalOnce')) {
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="aiGenCancel">Cancel</button>
         <button type="button" class="btn btn-outline-primary" id="aiGenRun"><i class="bi bi-stars me-1"></i> Generate</button>
         <button type="button" class="btn btn-primary d-none" id="aiGenUse"><i class="bi bi-check-circle me-1"></i> Use this</button>
       </div>
@@ -123,7 +123,15 @@ if (!function_exists('aiGenerateModalOnce')) {
     const btn=this, orig=btn.innerHTML;
     const tgt=document.getElementById('aiGenTarget').value;
     const existingEl=document.getElementById(tgt);
+    const closeX=document.getElementById('aiGenCloseX'), cancelBtn=document.getElementById('aiGenCancel');
     btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Generating…';
+    // Belt-and-braces alongside the modal's own data-bs-backdrop="static"
+    // data-bs-keyboard="false": block the explicit Cancel/X too, so there is
+    // no way — accidental (backdrop click, Escape) or deliberate (Cancel/X) —
+    // to dismiss the modal while a request is in flight. Without this, a
+    // generated result can land in a modal the user already closed, which
+    // looks exactly like "it generated, then closed, and I saw nothing."
+    closeX.disabled=true; cancelBtn.disabled=true;
     $.ajax({ url:URL, type:'POST', dataType:'json', data:{
         _csrf: CSRF_TOKEN,
         instruction: document.getElementById('aiGenInstruction').value,
@@ -133,13 +141,20 @@ if (!function_exists('aiGenerateModalOnce')) {
       },
       success:r=>{
         if(r.success){
-          document.getElementById('aiGenResult').value=r.text;
-          document.getElementById('aiGenResultWrap').classList.remove('d-none');
+          const resultBox=document.getElementById('aiGenResult');
+          const resultWrap=document.getElementById('aiGenResultWrap');
+          resultBox.value=r.text;
+          resultWrap.classList.remove('d-none');
           document.getElementById('aiGenUse').classList.remove('d-none');
+          // Make the result impossible to miss — scroll it into view and
+          // focus it, rather than relying on the user noticing it appeared
+          // below the fold inside the modal body.
+          resultWrap.scrollIntoView({ behavior:'smooth', block:'nearest' });
+          resultBox.focus();
         } else { Swal.fire({icon:'error',title:'AI',text:r.message||'Could not generate.'}); }
       },
       error:()=>Swal.fire({icon:'error',title:'Error',text:'Server error.'}),
-      complete:()=>{ btn.disabled=false; btn.innerHTML=orig; }
+      complete:()=>{ btn.disabled=false; btn.innerHTML=orig; closeX.disabled=false; cancelBtn.disabled=false; }
     });
   });
   document.getElementById('aiGenUse').addEventListener('click', function(){

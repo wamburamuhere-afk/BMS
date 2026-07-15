@@ -1,5 +1,61 @@
 # BMS Changelog
 
+## 2026-07-15 (fix) — "Generate with AI" modal could be dismissed mid-request, losing the result
+
+**File:** `app/includes/ai_generate.php`
+
+Follow-up to the AI Settings model-mismatch fix — reported that even after that fix, generating text
+still sometimes "closed automatically" with nothing to show. Root cause: `#aiGenModal` had no dismiss
+protection at all — no `data-bs-backdrop="static"`, no `data-bs-keyboard="false"`. An LLM request
+typically takes a few seconds; a stray click outside the modal, or an Escape key press, closes it via
+Bootstrap's default behaviour. Since the AJAX success handler still writes the generated text into
+the modal's DOM elements once the response arrives — Bootstrap's `.hide()` only hides an element, it
+doesn't remove it — the result was silently written into a modal the user had already dismissed. No
+error, nothing visible: exactly "generated, then closed, saw nothing."
+
+- Modal now locked against backdrop-click and Escape-key dismissal (`data-bs-backdrop="static"
+  data-bs-keyboard="false"`).
+- Belt-and-braces: the explicit Cancel button and the header's X close button are also disabled for
+  the duration of the request (re-enabled in the AJAX `complete` handler), so there's no dismiss path
+  — accidental or deliberate — that can lose an in-flight generation. `.hide()` calls (the "Use this"
+  button's own close) are unaffected, since programmatic hide isn't gated by these attributes.
+- On success, the result box now scrolls into view and receives focus, so it can't be missed even if
+  it renders below the fold inside the modal.
+
+This is the **shared** "Generate with AI" component used across invoices, quotations, expenses, and
+Create Document — the fix applies everywhere the widget is used, not just the one page it was
+reported on.
+
+Verified: rendered Create Document and confirmed the modal carries the new dismiss-protection
+attributes and button ids in the actual output; the updated click-handler logic was run standalone
+through Node against a mocked successful response with no exceptions. `php -l` clean.
+
+## 2026-07-15 (change) — Project Docs: "Create Doc" is now its own menu item, not embedded inside "Add Doc"
+
+**File:** `app/bms/operations/project_view.php`
+
+The Docs dropdown had two items — "Docs Library" and "Add Doc" — but "Create Document" (the link to
+the in-app letter editor, `new_document.php`) lived buried inside the "Add Doc" tab's own content,
+sharing space with the file-upload form. Moved it out to be its own top-level entry in the Docs
+dropdown, positioned below "Add Doc", renamed to "Create Doc" — same destination
+(`new_document.php?project_id=X`), just promoted to a direct menu item instead of a button embedded
+in the upload tab. The "Add Doc" tab now only contains the file-upload form, as its name implies.
+
+## 2026-07-15 — Delivery Note print: proper Customer box for outbound/customer DNs
+
+**File:** `api/account/print_delivery_note.php`
+
+Follow-up to `dn_outbound.php` becoming Sales-side / Customer-only (see PR #1315): the print template
+still only knew about a Supplier/Sub-Contractor "vendor" — a customer outbound DN printed with a
+`supplier_name` field that was simply `NULL`, showing "Local Inventory" instead of the actual
+customer. Added a `customers` JOIN and a proper Customer info box (name, company, postal address,
+address, phone, email, TIN/VRN) styled identically to `print_sales_order.php`'s own Customer box,
+shown whenever `dn_type = 'outbound' AND party_type = 'customer'`. Inbound (received-from-supplier)
+printouts and the 3 pre-existing legacy outbound supplier/sub-contractor DNs are untouched — they
+still print their vendor exactly as before; this was a deliberate scope decision to avoid breaking
+that unrelated, working flow. Verified live: DN #30 (customer, MICHAEL) resolves to the new Customer
+box; DN #24 (legacy supplier) still resolves to the existing vendor box.
+
 ## 2026-07-15 — Create Invoice: pre-select the Warehouse when arriving from an approved Sales Order
 
 **File:** `app/bms/invoice/invoice_create.php`
