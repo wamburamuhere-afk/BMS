@@ -33,6 +33,7 @@ try {
     $items            = json_decode($_POST['items'] ?? '[]', true);
     $purchase_order_id = intval($_POST['purchase_order_id'] ?? 0) ?: null;
     $customer_lpo_id  = intval($_POST['customer_lpo_id'] ?? 0) ?: null;
+    $order_id         = intval($_POST['order_id'] ?? 0) ?: null;
     $user_id          = $_SESSION['user_id'];
 
     if ($warehouse_id <= 0) throw new Exception('Warehouse is required.');
@@ -49,18 +50,35 @@ try {
     }
     if (empty($items)) throw new Exception('At least one item is required.');
 
-    // A customer-party outbound DN must be linked to an approved/partially-fulfilled LPO.
+    // A customer-party outbound DN must be linked to an approved/partially-fulfilled LPO
+    // or an approved/processing/shipped Sales Order.
     if ($party_type === 'customer') {
-        if (!$customer_lpo_id) throw new Exception('A Customer LPO reference is required for customer delivery notes.');
-        $lpoChk = $pdo->prepare("SELECT customer_id, status FROM customer_lpos WHERE lpo_id = ? AND status != 'deleted'");
-        $lpoChk->execute([$customer_lpo_id]);
-        $lpoRow = $lpoChk->fetch(PDO::FETCH_ASSOC);
-        if (!$lpoRow) throw new Exception('Linked LPO not found.');
-        if (!in_array($lpoRow['status'], ['approved', 'partially_fulfilled'], true)) {
-            throw new Exception('The linked LPO must be approved or partially fulfilled.');
+        if (!$customer_lpo_id && !$order_id) {
+            throw new Exception('A Customer LPO or Sales Order reference is required for customer delivery notes.');
         }
-        if ((int)$lpoRow['customer_id'] !== $party_id) {
-            throw new Exception('Customer does not match the linked LPO.');
+        if ($customer_lpo_id) {
+            $lpoChk = $pdo->prepare("SELECT customer_id, status FROM customer_lpos WHERE lpo_id = ? AND status != 'deleted'");
+            $lpoChk->execute([$customer_lpo_id]);
+            $lpoRow = $lpoChk->fetch(PDO::FETCH_ASSOC);
+            if (!$lpoRow) throw new Exception('Linked LPO not found.');
+            if (!in_array($lpoRow['status'], ['approved', 'partially_fulfilled'], true)) {
+                throw new Exception('The linked LPO must be approved or partially fulfilled.');
+            }
+            if ((int)$lpoRow['customer_id'] !== $party_id) {
+                throw new Exception('Customer does not match the linked LPO.');
+            }
+        }
+        if ($order_id) {
+            $soChk = $pdo->prepare("SELECT customer_id, status FROM sales_orders WHERE sales_order_id = ?");
+            $soChk->execute([$order_id]);
+            $soRow = $soChk->fetch(PDO::FETCH_ASSOC);
+            if (!$soRow) throw new Exception('Linked Sales Order not found.');
+            if (!in_array($soRow['status'], ['approved', 'processing', 'shipped'], true)) {
+                throw new Exception('The linked Sales Order must be approved, processing, or shipped.');
+            }
+            if ((int)$soRow['customer_id'] !== $party_id) {
+                throw new Exception('Customer does not match the linked Sales Order.');
+            }
         }
     }
 
@@ -94,6 +112,7 @@ try {
     if (!$wh->fetch()) throw new Exception('Invalid or inactive warehouse.');
 
     // Validate items — block non-inventory services
+    $soItemChk = $order_id ? $pdo->prepare("SELECT 1 FROM sales_order_items WHERE order_item_id = ? AND order_id = ?") : null;
     foreach ($items as &$item) {
         $item['product_id'] = intval($item['product_id']);
         $item['quantity']   = floatval($item['quantity']);
@@ -108,6 +127,15 @@ try {
             throw new Exception("'{$pi['product_name']}' is a Non-Inventory service — cannot be added to a Delivery Note.");
         }
         $item['unit'] = $item['unit'] ?? $pi['unit'] ?? 'pcs';
+
+        // order_item_id is optional per line, but if present it must genuinely
+        // belong to the linked Sales Order (defense against a tampered request).
+        $item['order_item_id'] = !empty($item['order_item_id']) ? intval($item['order_item_id']) : null;
+        if ($item['order_item_id']) {
+            if (!$soItemChk) throw new Exception('order_item_id supplied without a linked Sales Order.');
+            $soItemChk->execute([$item['order_item_id'], $order_id]);
+            if (!$soItemChk->fetch()) throw new Exception('One of the items does not belong to the linked Sales Order.');
+        }
     }
     unset($item);
 
@@ -135,14 +163,14 @@ try {
     $pdo->prepare("
         INSERT INTO deliveries
             (delivery_number, dn_number, dn_type, party_type, supplier_id, subcontractor_id, customer_id,
-             delivery_date, status, created_by, project_id, warehouse_id, purchase_order_id, customer_lpo_id,
+             delivery_date, status, created_by, project_id, warehouse_id, purchase_order_id, customer_lpo_id, order_id,
              contact_person, contact_phone, delivery_address, notes,
              vehicle_number, driver_name, shipping_method,
              prepared_by_name, prepared_by_role, prepared_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     ")->execute([
         $delivery_number, $dn_number, $dn_type, $party_type, $supplier_id, $subcontractor_id, $customer_id,
-        $delivery_date, $status, $user_id, $project_id ?: null, $warehouse_id, $purchase_order_id, $customer_lpo_id,
+        $delivery_date, $status, $user_id, $project_id ?: null, $warehouse_id, $purchase_order_id, $customer_lpo_id, $order_id,
         $contact_person ?: null, $contact_phone ?: null, $delivery_address ?: null, $notes ?: null,
         $vehicle_number ?: null, $driver_name ?: null, $shipping_method ?: null,
         $user_name, $user_role,
@@ -161,14 +189,14 @@ try {
 
     // Insert items
     $item_stmt = $pdo->prepare("
-        INSERT INTO delivery_items (delivery_id, product_id, product_name, sku, quantity_delivered, unit, `condition`)
-        SELECT ?, p.product_id, p.product_name, p.sku, ?, ?, ?
+        INSERT INTO delivery_items (delivery_id, order_item_id, product_id, product_name, sku, quantity_delivered, unit, `condition`)
+        SELECT ?, ?, p.product_id, p.product_name, p.sku, ?, ?, ?
         FROM products p WHERE p.product_id = ?
     ");
 
     foreach ($items as $item) {
         $cond = in_array($item['condition'] ?? 'good', ['good','damaged','expired'], true) ? ($item['condition'] ?? 'good') : 'good';
-        $item_stmt->execute([$delivery_id, $item['quantity'], $item['unit'], $cond, $item['product_id']]);
+        $item_stmt->execute([$delivery_id, $item['order_item_id'], $item['quantity'], $item['unit'], $cond, $item['product_id']]);
         // Stock side-effects (inbound add / outbound reserve) now fire from
         // api/approve_dn.php when the DN reaches 'approved' status, so they
         // only occur once the canonical three_approval.md gate is passed.

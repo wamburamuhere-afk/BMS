@@ -147,6 +147,11 @@ require_once 'header.php';
                     <i class="bi bi-pencil"></i> Edit
                 </a>
             <?php endif; ?>
+            <?php if (in_array($order['status'], ['approved', 'processing', 'shipped'], true)): ?>
+                <a href="<?= getUrl('dn_outbound') ?>?order=<?= $order['sales_order_id'] ?>" class="btn btn-info text-white">
+                    <i class="bi bi-box-arrow-up-right"></i> Create Delivery Note
+                </a>
+            <?php endif; ?>
             <?php if ($order['status'] === 'approved' || $order['status'] === 'processing'): ?>
                 <a href="<?= getUrl('invoice_create') ?>?order=<?= $order['sales_order_id'] ?>" class="btn btn-success">
                     <i class="bi bi-receipt"></i> Create Invoice

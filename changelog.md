@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-07-15 — Outbound Delivery Note: create directly from an approved Sales Order, with Customer selection
+
+**Files:** `app/bms/grn/dn_outbound.php`, `api/create_dn.php`, `api/approve_dn.php`, `app/bms/sales/sales_order_view.php`
+
+`dn_outbound.php`'s "Send To" dropdown only offered Supplier / Sub-Contractor manually — Customer only
+ever appeared pre-locked, and only when arriving via a Customer LPO (`?lpo_id=`). There was no way to
+create an outbound DN from a Sales Order at all, even though the DB already carried everything needed
+for it (`deliveries.order_id`, `sales_order_items.quantity_delivered`, `delivery_items.order_item_id`,
+`sales_orders.total_delivered` — all sitting unused). Added a symmetric Sales Order path, mirroring the
+existing LPO one exactly:
+
+- `dn_outbound.php` now accepts `?order=<sales_order_id>`, locks the customer from the SO, and
+  prefills remaining-to-deliver items using `sales_order_items.quantity - quantity_delivered` (simpler
+  than the LPO block's live-sum approach, since this column is now the maintained source of truth).
+  Each item row carries its `order_item_id` through to submit.
+- `api/create_dn.php` accepts `order_id`, validates the linked SO (status + customer match), stores
+  `order_id` on the delivery and `order_item_id` on each line (with a server-side check that a supplied
+  `order_item_id` genuinely belongs to that SO — defends against a tampered request).
+- `api/approve_dn.php`: on approval of an SO-linked outbound DN, bumps
+  `sales_order_items.quantity_delivered` per delivered line, recomputes `sales_orders.total_delivered`
+  from the items (source of truth), and advances `sales_orders.status` to `delivered` — forward-only,
+  never regresses — once every line is fully delivered. Mirrors the existing Customer-LPO fulfillment
+  block right above it.
+- `sales_order_view.php` gets a "Create Delivery Note" button (approved/processing/shipped), matching
+  the existing "Create Invoice" button.
+
+Every new/changed SQL statement (2 INSERTs, 2 UPDATEs) was verified with a live, rolled-back
+transaction against the local DB, and the full SO-prefill lookup was dry-run against a real approved
+SO (customer + remaining-quantity item resolved correctly).
+
 ## 2026-07-15 (hotfix) — Create Invoice: SQLSTATE[HY093] on save + SO→Invoice link dropped the order id
 
 **Files:** `api/account/save_invoice.php`, `app/bms/sales/sales_orders.php`

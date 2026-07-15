@@ -91,6 +91,49 @@ if ($lpo_id > 0) {
     }
 }
 
+// ── SALES ORDER LINK (create mode only) — customer-party outbound DN driven
+// directly by an approved Sales Order, prefilled with remaining-to-deliver
+// quantities from the SO's own quantity_delivered tracking ─────────────────
+$so = null; $so_items = []; $so_customer = null;
+$so_id = (!$is_edit && !$lpo && isset($_GET['order'])) ? intval($_GET['order']) : 0;
+if ($so_id > 0) {
+    $sostmt = $pdo->prepare("SELECT * FROM sales_orders WHERE sales_order_id = ? AND status IN ('approved', 'processing', 'shipped')");
+    $sostmt->execute([$so_id]);
+    $so = $sostmt->fetch(PDO::FETCH_ASSOC);
+    if ($so) {
+        $cstmt2 = $pdo->prepare("SELECT customer_id, customer_name, company_name, customer_type FROM customers WHERE customer_id = ? AND status = 'active'");
+        $cstmt2->execute([$so['customer_id']]);
+        $so_customer = $cstmt2->fetch(PDO::FETCH_ASSOC);
+
+        if ($so_customer) {
+            $project_id = intval($so['project_id'] ?? 0);
+            $soi_stmt = $pdo->prepare("
+                SELECT soi.order_item_id, soi.product_id, soi.product_name,
+                       (soi.quantity - soi.quantity_delivered) AS remaining, p.unit
+                FROM sales_order_items soi
+                LEFT JOIN products p ON soi.product_id = p.product_id
+                WHERE soi.order_id = ? AND soi.product_id IS NOT NULL
+            ");
+            $soi_stmt->execute([$so_id]);
+            foreach ($soi_stmt->fetchAll(PDO::FETCH_ASSOC) as $o) {
+                if ((float)$o['remaining'] > 0.0001) {
+                    $so_items[] = [
+                        'order_item_id' => $o['order_item_id'],
+                        'product_id'    => $o['product_id'],
+                        'product_name'  => $o['product_name'],
+                        'remaining'     => (float)$o['remaining'],
+                        'unit'          => $o['unit'] ?: 'pcs',
+                    ];
+                }
+            }
+        } else {
+            $so = null; // customer inactive/missing — treat as no SO link
+        }
+    } else {
+        $so = null; // not in an eligible status
+    }
+}
+
 $has_project = $project_id > 0;
 
 // ── LISTS — scoped by project for non-admins ─────────────────
@@ -129,15 +172,21 @@ if ($dn) {
 } elseif ($lpo && $lpo_customer) {
     $cur_party_type = 'customer';
     $cur_party_id   = (int)$lpo_customer['customer_id'];
+} elseif ($so && $so_customer) {
+    $cur_party_type = 'customer';
+    $cur_party_id   = (int)$so_customer['customer_id'];
 }
 
-// Locked customer display name — either the LPO's customer (create flow) or
-// the existing DN's linked customer (edit flow, party_type='customer').
+// Locked customer display name — either the LPO's/SO's customer (create flow)
+// or the existing DN's linked customer (edit flow, party_type='customer').
 $locked_customer_name = null;
 if ($cur_party_type === 'customer') {
     if ($lpo_customer) {
         $locked_customer_name = ($lpo_customer['customer_type'] === 'business' && !empty($lpo_customer['company_name']))
             ? $lpo_customer['company_name'] : $lpo_customer['customer_name'];
+    } elseif ($so_customer) {
+        $locked_customer_name = ($so_customer['customer_type'] === 'business' && !empty($so_customer['company_name']))
+            ? $so_customer['company_name'] : $so_customer['customer_name'];
     } elseif ($cur_party_id > 0) {
         $ccstmt = $pdo->prepare("SELECT customer_name, company_name, customer_type FROM customers WHERE customer_id = ?");
         $ccstmt->execute([$cur_party_id]);
@@ -171,7 +220,7 @@ $return_url = getUrl('delivery_notes');
                 <?= $is_edit ? 'Edit Outbound Delivery Note' : 'Create Delivery Note' ?>
                 <span class="badge bg-primary-subtle text-primary border border-primary ms-1" style="font-size:.65rem;">OUTBOUND</span>
             </h4>
-            <p class="text-muted small mb-0">Goods <strong>sent to</strong> a supplier, sub-contractor, or customer (LPO fulfillment) — the DN number is generated automatically.</p>
+            <p class="text-muted small mb-0">Goods <strong>sent to</strong> a supplier, sub-contractor, or customer (Sales Order / LPO fulfillment) — the DN number is generated automatically.</p>
         </div>
         <a href="<?= $return_url ?>" class="btn btn-outline-secondary btn-sm flex-shrink-0">
             <i class="bi bi-arrow-left me-1"></i> Back
@@ -190,9 +239,26 @@ $return_url = getUrl('delivery_notes');
     </div>
     <?php endif; ?>
 
+    <?php if ($so && $so_customer): ?>
+    <div class="alert alert-info d-flex align-items-center gap-2 d-print-none">
+        <i class="bi bi-info-circle fs-5"></i>
+        <div>
+            Pre-filling from Sales Order <strong><?= safe_output($so['order_number']) ?></strong>
+            — <strong><?= safe_output($locked_customer_name) ?></strong>
+            <?php if (!empty($so_items)): ?>
+            — <?= count($so_items) ?> item(s) with remaining quantity loaded.
+            <?php else: ?>
+            — <span class="text-warning-emphasis">all items already delivered.</span>
+            <?php endif; ?>
+            <a href="<?= getUrl('sales_order_view') ?>?id=<?= $so_id ?>" class="ms-2">Back to SO</a>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <form id="dnForm">
         <?php if ($is_edit): ?><input type="hidden" name="delivery_id" value="<?= $edit_id ?>"><?php endif; ?>
         <?php if ($lpo): ?><input type="hidden" name="customer_lpo_id" value="<?= $lpo_id ?>"><?php elseif ($is_edit && !empty($dn['customer_lpo_id'])): ?><input type="hidden" name="customer_lpo_id" value="<?= (int)$dn['customer_lpo_id'] ?>"><?php endif; ?>
+        <?php if ($so): ?><input type="hidden" name="order_id" value="<?= $so_id ?>"><?php elseif ($is_edit && !empty($dn['order_id'])): ?><input type="hidden" name="order_id" value="<?= (int)$dn['order_id'] ?>"><?php endif; ?>
 
         <div class="row g-4">
             <div class="col-lg-8">
@@ -215,13 +281,14 @@ $return_url = getUrl('delivery_notes');
                             <hr class="my-1">
 
                             <?php if ($cur_party_type === 'customer'): ?>
-                            <!-- LOCKED CUSTOMER PARTY (from Customer LPO) -->
+                            <!-- LOCKED CUSTOMER PARTY (from Sales Order or Customer LPO) -->
                             <input type="hidden" name="party_type" id="dn_party_type" value="customer">
                             <input type="hidden" name="party_id" id="dn_party_id" value="<?= $cur_party_id ?>">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Send To</label>
                                 <div class="form-control bg-light fw-bold"><i class="bi bi-person-check me-1"></i> <?= safe_output($locked_customer_name) ?></div>
-                                <small class="text-muted">Customer — locked from the linked LPO.</small>
+                                <?php $locked_via = $so ? 'Sales Order' : ($lpo ? 'LPO' : (($is_edit && !empty($dn['order_id'])) ? 'Sales Order' : (($is_edit && !empty($dn['customer_lpo_id'])) ? 'LPO' : 'source document'))); ?>
+                                <small class="text-muted">Customer — locked from the linked <?= $locked_via ?>.</small>
                             </div>
                             <?php else: ?>
                             <!-- PARTY TYPE (dropdown) -->
@@ -379,6 +446,7 @@ const CUR_PARTY_ID   = <?= (int)$cur_party_id ?>;
 const IS_EDIT        = <?= $is_edit ? 'true' : 'false' ?>;
 const PRESET_WH      = <?= (int)($dn['warehouse_id'] ?? 0) ?>;
 const LPO_ITEMS      = <?= json_encode(array_values($lpo_items)) ?>;
+const SO_ITEMS        = <?= json_encode(array_values($so_items)) ?>;
 
 function initS2($el, placeholder) {
     if ($el.data('select2')) $el.select2('destroy');
@@ -427,13 +495,19 @@ $(document).ready(function () {
     if (IS_EDIT) {
         setTimeout(function () {
             <?php foreach ($dn_items as $item): ?>
-            addDNItem('<?= $item['product_id'] ?>', '<?= addslashes($item['product_name']) ?>', '<?= $item['quantity_delivered'] ?>', '<?= $item['unit'] ?>', 0);
+            addDNItem('<?= $item['product_id'] ?>', '<?= addslashes($item['product_name']) ?>', '<?= $item['quantity_delivered'] ?>', '<?= $item['unit'] ?>', 0, <?= (int)($item['order_item_id'] ?? 0) ?>);
             <?php endforeach; ?>
         }, 800);
     } else if (LPO_ITEMS.length > 0) {
         setTimeout(function () {
             LPO_ITEMS.forEach(function (it) {
-                addDNItem(it.product_id, it.product_name, it.remaining, it.unit, 0);
+                addDNItem(it.product_id, it.product_name, it.remaining, it.unit, 0, 0);
+            });
+        }, 800);
+    } else if (SO_ITEMS.length > 0) {
+        setTimeout(function () {
+            SO_ITEMS.forEach(function (it) {
+                addDNItem(it.product_id, it.product_name, it.remaining, it.unit, 0, it.order_item_id);
             });
         }, 800);
     } else {
@@ -542,9 +616,9 @@ function selectProduct(rowId, p) {
     updateDNSummary();
 }
 
-function addDNItem(productId, productName, qty, unit, available) {
+function addDNItem(productId, productName, qty, unit, available, orderItemId) {
     productId = productId || ''; productName = productName || ''; qty = qty || '';
-    unit = unit || 'pcs'; available = available || 0;
+    unit = unit || 'pcs'; available = available || 0; orderItemId = orderItemId || 0;
     if (productId && (available == 0 || available == '0')) {
         const s = warehouseStock.find(s => s.product_id == productId);
         if (s) available = s.available_quantity;
@@ -563,6 +637,7 @@ function addDNItem(productId, productName, qty, unit, available) {
                     oninput="showProductDropdown('${rowId}', this)" onfocus="showProductDropdown('${rowId}', this)"
                     onblur="setTimeout(closeAllDropdowns, 200)">
                 <input type="hidden" name="product_id[]" id="pid_${rowId}" value="${productId}">
+                <input type="hidden" name="order_item_id[]" id="oiid_${rowId}" value="${orderItemId}">
             </div>
         </td>
         <td class="text-center" style="width:110px;">
@@ -626,7 +701,8 @@ function submitDN(status) {
         const productId = $(this).find('input[name="product_id[]"]').val();
         const qty = parseFloat($(this).find('input[name="quantity[]"]').val()) || 0;
         const unit = $(this).find('input[name="unit[]"]').val() || 'pcs';
-        if (productId && qty > 0) items.push({ product_id: productId, quantity: qty, unit: unit });
+        const orderItemId = parseInt($(this).find('input[name="order_item_id[]"]').val()) || 0;
+        if (productId && qty > 0) items.push({ product_id: productId, quantity: qty, unit: unit, order_item_id: orderItemId || null });
     });
     if (items.length === 0) { Swal.fire({ icon: 'warning', title: 'No Valid Items', text: 'Add at least one item with a product and quantity.' }); return; }
 
@@ -645,6 +721,7 @@ function submitDN(status) {
     fd.append('status', status);
     <?php if ($is_edit): ?>fd.append('delivery_id', '<?= $edit_id ?>');<?php endif; ?>
     <?php if ($lpo): ?>fd.append('customer_lpo_id', '<?= $lpo_id ?>');<?php elseif ($is_edit && !empty($dn['customer_lpo_id'])): ?>fd.append('customer_lpo_id', '<?= (int)$dn['customer_lpo_id'] ?>');<?php endif; ?>
+    <?php if ($so): ?>fd.append('order_id', '<?= $so_id ?>');<?php elseif ($is_edit && !empty($dn['order_id'])): ?>fd.append('order_id', '<?= (int)$dn['order_id'] ?>');<?php endif; ?>
 
     Swal.fire({ title: 'Saving...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     $.ajax({
