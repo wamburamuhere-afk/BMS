@@ -242,7 +242,7 @@ if ($is_legacy_procurement_edit) {
 // the client to rebuild.
 $party_field_locked = $party_locked_via_source || $is_legacy_procurement_edit;
 
-$return_url = getUrl('delivery_notes');
+$return_url = getUrl('delivery_notes') . '?type=outbound';
 ?>
 
 <link href="/assets/css/select2.min.css" rel="stylesheet" />

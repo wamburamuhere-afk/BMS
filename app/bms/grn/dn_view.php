@@ -76,7 +76,7 @@ $dn_display  = $is_inbound ? ($dn['dn_number'] ?: $dn['delivery_number']) : $dn[
 $has_return_items = !empty(array_filter($items, fn($i) => ($i['condition'] ?? 'good') !== 'good'));
 $can_create_return = $is_inbound && $dn['status'] === 'approved' && $has_return_items && canCreate('dn');
 
-$return_url   = getUrl('delivery_notes');
+$return_url   = getUrl('delivery_notes') . ($is_inbound ? '' : '?type=outbound');
 $status_colors = ['pending'=>'warning','reviewed'=>'primary','approved'=>'info','partially_delivered'=>'warning','dispatched'=>'info','delivered'=>'success','completed'=>'success','cancelled'=>'danger'];
 $status_color  = $status_colors[$dn['status']] ?? 'secondary';
 $total_qty     = array_sum(array_column($items, 'quantity_delivered'));
