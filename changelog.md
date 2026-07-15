@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-07-15 (test) — tests/test_dn_cli.php: update stale outbound-attachment assertion
+
+**File:** `tests/test_dn_cli.php`
+
+CI regression guard for the PR above — `hasNot($outbound, 'attachment_file[]', ...)` asserted the
+*old* behavior (outbound DN has no attachment mechanism at all), which the PR intentionally changes.
+Flipped to `has(...)`, updated the label and section/file doc-comments to describe the new intended
+shape (Sales-side/Customer-only party, optional-unless-no-Project attachment). Verified locally: all
+80 assertions in this suite pass, plus a full local run of every other CI-gated regression suite
+(e-signatures, document expiry, e-signatures wizard, sub-contractor details, quotations, quotation
+customer-box, document categories, CSRF redeclaration, print CSS standard, stock_movements ENUM
+safety) — all green, none affected by this session's changes.
+
 ## 2026-07-15 — Outbound DN: optional reference-document attachments (mandatory without a Project) + linked Invoice status
 
 **Files:** `app/bms/grn/dn_outbound.php`, `api/create_dn.php`, `app/bms/grn/dn_view.php`, `api/account/print_delivery_note.php`
