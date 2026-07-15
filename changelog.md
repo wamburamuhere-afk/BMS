@@ -14,6 +14,42 @@ it into `renderWarehouseOptions()`. The dropdown now opens with the right wareho
 default, same as Project already did, while staying fully editable if the user needs to change it.
 Verified live: SO #62 (warehouse_id=14, project_id=16) renders `<option value="14" ... selected>`.
 
+## 2026-07-15 — Outbound Delivery Note becomes Sales-side / Customer-only, with optional SO/LPO link
+
+**Files:** `app/bms/grn/dn_outbound.php`, `api/create_dn.php`, `api/approve_dn.php`, `app/bms/sales/sales_order_view.php`
+
+`dn_outbound.php` was a generic "Send To: Supplier / Sub-Contractor" procurement form; Customer only
+ever appeared pre-locked, and only when arriving via a required Customer LPO (`?lpo_id=`). There was
+also no way to create an outbound DN from a Sales Order at all, even though the DB already carried
+everything needed for it (`deliveries.order_id`, `sales_order_items.quantity_delivered`,
+`delivery_items.order_item_id`, `sales_orders.total_delivered` — all sitting unused). Per feedback,
+this page is now the **Sales-side delivery note creator — Customer only**:
+
+- The "Send To" type selector is gone. A fresh DN always creates `party_type = 'customer'`; the form
+  is a single Customer field, same shape as `sales_order_create.php`'s own customer picker
+  (`$all_customers`, project-scoped like the old supplier list, feeds a select2 dropdown).
+- A Sales Order or Customer LPO link is **optional**, never required — `api/create_dn.php` validates
+  a reference only if one is actually supplied.
+- Arriving via `?order=<sales_order_id>` (new "Create Delivery Note" button on `sales_order_view.php`,
+  approved/processing/shipped) or `?lpo_id=` **locks** the customer and prefills remaining-to-deliver
+  items as a convenience shortcut — `sales_order_items.quantity - quantity_delivered` for the SO path
+  (simpler than the LPO block's live-sum approach, since that column is now the maintained source of
+  truth). Each SO-sourced item row carries its `order_item_id` through to submit, validated
+  server-side to actually belong to that SO.
+- `api/approve_dn.php`: on approval of an SO-linked outbound DN, bumps
+  `sales_order_items.quantity_delivered` per delivered line, recomputes `sales_orders.total_delivered`
+  from the items (source of truth), and advances `sales_orders.status` to `delivered` — forward-only,
+  never regresses — once every line is fully delivered. Mirrors the existing Customer-LPO fulfillment
+  block right above it.
+- Supplier / Sub-Contractor sends are a procurement concern and no longer created here. The 3
+  pre-existing legacy records of that kind (verified live against the DB) remain viewable/editable —
+  their party renders read-only via `$is_legacy_procurement_edit` — rather than being broken or
+  silently reassigned.
+
+Every new/changed SQL statement (2 INSERTs, 2 UPDATEs) was verified with a live, rolled-back
+transaction against the local DB, and the full SO-prefill lookup was dry-run against a real approved
+SO (customer + remaining-quantity item resolved correctly).
+
 ## 2026-07-15 (hotfix) — Create Invoice: SQLSTATE[HY093] on save + SO→Invoice link dropped the order id
 
 **Files:** `api/account/save_invoice.php`, `app/bms/sales/sales_orders.php`
