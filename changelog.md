@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-07-15 — Create Document: optional custom sender address override per letter
+
+**Files:** `migrations/2026_07_15_documents_custom_sender_info.php`, `app/constant/document/create_document.php`,
+`api/document/save_created_document.php`, `api/document/duplicate_created_document.php`
+
+The letterhead's sender-address block (postal/physical address, phone, email, TIN, VRN) was always
+auto-pulled from Company Profile with no way to change it per letter. Added a "Customize sender
+address for this letter" toggle: off (default) keeps today's behaviour — always follows Company
+Profile automatically; on reveals a small, freely-formatted rich-text block (its own Summernote
+instance/toolbar, independent of the letter body's toolbar) the user can edit/format however they
+like just for that one letter, without touching Company Profile or any other letter.
+
+New nullable `documents.custom_sender_info` column: `NULL` = auto (Company Profile), non-null = this
+letter's own override. Wired through save (persists when the toggle is on, reverts to `NULL`/auto
+when turned off — even if stale text remains in the now-hidden editor), reload (toggle + block state
+rebuilt from the stored value), and duplicate (carries the source letter's override into the copy).
+`create_document.php` is the only page that renders this letterhead block — no separate print/view
+path needed updating. Verified live via direct DB round-trip: save-with-override, toggle-off clears
+to `NULL`, and duplicate copies the override correctly.
+
 ## 2026-07-15 (hotfix) — Project Details: "Failed to load project data" on every project — regression from PR #1302
 
 **File:** `api/operations/get_project.php`

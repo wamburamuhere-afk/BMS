@@ -64,8 +64,8 @@ try {
             document_name, description, content, file_path, original_filename,
             file_size, file_type, category_id, document_code, version,
             issue_date, access_level, uploaded_by, project_id, source,
-            use_letterhead, recipient_address, signature_align
-        ) VALUES (?, ?, ?, ?, ?, ?, 'pdf', ?, ?, '1.0', ?, ?, ?, ?, 'created', ?, ?, ?)
+            use_letterhead, recipient_address, signature_align, custom_sender_info
+        ) VALUES (?, ?, ?, ?, ?, ?, 'pdf', ?, ?, '1.0', ?, ?, ?, ?, 'created', ?, ?, ?, ?)
     ");
     $ins->execute([
         $new_name_field,
@@ -83,6 +83,7 @@ try {
         $source['use_letterhead'] ?? 1,
         $source['recipient_address'] ?? null,
         $source['signature_align'] ?? 'left',
+        $source['custom_sender_info'] ?? null,
     ]);
     $new_id = (int)$pdo->lastInsertId();
 

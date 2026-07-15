@@ -46,6 +46,14 @@ try {
     $use_letterhead = ($_POST['use_letterhead'] ?? '1') === '1' ? 1 : 0;
     $signature_align = in_array(($_POST['signature_align'] ?? ''), ['left', 'center', 'right'], true)
         ? $_POST['signature_align'] : 'left';
+    // NULL = always follow Company Profile automatically (default). Only
+    // persisted when the "Customize sender address" toggle was actually on —
+    // if the client sends the flag off, this document reverts to auto on
+    // every future load/render regardless of what was typed into the (now
+    // hidden) custom editor.
+    $use_custom_sender = ($_POST['use_custom_sender'] ?? '0') === '1';
+    $custom_sender_info = ($use_custom_sender && trim((string)($_POST['custom_sender_info'] ?? '')) !== '')
+        ? (string)$_POST['custom_sender_info'] : null;
 
     if ($subject === '') {
         throw new Exception('Subject is required');
@@ -109,7 +117,8 @@ try {
                 document_name = ?, description = ?, content = ?, file_path = ?,
                 original_filename = ?, file_size = ?, file_type = 'pdf',
                 category_id = ?, project_id = ?, issue_date = ?, access_level = ?,
-                use_letterhead = ?, recipient_address = ?, signature_align = ?, updated_at = NOW()
+                use_letterhead = ?, recipient_address = ?, signature_align = ?,
+                custom_sender_info = ?, updated_at = NOW()
             WHERE id = ?
         ");
         $upd->execute([
@@ -126,6 +135,7 @@ try {
             $use_letterhead,
             $recipient_address !== '' ? $recipient_address : null,
             $signature_align,
+            $custom_sender_info,
             $document_id,
         ]);
 
@@ -163,8 +173,8 @@ try {
                 document_name, description, content, file_path, original_filename,
                 file_size, file_type, category_id, document_code, version,
                 issue_date, access_level, uploaded_by, project_id, source,
-                use_letterhead, recipient_address, signature_align
-            ) VALUES (?, ?, ?, ?, ?, ?, 'pdf', ?, ?, '1.0', ?, ?, ?, ?, 'created', ?, ?, ?)
+                use_letterhead, recipient_address, signature_align, custom_sender_info
+            ) VALUES (?, ?, ?, ?, ?, ?, 'pdf', ?, ?, '1.0', ?, ?, ?, ?, 'created', ?, ?, ?, ?)
         ");
         $ins->execute([
             $subject,
@@ -182,6 +192,7 @@ try {
             $use_letterhead,
             $recipient_address !== '' ? $recipient_address : null,
             $signature_align,
+            $custom_sender_info,
         ]);
         $document_id = (int)$pdo->lastInsertId();
         $pdo->commit();
