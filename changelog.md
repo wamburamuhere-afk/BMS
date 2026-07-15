@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-07-15 (hotfix) — Project Details: "Failed to load project data" on every project — regression from PR #1302
+
+**File:** `api/operations/get_project.php`
+
+**My mistake, live on production.** PR #1302 renamed the budgets subquery's alias from `spent_amount`
+to `actual_amount` (so it correctly overrides the stale stored column — see that changelog entry).
+I updated the one place I'd checked used `spent_amount` (`project_view.php`'s JS), but missed that
+`get_project.php` itself, four lines below the query, also read `$b['spent_amount']` to compute
+`variance`/`remaining_balance`. With the key renamed, that line threw
+`Undefined array key "spent_amount"` — and with `display_errors` on, PHP printed that warning
+straight into the JSON response body, corrupting it. Every `GET /api/operations/get_project.php`
+call for a project with any budgets returned broken JSON, which jQuery's `dataType:'json'` handling
+surfaced as the generic AJAX failure — "Failed to load project data." on **every** Project Details
+page.
+
+Fixed the one missed reference: `$b['spent_amount']` → `$b['actual_amount']`. Grepped both this file
+and `project_view.php` for any other `spent_amount` reference — none remain.
+
+Verified live: fresh-process CLI requests against multiple real projects — valid JSON, correct
+`variance` values, no warnings in the output.
+
 ## 2026-07-14 (change) — Create Document: editor toolbar now spans the full content width
 
 **File:** `app/constant/document/create_document.php`
