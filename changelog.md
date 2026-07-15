@@ -15,6 +15,20 @@ still print their vendor exactly as before; this was a deliberate scope decision
 that unrelated, working flow. Verified live: DN #30 (customer, MICHAEL) resolves to the new Customer
 box; DN #24 (legacy supplier) still resolves to the existing vendor box.
 
+## 2026-07-15 — Create Invoice: pre-select the Warehouse when arriving from an approved Sales Order
+
+**File:** `app/bms/invoice/invoice_create.php`
+
+Follow-up to the SQLSTATE[HY093] hotfix above: the SO→Invoice link now carries the sales order id
+correctly, but the Warehouse dropdown still opened blank and the user had to reselect the same
+warehouse they'd already picked on the Sales Order (or Delivery Note). `renderWarehouseOptions()`
+was already built to accept a `$selectedId` to mark an option `selected`, and `$order`/`$delivery`
+are fetched with `SELECT *` so `warehouse_id` was already sitting on both — it just wasn't passed
+through. Added a `$prefill_warehouse_id` (SO's `warehouse_id`, falling back to the DN's) and wired
+it into `renderWarehouseOptions()`. The dropdown now opens with the right warehouse pre-selected by
+default, same as Project already did, while staying fully editable if the user needs to change it.
+Verified live: SO #62 (warehouse_id=14, project_id=16) renders `<option value="14" ... selected>`.
+
 ## 2026-07-15 — Outbound Delivery Note becomes Sales-side / Customer-only, with optional SO/LPO link
 
 **Files:** `app/bms/grn/dn_outbound.php`, `api/create_dn.php`, `api/approve_dn.php`, `app/bms/sales/sales_order_view.php`
