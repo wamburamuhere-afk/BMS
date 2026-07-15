@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-07-15 (fix) — "Generate with AI" modal could be dismissed mid-request, losing the result
+
+**File:** `app/includes/ai_generate.php`
+
+Follow-up to the AI Settings model-mismatch fix — reported that even after that fix, generating text
+still sometimes "closed automatically" with nothing to show. Root cause: `#aiGenModal` had no dismiss
+protection at all — no `data-bs-backdrop="static"`, no `data-bs-keyboard="false"`. An LLM request
+typically takes a few seconds; a stray click outside the modal, or an Escape key press, closes it via
+Bootstrap's default behaviour. Since the AJAX success handler still writes the generated text into
+the modal's DOM elements once the response arrives — Bootstrap's `.hide()` only hides an element, it
+doesn't remove it — the result was silently written into a modal the user had already dismissed. No
+error, nothing visible: exactly "generated, then closed, saw nothing."
+
+- Modal now locked against backdrop-click and Escape-key dismissal (`data-bs-backdrop="static"
+  data-bs-keyboard="false"`).
+- Belt-and-braces: the explicit Cancel button and the header's X close button are also disabled for
+  the duration of the request (re-enabled in the AJAX `complete` handler), so there's no dismiss path
+  — accidental or deliberate — that can lose an in-flight generation. `.hide()` calls (the "Use this"
+  button's own close) are unaffected, since programmatic hide isn't gated by these attributes.
+- On success, the result box now scrolls into view and receives focus, so it can't be missed even if
+  it renders below the fold inside the modal.
+
+This is the **shared** "Generate with AI" component used across invoices, quotations, expenses, and
+Create Document — the fix applies everywhere the widget is used, not just the one page it was
+reported on.
+
+Verified: rendered Create Document and confirmed the modal carries the new dismiss-protection
+attributes and button ids in the actual output; the updated click-handler logic was run standalone
+through Node against a mocked successful response with no exceptions. `php -l` clean.
+
 ## 2026-07-15 (change) — Project Docs: "Create Doc" is now its own menu item, not embedded inside "Add Doc"
 
 **File:** `app/bms/operations/project_view.php`
