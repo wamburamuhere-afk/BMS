@@ -276,6 +276,13 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
     </div>
     <?php endif; ?>
 
+    <!-- The Summernote toolbar mounts here — kept OUTSIDE the letter-paper mockup
+         (via the toolbarContainer option below) so it reads as an editor control
+         bar, not as content printed inside the page. Sits OUTSIDE .letter-workspace
+         (not nested in its 24px padding) and full width, same pattern as vikundi —
+         same toolbar, same buttons, just no longer boxed to the A4 page width. -->
+    <div class="letter-toolbar-bar d-print-none" id="letterToolbar"></div>
+
     <!-- Wide editing canvas (fills the desktop like the rest of BMS) — purely
          a screen backdrop. The A4-sized page inside it (#letterPaper) is what
          actually gets captured into the PDF, so its own size/padding must
@@ -289,10 +296,6 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
         <div class="letter-paper-wrap d-print-none">
             <div class="letter-paper-label"><i class="bi bi-eye"></i> Live Preview — this is exactly how the saved PDF will look</div>
         </div>
-        <!-- The Summernote toolbar mounts here — kept OUTSIDE the letter-paper
-             mockup (via the toolbarContainer option below) so it reads as an
-             editor control bar above the page, not as content printed inside it. -->
-        <div class="letter-toolbar-bar mx-auto d-print-none" id="letterToolbar"></div>
         <div class="letter-paper mx-auto shadow-sm<?= $use_letterhead ? '' : ' no-letterhead' ?>" id="letterPaper">
         <div class="letter-head text-center">
             <?php if ($company_logo): ?>
@@ -458,12 +461,15 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
 /* Editor ribbon — sits ABOVE the letter-paper page, like Word's ribbon above
    a blank document. Summernote's toolbarContainer option mounts the real
    toolbar into this box instead of inside #letterBody, so it never renders
-   as if it were part of the printed page. */
+   as if it were part of the printed page. Full width of the content area
+   (not the A4 page width) and positioned outside .letter-workspace so its
+   padding doesn't inset it — same full-bleed toolbar pattern as vikundi. */
 .letter-toolbar-bar {
-    max-width: 210mm;
+    width: 100%;
     background: #f8f9fa;
     border: 1px solid #dee2e6;
-    border-bottom: none;
+    border-radius: 8px;
+    margin-bottom: 16px;
 }
 .letter-toolbar-bar .note-toolbar {
     background: transparent !important;
