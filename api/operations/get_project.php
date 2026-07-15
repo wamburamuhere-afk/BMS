@@ -192,10 +192,17 @@ try {
         $debit_notes = [];
     }
 
-    // Get Budgets with calculated spent amounts
+    // Get Budgets with calculated spent amounts.
+    // b.actual_amount is a stored column that is never updated after insert (stays
+    // 0 forever) — the external budget.php list never reads it either, it always
+    // recomputes live from linked expenses. This subquery is aliased to the SAME
+    // column name so it overrides b.*'s stale value in the result set (PDO keeps
+    // the later-selected column), using the same status filter as budget.php
+    // ('approved','paid' — accrual-basis: a merely-pending expense hasn't been
+    // recognised yet and shouldn't count as spent).
     $stmt = $pdo->prepare("
         SELECT b.*, ec.name AS category_name,
-               (SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE budget_id = b.budget_id AND status != 'rejected') as spent_amount
+               (SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE budget_id = b.budget_id AND status IN ('approved','paid')) as actual_amount
         FROM budgets b
         LEFT JOIN expense_categories ec ON b.category_id = ec.id
         WHERE b.project_id = ?
