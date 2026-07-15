@@ -71,6 +71,12 @@ $stmtItems = $pdo->prepare("
 $stmtItems->execute([$id]);
 $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
 
+// Linked Invoice (outbound customer DNs) — boss's requirement: show whether
+// it's Paid or just Approved.
+$inv_stmt = $pdo->prepare("SELECT invoice_number, status FROM invoices WHERE delivery_id = ? AND status != 'cancelled' ORDER BY invoice_date DESC LIMIT 1");
+$inv_stmt->execute([$id]);
+$linked_invoice = $inv_stmt->fetch(PDO::FETCH_ASSOC);
+
 // Company Settings
 $comp = ['name'=>'Business Management System','email'=>'','phone'=>'','address'=>'','postal_address'=>'','website'=>'','tin'=>'','vrn'=>'','logo'=>''];
 try {
@@ -409,6 +415,9 @@ $wf = [
             <p><strong>Contract:</strong> <?= htmlspecialchars($dn['project_contract_no']) ?></p>
             <?php endif; ?>
             <p><strong>Prepared By:</strong> <?= htmlspecialchars($dn['prepared_by_name'] ?: ($dn_creator_name ?: 'Staff')) ?></p>
+            <?php if ($linked_invoice): ?>
+            <p><strong>Invoice:</strong> <?= htmlspecialchars($linked_invoice['invoice_number']) ?> &mdash; <?= strtoupper(htmlspecialchars($linked_invoice['status'])) ?></p>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -460,8 +469,25 @@ $wf = [
     <!-- DRAFT WATERMARK (position:fixed; only when status !== 'approved') -->
     <?php require ROOT_DIR . '/includes/workflow_draft_watermark.php'; ?>
 
-    <!-- SIGNATURE / AUTHORIZATION — canonical partial -->
-    <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
+    <!-- SIGNATURE / AUTHORIZATION — canonical partial (Created/Reviewed/Approved),
+         plus a DN-specific "Received By" column in the same row. The wrapper below
+         is local to this page only — workflow_signature_row.php itself is untouched,
+         so every other print page keeps its unmodified 3-column row at full width.
+         The #dnSigRow-scoped override just below narrows the columns so all 4 fit
+         the ~733px printable width of an A4 page (3×210px+2×40px alone already
+         uses ~710px — a 4th 210px column would overflow). Proof of physical
+         receipt at the delivery destination — boss's requirement. -->
+    <div id="dnSigRow" style="display:flex; align-items:flex-start; justify-content:space-between; gap:20px;">
+        <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
+        <div class="signature-line" style="margin-top:46px;">
+            Received By<br>
+            <small>&nbsp;</small>
+        </div>
+    </div>
+    <style>
+        #dnSigRow .signature-box { gap: 20px; }
+        #dnSigRow .signature-line { width: 160px; }
+    </style>
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 
