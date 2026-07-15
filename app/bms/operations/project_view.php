@@ -9927,7 +9927,27 @@ function renderBudgets(budgets, paginationInfo) {
                         <li><a class="dropdown-item py-2 text-warning" href="javascript:void(0)" onclick="updateBudgetItemStatus(${b.budget_id}, 'rejected')"><i class="bi bi-x-circle me-2"></i>Reject</a></li>` : ''}
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteBudgetItem(${b.budget_id})"><i class="bi bi-trash me-2"></i>Delete</a></li>`;
-        const _bStatus = `<span class="badge bg-${getStatusBadgeColor(b.status)}">${b.status}</span>${b.rejection_reason ? `<div class="mt-1"><small class="${b.status === 'rejected' ? 'text-danger' : 'text-muted'} fw-bold" style="font-size:0.7rem;" title="${b.rejection_reason}"><i class="bi bi-info-circle me-1"></i>${b.status === 'rejected' ? 'View Reason' : 'Was Rejected'}</small></div>` : ''}`;
+        // Same badge derivation as budget.php's list: the workflow status (draft/
+        // pending/approved/rejected) only ever changes via explicit approve/reject —
+        // "Partially Paid"/"Paid" are never stored, they're a spending-state label
+        // computed live from allocated vs actual once a budget is approved. Without
+        // this, an approved budget's badge stayed stuck on "approved" forever
+        // regardless of how much had actually been spent against it.
+        const usagePct = allocated > 0 ? (actual / allocated) * 100 : 0;
+        let spLabel, spCls;
+        if (b.status === 'pending' || b.status === 'draft') {
+            spLabel = 'Pending Approval'; spCls = 'bg-warning text-dark';
+        } else if (b.status === 'rejected') {
+            spLabel = 'Rejected'; spCls = 'bg-danger';
+        } else if (b.status === 'approved') {
+            if (allocated <= 0) { spLabel = 'No Budget'; spCls = 'bg-secondary'; }
+            else if (usagePct === 0) { spLabel = 'Approved'; spCls = 'bg-success bg-opacity-10 text-success border border-success border-opacity-25'; }
+            else if (usagePct < 100) { spLabel = 'Partially Paid'; spCls = 'bg-info bg-opacity-10 text-info border border-info border-opacity-25'; }
+            else { spLabel = 'Paid'; spCls = 'bg-success'; }
+        } else {
+            spLabel = 'No Budget'; spCls = 'bg-secondary';
+        }
+        const _bStatus = `<span class="badge ${spCls}">${spLabel}</span>${b.rejection_reason ? `<div class="mt-1"><small class="${b.status === 'rejected' ? 'text-danger' : 'text-muted'} fw-bold" style="font-size:0.7rem;" title="${b.rejection_reason}"><i class="bi bi-info-circle me-1"></i>${b.status === 'rejected' ? 'View Reason' : 'Was Rejected'}</small></div>` : ''}`;
 
         html += `<tr data-bid="${b.budget_id}">
             <td class="dt-control text-center text-primary" style="cursor:pointer;"><i class="bi bi-chevron-right"></i></td>

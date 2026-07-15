@@ -1,5 +1,41 @@
 # BMS Changelog
 
+## 2026-07-14 (fix) — Project Budget: "Actual Amount" always read 0, status badge never reflected real spending
+
+**Files:** `api/operations/get_project.php`, `app/bms/operations/project_view.php`
+
+Follow-up to the project-Budget parity fix: reported that adding an expense against an approved
+project budget left "Actual Amount" and the status badge unchanged, while the external Budget list
+correctly shows "Partially Paid"/"Paid" once spending occurs.
+
+- **Root cause: `renderBudgets()` was reading the wrong field.** `budgets.actual_amount` is a stored
+  column that is set once at creation and **never updated anywhere in the codebase** (confirmed via
+  repo-wide search — no `UPDATE budgets SET actual_amount` exists) — it stays at whatever it was on
+  create, permanently. The external `budget.php` list has always known this and never reads it either;
+  it recomputes live from linked expenses on every page load. `get_project.php`'s budgets query
+  already computed this correctly too, but aliased it as `spent_amount` — a field the frontend never
+  read (confirmed unused anywhere in `project_view.php`), so the JS fell back to the stale
+  `b.actual_amount` from `SELECT b.*`, which was always 0 (or whatever it started at). Fixed by
+  aliasing the live subquery to `actual_amount` itself, so it overrides the stale column in the
+  result set — verified live that PDO's `FETCH_ASSOC` keeps the later-selected column when both share
+  a name. Also aligned the business rule with `budget.php`'s exact one: counts expenses with
+  `status IN ('approved','paid')` (accrual-basis — a merely-`pending` expense hasn't been recognised
+  yet), not the looser `status != 'rejected'` this subquery used before.
+- **Root cause 2: the status badge just echoed the raw `status` column.** "Paid"/"Partially Paid" were
+  never real stored values on `budgets.status` (confirmed: the column's real ENUM is
+  `draft/pending/approved/rejected/paid`, and "Partially Paid" isn't in it at all) — `budget.php`
+  derives these as a **display-only spending-state label**, computed from `allocated` vs `actual`
+  only when the real workflow status is `approved`. `project_view.php`'s badge just printed the raw
+  status, so it stayed on "approved" forever no matter how much was spent. Ported the identical
+  derivation logic (same thresholds, same labels: Pending Approval / Rejected / No Budget / Approved /
+  Partially Paid / Paid).
+
+Verified live end-to-end: created an approved budget (allocated 1,000), added a 400 linked expense at
+`approved` status, ran the fixed query — `actual_amount` correctly resolves to 400 (not the stale 0),
+and the ported badge logic correctly derives "Partially Paid" at 40% usage. Also proved the column-
+override mechanism directly with a deliberately-wrong stale value (9999) to confirm the live subquery
+wins, not the stored column. `php -l` clean on both files. Rolled back all test data.
+
 ## 2026-07-14 (fix) — Project Budget: missing Year/Month fields silently reset period; View Details/actions didn't match external
 
 **Files:** `app/bms/operations/project_view.php`, `app/constant/accounts/budget_details.php`
