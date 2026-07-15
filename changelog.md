@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-07-15 (hotfix) — Create Invoice: SQLSTATE[HY093] on save + SO→Invoice link dropped the order id
+
+**Files:** `api/account/save_invoice.php`, `app/bms/sales/sales_orders.php`
+
+Two bugs in the Sales Order → Invoice flow, reported by user after approving a Sales Order and
+clicking "Create Invoice":
+
+1. `save_invoice.php`'s new-invoice `INSERT INTO invoices` VALUES clause was missing one `?`
+   placeholder — the literal `0` (meant for `paid_amount`) had slid one slot early into
+   `grand_total`'s place, leaving 19 placeholders for 20 bound values. Every new invoice save hit
+   `SQLSTATE[HY093]: Invalid parameter number`, regardless of warehouse/sales-order selection.
+   Added the missing `?` so `grand_total` gets its own placeholder again. Verified with a live
+   (rolled-back) INSERT against the local DB.
+2. The "Create Invoice" action on the Sales Orders **list** page linked to
+   `invoice_create?id=<sales_order_id>`, but `invoice_create.php` only reads `$_GET['order']` — so
+   the sales order, its items, and the warehouse never pre-filled. Changed the link to
+   `?order=<sales_order_id>` to match (the Sales Order *view* page's link was already correct).
+
 ## 2026-07-15 (fix) — AI Settings: Model is now filtered to the selected Provider, not free text
 
 **File:** `app/constant/settings/ai_settings.php`
