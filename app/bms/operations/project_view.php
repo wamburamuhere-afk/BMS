@@ -1004,6 +1004,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <ul class="dropdown-menu shadow border-0">
                                 <li><button class="dropdown-item py-2" id="docs-view-tab" data-bs-toggle="tab" data-bs-target="#docs" type="button"><i class="bi bi-eye me-2"></i> Docs Library</button></li>
                                 <li><button class="dropdown-item py-2" id="docs-add-tab" data-bs-toggle="tab" data-bs-target="#docs-add" type="button"><i class="bi bi-plus-circle me-2"></i> Add Doc</button></li>
+                                <li><a class="dropdown-item py-2" href="<?= getUrl('new_document') ?>?project_id=<?= (int)$project_id ?>"><i class="bi bi-file-earmark-plus me-2"></i> Create Doc</a></li>
                             </ul>
                         </li>
                         <!-- Reports Group -->
@@ -2710,11 +2711,8 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
                     <!-- Add Document Tab -->
                     <div class="tab-pane fade p-3 p-md-4" id="docs-add" role="tabpanel">
-                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-2">
+                        <div class="mb-4">
                             <h5 class="fw-bold mb-0 text-center text-md-start text-primary"><i class="bi bi-cloud-upload me-2"></i>Upload New Project Document</h5>
-                            <a href="<?= getUrl('new_document') ?>?project_id=<?= (int)$project_id ?>" class="btn btn-outline-primary">
-                                <i class="bi bi-file-earmark-plus me-1"></i> Create Document
-                            </a>
                         </div>
                         <div class="card border-0 shadow-sm bg-light-soft" style="border-radius: 15px;">
                             <div class="card-body p-4">

@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-07-15 (change) — Project Docs: "Create Doc" is now its own menu item, not embedded inside "Add Doc"
+
+**File:** `app/bms/operations/project_view.php`
+
+The Docs dropdown had two items — "Docs Library" and "Add Doc" — but "Create Document" (the link to
+the in-app letter editor, `new_document.php`) lived buried inside the "Add Doc" tab's own content,
+sharing space with the file-upload form. Moved it out to be its own top-level entry in the Docs
+dropdown, positioned below "Add Doc", renamed to "Create Doc" — same destination
+(`new_document.php?project_id=X`), just promoted to a direct menu item instead of a button embedded
+in the upload tab. The "Add Doc" tab now only contains the file-upload form, as its name implies.
+
 ## 2026-07-15 (hotfix) — Project Details: "Failed to load project data" on every project — regression from PR #1302
 
 **File:** `api/operations/get_project.php`
