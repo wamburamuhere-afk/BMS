@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-07-15 — Delivery Notes list: Sales (Outbound) and Purchases (Inbound) entry points fully separated
+
+**Files:** `app/bms/grn/delivery_notes.php`, `app/bms/grn/dn_outbound.php`, `app/bms/grn/dn_view.php`
+
+Reported: leaving `dn_outbound.php` (create/edit/view) via Back landed on a list page showing *both*
+Inbound and Outbound tabs, even though the Sales menu's dedicated "DN (Outbound)" link
+(`delivery_notes?type=outbound`) was supposed to be a self-contained entry point — the Inbound tab was
+rendered unconditionally regardless of how the page was reached.
+
+- The Inbound tab is now conditional too (previously only Outbound was): the Sales-side entry point
+  shows *only* the Outbound tab, the default Purchases entry point shows *only* Inbound — each is
+  fully self-contained, matching the existing "Purchases must not offer Outbound at all" rule
+  symmetrically. Card header title now paints correctly server-side on first load too (was a
+  JS-driven swap after the fact).
+- `dn_outbound.php` (outbound-only) and `dn_view.php` (when viewing an outbound DN) now build their
+  Back/Cancel/breadcrumb/post-save `$return_url` as `delivery_notes?type=outbound`, so leaving an
+  outbound DN returns to the outbound-only list, not the Purchases default.
+- The list table's party column header was static "Supplier / Sub-Contractor" text shared by both
+  tabs — stale for Outbound, which is Customer-only now (see the Sales-side rework earlier this
+  session). Now reads "Customer" on the Outbound entry point, "Supplier / Sub-Contractor" on Inbound.
+
+Verified: rendered both entry points directly — each produces exactly one tab (no dead
+switch-to-the-other-tab click target remains, since only one tab element exists per page load) and
+the correct column heading. `tests/test_dn_cli.php` (80 assertions) and the e-signatures / sub-contractor-details
+regression suites all still pass.
+
 ## 2026-07-15 (test) — tests/test_dn_cli.php: update stale outbound-attachment assertion
 
 **File:** `tests/test_dn_cli.php`

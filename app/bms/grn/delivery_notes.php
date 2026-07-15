@@ -323,17 +323,20 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
         </div>
     </div>
 
-    <!-- Inbound / Outbound separation tabs -->
+    <!-- Inbound / Outbound separation tabs — each entry point (Purchases vs
+         Sales menu) is fully self-contained: the Sales-side Outbound view
+         never offers Inbound, and vice versa. -->
     <ul class="nav nav-tabs dn-type-tabs d-print-none" id="dnTypeTabs">
+        <?php if (!$is_outbound_view): ?>
         <li class="nav-item">
             <button class="nav-link active" type="button" data-dntype="inbound">
                 <i class="bi bi-box-arrow-in-down me-1"></i> Inbound — Received
                 <span class="badge bg-primary ms-1" id="tabCountInbound">0</span>
             </button>
         </li>
-        <?php if ($is_outbound_view): ?>
+        <?php else: ?>
         <li class="nav-item">
-            <button class="nav-link" type="button" data-dntype="outbound">
+            <button class="nav-link active" type="button" data-dntype="outbound">
                 <i class="bi bi-box-arrow-up-right me-1"></i> Outbound — Sent
                 <span class="badge bg-info ms-1" id="tabCountOutbound">0</span>
             </button>
@@ -344,7 +347,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
     <!-- Table Card -->
     <div class="card border-0 shadow-sm mb-4" style="border-top-left-radius:0;">
         <div class="card-header bg-white py-3 border-bottom d-print-none d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-bold" id="dnListHeading">Inbound Delivery Notes — Received</h5>
+            <h5 class="mb-0 fw-bold" id="dnListHeading"><?= $is_outbound_view ? 'Outbound Delivery Notes — Sent' : 'Inbound Delivery Notes — Received' ?></h5>
             <div class="btn-group shadow-sm d-none d-md-flex" role="group">
                 <button type="button" class="btn btn-light btn-sm border" onclick="toggleViewMode('table')" id="tableViewBtn-toggle" title="Table View">
                     <i class="bi bi-table"></i>
@@ -364,7 +367,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                             <th>DN Number</th>
                             <th style="width:90px;">Type</th>
                             <th>Date</th>
-                            <th>Supplier / Sub-Contractor</th>
+                            <th id="dnPartyColHeading"><?= $is_outbound_view ? 'Customer' : 'Supplier / Sub-Contractor' ?></th>
                             <?php if ($enable_projects): ?><th>Project</th><?php endif; ?>
                             <th>Items</th>
                             <th>Warehouse</th>
@@ -411,7 +414,7 @@ const DN_CAN_CREATE_GRN  = <?= $can_create_grn   ? 'true' : 'false' ?>;
 const GRN_CREATE_URL     = '<?= getUrl('grn_create') ?>';
 
 let dnTable;
-let currentDnType = 'inbound'; // active tab: 'inbound' or 'outbound'
+let currentDnType = '<?= $is_outbound_view ? 'outbound' : 'inbound' ?>'; // active tab: 'inbound' or 'outbound'
 const API_URL = "<?= getUrl('api/get_delivery_notes_list.php') ?>";
 
 // View Mode Toggle Logic
