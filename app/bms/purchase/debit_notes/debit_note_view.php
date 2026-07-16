@@ -109,7 +109,19 @@ $badge = [
             <?php if ($status === 'pending' && $can_edit): ?>
                 <a class="btn btn-outline-primary" href="<?= getUrl('debit_note_edit') ?>?id=<?= $id ?><?= $proj_qs ?>"><i class="bi bi-pencil me-1"></i> Edit</a>
             <?php endif; ?>
-            <a class="btn btn-outline-primary" href="<?= getUrl('print_debit_note') ?>?id=<?= $id ?>" target="_blank"><i class="bi bi-printer me-1"></i> Print</a>
+            <div class="btn-group">
+                <a class="btn btn-outline-primary" href="<?= getUrl('print_debit_note') ?>?id=<?= $id ?>" target="_blank"><i class="bi bi-printer me-1"></i> Print</a>
+                <button type="button" class="btn btn-outline-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Choose print template</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><h6 class="dropdown-header">Print Template</h6></li>
+                    <li><a class="dropdown-item" href="<?= getUrl('print_debit_note') ?>?id=<?= $id ?>" target="_blank"><i class="bi bi-check2 me-2"></i>Standard (default)</a></li>
+                    <li><a class="dropdown-item" href="<?= getUrl('print_debit_note_navy') ?>?id=<?= $id ?>" target="_blank">Navy</a></li>
+                    <li><a class="dropdown-item" href="<?= getUrl('print_debit_note_corporate') ?>?id=<?= $id ?>" target="_blank">Corporate</a></li>
+                    <li><a class="dropdown-item" href="<?= getUrl('print_debit_note_banded') ?>?id=<?= $id ?>" target="_blank">Banded</a></li>
+                </ul>
+            </div>
             <?php if ($proj_id): ?>
                 <a class="btn btn-outline-primary" href="<?= getUrl('project_view') ?>?id=<?= $proj_id ?>&tab=proc-debit-notes"><i class="bi bi-kanban me-1"></i> Back to Project</a>
             <?php endif; ?>

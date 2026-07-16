@@ -363,8 +363,19 @@ $(document).ready(function(){
                             <li><a class="dropdown-item py-2 text-success fw-semibold" href="#" onclick="approveRFQ(${row.rfq_id},'${row.rfq_number}');return false;">
                                 <i class="bi bi-check-circle me-2"></i>Approve</a></li>
                         ` : ''}
-                        <li><a class="dropdown-item py-2" href="#" onclick="printRFQ(${row.rfq_id});return false;">
-                            <i class="bi bi-printer text-dark me-2"></i>Print</a></li>
+                        <li>
+                            <div class="d-flex align-items-center dropdown-item py-0 pe-1">
+                                <a class="flex-grow-1 py-2 text-decoration-none text-dark" href="#" onclick="printRFQ(${row.rfq_id});return false;"><i class="bi bi-printer text-dark me-2"></i>Print</a>
+                                <button type="button" class="btn btn-sm border-0 p-1 text-muted" title="Choose a different template" onclick="event.stopPropagation(); $('#rfqTplSub${row.rfq_id}').toggleClass('d-none'); $(this).find('i').toggleClass('bi-chevron-down bi-chevron-up');">
+                                    <i class="bi bi-chevron-down"></i>
+                                </button>
+                            </div>
+                            <ul class="list-unstyled ms-4 mb-1 d-none" id="rfqTplSub${row.rfq_id}">
+                                <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printRFQ(${row.rfq_id}, 'navy'); return false;"><i class="bi bi-file-earmark-text me-2"></i>Striped Template</a></li>
+                                <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printRFQ(${row.rfq_id}, 'corporate'); return false;"><i class="bi bi-file-earmark-text me-2"></i>Minimal Template</a></li>
+                                <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printRFQ(${row.rfq_id}, 'banded'); return false;"><i class="bi bi-file-earmark-text me-2"></i>Radiant Template</a></li>
+                            </ul>
+                        </li>
                         ${row.status === 'draft' ? `
                         <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_create') ?>?edit=${row.rfq_id}">
                             <i class="bi bi-pencil text-info me-2"></i>Edit</a></li>
@@ -416,8 +427,15 @@ $(document).ready(function(){
 
 function clearFilters(){$('#filterForm')[0].reset();$('#rfqTable').DataTable().ajax.reload();}
 
-function printRFQ(id) {
-    window.open('<?= getUrl('print_rfq') ?>?id=' + id, '_blank');
+const RFQ_PRINT_TEMPLATES = {
+    standard:  '<?= getUrl('print_rfq') ?>',
+    navy:      '<?= getUrl('print_rfq_navy') ?>',
+    corporate: '<?= getUrl('print_rfq_corporate') ?>',
+    banded:    '<?= getUrl('print_rfq_banded') ?>'
+};
+function printRFQ(id, template) {
+    const base = RFQ_PRINT_TEMPLATES[template] || RFQ_PRINT_TEMPLATES.standard;
+    window.open(base + '?id=' + id, '_blank');
 }
 
 function exportRFQ(){

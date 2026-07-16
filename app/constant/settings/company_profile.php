@@ -42,6 +42,12 @@ $default_settings = [
     'print_template_color_navy'      => '#0f1f3d',
     'print_template_color_corporate' => '#000000',
     'print_template_color_banded'    => '#1f7ae0',
+    // RFQ's own, unrelated 3-template design family (letter-format, not the boxed
+    // Navy/Corporate/Banded layout) — separate colors so retinting one family
+    // never touches the other.
+    'print_template_color_rfq_striped' => '#d9601a',
+    'print_template_color_rfq_minimal' => '#1a7ea8',
+    'print_template_color_rfq_radiant' => '#e07b1e',
 ];
 
 // Handle Form Submission
@@ -56,8 +62,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'company_postal_address', 'company_physical_address',
             'share_capital_paid_in',
             'print_template_color_navy', 'print_template_color_corporate', 'print_template_color_banded',
+            'print_template_color_rfq_striped', 'print_template_color_rfq_minimal', 'print_template_color_rfq_radiant',
         ];
-        $color_fields = ['print_template_color_navy', 'print_template_color_corporate', 'print_template_color_banded'];
+        $color_fields = ['print_template_color_navy', 'print_template_color_corporate', 'print_template_color_banded',
+            'print_template_color_rfq_striped', 'print_template_color_rfq_minimal', 'print_template_color_rfq_radiant'];
 
         foreach ($allowed_fields as $field) {
             if (isset($_POST[$field])) {
@@ -293,6 +301,24 @@ try {
                                 <label for="print_template_color_banded" class="form-label">Banded Template</label>
                                 <input type="color" class="form-control form-control-color w-100" id="print_template_color_banded" name="print_template_color_banded" value="<?= htmlspecialchars($current_settings['print_template_color_banded']) ?>">
                                 <div class="form-text">Only the blue is configurable here; the orange section bands stay fixed.</div>
+                            </div>
+
+                            <!-- RFQ Print Template Colors (own family, unrelated design) -->
+                            <div class="col-12 mt-3">
+                                <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette2 me-1"></i> RFQ Print Template Colors</h6>
+                                <p class="text-muted small mb-2">RFQ uses its own letter-format template family, separate from the layouts above.</p>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_rfq_striped" class="form-label">Striped Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_rfq_striped" name="print_template_color_rfq_striped" value="<?= htmlspecialchars($current_settings['print_template_color_rfq_striped']) ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_rfq_minimal" class="form-label">Minimal Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_rfq_minimal" name="print_template_color_rfq_minimal" value="<?= htmlspecialchars($current_settings['print_template_color_rfq_minimal']) ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_rfq_radiant" class="form-label">Radiant Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_rfq_radiant" name="print_template_color_rfq_radiant" value="<?= htmlspecialchars($current_settings['print_template_color_rfq_radiant']) ?>">
                             </div>
 
                             <div class="col-12 mt-4">
