@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-07-16 (refactor) — Moved print-template accent colors from Company Profile to System Settings
+
+**Files:** `app/constant/settings/company_profile.php`, `app/constant/settings/system_settings.php`
+
+Removed all `print_template_color_*` fields (Navy/Corporate/Banded, RFQ, Sales Order, Quotation,
+Invoice, Delivery Note Outbound) from Company Profile — defaults array, allowed-fields/validation
+logic, and the six color-picker form sections. Added a new "Color Setting" tab in System Settings,
+positioned between SMS Gateway and Collections, split into "Sales Side" (Sales Order, Quotation,
+Invoice, Delivery Note Outbound) and "Purchase Side" (shared Navy/Corporate/Banded family used by
+Purchase Order/Purchase Return/Debit Note, plus RFQ's own family) — grouping confirmed by grepping
+each print template file's `getSetting()` call. Save logic (hex validation with fallback to default)
+and storage (`system_settings` table via `save_setting()`/`get_setting()`) are unchanged, so every
+print template that reads these colors continues to work without modification.
+
 ## 2026-07-16 (feat) — Invoice and Delivery Note (Outbound) each get their own 3-template print family
 
 **New:** `app/bms/invoice/invoice_print_summit.php`, `app/bms/invoice/invoice_print_wave.php`,
