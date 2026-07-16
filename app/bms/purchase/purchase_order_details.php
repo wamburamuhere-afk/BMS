@@ -146,9 +146,21 @@ if ($order_id) {
                 <a href="#" id="editLink" class="btn btn-outline-primary shadow-sm">
                     <i class="bi bi-pencil me-1"></i> Edit
                 </a>
-                <button onclick="printOrder(<?= $order_id ?>)" class="btn btn-blue-touch shadow-sm">
-                    <i class="bi bi-printer me-1"></i> Print
-                </button>
+                <div class="btn-group shadow-sm">
+                    <button onclick="printOrder(<?= $order_id ?>)" class="btn btn-blue-touch">
+                        <i class="bi bi-printer me-1"></i> Print
+                    </button>
+                    <button type="button" class="btn btn-blue-touch dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="visually-hidden">Choose print template</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><h6 class="dropdown-header">Print Template</h6></li>
+                        <li><a class="dropdown-item" href="#" onclick="printOrder(<?= $order_id ?>, 'standard'); return false;"><i class="bi bi-check2 me-2"></i>Standard (default)</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="printOrder(<?= $order_id ?>, 'navy'); return false;">Navy</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="printOrder(<?= $order_id ?>, 'corporate'); return false;">Corporate</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="printOrder(<?= $order_id ?>, 'banded'); return false;">Banded</a></li>
+                    </ul>
+                </div>
             </div>
         </div>
 
@@ -811,9 +823,16 @@ function formatCurrency(amount, currency) {
     return currency + ' ' + parseFloat(amount).toLocaleString('en-US', {minimumFractionDigits: 2});
 }
 
-function printOrder(id) {
-    logReportAction('Printed Purchase Order Details', 'User printed purchase order details for PO ID #' + id);
-    window.open('<?= getUrl('print_purchase_order') ?>?id=' + id, '_blank');
+const PO_PRINT_TEMPLATES = {
+    standard:  '<?= getUrl('print_purchase_order') ?>',
+    navy:      '<?= getUrl('print_purchase_order_navy') ?>',
+    corporate: '<?= getUrl('print_purchase_order_corporate') ?>',
+    banded:    '<?= getUrl('print_purchase_order_banded') ?>'
+};
+function printOrder(id, template) {
+    logReportAction('Printed Purchase Order Details', 'User printed purchase order details for PO ID #' + id + ' (template: ' + (template || 'standard') + ')');
+    const base = PO_PRINT_TEMPLATES[template] || PO_PRINT_TEMPLATES.standard;
+    window.open(base + '?id=' + id, '_blank');
 }
 
 function convertToInvoice(poId, remaining) {
