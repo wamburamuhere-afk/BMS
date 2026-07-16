@@ -48,6 +48,15 @@ $default_settings = [
     'print_template_color_rfq_striped' => '#d9601a',
     'print_template_color_rfq_minimal' => '#1a7ea8',
     'print_template_color_rfq_radiant' => '#e07b1e',
+    // Sales Order's own 3-template design family — separate from Quotation's,
+    // even though both documents share the same underlying data fields.
+    'print_template_color_so_confirmation' => '#c8981f',
+    'print_template_color_so_ledger'       => '#14213d',
+    'print_template_color_so_studio'       => '#2b2b2b',
+    // Quotation's own 3-template design family — separate from Sales Order's.
+    'print_template_color_qt_noir'   => '#111111',
+    'print_template_color_qt_meadow' => '#2f7d4f',
+    'print_template_color_qt_terra'  => '#9c6b3e',
 ];
 
 // Handle Form Submission
@@ -63,9 +72,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'share_capital_paid_in',
             'print_template_color_navy', 'print_template_color_corporate', 'print_template_color_banded',
             'print_template_color_rfq_striped', 'print_template_color_rfq_minimal', 'print_template_color_rfq_radiant',
+            'print_template_color_so_confirmation', 'print_template_color_so_ledger', 'print_template_color_so_studio',
+            'print_template_color_qt_noir', 'print_template_color_qt_meadow', 'print_template_color_qt_terra',
         ];
         $color_fields = ['print_template_color_navy', 'print_template_color_corporate', 'print_template_color_banded',
-            'print_template_color_rfq_striped', 'print_template_color_rfq_minimal', 'print_template_color_rfq_radiant'];
+            'print_template_color_rfq_striped', 'print_template_color_rfq_minimal', 'print_template_color_rfq_radiant',
+            'print_template_color_so_confirmation', 'print_template_color_so_ledger', 'print_template_color_so_studio',
+            'print_template_color_qt_noir', 'print_template_color_qt_meadow', 'print_template_color_qt_terra'];
 
         foreach ($allowed_fields as $field) {
             if (isset($_POST[$field])) {
@@ -319,6 +332,42 @@ try {
                             <div class="col-md-4">
                                 <label for="print_template_color_rfq_radiant" class="form-label">Radiant Template</label>
                                 <input type="color" class="form-control form-control-color w-100" id="print_template_color_rfq_radiant" name="print_template_color_rfq_radiant" value="<?= htmlspecialchars($current_settings['print_template_color_rfq_radiant']) ?>">
+                            </div>
+
+                            <!-- Sales Order Print Template Colors (own family, unrelated to Quotation) -->
+                            <div class="col-12 mt-3">
+                                <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette2 me-1"></i> Sales Order Print Template Colors</h6>
+                                <p class="text-muted small mb-2">Sales Order uses its own template family, visually distinct from Quotation even though both share the same data fields.</p>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_so_confirmation" class="form-label">Confirmation Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_so_confirmation" name="print_template_color_so_confirmation" value="<?= htmlspecialchars($current_settings['print_template_color_so_confirmation']) ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_so_ledger" class="form-label">Ledger Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_so_ledger" name="print_template_color_so_ledger" value="<?= htmlspecialchars($current_settings['print_template_color_so_ledger']) ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_so_studio" class="form-label">Studio Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_so_studio" name="print_template_color_so_studio" value="<?= htmlspecialchars($current_settings['print_template_color_so_studio']) ?>">
+                            </div>
+
+                            <!-- Quotation Print Template Colors (own family, unrelated to Sales Order) -->
+                            <div class="col-12 mt-3">
+                                <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette2 me-1"></i> Quotation Print Template Colors</h6>
+                                <p class="text-muted small mb-2">Quotation uses its own template family, visually distinct from Sales Order even though both share the same data fields.</p>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_qt_noir" class="form-label">Noir Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_qt_noir" name="print_template_color_qt_noir" value="<?= htmlspecialchars($current_settings['print_template_color_qt_noir']) ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_qt_meadow" class="form-label">Meadow Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_qt_meadow" name="print_template_color_qt_meadow" value="<?= htmlspecialchars($current_settings['print_template_color_qt_meadow']) ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_qt_terra" class="form-label">Terra Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_qt_terra" name="print_template_color_qt_terra" value="<?= htmlspecialchars($current_settings['print_template_color_qt_terra']) ?>">
                             </div>
 
                             <div class="col-12 mt-4">

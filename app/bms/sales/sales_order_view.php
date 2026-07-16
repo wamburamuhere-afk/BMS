@@ -157,9 +157,21 @@ require_once 'header.php';
                     <i class="bi bi-receipt"></i> Create Invoice
                 </a>
             <?php endif; ?>
-            <a href="<?= getUrl('print_sales_order') ?>?id=<?= $order['sales_order_id'] ?>" target="_blank" class="btn btn-primary">
-                <i class="bi bi-printer"></i> Print
-            </a>
+            <div class="btn-group shadow-sm">
+                <button onclick="printSalesOrderDoc()" class="btn btn-primary btn-sm px-3">
+                    <i class="bi bi-printer me-1"></i> Print
+                </button>
+                <button type="button" class="btn btn-primary btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><h6 class="dropdown-header">Print Template</h6></li>
+                    <li><a class="dropdown-item" href="#" onclick="printSalesOrderDoc('standard'); return false;"><i class="bi bi-check2 me-2"></i>Standard (default)</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printSalesOrderDoc('confirmation'); return false;">Confirmation</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printSalesOrderDoc('ledger'); return false;">Ledger</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printSalesOrderDoc('studio'); return false;">Studio</a></li>
+                </ul>
+            </div>
             <?php if ($so_can_edit_now && in_array($order['status'], ['pending','reviewed','approved','processing'])): ?>
             <button type="button" class="btn btn-outline-danger" onclick="cancelThisOrder()">
                 <i class="bi bi-x-circle"></i> Cancel Order
@@ -549,6 +561,17 @@ function get_status_color($status) {
 
 <script>
 const SO_ID = <?= (int)$order['sales_order_id'] ?>;
+
+const SO_PRINT_TEMPLATES = {
+    standard:     '<?= getUrl('print_sales_order') ?>',
+    confirmation: '<?= getUrl('print_sales_order_confirmation') ?>',
+    ledger:       '<?= getUrl('print_sales_order_ledger') ?>',
+    studio:       '<?= getUrl('print_sales_order_studio') ?>'
+};
+function printSalesOrderDoc(template) {
+    const base = SO_PRINT_TEMPLATES[template] || SO_PRINT_TEMPLATES.standard;
+    window.open(base + '?id=' + SO_ID, '_blank');
+}
 
 function reviewThisOrder() {
     Swal.fire({
