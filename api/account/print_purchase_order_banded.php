@@ -91,11 +91,11 @@ try {
     }
 } catch (Exception $e) {}
 
-// Print-template accent color — shared per LAYOUT NAME (not per document type), so
-// retinting "Banded" here also retints every other document that uses the Banded
-// layout. Only the blue is configurable (the orange section bands are a fixed
-// complementary tone); falls back to the original design color when unset.
-$accent = getSetting('print_template_color_banded', '#1f7ae0');
+// Purchase Order's own Banded-layout accent color — separate from Purchase Return
+// and Debit Note even though they share the same Navy/Corporate/Banded designs.
+// Only the blue is configurable (the orange section bands are a fixed complementary
+// tone); falls back to the original design color when unset.
+$accent = getSetting('print_template_color_po_banded', '#1f7ae0');
 ?>
 <!DOCTYPE html>
 <html lang="en">
