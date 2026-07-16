@@ -91,11 +91,11 @@ try {
     }
 } catch (Exception $e) {}
 
-// Print-template accent color — shared per LAYOUT NAME (not per document type), so
-// retinting "Corporate" here also retints every other document that uses the
-// Corporate layout. Configurable from Company Profile > Print Template Colors;
-// falls back to the original design color when unset.
-$accent = getSetting('print_template_color_corporate', '#000000');
+// Purchase Order's own Corporate-layout accent color — separate from Purchase
+// Return and Debit Note even though they share the same Navy/Corporate/Banded
+// designs. Configurable from System Settings > Color Setting; falls back to the
+// original design color when unset.
+$accent = getSetting('print_template_color_po_corporate', '#000000');
 ?>
 <!DOCTYPE html>
 <html lang="en">

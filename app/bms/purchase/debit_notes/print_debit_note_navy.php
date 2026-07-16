@@ -102,9 +102,9 @@ $wf = [
     '__include_css'      => true,
 ];
 
-// Print-template accent color — shared per LAYOUT NAME (not per document type), so
-// retinting "Navy" here also retints every other document that uses the Navy layout.
-$accent = getSetting('print_template_color_navy', '#0f1f3d');
+// Debit Note's own Navy-layout accent color — separate from Purchase Order and
+// Purchase Return even though they share the same Navy/Corporate/Banded designs.
+$accent = getSetting('print_template_color_dbn_navy', '#0f1f3d');
 ?>
 <!DOCTYPE html>
 <html lang="en">

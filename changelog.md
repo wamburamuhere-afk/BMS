@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-07-16 (refactor) — Purchase Order, Purchase Return, and Debit Note each get their own Navy/Corporate/Banded colors
+
+**Files:** `app/constant/settings/system_settings.php`, `api/account/print_purchase_order_navy.php`,
+`api/account/print_purchase_order_corporate.php`, `api/account/print_purchase_order_banded.php`,
+`app/bms/purchase/print_purchase_return_navy.php`, `app/bms/purchase/print_purchase_return_corporate.php`,
+`app/bms/purchase/print_purchase_return_banded.php`, `app/bms/purchase/debit_notes/print_debit_note_navy.php`,
+`app/bms/purchase/debit_notes/print_debit_note_corporate.php`, `app/bms/purchase/debit_notes/print_debit_note_banded.php`
+
+Split the previously shared `print_template_color_navy/corporate/banded` keys (one color per layout,
+used by all three of Purchase Order, Purchase Return, and Debit Note at once) into 9 independent keys —
+`_po_*`, `_pret_*`, `_dbn_*` — so each document type can be retinted without affecting the others, matching
+the pattern already used for RFQ/Sales Order/Quotation/Invoice/Delivery Note. Live DB values for the old
+shared keys were still at their hardcoded defaults, so no data migration was needed. System Settings >
+Color Setting > Purchase Side now shows three separate Navy/Corporate/Banded color-picker groups instead
+of one shared group.
+
 ## 2026-07-16 (refactor) — Moved print-template accent colors from Company Profile to System Settings
 
 **Files:** `app/constant/settings/company_profile.php`, `app/constant/settings/system_settings.php`
