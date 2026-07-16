@@ -1,5 +1,41 @@
 # BMS Changelog
 
+## 2026-07-15 (feat) — Purchase Order print: 3 alternate templates, selectable at print time
+
+**New:** `api/account/print_purchase_order_navy.php`, `api/account/print_purchase_order_corporate.php`,
+`api/account/print_purchase_order_banded.php`
+**Files:** `roots.php`, `app/bms/purchase/purchase_orders.php`, `app/bms/purchase/purchase_order_details.php`
+
+First step of a broader effort to make Sales and Procurement print documents look visually distinct from
+each other (color, layout) instead of sharing one generic look system-wide. Starting with Purchase Order:
+
+- Kept `print_purchase_order.php` completely untouched as the default — every existing print action
+  (the plain "Print" button/icon) still goes straight to it, no behavior change for anyone who doesn't
+  pick an alternate.
+- Added three new standalone print templates, each visually referenced from a real Canva Purchase Order
+  layout (Canva itself only supplied the visual reference — a paid-plan-gated brand-template search was
+  hit and bypassed by browsing Canva's public gallery instead): **Navy** (bold header band, itemized
+  table, Special Instructions, dual signature lines), **Corporate** (black boxed sections, an Order
+  Status panel using the PO's real workflow status rather than an invented checklist, Delivery Details),
+  and **Banded** (blue header / orange section bands, a Vendor + "Deliver To" pair, a
+  Requisitioner/Quote-Ref/Contract-No/Expected-Delivery meta strip).
+- Every field the original template renders — company name, logo, full company/vendor contact and
+  tax details, PO#/date/status, project/warehouse/contract/quote-ref, the itemized table, subtotal/VAT/
+  shipping/grand total, internal notes, terms & conditions, and the shared three-approval signature row
+  with e-signature images — is present on all three, using the same `empty()`-guarded conditional
+  rendering as the original so nothing shows an empty slot when the underlying data isn't set. No
+  fabricated fields: sections inspired by the Canva references that had no real backing data (e.g. a
+  generic "Ship Via"/"F.O.B." pair) were remapped onto real PO fields instead of left decorative.
+- Template picker added at the two places printing is triggered from: the Purchase Orders list's gear
+  menu (Print Order + three template links per row) and the PO detail page's Print button, now a
+  Bootstrap split-button (plain click = standard/default, caret = the other three). New route entries
+  registered in `roots.php` for the three new files, same clean-URL pattern as the existing one.
+
+Verified live on `dev.bms.local`: all three new templates fetched directly return HTTP 200 with no PHP
+errors/warnings and confirmed present (company name, logo, signature block, itemized table, totals, shared
+print footer) against a real Purchase Order; both picker UIs (list gear-menu and detail split-button)
+confirmed wired to all four templates in the rendered DOM.
+
 ## 2026-07-15 (fix) — Create Document: "Could not generate the PDF" on every save, AI-suggestion modal auto-closing before it showed a result
 
 **Files:** `app/constant/document/create_document.php`, `app/includes/ai_generate.php`, `footer.php`
