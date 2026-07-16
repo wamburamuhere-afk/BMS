@@ -165,6 +165,9 @@ const DN_PERMS = { edit: <?= json_encode($can_edit) ?>, del: <?= json_encode($ca
 const DN_VIEW  = 'debit_note_view';
 const DN_EDIT  = 'debit_note_edit';
 const DN_PRINT = 'print_debit_note';
+const DN_PRINT_NAVY = 'print_debit_note_navy';
+const DN_PRINT_CORPORATE = 'print_debit_note_corporate';
+const DN_PRINT_BANDED = 'print_debit_note_banded';
 
 const DN_BADGE = { pending:['#e9ecef','#495057'], reviewed:['#bfdbfe','#1e3a8a'], approved:['#0d6efd','#fff'], paid:['#052c65','#fff'], rejected:['#dc3545','#fff'], cancelled:['#6c757d','#fff'] };
 function dnBadge(s){ const c=DN_BADGE[s]||['#e9ecef','#495057']; const l=s.charAt(0).toUpperCase()+s.slice(1); return `<span class="badge-status" style="background:${c[0]};color:${c[1]};">${l}</span>`; }
@@ -172,7 +175,19 @@ function dnMoney(v){ return Number(v||0).toLocaleString(undefined,{minimumFracti
 
 function dnActions(row){
     let items = `<li><a class="dropdown-item py-2 rounded" href="${DN_VIEW}?id=${row.id}"><i class="bi bi-eye text-primary me-2"></i> View</a></li>`;
-    items += `<li><a class="dropdown-item py-2 rounded" href="${DN_PRINT}?id=${row.id}" target="_blank"><i class="bi bi-printer text-primary me-2"></i> Print</a></li>`;
+    items += `<li>
+        <div class="d-flex align-items-center dropdown-item py-0 pe-1 rounded">
+            <a class="flex-grow-1 py-2 text-decoration-none text-dark" href="${DN_PRINT}?id=${row.id}" target="_blank"><i class="bi bi-printer text-primary me-2"></i> Print</a>
+            <button type="button" class="btn btn-sm border-0 p-1 text-muted" title="Choose a different template" onclick="event.stopPropagation(); $('#dnTplSub${row.id}').toggleClass('d-none'); $(this).find('i').toggleClass('bi-chevron-down bi-chevron-up');">
+                <i class="bi bi-chevron-down"></i>
+            </button>
+        </div>
+        <ul class="list-unstyled ms-4 mb-1 d-none" id="dnTplSub${row.id}">
+            <li><a class="dropdown-item py-1 small text-muted" href="${DN_PRINT_NAVY}?id=${row.id}" target="_blank"><i class="bi bi-file-earmark-text me-2"></i>Navy Template</a></li>
+            <li><a class="dropdown-item py-1 small text-muted" href="${DN_PRINT_CORPORATE}?id=${row.id}" target="_blank"><i class="bi bi-file-earmark-text me-2"></i>Corporate Template</a></li>
+            <li><a class="dropdown-item py-1 small text-muted" href="${DN_PRINT_BANDED}?id=${row.id}" target="_blank"><i class="bi bi-file-earmark-text me-2"></i>Banded Template</a></li>
+        </ul>
+    </li>`;
     if (DN_PERMS.edit && row.status === 'pending') items += `<li><a class="dropdown-item py-2 rounded" href="${DN_EDIT}?id=${row.id}"><i class="bi bi-pencil text-primary me-2"></i> Edit</a></li>`;
     if (DN_PERMS.del && row.status !== 'paid') items += `<li><hr class="dropdown-divider"></li><li><button class="dropdown-item py-2 rounded text-danger" onclick="dnDelete(${row.id})"><i class="bi bi-trash text-danger me-2"></i> Delete</button></li>`;
     return `<div class="dropdown d-flex justify-content-end"><button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button><ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${items}</ul></div>`;
