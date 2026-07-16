@@ -402,7 +402,19 @@ $(document).ready(function() {
                                 ${(isDraftPending && PO_CAN_REVIEW) ? `<li><a class="dropdown-item py-2 text-primary fw-bold" href="#" onclick="reviewOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-check2 me-2"></i> Mark Reviewed</a></li>` : ''}
                                 ${(isReviewed && PO_CAN_APPROVE) ? `<li><a class="dropdown-item py-2 text-success fw-bold" href="#" onclick="approveOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-check-circle me-2"></i> Approve Order</a></li>` : ''}
                                 ${canEditNow ? `<li><a class="dropdown-item py-2" href="<?= getUrl('purchase_order_create') ?>?edit=${row.purchase_order_id}" onclick="logReportAction('Initiated Purchase Order Edit', 'User clicked edit for PO #${row.order_number}')"><i class="bi bi-pencil text-info me-2"></i> Edit Order</a></li>` : ''}
-                                <li><a class="dropdown-item py-2" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-printer text-dark me-2"></i> Print Order</a></li>
+                                <li>
+                                    <div class="d-flex align-items-center dropdown-item py-0 pe-1">
+                                        <a class="flex-grow-1 py-2 text-decoration-none text-dark" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}'); return false;"><i class="bi bi-printer text-dark me-2"></i> Print Order</a>
+                                        <button type="button" class="btn btn-sm border-0 p-1 text-muted" title="Choose a different template" onclick="event.stopPropagation(); $('#poTplSub${row.purchase_order_id}').toggleClass('d-none'); $(this).find('i').toggleClass('bi-chevron-down bi-chevron-up');">
+                                            <i class="bi bi-chevron-down"></i>
+                                        </button>
+                                    </div>
+                                    <ul class="list-unstyled ms-4 mb-1 d-none" id="poTplSub${row.purchase_order_id}">
+                                        <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}', 'navy'); return false;"><i class="bi bi-file-earmark-text me-2"></i> Navy Template</a></li>
+                                        <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}', 'corporate'); return false;"><i class="bi bi-file-earmark-text me-2"></i> Corporate Template</a></li>
+                                        <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}', 'banded'); return false;"><i class="bi bi-file-earmark-text me-2"></i> Banded Template</a></li>
+                                    </ul>
+                                </li>
                                 ${(isApproved && row.delivery_status !== 'complete') ? `<li><a class="dropdown-item py-2 text-info" href="<?= getUrl('dn_create') ?>?po_id=${row.purchase_order_id}"><i class="bi bi-truck me-2"></i> Add Delivery Note</a></li>` : ''}
                                 ${canEditNow ? `<li><hr class="dropdown-divider opacity-50"></li><li><a class="dropdown-item py-2 text-danger" href="#" onclick="cancelOrder(${row.purchase_order_id})"><i class="bi bi-trash me-2"></i> Cancel Order</a></li>` : ''}
                             </ul>
@@ -535,9 +547,16 @@ function printList() {
     document.title = oldTitle;
 }
 
-function printOrder(id, orderNumber) {
-    logReportAction('Printed Purchase Order', 'User printed purchase order #' + orderNumber);
-    window.open('<?= getUrl('print_purchase_order') ?>?id=' + id, '_blank');
+const PO_PRINT_TEMPLATES = {
+    standard:  '<?= getUrl('print_purchase_order') ?>',
+    navy:      '<?= getUrl('print_purchase_order_navy') ?>',
+    corporate: '<?= getUrl('print_purchase_order_corporate') ?>',
+    banded:    '<?= getUrl('print_purchase_order_banded') ?>'
+};
+function printOrder(id, orderNumber, template) {
+    logReportAction('Printed Purchase Order', 'User printed purchase order #' + orderNumber + ' (template: ' + (template || 'standard') + ')');
+    const base = PO_PRINT_TEMPLATES[template] || PO_PRINT_TEMPLATES.standard;
+    window.open(base + '?id=' + id, '_blank');
 }
 
 function copyTable() {
