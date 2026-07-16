@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-07-15 (fix) — Create Document: "Could not generate the PDF" on every save, AI-suggestion modal auto-closing before it showed a result
+
+**Files:** `app/constant/document/create_document.php`, `app/includes/ai_generate.php`, `footer.php`
+
+Two separate bugs reported together, both on the Create Document page:
+
+- **Save Draft / Save & Print always failed with a generic "Could not generate the PDF."** Root cause:
+  `senderCustomInited` was declared with block-scoped `let` inside `$(document).ready(...)`, but read
+  again inside the separate top-level `saveDocument()` function — a scope it can't see — throwing
+  `ReferenceError: senderCustomInited is not defined` inside the html2pdf success callback shared by
+  both save modes. Not intermittent or network-dependent — 100% reproducible on every save, local and
+  live. Fixed by declaring it at module (script) scope instead, same pattern already used by
+  `currentDocumentId` on the line above it for the same reason. Also added `console.error` logging plus
+  the caught error's message to the SweetAlert text in the PDF-generation catch block, so any future
+  client-side render failure is diagnosable without needing DevTools reproduction.
+- **"Generate with AI" modal closed itself right after generating, before showing the suggestion.**
+  `footer.php` has a global `$(document).ajaxSuccess` handler that auto-closes any open modal after any
+  AJAX POST returning `{success:true}` — built for the standard "submit form in modal → close → reload"
+  pattern used everywhere else. The AI-generate endpoint also returns `{success:true}` on a successful
+  generation, so the instant the response landed, this unrelated global rule slammed the modal shut
+  before the user ever saw the result or could click "Use this" — even though the AI call itself worked
+  (verified the generated text was sitting correctly in the now-hidden result box). Fixed with a targeted
+  opt-out: `#aiGenModal` now carries `data-no-autoclose="true"`, and the global handler skips modals
+  carrying that flag. Every other modal in the app is unaffected.
+
+Verified live on both `dev.bms.local` and the demo site: reproduced the `ReferenceError` in console pre-fix,
+confirmed clean `html2pdf` render (no error) post-fix; reproduced the AI modal closing with the result
+already generated but hidden pre-fix, confirmed it now stays open through Generate → review → "Use this"
+post-fix.
+
 ## 2026-07-15 (feat) — Create Document: professional template engine (merge variables, full-structure templates, one category taxonomy)
 
 **New:** `core/document_merge.php`, `migrations/2026_07_15_document_templates_structure.php`,

@@ -54,14 +54,19 @@ echo '
 <script>
 $(document).ajaxSuccess(function(event, xhr, settings, data) {
     // If the response indicates success, try to close any open modals
-    // EXCLUSIONS: 
+    // EXCLUSIONS:
     // 1. Only close modals if the request was NOT a GET request
     // 2. Do NOT close for activity logging or heartbeat requests
     const isLogRequest = settings.url.includes('log_activity') || settings.url.includes('log_audit');
-    
+
     if (data && data.success === true && settings.type !== 'GET' && !isLogRequest) {
         const openModal = document.querySelector('.modal.show');
-        if (openModal) {
+        // Opt-out for modals with their own multi-step flow (e.g. "Generate with
+        // AI": generate -> review suggestion -> Use this), where a success:true
+        // response is only an intermediate step, not "the record was saved,
+        // close the dialog" — this global rule would otherwise slam the modal
+        // shut before the user ever sees the result.
+        if (openModal && openModal.getAttribute('data-no-autoclose') !== 'true') {
             const modalInstance = bootstrap.Modal.getInstance(openModal);
             if (modalInstance) {
                 modalInstance.hide();

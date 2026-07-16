@@ -48,7 +48,7 @@ if (!function_exists('aiGenerateModalOnce')) {
         $done = true;
         $url = buildUrl('api/ai/generate.php');
         ob_start(); ?>
-<div class="modal fade" id="aiGenModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade" id="aiGenModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" data-no-autoclose="true">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header bg-primary text-white">
