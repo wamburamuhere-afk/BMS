@@ -168,6 +168,10 @@ if ($_POST) {
                 'print_template_color_dn_depot'   => '#e05a1c',
                 'print_template_color_dn_transit' => '#1b5fa8',
                 'print_template_color_dn_custody' => '#6b7c5e',
+                // Sales Side — Credit Note's own family
+                'print_template_color_cn_ledger'  => '#2F5D50',
+                'print_template_color_cn_horizon' => '#1F5AA8',
+                'print_template_color_cn_ember'   => '#B3402C',
             ];
 
             foreach ($color_defaults as $field => $default) {
@@ -896,6 +900,26 @@ if ($_POST) {
                             <div class="col-md-4">
                                 <label for="print_template_color_dn_custody" class="form-label">Custody Template</label>
                                 <input type="color" class="form-control form-control-color w-100" id="print_template_color_dn_custody" name="print_template_color_dn_custody" value="<?= get_setting('print_template_color_dn_custody', '#6b7c5e') ?>">
+                            </div>
+                        </div>
+
+                        <!-- Credit Note Print Template Colors (own family) -->
+                        <div class="mb-3">
+                            <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette2 me-1"></i> Credit Note Print Template Colors</h6>
+                            <p class="text-muted small mb-2">Credit Note uses its own template family, separate from every other document.</p>
+                        </div>
+                        <div class="row g-4 mb-3">
+                            <div class="col-md-4">
+                                <label for="print_template_color_cn_ledger" class="form-label">Ledger Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_cn_ledger" name="print_template_color_cn_ledger" value="<?= get_setting('print_template_color_cn_ledger', '#2F5D50') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_cn_horizon" class="form-label">Horizon Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_cn_horizon" name="print_template_color_cn_horizon" value="<?= get_setting('print_template_color_cn_horizon', '#1F5AA8') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_cn_ember" class="form-label">Ember Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_cn_ember" name="print_template_color_cn_ember" value="<?= get_setting('print_template_color_cn_ember', '#B3402C') ?>">
                             </div>
                         </div>
 
