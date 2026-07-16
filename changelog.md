@@ -1,5 +1,36 @@
 # BMS Changelog
 
+## 2026-07-16 (fix) — RFQ's 3 templates rebuilt as their own distinct letter-format family, not the shared one
+
+**Files:** `api/account/print_rfq_navy.php`, `api/account/print_rfq_corporate.php`, `api/account/print_rfq_banded.php`,
+`app/bms/purchase/rfq.php`, `app/bms/purchase/rfq_view.php`, `app/constant/settings/company_profile.php`
+
+Correction to the entry below: the instruction to "reuse the same [Navy/Corporate/Banded] family" applied
+**only to Debit Note** (which has no distinct Canva reference to build from) — RFQ was supposed to get its
+own unique visual identity based on the three specific Canva letter designs already researched and shown
+(a diagonal-stripe/tools-branded orange letter, a clean minimal blue letter, and an orange-radiating-corner
+letter with a solid title bar). The first pass mistakenly re-skinned RFQ with the same boxed-panel
+Navy/Corporate/Banded layout used everywhere else, defeating the point of researching distinct references
+for it.
+
+Rebuilt all three RFQ templates as genuine letter-format documents — a plain "To:" address block (not a
+boxed panel), a "Subject: Request for Quotation" line, an unboxed RFQ-details row, the items table, and a
+"Sincerely," + signature close — each carrying its own decorative identity: **Striped** (diagonal stripe
+corner, orange), **Minimal** (a small chevron mark, clean blue, generous whitespace), **Radiant** (a
+radiating-line corner decoration, orange, solid title bar). Company name, logo, and the full three-approval
+signature block (with e-signature images) remain on all three, per the original requirement. Content stays
+exactly as before — real RFQ fields only, still no Unit Price/Total column since a request-for-quote has no
+pricing.
+
+Given RFQ's design language has nothing in common with the Navy/Corporate/Banded family, it now has its
+**own** three accent-color settings (`print_template_color_rfq_striped/_minimal/_radiant`, own "RFQ Print
+Template Colors" section in Company Profile) rather than sharing the existing ones — retinting a
+Navy/Corporate/Banded document never touches RFQ, and vice versa. Picker labels in the RFQ list and detail
+pages renamed from Navy/Corporate/Banded to Striped/Minimal/Radiant to match.
+
+Verified live: all three templates return HTTP 200, zero PHP errors, and each correctly resolves its own
+new dedicated accent color from the new settings (confirmed distinct from the Navy/Corporate/Banded values).
+
 ## 2026-07-16 (feat) — RFQ and Debit Note join the shared print-template family (Navy/Corporate/Banded)
 
 **New:** `api/account/print_rfq_navy.php`, `api/account/print_rfq_corporate.php`, `api/account/print_rfq_banded.php`,

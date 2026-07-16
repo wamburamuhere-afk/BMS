@@ -1,5 +1,8 @@
 <?php
 // File: api/account/print_rfq_corporate.php
+// "Minimal" layout — clean letter-format RFQ, visually distinct from the boxed-panel
+// Navy/Corporate/Banded family. Route name kept as "corporate" for the picker wiring
+// already in place; the design itself is unrelated to that family.
 error_reporting(0);
 ini_set('display_errors', 0);
 
@@ -70,10 +73,9 @@ $wf = [
     '__include_css'      => true,
 ];
 
-// Print-template accent color — shared per LAYOUT NAME (not per document type), so
-// retinting "Corporate" here also retints every other document that uses the
-// Corporate layout.
-$accent = getSetting('print_template_color_corporate', '#000000');
+// Accent color — dedicated to this RFQ-only design family (not shared with the
+// Navy/Corporate/Banded set used by other document types).
+$accent = getSetting('print_template_color_rfq_minimal', '#1a7ea8');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -86,47 +88,50 @@ $accent = getSetting('print_template_color_corporate', '#000000');
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             font-size: 12px;
-            color: #1a1a1a;
-            line-height: 1.5;
-            padding: 20px 20px 0 20px;
+            color: #24303a;
+            line-height: 1.65;
+            padding: 30px 32px 0 32px;
             background: #fff;
         }
 
-        /* ── COMPANY STRIP (name, logo, contacts) ── */
-        .company-strip { display: flex; align-items: center; gap: 14px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid #d8d8d8; }
-        .company-strip img { max-height: 46px; width: auto; object-fit: contain; }
-        .company-strip h1 { font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
-        .company-strip p { font-size: 10px; color: #444; margin: 0; }
+        /* ── HEADER: small chevron mark + company name, minimal ── */
+        .letter-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
+        .letter-header .company-block { display: flex; align-items: center; gap: 10px; }
+        .chevron-mark { width: 0; height: 0; border-top: 9px solid transparent; border-bottom: 9px solid transparent; border-left: 14px solid var(--accent); print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .letter-header img { max-height: 40px; width: auto; object-fit: contain; }
+        .letter-header h1 { font-size: 16px; font-weight: 700; letter-spacing: 0.2px; color: var(--accent); }
+        .letter-header .meta { text-align: right; font-size: 11px; color: #444; }
+        .letter-header .meta p { margin: 2px 0; }
 
-        /* ── BLACK TITLE BAR ── */
-        .title-bar { background: var(--accent); color: #fff; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-        .title-bar h2 { font-size: 20px; font-weight: 800; letter-spacing: 1.5px; }
-        .title-bar .meta { text-align: right; font-size: 11.5px; }
-        .title-bar .meta p { margin: 2px 0; }
+        .accent-rule { height: 2px; background: var(--accent); margin-bottom: 20px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 
-        /* ── SECTION LABEL BARS ── */
-        .section-label { background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 6px 12px; margin-bottom: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-        .section-body { border: 1px solid var(--accent); border-top: none; padding: 12px 14px; margin-bottom: 18px; }
-        .section-body p { margin: 3px 0; font-size: 11.5px; }
-        .section-body strong { font-weight: 700; }
+        .company-contacts { font-size: 10px; color: #667; margin-bottom: 22px; }
+        .company-contacts p { margin: 1px 0; }
 
-        .two-col { display: flex; gap: 16px; }
-        .two-col > div { width: 50%; }
+        .to-block { margin-bottom: 14px; font-size: 11.5px; }
+        .to-block .label { font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; color: #8a94a0; margin-bottom: 4px; }
+        .to-block p { margin: 1px 0; }
+        .subject-line { font-size: 12px; margin-bottom: 20px; color: #24303a; }
+        .subject-line strong { color: var(--accent); }
 
-        /* ── ITEMS TABLE ── */
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        th { background: var(--accent); color: #fff; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; padding: 9px 10px; text-align: left; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-        tbody tr { border-bottom: 1px solid #ddd; }
-        tbody tr:last-child { border-bottom: 2px solid var(--accent); }
-        tbody tr td { height: 0.75cm; padding: 2px 10px; vertical-align: middle; font-size: 13px; line-height: 1.6; }
+        .rfq-meta-row { display: flex; flex-wrap: wrap; gap: 8px 30px; margin-bottom: 20px; font-size: 11.5px; }
+        .rfq-meta-row div strong { display: block; color: #8a94a0; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; margin-bottom: 2px; }
+
+        /* ── ITEMS TABLE — clean, minimal borders ── */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 22px; }
+        th { background: #fff; color: var(--accent); font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; padding: 8px 10px; text-align: left; border-bottom: 2px solid var(--accent); }
+        tbody tr td { padding: 7px 10px; vertical-align: middle; font-size: 12.5px; line-height: 1.6; color: #24303a; border-bottom: 1px solid #e7ebef; }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
         .fw-bold { font-weight: 700; }
 
-        .status-badge { display: inline-block; padding: 5px 14px; background: var(--accent); color: #fff; font-weight: 700; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.6px; border-radius: 3px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .closing-line { margin: 20px 0 4px; font-size: 11.5px; }
 
         @page { margin: 10mm 8mm 16mm 8mm; }
-        @media print { .no-print { display: none !important; } body { margin: 0 !important; } }
+        @media print {
+            .no-print { display: none !important; }
+            body { margin: 0 !important; }
+        }
     </style>
     <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </head>
@@ -137,73 +142,72 @@ $accent = getSetting('print_template_color_corporate', '#000000');
         <button onclick="window.close()" style="padding:6px 16px; cursor:pointer;">Close</button>
     </div>
 
-    <!-- COMPANY STRIP -->
-    <div class="company-strip">
-        <?php if (!empty($comp['logo'])): ?>
-        <img src="<?= htmlspecialchars('../../' . $comp['logo']) ?>" alt="Logo">
-        <?php endif; ?>
-        <div>
+    <!-- HEADER -->
+    <div class="letter-header">
+        <div class="company-block">
+            <?php if (!empty($comp['logo'])): ?>
+            <img src="<?= htmlspecialchars('../../' . $comp['logo']) ?>" alt="Logo">
+            <?php else: ?>
+            <div class="chevron-mark"></div>
+            <?php endif; ?>
             <h1><?= htmlspecialchars($comp['name']) ?></h1>
-            <?php
-            $line = [];
-            if (!empty($comp['address'])) $line[] = htmlspecialchars($comp['address']);
-            if (!empty($comp['phone']))   $line[] = 'Tel: ' . htmlspecialchars($comp['phone']);
-            if (!empty($comp['email']))   $line[] = htmlspecialchars($comp['email']);
-            if ($line): ?><p><?= implode(' &nbsp;|&nbsp; ', $line) ?></p><?php endif; ?>
-            <?php
-            $tv = [];
-            if (!empty($comp['tin'])) $tv[] = 'TIN: ' . htmlspecialchars($comp['tin']);
-            if (!empty($comp['vrn'])) $tv[] = 'VRN: ' . htmlspecialchars($comp['vrn']);
-            if (!empty($comp['website'])) $tv[] = 'Web: ' . htmlspecialchars($comp['website']);
-            if ($tv): ?><p><?= implode(' &nbsp;|&nbsp; ', $tv) ?></p><?php endif; ?>
         </div>
-    </div>
-
-    <!-- TITLE BAR -->
-    <div class="title-bar">
-        <h2>REQUEST FOR QUOTATION</h2>
         <div class="meta">
-            <p><strong>RFQ #:</strong> <?= htmlspecialchars($rfq['rfq_number']) ?></p>
             <p><strong>Date:</strong> <?= date('d M Y', strtotime($rfq['rfq_date'])) ?></p>
+            <p><strong>RFQ #:</strong> <?= htmlspecialchars($rfq['rfq_number']) ?></p>
         </div>
     </div>
+    <div class="accent-rule"></div>
 
-    <!-- VENDOR + RFQ INFORMATION -->
-    <div class="two-col">
-        <div>
-            <div class="section-label">Vendor</div>
-            <div class="section-body">
-                <p><strong><?= htmlspecialchars($rfq['supplier_name'] ?? '—') ?></strong></p>
-                <?php if (!empty($rfq['supplier_company'])): ?><p><?= htmlspecialchars($rfq['supplier_company']) ?></p><?php endif; ?>
-                <?php if (!empty($rfq['s_postal_address'])): ?><p><?= htmlspecialchars($rfq['s_postal_address']) ?></p><?php endif; ?>
-                <?php if (!empty($rfq['s_address'])): ?><p><?= htmlspecialchars($rfq['s_address']) ?></p><?php endif; ?>
-                <?php if (!empty($rfq['s_phone'])): ?><p><?= htmlspecialchars($rfq['s_phone']) ?></p><?php endif; ?>
-                <?php if (!empty($rfq['s_email'])): ?><p><?= htmlspecialchars($rfq['s_email']) ?></p><?php endif; ?>
-                <?php
-                $s_tv = [];
-                if (!empty($rfq['s_tin'])) $s_tv[] = 'TIN: ' . htmlspecialchars($rfq['s_tin']);
-                if (!empty($rfq['s_vrn'])) $s_tv[] = 'VRN: ' . htmlspecialchars($rfq['s_vrn']);
-                if ($s_tv): ?><p><?= implode(' | ', $s_tv) ?></p><?php endif; ?>
-            </div>
-        </div>
-        <div>
-            <div class="section-label">RFQ Information</div>
-            <div class="section-body">
-                <p><strong>Response Deadline:</strong> <?= !empty($rfq['deadline_date']) ? date('d M Y', strtotime($rfq['deadline_date'])) : 'Not specified' ?></p>
-                <?php if (!empty($rfq['project_contract_no'])): ?><p><strong>Contract No:</strong> <?= htmlspecialchars($rfq['project_contract_no']) ?></p><?php endif; ?>
-                <?php if (!empty($rfq['project_name'])): ?><p><strong>Project:</strong> <?= htmlspecialchars($rfq['project_name']) ?></p><?php endif; ?>
-                <?php if (!empty($rfq['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= htmlspecialchars($rfq['warehouse_name']) ?></p><?php endif; ?>
-                <p><strong>Created By:</strong> <?= htmlspecialchars($rfq['username'] ?? 'N/A') ?></p>
-                <p style="margin-top:8px;"><span class="status-badge"><?= strtoupper($status) ?></span></p>
-            </div>
-        </div>
+    <!-- COMPANY CONTACTS -->
+    <div class="company-contacts">
+        <?php if (!empty($comp['address'])): ?><p><?= htmlspecialchars($comp['address']) ?></p><?php endif; ?>
+        <?php
+        $ln = [];
+        if (!empty($comp['phone'])) $ln[] = 'Phone: ' . htmlspecialchars($comp['phone']);
+        if (!empty($comp['email'])) $ln[] = 'Email: ' . htmlspecialchars($comp['email']);
+        if (!empty($comp['website'])) $ln[] = 'Web: ' . htmlspecialchars($comp['website']);
+        if ($ln): ?><p><?= implode(' &nbsp;|&nbsp; ', $ln) ?></p><?php endif; ?>
+        <?php
+        $tv = [];
+        if (!empty($comp['tin'])) $tv[] = 'TIN: ' . htmlspecialchars($comp['tin']);
+        if (!empty($comp['vrn'])) $tv[] = 'VRN: ' . htmlspecialchars($comp['vrn']);
+        if ($tv): ?><p><?= implode(' &nbsp;|&nbsp; ', $tv) ?></p><?php endif; ?>
+    </div>
+
+    <!-- TO -->
+    <div class="to-block">
+        <div class="label">To</div>
+        <p><strong><?= htmlspecialchars($rfq['supplier_name'] ?? '—') ?></strong></p>
+        <?php if (!empty($rfq['supplier_company'])): ?><p><?= htmlspecialchars($rfq['supplier_company']) ?></p><?php endif; ?>
+        <?php if (!empty($rfq['s_postal_address'])): ?><p><?= htmlspecialchars($rfq['s_postal_address']) ?></p><?php endif; ?>
+        <?php if (!empty($rfq['s_address'])): ?><p><?= htmlspecialchars($rfq['s_address']) ?></p><?php endif; ?>
+        <?php if (!empty($rfq['s_phone'])): ?><p><?= htmlspecialchars($rfq['s_phone']) ?></p><?php endif; ?>
+        <?php if (!empty($rfq['s_email'])): ?><p><?= htmlspecialchars($rfq['s_email']) ?></p><?php endif; ?>
+        <?php
+        $s_tv = [];
+        if (!empty($rfq['s_tin'])) $s_tv[] = 'TIN: ' . htmlspecialchars($rfq['s_tin']);
+        if (!empty($rfq['s_vrn'])) $s_tv[] = 'VRN: ' . htmlspecialchars($rfq['s_vrn']);
+        if ($s_tv): ?><p><?= implode(' | ', $s_tv) ?></p><?php endif; ?>
+    </div>
+
+    <!-- SUBJECT -->
+    <div class="subject-line">Subject: <strong>Request for Quotation (RFQ)</strong> &mdash; Status: <strong><?= strtoupper($status) ?></strong></div>
+
+    <!-- RFQ META (real fields only) -->
+    <div class="rfq-meta-row">
+        <div><strong>Response Deadline</strong><?= !empty($rfq['deadline_date']) ? date('d M Y', strtotime($rfq['deadline_date'])) : 'Not specified' ?></div>
+        <?php if (!empty($rfq['project_name'])): ?><div><strong>Project</strong><?= htmlspecialchars($rfq['project_name']) ?></div><?php endif; ?>
+        <?php if (!empty($rfq['project_contract_no'])): ?><div><strong>Contract No</strong><?= htmlspecialchars($rfq['project_contract_no']) ?></div><?php endif; ?>
+        <?php if (!empty($rfq['warehouse_name'])): ?><div><strong>Warehouse</strong><?= htmlspecialchars($rfq['warehouse_name']) ?></div><?php endif; ?>
+        <div><strong>Created By</strong><?= htmlspecialchars($rfq['username'] ?? 'N/A') ?></div>
     </div>
 
     <!-- ITEMS TABLE -->
     <table>
         <thead>
             <tr>
-                <th class="text-center" style="width:38px;">S/NO</th>
+                <th class="text-center" style="width:38px;">No.</th>
                 <th>Item / Description</th>
                 <th class="text-center" style="width:120px;">Unit</th>
                 <th class="text-right" style="width:100px;">Qty</th>
@@ -224,6 +228,8 @@ $accent = getSetting('print_template_color_corporate', '#000000');
             <?php endif; ?>
         </tbody>
     </table>
+
+    <div class="closing-line">Sincerely,</div>
 
     <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
 

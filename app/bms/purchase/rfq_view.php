@@ -155,9 +155,9 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li><h6 class="dropdown-header">Print Template</h6></li>
                     <li><a class="dropdown-item" href="#" onclick="printRfqDoc('standard'); return false;"><i class="bi bi-check2 me-2"></i>Standard (default)</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('navy'); return false;">Navy</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('corporate'); return false;">Corporate</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('banded'); return false;">Banded</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('navy'); return false;">Striped</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('corporate'); return false;">Minimal</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('banded'); return false;">Radiant</a></li>
                 </ul>
             </div>
             <?php if ($status === 'draft'): ?>

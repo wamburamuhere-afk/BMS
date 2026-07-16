@@ -371,9 +371,9 @@ $(document).ready(function(){
                                 </button>
                             </div>
                             <ul class="list-unstyled ms-4 mb-1 d-none" id="rfqTplSub${row.rfq_id}">
-                                <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printRFQ(${row.rfq_id}, 'navy'); return false;"><i class="bi bi-file-earmark-text me-2"></i>Navy Template</a></li>
-                                <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printRFQ(${row.rfq_id}, 'corporate'); return false;"><i class="bi bi-file-earmark-text me-2"></i>Corporate Template</a></li>
-                                <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printRFQ(${row.rfq_id}, 'banded'); return false;"><i class="bi bi-file-earmark-text me-2"></i>Banded Template</a></li>
+                                <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printRFQ(${row.rfq_id}, 'navy'); return false;"><i class="bi bi-file-earmark-text me-2"></i>Striped Template</a></li>
+                                <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printRFQ(${row.rfq_id}, 'corporate'); return false;"><i class="bi bi-file-earmark-text me-2"></i>Minimal Template</a></li>
+                                <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printRFQ(${row.rfq_id}, 'banded'); return false;"><i class="bi bi-file-earmark-text me-2"></i>Radiant Template</a></li>
                             </ul>
                         </li>
                         ${row.status === 'draft' ? `

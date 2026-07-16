@@ -1,5 +1,9 @@
 <?php
 // File: api/account/print_rfq_banded.php
+// "Radiant" layout — letter-format RFQ with a radiating-line corner decoration and a
+// solid title bar, visually distinct from the boxed-panel Navy/Corporate/Banded
+// family. Route name kept as "banded" for the picker wiring already in place; the
+// design itself is unrelated to that family.
 error_reporting(0);
 ini_set('display_errors', 0);
 
@@ -70,11 +74,9 @@ $wf = [
     '__include_css'      => true,
 ];
 
-// Print-template accent color — shared per LAYOUT NAME (not per document type), so
-// retinting "Banded" here also retints every other document that uses the Banded
-// layout. Only the blue is configurable (the orange section bands are a fixed
-// complementary tone).
-$accent = getSetting('print_template_color_banded', '#1f7ae0');
+// Accent color — dedicated to this RFQ-only design family (not shared with the
+// Navy/Corporate/Banded set used by other document types).
+$accent = getSetting('print_template_color_rfq_radiant', '#e07b1e');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -88,33 +90,54 @@ $accent = getSetting('print_template_color_banded', '#1f7ae0');
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             font-size: 12px;
             color: #1a252f;
-            line-height: 1.5;
-            padding: 0 20px;
+            line-height: 1.6;
+            padding: 26px 26px 0 26px;
             background: #fff;
+            position: relative;
         }
 
-        /* ── BLUE HEADER BAND ── */
-        .blue-header { background: var(--accent); color: #fff; padding: 16px 22px; border-radius: 8px; margin: 20px 0 18px 0; display: flex; justify-content: space-between; align-items: center; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-        .blue-header .company-side { display: flex; align-items: center; gap: 12px; }
-        .blue-header img { max-height: 42px; width: auto; object-fit: contain; background: #fff; border-radius: 4px; padding: 3px; }
-        .blue-header h1 { font-size: 20px; font-weight: 800; letter-spacing: 0.5px; }
-        .blue-header .meta { text-align: right; font-size: 11.5px; }
-        .blue-header .meta p { margin: 2px 0; }
-        .blue-header .meta strong { font-weight: 700; }
+        /* ── RADIATING-LINE CORNER DECORATION ── */
+        .radiant-corner {
+            position: absolute;
+            top: -10px; left: -10px;
+            width: 130px; height: 130px;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .radiant-corner div {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 160px; height: 1.6px;
+            background: var(--accent);
+            opacity: 0.5;
+            transform-origin: left center;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
+        <?php for ($i = 0; $i < 10; $i++): $ang = $i * 9; ?>
+        .radiant-corner div:nth-child(<?= $i + 1 ?>) { transform: rotate(<?= $ang ?>deg); opacity: <?= 0.22 + ($i * 0.03) ?>; }
+        <?php endfor; ?>
 
-        .company-contacts { font-size: 10.5px; color: #445; margin-bottom: 16px; }
-        .company-contacts p { margin: 2px 0; }
+        /* ── HEADER ── */
+        .letter-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; position: relative; z-index: 1; }
+        .letter-header .company-block { display: flex; align-items: center; gap: 12px; }
+        .letter-header img { max-height: 44px; width: auto; object-fit: contain; }
+        .letter-header h1 { font-size: 17px; font-weight: 800; letter-spacing: 0.3px; }
+        .letter-header .meta { text-align: right; font-size: 11px; }
+        .letter-header .meta p { margin: 2px 0; }
 
-        /* ── ORANGE BANDED BLOCKS ── */
-        .band { background: #fce4cc; padding: 10px 14px; margin-bottom: 2px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-        .band-title { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #7a4a13; margin-bottom: 3px; }
-        .band p { margin: 1px 0; font-size: 11px; }
-        .two-col { display: flex; gap: 2px; margin-bottom: 14px; }
-        .two-col > .band { width: 50%; }
+        .company-contacts { font-size: 10px; color: #555; margin: 6px 0 16px; position: relative; z-index: 1; }
+        .company-contacts p { margin: 1px 0; }
 
-        .meta-strip { display: flex; gap: 2px; margin-bottom: 18px; }
-        .meta-strip > .band { width: 25%; }
-        .meta-strip .band-title { margin-bottom: 4px; }
+        /* ── TITLE BAR ── */
+        .title-bar { background: var(--accent); color: #fff; text-align: center; padding: 10px; font-size: 15px; font-weight: 800; letter-spacing: 1px; margin-bottom: 20px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+
+        .to-date-row { display: flex; justify-content: space-between; margin-bottom: 18px; font-size: 11.5px; }
+        .to-block .label { font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); margin-bottom: 4px; }
+        .to-block p { margin: 1px 0; }
+
+        .rfq-meta-row { display: flex; flex-wrap: wrap; gap: 8px 26px; margin-bottom: 20px; font-size: 11.5px; }
+        .rfq-meta-row div strong { display: block; color: var(--accent); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px; }
 
         /* ── ITEMS TABLE ── */
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
@@ -127,8 +150,13 @@ $accent = getSetting('print_template_color_banded', '#1f7ae0');
         .text-center { text-align: center; }
         .fw-bold { font-weight: 700; }
 
+        .closing-line { margin: 18px 0 4px; font-size: 11.5px; }
+
         @page { margin: 10mm 8mm 16mm 8mm; }
-        @media print { .no-print { display: none !important; } body { margin: 0 !important; } }
+        @media print {
+            .no-print { display: none !important; }
+            body { margin: 0 !important; }
+        }
     </style>
     <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 </head>
@@ -139,16 +167,19 @@ $accent = getSetting('print_template_color_banded', '#1f7ae0');
         <button onclick="window.close()" style="padding:6px 16px; cursor:pointer;">Close</button>
     </div>
 
+    <div class="radiant-corner">
+        <?php for ($i = 0; $i < 10; $i++): ?><div></div><?php endfor; ?>
+    </div>
+
     <!-- HEADER -->
-    <div class="blue-header">
-        <div class="company-side">
+    <div class="letter-header">
+        <div class="company-block">
             <?php if (!empty($comp['logo'])): ?>
             <img src="<?= htmlspecialchars('../../' . $comp['logo']) ?>" alt="Logo">
             <?php endif; ?>
             <h1><?= htmlspecialchars($comp['name']) ?></h1>
         </div>
         <div class="meta">
-            <p style="font-size:15px; font-weight:800;">REQUEST FOR QUOTATION</p>
             <p><strong>Date:</strong> <?= date('d M Y', strtotime($rfq['rfq_date'])) ?></p>
             <p><strong>RFQ #:</strong> <?= htmlspecialchars($rfq['rfq_number']) ?></p>
         </div>
@@ -170,10 +201,13 @@ $accent = getSetting('print_template_color_banded', '#1f7ae0');
         if ($tv): ?><p><?= implode(' &nbsp;|&nbsp; ', $tv) ?></p><?php endif; ?>
     </div>
 
-    <!-- VENDOR + STATUS -->
-    <div class="two-col">
-        <div class="band">
-            <div class="band-title">Vendor</div>
+    <!-- TITLE BAR -->
+    <div class="title-bar">REQUEST FOR QUOTATION (RFQ)</div>
+
+    <!-- TO + STATUS -->
+    <div class="to-date-row">
+        <div class="to-block">
+            <div class="label">To</div>
             <p><strong><?= htmlspecialchars($rfq['supplier_name'] ?? '—') ?></strong></p>
             <?php if (!empty($rfq['supplier_company'])): ?><p><?= htmlspecialchars($rfq['supplier_company']) ?></p><?php endif; ?>
             <?php if (!empty($rfq['s_postal_address'])): ?><p><?= htmlspecialchars($rfq['s_postal_address']) ?></p><?php endif; ?>
@@ -186,35 +220,23 @@ $accent = getSetting('print_template_color_banded', '#1f7ae0');
             if (!empty($rfq['s_vrn'])) $s_tv[] = 'VRN: ' . htmlspecialchars($rfq['s_vrn']);
             if ($s_tv): ?><p><?= implode(' | ', $s_tv) ?></p><?php endif; ?>
         </div>
-        <div class="band">
-            <div class="band-title">RFQ Status</div>
-            <p><strong><?= strtoupper($status) ?></strong></p>
-            <?php if (!empty($rfq['warehouse_name'])): ?><p>Warehouse: <?= htmlspecialchars($rfq['warehouse_name']) ?></p><?php endif; ?>
-            <?php if (!empty($rfq['project_name'])): ?><p>Project: <?= htmlspecialchars($rfq['project_name']) ?></p><?php endif; ?>
-        </div>
+        <div style="text-align:right;"><strong style="color:var(--accent);">STATUS: <?= strtoupper($status) ?></strong></div>
     </div>
 
-    <!-- META STRIP (real fields only) -->
-    <div class="meta-strip">
-        <div class="band">
-            <div class="band-title">Created By</div>
-            <p><?= htmlspecialchars($rfq['username'] ?? 'N/A') ?></p>
-        </div>
-        <div class="band">
-            <div class="band-title">Response Deadline</div>
-            <p><?= !empty($rfq['deadline_date']) ? date('d M Y', strtotime($rfq['deadline_date'])) : '—' ?></p>
-        </div>
-        <div class="band">
-            <div class="band-title">Contract No</div>
-            <p><?= !empty($rfq['project_contract_no']) ? htmlspecialchars($rfq['project_contract_no']) : '—' ?></p>
-        </div>
+    <!-- RFQ META (real fields only) -->
+    <div class="rfq-meta-row">
+        <div><strong>Response Deadline</strong><?= !empty($rfq['deadline_date']) ? date('d M Y', strtotime($rfq['deadline_date'])) : 'Not specified' ?></div>
+        <?php if (!empty($rfq['project_name'])): ?><div><strong>Project</strong><?= htmlspecialchars($rfq['project_name']) ?></div><?php endif; ?>
+        <?php if (!empty($rfq['project_contract_no'])): ?><div><strong>Contract No</strong><?= htmlspecialchars($rfq['project_contract_no']) ?></div><?php endif; ?>
+        <?php if (!empty($rfq['warehouse_name'])): ?><div><strong>Warehouse</strong><?= htmlspecialchars($rfq['warehouse_name']) ?></div><?php endif; ?>
+        <div><strong>Created By</strong><?= htmlspecialchars($rfq['username'] ?? 'N/A') ?></div>
     </div>
 
     <!-- ITEMS TABLE -->
     <table>
         <thead>
             <tr>
-                <th class="text-center" style="width:38px;">S/NO</th>
+                <th class="text-center" style="width:38px;">No.</th>
                 <th>Item / Description</th>
                 <th class="text-center" style="width:120px;">Unit</th>
                 <th class="text-right" style="width:100px;">Qty</th>
@@ -235,6 +257,8 @@ $accent = getSetting('print_template_color_banded', '#1f7ae0');
             <?php endif; ?>
         </tbody>
     </table>
+
+    <div class="closing-line">Sincerely,</div>
 
     <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
 
