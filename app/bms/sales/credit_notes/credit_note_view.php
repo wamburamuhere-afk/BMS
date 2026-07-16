@@ -90,7 +90,21 @@ $badge = [
             <?php if ($status === 'pending' && $can_edit): ?>
                 <a class="btn btn-outline-primary" href="<?= getUrl('credit_note_edit') ?>?id=<?= $id ?>"><i class="bi bi-pencil me-1"></i> Edit</a>
             <?php endif; ?>
-            <a class="btn btn-outline-primary" href="<?= getUrl('print_credit_note') ?>?id=<?= $id ?>" target="_blank"><i class="bi bi-printer me-1"></i> Print</a>
+            <div class="btn-group shadow-sm">
+                <button onclick="printCreditNoteDoc()" class="btn btn-outline-primary btn-sm px-3">
+                    <i class="bi bi-printer me-1"></i> Print
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><h6 class="dropdown-header">Print Template</h6></li>
+                    <li><a class="dropdown-item" href="#" onclick="printCreditNoteDoc('standard'); return false;"><i class="bi bi-check2 me-2"></i>Standard (default)</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printCreditNoteDoc('ledger'); return false;">Ledger</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printCreditNoteDoc('horizon'); return false;">Horizon</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printCreditNoteDoc('ember'); return false;">Ember</a></li>
+                </ul>
+            </div>
             <a class="btn btn-outline-secondary" href="<?= getUrl('credit_notes') ?>"><i class="bi bi-arrow-left me-1"></i> Back</a>
         </div>
     </div>
@@ -245,6 +259,18 @@ $badge = [
 
 <script>
 const CN_ID = <?= $id ?>;
+
+const CN_PRINT_TEMPLATES = {
+    standard: '<?= getUrl('print_credit_note') ?>',
+    ledger:   '<?= getUrl('print_credit_note_ledger') ?>',
+    horizon:  '<?= getUrl('print_credit_note_horizon') ?>',
+    ember:    '<?= getUrl('print_credit_note_ember') ?>'
+};
+function printCreditNoteDoc(template) {
+    const base = CN_PRINT_TEMPLATES[template] || CN_PRINT_TEMPLATES.standard;
+    window.open(base + '?id=' + CN_ID, '_blank');
+}
+
 function cnPost(url, okTitle){
     Swal.fire({ title:'Processing...', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
     $.post(url, { credit_note_id: CN_ID, _csrf: (typeof CSRF_TOKEN!=='undefined'?CSRF_TOKEN:'') }, function(res){

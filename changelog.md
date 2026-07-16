@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-07-16 (feat) — Credit Note gets its own 3-template print family
+
+**New:** `app/bms/sales/credit_notes/print_credit_note_ledger.php`,
+`app/bms/sales/credit_notes/print_credit_note_horizon.php`,
+`app/bms/sales/credit_notes/print_credit_note_ember.php`
+**Files:** `roots.php`, `app/bms/sales/credit_notes/credit_note_view.php`,
+`app/constant/settings/system_settings.php`
+
+Built Credit Note's own 3-template print family (Ledger — minimal/quiet; Horizon — full-width
+colour band header; Ember — bold modern block with a prominent Total Credit figure), following the
+same "research → present candidates → get approval → build" process used for the other document
+types. Canva stayed blocked (no paid plan on the connected account) so candidates were sourced from
+a public template catalog instead. Each template carries every field the existing `print_credit_note.php`
+has (company logo/name, customer box, items with VAT, subtotal/VAT/grand total, notes, full
+Created/Reviewed/Approved signature row), plus two additions using data that was already available
+but unused in print — a "Ref Invoice" line (`credit_notes.invoice_id` → `invoices.invoice_number`)
+and a Payment Info block (paid-from account, paid date, payment reference) shown only when the note
+has been paid. Each template has its own accent-colour keys (`print_template_color_cn_ledger/_horizon/_ember`)
+wired into System Settings > Color Setting > Sales Side. The original `print_credit_note.php` is kept
+as "Standard (default)" in the print dropdown, matching the pattern used for every other document
+family. Verified with a real paid credit note (CN-2026-0004) — ran all 3 templates in-process against
+live DB data (structural assertions: correct totals, item rows, signature block, payment info,
+accent CSS variable) and visually confirmed each in-browser via a screenshot.
+
 ## 2026-07-16 (refactor) — Purchase Order, Purchase Return, and Debit Note each get their own Navy/Corporate/Banded colors
 
 **Files:** `app/constant/settings/system_settings.php`, `api/account/print_purchase_order_navy.php`,
