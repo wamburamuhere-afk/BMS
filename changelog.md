@@ -1,5 +1,52 @@
 # BMS Changelog
 
+## 2026-07-16 (feat) — Sales Order and Quotation each get their own 3-template print family
+
+**New:** `app/bms/sales/print_sales_order_confirmation.php`, `app/bms/sales/print_sales_order_ledger.php`,
+`app/bms/sales/print_sales_order_studio.php`, `app/bms/sales/quotations/print_quotation_noir.php`,
+`app/bms/sales/quotations/print_quotation_meadow.php`, `app/bms/sales/quotations/print_quotation_terra.php`
+**Files:** `roots.php`, `app/bms/sales/sales_order_view.php`, `app/bms/sales/sales_orders.php`,
+`app/bms/sales/quotations/quotation_view.php`, `app/bms/sales/quotations/quotations.php`,
+`app/constant/settings/company_profile.php`
+
+Researched WorkDo and Canva for Sales Order and Quotation print layouts. Sales Order and Quotation share the
+exact same underlying data fields (Sales Order is the base; Quotation adds Valid Until + Bank/Account
+Details), but per explicit instruction they must look like two distinct document families rather than one
+shared template reused across both — so each got its own 3-candidate design set and its own 3 new templates,
+alongside the existing default (unchanged).
+
+**Sales Order** (own family — Confirmation / Ledger / Studio):
+- **Confirmation** — a formal letter-style order confirmation (colored letterhead block, "To:" address,
+  "Subject: Confirmation of Sales Order No. …", order facts list, items table, "Yours sincerely," + signature).
+- **Ledger** — a navy boxed order-form layout (header bar, status strip, bordered Customer/Order panels,
+  bordered totals box).
+- **Studio** — an elegant black-and-white minimalist form (centered serif letterhead, thin-rule field rows,
+  understated table).
+
+**Quotation** (own family — Noir / Meadow / Terra):
+- **Noir** — solid black header band, bordered panels, black totals box.
+- **Meadow** — soft green rounded-panel layout with pill-shaped title and a highlighted "Valid Until" chip.
+- **Terra** — warm tan/cream page with a numbered "QUOTATION #…" header and tan-accented boxed sections.
+
+Every template carries company name, logo, and the full three-approval signature block (with e-signature
+images), and every field the existing default template shows remains present — nothing dropped, nothing
+invented. Quotation's extra fields (Valid Until, Bank/Account Details: bank transfer, mobile money, cheque)
+only appear in the Quotation family, since Sales Order's own data has no Valid Until or bank details. Sales
+Order templates also carry the DRAFT watermark (Quotation's default template never had one, so its new
+templates don't either).
+
+Since Sales Order and Quotation are visually unrelated families (not a shared layout), each of the six new
+templates gets its own accent-color setting — `print_template_color_so_confirmation/_ledger/_studio` and
+`print_template_color_qt_noir/_meadow/_terra` — with matching "Sales Order Print Template Colors" and
+"Quotation Print Template Colors" sections in Company Profile, following the same precedent set for RFQ.
+
+Print pickers added: chevron-toggle sub-menu on the Sales Order list (previously had no print action at
+row level) and Quotation list (extends the existing "Print PDF" item), plus a split-button picker on both
+detail pages — all defaulting to the existing standard template.
+
+Verified live: all six templates return HTTP 200, zero PHP errors, correct document title, company info,
+and signature block present, against a real Sales Order (#SO-20260529-0062) and a real Quotation (id 68).
+
 ## 2026-07-16 (fix) — RFQ's 3 templates rebuilt as their own distinct letter-format family, not the shared one
 
 **Files:** `api/account/print_rfq_navy.php`, `api/account/print_rfq_corporate.php`, `api/account/print_rfq_banded.php`,

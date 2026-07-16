@@ -463,9 +463,19 @@ $can_approve = canApprove('sales_orders');
                                                     </li>
                                                     <?php endif; ?>
                                                     <li>
-                                                        <a class="dropdown-item" href="javascript:void(0)" onclick="printQuote(<?= $q['sales_order_id'] ?>)">
-                                                            <i class="bi bi-printer text-secondary me-2"></i> Print PDF
-                                                        </a>
+                                                        <div class="d-flex align-items-center dropdown-item py-0 pe-1">
+                                                            <a class="flex-grow-1 py-2 text-decoration-none text-dark" href="javascript:void(0)" onclick="printQuote(<?= $q['sales_order_id'] ?>)">
+                                                                <i class="bi bi-printer text-secondary me-2"></i> Print PDF
+                                                            </a>
+                                                            <button type="button" class="btn btn-sm border-0 p-1 text-muted" title="Choose a different template" onclick="event.stopPropagation(); $('#qtTplSub<?= $q['sales_order_id'] ?>').toggleClass('d-none'); $(this).find('i').toggleClass('bi-chevron-down bi-chevron-up');">
+                                                                <i class="bi bi-chevron-down"></i>
+                                                            </button>
+                                                        </div>
+                                                        <ul class="list-unstyled ms-4 mb-1 d-none" id="qtTplSub<?= $q['sales_order_id'] ?>">
+                                                            <li><a class="dropdown-item py-1 small text-muted" href="javascript:void(0)" onclick="printQuote(<?= $q['sales_order_id'] ?>, 'noir')">Noir Template</a></li>
+                                                            <li><a class="dropdown-item py-1 small text-muted" href="javascript:void(0)" onclick="printQuote(<?= $q['sales_order_id'] ?>, 'meadow')">Meadow Template</a></li>
+                                                            <li><a class="dropdown-item py-1 small text-muted" href="javascript:void(0)" onclick="printQuote(<?= $q['sales_order_id'] ?>, 'terra')">Terra Template</a></li>
+                                                        </ul>
                                                     </li>
                                                     <?php if ($status !== 'approved' && $status !== 'cancelled'): ?>
                                                     <li><hr class="dropdown-divider"></li>
@@ -653,8 +663,15 @@ function deleteQuote(id) {
     });
 }
 
-function printQuote(id) {
-    window.open('<?= getUrl('print_quotation') ?>?id=' + id, '_blank');
+const QT_PRINT_TEMPLATES_LIST = {
+    standard: '<?= getUrl('print_quotation') ?>',
+    noir:     '<?= getUrl('print_quotation_noir') ?>',
+    meadow:   '<?= getUrl('print_quotation_meadow') ?>',
+    terra:    '<?= getUrl('print_quotation_terra') ?>'
+};
+function printQuote(id, template) {
+    const base = QT_PRINT_TEMPLATES_LIST[template] || QT_PRINT_TEMPLATES_LIST.standard;
+    window.open(base + '?id=' + id, '_blank');
 }
 
 function copyTable() {

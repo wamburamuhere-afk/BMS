@@ -850,6 +850,19 @@ function initTable() {
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
                                 <li><a class="dropdown-item py-2" href="sales_order_view?id=${row.sales_order_id}"><i class="bi bi-eye text-primary me-2"></i> View Details</a></li>
+                                <li>
+                                    <div class="d-flex align-items-center dropdown-item py-0 pe-1">
+                                        <a class="flex-grow-1 py-2 text-decoration-none text-dark" href="#" onclick="printSalesOrderRow(${row.sales_order_id}); return false;"><i class="bi bi-printer text-dark me-2"></i> Print Order</a>
+                                        <button type="button" class="btn btn-sm border-0 p-1 text-muted" title="Choose a different template" onclick="event.stopPropagation(); $('#soTplSub${row.sales_order_id}').toggleClass('d-none'); $(this).find('i').toggleClass('bi-chevron-down bi-chevron-up');">
+                                            <i class="bi bi-chevron-down"></i>
+                                        </button>
+                                    </div>
+                                    <ul class="list-unstyled ms-4 mb-1 d-none" id="soTplSub${row.sales_order_id}">
+                                        <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printSalesOrderRow(${row.sales_order_id}, 'confirmation'); return false;">Confirmation Template</a></li>
+                                        <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printSalesOrderRow(${row.sales_order_id}, 'ledger'); return false;">Ledger Template</a></li>
+                                        <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printSalesOrderRow(${row.sales_order_id}, 'studio'); return false;">Studio Template</a></li>
+                                    </ul>
+                                </li>
                     `;
 
                     // Three-approval workflow actions — both Review and Approve are shown
@@ -976,6 +989,17 @@ function changeOrderStatus(id, currentStatus) {
             updateOrderStatus(id, result.value);
         }
     });
+}
+
+const SO_PRINT_TEMPLATES_LIST = {
+    standard:     '<?= getUrl('print_sales_order') ?>',
+    confirmation: '<?= getUrl('print_sales_order_confirmation') ?>',
+    ledger:       '<?= getUrl('print_sales_order_ledger') ?>',
+    studio:       '<?= getUrl('print_sales_order_studio') ?>'
+};
+function printSalesOrderRow(id, template) {
+    const base = SO_PRINT_TEMPLATES_LIST[template] || SO_PRINT_TEMPLATES_LIST.standard;
+    window.open(base + '?id=' + id, '_blank');
 }
 
 function reviewSalesOrder(id, orderNumber) {
