@@ -726,6 +726,13 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
 // create a brand new row instead of updating the one just saved.
 let currentDocumentId = <?= (int)($existing['id'] ?? 0) ?>;
 
+// Same reason as currentDocumentId above: saveDocument() (a top-level function,
+// outside this ready block) reads this flag, so it can't be block-scoped to
+// $(document).ready — that raised "senderCustomInited is not defined" on every
+// single save (the html2pdf .then() callback that builds the upload wraps both
+// Save Draft and Save & Print), not just an intermittent PDF-render failure.
+let senderCustomInited = false;
+
 $(document).ready(function () {
     $('#f_category_id').select2({ theme: 'bootstrap-5', placeholder: 'Select...', allowClear: true, width: '100%' });
 
@@ -755,7 +762,8 @@ $(document).ready(function () {
     // choice. Initialized lazily (only when custom mode is actually turned
     // on) rather than on page load, since Summernote initializing on a
     // display:none element is a known source of layout/rendering quirks.
-    let senderCustomInited = false;
+    // senderCustomInited itself is declared at module scope above (top of
+    // the <script> block) — saveDocument() needs to read it too.
     function initSenderCustomEditor() {
         if (senderCustomInited) return;
         senderCustomInited = true;
@@ -1148,9 +1156,15 @@ function saveDocument(mode) {
                 $btn.prop('disabled', false).html(orig);
             }
         });
-    }).catch(function () {
+    }).catch(function (err) {
+        // Surface the real html2canvas/html2pdf failure reason (e.g. a
+        // cross-origin image tainting the canvas) instead of only a generic
+        // message — the console line is for developers, the appended detail
+        // is so a report of this error is actionable without DevTools.
+        console.error('html2pdf generation failed:', err);
         $('#letterFooterWrap').css('display', '');
-        Swal.fire({ icon: 'error', title: 'Error', text: 'Could not generate the PDF.' });
+        const detail = err && err.message ? ' (' + err.message + ')' : '';
+        Swal.fire({ icon: 'error', title: 'Error', text: 'Could not generate the PDF.' + detail });
         $btn.prop('disabled', false).html(orig);
     });
 }
