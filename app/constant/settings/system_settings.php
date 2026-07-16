@@ -136,10 +136,18 @@ if ($_POST) {
     if (isset($_POST['save_colors'])) {
         try {
             $color_defaults = [
-                // Purchase Side — shared Navy/Corporate/Banded family (Purchase Order, Purchase Return, Debit Note)
-                'print_template_color_navy'      => '#0f1f3d',
-                'print_template_color_corporate' => '#000000',
-                'print_template_color_banded'    => '#1f7ae0',
+                // Purchase Side — Purchase Order's own Navy/Corporate/Banded family
+                'print_template_color_po_navy'      => '#0f1f3d',
+                'print_template_color_po_corporate' => '#000000',
+                'print_template_color_po_banded'    => '#1f7ae0',
+                // Purchase Side — Purchase Return's own Navy/Corporate/Banded family
+                'print_template_color_pret_navy'      => '#0f1f3d',
+                'print_template_color_pret_corporate' => '#000000',
+                'print_template_color_pret_banded'    => '#1f7ae0',
+                // Purchase Side — Debit Note's own Navy/Corporate/Banded family
+                'print_template_color_dbn_navy'      => '#0f1f3d',
+                'print_template_color_dbn_corporate' => '#000000',
+                'print_template_color_dbn_banded'    => '#1f7ae0',
                 // Purchase Side — RFQ's own letter-format family
                 'print_template_color_rfq_striped' => '#d9601a',
                 'print_template_color_rfq_minimal' => '#1a7ea8',
@@ -895,23 +903,65 @@ if ($_POST) {
 
                         <h6 class="fw-bold text-uppercase small text-muted mb-3"><i class="bi bi-truck me-1"></i> Purchase Side</h6>
 
-                        <!-- Print Template Colors (shared: Purchase Order, Purchase Return, Debit Note) -->
+                        <!-- Purchase Order Print Template Colors (own family, unrelated to Purchase Return / Debit Note) -->
                         <div class="mb-3">
-                            <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette me-1"></i> Print Template Colors</h6>
-                            <p class="text-muted small mb-2">One accent color per layout, shared across every document that uses it (Purchase Order, Return Note, and future documents built the same way).</p>
+                            <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette2 me-1"></i> Purchase Order Print Template Colors</h6>
+                            <p class="text-muted small mb-2">Purchase Order uses its own Navy/Corporate/Banded colors, separate from Purchase Return and Debit Note even though all three share the same layout designs.</p>
                         </div>
                         <div class="row g-4 mb-3">
                             <div class="col-md-4">
-                                <label for="print_template_color_navy" class="form-label">Navy Template</label>
-                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_navy" name="print_template_color_navy" value="<?= get_setting('print_template_color_navy', '#0f1f3d') ?>">
+                                <label for="print_template_color_po_navy" class="form-label">Navy Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_po_navy" name="print_template_color_po_navy" value="<?= get_setting('print_template_color_po_navy', '#0f1f3d') ?>">
                             </div>
                             <div class="col-md-4">
-                                <label for="print_template_color_corporate" class="form-label">Corporate Template</label>
-                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_corporate" name="print_template_color_corporate" value="<?= get_setting('print_template_color_corporate', '#000000') ?>">
+                                <label for="print_template_color_po_corporate" class="form-label">Corporate Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_po_corporate" name="print_template_color_po_corporate" value="<?= get_setting('print_template_color_po_corporate', '#000000') ?>">
                             </div>
                             <div class="col-md-4">
-                                <label for="print_template_color_banded" class="form-label">Banded Template</label>
-                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_banded" name="print_template_color_banded" value="<?= get_setting('print_template_color_banded', '#1f7ae0') ?>">
+                                <label for="print_template_color_po_banded" class="form-label">Banded Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_po_banded" name="print_template_color_po_banded" value="<?= get_setting('print_template_color_po_banded', '#1f7ae0') ?>">
+                                <div class="form-text">Only the blue is configurable here; the orange section bands stay fixed.</div>
+                            </div>
+                        </div>
+
+                        <!-- Purchase Return Print Template Colors (own family, unrelated to Purchase Order / Debit Note) -->
+                        <div class="mb-3">
+                            <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette2 me-1"></i> Purchase Return Print Template Colors</h6>
+                            <p class="text-muted small mb-2">Purchase Return uses its own Navy/Corporate/Banded colors, separate from Purchase Order and Debit Note even though all three share the same layout designs.</p>
+                        </div>
+                        <div class="row g-4 mb-3">
+                            <div class="col-md-4">
+                                <label for="print_template_color_pret_navy" class="form-label">Navy Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_pret_navy" name="print_template_color_pret_navy" value="<?= get_setting('print_template_color_pret_navy', '#0f1f3d') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_pret_corporate" class="form-label">Corporate Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_pret_corporate" name="print_template_color_pret_corporate" value="<?= get_setting('print_template_color_pret_corporate', '#000000') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_pret_banded" class="form-label">Banded Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_pret_banded" name="print_template_color_pret_banded" value="<?= get_setting('print_template_color_pret_banded', '#1f7ae0') ?>">
+                                <div class="form-text">Only the blue is configurable here; the orange section bands stay fixed.</div>
+                            </div>
+                        </div>
+
+                        <!-- Debit Note Print Template Colors (own family, unrelated to Purchase Order / Purchase Return) -->
+                        <div class="mb-3">
+                            <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette2 me-1"></i> Debit Note Print Template Colors</h6>
+                            <p class="text-muted small mb-2">Debit Note uses its own Navy/Corporate/Banded colors, separate from Purchase Order and Purchase Return even though all three share the same layout designs.</p>
+                        </div>
+                        <div class="row g-4 mb-3">
+                            <div class="col-md-4">
+                                <label for="print_template_color_dbn_navy" class="form-label">Navy Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_dbn_navy" name="print_template_color_dbn_navy" value="<?= get_setting('print_template_color_dbn_navy', '#0f1f3d') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_dbn_corporate" class="form-label">Corporate Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_dbn_corporate" name="print_template_color_dbn_corporate" value="<?= get_setting('print_template_color_dbn_corporate', '#000000') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_dbn_banded" class="form-label">Banded Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_dbn_banded" name="print_template_color_dbn_banded" value="<?= get_setting('print_template_color_dbn_banded', '#1f7ae0') ?>">
                                 <div class="form-text">Only the blue is configurable here; the orange section bands stay fixed.</div>
                             </div>
                         </div>
