@@ -403,8 +403,13 @@ $(document).ready(function() {
                                 ${(isReviewed && PO_CAN_APPROVE) ? `<li><a class="dropdown-item py-2 text-success fw-bold" href="#" onclick="approveOrder(${row.purchase_order_id}, '${row.order_number}')"><i class="bi bi-check-circle me-2"></i> Approve Order</a></li>` : ''}
                                 ${canEditNow ? `<li><a class="dropdown-item py-2" href="<?= getUrl('purchase_order_create') ?>?edit=${row.purchase_order_id}" onclick="logReportAction('Initiated Purchase Order Edit', 'User clicked edit for PO #${row.order_number}')"><i class="bi bi-pencil text-info me-2"></i> Edit Order</a></li>` : ''}
                                 <li>
-                                    <a class="dropdown-item py-2" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}'); return false;"><i class="bi bi-printer text-dark me-2"></i> Print Order</a>
-                                    <ul class="list-unstyled ms-4 mb-1">
+                                    <div class="d-flex align-items-center dropdown-item py-0 pe-1">
+                                        <a class="flex-grow-1 py-2 text-decoration-none text-dark" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}'); return false;"><i class="bi bi-printer text-dark me-2"></i> Print Order</a>
+                                        <button type="button" class="btn btn-sm border-0 p-1 text-muted" title="Choose a different template" onclick="event.stopPropagation(); $('#poTplSub${row.purchase_order_id}').toggleClass('d-none'); $(this).find('i').toggleClass('bi-chevron-down bi-chevron-up');">
+                                            <i class="bi bi-chevron-down"></i>
+                                        </button>
+                                    </div>
+                                    <ul class="list-unstyled ms-4 mb-1 d-none" id="poTplSub${row.purchase_order_id}">
                                         <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}', 'navy'); return false;"><i class="bi bi-file-earmark-text me-2"></i> Navy Template</a></li>
                                         <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}', 'corporate'); return false;"><i class="bi bi-file-earmark-text me-2"></i> Corporate Template</a></li>
                                         <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printOrder(${row.purchase_order_id}, '${row.order_number}', 'banded'); return false;"><i class="bi bi-file-earmark-text me-2"></i> Banded Template</a></li>
