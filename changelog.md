@@ -1,5 +1,56 @@
 # BMS Changelog
 
+## 2026-07-16 (feat) — Invoice and Delivery Note (Outbound) each get their own 3-template print family
+
+**New:** `app/bms/invoice/invoice_print_summit.php`, `app/bms/invoice/invoice_print_wave.php`,
+`app/bms/invoice/invoice_print_onyx.php`, `api/account/print_delivery_note_depot.php`,
+`api/account/print_delivery_note_transit.php`, `api/account/print_delivery_note_custody.php`
+**Files:** `roots.php`, `app/bms/invoice/invoice_view.php`, `app/bms/invoice/invoices.php`,
+`app/bms/grn/dn_view.php`, `app/constant/settings/company_profile.php`
+
+Researched WorkDo and Canva for Invoice and Delivery Note (Outbound) print layouts, following the same
+"research → present candidates → get approval → build" process used for the other document types. WorkDo
+confirmed both are standard document types but had no populated sample data or an accessible template
+gallery to compare visually — same as prior rounds, it mainly confirms feature parity while Canva supplies
+the actual visual candidates.
+
+**Invoice** (own family — Summit / Wave / Onyx):
+- **Summit** — bold cyan-boxed layout with a prominent "Total Due" figure in the header meta bar, boxed
+  totals/grand-total bars, Payment Method box.
+- **Wave** — a diagonal blue banner header (Bill To / From side-by-side), blue-headed items table, a
+  "Thank You!" close.
+- **Onyx** — bold black minimalist title with a subtle dark wave graphic accent behind the totals/notes
+  section.
+
+**Delivery Note (Outbound)** (own family — Depot / Transit / Custody):
+- **Depot** — clean white form, dual side-by-side "Signature," lines (plus the existing canonical
+  three-approval row and Received By line), orange accent bar.
+- **Transit** — boxed Customer Information / Delivery Details panels with a blue logo-mark-style header.
+- **Custody** — Sender Information / Receipt Information panels with a Delivered-By/Received-By
+  acknowledgment block. The reference design's Fragile/Handle-with-care checkbox row has no backing data in
+  BMS (no such field exists on `deliveries`), so it was intentionally left out — nothing invented.
+
+Every template carries company name, logo, and the full three-approval signature block (with e-signature
+images); every field the existing default template shows remains present. Invoice's own extra fields (DN
+Ref, LPO Ref, Paid Amount/Balance Due, Payment Method/Bank Details) are all still there. The `print_delivery_note.php`
+page itself renders both inbound and outbound DNs from one file (direction-aware); the three new templates
+keep that same inbound/outbound branching for safety, but the picker on `dn_view.php` only appears for
+outbound records — inbound DNs keep their plain single Print button, since the new designs were researched
+and built specifically for the outbound (customer-facing) use case per the requested scope.
+
+Each of the six new templates gets its own accent-color setting — `print_template_color_inv_summit/_wave/_onyx`
+and `print_template_color_dn_depot/_transit/_custody` — with matching "Invoice Print Template Colors" and
+"Delivery Note (Outbound) Print Template Colors" sections in Company Profile, following the same
+one-family-per-document-type precedent set for Sales Order/Quotation and RFQ.
+
+Print pickers added: chevron-toggle sub-menu on the Invoice list (extends the existing "Print Invoice"
+item), plus split-button pickers on the Invoice detail page and the DN detail page (outbound only) — all
+defaulting to the existing standard template.
+
+Verified live: all six templates return HTTP 200, zero PHP errors, correct document title, company info,
+and signature block present, against a real Invoice (#INV-20260701-776, id 1404, which also has a linked
+DN Ref and LPO Ref) and a real outbound Delivery Note (id 28, linked to that same invoice).
+
 ## 2026-07-16 (feat) — Sales Order and Quotation each get their own 3-template print family
 
 **New:** `app/bms/sales/print_sales_order_confirmation.php`, `app/bms/sales/print_sales_order_ledger.php`,

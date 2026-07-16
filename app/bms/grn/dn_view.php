@@ -188,9 +188,27 @@ $wf = [
                 <i class="bi bi-trash me-1"></i> Delete
             </button>
             <?php endif; ?>
+            <?php if ($is_inbound): ?>
             <button class="btn btn-outline-secondary btn-sm" onclick="window.open('<?= getUrl('print_delivery_note') ?>?id=<?= $delivery_id ?>', '_blank')">
                 <i class="bi bi-printer me-1"></i> Print
             </button>
+            <?php else: ?>
+            <div class="btn-group shadow-sm">
+                <button class="btn btn-outline-secondary btn-sm" onclick="printDnDoc()">
+                    <i class="bi bi-printer me-1"></i> Print
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><h6 class="dropdown-header">Print Template</h6></li>
+                    <li><a class="dropdown-item" href="#" onclick="printDnDoc('standard'); return false;"><i class="bi bi-check2 me-2"></i>Standard (default)</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printDnDoc('depot'); return false;">Depot</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printDnDoc('transit'); return false;">Transit</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printDnDoc('custody'); return false;">Custody</a></li>
+                </ul>
+            </div>
+            <?php endif; ?>
             <a href="<?= $return_url ?>" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-arrow-left me-1"></i> Back
             </a>
@@ -462,6 +480,17 @@ $wf = [
 
 <script>
 const DN_ID = <?= (int)$delivery_id ?>;
+
+const DN_PRINT_TEMPLATES = {
+    standard: '<?= getUrl('print_delivery_note') ?>',
+    depot:    '<?= getUrl('print_delivery_note_depot') ?>',
+    transit:  '<?= getUrl('print_delivery_note_transit') ?>',
+    custody:  '<?= getUrl('print_delivery_note_custody') ?>'
+};
+function printDnDoc(template) {
+    const base = DN_PRINT_TEMPLATES[template] || DN_PRINT_TEMPLATES.standard;
+    window.open(base + '?id=' + DN_ID, '_blank');
+}
 
 function markReviewedFromView() {
     Swal.fire({

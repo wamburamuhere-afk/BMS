@@ -165,9 +165,21 @@ includeHeader();
                     <i class="bi bi-pencil"></i> Edit Invoice
                 </a>
             <?php endif; ?>
-            <a href="<?= getUrl('invoice_print') ?>?id=<?= $invoice['invoice_id'] ?>" target="_blank" class="btn btn-outline-primary">
-                <i class="bi bi-printer"></i> Print Invoice
-            </a>
+            <div class="btn-group shadow-sm">
+                <button onclick="printInvoiceDoc()" class="btn btn-outline-primary btn-sm px-3">
+                    <i class="bi bi-printer me-1"></i> Print Invoice
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><h6 class="dropdown-header">Print Template</h6></li>
+                    <li><a class="dropdown-item" href="#" onclick="printInvoiceDoc('standard'); return false;"><i class="bi bi-check2 me-2"></i>Standard (default)</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printInvoiceDoc('summit'); return false;">Summit</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printInvoiceDoc('wave'); return false;">Wave</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printInvoiceDoc('onyx'); return false;">Onyx</a></li>
+                </ul>
+            </div>
             <?php
             // Three-approval sequential action buttons (parallel — only the
             // one matching current status is active; the other is disabled).
@@ -637,6 +649,17 @@ $(document).ready(function() {
 });
 
 const INV_ID = <?= (int)$invoice['invoice_id'] ?>;
+
+const INV_PRINT_TEMPLATES = {
+    standard: '<?= getUrl('invoice_print') ?>',
+    summit:   '<?= getUrl('invoice_print_summit') ?>',
+    wave:     '<?= getUrl('invoice_print_wave') ?>',
+    onyx:     '<?= getUrl('invoice_print_onyx') ?>'
+};
+function printInvoiceDoc(template) {
+    const base = INV_PRINT_TEMPLATES[template] || INV_PRINT_TEMPLATES.standard;
+    window.open(base + '?id=' + INV_ID, '_blank');
+}
 
 function reviewThisInvoice() {
     Swal.fire({ title: 'Mark as Reviewed?', text: 'Invoice will move to "Reviewed" and become approvable.', icon: 'question', showCancelButton: true, confirmButtonText: 'Yes, mark reviewed', confirmButtonColor: '#0d6efd' }).then(function(result) {

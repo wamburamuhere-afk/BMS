@@ -57,6 +57,14 @@ $default_settings = [
     'print_template_color_qt_noir'   => '#111111',
     'print_template_color_qt_meadow' => '#2f7d4f',
     'print_template_color_qt_terra'  => '#9c6b3e',
+    // Invoice's own 3-template design family.
+    'print_template_color_inv_summit' => '#12b5c9',
+    'print_template_color_inv_wave'   => '#164a91',
+    'print_template_color_inv_onyx'   => '#1c1c1c',
+    // Delivery Note (Outbound)'s own 3-template design family.
+    'print_template_color_dn_depot'   => '#e05a1c',
+    'print_template_color_dn_transit' => '#1b5fa8',
+    'print_template_color_dn_custody' => '#6b7c5e',
 ];
 
 // Handle Form Submission
@@ -74,11 +82,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'print_template_color_rfq_striped', 'print_template_color_rfq_minimal', 'print_template_color_rfq_radiant',
             'print_template_color_so_confirmation', 'print_template_color_so_ledger', 'print_template_color_so_studio',
             'print_template_color_qt_noir', 'print_template_color_qt_meadow', 'print_template_color_qt_terra',
+            'print_template_color_inv_summit', 'print_template_color_inv_wave', 'print_template_color_inv_onyx',
+            'print_template_color_dn_depot', 'print_template_color_dn_transit', 'print_template_color_dn_custody',
         ];
         $color_fields = ['print_template_color_navy', 'print_template_color_corporate', 'print_template_color_banded',
             'print_template_color_rfq_striped', 'print_template_color_rfq_minimal', 'print_template_color_rfq_radiant',
             'print_template_color_so_confirmation', 'print_template_color_so_ledger', 'print_template_color_so_studio',
-            'print_template_color_qt_noir', 'print_template_color_qt_meadow', 'print_template_color_qt_terra'];
+            'print_template_color_qt_noir', 'print_template_color_qt_meadow', 'print_template_color_qt_terra',
+            'print_template_color_inv_summit', 'print_template_color_inv_wave', 'print_template_color_inv_onyx',
+            'print_template_color_dn_depot', 'print_template_color_dn_transit', 'print_template_color_dn_custody'];
 
         foreach ($allowed_fields as $field) {
             if (isset($_POST[$field])) {
@@ -368,6 +380,42 @@ try {
                             <div class="col-md-4">
                                 <label for="print_template_color_qt_terra" class="form-label">Terra Template</label>
                                 <input type="color" class="form-control form-control-color w-100" id="print_template_color_qt_terra" name="print_template_color_qt_terra" value="<?= htmlspecialchars($current_settings['print_template_color_qt_terra']) ?>">
+                            </div>
+
+                            <!-- Invoice Print Template Colors (own family) -->
+                            <div class="col-12 mt-3">
+                                <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette2 me-1"></i> Invoice Print Template Colors</h6>
+                                <p class="text-muted small mb-2">Invoice uses its own template family, separate from every other document.</p>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_inv_summit" class="form-label">Summit Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_inv_summit" name="print_template_color_inv_summit" value="<?= htmlspecialchars($current_settings['print_template_color_inv_summit']) ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_inv_wave" class="form-label">Wave Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_inv_wave" name="print_template_color_inv_wave" value="<?= htmlspecialchars($current_settings['print_template_color_inv_wave']) ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_inv_onyx" class="form-label">Onyx Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_inv_onyx" name="print_template_color_inv_onyx" value="<?= htmlspecialchars($current_settings['print_template_color_inv_onyx']) ?>">
+                            </div>
+
+                            <!-- Delivery Note (Outbound) Print Template Colors (own family) -->
+                            <div class="col-12 mt-3">
+                                <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette2 me-1"></i> Delivery Note (Outbound) Print Template Colors</h6>
+                                <p class="text-muted small mb-2">Outbound Delivery Note uses its own template family, separate from every other document.</p>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_dn_depot" class="form-label">Depot Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_dn_depot" name="print_template_color_dn_depot" value="<?= htmlspecialchars($current_settings['print_template_color_dn_depot']) ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_dn_transit" class="form-label">Transit Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_dn_transit" name="print_template_color_dn_transit" value="<?= htmlspecialchars($current_settings['print_template_color_dn_transit']) ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_dn_custody" class="form-label">Custody Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_dn_custody" name="print_template_color_dn_custody" value="<?= htmlspecialchars($current_settings['print_template_color_dn_custody']) ?>">
                             </div>
 
                             <div class="col-12 mt-4">

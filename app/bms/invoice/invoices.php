@@ -639,7 +639,19 @@ $(document).ready(function() {
                         actions += `<li><a class="dropdown-item py-2" href="<?= getUrl('invoice_edit') ?>?id=${row.invoice_id}" onclick="logReportAction('Initiated Invoice Edit', 'User clicked edit for invoice #${row.invoice_id}')"><i class="bi bi-pencil text-info me-2"></i> Edit Invoice</a></li>`;
                     }
 
-                    actions += `<li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printInvoice(${row.invoice_id})"><i class="bi bi-printer text-secondary me-2"></i> Print Invoice</a></li>`;
+                    actions += `<li>
+                        <div class="d-flex align-items-center dropdown-item py-0 pe-1">
+                            <a class="flex-grow-1 py-2 text-decoration-none text-dark" href="javascript:void(0)" onclick="printInvoice(${row.invoice_id})"><i class="bi bi-printer text-secondary me-2"></i> Print Invoice</a>
+                            <button type="button" class="btn btn-sm border-0 p-1 text-muted" title="Choose a different template" onclick="event.stopPropagation(); $('#invTplSub${row.invoice_id}').toggleClass('d-none'); $(this).find('i').toggleClass('bi-chevron-down bi-chevron-up');">
+                                <i class="bi bi-chevron-down"></i>
+                            </button>
+                        </div>
+                        <ul class="list-unstyled ms-4 mb-1 d-none" id="invTplSub${row.invoice_id}">
+                            <li><a class="dropdown-item py-1 small text-muted" href="javascript:void(0)" onclick="printInvoice(${row.invoice_id}, 'summit')">Summit Template</a></li>
+                            <li><a class="dropdown-item py-1 small text-muted" href="javascript:void(0)" onclick="printInvoice(${row.invoice_id}, 'wave')">Wave Template</a></li>
+                            <li><a class="dropdown-item py-1 small text-muted" href="javascript:void(0)" onclick="printInvoice(${row.invoice_id}, 'onyx')">Onyx Template</a></li>
+                        </ul>
+                    </li>`;
 
                     // Record Payment: approved / overdue / partial — any open invoice with a balance
                     if (['approved','overdue','partial'].includes(row.status) && row.balance_due > 0) {
@@ -683,9 +695,16 @@ function printInvoicesList() {
     document.title = oldTitle;
 }
 
-function printInvoice(id) {
+const INV_PRINT_TEMPLATES_LIST = {
+    standard: '<?= getUrl('invoice_print') ?>',
+    summit:   '<?= getUrl('invoice_print_summit') ?>',
+    wave:     '<?= getUrl('invoice_print_wave') ?>',
+    onyx:     '<?= getUrl('invoice_print_onyx') ?>'
+};
+function printInvoice(id, template) {
     logReportAction('Printed Invoice', 'User printed invoice #' + id);
-    window.open('<?= getUrl('invoice_print') ?>?id=' + id, '_blank');
+    const base = INV_PRINT_TEMPLATES_LIST[template] || INV_PRINT_TEMPLATES_LIST.standard;
+    window.open(base + '?id=' + id, '_blank');
 }
 
 function reviewInvoice(id) {
