@@ -36,7 +36,12 @@ $default_settings = [
     'company_postal_address' => '',
     'company_physical_address' => '',
     // Equity setting used by the Balance Sheet report.
-    'share_capital_paid_in' => '0'
+    'share_capital_paid_in' => '0',
+    // Print-template accent colors — one per LAYOUT NAME, shared across every
+    // document type that uses that layout (Purchase Order, Return Note, ...).
+    'print_template_color_navy'      => '#0f1f3d',
+    'print_template_color_corporate' => '#000000',
+    'print_template_color_banded'    => '#1f7ae0',
 ];
 
 // Handle Form Submission
@@ -50,7 +55,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'company_tin', 'company_vrn', 'company_code_prefix',
             'company_postal_address', 'company_physical_address',
             'share_capital_paid_in',
+            'print_template_color_navy', 'print_template_color_corporate', 'print_template_color_banded',
         ];
+        $color_fields = ['print_template_color_navy', 'print_template_color_corporate', 'print_template_color_banded'];
 
         foreach ($allowed_fields as $field) {
             if (isset($_POST[$field])) {
@@ -60,6 +67,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($field === 'company_code_prefix') {
                     $value = strtoupper(preg_replace('/[^A-Za-z]/', '', $value));
                     $value = substr($value, 0, 5);
+                }
+
+                // Accent colors: must be a valid #rrggbb hex, otherwise keep the default
+                // rather than let the print template's :root rule inherit something
+                // unparseable from an unsanitised value.
+                if (in_array($field, $color_fields, true) && !preg_match('/^#[0-9A-Fa-f]{6}$/', $value)) {
+                    $value = $default_settings[$field];
                 }
 
                 // Check if setting exists
@@ -260,6 +274,25 @@ try {
                                 <label for="share_capital_paid_in" class="form-label">Share Capital (Paid-up, TZS)</label>
                                 <input type="number" step="0.01" min="0" class="form-control" id="share_capital_paid_in" name="share_capital_paid_in" value="<?= htmlspecialchars($current_settings['share_capital_paid_in']) ?>">
                                 <small class="text-muted">Owner's paid-in capital. Used by the Balance Sheet Equity section.</small>
+                            </div>
+
+                            <!-- Print Template Colors -->
+                            <div class="col-12 mt-3">
+                                <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette me-1"></i> Print Template Colors</h6>
+                                <p class="text-muted small mb-2">One accent color per layout, shared across every document that uses it (Purchase Order, Return Note, and future documents built the same way).</p>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_navy" class="form-label">Navy Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_navy" name="print_template_color_navy" value="<?= htmlspecialchars($current_settings['print_template_color_navy']) ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_corporate" class="form-label">Corporate Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_corporate" name="print_template_color_corporate" value="<?= htmlspecialchars($current_settings['print_template_color_corporate']) ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_banded" class="form-label">Banded Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_banded" name="print_template_color_banded" value="<?= htmlspecialchars($current_settings['print_template_color_banded']) ?>">
+                                <div class="form-text">Only the blue is configurable here; the orange section bands stay fixed.</div>
                             </div>
 
                             <div class="col-12 mt-4">
