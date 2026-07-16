@@ -132,6 +132,55 @@ if ($_POST) {
         }
     }
     
+    // Color Settings (print template accent colors — Sales Side + Purchase Side)
+    if (isset($_POST['save_colors'])) {
+        try {
+            $color_defaults = [
+                // Purchase Side — shared Navy/Corporate/Banded family (Purchase Order, Purchase Return, Debit Note)
+                'print_template_color_navy'      => '#0f1f3d',
+                'print_template_color_corporate' => '#000000',
+                'print_template_color_banded'    => '#1f7ae0',
+                // Purchase Side — RFQ's own letter-format family
+                'print_template_color_rfq_striped' => '#d9601a',
+                'print_template_color_rfq_minimal' => '#1a7ea8',
+                'print_template_color_rfq_radiant' => '#e07b1e',
+                // Sales Side — Sales Order's own family
+                'print_template_color_so_confirmation' => '#c8981f',
+                'print_template_color_so_ledger'       => '#14213d',
+                'print_template_color_so_studio'       => '#2b2b2b',
+                // Sales Side — Quotation's own family
+                'print_template_color_qt_noir'   => '#111111',
+                'print_template_color_qt_meadow' => '#2f7d4f',
+                'print_template_color_qt_terra'  => '#9c6b3e',
+                // Sales Side — Invoice's own family
+                'print_template_color_inv_summit' => '#12b5c9',
+                'print_template_color_inv_wave'   => '#164a91',
+                'print_template_color_inv_onyx'   => '#1c1c1c',
+                // Sales Side — Delivery Note (Outbound)'s own family
+                'print_template_color_dn_depot'   => '#e05a1c',
+                'print_template_color_dn_transit' => '#1b5fa8',
+                'print_template_color_dn_custody' => '#6b7c5e',
+            ];
+
+            foreach ($color_defaults as $field => $default) {
+                if (!isset($_POST[$field])) continue;
+                $value = trim($_POST[$field]);
+
+                // Accent colors: must be a valid #rrggbb hex, otherwise keep the default
+                // rather than let the print template's :root rule inherit something
+                // unparseable from an unsanitised value.
+                if (!preg_match('/^#[0-9A-Fa-f]{6}$/', $value)) {
+                    $value = $default;
+                }
+
+                save_setting($field, $value);
+            }
+            $success_messages[] = "Color settings updated successfully";
+        } catch (Exception $e) {
+            $error_messages[] = "Error updating color settings: " . $e->getMessage();
+        }
+    }
+
     // Collection Settings
     if (isset($_POST['save_collection'])) {
         try {
@@ -265,7 +314,19 @@ if ($_POST) {
                                 </div>
                             </div>
                         </a>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent" 
+                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
+                           id="colors-tab" data-bs-toggle="tab" data-bs-target="#colors" type="button" role="tab" aria-selected="false">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-box me-3 bg-success-soft text-success">
+                                    <i class="bi bi-palette"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold">Color Setting</h6>
+                                    <small class="text-muted">Print template accents</small>
+                                </div>
+                            </div>
+                        </a>
+                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            id="collection-tab" data-bs-toggle="tab" data-bs-target="#collection" type="button" role="tab" aria-selected="false">
                             <div class="d-flex align-items-center">
                                 <div class="icon-box me-3 bg-danger-soft text-danger">
@@ -735,6 +796,149 @@ if ($_POST) {
                         <div class="mt-5 pt-3 border-top d-flex justify-content-end">
                             <button type="submit" name="save_sms" class="btn btn-primary px-5">
                                 <i class="bi bi-save me-2"></i> Save SMS Gateway
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Color Setting Tab -->
+                <div class="tab-pane fade" id="colors" role="tabpanel">
+                    <form method="POST">
+                        <div class="d-flex align-items-center mb-4">
+                            <h4 class="section-title mb-0">Color Setting</h4>
+                            <span class="badge bg-success-soft text-success ms-3">Print Templates</span>
+                        </div>
+
+                        <h6 class="fw-bold text-uppercase small text-muted mb-3"><i class="bi bi-cart-check me-1"></i> Sales Side</h6>
+
+                        <!-- Sales Order Print Template Colors (own family, unrelated to Quotation) -->
+                        <div class="mb-3">
+                            <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette2 me-1"></i> Sales Order Print Template Colors</h6>
+                            <p class="text-muted small mb-2">Sales Order uses its own template family, visually distinct from Quotation even though both share the same data fields.</p>
+                        </div>
+                        <div class="row g-4 mb-3">
+                            <div class="col-md-4">
+                                <label for="print_template_color_so_confirmation" class="form-label">Confirmation Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_so_confirmation" name="print_template_color_so_confirmation" value="<?= get_setting('print_template_color_so_confirmation', '#c8981f') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_so_ledger" class="form-label">Ledger Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_so_ledger" name="print_template_color_so_ledger" value="<?= get_setting('print_template_color_so_ledger', '#14213d') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_so_studio" class="form-label">Studio Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_so_studio" name="print_template_color_so_studio" value="<?= get_setting('print_template_color_so_studio', '#2b2b2b') ?>">
+                            </div>
+                        </div>
+
+                        <!-- Quotation Print Template Colors (own family, unrelated to Sales Order) -->
+                        <div class="mb-3">
+                            <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette2 me-1"></i> Quotation Print Template Colors</h6>
+                            <p class="text-muted small mb-2">Quotation uses its own template family, visually distinct from Sales Order even though both share the same data fields.</p>
+                        </div>
+                        <div class="row g-4 mb-3">
+                            <div class="col-md-4">
+                                <label for="print_template_color_qt_noir" class="form-label">Noir Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_qt_noir" name="print_template_color_qt_noir" value="<?= get_setting('print_template_color_qt_noir', '#111111') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_qt_meadow" class="form-label">Meadow Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_qt_meadow" name="print_template_color_qt_meadow" value="<?= get_setting('print_template_color_qt_meadow', '#2f7d4f') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_qt_terra" class="form-label">Terra Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_qt_terra" name="print_template_color_qt_terra" value="<?= get_setting('print_template_color_qt_terra', '#9c6b3e') ?>">
+                            </div>
+                        </div>
+
+                        <!-- Invoice Print Template Colors (own family) -->
+                        <div class="mb-3">
+                            <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette2 me-1"></i> Invoice Print Template Colors</h6>
+                            <p class="text-muted small mb-2">Invoice uses its own template family, separate from every other document.</p>
+                        </div>
+                        <div class="row g-4 mb-3">
+                            <div class="col-md-4">
+                                <label for="print_template_color_inv_summit" class="form-label">Summit Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_inv_summit" name="print_template_color_inv_summit" value="<?= get_setting('print_template_color_inv_summit', '#12b5c9') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_inv_wave" class="form-label">Wave Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_inv_wave" name="print_template_color_inv_wave" value="<?= get_setting('print_template_color_inv_wave', '#164a91') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_inv_onyx" class="form-label">Onyx Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_inv_onyx" name="print_template_color_inv_onyx" value="<?= get_setting('print_template_color_inv_onyx', '#1c1c1c') ?>">
+                            </div>
+                        </div>
+
+                        <!-- Delivery Note (Outbound) Print Template Colors (own family) -->
+                        <div class="mb-3">
+                            <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette2 me-1"></i> Delivery Note (Outbound) Print Template Colors</h6>
+                            <p class="text-muted small mb-2">Outbound Delivery Note uses its own template family, separate from every other document.</p>
+                        </div>
+                        <div class="row g-4 mb-3">
+                            <div class="col-md-4">
+                                <label for="print_template_color_dn_depot" class="form-label">Depot Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_dn_depot" name="print_template_color_dn_depot" value="<?= get_setting('print_template_color_dn_depot', '#e05a1c') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_dn_transit" class="form-label">Transit Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_dn_transit" name="print_template_color_dn_transit" value="<?= get_setting('print_template_color_dn_transit', '#1b5fa8') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_dn_custody" class="form-label">Custody Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_dn_custody" name="print_template_color_dn_custody" value="<?= get_setting('print_template_color_dn_custody', '#6b7c5e') ?>">
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <h6 class="fw-bold text-uppercase small text-muted mb-3"><i class="bi bi-truck me-1"></i> Purchase Side</h6>
+
+                        <!-- Print Template Colors (shared: Purchase Order, Purchase Return, Debit Note) -->
+                        <div class="mb-3">
+                            <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette me-1"></i> Print Template Colors</h6>
+                            <p class="text-muted small mb-2">One accent color per layout, shared across every document that uses it (Purchase Order, Return Note, and future documents built the same way).</p>
+                        </div>
+                        <div class="row g-4 mb-3">
+                            <div class="col-md-4">
+                                <label for="print_template_color_navy" class="form-label">Navy Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_navy" name="print_template_color_navy" value="<?= get_setting('print_template_color_navy', '#0f1f3d') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_corporate" class="form-label">Corporate Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_corporate" name="print_template_color_corporate" value="<?= get_setting('print_template_color_corporate', '#000000') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_banded" class="form-label">Banded Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_banded" name="print_template_color_banded" value="<?= get_setting('print_template_color_banded', '#1f7ae0') ?>">
+                                <div class="form-text">Only the blue is configurable here; the orange section bands stay fixed.</div>
+                            </div>
+                        </div>
+
+                        <!-- RFQ Print Template Colors (own family, unrelated design) -->
+                        <div class="mb-3">
+                            <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette2 me-1"></i> RFQ Print Template Colors</h6>
+                            <p class="text-muted small mb-2">RFQ uses its own letter-format template family, separate from the layouts above.</p>
+                        </div>
+                        <div class="row g-4 mb-3">
+                            <div class="col-md-4">
+                                <label for="print_template_color_rfq_striped" class="form-label">Striped Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_rfq_striped" name="print_template_color_rfq_striped" value="<?= get_setting('print_template_color_rfq_striped', '#d9601a') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_rfq_minimal" class="form-label">Minimal Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_rfq_minimal" name="print_template_color_rfq_minimal" value="<?= get_setting('print_template_color_rfq_minimal', '#1a7ea8') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_rfq_radiant" class="form-label">Radiant Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_rfq_radiant" name="print_template_color_rfq_radiant" value="<?= get_setting('print_template_color_rfq_radiant', '#e07b1e') ?>">
+                            </div>
+                        </div>
+
+                        <div class="mt-5 pt-3 border-top d-flex justify-content-end">
+                            <button type="submit" name="save_colors" class="btn btn-primary px-5">
+                                <i class="bi bi-save me-2"></i> Save Color Settings
                             </button>
                         </div>
                     </form>
