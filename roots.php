@@ -527,6 +527,9 @@ $routes = [
     'credit_note_edit' => SALES_DIR . '/credit_notes/credit_note_edit.php',
     'credit_note_view' => SALES_DIR . '/credit_notes/credit_note_view.php',
     'print_credit_note' => SALES_DIR . '/credit_notes/print_credit_note.php',
+    'print_credit_note_ledger' => SALES_DIR . '/credit_notes/print_credit_note_ledger.php',
+    'print_credit_note_horizon' => SALES_DIR . '/credit_notes/print_credit_note_horizon.php',
+    'print_credit_note_ember' => SALES_DIR . '/credit_notes/print_credit_note_ember.php',
     'pos' => POS_DIR . '/pos.php',
 
     // ========================================================================
