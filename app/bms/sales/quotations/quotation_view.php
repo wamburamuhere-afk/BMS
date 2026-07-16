@@ -129,9 +129,21 @@ includeHeader();
                 <i class="bi bi-x-octagon"></i> Decline
             </button>
             <?php endif; ?>
-            <a href="<?= getUrl('print_quotation') ?>?id=<?= $quote['sales_order_id'] ?>" target="_blank" class="btn btn-primary">
-                <i class="bi bi-printer"></i> Print
-            </a>
+            <div class="btn-group shadow-sm">
+                <button onclick="printQuotationDoc()" class="btn btn-primary btn-sm px-3">
+                    <i class="bi bi-printer me-1"></i> Print
+                </button>
+                <button type="button" class="btn btn-primary btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><h6 class="dropdown-header">Print Template</h6></li>
+                    <li><a class="dropdown-item" href="#" onclick="printQuotationDoc('standard'); return false;"><i class="bi bi-check2 me-2"></i>Standard (default)</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printQuotationDoc('noir'); return false;">Noir</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printQuotationDoc('meadow'); return false;">Meadow</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printQuotationDoc('terra'); return false;">Terra</a></li>
+                </ul>
+            </div>
         </div>
     </div>
 
@@ -382,6 +394,17 @@ includeHeader();
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+const QT_PRINT_TEMPLATES = {
+    standard: '<?= getUrl('print_quotation') ?>',
+    noir:     '<?= getUrl('print_quotation_noir') ?>',
+    meadow:   '<?= getUrl('print_quotation_meadow') ?>',
+    terra:    '<?= getUrl('print_quotation_terra') ?>'
+};
+function printQuotationDoc(template) {
+    const base = QT_PRINT_TEMPLATES[template] || QT_PRINT_TEMPLATES.standard;
+    window.open(base + '?id=' + <?= (int)$quote['sales_order_id'] ?>, '_blank');
+}
+
 function postWorkflow(url, id, loadingTitle) {
     Swal.fire({ title: loadingTitle, didOpen: () => { Swal.showLoading(); } });
     $.post(url, { quotation_id: id }, function(res) {
