@@ -1,5 +1,45 @@
 # BMS Changelog
 
+## 2026-07-16 (feat) — Print templates: shared accent-color mechanism + Return Note gets the same 3 templates as Purchase Order
+
+**New:** `app/bms/purchase/print_purchase_return_navy.php`, `app/bms/purchase/print_purchase_return_corporate.php`,
+`app/bms/purchase/print_purchase_return_banded.php`
+**Files:** `api/account/print_purchase_order_navy.php`, `api/account/print_purchase_order_corporate.php`,
+`api/account/print_purchase_order_banded.php`, `app/constant/settings/company_profile.php`,
+`api/get_purchase_returns.php`, `app/bms/purchase/purchase_return_view.php`, `roots.php`
+
+Two things, continuing yesterday's Purchase Order print-template work:
+
+- **One accent color per layout, not per document.** Each of the three PO print templates (Navy,
+  Corporate, Banded) had its color hardcoded in CSS. Pulled it out into a single `getSetting()` call per
+  layout (`print_template_color_navy` / `_corporate` / `_banded`), fed into a `:root { --accent: ... }`
+  CSS variable that every rule in that layout now reads via `var(--accent)`. Added a "Print Template
+  Colors" section to Company Profile with a color picker per layout (defaults match the original design
+  colors; invalid/malformed hex values are rejected server-side back to the default rather than
+  corrupting the `:root` rule). Because the setting is keyed by **layout name**, not by document type,
+  changing "Navy" once retints every document built on that layout — verified live: changed Navy from
+  `#0f1f3d` to `#0b5d1e` in Company Profile and confirmed both the Purchase Order Navy template and the
+  new Return Note Navy template picked up the new color from the same save, with no code change.
+- **Return Note (Purchase Return) gets the same three templates as Purchase Order.** Canva has no
+  dedicated "Return Note"/"Purchase Return" template category (confirmed by searching "return note",
+  "purchase return form", and "debit note" — none returned a relevant genre), so rather than invent a
+  fourth arbitrary style, reused the same Navy/Corporate/Banded layouts already built for Purchase Order,
+  with Return Note's own fields (Return #, Reason, Related GRN, Warehouse, Total Return Value, Reason
+  Details/Additional Notes) in place of PO's. Keeps every Procurement document visually consistent as one
+  family. Picker added the same way: the PO detail page's Print button and Return Note's own detail page
+  (`purchase_return_view.php`) both got a split-button (plain click = default template, caret = the other
+  three); the Purchase Returns list's gear menu got the chevron-toggle pattern.
+  **Found and fixed along the way:** the Purchase Returns list actually calls `api/get_purchase_returns.php`
+  (no `/account/` in the path) — a different, unrelated `api/account/get_purchase_returns.php` file exists
+  in the codebase but is dead code, referenced by no page. The list previously had no Print action in its
+  gear menu at all; added Print + the template picker to the file that's actually wired to the page.
+
+Verified live on `dev.bms.local`: all three new Return Note templates fetched directly against a real
+record return HTTP 200, zero PHP errors/warnings, and confirmed present (company name, logo, signature
+block, itemized table, "TOTAL RETURN VALUE", shared print footer); both picker UIs (list gear-menu toggle
+and detail split-button) confirmed wired to all four templates in the rendered DOM; the color-propagation
+test above confirmed the shared mechanism end-to-end.
+
 ## 2026-07-15 (feat) — Purchase Order print: 3 alternate templates, selectable at print time
 
 **New:** `api/account/print_purchase_order_navy.php`, `api/account/print_purchase_order_corporate.php`,
