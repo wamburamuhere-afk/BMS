@@ -1,6 +1,6 @@
 # BMS Changelog
 
-## 2026-07-16 (fix) — Create Document: "Could not generate the PDF" on every save, AI-suggestion modal auto-closing before it showed a result
+## 2026-07-15 (fix) — Create Document: "Could not generate the PDF" on every save, AI-suggestion modal auto-closing before it showed a result
 
 **Files:** `app/constant/document/create_document.php`, `app/includes/ai_generate.php`, `footer.php`
 
