@@ -156,6 +156,21 @@ try {
             
         $actions .= '<li><a class="dropdown-item" href="#" onclick="viewReturn(' . $row['purchase_return_id'] . ')"><i class="bi bi-eye"></i> View Details</a></li>';
 
+        // Print, with a chevron toggle revealing the alternate templates (hidden by
+        // default) — the plain "Print" link still opens the default template directly.
+        $rid = $row['purchase_return_id'];
+        $actions .= '<li>';
+        $actions .= '<div class="d-flex align-items-center dropdown-item py-0 pe-1">';
+        $actions .= '<a class="flex-grow-1 py-2 text-decoration-none text-dark" href="' . getUrl('print_purchase_return') . '?id=' . $rid . '" target="_blank"><i class="bi bi-printer"></i> Print</a>';
+        $actions .= '<button type="button" class="btn btn-sm border-0 p-1 text-muted" title="Choose a different template" onclick="event.stopPropagation(); event.preventDefault(); $(\'#retTplSub' . $rid . '\').toggleClass(\'d-none\'); $(this).find(\'i\').toggleClass(\'bi-chevron-down bi-chevron-up\');"><i class="bi bi-chevron-down"></i></button>';
+        $actions .= '</div>';
+        $actions .= '<ul class="list-unstyled ms-4 mb-1 d-none" id="retTplSub' . $rid . '">';
+        $actions .= '<li><a class="dropdown-item py-1 small text-muted" href="' . getUrl('print_purchase_return_navy') . '?id=' . $rid . '" target="_blank"><i class="bi bi-file-earmark-text me-2"></i>Navy Template</a></li>';
+        $actions .= '<li><a class="dropdown-item py-1 small text-muted" href="' . getUrl('print_purchase_return_corporate') . '?id=' . $rid . '" target="_blank"><i class="bi bi-file-earmark-text me-2"></i>Corporate Template</a></li>';
+        $actions .= '<li><a class="dropdown-item py-1 small text-muted" href="' . getUrl('print_purchase_return_banded') . '?id=' . $rid . '" target="_blank"><i class="bi bi-file-earmark-text me-2"></i>Banded Template</a></li>';
+        $actions .= '</ul>';
+        $actions .= '</li>';
+
         // Three-approval workflow: pending -> reviewed -> approved.
         // Each transition must go through the canonical endpoint so the
         // workflow_signatures row + reviewed_by/approved_by stamps are captured.

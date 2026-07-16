@@ -85,9 +85,21 @@ $dn_create_qs = $return_project_id ? ('&project=' . $return_project_id) : '';
                 <a href="<?= getUrl('purchase_returns') ?>" class="btn btn-outline-secondary px-4 shadow-sm">
                     <i class="bi bi-arrow-left"></i> Back
                 </a>
-                <button onclick="printReturn()" class="btn btn-outline-dark px-4 shadow-sm">
-                    <i class="bi bi-printer"></i> Print
-                </button>
+                <div class="btn-group shadow-sm">
+                    <button onclick="printReturn()" class="btn btn-outline-dark px-4">
+                        <i class="bi bi-printer"></i> Print
+                    </button>
+                    <button type="button" class="btn btn-outline-dark dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="visually-hidden">Choose print template</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><h6 class="dropdown-header">Print Template</h6></li>
+                        <li><a class="dropdown-item" href="#" onclick="printReturn('standard'); return false;"><i class="bi bi-check2 me-2"></i>Standard (default)</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="printReturn('navy'); return false;">Navy</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="printReturn('corporate'); return false;">Corporate</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="printReturn('banded'); return false;">Banded</a></li>
+                    </ul>
+                </div>
             </div>
         </div>
 
@@ -208,8 +220,15 @@ $dn_create_qs = $return_project_id ? ('&project=' . $return_project_id) : '';
 const returnId = <?= $return_id ?>;
 const returnNumber = '<?= isset($return_data['return_number']) ? $return_data['return_number'] : '' ?>';
 
-function printReturn() {
-    window.open('<?= getUrl('print_purchase_return') ?>?id=' + returnId, '_blank');
+const RETURN_PRINT_TEMPLATES = {
+    standard:  '<?= getUrl('print_purchase_return') ?>',
+    navy:      '<?= getUrl('print_purchase_return_navy') ?>',
+    corporate: '<?= getUrl('print_purchase_return_corporate') ?>',
+    banded:    '<?= getUrl('print_purchase_return_banded') ?>'
+};
+function printReturn(template) {
+    const base = RETURN_PRINT_TEMPLATES[template] || RETURN_PRINT_TEMPLATES.standard;
+    window.open(base + '?id=' + returnId, '_blank');
 }
 
 $(document).ready(function() {

@@ -90,6 +90,12 @@ try {
         else                           $comp[$k]        = $r['setting_value'];
     }
 } catch (Exception $e) {}
+
+// Print-template accent color — shared per LAYOUT NAME (not per document type), so
+// retinting "Corporate" here also retints every other document that uses the
+// Corporate layout. Configurable from Company Profile > Print Template Colors;
+// falls back to the original design color when unset.
+$accent = getSetting('print_template_color_corporate', '#000000');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -97,6 +103,7 @@ try {
     <meta charset="UTF-8">
     <title>Purchase Order #<?= htmlspecialchars($order['order_number']) ?></title>
     <style>
+        :root { --accent: <?= htmlspecialchars($accent) ?>; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -114,14 +121,14 @@ try {
         .company-strip p { font-size: 10px; color: #444; margin: 0; }
 
         /* ── BLACK TITLE BAR ── */
-        .title-bar { background: #000; color: #fff; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .title-bar { background: var(--accent); color: #fff; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
         .title-bar h2 { font-size: 20px; font-weight: 800; letter-spacing: 1.5px; }
         .title-bar .meta { text-align: right; font-size: 11.5px; }
         .title-bar .meta p { margin: 2px 0; }
 
         /* ── SECTION LABEL BARS ── */
-        .section-label { background: #000; color: #fff; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 6px 12px; margin-bottom: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-        .section-body { border: 1px solid #000; border-top: none; padding: 12px 14px; margin-bottom: 18px; }
+        .section-label { background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 6px 12px; margin-bottom: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .section-body { border: 1px solid var(--accent); border-top: none; padding: 12px 14px; margin-bottom: 18px; }
         .section-body p { margin: 3px 0; font-size: 11.5px; }
         .section-body strong { font-weight: 700; }
 
@@ -130,9 +137,9 @@ try {
 
         /* ── ITEMS TABLE ── */
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        th { background: #000; color: #fff; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; padding: 9px 10px; text-align: left; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        th { background: var(--accent); color: #fff; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; padding: 9px 10px; text-align: left; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
         tbody tr { border-bottom: 1px solid #ddd; }
-        tbody tr:last-child { border-bottom: 2px solid #000; }
+        tbody tr:last-child { border-bottom: 2px solid var(--accent); }
         tbody tr td { height: 0.75cm; padding: 2px 10px; vertical-align: middle; font-size: 13px; line-height: 1.6; }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
@@ -141,17 +148,17 @@ try {
         /* ── STATUS + DELIVERY (two columns) ── */
         .status-delivery { display: flex; gap: 16px; margin-bottom: 18px; }
         .status-delivery > div { width: 50%; }
-        .status-badge { display: inline-block; padding: 5px 14px; background: #000; color: #fff; font-weight: 700; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.6px; border-radius: 3px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .status-badge { display: inline-block; padding: 5px 14px; background: var(--accent); color: #fff; font-weight: 700; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.6px; border-radius: 3px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 
         /* ── TOTALS ── */
-        .totals { float: right; width: 300px; border: 1px solid #000; padding: 12px 16px; margin-bottom: 18px; }
+        .totals { float: right; width: 300px; border: 1px solid var(--accent); padding: 12px 16px; margin-bottom: 18px; }
         .totals-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; border-bottom: 1px solid #ddd; }
         .totals-row:last-child { border-bottom: none; }
-        .totals-row.grand-total { border-top: 2px solid #000; border-bottom: none; margin-top: 8px; padding-top: 9px; font-size: 14px; font-weight: 700; }
+        .totals-row.grand-total { border-top: 2px solid var(--accent); border-bottom: none; margin-top: 8px; padding-top: 9px; font-size: 14px; font-weight: 700; }
 
         /* ── NOTES ── */
         .notes-section { clear: both; padding-top: 22px; margin-top: 14px; }
-        .notes-section > div { border: 1px solid #000; padding: 12px 14px; margin-bottom: 10px; }
+        .notes-section > div { border: 1px solid var(--accent); padding: 12px 14px; margin-bottom: 10px; }
         .notes-section strong { display: block; margin-bottom: 5px; font-size: 11.5px; font-weight: 700; text-transform: uppercase; }
         .notes-section p { font-size: 11px; }
 
