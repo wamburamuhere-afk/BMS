@@ -145,9 +145,21 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
             </a>
             <?php endif; ?>
 
-            <button onclick="window.open('<?= getUrl('print_rfq') ?>?id=<?= $rfq_id ?>', '_blank')" class="btn btn-blue-touch btn-sm px-3 shadow-sm">
-                <i class="bi bi-printer me-1"></i> Print
-            </button>
+            <div class="btn-group shadow-sm">
+                <button onclick="printRfqDoc()" class="btn btn-blue-touch btn-sm px-3">
+                    <i class="bi bi-printer me-1"></i> Print
+                </button>
+                <button type="button" class="btn btn-blue-touch btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Choose print template</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><h6 class="dropdown-header">Print Template</h6></li>
+                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('standard'); return false;"><i class="bi bi-check2 me-2"></i>Standard (default)</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('navy'); return false;">Navy</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('corporate'); return false;">Corporate</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printRfqDoc('banded'); return false;">Banded</a></li>
+                </ul>
+            </div>
             <?php if ($status === 'draft'): ?>
             <a href="<?= getUrl('rfq_create') ?>?edit=<?= $rfq_id ?><?= $return_url ? '&return_url=' . urlencode($back_url) : '' ?>" class="btn btn-outline-info btn-sm">
                 <i class="bi bi-pencil me-1"></i> Edit
@@ -399,6 +411,17 @@ $badge = $statusMap[$status] ?? ['class' => 'secondary', 'label' => ucfirst($sta
 const rfqId     = <?= $rfq_id ?>;
 const reviewUrl = '<?= getUrl('api/review_rfq') ?>';
 const approveUrl= '<?= getUrl('api/approve_rfq') ?>';
+
+const RFQ_PRINT_TEMPLATES = {
+    standard:  '<?= getUrl('print_rfq') ?>',
+    navy:      '<?= getUrl('print_rfq_navy') ?>',
+    corporate: '<?= getUrl('print_rfq_corporate') ?>',
+    banded:    '<?= getUrl('print_rfq_banded') ?>'
+};
+function printRfqDoc(template) {
+    const base = RFQ_PRINT_TEMPLATES[template] || RFQ_PRINT_TEMPLATES.standard;
+    window.open(base + '?id=' + rfqId, '_blank');
+}
 
 function submitForReview() {
     Swal.fire({

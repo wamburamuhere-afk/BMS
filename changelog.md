@@ -1,5 +1,47 @@
 # BMS Changelog
 
+## 2026-07-16 (feat) — RFQ and Debit Note join the shared print-template family (Navy/Corporate/Banded)
+
+**New:** `api/account/print_rfq_navy.php`, `api/account/print_rfq_corporate.php`, `api/account/print_rfq_banded.php`,
+`app/bms/purchase/debit_notes/print_debit_note_navy.php`, `app/bms/purchase/debit_notes/print_debit_note_corporate.php`,
+`app/bms/purchase/debit_notes/print_debit_note_banded.php`
+**Files:** `roots.php`, `app/bms/purchase/rfq.php`, `app/bms/purchase/rfq_view.php`,
+`app/bms/purchase/debit_notes/debit_notes.php`, `app/bms/purchase/debit_notes/debit_note_view.php`
+
+Extends the Navy/Corporate/Banded print-template family (built for Purchase Order, then reused for Return
+Note) to the last two Procurement document types: RFQ and Debit Note.
+
+- **Researched both before building anything.** RFQ: Canva has no genre for the generic phrase "request
+  for quotation" (dilutes into unrelated "request" results), but searching the bare acronym **"RFQ"**
+  surfaces a real, purpose-built category — letterhead-style vendor-inquiry letters with a To/Subject
+  header, an item table, and a signature block. Debit Note: confirmed again Canva has nothing (still just
+  debit-card promos and generic notepads), and WorkDo's own Debit Note is purely auto-generated from a
+  Purchase Return with no independent create form at all — reinforcing that reusing the existing
+  Procurement family, rather than inventing a fourth arbitrary style, is the right call for it.
+- **Every field the current templates render is present on all three, for both document types — nothing
+  dropped, nothing invented.** Cross-checked each print template against its own create form first (RFQ:
+  `rfq_create.php`; Debit Note: `debit_note_create.php`) to confirm the existing print output already
+  covers every field captured at creation, so the three new layouts are a faithful visual re-skin, not a
+  data re-scope. RFQ carries company name/logo/full contact details, RFQ#/date/status, vendor block,
+  Response Deadline/contract/project/warehouse/created-by, and the items table — deliberately **without**
+  a Unit Price/Total column, since an RFQ is a request for pricing, not a confirmed order, and the source
+  data has no such column. Debit Note carries the same company/vendor detail plus Debit Note#/date/Ref
+  Return/status, Prepared By/Currency/Returned From/Reason, the priced items table, Subtotal/VAT/TOTAL
+  DEBIT, and Notes.
+- **Same shared accent-color mechanism, same signature block, same picker pattern** as Purchase Order and
+  Return Note: each layout reads its color from the layout-keyed setting (already configurable from
+  Company Profile > Print Template Colors — no new settings needed), includes the full three-approval
+  signature row with e-signature images, and is reachable via a chevron-toggle in the list's gear menu
+  (hidden by default, plain "Print" click still goes straight to the default template) plus a split-button
+  on the detail page.
+
+Verified live on `dev.bms.local`: all six new templates fetched directly against real records (RFQ #5,
+Debit Note #13) return HTTP 200, zero PHP errors/warnings, correct accent color inherited from the shared
+setting, and all required fields present (company name, logo, signature block, itemized table, shared
+print footer, plus Debit Note's totals block); all four picker UIs (RFQ list toggle, RFQ detail
+split-button, Debit Note list toggle, Debit Note detail split-button) confirmed wired to all four templates
+in the rendered DOM.
+
 ## 2026-07-16 (feat) — Print templates: shared accent-color mechanism + Return Note gets the same 3 templates as Purchase Order
 
 **New:** `app/bms/purchase/print_purchase_return_navy.php`, `app/bms/purchase/print_purchase_return_corporate.php`,
