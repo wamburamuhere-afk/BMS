@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-07-17 (fix) — Non-Inventory Products stat cards + POS service warehouse strictness
+
+**Files:** `app/bms/product/services.php`, `api/pos/simple_products.php`
+
+Two follow-on bugs found by manual testing:
+
+1. **Non-Inventory Products page — summary cards disagreed with the table.**
+   The "Total Products" card and the table both correctly applied project
+   scope; the "Active", "Inactive", and "Categories" cards each ran their own
+   separate, completely unscoped `SELECT COUNT(*) FROM products WHERE
+   is_service=1 AND ...` query — company-wide totals with no project filter
+   at all. A user with zero services in their own scope saw an empty table
+   but non-zero numbers on 3 of the 4 cards. Fixed by applying the same
+   `scopeFilterSqlNullable('project','p')` clause already used for the table
+   to all three.
+2. **POS — a service tagged to one warehouse still showed in every other
+   warehouse.** The warehouse-leak fix shipped earlier today exempted a
+   service from warehouse filtering whenever `products.warehouse_id` was
+   NULL, treating it as a general/location-agnostic service. Warehouse is
+   actually a *required* field on the non-inventory product create form, so
+   that NULL case shouldn't be trusted as "intentionally global" — it let
+   services silently bleed across warehouses. Tightened to an exact
+   `products.warehouse_id` match only. Verified against real data: warehouse
+   5 now returns exactly its 1 stocked product (was showing 2 unrelated
+   NULL-warehouse services); warehouse 14 shows its own stocked products plus
+   only its own 4 warehouse-tagged services. `tests/test_warehouse_scope_cli.php`
+   (137 checks) still passes.
+
 ## 2026-07-17 (feat) — Project→warehouse narrowing across procurement & sales (create/edit/list/view)
 
 **Files:** `core/project_scope.php`, `core/warehouse_scope.php`,
