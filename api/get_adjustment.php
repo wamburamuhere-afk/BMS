@@ -3,6 +3,7 @@
 ob_start();
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/warehouse_scope.php';
 
 global $pdo;
 
@@ -47,7 +48,13 @@ try {
 
     ob_clean();
     if ($adjustment) {
-        echo json_encode(['success' => true, 'data' => $adjustment]);
+        if (!empty($adjustment['project_id']) && !userCan('project', (int)$adjustment['project_id'])) {
+            echo json_encode(['success' => false, 'message' => 'Access denied: this record belongs to a project not in your scope.']);
+        } elseif (!empty($adjustment['warehouse_id']) && !userCan('warehouse', (int)$adjustment['warehouse_id'])) {
+            echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+        } else {
+            echo json_encode(['success' => true, 'data' => $adjustment]);
+        }
     } else {
         echo json_encode(['success' => false, 'message' => 'Adjustment not found']);
     }

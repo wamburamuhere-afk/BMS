@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/warehouse_scope.php';
 global $pdo;
 
 try {
@@ -36,6 +37,9 @@ try {
     $stmt = $pdo->prepare("SELECT warehouse_id FROM warehouses WHERE warehouse_id = ? AND status = 'active'");
     $stmt->execute([$warehouse_id]);
     if (!$stmt->fetch()) throw new Exception('Selected warehouse not found or inactive.');
+    if (!userCan('warehouse', $warehouse_id)) {
+        throw new Exception('Access denied: this warehouse is not in your assigned scope.');
+    }
 
     $components = $_POST['components'] ?? [];
     if (empty($components) || !is_array($components)) {

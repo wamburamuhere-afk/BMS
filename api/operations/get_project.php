@@ -612,11 +612,14 @@ try {
                 return $stmt->fetchAll(PDO::FETCH_ASSOC);
             })($pdo, $id),
             "warehouses" => (function($pdo, $id) {
+                // Phase 6 (pos_upgrade_plan.md): a user assigned to this
+                // project doesn't automatically see every one of its
+                // warehouses — only the ones they're actually granted.
                 $stmt = $pdo->prepare("
                     SELECT w.*, u.username as creator_name
                     FROM warehouses w
                     LEFT JOIN users u ON w.created_by = u.user_id
-                    WHERE w.project_id = ?
+                    WHERE w.project_id = ?" . scopeFilterSqlNullable('warehouse', 'w') . "
                     ORDER BY w.warehouse_name ASC
                 ");
                 $stmt->execute([$id]);

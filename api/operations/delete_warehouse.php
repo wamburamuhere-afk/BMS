@@ -26,6 +26,13 @@ try {
     if ($warehouse_id <= 0) throw new Exception('Warehouse ID is required.');
     if ($project_id   <= 0) throw new Exception('Project ID is required.');
 
+    // Found during the 2026-07-17 warehouse-scope sweep: this endpoint had no
+    // project-scope check at all — any user with delete permission could
+    // delete any project's warehouse just by supplying that project's id.
+    if (!userCan('project', $project_id)) {
+        throw new Exception('Access denied: this project is not in your assigned scope.');
+    }
+
     // Confirm warehouse belongs to this project before deleting
     $check = $pdo->prepare("SELECT warehouse_id, warehouse_name FROM warehouses WHERE warehouse_id = ? AND project_id = ?");
     $check->execute([$warehouse_id, $project_id]);

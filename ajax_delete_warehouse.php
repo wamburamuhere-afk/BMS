@@ -32,6 +32,21 @@ if ($warehouse_id <= 0) {
     exit();
 }
 
+// Found during the 2026-07-17 warehouse-scope sweep: this endpoint had no
+// scope check at all — any user with delete permission could delete any
+// company warehouse. Gate on project scope (see the equivalent handler in
+// app/bms/stock/warehouses.php for why userCan('warehouse', ...) is the
+// wrong check for a management action like this).
+require_once __DIR__ . '/core/project_scope.php';
+$del_project_stmt = $pdo->prepare("SELECT project_id FROM warehouses WHERE warehouse_id = ?");
+$del_project_stmt->execute([$warehouse_id]);
+$del_current_project = $del_project_stmt->fetchColumn();
+if ($del_current_project !== false && $del_current_project !== null
+    && !userCan('project', (int)$del_current_project)) {
+    echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse belongs to a project not in your scope.']);
+    exit();
+}
+
 try {
     // Gather counts for the warning summary
     $stockRow = $pdo->prepare("SELECT COUNT(DISTINCT product_id) as product_count, COALESCE(SUM(stock_quantity),0) as total_qty FROM product_stocks WHERE warehouse_id = ?");

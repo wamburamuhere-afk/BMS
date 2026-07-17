@@ -1,5 +1,76 @@
 # BMS Changelog
 
+## 2026-07-17 (fix) — Full warehouse-scope sweep: warehouse management, products, stock, NIP materials
+
+**Files:** `app/bms/stock/warehouses.php`, `ajax_delete_warehouse.php`,
+`app/bms/product/{products,product_create,product_edit,product_view}.php`,
+`app/bms/stock/{locations,stock_adjustments,stock_movements,stock_transfers,inventory_valuation}.php`,
+`app/bms/purchase/{nip_materials,edit_nip_materials}.php`,
+`app/bms/operations/project_view.php`,
+`api/{add_nip_materials,create_dn,get_project_warehouse_stock,get_product_stock,get_adjustment,delete_adjustment,process_bulk_adjustment,received_invoices}.php`,
+`api/operations/{delete_warehouse,get_project}.php`,
+`api/stock/update_warehouse.php`, `api/get_nip_materials_form_data.php`
+
+User-reported: a non-admin could still see and select warehouses they weren't
+assigned to in `warehouses.php` and "other areas". Systematic codebase-wide
+sweep for every remaining place a warehouse dropdown, list, or write action
+had no scope check — 25 files, found via `grep -rl "FROM warehouses"` across
+`app/`, `api/`, `core/` and checked one by one.
+
+**Management list** — `app/bms/stock/warehouses.php`'s warehouse list now
+applies `scopeFilterSqlNullable('warehouse')` alongside its existing project
+scope. Its delete/toggle-status POST handlers, and the separate
+`ajax_delete_warehouse.php` endpoint the UI actually calls, had **no scope
+check of any kind** — any user with delete/edit permission could act on any
+company warehouse; gated on project scope (not `userCan('warehouse', ...)` —
+a legacy user's derived warehouse list only includes warehouses with prior
+transaction history, so that check would incorrectly block editing a
+freshly-created, never-transacted warehouse under a project they legitimately
+manage — confirmed one such real warehouse exists in this DB).
+
+**Dropdown drift** — 8 more pages were hand-rolling their own project-only
+warehouse dropdown query instead of the shared `warehousesForSelect()`
+helper (`products.php`, `product_create/edit/view.php`, `locations.php`,
+`stock_adjustments.php` — CI-locked, verified its client-side cascade
+guard in `tests/test_warehouse_project_filter_cli.php` is untouched —
+`stock_movements.php`, `stock_transfers.php`, `nip_materials.php`,
+`edit_nip_materials.php`, `project_view.php`). All swapped to the shared
+helper, which also closes the same "zero project assignment → zero
+warehouses shown, even with an explicit external grant" bug found earlier
+today in the Non-Inventory Products page.
+
+**List-level scope** — added `scopeFilterSqlNullable('warehouse', …)`
+alongside existing project scope on `products.php`, `stock_adjustments.php`,
+`stock_movements.php`, `stock_transfers.php` (either-endpoint rule, matching
+the earlier report-side fix), `inventory_valuation.php`, `nip_materials.php`,
+`get_project.php`'s project-detail warehouse tab, and `received_invoices.php`'s
+warehouse picker.
+
+**Write/read-path gaps with zero scope check found and fixed:**
+`api/get_adjustment.php`, `api/get_product_stock.php`,
+`api/get_project_warehouse_stock.php` (reads), `api/delete_adjustment.php`,
+`api/process_bulk_adjustment.php` (per-CSV-row check), `api/add_nip_materials.php`,
+`api/create_dn.php` (writes) — all now call `userCan('warehouse', …)` before
+touching the target warehouse. `api/operations/delete_warehouse.php` and
+`api/stock/update_warehouse.php` (two more warehouse management write paths
+distinct from the ones in `warehouses.php`) had no scope check at all; gated
+on project scope for the same reason as the management page's handlers.
+
+Left untouched, deliberately: `api/pos/get_products.php` — confirmed its
+actual file content is a mislabeled copy of `grn_create.php` (starts with
+`// File: grn_create.php`, references GRN 28 times, `require_once` path
+depth is wrong for its own location) — a pre-existing, unrelated, likely
+unreachable bug, not a live security surface.
+
+Verified: `warehouses.php`'s list correctly narrows to exactly one granted
+warehouse out of 9 for a scoped test user; a stock transfer from a granted
+warehouse to a non-granted one was attempted end-to-end and correctly
+rejected with zero row written (`stock_transfers` count unchanged: 15 → 15).
+Full regression: `tests/test_warehouse_scope_cli.php` (137),
+`test_warehouse_project_filter_cli.php` (84, including the CI-locked
+`stock_adjustments.php` client-cascade guard), `test_pos_dashboard_cli.php`
+(98) — 319 checks, all green.
+
 ## 2026-07-17 (fix) — POS Dashboard: Low Stock tile now respects warehouse + project scope
 
 **Files:** `api/pos/get_dashboard.php`, `tests/test_pos_dashboard_cli.php`

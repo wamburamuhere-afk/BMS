@@ -2,12 +2,16 @@
 // scope-audit: skip — project warehouse stock lookup; project_id required param
 // File: api/get_project_warehouse_stock.php
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/warehouse_scope.php';
 header('Content-Type: application/json');
 if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
 try {
     $warehouse_id = intval($_GET['warehouse_id'] ?? 0);
     $project_id   = intval($_GET['project_id']   ?? 0);
     if ($warehouse_id <= 0) throw new Exception('Warehouse ID required.');
+    if (!userCan('warehouse', $warehouse_id)) {
+        throw new Exception('Access denied: this warehouse is not in your assigned scope.');
+    }
 
     // Validate warehouse belongs to project
     if ($project_id > 0) {

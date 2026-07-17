@@ -291,10 +291,12 @@ try {
     $stock_transfers = [];
 }
 
-// Get warehouses for adjustment form
+// Get warehouses for adjustment form — shared helper, also respects the
+// user's direct warehouse grant (Phase 6, pos_upgrade_plan.md).
 $warehouses = [];
 try {
-    $warehouses = $pdo->query("SELECT * FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll();
+    require_once ROOT_DIR . '/core/warehouse_scope.php';
+    $warehouses = warehousesForSelect($pdo);
 } catch (PDOException $e) {
     $warehouses = [];
 }

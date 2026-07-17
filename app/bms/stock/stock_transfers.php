@@ -3,6 +3,7 @@
 // scope-audit: skip — stock transfers between warehouses; stock_transfers table has no project_id; warehouse scope deferred to Phase G-2
 require_once __DIR__ . '/../../../roots.php';
 require_once HELPERS_FILE;
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
 
 // Enforce permission BEFORE any output
 autoEnforcePermission('warehouses');
@@ -63,6 +64,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_transfer) {
         
         if ($from_wh === $to_wh) {
             $_SESSION['error'] = "Source and destination warehouses must be different.";
+        } elseif (!userCan('warehouse', $from_wh)) {
+            $_SESSION['error'] = "Access denied: the source warehouse is not in your assigned scope.";
+        } elseif (!userCan('warehouse', $to_wh)) {
+            $_SESSION['error'] = "Access denied: the destination warehouse is not in your assigned scope.";
         } else {
             try {
                 $pdo->beginTransaction();
@@ -133,6 +138,9 @@ if ($end_date) {
     $where_clauses[] = "t.transfer_date <= ?";
     $params[] = $end_date;
 }
+if ($wh_filter > 0 && !userCan('warehouse', (int)$wh_filter)) {
+    $wh_filter = '0'; // ignore an out-of-scope filter rather than error on a list page
+}
 if ($wh_filter > 0) {
     $where_clauses[] = "(t.from_warehouse_id = ? OR t.to_warehouse_id = ?)";
     $params[] = $wh_filter;
@@ -140,6 +148,16 @@ if ($wh_filter > 0) {
 }
 
 $where_sql = !empty($where_clauses) ? "WHERE " . implode(" AND ", $where_clauses) : "";
+// Phase 6 (pos_upgrade_plan.md): default scope when no specific warehouse was
+// chosen — visible if EITHER endpoint is in the viewer's warehouse scope
+// (mirrors api/account/get_stock_transfers.php's equivalent fix).
+if ($wh_filter <= 0) {
+    $fScope = scopeFilterSqlNullable('warehouse', 'fw');
+    $tScope = scopeFilterSqlNullable('warehouse', 'tw');
+    if ($fScope !== '' || $tScope !== '') {
+        $where_sql .= ($where_sql === '' ? 'WHERE ' : ' AND ') . "((1=1$fScope) OR (1=1$tScope))";
+    }
+}
 
 // Fetch transfers
 $query = "
@@ -157,18 +175,9 @@ $stmt = $pdo->prepare($query);
 $stmt->execute($params);
 $transfers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Warehouses for dropdown — scoped by project for non-admins
-$_st_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
-if (isAdmin()) {
-    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-} elseif (!empty($_st_assigned)) {
-    $_st_ph = implode(',', array_fill(0, count($_st_assigned), '?'));
-    $_st_wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_st_ph)) ORDER BY warehouse_name");
-    $_st_wstmt->execute($_st_assigned);
-    $warehouses = $_st_wstmt->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
-}
+// Warehouses for dropdown — shared helper, also respects the user's direct
+// warehouse grant (Phase 6, pos_upgrade_plan.md).
+$warehouses = warehousesForSelect($pdo);
 
 // Products for transfer (only products available in warehouses)
 $available_products = $pdo->query("

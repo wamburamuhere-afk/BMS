@@ -2,6 +2,7 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/stock_posting.php';
+require_once __DIR__ . '/../core/warehouse_scope.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -47,6 +48,12 @@ try {
     $quantity = $adjustment['quantity'];
     $type = $adjustment['movement_type'];
     $warehouse_id = $adjustment['warehouse_id'];
+
+    // Phase 6 (pos_upgrade_plan.md) — the warehouse itself must be one this
+    // user is directly granted, on top of the project-level check above.
+    if (!empty($warehouse_id) && !userCan('warehouse', (int)$warehouse_id)) {
+        throw new Exception('Access denied: this warehouse is not in your assigned scope.');
+    }
 
     // Determine the effect on stock to reverse
     // If type was 'adjustment_in' or 'found', it added to stock. To reverse, we subtract.
