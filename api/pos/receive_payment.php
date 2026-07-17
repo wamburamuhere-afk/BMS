@@ -14,6 +14,7 @@
  */
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
 
@@ -42,6 +43,11 @@ try {
     if (!$sale)                              { throw new Exception('Sale not found.'); }
     if ((int)$sale['is_return_sale'] === 1)  { throw new Exception('Cannot take a payment on a return.'); }
     if ($sale['sale_status'] === 'voided')   { throw new Exception('This sale is voided.'); }
+
+    $wid = $sale['warehouse_id'] !== null && $sale['warehouse_id'] !== '' ? (int)$sale['warehouse_id'] : null;
+    if ($wid !== null && !userCan('warehouse', $wid)) {
+        throw new Exception('Access denied: this warehouse is not in your assigned scope.');
+    }
 
     $grand = (float)$sale['grand_total'];
     $paid  = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM pos_sale_payments WHERE sale_id = " . (int)$sale_id)->fetchColumn();

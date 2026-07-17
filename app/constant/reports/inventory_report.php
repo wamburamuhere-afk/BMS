@@ -24,7 +24,8 @@ $projects = $pdo->query(
 
 $warehouses = $pdo->query(
     "SELECT warehouse_id, warehouse_name FROM warehouses
-      WHERE status = 'active' ORDER BY warehouse_name ASC"
+      WHERE status = 'active' " . scopeFilterSql('warehouse', 'warehouses') . "
+      ORDER BY warehouse_name ASC"
 )->fetchAll(PDO::FETCH_ASSOC);
 
 $products = $pdo->query(

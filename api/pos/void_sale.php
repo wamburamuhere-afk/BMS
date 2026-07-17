@@ -17,6 +17,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/stock_ledger.php';
+require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
 
@@ -45,6 +46,10 @@ try {
 
     $warehouse_id = $sale['warehouse_id'] !== null && $sale['warehouse_id'] !== '' ? (int)$sale['warehouse_id'] : null;
     $project_id   = $sale['project_id']   !== null && $sale['project_id']   !== '' ? (int)$sale['project_id']   : null;
+
+    if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
+        throw new Exception('Access denied: this warehouse is not in your assigned scope.');
+    }
 
     // Reverse every line back into stock (mirrors process_sale.php in reverse).
     $items = $pdo->prepare("SELECT psi.*, p.is_service

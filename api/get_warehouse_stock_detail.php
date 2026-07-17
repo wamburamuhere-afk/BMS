@@ -1,7 +1,7 @@
 <?php
-// scope-audit: skip — warehouse stock detail; complex multi-table view; scope deferred to Phase G-2
 // File: api/get_warehouse_stock_detail.php
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/warehouse_scope.php';
 header('Content-Type: application/json');
 
 if (!isAuthenticated()) {
@@ -20,6 +20,12 @@ try {
     $wh = $pdo->prepare("SELECT warehouse_id, warehouse_name FROM warehouses WHERE warehouse_id = ? AND project_id = ?");
     $wh->execute([$warehouse_id, $project_id]);
     if (!$wh->fetch()) throw new Exception('Warehouse not found in this project.');
+
+    // Phase 6 (pos_upgrade_plan.md): a non-admin may only view stock for a
+    // warehouse in their assigned scope.
+    if (!userCan('warehouse', $warehouse_id)) {
+        throw new Exception('Access denied: this warehouse is not in your assigned scope.');
+    }
 
     // ── 1. STOCK SUMMARY — from product_stocks (current real stock) ──
     $stmt = $pdo->prepare("

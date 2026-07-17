@@ -6,6 +6,10 @@
  */
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../helpers.php';
+require_once __DIR__ . '/../../core/warehouse_scope.php';
+
+if (!isAuthenticated()) { die("Unauthorized"); }
+if (!canView('pos'))    { die("Permission denied"); }
 
 $sale_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
@@ -17,7 +21,7 @@ global $pdo;
 
 // Get sale details
 $stmt = $pdo->prepare("
-    SELECT 
+    SELECT
         s.*,
         c.customer_name,
         c.phone as customer_phone,
@@ -32,6 +36,13 @@ $sale = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$sale) {
     die("Sale not found");
+}
+
+// Warehouse-scope guard: a non-admin may only print a receipt for a sale
+// drawn from their assigned warehouse(s).
+$wid = $sale['warehouse_id'] !== null && $sale['warehouse_id'] !== '' ? (int)$sale['warehouse_id'] : null;
+if ($wid !== null && !userCan('warehouse', $wid)) {
+    die("Access denied: this warehouse is not in your assigned scope.");
 }
 
 // Log Activity

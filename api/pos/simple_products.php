@@ -1,5 +1,6 @@
 <?php
-// scope-audit: skip — POS simple product search; product catalog is global
+// Phase 6 (pos_upgrade_plan.md) — a warehouse_id is now checked against the
+// requesting user's own warehouse scope, not just used to filter the query.
 /**
  * Simple products API with category and search filters
  */
@@ -8,6 +9,7 @@ header('Access-Control-Allow-Origin: *');
 
 // Include global configuration and database connection
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 // Security: Check if user is authenticated
 if (!isAuthenticated()) {
@@ -18,17 +20,32 @@ if (!isAuthenticated()) {
 
 try {
     global $pdo;
-    
+
     if (!$pdo) {
         throw new Exception("Database connection not available.");
     }
-    
+
     // Get parameters
     $category = isset($_GET['category']) ? intval($_GET['category']) : 0;
     $search = isset($_GET['search']) ? trim($_GET['search']) : '';
     $warehouse_id = isset($_GET['warehouse_id']) ? intval($_GET['warehouse_id']) : 0;
     $project_id = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
-    
+
+    // A specific warehouse must be one this user is actually scoped to;
+    // omitting it entirely is only allowed for admins / grant-all users
+    // (otherwise this would silently fall back to a company-wide total).
+    if ($warehouse_id > 0) {
+        if (!userCan('warehouse', $warehouse_id)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+            exit;
+        }
+    } elseif (!hasAllWarehouseAccess()) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Select a warehouse — you do not have access to view stock across all warehouses.']);
+        exit;
+    }
+
     // Build query using product_stocks for accurate warehouse balance
     $ps_warehouse_filter = $warehouse_id > 0 ? "AND ps.warehouse_id = :warehouse_ps" : "";
     $sm_warehouse_filter = $warehouse_id > 0 ? "AND sm.warehouse_id = :warehouse_sm" : "";

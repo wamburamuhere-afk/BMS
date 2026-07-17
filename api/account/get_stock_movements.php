@@ -32,6 +32,9 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from) || !preg_match('/^\d{4}-\d{
 if ($project_id !== null && !userCan('project', $project_id)) {
     http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']); exit;
 }
+if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
+    http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']); exit;
+}
 
 // Canonical IN / OUT type lists. `norm_type` resolves legacy empty types.
 $in_types  = "'purchase_in','adjustment_in','transfer_in','return_in','production_in','found','correction'";
@@ -69,9 +72,8 @@ try {
     if ($direction === 'in')    { $where[] = "($norm_type) IN ($in_types)"; }
     elseif ($direction === 'out') { $where[] = "($norm_type) IN ($out_types)"; }
 
-    $scope_sql = '';
     if ($project_id !== null) { $where[] = "w.project_id = ?"; $params[] = $project_id; }
-    else                      { $scope_sql = scopeFilterSqlNullable('project', 'w'); }
+    $scope_sql = ($warehouse_id === null) ? scopeFilterSqlNullable('warehouse', 'w') : '';
     $where_sql = implode(' AND ', $where) . $scope_sql;
 
     $base_from = "

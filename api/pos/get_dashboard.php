@@ -26,7 +26,8 @@ if ($trend_days < 1 || $trend_days > 90) $trend_days = 14;
 
 try {
     global $pdo;
-    $scope = scopeFilterSqlNullable('project', 'ps');   // '' for admins; scoped for others
+    $scope = scopeFilterSqlNullable('project', 'ps')    // '' for admins; scoped for others
+           . scopeFilterSqlNullable('warehouse', 'ps');
 
     $today      = date('Y-m-d');
     $month_from = date('Y-m-01');

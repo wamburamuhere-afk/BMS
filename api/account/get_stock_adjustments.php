@@ -33,6 +33,9 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from) || !preg_match('/^\d{4}-\d{
 if ($project_id !== null && !userCan('project', $project_id)) {
     http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']); exit;
 }
+if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
+    http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']); exit;
+}
 
 // Adjustments = manual reference OR an adjustment-family movement_type.
 $adj_in_types  = "'adjustment_in','correction','found','return_in'";
@@ -62,9 +65,8 @@ try {
     if ($direction === 'out')   { $where[] = "sm.movement_type IN ($adj_out_types)"; }
     elseif ($direction === 'in'){ $where[] = "(sm.movement_type IN ($adj_in_types) OR sm.movement_type NOT IN ($adj_out_types))"; }
 
-    $scope_sql = '';
     if ($project_id !== null) { $where[] = "w.project_id = ?"; $params[] = $project_id; }
-    else                      { $scope_sql = scopeFilterSqlNullable('project', 'w'); }
+    $scope_sql = ($warehouse_id === null) ? scopeFilterSqlNullable('warehouse', 'w') : '';
     $where_sql = implode(' AND ', $where) . $scope_sql;
 
     $base_from = "
