@@ -25,10 +25,12 @@ $stmt = $pdo->prepare("
         s.*,
         c.customer_name,
         c.phone as customer_phone,
-        u.username as cashier_name
+        u.username as cashier_name,
+        w.warehouse_name
     FROM pos_sales s
     LEFT JOIN customers c ON s.customer_id = c.customer_id
     LEFT JOIN users u ON s.user_id = u.user_id
+    LEFT JOIN warehouses w ON s.warehouse_id = w.warehouse_id
     WHERE s.sale_id = ?
 ");
 $stmt->execute([$sale_id]);
@@ -180,6 +182,12 @@ $company_tin = "123-456-789";
             <span>Cashier:</span>
             <span><?= $sale['cashier_name'] ?? 'N/A' ?></span>
         </div>
+        <?php if (!empty($sale['warehouse_name'])): ?>
+        <div>
+            <span>Warehouse:</span>
+            <span><?= htmlspecialchars($sale['warehouse_name']) ?></span>
+        </div>
+        <?php endif; ?>
         <?php if ($sale['customer_name']): ?>
         <div>
             <span>Customer:</span>

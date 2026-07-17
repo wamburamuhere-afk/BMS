@@ -8,6 +8,7 @@ ini_set('display_errors', 0);
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/permissions.php';
 require_once __DIR__ . '/../../../core/workflow.php';
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
 
 if (!isAuthenticated()) die("Unauthorized");
 if (!canView('invoices')) die("Access Denied");
@@ -37,9 +38,11 @@ try {
             CONCAT(ur.first_name, ' ', ur.last_name) AS reviewer_name,
             COALESCE(ur.user_role, ur.role) AS reviewer_role,
             CONCAT(ua.first_name, ' ', ua.last_name) AS approver_name,
-            COALESCE(ua.user_role, ua.role) AS approver_role
+            COALESCE(ua.user_role, ua.role) AS approver_role,
+            w.warehouse_name
         FROM invoices i
         LEFT JOIN customers c ON i.customer_id = c.customer_id
+        LEFT JOIN warehouses w ON i.warehouse_id = w.warehouse_id
         LEFT JOIN users uc ON i.created_by  = uc.user_id
         LEFT JOIN users ur ON i.reviewed_by = ur.user_id
         LEFT JOIN users ua ON i.approved_by = ua.user_id
@@ -49,6 +52,14 @@ try {
     $invoice = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$invoice) die("Invoice Not Found");
+
+    // Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope, not
+    // just project — a user granted only some of a project's warehouses
+    // shouldn't be able to print an invoice drawn from a different one.
+    if (!empty($invoice['warehouse_id']) && !userCan('warehouse', (int)$invoice['warehouse_id'])) {
+        http_response_code(403);
+        die('Access denied: this warehouse is not in your assigned scope.');
+    }
 
     $stmtItems = $pdo->prepare("
         SELECT ii.*, p.sku, p.unit
@@ -275,6 +286,7 @@ $accent = getSetting('print_template_color_inv_onyx', '#1c1c1c');
             <?php if (!empty($invoice['payment_terms'])): ?><p><strong>Payment Terms:</strong> <?= htmlspecialchars(ucwords(str_replace('_', ' ', $invoice['payment_terms']))) ?></p><?php endif; ?>
             <?php if ($dn_ref): ?><p><strong>DN Ref:</strong> <?= htmlspecialchars($dn_ref) ?></p><?php endif; ?>
             <?php if ($lpo_ref): ?><p><strong>LPO Ref:</strong> <?= htmlspecialchars($lpo_ref) ?></p><?php endif; ?>
+            <?php if (!empty($invoice['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= htmlspecialchars($invoice['warehouse_name']) ?></p><?php endif; ?>
             <p><strong>Created By:</strong> <?= htmlspecialchars($creator_label) ?></p>
         </div>
     </div>

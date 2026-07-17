@@ -107,6 +107,7 @@ if ($lpo_id) {
                                 <p class="mb-1"><strong>Issue Date:</strong> <span id="issueDate"></span></p>
                                 <p class="mb-1" id="expiryRow" style="display:none;"><strong>Expiry Date:</strong> <span id="expiryDate"></span></p>
                                 <p class="mb-1" id="projectRow" style="display:none;"><strong>Project:</strong> <span id="projectName" class="text-primary fw-bold"></span></p>
+                                <p class="mb-1" id="warehouseRow" style="display:none;"><strong>Warehouse:</strong> <span id="warehouseName" class="text-primary fw-bold"></span></p>
                                 <p class="mb-1"><strong>Created By:</strong> <span id="createdBy"></span></p>
                             </div>
                         </div>
@@ -329,6 +330,7 @@ function renderLpo(o) {
     $('#issueDate').text(o.issue_date);
     if (o.expiry_date) { $('#expiryDate').text(o.expiry_date); $('#expiryRow').show(); }
     if (o.project_name) { $('#projectName').text(o.project_name); $('#projectRow').show(); }
+    if (o.warehouse_name) { $('#warehouseName').text(o.warehouse_name); $('#warehouseRow').show(); }
     $('#createdBy').text(o.created_by_name || '');
 
     // Authorization trail
