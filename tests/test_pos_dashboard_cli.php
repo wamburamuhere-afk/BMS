@@ -195,7 +195,19 @@ try {
 
             $todayNet = (float)$pdo->query("SELECT $netX FROM pos_sales ps WHERE DATE(ps.sale_date)='$today'")->fetchColumn();
             $monthNet = (float)$pdo->query("SELECT $netX FROM pos_sales ps WHERE DATE(ps.sale_date) BETWEEN '$mfrom' AND '$today'")->fetchColumn();
-            $lowCnt   = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE COALESCE(is_service,0)=0 AND current_stock <= min_stock_level")->fetchColumn();
+            // Low stock is now a per-warehouse product_stocks reconciliation
+            // (2026-07-17 fix — was reading the company-wide products.current_stock
+            // rollup, which ignored the viewer's warehouse scope entirely).
+            $lowCnt   = (int)$pdo->query("
+                SELECT COUNT(*) FROM (
+                    SELECT p.product_id
+                      FROM product_stocks lps
+                      JOIN products p ON lps.product_id = p.product_id
+                     WHERE p.status = 'active' AND COALESCE(p.is_service,0) = 0
+                  GROUP BY p.product_id
+                    HAVING SUM(lps.stock_quantity) <= MAX(COALESCE(NULLIF(lps.min_stock_level,0), p.reorder_level, 0))
+                ) t
+            ")->fetchColumn();
 
             ok(approx($data['today']['net'], $todayNet), sprintf('today net == SQL (%.2f)', $todayNet));
             ok(approx($data['month']['net'], $monthNet), sprintf('month net == SQL (%.2f)', $monthNet));
