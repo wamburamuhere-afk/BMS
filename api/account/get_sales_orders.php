@@ -91,13 +91,19 @@ try {
 
     $where_sql = implode(" AND ", $where_conditions);
 
-    // Phase C — project-scope filter
+    // Phase C — project-scope filter. Nullable, not strict: a sales order
+    // with no project (warehouse-only access, no project assignment) must
+    // still be visible to a user with zero project assignments —
+    // scopeFilterSql() (strict) would hard-block them with "AND 0" even
+    // when their warehouse grant legitimately covers the row. Found
+    // 2026-07-17: a warehouse-only user's own newly-created order was
+    // invisible in this list because of it.
     // Phase 6 (pos_upgrade_plan.md) — warehouse scope, redundant-but-harmless
     // when $warehouse_filter was already validated above.
-    $scopeSO = scopeFilterSql('project', 'so') . scopeFilterSqlNullable('warehouse', 'so');
+    $scopeSO = scopeFilterSqlNullable('project', 'so') . scopeFilterSqlNullable('warehouse', 'so');
 
     // 1. Get Total Count (scope-aware, orders only)
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM sales_orders WHERE is_quote = 0 " . scopeFilterSql('project'));
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM sales_orders WHERE is_quote = 0 " . scopeFilterSqlNullable('project'));
     $stmt->execute();
     $recordsTotal = $stmt->fetchColumn();
 

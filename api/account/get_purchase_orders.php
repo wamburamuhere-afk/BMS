@@ -105,8 +105,13 @@ try {
                     AND NOT EXISTS (SELECT 1 FROM purchase_receipts pr WHERE pr.purchase_order_id = po.purchase_order_id)";
     }
 
-    // Phase C — project-scope filter (non-admin: AND po.project_id IN (...) | admin: '')
-    $query .= scopeFilterSql('project', 'po');
+    // Phase C — project-scope filter. Nullable, not strict: a PO with no
+    // project (warehouse-only access, no project assignment) must still be
+    // visible to a user with zero project assignments — scopeFilterSql()
+    // (strict) would hard-block them with "AND 0" even when their warehouse
+    // grant legitimately covers the row. Found 2026-07-17: a warehouse-only
+    // user's own newly-created PO was invisible in this list because of it.
+    $query .= scopeFilterSqlNullable('project', 'po');
     // Phase 6 (pos_upgrade_plan.md) — warehouse scope (redundant-but-harmless
     // when a specific $warehouse_id was already validated above).
     $query .= scopeFilterSqlNullable('warehouse', 'po');
