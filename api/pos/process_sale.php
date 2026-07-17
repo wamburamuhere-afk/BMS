@@ -1,5 +1,6 @@
 <?php
-// scope-audit: skip — POS sale processing; project association via project dropdown at sale time
+// Phase 6 (pos_upgrade_plan.md) — warehouse_id is now checked against the
+// requesting user's own warehouse scope before any stock is touched.
 /**
  * API: Process POS Sale
  * Complete sale transaction with inventory update
@@ -9,6 +10,7 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../helpers.php';
 require_once __DIR__ . '/../../core/stock_ledger.php';
+require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
@@ -75,7 +77,10 @@ try {
     if (empty($warehouse_id)) {
         throw new Exception("A warehouse must be selected for the sale.");
     }
-    
+    if (!userCan('warehouse', $warehouse_id)) {
+        throw new Exception("Access denied: this warehouse is not in your assigned scope.");
+    }
+
     // Check for active shift — pos_sales.shift_id is NOT NULL, so this must be
     // validated before the insert, not silently passed through as null.
     $stmt = $pdo->prepare("SELECT shift_id FROM cash_register_shifts WHERE user_id = ? AND status = 'active' LIMIT 1");

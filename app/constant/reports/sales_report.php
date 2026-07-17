@@ -22,6 +22,13 @@ $projects = $pdo->query(
       WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
       ORDER BY project_name ASC"
 )->fetchAll(PDO::FETCH_ASSOC);
+
+// Warehouses the CURRENT user may see, per security.md §23 (Phase 6 — warehouse ACL).
+$warehouses = $pdo->query(
+    "SELECT warehouse_id, warehouse_name FROM warehouses
+      WHERE status = 'active' " . scopeFilterSql('warehouse', 'warehouses') . "
+      ORDER BY warehouse_name ASC"
+)->fetchAll(PDO::FETCH_ASSOC);
 $date_from = $_GET['date_from'] ?? date('Y-01-01');
 $date_to   = $_GET['date_to']   ?? date('Y-12-31');
 $currency  = get_setting('currency', 'TZS');
@@ -67,6 +74,15 @@ $currency  = get_setting('currency', 'TZS');
                         <option value="">All My Projects</option>
                         <?php foreach ($projects as $p): ?>
                             <option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Warehouse</label>
+                    <select name="warehouse_id" id="f-warehouse" class="form-select" style="width:100%">
+                        <option value="">All My Warehouses</option>
+                        <?php foreach ($warehouses as $w): ?>
+                            <option value="<?= (int)$w['warehouse_id'] ?>"><?= safe_output($w['warehouse_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -232,7 +248,7 @@ $(function () {
         theme: 'bootstrap-5', placeholder: 'All Customers', allowClear: true, width: '100%',
         ajax: { url: CUST_URL, dataType: 'json', delay: 300, data: p => ({ q: p.term }), processResults: d => d, cache: true }
     });
-    $('#f-project, #f-salesperson, #f-status, #f-source').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
+    $('#f-project, #f-warehouse, #f-salesperson, #f-status, #f-source').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
 
     // ── DataTable (per §UI-2) ─────────────────────────────────────────────
     const table = $('#salesTable').DataTable({
@@ -277,6 +293,7 @@ $(function () {
         const params = {
             date_from: $('#f-from').val(), date_to: $('#f-to').val(),
             project_id: $('#f-project').val() || '',
+            warehouse_id: $('#f-warehouse').val() || '',
             customer_id: $('#f-customer').val() || '', salesperson_id: $('#f-salesperson').val() || '',
             status: $('#f-status').val() || '',
             source: $('#f-source').val() || ''
@@ -325,7 +342,7 @@ $(function () {
     }
 
     $('#filterForm').on('submit', e => { e.preventDefault(); loadReport(); });
-    $('#f-project, #f-customer, #f-salesperson, #f-status, #f-source').on('change', loadReport);
+    $('#f-project, #f-warehouse, #f-customer, #f-salesperson, #f-status, #f-source').on('change', loadReport);
 
     loadReport();
     if (typeof logReportAction === 'function') logReportAction('Viewed Sales Report', 'Loaded sales report');

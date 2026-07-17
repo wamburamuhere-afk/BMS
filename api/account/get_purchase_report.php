@@ -31,6 +31,7 @@ $date_to     = $_GET['date_to']     ?? date('Y-12-31');
 $status      = $_GET['status']      ?? '';
 $supplier_id = $_GET['supplier_id'] ?? '';
 $project_id  = (isset($_GET['project_id']) && $_GET['project_id'] !== '') ? (int)$_GET['project_id'] : null;
+$warehouse_id = (isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '') ? (int)$_GET['warehouse_id'] : null;
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_to)) {
     echo json_encode(['success' => false, 'message' => 'Invalid date range']);
@@ -41,6 +42,11 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from) || !preg_match('/^\d{4}-\d{
 if ($project_id !== null && !userCan('project', $project_id)) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your assigned scope.']);
+    exit;
+}
+if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
     exit;
 }
 
@@ -64,7 +70,13 @@ try {
         $where[]  = "po.project_id = ?";
         $params[] = $project_id;
     } else {
-        $scope_sql = scopeFilterSqlNullable('project', 'po');
+        $scope_sql .= scopeFilterSqlNullable('project', 'po');
+    }
+    if ($warehouse_id !== null) {
+        $where[]  = "po.warehouse_id = ?";
+        $params[] = $warehouse_id;
+    } else {
+        $scope_sql .= scopeFilterSqlNullable('warehouse', 'po');
     }
     $where_sql = implode(' AND ', $where) . $scope_sql;
 

@@ -41,6 +41,29 @@ if (!function_exists('warehousesForSelect')) {
     }
 }
 
+if (!function_exists('hasAllWarehouseAccess')) {
+    /**
+     * True for admins and for users explicitly granted "all warehouses"
+     * (a user_scope_overrides row with resource_id = NULL — see
+     * loadUserScope() in project_scope.php, which turns that into the ['*']
+     * sentinel). Use this where there's no single warehouse_id to check via
+     * userCan('warehouse', $id) — e.g. deciding whether an unscoped,
+     * company-wide view is allowed at all.
+     */
+    function hasAllWarehouseAccess(): bool
+    {
+        if (!isset($_SESSION['scope'])) {
+            if (isset($_SESSION['user_id']) && function_exists('loadUserScope')) {
+                loadUserScope((int)$_SESSION['user_id']);
+            } else {
+                return false;
+            }
+        }
+        if (!empty($_SESSION['scope']['is_admin'])) return true;
+        return in_array('*', $_SESSION['scope']['warehouses'] ?? [], true);
+    }
+}
+
 if (!function_exists('renderWarehouseOptions')) {
     /**
      * Emit the <option> list for a warehouse <select>. Every option carries

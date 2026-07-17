@@ -139,9 +139,19 @@ $currency = 'TZS';
                             <select class="form-select" id="posWarehouseId" onchange="loadProducts()" required>
                                 <option value="" selected disabled>— Select Warehouse —</option>
                                 <?php
-                                // Shared Project ↔ Warehouse mechanism (core/warehouse_scope.php)
+                                // Shared Project ↔ Warehouse mechanism (core/warehouse_scope.php) narrows
+                                // by project scope first; then narrowed again to this specific user's own
+                                // warehouse assignment (Phase 6, pos_upgrade_plan.md) — a cashier only ever
+                                // sees the warehouse(s) they're personally assigned to here, never every
+                                // warehouse their project touches. Still calls warehousesForSelect() /
+                                // renderWarehouseOptions() per tests/test_warehouse_project_filter_cli.php.
                                 require_once ROOT_DIR . '/core/warehouse_scope.php';
-                                echo renderWarehouseOptions(warehousesForSelect($pdo));
+                                $_pos_project_scoped = warehousesForSelect($pdo);
+                                $_pos_warehouse_scoped = array_values(array_filter(
+                                    $_pos_project_scoped,
+                                    fn($w) => userCan('warehouse', (int)$w['warehouse_id'])
+                                ));
+                                echo renderWarehouseOptions($_pos_warehouse_scoped);
                                 ?>
                             </select>
                         </div>

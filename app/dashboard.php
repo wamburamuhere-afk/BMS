@@ -240,9 +240,11 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
     }
 
     // ── 3. Inventory value ────────────────────────────────────────────────────
-    // Gate: products module; scope: p.project_id (nullable)
+    // Gate: products module; scope: p.project_id (nullable) + stock aggregated
+    // only from warehouses the user is assigned to (Phase 6 — pos_upgrade_plan.md).
     if (canView('products') || canView('inventory_report')) {
         $prodScope = scopeFilterSqlNullable('project', 'p');
+        $whScope   = scopeFilterSqlNullable('warehouse', 'product_stocks');
         $stmt = $pdo->prepare("
             SELECT COUNT(p.product_id) as total_products,
                    SUM(COALESCE(s.total_stock, 0) * p.cost_price) as inventory_value,
@@ -254,6 +256,7 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
                        SUM(stock_quantity) as total_stock,
                        SUM(stock_quantity - reserved_quantity) as available_stock
                 FROM product_stocks
+                WHERE 1=1 {$whScope}
                 GROUP BY product_id
             ) s ON p.product_id = s.product_id
             WHERE p.status = 'active'
@@ -296,13 +299,15 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
     }
 
     // ── 6. POS sales today ────────────────────────────────────────────────────
-    // Gate: pos module; no project scope — POS is a shared point-of-sale terminal
+    // Gate: pos module; scope: pos_sales.warehouse_id (Phase 6 — pos_upgrade_plan.md)
     if (canView('pos')) {
+        $posScope = scopeFilterSqlNullable('warehouse', 'pos_sales');
         $stmt = $pdo->prepare("
             SELECT COUNT(*) as pos_sales_today, SUM(grand_total) as pos_revenue_today
             FROM pos_sales
             WHERE DATE(sale_date) = CURDATE()
               AND sale_status = 'completed'
+              {$posScope}
         ");
         $stmt->execute();
         $stats['pos_today'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $stats['pos_today'];
@@ -425,6 +430,7 @@ function get_system_alerts($pdo, $user_id) {
     $stock_alerts = $expiry_alerts = $negative_stock_alerts = [];
     if (canView('products')) {
         $prodScope = scopeFilterSqlNullable('project', 'p');
+        $whScope   = scopeFilterSqlNullable('warehouse', 'product_stocks');
 
         $stmt = $pdo->prepare("
             SELECT 'low_stock' as type,
@@ -438,7 +444,7 @@ function get_system_alerts($pdo, $user_id) {
             FROM products p
             LEFT JOIN (
                 SELECT product_id, SUM(stock_quantity - reserved_quantity) as available_stock
-                FROM product_stocks GROUP BY product_id
+                FROM product_stocks WHERE 1=1 {$whScope} GROUP BY product_id
             ) s ON p.product_id = s.product_id
             WHERE p.status = 'active'
               AND p.is_service = 0
@@ -480,7 +486,7 @@ function get_system_alerts($pdo, $user_id) {
                 FROM products p
                 INNER JOIN (
                     SELECT product_id, SUM(stock_quantity - reserved_quantity) as available_stock
-                    FROM product_stocks GROUP BY product_id
+                    FROM product_stocks WHERE 1=1 {$whScope} GROUP BY product_id
                     HAVING available_stock < 0
                 ) s ON p.product_id = s.product_id
                 WHERE p.status = 'active'

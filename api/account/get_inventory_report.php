@@ -42,6 +42,11 @@ if ($project_id !== null && !userCan('project', $project_id)) {
     echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']);
     exit;
 }
+if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+    exit;
+}
 
 // Threshold used to classify low/out/in. product_stocks.min_stock_level is the
 // per-warehouse reorder point; when unset (0) fall back to the product's level.
@@ -74,14 +79,14 @@ try {
         $where[] = "ps.stock_quantity > $threshold";
     }
 
-    // Project scope via the warehouse the stock sits in.
-    $scope_sql = '';
+    // Phase 6 (pos_upgrade_plan.md): stock physically lives in a warehouse, so
+    // scope directly by warehouse access rather than by the warehouse's project.
+    // project_id, when given, is kept as an optional narrowing filter.
     if ($project_id !== null) {
         $where[]  = "w.project_id = ?";
         $params[] = $project_id;
-    } else {
-        $scope_sql = scopeFilterSqlNullable('project', 'w');
     }
+    $scope_sql = ($warehouse_id === null) ? scopeFilterSqlNullable('warehouse', 'w') : '';
     $where_sql = implode(' AND ', $where) . $scope_sql;
 
     $base_from = "

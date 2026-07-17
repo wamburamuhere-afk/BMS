@@ -21,7 +21,8 @@ $end_date   = $_GET['end_date']   ?? date('Y-m-t');
 
 try {
     global $pdo;
-    $scope = scopeFilterSqlNullable('project', 'ps');   // '' for admins; AND (ps.project_id IS NULL OR IN (...)) for non-admins
+    $scope = scopeFilterSqlNullable('project', 'ps')    // '' for admins; AND (ps.project_id IS NULL OR IN (...)) for non-admins
+           . scopeFilterSqlNullable('warehouse', 'ps');
 
     // Paid-to-date per sale (guarded: pos_sale_payments arrives with the credit/AR migration).
     $hasPayTable = false;
