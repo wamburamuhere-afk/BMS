@@ -8590,6 +8590,11 @@ function renderDocs(data) {
                                 <a href="javascript:void(0)" class="dropdown-item py-2" onclick="editProjectDocument(${doc.id}, '${doc.origin}', '${doc.name.replace(/'/g, "\\'")}', '${doc.source.replace(/'/g, "\\'")}')">
                                     <i class="bi bi-pencil text-info me-2"></i> Edit
                                 </a>
+                            </li>
+                            <li>
+                                <a href="javascript:void(0)" class="dropdown-item py-2" onclick="openDocActivity(${doc.id}, '${doc.name.replace(/'/g, "\\'")}')">
+                                    <i class="bi bi-chat-square-text text-secondary me-2"></i> Comments &amp; Access
+                                </a>
                             </li>` : ''}
                             <li><hr class="dropdown-divider"></li>
                             <li>
@@ -21900,5 +21905,8 @@ $(function () {
     }
 });
 </script>
+
+<!-- Comments / Notes / Access modal — shared with document_library.php -->
+<?php require_once __DIR__ . '/../../../includes/document_activity_modal.php'; ?>
 
 <?php includeFooter(); ?>
