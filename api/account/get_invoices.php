@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
 
@@ -36,6 +37,13 @@ try {
     $date_from = $_GET['date_from'] ?? '';
     $date_to = $_GET['date_to'] ?? '';
     $payment_filter = $_GET['payment_status'] ?? '';
+    $warehouse_filter = isset($_GET['warehouse']) ? intval($_GET['warehouse']) : 0;
+
+    if ($warehouse_filter > 0 && !userCan('warehouse', $warehouse_filter)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+        exit;
+    }
 
     // Get DataTables parameters
     $draw = isset($_GET['draw']) ? intval($_GET['draw']) : 1;
@@ -89,10 +97,16 @@ try {
         }
     }
 
+    if ($warehouse_filter > 0) {
+        $where_conditions[] = "i.warehouse_id = ?";
+        $params[] = $warehouse_filter;
+    }
+
     $where_sql = implode(" AND ", $where_conditions);
 
     // Phase G — show invoices in assigned projects OR with no project (nullable)
-    $scopeI = scopeFilterSqlNullable('project', 'i');
+    // Phase 6 (pos_upgrade_plan.md) — warehouse scope, same nullable convention.
+    $scopeI = scopeFilterSqlNullable('project', 'i') . scopeFilterSqlNullable('warehouse', 'i');
 
     // 1. Stats — full counts including per-status breakdown
     $stats_query = "

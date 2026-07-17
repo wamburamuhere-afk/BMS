@@ -83,6 +83,7 @@ $query = "
     WHERE so.is_quote = 0
 ";
 $query .= scopeFilterSqlNullable('project', 'so');
+$query .= scopeFilterSqlNullable('warehouse', 'so');
 
 $params = [];
 

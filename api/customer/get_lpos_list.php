@@ -56,6 +56,8 @@ try {
 
     // Project-scope filter for non-admins (nullable — LPOs with no project stay visible)
     $query .= scopeFilterSqlNullable('project', 'l');
+    // Phase 6 (pos_upgrade_plan.md) — warehouse scope, same nullable convention.
+    $query .= scopeFilterSqlNullable('warehouse', 'l');
 
     $query .= " ORDER BY l.issue_date DESC, l.lpo_id DESC";
 

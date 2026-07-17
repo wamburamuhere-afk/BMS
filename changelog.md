@@ -1,5 +1,71 @@
 # BMS Changelog
 
+## 2026-07-17 (feat) — Project→warehouse narrowing across procurement & sales (create/edit/list/view)
+
+**Files:** `core/project_scope.php`, `core/warehouse_scope.php`,
+`app/bms/purchase/rfq.php`, `app/bms/purchase/rfq_view.php`, `api/get_rfqs.php`,
+`api/account/get_purchase_orders.php`, `api/account/get_purchase_order_details.php`,
+`app/bms/grn/grn.php`, `app/bms/grn/grn_view.php`, `api/get_grns.php`,
+`app/bms/purchase/purchase_returns.php`, `api/get_purchase_returns.php`,
+`app/bms/sales/quotations/quotations.php`, `app/bms/sales/quotations/quotation_view.php`,
+`app/bms/sales/sales_orders.php`, `app/bms/sales/sales_order_view.php`,
+`api/account/get_sales_orders.php`, `api/customer/get_lpos_list.php`,
+`api/customer/get_lpo.php`, `api/account/get_invoices.php`,
+`app/bms/invoice/invoice_view.php`, `app/bms/grn/delivery_notes.php`,
+`app/bms/grn/dn_view.php`, `api/get_delivery_notes_list.php`,
+`tests/test_warehouse_scope_cli.php`
+
+Closes the gap identified after the Phase 6 warehouse-access-control work shipped:
+being assigned to a project auto-granted every warehouse that project had ever
+transacted through (via `loadUserScope()`'s transactional derivation), so a
+Phase 6 warehouse grant could only ever add access, never narrow it below the
+project level. A cashier or clerk assigned to a multi-warehouse project still
+saw every one of that project's warehouses everywhere except POS (which had a
+one-off manual fix in Phase 6c).
+
+- **`core/project_scope.php`** — `loadUserScope()` now special-cases warehouses:
+  once an admin has explicitly configured a user's warehouse access via the
+  Phase 6 assignment UI (even a single warehouse, or the grant-all sentinel),
+  that explicit set replaces the project-derived union instead of adding to it.
+  A new `$_SESSION['scope']['warehouse_explicit']` flag records whether a user
+  has been migrated to explicit assignment. Users never migrated (zero
+  `user_scope_overrides` warehouse rows) keep today's behaviour exactly, so
+  nobody's access silently narrowed when this shipped.
+- **`core/warehouse_scope.php`** — `warehousesForSelect()` (the single function
+  every create/edit page's warehouse dropdown already calls) now also applies
+  the warehouse-grant filter when `warehouse_explicit` is set, fixing the
+  dropdown for all 13 pages that call it with a one-line change to the shared
+  helper — no page-level edits needed for the create/edit side.
+- **List pages** (RFQ, Purchase Order, GRN, Purchase Return, Quotation, Sales
+  Order, LPO, Invoice, Delivery Note in+out) — each list's data source now
+  filters by warehouse alongside its existing project filter, with a
+  `userCan('warehouse', …)` guard on any explicit `?warehouse=` param. Also
+  replaced 4 pages' (`rfq.php`, `grn.php`, `purchase_returns.php`,
+  `delivery_notes.php`) hand-rolled, project-only warehouse dropdown queries
+  with the shared `warehousesForSelect()` helper.
+- **View/detail pages** for the same 9 document types now deny access if the
+  record's own warehouse isn't in the viewer's scope, even when the project
+  check passes — mirrors the existing `warehouse_stock_view.php`/
+  `warehouse_view.php` pattern. (`purchase_return_view.php`'s underlying API
+  has no scope check of any kind today — a pre-existing, separately documented
+  gap, left as-is rather than folded into this change.)
+
+Project-scope filtering itself was not modified anywhere — every change is a
+warehouse clause added alongside the existing project clause.
+
+Verified via an extended `tests/test_warehouse_scope_cli.php` (137 checks,
+including a new live test: a user assigned to a real 3-warehouse project sees
+all 3 under the legacy fallback, then narrows to exactly 1 once explicitly
+granted, with `userCan()` correctly denying the other 2) plus two independent
+pre-existing suites (`test_warehouse_project_filter_cli.php` 84 checks,
+`test_pos_dashboard_cli.php` 98 checks) — 319 checks total, all green. Also
+live-verified end-to-end against real data outside the test suite: an RFQ list
+call correctly excluded a warehouse-14 record for a user granted only
+warehouse 5, and `rfq_view.php` correctly denied that same record only once
+the *warehouse* check was isolated from the pre-existing project check
+(confirmed by first assigning the test user to the record's own project, then
+observing the warehouse check deny it independently).
+
 ## 2026-07-17 (fix) — POS: services also now respect per-warehouse tagging
 
 **Files:** `api/pos/simple_products.php`

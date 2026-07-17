@@ -1,6 +1,7 @@
 <?php
 // File: app/bms/purchase/rfq.php
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
 autoEnforcePermission('rfq');
 includeHeader();
 logActivity($pdo, $_SESSION['user_id'], 'View RFQs', 'User viewed the RFQ management list');
@@ -8,7 +9,9 @@ logActivity($pdo, $_SESSION['user_id'], 'View RFQs', 'User viewed the RFQ manage
 global $pdo;
 
 $suppliers  = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status='active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
-$warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status='active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+// Scoped to the current user's assigned projects AND their warehouse grant
+// (Phase 6 — pos_upgrade_plan.md); was a flat, fully-unscoped query before.
+$warehouses = warehousesForSelect($pdo);
 
 $enable_projects = 0;
 try {
@@ -38,7 +41,7 @@ try {
         SUM(status='received') as received,
         SUM(status IN ('approved','partially')) as approved,
         SUM(status IN ('awarded','completed','cancelled')) as closed
-        FROM rfq WHERE 1=1" . scopeFilterSqlNullable('project', 'rfq'))->fetch(PDO::FETCH_ASSOC);
+        FROM rfq WHERE 1=1" . scopeFilterSqlNullable('project', 'rfq') . scopeFilterSqlNullable('warehouse', 'rfq'))->fetch(PDO::FETCH_ASSOC);
     if ($r) $stats = array_map('intval', $r);
 } catch (Exception $e) {}
 

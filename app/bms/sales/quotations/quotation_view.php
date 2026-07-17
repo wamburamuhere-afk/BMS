@@ -4,6 +4,7 @@
 // Shows the approval workflow (pending -> reviewed -> approved) and the
 // status-appropriate action buttons.
 require_once __DIR__ . '/../../../../roots.php';
+require_once __DIR__ . '/../../../../core/warehouse_scope.php';
 
 autoEnforcePermission('sales_orders');
 
@@ -47,6 +48,14 @@ $quote = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$quote) {
     header("Location: " . getUrl('quotations') . "?error=Quotation Not Found");
     exit();
+}
+
+// Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope, not just
+// project — a user granted only some of a project's warehouses shouldn't be
+// able to open a quotation drawn from a different one.
+if (!empty($quote['warehouse_id']) && !userCan('warehouse', (int)$quote['warehouse_id'])) {
+    if (!headers_sent()) http_response_code(403);
+    die('Access denied: this warehouse is not in your assigned scope.');
 }
 
 logActivity($pdo, $_SESSION['user_id'], 'View Quotation',

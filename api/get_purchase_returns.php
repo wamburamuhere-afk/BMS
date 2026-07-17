@@ -119,6 +119,7 @@ try {
     }
 
     $where_clause .= scopeFilterSqlNullable('project', 'po');
+    $where_clause .= scopeFilterSqlNullable('warehouse', 'pr');
     $query .= $where_clause;
 
     // Group By is needed for aggregate functions

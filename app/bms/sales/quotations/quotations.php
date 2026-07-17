@@ -33,6 +33,7 @@ $query = "
     WHERE 1=1
 ";
 $query .= scopeFilterSqlNullable('project', 'q');
+$query .= scopeFilterSqlNullable('warehouse', 'q');
 
 $params = [];
 
