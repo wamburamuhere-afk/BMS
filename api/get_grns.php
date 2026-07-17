@@ -2,6 +2,7 @@
 ob_start();
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
+require_once __DIR__ . '/../core/warehouse_scope.php';
 
 // Ensure no output before JSON
 if (ob_get_length()) ob_clean(); 
@@ -34,6 +35,12 @@ try {
     $project_filter = intval($_GET['project'] ?? 0);
     $date_from = $_GET['date_from'] ?? '';
     $date_to = $_GET['date_to'] ?? '';
+
+    if ($warehouse_filter > 0 && !userCan('warehouse', $warehouse_filter)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+        exit;
+    }
 
     // Get DataTables parameters
     $draw = isset($_GET['draw']) ? intval($_GET['draw']) : 1;
@@ -90,7 +97,7 @@ try {
         $params[] = $search_term;
     }
 
-    $where_sql = implode(" AND ", $where_conditions) . scopeFilterSqlNullable('project', 'po');
+    $where_sql = implode(" AND ", $where_conditions) . scopeFilterSqlNullable('project', 'po') . scopeFilterSqlNullable('warehouse', 'pr');
 
     // 1. Get Total Count (without filters)
     $stmt = $pdo->query("SELECT COUNT(*) FROM purchase_receipts");

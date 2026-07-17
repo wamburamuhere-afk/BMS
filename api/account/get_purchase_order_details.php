@@ -2,6 +2,7 @@
 // File: api/account/get_purchase_order_details.php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
 
@@ -43,6 +44,15 @@ try {
 
     if (!$order) {
         echo json_encode(['success' => false, 'message' => 'Order not found']);
+        exit;
+    }
+
+    // Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope, not
+    // just project — a user granted only some of a project's warehouses
+    // shouldn't be able to open a PO drawn from a different one.
+    if (!empty($order['warehouse_id']) && !userCan('warehouse', (int)$order['warehouse_id'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
         exit;
     }
 

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
 
@@ -27,6 +28,13 @@ try {
     $date_from = $_GET['date_from'] ?? '';
     $date_to = $_GET['date_to'] ?? '';
     $payment_filter = $_GET['payment_status'] ?? '';
+    $warehouse_filter = intval($_GET['warehouse'] ?? 0);
+
+    if ($warehouse_filter > 0 && !userCan('warehouse', $warehouse_filter)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+        exit;
+    }
 
     // Get DataTables parameters
     $draw = isset($_GET['draw']) ? intval($_GET['draw']) : 1;
@@ -76,10 +84,17 @@ try {
         $params[] = $search_term;
     }
 
+    if ($warehouse_filter > 0) {
+        $where_conditions[] = "so.warehouse_id = ?";
+        $params[] = $warehouse_filter;
+    }
+
     $where_sql = implode(" AND ", $where_conditions);
 
     // Phase C — project-scope filter
-    $scopeSO = scopeFilterSql('project', 'so');
+    // Phase 6 (pos_upgrade_plan.md) — warehouse scope, redundant-but-harmless
+    // when $warehouse_filter was already validated above.
+    $scopeSO = scopeFilterSql('project', 'so') . scopeFilterSqlNullable('warehouse', 'so');
 
     // 1. Get Total Count (scope-aware, orders only)
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM sales_orders WHERE is_quote = 0 " . scopeFilterSql('project'));

@@ -18,14 +18,30 @@ require_once __DIR__ . '/project_scope.php';
 
 if (!function_exists('warehousesForSelect')) {
     /**
-     * Active warehouses for a Project+Warehouse dropdown pair, scoped to the
-     * current user's assigned projects (admin → all; scoped user → unassigned
-     * + own projects' warehouses; user with no assignments → unassigned only).
+     * Active warehouses for a Project+Warehouse dropdown pair, scoped to BOTH
+     * the current user's assigned projects AND their direct warehouse grant
+     * (Phase 6, pos_upgrade_plan.md — user_scope_overrides). A user assigned
+     * to a project no longer automatically sees every warehouse that project
+     * has ever touched — only the warehouse(s) they were specifically granted
+     * (project-linked or external). Admin / grant-all-warehouse users are
+     * unaffected (both clauses collapse to unrestricted for them).
      * project_id comes back as 0 for warehouses not linked to any project.
      */
     function warehousesForSelect(PDO $pdo): array
     {
         $scope = scopeFilterSqlNullable('project', 'w');
+        // scopeFilterSqlNullable('project', ...) lazy-loads the scope cache
+        // if needed, so $_SESSION['scope']['warehouse_explicit'] is reliably
+        // populated by this point. Only apply the strict warehouse-id filter
+        // for users an admin has actually configured via the Phase 6 UI —
+        // scopeFilterSqlNullable('warehouse', ...) has no "still allow
+        // unassigned" leniency (unlike the project variant, since a
+        // warehouse row's own id is never NULL), so applying it
+        // unconditionally would silently zero out every legacy
+        // (not-yet-migrated) user's warehouse list.
+        if (!empty($_SESSION['scope']['warehouse_explicit'])) {
+            $scope .= scopeFilterSqlNullable('warehouse', 'w');
+        }
         try {
             return $pdo->query(
                 "SELECT w.warehouse_id, w.warehouse_name, w.location,

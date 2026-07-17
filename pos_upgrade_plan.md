@@ -255,6 +255,25 @@ All of 6a–6f below are done and verified (`tests/test_warehouse_scope_cli.php`
 `develop` opened per 6g and held for review before merge (not auto-merged, per
 explicit instruction for this phase).
 
+**Follow-up (2026-07-17, same branch):** two rounds of fixes discovered by
+manual testing after the above shipped —
+1. `api/pos/simple_products.php` was still leaking every company-wide product
+   (and, in a second pass, every service regardless of its own `warehouse_id`
+   tag) into a scoped warehouse's POS grid via a `LEFT JOIN` that restricted
+   quantities but not row presence. Fixed to exclude products/services with no
+   stock record — or warehouse tag — in the selected warehouse.
+2. A deeper gap: `loadUserScope()` auto-granted every warehouse a user's
+   assigned project had ever transacted through, so a project assignment alone
+   could never be narrowed below the project level by a Phase 6 warehouse
+   grant — only POS had a manual workaround for this. Fixed at the source
+   (`loadUserScope()` + `warehousesForSelect()`) and then wired the same
+   project+warehouse composition into create/edit/list/view for RFQ, Purchase
+   Order, GRN, Purchase Return, Quotation, Sales Order, LPO, Invoice, and
+   Delivery Note (in+out) — the procurement and sales document families this
+   plan didn't originally cover. Test suite extended to 137 checks; see
+   `changelog.md` (2026-07-17, "Project→warehouse narrowing…") for the full
+   write-up.
+
 **Why this is its own phase, not a POS-only fix:** the same gap exists in sales
 reports, procurement reports, and the dashboard — anywhere `warehouse_id` is
 used to filter data. Fixing only POS would leave a cashier locked out of the

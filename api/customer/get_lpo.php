@@ -21,6 +21,7 @@ if (!$lpo_id) {
 }
 
 require_once __DIR__ . '/../../core/project_scope.php';
+require_once __DIR__ . '/../../core/warehouse_scope.php';
 assertScopeForRecord('customer_lpos', 'lpo_id', $lpo_id);
 
 try {
@@ -42,6 +43,15 @@ try {
 
     if (!$lpo) {
         echo json_encode(['success' => false, 'message' => 'LPO not found']);
+        exit;
+    }
+
+    // Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope, not
+    // just project — a user granted only some of a project's warehouses
+    // shouldn't be able to open an LPO drawn from a different one.
+    if (!empty($lpo['warehouse_id']) && !userCan('warehouse', (int)$lpo['warehouse_id'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
         exit;
     }
 

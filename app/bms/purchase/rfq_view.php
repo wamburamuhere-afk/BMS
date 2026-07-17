@@ -2,6 +2,7 @@
 // File: app/bms/purchase/rfq_view.php
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/permissions.php';
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
 autoEnforcePermission('rfq');
 logActivity($pdo, $_SESSION['user_id'], 'VIEW', '[RFQ View] Page viewed');
 includeHeader();
@@ -30,6 +31,14 @@ $stmt = $pdo->prepare("
 $stmt->execute([$rfq_id]);
 $rfq = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$rfq) { header('Location: ' . getUrl('rfq')); exit; }
+
+// Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope, not just
+// project — a user granted only some of a project's warehouses shouldn't be
+// able to open the detail page of a record drawn from a different one.
+if (!empty($rfq['warehouse_id']) && !userCan('warehouse', (int)$rfq['warehouse_id'])) {
+    if (!headers_sent()) http_response_code(403);
+    die('Access denied: this warehouse is not in your assigned scope.');
+}
 
 // Compute back URL now that we have the rfq's project_id
 if ($from_project && !empty($rfq['project_id'])) {
