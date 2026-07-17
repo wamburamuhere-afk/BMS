@@ -3,6 +3,7 @@
 // scope-audit: skip — global inventory valuation report; product/stock scope deferred to Phase G-2
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
 
 // Get user role for permissions (extracted from header.php logic)
 $user_id = $_SESSION['user_id'] ?? 0;
@@ -27,9 +28,13 @@ $category_id = isset($_GET['category']) ? intval($_GET['category']) : 0;
 $valuation_method = isset($_GET['method']) ? $_GET['method'] : 'average_cost';
 $as_of_date = isset($_GET['as_of_date']) ? $_GET['as_of_date'] : date('Y-m-d');
 
-// Get warehouses for filter
-$warehouses_query = "SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name";
-$warehouses = $pdo->query($warehouses_query)->fetchAll(PDO::FETCH_ASSOC);
+// Get warehouses for filter — shared helper, also respects the user's direct
+// warehouse grant (Phase 6, pos_upgrade_plan.md).
+$warehouses = warehousesForSelect($pdo);
+
+if ($warehouse_id > 0 && !userCan('warehouse', $warehouse_id)) {
+    $warehouse_id = 0; // ignore an out-of-scope filter rather than error on a report page
+}
 
 // Get categories for filter
 $categories_query = "SELECT category_id, category_name FROM categories WHERE status = 'active' AND type = 'product' ORDER BY category_name";
@@ -63,6 +68,10 @@ $params = [];
 if ($warehouse_id > 0) {
     $query .= " AND ps.warehouse_id = ?";
     $params[] = $warehouse_id;
+} else {
+    // Phase 6 (pos_upgrade_plan.md): default scope when no specific
+    // warehouse was chosen.
+    $query .= scopeFilterSqlNullable('warehouse', 'ps');
 }
 
 if ($category_id > 0) {

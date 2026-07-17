@@ -2,6 +2,7 @@
 // File: app/bms/stock/locations.php
 // scope-audit: skip — warehouse location management; locations are sub-entities of warehouses, no independent project_id
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
 
 // Enforce permission BEFORE any output
 autoEnforcePermission('locations');
@@ -32,9 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $loc_type = $_POST['location_type'];
         $status = $_POST['status'];
         
-        if (!empty($loc_name) && $wh_id > 0) {
+        if (!empty($loc_name) && $wh_id > 0 && !userCan('warehouse', $wh_id)) {
+            $_SESSION['error'] = "Access denied: this warehouse is not in your assigned scope.";
+        } elseif (!empty($loc_name) && $wh_id > 0) {
             try {
-                $query = "INSERT INTO locations (warehouse_id, location_name, location_code, location_type, capacity, status, created_by) 
+                $query = "INSERT INTO locations (warehouse_id, location_name, location_code, location_type, capacity, status, created_by)
                           VALUES (?, ?, ?, ?, ?, ?, ?)";
                 $stmt = $pdo->prepare($query);
                 $stmt->execute([$wh_id, $loc_name, $loc_code, $loc_type, $capacity, $status, $user_id]);
@@ -64,8 +67,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $loc_type = $_POST['location_type'];
         $status = $_POST['status'];
 
+        if ($wh_id > 0 && !userCan('warehouse', $wh_id)) {
+            $_SESSION['error'] = "Access denied: this warehouse is not in your assigned scope.";
+        } else {
         try {
-            $query = "UPDATE locations SET warehouse_id = ?, location_name = ?, location_code = ?, location_type = ?, capacity = ?, status = ?, updated_by = ?, updated_at = NOW() 
+            $query = "UPDATE locations SET warehouse_id = ?, location_name = ?, location_code = ?, location_type = ?, capacity = ?, status = ?, updated_by = ?, updated_at = NOW()
                       WHERE location_id = ?";
             $stmt = $pdo->prepare($query);
             $stmt->execute([$wh_id, $loc_name, $loc_code, $loc_type, $capacity, $status, $user_id, $loc_id]);
@@ -73,6 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['success'] = "Location updated successfully!";
         } catch (PDOException $e) {
             $_SESSION['error'] = "Error: " . $e->getMessage();
+        }
         }
         $redirect_params = [];
         if ($warehouse_id) $redirect_params[] = "warehouse_id=$warehouse_id";
@@ -111,8 +118,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Include header AFTER all POST handling so header() redirects work
 includeHeader();
 
-// Fetch Warehouses for dropdown
-$warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch Warehouses for dropdown — shared helper, also respects the user's
+// direct warehouse grant (Phase 6, pos_upgrade_plan.md).
+$warehouses = warehousesForSelect($pdo);
 
 // Build query for locations
 $where = ["l.status != 'deleted'"];
@@ -127,7 +135,9 @@ if ($status_filter !== 'all') {
     $params[] = $status_filter;
 }
 
-$where_clause = "WHERE " . implode(" AND ", $where);
+// Phase 6 (pos_upgrade_plan.md): a location is a sub-entity of a warehouse,
+// so scope it by the warehouse the viewer is actually granted, not company-wide.
+$where_clause = "WHERE " . implode(" AND ", $where) . scopeFilterSqlNullable('warehouse', 'w');
 
 $query = "
     SELECT l.*, w.warehouse_name,

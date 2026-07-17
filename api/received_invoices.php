@@ -214,14 +214,14 @@ if ($method === 'GET') {
             }
             $stmt = $pdo->prepare("SELECT warehouse_id AS id, warehouse_name AS text
                                      FROM warehouses
-                                    WHERE status = 'active' AND project_id = ?
+                                    WHERE status = 'active' AND project_id = ?" . scopeFilterSqlNullable('warehouse') . "
                                  ORDER BY warehouse_name");
             $stmt->execute([$project_id]);
         } else {
             // No project → only company-wide warehouses (not tied to any project).
             $stmt = $pdo->query("SELECT warehouse_id AS id, warehouse_name AS text
                                    FROM warehouses
-                                  WHERE status = 'active' AND project_id IS NULL
+                                  WHERE status = 'active' AND project_id IS NULL" . scopeFilterSqlNullable('warehouse') . "
                                ORDER BY warehouse_name");
         }
         echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);

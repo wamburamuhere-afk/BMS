@@ -3,6 +3,7 @@
 ini_set('display_errors', 0);
 error_reporting(0);
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
 autoEnforcePermission('nip_materials');
 logActivity($pdo, $_SESSION['user_id'], 'VIEW', '[NIP Materials] Page viewed');
 includeHeader();
@@ -45,6 +46,7 @@ try {
         LEFT JOIN projects   p ON ml.project_id   = p.project_id
         LEFT JOIN warehouses w ON ml.warehouse_id = w.warehouse_id
         LEFT JOIN nip_material_list_nips mln ON mln.material_list_id = ml.id
+        WHERE 1=1" . scopeFilterSqlNullable('project', 'ml') . scopeFilterSqlNullable('warehouse', 'ml') . "
         GROUP BY ml.id, ml.name, ml.list_no, ml.project_id, p.project_name,
                  ml.warehouse_id, w.warehouse_name, ml.created_at
         ORDER BY ml.created_at DESC
@@ -66,11 +68,9 @@ try {
     ")->fetchColumn();
 } catch (Exception $e) {}
 
-// Form data
-$warehouses_all = $pdo->query("
-    SELECT warehouse_id, warehouse_name, COALESCE(project_id,0) AS project_id
-    FROM warehouses WHERE status='active' ORDER BY warehouse_name
-")->fetchAll(PDO::FETCH_ASSOC);
+// Form data — shared helper, also respects the user's direct warehouse grant
+// (Phase 6, pos_upgrade_plan.md).
+$warehouses_all = warehousesForSelect($pdo);
 
 $_nip_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
 if (isAdmin()) {

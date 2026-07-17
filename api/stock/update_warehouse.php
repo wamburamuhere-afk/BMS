@@ -55,6 +55,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // Found during the 2026-07-17 warehouse-scope sweep: this endpoint had no
+    // scope check at all — any user with edit permission could edit any
+    // company warehouse, including reassigning it to any project. Gate on
+    // project scope (not userCan('warehouse', ...) — see the equivalent
+    // handler in app/bms/stock/warehouses.php for why).
+    $cur_proj_stmt = $pdo->prepare("SELECT project_id FROM warehouses WHERE warehouse_id = ?");
+    $cur_proj_stmt->execute([$warehouse_id]);
+    $cur_project_id = $cur_proj_stmt->fetchColumn();
+    if ($cur_project_id !== false && $cur_project_id !== null && !userCan('project', (int)$cur_project_id)) {
+        echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse belongs to a project not in your scope.']);
+        exit;
+    }
+    if ($project_id !== null && !userCan('project', (int)$project_id)) {
+        echo json_encode(['success' => false, 'message' => 'Access denied: that project is not in your assigned scope.']);
+        exit;
+    }
+
     try {
         $pdo->beginTransaction();
 

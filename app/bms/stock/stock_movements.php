@@ -1,6 +1,7 @@
 <?php
 // File: app/bms/stock/stock_movements.php
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
 
 // Check permissions
 autoEnforcePermission('products');
@@ -18,6 +19,10 @@ $date_to = isset($_GET['date_to']) ? $_GET['date_to'] : '';
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $per_page = isset($_GET['per_page']) ? max(1, intval($_GET['per_page'])) : 50;
 $offset = ($page - 1) * $per_page;
+
+if ($warehouse_id > 0 && !userCan('warehouse', $warehouse_id)) {
+    $warehouse_id = 0; // ignore an out-of-scope filter rather than error on a list page
+}
 
 // Get product details if filtered
 $product_info = null;
@@ -64,6 +69,7 @@ if (!empty($date_to)) {
     $params[] = $date_to;
 }
 $query .= scopeFilterSqlNullable('project', 'sm');
+$query .= scopeFilterSqlNullable('warehouse', 'sm');
 
 // Get total count for pagination
 $count_query = str_replace("sm.*, p.product_name, p.sku, w.warehouse_name, u.username as created_by_name", "COUNT(*)", $query);
@@ -153,10 +159,11 @@ function getMovementBadge($type) {
                     <select class="form-select form-select-sm select2-static" id="smWarehouseFilter" name="warehouse_id">
                         <option value="0">All Warehouses</option>
                         <?php
-                        $wh_stmt = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status='active'");
-                        while ($wh = $wh_stmt->fetch()) {
+                        // Shared helper — also respects the user's direct warehouse
+                        // grant (Phase 6, pos_upgrade_plan.md).
+                        foreach (warehousesForSelect($pdo) as $wh) {
                             $sel = ($warehouse_id == $wh['warehouse_id']) ? 'selected' : '';
-                            echo "<option value='{$wh['warehouse_id']}' $sel>{$wh['warehouse_name']}</option>";
+                            echo "<option value='{$wh['warehouse_id']}' $sel>" . htmlspecialchars($wh['warehouse_name']) . "</option>";
                         }
                         ?>
                     </select>

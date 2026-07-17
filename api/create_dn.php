@@ -4,6 +4,7 @@
 // supplier/sub-contractor) or an outbound "Create DN" (goods sent TO one).
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/dn_attachment_helper.php';
+require_once __DIR__ . '/../core/warehouse_scope.php';
 header('Content-Type: application/json');
 
 if (!isAuthenticated()) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
@@ -110,6 +111,10 @@ try {
     $wh = $pdo->prepare("SELECT warehouse_id FROM warehouses WHERE warehouse_id = ? AND status = 'active'");
     $wh->execute([$warehouse_id]);
     if (!$wh->fetch()) throw new Exception('Invalid or inactive warehouse.');
+    if (!userCan('warehouse', $warehouse_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: this warehouse is not in your assigned scope.');
+    }
 
     // Validate items — block non-inventory services
     $soItemChk = $order_id ? $pdo->prepare("SELECT 1 FROM sales_order_items WHERE order_item_id = ? AND order_id = ?") : null;

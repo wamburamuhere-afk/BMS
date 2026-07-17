@@ -185,6 +185,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($project_id !== null && !userCan('project', (int)$project_id)) {
             $errors[] = "Access denied: that project is not in your assigned scope.";
         }
+        // Note: deliberately NOT also gating on userCan('warehouse', ...) here —
+        // a legacy (not-yet-explicitly-assigned) user's derived warehouse list
+        // only includes warehouses that already have transaction history, so a
+        // freshly-created, never-transacted warehouse under their own project
+        // would otherwise become uneditable. The project-level check above is
+        // the intended control for warehouse *management* (creating/editing
+        // warehouse records); Phase 6's warehouse grant controls *operational*
+        // access (POS, stock movements, reports) — see the list-query scope
+        // above for how that distinction plays out on this page.
 
         if (empty($errors)) {
             try {
@@ -233,6 +242,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['delete_warehouse']) && $can_delete_warehouses) {
         $warehouse_id = intval($_POST['warehouse_id']);
 
+        // Found during the 2026-07-17 warehouse-scope sweep: this action had
+        // no scope check of any kind — any user with delete permission could
+        // delete any company warehouse. Gate on project scope, matching the
+        // add/update handlers above (not userCan('warehouse', ...) — see the
+        // note on the update handler for why that's the wrong check here).
+        $del_project_id = $pdo->prepare("SELECT project_id FROM warehouses WHERE warehouse_id = ?");
+        $del_project_id->execute([$warehouse_id]);
+        $del_current_project = $del_project_id->fetchColumn();
+        if ($del_current_project !== false && $del_current_project !== null
+            && !userCan('project', (int)$del_current_project)) {
+            $_SESSION['error'] = "Access denied: this warehouse belongs to a project not in your scope.";
+            header("Location: warehouses.php");
+            exit();
+        }
+
         try {
             // Cascade delete related data, then soft-delete the warehouse — one
             // atomic unit (all or nothing). stock_movements are intentionally
@@ -264,7 +288,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['toggle_status']) && $can_edit_warehouses) {
         $warehouse_id = intval($_POST['warehouse_id']);
         $new_status = $_POST['new_status'];
-        
+
+        $ts_project_id = $pdo->prepare("SELECT project_id FROM warehouses WHERE warehouse_id = ?");
+        $ts_project_id->execute([$warehouse_id]);
+        $ts_current_project = $ts_project_id->fetchColumn();
+        if ($ts_current_project !== false && $ts_current_project !== null
+            && !userCan('project', (int)$ts_current_project)) {
+            $_SESSION['error'] = "Access denied: this warehouse belongs to a project not in your scope.";
+            header("Location: warehouses.php");
+            exit();
+        }
+
         try {
             $query = "UPDATE warehouses SET status = ?, updated_by = ?, updated_at = NOW() WHERE warehouse_id = ?";
             $stmt = $pdo->prepare($query);
@@ -341,7 +375,12 @@ if ($status_filter !== 'all') {
 // Exclude deleted warehouses
 $where_conditions[] = "status != 'deleted'";
 
-$scope_sql = scopeFilterSqlNullable('project');
+// Phase 6 (pos_upgrade_plan.md): a non-admin sees only the warehouses they're
+// actually assigned to (project-derived or directly granted), not the full
+// company list — reversed from this page's earlier "management concern,
+// leave on project scope only" decision after live testing showed a
+// non-admin could browse to every warehouse from here regardless of grant.
+$scope_sql = scopeFilterSqlNullable('project') . scopeFilterSqlNullable('warehouse');
 $where_conditions[] = '1=1'; // ensure WHERE is always built so scope can append
 $where_clause = 'WHERE ' . implode(' AND ', $where_conditions) . $scope_sql;
 
