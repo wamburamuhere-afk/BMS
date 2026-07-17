@@ -10,6 +10,7 @@ ini_set('display_errors', 0);
 require_once __DIR__ . '/../../../../roots.php';
 require_once __DIR__ . '/../../../../core/permissions.php';
 require_once __DIR__ . '/../../../../core/workflow.php';
+require_once __DIR__ . '/../../../../core/warehouse_scope.php';
 
 if (!isAuthenticated()) die("Unauthorized");
 if (!canView('sales_returns')) die("Access Denied");
@@ -50,10 +51,12 @@ try {
             TRIM(CONCAT(COALESCE(ur.first_name,''),' ',COALESCE(ur.last_name,''))) AS reviewer_name,
             COALESCE(ur.user_role, ur.role)                                        AS reviewer_role,
             TRIM(CONCAT(COALESCE(ua.first_name,''),' ',COALESCE(ua.last_name,''))) AS approver_name,
-            COALESCE(ua.user_role, ua.role)                                        AS approver_role
+            COALESCE(ua.user_role, ua.role)                                        AS approver_role,
+            w.warehouse_id AS resolved_warehouse_id, w.warehouse_name
         FROM sales_returns sr
         LEFT JOIN sales_orders so ON sr.sales_order_id = so.sales_order_id
         LEFT JOIN invoices inv    ON sr.invoice_id = inv.invoice_id
+        LEFT JOIN warehouses w    ON w.warehouse_id = COALESCE(inv.warehouse_id, so.warehouse_id)
         LEFT JOIN customers c ON sr.customer_id = c.customer_id
         LEFT JOIN users u  ON sr.created_by  = u.user_id
         LEFT JOIN users ur ON sr.reviewed_by = ur.user_id
@@ -63,6 +66,13 @@ try {
     $stmt->execute([$return_id]);
     $return = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$return) die("Return not found");
+
+    // Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope (the
+    // source invoice/sales order's warehouse), not just project.
+    if (!empty($return['resolved_warehouse_id']) && !userCan('warehouse', (int)$return['resolved_warehouse_id'])) {
+        http_response_code(403);
+        die('Access denied: this warehouse is not in your assigned scope.');
+    }
 
     $action = "Print Sales Return";
     $user_name = $_SESSION['username'] ?? 'User';
@@ -219,6 +229,7 @@ $accent = getSetting('print_template_color_sr_register', '#2c3e5c');
             <h3>Return Information</h3>
             <?php if (!empty($return['order_number'])): ?><p><strong>Ref Order:</strong> <?= htmlspecialchars($return['order_number']) ?></p><?php endif; ?>
             <?php if (!empty($return['invoice_number'])): ?><p><strong>Ref Invoice:</strong> <?= htmlspecialchars($return['invoice_number']) ?></p><?php endif; ?>
+            <?php if (!empty($return['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= htmlspecialchars($return['warehouse_name']) ?></p><?php endif; ?>
             <p><strong>Prepared By:</strong> <?= htmlspecialchars($creator_name ?: 'System') ?></p>
             <p><strong>Currency:</strong> <?= htmlspecialchars($currency) ?></p>
         </div>

@@ -2,6 +2,7 @@
 // File: app/bms/sales/sales_returns/sales_return_view.php
 // scope-audit: skip — sales_returns has no direct project_id; scope enforced via parent list (sales_returns.php filters by so.project_id)
 require_once __DIR__ . '/../../../../roots.php';
+require_once __DIR__ . '/../../../../core/warehouse_scope.php';
 autoEnforcePermission('sales_returns');
 
 includeHeader();
@@ -34,9 +35,13 @@ $stmt = $pdo->prepare("
         c.company_name,
         c.email as customer_email,
         c.phone as customer_phone,
-        u.username as created_by_name
+        u.username as created_by_name,
+        inv.invoice_number,
+        w.warehouse_id AS resolved_warehouse_id, w.warehouse_name
     FROM sales_returns sr
     LEFT JOIN sales_orders so ON sr.sales_order_id = so.sales_order_id
+    LEFT JOIN invoices inv    ON sr.invoice_id = inv.invoice_id
+    LEFT JOIN warehouses w    ON w.warehouse_id = COALESCE(inv.warehouse_id, so.warehouse_id)
     LEFT JOIN customers c ON sr.customer_id = c.customer_id
     LEFT JOIN users u ON sr.created_by = u.user_id
     WHERE sr.sales_return_id = ?
@@ -46,6 +51,16 @@ $return = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$return) {
     echo '<div class="container-fluid mt-4"><div class="alert alert-danger">Return not found</div></div>';
+    includeFooter();
+    exit;
+}
+
+// Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope (the
+// source invoice/sales order's warehouse) — sales returns carry no
+// project_id of their own, so this is the only scope check available here.
+if (!empty($return['resolved_warehouse_id']) && !userCan('warehouse', (int)$return['resolved_warehouse_id'])) {
+    http_response_code(403);
+    echo '<div class="container-fluid mt-4"><div class="alert alert-danger">Access denied: this warehouse is not in your assigned scope.</div></div>';
     includeFooter();
     exit;
 }
@@ -273,6 +288,12 @@ $can_create_cn = canCreate('credit_notes');
                         <span>Processed By:</span>
                         <span class="text-muted"><?= safe_output($return['created_by_name']) ?></span>
                     </div>
+                    <?php if (!empty($return['warehouse_name'])): ?>
+                    <div class="d-flex justify-content-between mt-2">
+                        <span>Warehouse:</span>
+                        <span class="text-muted"><?= safe_output($return['warehouse_name']) ?></span>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

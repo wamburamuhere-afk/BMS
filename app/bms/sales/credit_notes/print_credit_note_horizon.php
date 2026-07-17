@@ -9,6 +9,7 @@ ini_set('display_errors', 0);
 require_once __DIR__ . '/../../../../roots.php';
 require_once __DIR__ . '/../../../../core/permissions.php';
 require_once __DIR__ . '/../../../../core/workflow.php';
+require_once __DIR__ . '/../../../../core/warehouse_scope.php';
 
 if (!isAuthenticated()) die("Unauthorized");
 if (!canView('credit_notes')) die("Access Denied");
@@ -47,11 +48,14 @@ try {
                TRIM(CONCAT(COALESCE(ur.first_name,''),' ',COALESCE(ur.last_name,''))) AS reviewer_name,
                COALESCE(ur.user_role, ur.role)                                        AS reviewer_role,
                TRIM(CONCAT(COALESCE(ua.first_name,''),' ',COALESCE(ua.last_name,''))) AS approver_name,
-               COALESCE(ua.user_role, ua.role)                                        AS approver_role
+               COALESCE(ua.user_role, ua.role)                                        AS approver_role,
+               w.warehouse_id AS resolved_warehouse_id, w.warehouse_name
           FROM credit_notes cn
           LEFT JOIN customers c      ON cn.customer_id  = c.customer_id
           LEFT JOIN sales_returns sr ON cn.sales_return_id = sr.sales_return_id
           LEFT JOIN invoices inv     ON cn.invoice_id = inv.invoice_id
+          LEFT JOIN sales_orders so  ON sr.sales_order_id = so.sales_order_id
+          LEFT JOIN warehouses w     ON w.warehouse_id = COALESCE(inv.warehouse_id, so.warehouse_id)
           LEFT JOIN accounts pa      ON cn.paid_from_account_id = pa.account_id
           LEFT JOIN users u  ON cn.created_by  = u.user_id
           LEFT JOIN users ur ON cn.reviewed_by = ur.user_id
@@ -61,6 +65,13 @@ try {
     $stmt->execute([$id]);
     $cn = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$cn) die("Credit note not found");
+
+    // Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope (the
+    // source invoice/sales order's warehouse), not just project.
+    if (!empty($cn['resolved_warehouse_id']) && !userCan('warehouse', (int)$cn['resolved_warehouse_id'])) {
+        http_response_code(403);
+        die('Access denied: this warehouse is not in your assigned scope.');
+    }
 
     require_once __DIR__ . '/../../../../helpers.php';
     logActivity($pdo, $_SESSION['user_id'], 'Print Credit Note',
@@ -210,6 +221,7 @@ $accent = getSetting('print_template_color_cn_horizon', '#1F5AA8');
         <div class="cell"><div class="lbl">Date</div><div class="val"><?= date('d M Y', strtotime($cn['credit_date'])) ?></div></div>
         <?php if (!empty($cn['return_number'])): ?><div class="cell"><div class="lbl">Ref Return</div><div class="val"><?= htmlspecialchars($cn['return_number']) ?></div></div><?php endif; ?>
         <?php if (!empty($cn['invoice_number'])): ?><div class="cell"><div class="lbl">Ref Invoice</div><div class="val"><?= htmlspecialchars($cn['invoice_number']) ?></div></div><?php endif; ?>
+        <?php if (!empty($cn['warehouse_name'])): ?><div class="cell"><div class="lbl">Warehouse</div><div class="val"><?= htmlspecialchars($cn['warehouse_name']) ?></div></div><?php endif; ?>
         <div class="cell"><div class="lbl">Status</div><div class="val status"><?= strtoupper($cn['status']) ?></div></div>
     </div>
 

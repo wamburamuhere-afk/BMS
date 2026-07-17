@@ -4,6 +4,7 @@
 // creation, and credit notes carry no direct project_id.
 require_once __DIR__ . '/../../../../roots.php';
 require_once __DIR__ . '/../../../../core/payment_source.php';
+require_once __DIR__ . '/../../../../core/warehouse_scope.php';
 
 autoEnforcePermission('credit_notes');
 includeHeader();
@@ -19,10 +20,14 @@ $stmt = $pdo->prepare("
            uc.username AS created_by_name,
            TRIM(CONCAT(COALESCE(ur.first_name,''),' ',COALESCE(ur.last_name,''))) AS reviewer_name,
            TRIM(CONCAT(COALESCE(ua.first_name,''),' ',COALESCE(ua.last_name,''))) AS approver_name,
-           pa.account_name AS paid_from_name
+           pa.account_name AS paid_from_name,
+           w.warehouse_id AS resolved_warehouse_id, w.warehouse_name
       FROM credit_notes cn
       LEFT JOIN customers c      ON cn.customer_id          = c.customer_id
       LEFT JOIN sales_returns sr ON cn.sales_return_id      = sr.sales_return_id
+      LEFT JOIN invoices inv     ON cn.invoice_id           = inv.invoice_id
+      LEFT JOIN sales_orders so  ON sr.sales_order_id       = so.sales_order_id
+      LEFT JOIN warehouses w     ON w.warehouse_id = COALESCE(inv.warehouse_id, so.warehouse_id)
       LEFT JOIN users uc         ON cn.created_by           = uc.user_id
       LEFT JOIN users ur         ON cn.reviewed_by          = ur.user_id
       LEFT JOIN users ua         ON cn.approved_by          = ua.user_id
@@ -32,6 +37,15 @@ $stmt = $pdo->prepare("
 $stmt->execute([$id]);
 $cn = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$cn) { echo '<div class="container-fluid mt-4"><div class="alert alert-danger">Credit note not found</div></div>'; includeFooter(); exit; }
+
+// Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope (the
+// source invoice/sales order's warehouse) — credit notes carry no project_id
+// of their own, so this is the only scope check available on this page.
+if (!empty($cn['resolved_warehouse_id']) && !userCan('warehouse', (int)$cn['resolved_warehouse_id'])) {
+    http_response_code(403);
+    echo '<div class="container-fluid mt-4"><div class="alert alert-danger">Access denied: this warehouse is not in your assigned scope.</div></div>';
+    includeFooter(); exit;
+}
 
 $stmtI = $pdo->prepare("SELECT * FROM credit_note_items WHERE credit_note_id = ?");
 $stmtI->execute([$id]);
@@ -76,6 +90,7 @@ $badge = [
             <h4 class="mb-1 fw-bold"><i class="bi bi-receipt text-primary me-2"></i><?= htmlspecialchars($cn['credit_note_number']) ?></h4>
             <span class="badge" style="background:<?= $badge[0] ?>;color:<?= $badge[1] ?>;padding:.45em .8em;border-radius:50rem;"><?= strtoupper($status) ?></span>
             <span class="text-muted ms-2"><i class="bi bi-calendar-event"></i> <?= date('d M Y', strtotime($cn['credit_date'])) ?></span>
+            <?php if (!empty($cn['warehouse_name'])): ?><span class="text-muted ms-2"><i class="bi bi-building"></i> <?= safe_output($cn['warehouse_name']) ?></span><?php endif; ?>
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <?php if ($status === 'pending' && $can_review): ?>

@@ -579,6 +579,7 @@ foreach ($orders as $order) {
                         <th>Date</th>
                         <th>Customer</th>
                         <?php if ($enable_projects): ?><th>Project</th><?php endif; ?>
+                        <th>Warehouse</th>
                         <th class="text-center">Type</th>
                         <th class="text-center">Items</th>
                         <th class="text-end">Total Amount</th>
@@ -759,6 +760,13 @@ function initTable() {
                 }
             },
             <?php endif; ?>
+            {
+                data: 'warehouse_name',
+                defaultContent: '-',
+                render: function(data) {
+                    return data ? `<span class="badge bg-light text-dark border small p-1"><i class="bi bi-building"></i> ${data}</span>` : '-';
+                }
+            },
             {
                 data: 'order_type',
                 className: 'text-center',
