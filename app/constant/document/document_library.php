@@ -512,6 +512,9 @@ $categories = $pdo->query("SELECT * FROM document_categories ORDER BY category_n
     </div>
 </div>
 
+<!-- Comments / Notes / Access modal — shared with project_view.php's Docs tab -->
+<?php require_once __DIR__ . '/../../../includes/document_activity_modal.php'; ?>
+
 <!-- Scripts Section -->
 <!-- DataTables JS is handled by footer.php -->
 
@@ -622,7 +625,8 @@ $(document).ready(function() {
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item" href="${APP_URL}/document_library?action=download&document_id=${row.id}"><i class="bi bi-download"></i> Download</a></li>
-                            <li><a class="dropdown-item" href="${APP_URL}/${row.file_path}" target="_blank" onclick="logReportAction('Viewed Document Online', 'User viewed document: ${escapeHtml(row.document_name).replace(/'/g, '&apos;')} in browser')"><i class="bi bi-eye"></i> View Online</a></li>`;
+                            <li><a class="dropdown-item" href="${APP_URL}/${row.file_path}" target="_blank" onclick="logReportAction('Viewed Document Online', 'User viewed document: ${escapeHtml(row.document_name).replace(/'/g, '&apos;')} in browser')"><i class="bi bi-eye"></i> View Online</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="openDocActivity(${row.id}, '${escapeHtml(row.document_name).replace(/'/g, '&apos;')}'); return false;"><i class="bi bi-chat-square-text"></i> Comments &amp; Access</a></li>`;
 
                     // "Create Document" letters only — the creator (or an admin) can
                     // reopen it for further editing, or duplicate it as a new draft.

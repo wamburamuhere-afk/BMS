@@ -15,6 +15,10 @@ try {
     if (!isset($_SESSION['user_id'])) {
         throw new Exception('Unauthorized');
     }
+    if (!canView('documents')) {
+        http_response_code(403);
+        throw new Exception('Access Denied');
+    }
 
 // Get parameters from DataTables
 $draw = $_GET['draw'] ?? 1;
@@ -59,11 +63,24 @@ $query = "SELECT d.*,
           LEFT JOIN document_templates dt ON d.template_id = dt.id
           WHERE 1=1";
 
-$countQuery = "SELECT COUNT(*) FROM documents d 
+$countQuery = "SELECT COUNT(*) FROM documents d
                LEFT JOIN document_categories c ON d.category_id = c.id
                WHERE 1=1";
 
 $params = [];
+
+// Visibility gap-fix: a non-admin only sees public documents, their own
+// uploads, and private/restricted documents they've been explicitly
+// assigned. Admins are unrestricted.
+if (!isAdmin()) {
+    $visibilitySql = " AND (d.access_level = 'public'
+                         OR d.uploaded_by = :vis_user1
+                         OR d.id IN (SELECT document_id FROM document_assignees WHERE user_id = :vis_user2))";
+    $query .= $visibilitySql;
+    $countQuery .= $visibilitySql;
+    $params[':vis_user1'] = $_SESSION['user_id'];
+    $params[':vis_user2'] = $_SESSION['user_id'];
+}
 
 // Apply custom filters
 if (!empty($category_id)) {
@@ -160,8 +177,19 @@ $stmt->execute();
 $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $stmt->closeCursor();
 
-// Get total records without filters
-$totalRecords = $pdo->query("SELECT COUNT(*) FROM documents")->fetchColumn();
+// Get total records without filters (still respects visibility for non-admins)
+if (isAdmin()) {
+    $totalRecords = $pdo->query("SELECT COUNT(*) FROM documents")->fetchColumn();
+} else {
+    $totalStmt = $pdo->prepare("
+        SELECT COUNT(*) FROM documents d
+        WHERE d.access_level = 'public'
+           OR d.uploaded_by = :vis_user1
+           OR d.id IN (SELECT document_id FROM document_assignees WHERE user_id = :vis_user2)
+    ");
+    $totalStmt->execute([':vis_user1' => $_SESSION['user_id'], ':vis_user2' => $_SESSION['user_id']]);
+    $totalRecords = $totalStmt->fetchColumn();
+}
 
 // Get Stats
 $statsQuery = "SELECT 
