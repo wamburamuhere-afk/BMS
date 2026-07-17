@@ -1,5 +1,40 @@
 # BMS Changelog
 
+## 2026-07-17 (fix) — Warehouse-only users couldn't see their own Purchase/Sales Orders
+
+**Files:** `api/account/get_purchase_orders.php`, `api/account/get_sales_orders.php`
+
+User-reported: a non-admin assigned to an external warehouse only (no project
+at all) created a Purchase Order or Sales Order, got the success message, but
+the record was invisible in the list afterward.
+
+Root cause traced live with real data: both files gated their main rows with
+`scopeFilterSql('project', alias)` — the **strict** variant, which returns a
+hard `AND 0` when a user has zero project assignments, regardless of any
+warehouse access they legitimately have. Since these two document types
+allow a `NULL` `project_id` (a purchase/sales order doesn't have to belong to
+a project — that's exactly the "external warehouse" use case), a
+warehouse-only user's own order was silently thrown away by this clause
+before the (correct) warehouse check even ran.
+
+Traced across every other procurement and sales document type first — RFQ,
+GRN, Purchase Return, Debit Note, Quotation, LPO, Invoice, DN Outbound,
+Sales Return, Credit Note — all of them already use the nullable variant.
+Purchase Order and Sales Order were the only two exceptions; this is a
+pre-existing issue in those two files, not something introduced by the
+Phase 6 warehouse work, just newly exposed by it since "warehouse-only, no
+project" is the access pattern that work added.
+
+Fix: swapped `scopeFilterSql('project', …)` for `scopeFilterSqlNullable('project', …)`
+in both files (including `get_sales_orders.php`'s separate `recordsTotal`
+count query), matching the convention already used everywhere else.
+
+Verified live: recreated the exact bug scenario (zero project assignment,
+warehouse 5 granted, a PO/SO with `project_id = NULL` and `warehouse_id = 5`)
+— both now correctly show up. Also verified no regression: a user assigned
+only to project 3 still cannot see a PO belonging to project 16. Full
+regression suite (319 checks across the 3 CLI suites) still green.
+
 ## 2026-07-17 (feat) — Warehouse clearly labeled on every sales/procurement document (list, view, print)
 
 **Files:** `app/bms/sales/sales_orders.php`, `api/account/get_sales_orders.php`,
