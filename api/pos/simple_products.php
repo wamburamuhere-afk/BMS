@@ -81,15 +81,15 @@ try {
 
     // A specific warehouse was chosen: only list products actually available
     // there — a physical product needs a product_stocks row for THIS
-    // warehouse; a service needs either no warehouse tag at all (products.
-    // warehouse_id NULL — a general, location-agnostic service like
-    // "delivery fee") or a warehouse_id matching the one selected. Without
-    // this, the LEFT JOIN above still lets every company-wide product/service
+    // warehouse; a service needs its own products.warehouse_id to match
+    // exactly (Warehouse is a required field on the non-inventory product
+    // create form, so every service is expected to carry one). Without this,
+    // the LEFT JOIN above still lets every company-wide product/service
     // through with a zero quantity instead of excluding it.
     if ($warehouse_id > 0) {
         $sql .= " AND (
                     ps.warehouse_id IS NOT NULL
-                    OR (p.is_service = 1 AND (p.warehouse_id IS NULL OR p.warehouse_id = :warehouse_svc))
+                    OR (p.is_service = 1 AND p.warehouse_id = :warehouse_svc)
                   )";
     }
 

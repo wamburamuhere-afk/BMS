@@ -224,7 +224,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
             <div class="card border-0 shadow-sm rounded-4 h-100">
                 <div class="card-body p-3 text-center">
                     <?php
-                    $active_count = $pdo->query("SELECT COUNT(*) FROM products WHERE is_service=1 AND status='active'")->fetchColumn();
+                    $active_count = $pdo->query("SELECT COUNT(*) FROM products p WHERE p.is_service=1 AND p.status='active'" . $scope_sql)->fetchColumn();
                     ?>
                     <div class="text-success fw-bold fs-4"><?= $active_count ?></div>
                     <small class="text-muted">Active</small>
@@ -235,7 +235,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
             <div class="card border-0 shadow-sm rounded-4 h-100">
                 <div class="card-body p-3 text-center">
                     <?php
-                    $inactive_count = $pdo->query("SELECT COUNT(*) FROM products WHERE is_service=1 AND status='inactive'")->fetchColumn();
+                    $inactive_count = $pdo->query("SELECT COUNT(*) FROM products p WHERE p.is_service=1 AND p.status='inactive'" . $scope_sql)->fetchColumn();
                     ?>
                     <div class="text-danger fw-bold fs-4"><?= $inactive_count ?></div>
                     <small class="text-muted">Inactive</small>
@@ -246,7 +246,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
             <div class="card border-0 shadow-sm rounded-4 h-100">
                 <div class="card-body p-3 text-center">
                     <?php
-                    $cat_count = $pdo->query("SELECT COUNT(DISTINCT category_id) FROM products WHERE is_service=1 AND category_id IS NOT NULL")->fetchColumn();
+                    $cat_count = $pdo->query("SELECT COUNT(DISTINCT p.category_id) FROM products p WHERE p.is_service=1 AND p.category_id IS NOT NULL" . $scope_sql)->fetchColumn();
                     ?>
                     <div class="text-info fw-bold fs-4"><?= $cat_count ?></div>
                     <small class="text-muted">Categories</small>
