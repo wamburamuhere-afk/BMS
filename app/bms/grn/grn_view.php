@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('grn');
 
 require_once __DIR__ . '/../../../core/workflow.php';
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
 // Include the header
 includeHeader();
 
@@ -63,6 +64,14 @@ $grn = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$grn) {
     header("Location: grn.php?error=GRN Not Found");
     exit();
+}
+
+// Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope, not just
+// project — a user granted only some of a project's warehouses shouldn't be
+// able to open a GRN drawn from a different one.
+if (!empty($grn['warehouse_id']) && !userCan('warehouse', (int)$grn['warehouse_id'])) {
+    if (!headers_sent()) http_response_code(403);
+    die('Access denied: this warehouse is not in your assigned scope.');
 }
 
 // Fetch GRN Items

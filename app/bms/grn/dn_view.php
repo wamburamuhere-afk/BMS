@@ -4,6 +4,7 @@
 // View a single Delivery Note — inbound (Record) or outbound (Create).
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/workflow.php';
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
 autoEnforcePermission('dn');
 includeHeader();
 
@@ -42,6 +43,15 @@ $stmt = $pdo->prepare("
 $stmt->execute([$delivery_id]);
 $dn = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$dn) { echo '<div class="alert alert-danger m-4">Delivery Note not found.</div>'; includeFooter(); exit; }
+
+// Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope. (Project
+// scope on this page is a pre-existing, separately-tracked gap — see the
+// scope-audit comment at the top of this file.)
+if (!empty($dn['warehouse_id']) && !userCan('warehouse', (int)$dn['warehouse_id'])) {
+    echo '<div class="alert alert-danger m-4">Access denied: this warehouse is not in your assigned scope.</div>';
+    includeFooter();
+    exit;
+}
 
 $items_stmt = $pdo->prepare("
     SELECT di.*, p.product_name, p.sku, p.unit

@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/permissions.php';
 require_once __DIR__ . '/../../../core/workflow.php';
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
 
 // Check permissions
 if (!isAuthenticated()) {
@@ -55,6 +56,14 @@ $invoice = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$invoice) {
     header("Location: " . getUrl('invoices') . "?error=Invoice Not Found");
     exit();
+}
+
+// Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope, not just
+// project — a user granted only some of a project's warehouses shouldn't be
+// able to open an invoice drawn from a different one.
+if (!empty($invoice['warehouse_id']) && !userCan('warehouse', (int)$invoice['warehouse_id'])) {
+    if (!headers_sent()) http_response_code(403);
+    die('Access denied: this warehouse is not in your assigned scope.');
 }
 
 // Edit/Delete gating per three_approval.md: once approved, only admin can edit

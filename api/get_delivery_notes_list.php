@@ -2,6 +2,7 @@
 // File: api/get_delivery_notes_list.php
 // Server-side DataTables feed for the Delivery Notes list (inbound + outbound).
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/warehouse_scope.php';
 header('Content-Type: application/json');
 
 if (!isAuthenticated()) {
@@ -19,6 +20,12 @@ try {
     $type_filter      = $_GET['dn_type']   ?? '';
     $date_from        = $_GET['date_from'] ?? '';
     $date_to          = $_GET['date_to']   ?? '';
+
+    if ($warehouse_filter > 0 && !userCan('warehouse', $warehouse_filter)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+        exit;
+    }
 
     // DataTables params
     $draw   = isset($_GET['draw'])   ? intval($_GET['draw'])   : 1;
@@ -68,7 +75,7 @@ try {
         $params_full[] = $type_filter;
     }
 
-    $scope_sql  = scopeFilterSqlNullable('project', 'd');
+    $scope_sql  = scopeFilterSqlNullable('project', 'd') . scopeFilterSqlNullable('warehouse', 'd');
     $common_sql = implode(' AND ', $where) . $scope_sql;
     $full_sql   = implode(' AND ', $where_full) . $scope_sql;
 

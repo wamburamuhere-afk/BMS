@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
+require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
 
@@ -26,6 +27,13 @@ try {
     $date_from = $_GET['date_from'] ?? '';
     $date_to = $_GET['date_to'] ?? '';
     $attention = (isset($_GET['attention']) && $_GET['attention'] === '1');
+    $warehouse_id = isset($_GET['warehouse']) ? (int)$_GET['warehouse'] : 0;
+
+    if ($warehouse_id && !userCan('warehouse', $warehouse_id)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+        exit;
+    }
 
     // Build query
     $query = "
@@ -83,6 +91,11 @@ try {
         $params[] = $date_to;
     }
 
+    if ($warehouse_id) {
+        $query .= " AND po.warehouse_id = ?";
+        $params[] = $warehouse_id;
+    }
+
     // Attention mode — "Goods Receipt Pending": POs past their expected date, still
     // open, with NO goods receipt recorded (mirrors dashboard get_system_alerts()).
     if ($attention) {
@@ -94,6 +107,9 @@ try {
 
     // Phase C — project-scope filter (non-admin: AND po.project_id IN (...) | admin: '')
     $query .= scopeFilterSql('project', 'po');
+    // Phase 6 (pos_upgrade_plan.md) — warehouse scope (redundant-but-harmless
+    // when a specific $warehouse_id was already validated above).
+    $query .= scopeFilterSqlNullable('warehouse', 'po');
 
     $query .= " GROUP BY po.purchase_order_id ORDER BY po.order_date DESC, po.created_at DESC";
 

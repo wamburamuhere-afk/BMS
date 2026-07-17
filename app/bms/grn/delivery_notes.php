@@ -3,6 +3,7 @@
 // scope-audit: skip — Phase G complete; stats query scoped via scopeFilterSqlNullable('project','d'); suppliers/warehouses/projects dropdowns scoped inline; DN list loaded via AJAX (api/get_delivery_notes_list.php already scoped)
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/workflow.php';
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
 
 // Enforce permission (using GRN permissions as base)
 autoEnforcePermission('grn');
@@ -31,18 +32,18 @@ $dn_is_admin    = isAdmin();
 $_dn_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
 $enable_projects = getSetting('enable_projects', 0);
 
+// Warehouses: shared helper — also respects the user's direct warehouse
+// grant (Phase 6, pos_upgrade_plan.md), not just project membership.
+$warehouses = warehousesForSelect($pdo);
+
 if (isAdmin()) {
     $suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
-    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
     $projects   = $enable_projects ? $pdo->query("SELECT project_id, project_name FROM projects WHERE status != 'cancelled' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC) : [];
 } elseif (!empty($_dn_assigned)) {
     $_dn_ph = implode(',', array_fill(0, count($_dn_assigned), '?'));
     $_dn_sup = $pdo->prepare("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_dn_ph)) ORDER BY supplier_name");
     $_dn_sup->execute($_dn_assigned);
     $suppliers = $_dn_sup->fetchAll(PDO::FETCH_ASSOC);
-    $_dn_wh = $pdo->prepare("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_dn_ph)) ORDER BY warehouse_name");
-    $_dn_wh->execute($_dn_assigned);
-    $warehouses = $_dn_wh->fetchAll(PDO::FETCH_ASSOC);
     $projects = [];
     if ($enable_projects) {
         $_dn_prj = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status != 'cancelled' AND project_id IN ($_dn_ph) ORDER BY project_name");
@@ -51,7 +52,6 @@ if (isAdmin()) {
     }
 } else {
     $suppliers  = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' AND project_id IS NULL ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
-    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' AND project_id IS NULL ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
     $projects   = [];
 }
 
@@ -67,6 +67,7 @@ $stats_query = "
     WHERE 1=1
 ";
 $stats_query .= scopeFilterSqlNullable('project', 'd');
+$stats_query .= scopeFilterSqlNullable('warehouse', 'd');
 $stats_stmt = $pdo->query($stats_query);
 $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 ?>

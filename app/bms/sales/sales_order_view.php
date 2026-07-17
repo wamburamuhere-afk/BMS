@@ -9,6 +9,7 @@ if (!isAuthenticated()) {
 autoEnforcePermission('sales_orders');
 
 require_once ROOT_DIR . '/core/workflow.php';
+require_once ROOT_DIR . '/core/warehouse_scope.php';
 
 // Three-approval workflow capabilities (mirrored to JS below)
 $so_can_review  = canReview('sales_orders');
@@ -58,6 +59,14 @@ $order = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$order) {
     header("Location: " . getUrl('sales_orders') . "?error=Order Not Found");
     exit();
+}
+
+// Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope, not just
+// project — a user granted only some of a project's warehouses shouldn't be
+// able to open a sales order drawn from a different one.
+if (!empty($order['warehouse_id']) && !userCan('warehouse', (int)$order['warehouse_id'])) {
+    if (!headers_sent()) http_response_code(403);
+    die('Access denied: this warehouse is not in your assigned scope.');
 }
 
 // Log Activity

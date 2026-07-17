@@ -1,6 +1,7 @@
 <?php
 // File: api/get_rfqs.php
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/warehouse_scope.php';
 global $pdo;
 header('Content-Type: application/json');
 
@@ -14,6 +15,10 @@ try {
     $status_group = $_GET['status_group'] ?? '';
     $date_from    = $_GET['date_from']    ?? '';
     $date_to      = $_GET['date_to']      ?? '';
+
+    if ($warehouse && !userCan('warehouse', $warehouse)) {
+        throw new Exception('Access denied: this warehouse is not in your assigned scope.');
+    }
 
     $where  = ['1=1'];
     $params = [];
@@ -53,7 +58,7 @@ try {
             LEFT JOIN suppliers s ON r.supplier_id = s.supplier_id
             LEFT JOIN warehouses w ON r.warehouse_id = w.warehouse_id
             LEFT JOIN projects p ON r.project_id = p.project_id
-            WHERE " . implode(' AND ', $where) . scopeFilterSqlNullable('project', 'r') . "
+            WHERE " . implode(' AND ', $where) . scopeFilterSqlNullable('project', 'r') . scopeFilterSqlNullable('warehouse', 'r') . "
             ORDER BY r.rfq_id DESC";
 
     $stmt = $pdo->prepare($sql);
@@ -66,7 +71,7 @@ try {
         SUM(status IN ('pending','draft','sent')) as pending,
         SUM(status IN ('approved','partially')) as approved,
         SUM(status IN ('awarded','completed','cancelled')) as closed
-        FROM rfq WHERE 1=1" . scopeFilterSqlNullable('project', 'rfq'))->fetch(PDO::FETCH_ASSOC);
+        FROM rfq WHERE 1=1" . scopeFilterSqlNullable('project', 'rfq') . scopeFilterSqlNullable('warehouse', 'rfq'))->fetch(PDO::FETCH_ASSOC);
 
     echo json_encode(['success'=>true,'data'=>$data,'stats'=>$sr]);
 

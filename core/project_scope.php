@@ -42,9 +42,10 @@ if (!function_exists('loadUserScope')) {
 
         if ($isAdmin) {
             $_SESSION['scope'] = [
-                'is_admin'    => true,
-                'projects'    => [],
-                'warehouses'  => [],
+                'is_admin'            => true,
+                'projects'            => [],
+                'warehouses'          => [],
+                'warehouse_explicit'  => false,
                 'suppliers'   => [],
                 'customers'   => [],
                 'employees'   => [],
@@ -153,15 +154,40 @@ if (!function_exists('loadUserScope')) {
             // If an override grants ALL of a resource type, set the
             // session list to the sentinel ['*'] — the helpers below
             // treat that as unrestricted for that resource type.
-            $warehouses = $grantAll['warehouse'] ? ['*'] : array_values(array_unique(array_merge($warehouses, $extras['warehouse'])));
+            //
+            // Warehouses are special-cased: an explicit assignment via the
+            // Phase 6 (pos_upgrade_plan.md) UI — even a single warehouse, or
+            // the grant-all sentinel — REPLACES the project-derived set
+            // rather than adding to it. A project can span more warehouses
+            // than a given user was actually granted (e.g. a cashier
+            // assigned to a multi-warehouse project but only trusted with
+            // one of its tills), so once an admin has deliberately curated
+            // this user's warehouse access, that curated set is
+            // authoritative. Users never migrated to explicit warehouse
+            // assignment (zero 'warehouse' override rows) keep today's
+            // behaviour: every warehouse their assigned projects have
+            // transacted against — so nobody's access silently narrows
+            // just because this code shipped.
+            $warehouseExplicit = $grantAll['warehouse'] || !empty($extras['warehouse']);
+            if ($grantAll['warehouse']) {
+                $warehouses = ['*'];
+            } elseif (!empty($extras['warehouse'])) {
+                $warehouses = array_values(array_unique($extras['warehouse']));
+            }
+            // else: $warehouses keeps its project-derived value from step 2.
             $suppliers  = $grantAll['supplier']  ? ['*'] : array_values(array_unique(array_merge($suppliers,  $extras['supplier'])));
             $customers  = $grantAll['customer']  ? ['*'] : array_values(array_unique(array_merge($customers,  $extras['customer'])));
             $employees  = $grantAll['employee']  ? ['*'] : array_values(array_unique(array_merge($employees,  $extras['employee'])));
 
             $_SESSION['scope'] = [
-                'is_admin'    => false,
-                'projects'    => $projects,
-                'warehouses'  => $warehouses,
+                'is_admin'          => false,
+                'projects'          => $projects,
+                'warehouses'        => $warehouses,
+                // True once an admin has explicitly configured this user's
+                // warehouse access (Phase 6 UI) — lets warehousesForSelect()
+                // know whether to apply a strict warehouse-id filter or
+                // leave legacy (project-structural-only) users untouched.
+                'warehouse_explicit' => $warehouseExplicit,
                 'suppliers'   => $suppliers,
                 'customers'   => $customers,
                 'employees'   => $employees,
@@ -465,9 +491,10 @@ if (!function_exists('_empty_scope')) {
     function _empty_scope(): array
     {
         return [
-            'is_admin'    => false,
-            'projects'    => [],
-            'warehouses'  => [],
+            'is_admin'            => false,
+            'projects'            => [],
+            'warehouses'          => [],
+            'warehouse_explicit'  => false,
             'suppliers'   => [],
             'customers'   => [],
             'employees'   => [],

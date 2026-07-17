@@ -92,6 +92,29 @@ try {
         'app/constant/reports/sales_report.php'      => ["scopeFilterSql('warehouse'"],
         'app/constant/reports/purchase_report.php'   => ["scopeFilterSql('warehouse'"],
         'app/constant/reports/inventory_report.php'  => ["scopeFilterSql('warehouse'"],
+        // Project→warehouse narrowing (procurement + sales create/list/view — see analysis 2026-07-17).
+        'app/bms/purchase/rfq.php'                        => ['warehousesForSelect('],
+        'api/get_rfqs.php'                                => ["userCan('warehouse'", "scopeFilterSqlNullable('warehouse'"],
+        'app/bms/purchase/rfq_view.php'                   => ["userCan('warehouse'"],
+        'api/account/get_purchase_orders.php'             => ["userCan('warehouse'", "scopeFilterSqlNullable('warehouse'"],
+        'api/account/get_purchase_order_details.php'      => ["userCan('warehouse'"],
+        'app/bms/grn/grn.php'                             => ['warehousesForSelect(', "scopeFilterSqlNullable('warehouse'"],
+        'api/get_grns.php'                                => ["userCan('warehouse'", "scopeFilterSqlNullable('warehouse'"],
+        'app/bms/grn/grn_view.php'                         => ["userCan('warehouse'"],
+        'app/bms/purchase/purchase_returns.php'           => ['warehousesForSelect('],
+        'api/get_purchase_returns.php'                    => ["scopeFilterSqlNullable('warehouse'"],
+        'app/bms/sales/quotations/quotations.php'         => ["scopeFilterSqlNullable('warehouse'"],
+        'app/bms/sales/quotations/quotation_view.php'     => ["userCan('warehouse'"],
+        'app/bms/sales/sales_orders.php'                  => ["scopeFilterSqlNullable('warehouse'"],
+        'api/account/get_sales_orders.php'                => ["userCan('warehouse'", "scopeFilterSqlNullable('warehouse'"],
+        'app/bms/sales/sales_order_view.php'              => ["userCan('warehouse'"],
+        'api/customer/get_lpos_list.php'                  => ["scopeFilterSqlNullable('warehouse'"],
+        'api/customer/get_lpo.php'                        => ["userCan('warehouse'"],
+        'api/account/get_invoices.php'                    => ["userCan('warehouse'", "scopeFilterSqlNullable('warehouse'"],
+        'app/bms/invoice/invoice_view.php'                => ["userCan('warehouse'"],
+        'app/bms/grn/delivery_notes.php'                  => ['warehousesForSelect(', "scopeFilterSqlNullable('warehouse'"],
+        'api/get_delivery_notes_list.php'                 => ["userCan('warehouse'", "scopeFilterSqlNullable('warehouse'"],
+        'app/bms/grn/dn_view.php'                          => ["userCan('warehouse'"],
     ];
     foreach ($must_contain as $rel => $needles) {
         $s = src("$root/$rel");
@@ -170,12 +193,80 @@ try {
         ok((int)$left->fetchColumn() === 0, 'Test fixtures fully cleaned up from user_scope_overrides');
     }
 
+    // ── F. LIVE — project assignment no longer auto-grants every warehouse
+    //      that project has ever transacted through; an explicit warehouse
+    //      assignment narrows it (2026-07-17 analysis + fix) ─────────────────
+    section('F. Live — project→warehouse narrowing (warehousesForSelect + userCan)');
+
+    $projRow = $pdo->query("
+        SELECT project_id, COUNT(DISTINCT warehouse_id) AS n
+          FROM (
+            SELECT project_id, warehouse_id FROM purchase_orders   WHERE warehouse_id IS NOT NULL AND project_id IS NOT NULL
+            UNION SELECT project_id, warehouse_id FROM purchase_receipts WHERE warehouse_id IS NOT NULL AND project_id IS NOT NULL
+            UNION SELECT project_id, warehouse_id FROM deliveries      WHERE warehouse_id IS NOT NULL AND project_id IS NOT NULL
+            UNION SELECT project_id, warehouse_id FROM stock_movements WHERE warehouse_id IS NOT NULL AND project_id IS NOT NULL
+          ) t GROUP BY project_id HAVING n >= 2 ORDER BY n DESC LIMIT 1
+    ")->fetch(PDO::FETCH_ASSOC);
+
+    if (!$projRow) {
+        ok(false, 'Need a project tied to 2+ warehouses (via PO/GRN/DN/movement history) to run test F — skipping');
+    } else {
+        $projId = (int)$projRow['project_id'];
+        $projWarehouses = $pdo->prepare("
+            SELECT DISTINCT warehouse_id FROM (
+                SELECT warehouse_id, project_id FROM purchase_orders   WHERE warehouse_id IS NOT NULL
+                UNION SELECT warehouse_id, project_id FROM purchase_receipts WHERE warehouse_id IS NOT NULL
+                UNION SELECT warehouse_id, project_id FROM deliveries      WHERE warehouse_id IS NOT NULL
+                UNION SELECT warehouse_id, project_id FROM stock_movements WHERE warehouse_id IS NOT NULL
+            ) t WHERE project_id = ?
+        ");
+        $projWarehouses->execute([$projId]);
+        $allProjWh = array_map('intval', $projWarehouses->fetchAll(PDO::FETCH_COLUMN));
+        $narrowTo  = $allProjWh[0];
+
+        $reset = function () { unset($_SESSION['scope'], $_SESSION['is_admin'], $_SESSION['role_id'], $_SESSION['user_id']); };
+        $pdo->prepare("DELETE FROM user_projects WHERE user_id = ?")->execute([TEST_UID_GRANTED]);
+        $pdo->prepare("DELETE FROM user_scope_overrides WHERE user_id = ?")->execute([TEST_UID_GRANTED]);
+        $pdo->prepare("INSERT INTO user_projects (user_id, project_id, assigned_by, assigned_at) VALUES (?, ?, 1, NOW())")
+            ->execute([TEST_UID_GRANTED, $projId]);
+
+        // Legacy fallback: assigned to the project, zero warehouse overrides
+        // → sees every warehouse that project has transacted through (unchanged
+        // pre-existing behaviour, so nobody's access silently narrows).
+        $reset(); $_SESSION['user_id'] = TEST_UID_GRANTED;
+        loadUserScope(TEST_UID_GRANTED);
+        $legacyList = array_column(warehousesForSelect($pdo), 'warehouse_id');
+        $legacyOk = true;
+        foreach ($allProjWh as $w) { if (!in_array($w, $legacyList, true)) $legacyOk = false; }
+        ok($legacyOk, "Legacy (no warehouse override): warehousesForSelect() includes all of project $projId's transacted warehouses (" . implode(',', $allProjWh) . ')');
+
+        // Explicit narrowing: same project, but admin has curated exactly one
+        // warehouse for this user → dropdown AND userCan() both narrow to it,
+        // even though the project spans more.
+        $pdo->prepare("INSERT INTO user_scope_overrides (user_id, resource_type, resource_id, granted_by) VALUES (?, 'warehouse', ?, 1)")
+            ->execute([TEST_UID_GRANTED, $narrowTo]);
+        $reset(); $_SESSION['user_id'] = TEST_UID_GRANTED;
+        loadUserScope(TEST_UID_GRANTED);
+        $narrowList = array_column(warehousesForSelect($pdo), 'warehouse_id');
+        ok($narrowList === [$narrowTo], "Explicit grant: warehousesForSelect() narrows to exactly [$narrowTo], not all of project $projId's warehouses");
+        ok(userCan('warehouse', $narrowTo) === true, "userCan('warehouse', $narrowTo) TRUE (granted)");
+        $otherProjWh = array_values(array_diff($allProjWh, [$narrowTo]));
+        if (!empty($otherProjWh)) {
+            ok(userCan('warehouse', $otherProjWh[0]) === false, "userCan('warehouse', {$otherProjWh[0]}) FALSE — same project, but not the granted warehouse");
+        }
+
+        $pdo->prepare("DELETE FROM user_projects WHERE user_id = ?")->execute([TEST_UID_GRANTED]);
+        $pdo->prepare("DELETE FROM user_scope_overrides WHERE user_id = ?")->execute([TEST_UID_GRANTED]);
+        $reset();
+    }
+
 } catch (Throwable $e) {
     echo "\n\033[31mFATAL: {$e->getMessage()}\033[0m\n";
     // Best-effort cleanup even on failure.
     try {
         $pdo->prepare("DELETE FROM user_scope_overrides WHERE user_id IN (?,?,?)")
             ->execute([TEST_UID_GRANTED, TEST_UID_GRANTALL, TEST_UID_NONE]);
+        $pdo->prepare("DELETE FROM user_projects WHERE user_id = ?")->execute([TEST_UID_GRANTED]);
     } catch (Throwable $e2) {}
     $fail++;
 }
