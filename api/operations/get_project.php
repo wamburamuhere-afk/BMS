@@ -449,15 +449,27 @@ try {
     $progress_analysis['days_remaining'] = $days_remaining;
     $progress_analysis['is_overdue'] = $is_overdue;
     
-    // Get Project Documents (Unified Library)
+    // Get Project Documents (Unified Library) — same visibility gap-fix as
+    // api/document/get_documents.php: a non-admin only sees public documents,
+    // their own uploads, and private/restricted documents they're assigned to.
+    $docVisibilitySql = isAdmin() ? "" : "
+        AND (d.access_level = 'public'
+             OR d.uploaded_by = :vis_user1
+             OR d.id IN (SELECT document_id FROM document_assignees WHERE user_id = :vis_user2))";
     $stmt = $pdo->prepare("
         SELECT d.*, u.username as uploader_name
         FROM documents d
         LEFT JOIN users u ON d.uploaded_by = u.user_id
-        WHERE d.project_id = ?
+        WHERE d.project_id = :project_id
+        $docVisibilitySql
         ORDER BY d.uploaded_at DESC
     ");
-    $stmt->execute([$id]);
+    $docParams = [':project_id' => $id];
+    if (!isAdmin()) {
+        $docParams[':vis_user1'] = $_SESSION['user_id'];
+        $docParams[':vis_user2'] = $_SESSION['user_id'];
+    }
+    $stmt->execute($docParams);
     $project_documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Get Project Staff

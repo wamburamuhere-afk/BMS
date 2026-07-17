@@ -1,5 +1,52 @@
 # BMS Changelog
 
+## 2026-07-17 (feat) — Document comments/notes + per-user document sharing (WorkDo gap closure #1 and #2)
+
+**New:** `migrations/2026_07_17_document_comments_notes_assignees.php`,
+`api/document/get_document_activity.php`, `api/document/add_document_comment.php`,
+`api/document/delete_document_comment.php`, `api/document/add_document_note.php`,
+`api/document/delete_document_note.php`, `api/document/save_document_assignees.php`,
+`includes/document_activity_modal.php`
+**Files:** `api/document/get_documents.php`, `api/operations/get_project.php`,
+`app/constant/document/document_library.php`, `app/bms/operations/project_view.php`
+
+Closes gaps #1 and #2 from the WorkDo Documents-module gap analysis (gap #3, richer AI generation,
+deferred). BMS had zero collaboration infrastructure on a document (no comments, no notes) and
+`documents.access_level` was a bare enum with no link to *which* users a private/restricted
+document was actually visible to — `get_documents.php` had no visibility filtering at all, so any
+logged-in user with `documents` view permission could see every document regardless of its access
+level.
+
+- **Comments & Notes** — two separate threads per document (`document_comments`, `document_notes`),
+  post/delete with timestamps; delete is author-or-admin only.
+- **Per-user document assignment** — new `document_assignees` table. A private/restricted document
+  is now only visible to its uploader, assigned users, and admins. Enforced server-side in both
+  `get_documents.php` (Docs > Library) and `get_project.php`'s `project_documents` query (a
+  project's Docs tab), not just hidden client-side. Only the uploader or an admin can manage who's
+  assigned.
+- One shared modal (`includes/document_activity_modal.php`, tabs: Comments / Notes / Access) reused
+  by both surfaces, wired via a new "Comments & Access" row action — reachable in Docs > Library
+  for every document, and in a project's Docs tab for that project's manually-uploaded documents
+  (the contract/budget/voucher-attachment rows aren't real `documents` rows, so the action is
+  scoped to `doc.isManual` there). Access-tab user picker follows the existing `select2-static`
+  convention (`crm_leads.php`'s "Assigned To" picker), not AJAX — the org's user count doesn't
+  warrant it.
+
+Verified end-to-end against a real document (in-process API calls against live DB, 15 assertions:
+comment/note CRUD, visibility hidden-from-unassigned vs. visible-to-assigned, direct-API-bypass
+denial, delete-permission enforcement) — caught and fixed two real bugs along the way:
+1. `add_document_comment.php`/`add_document_note.php` captured `lastInsertId()` *after* calling
+   `logActivity()`, which does its own `INSERT` — silently returning the activity-log row's ID
+   instead of the comment/note's ID. Fixed by capturing it immediately after the actual insert.
+2. `get_project.php`'s new visibility filter initially mixed positional (`?`) and named (`:x`)
+   placeholders in one prepared statement, which PDO does not support — converted to all-named.
+
+Full interactive browser click-through (Select2 rendering, tab switching) wasn't completed — this
+dev environment's clean-URL router assumes it's served from the domain root, but WAMP serves it
+under `/bms/` as a subfolder, so `getUrl()`-generated routes 404 through to the WAMP homepage
+outside of directly-hit `.php` files. Worth a manual click-through before relying on this in
+production.
+
 ## 2026-07-16 (feat) — Sales Return gets its own 3-template print family, borrowed from existing Sales-side designs
 
 **New:** `app/bms/sales/sales_returns/print_sales_return_intake.php`,

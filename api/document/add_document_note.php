@@ -1,0 +1,56 @@
+<?php
+// File: api/document/add_document_note.php
+require_once __DIR__ . '/../../roots.php';
+global $pdo;
+
+header('Content-Type: application/json');
+
+try {
+    if (!isAuthenticated()) {
+        throw new Exception('Unauthorized');
+    }
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        throw new Exception('Invalid request method');
+    }
+    if (!canView('documents')) {
+        http_response_code(403);
+        throw new Exception('Access Denied');
+    }
+
+    $document_id = isset($_POST['document_id']) ? (int)$_POST['document_id'] : 0;
+    $note        = trim($_POST['note'] ?? '');
+
+    if ($document_id <= 0 || $note === '') {
+        throw new Exception('A note is required');
+    }
+
+    $stmt = $pdo->prepare("SELECT id, document_name, access_level, uploaded_by FROM documents WHERE id = ?");
+    $stmt->execute([$document_id]);
+    $document = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$document) {
+        throw new Exception('Document not found');
+    }
+
+    $currentUserId = (int)$_SESSION['user_id'];
+    $isOwner = (int)$document['uploaded_by'] === $currentUserId;
+    if ($document['access_level'] !== 'public' && !isAdmin() && !$isOwner) {
+        $chk = $pdo->prepare("SELECT COUNT(*) FROM document_assignees WHERE document_id = ? AND user_id = ?");
+        $chk->execute([$document_id, $currentUserId]);
+        if (!$chk->fetchColumn()) {
+            http_response_code(403);
+            throw new Exception('Access Denied: this document is not shared with you');
+        }
+    }
+
+    $ins = $pdo->prepare("INSERT INTO document_notes (document_id, user_id, note, created_at) VALUES (?, ?, ?, NOW())");
+    $ins->execute([$document_id, $currentUserId, $note]);
+    $newNoteId = (int)$pdo->lastInsertId();
+
+    logActivity($pdo, $currentUserId, 'Note on Document',
+        "Added a note to document \"{$document['document_name']}\" (ID: $document_id)");
+
+    echo json_encode(['success' => true, 'message' => 'Note added', 'id' => $newNoteId]);
+
+} catch (Exception $e) {
+    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+}
