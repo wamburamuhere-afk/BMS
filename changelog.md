@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-07-17 (fix) — POS product list leaked products from other warehouses
+
+**Files:** `api/pos/simple_products.php`
+
+Follow-up to the Phase 6 warehouse-access-control PR: a cashier granted only one
+warehouse could still see every company-wide product in the POS product grid
+(just showing 0 quantity for items not actually stocked there), because the
+`product_stocks` join used `LEFT JOIN` — restricting the *stock numbers* to the
+selected warehouse but not excluding products with no stock record there at all.
+Added a condition so that, once a specific warehouse is selected, only products
+actually stocked in that warehouse are listed; services are exempted since
+they aren't warehouse-bound. Verified against real data: warehouse 5 has exactly
+1 physical product on hand — before the fix the API returned all 21 company-wide
+products for it, after the fix it correctly returns 7 (that 1 product + 6
+services). The no-warehouse "company-wide" view used by admins/grant-all users
+is unaffected (still returns all 21). Full `tests/test_warehouse_scope_cli.php`
+suite (81 checks) still passes.
+
 ## 2026-07-17 (feat) — POS + reports + dashboard: per-warehouse access control (pos_upgrade_plan.md Phase 6)
 
 **New:** `migrations/2026_07_17_user_scope_overrides_unique_key.php`,

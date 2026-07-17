@@ -78,7 +78,15 @@ try {
             FROM products p
             LEFT JOIN product_stocks ps ON p.product_id = ps.product_id $ps_warehouse_filter
             WHERE p.status = 'active'";
-    
+
+    // A specific warehouse was chosen: only list products actually stocked
+    // there (services aren't warehouse-bound and stay visible everywhere).
+    // Without this, the LEFT JOIN above still lets every company-wide
+    // product through with a zero quantity instead of excluding it.
+    if ($warehouse_id > 0) {
+        $sql .= " AND (p.is_service = 1 OR ps.warehouse_id IS NOT NULL)";
+    }
+
     $params = [];
     if ($warehouse_id > 0) {
         $params[':warehouse_ps'] = $warehouse_id;
