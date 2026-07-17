@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-07-16 (feat) — Sales Return gets its own 3-template print family, borrowed from existing Sales-side designs
+
+**New:** `app/bms/sales/sales_returns/print_sales_return_intake.php`,
+`app/bms/sales/sales_returns/print_sales_return_register.php`,
+`app/bms/sales/sales_returns/print_sales_return_meridian.php`
+**Files:** `roots.php`, `app/bms/sales/sales_returns/sales_return_view.php`,
+`app/constant/settings/system_settings.php`
+
+No professional "Sales Return" design gallery exists anywhere online (confirmed by extensive
+search — every real "sales return"/"goods return" resource found was a plain fill-in Word/Google
+Docs form, not a styled design). Rather than borrow a mismatched document type from outside the
+app again, sourced the 3 candidates from BMS's own already-built, professional Sales-side template
+families instead — one structural concept from each of 3 different document types:
+
+- **Intake** — adapted from Delivery Note (Outbound)'s "Custody": earthy panels, a colored title
+  bar, and a Returned-By/Received-By acknowledgment block. The best conceptual fit — Custody's
+  Sender/Receipt handover structure mirrors exactly onto goods coming back in instead of going out.
+- **Register** — adapted from Sales Order's "Ledger": a colored header-bar, bordered accent panels,
+  and a status-strip pill.
+- **Meridian** — adapted from Quotation's "Meadow": a pill-shaped title badge, a meta-chip strip,
+  and soft rounded panels with a green undertone (reads as "credit/approved" at a glance).
+
+Each carries every field the existing `print_sales_return.php` has (company logo/name, customer
+box, items, subtotal/VAT/grand total, reason, full Created/Reviewed/Approved signature row), plus
+two additions using data that was already in the DB but unused in print — a "Ref Invoice" line
+(`sales_returns.invoice_id` → `invoices.invoice_number`), a Refund Status line
+(`sales_returns.payment_status`), and a per-line VAT% column in the items table (`sales_return_items.tax_rate`,
+matching the convention already established on Credit Note). Own accent colors wired into System
+Settings > Color Setting > Sales Side. Original `print_sales_return.php` stays as "Standard
+(default)" in the print dropdown. Verified with a real approved return (RET-20260529-3408) — ran
+all 3 templates in-process against live DB data (structural assertions: totals, item rows,
+signature block) and visually confirmed each in-browser via screenshot, including real e-signature
+images.
+
 ## 2026-07-16 (feat) — Credit Note gets its own 3-template print family
 
 **New:** `app/bms/sales/credit_notes/print_credit_note_ledger.php`,

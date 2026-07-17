@@ -134,9 +134,21 @@ $can_create_cn = canCreate('credit_notes');
                 <?php endif; ?>
             <?php endif; ?>
             
-            <button onclick="printReturn(<?= $return['return_id'] ?>)" class="btn btn-secondary me-2">
-                <i class="bi bi-printer"></i> Print
-            </button>
+            <div class="btn-group shadow-sm me-2">
+                <button onclick="printReturn()" class="btn btn-secondary btn-sm px-3">
+                    <i class="bi bi-printer"></i> Print
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><h6 class="dropdown-header">Print Template</h6></li>
+                    <li><a class="dropdown-item" href="#" onclick="printReturn('standard'); return false;"><i class="bi bi-check2 me-2"></i>Standard (default)</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printReturn('intake'); return false;">Intake</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printReturn('register'); return false;">Register</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printReturn('meridian'); return false;">Meridian</a></li>
+                </ul>
+            </div>
             
             <a href="<?= getUrl('sales_returns') ?>" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left"></i> Back
@@ -306,8 +318,16 @@ function markRefunded(id) {
     });
 }
 
-function printReturn(id) {
-    window.open('print_sales_return?id=' + id, '_blank');
+const SR_ID = <?= (int)$return['return_id'] ?>;
+const SR_PRINT_TEMPLATES = {
+    standard: '<?= getUrl('print_sales_return') ?>',
+    intake:   '<?= getUrl('print_sales_return_intake') ?>',
+    register: '<?= getUrl('print_sales_return_register') ?>',
+    meridian: '<?= getUrl('print_sales_return_meridian') ?>'
+};
+function printReturn(template) {
+    const base = SR_PRINT_TEMPLATES[template] || SR_PRINT_TEMPLATES.standard;
+    window.open(base + '?id=' + SR_ID, '_blank');
 }
 
 // ── Three-approval workflow action handlers (returns three-approval slice) ──
