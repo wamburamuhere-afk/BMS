@@ -41,12 +41,14 @@ $stmt = $pdo->prepare("
         c.phone as customer_phone,
         c.address as customer_address,
         p.project_name,
+        w.warehouse_name,
         u.username as created_by_name,
         CONCAT_WS(' ', u.first_name, u.last_name) as created_by_full_name,
         u.user_role as created_by_role
     FROM invoices i
     LEFT JOIN customers c ON i.customer_id = c.customer_id
     LEFT JOIN projects p ON i.project_id = p.project_id
+    LEFT JOIN warehouses w ON i.warehouse_id = w.warehouse_id
     LEFT JOIN users u ON i.created_by = u.user_id
     WHERE i.invoice_id = ?
 ");
@@ -572,7 +574,14 @@ includeHeader();
                         <span class="fw-medium text-primary"><?= safe_output($invoice['project_name']) ?></span>
                     </div>
                     <?php endif; ?>
-                    
+
+                    <?php if (!empty($invoice['warehouse_name'])): ?>
+                    <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
+                        <span class="text-muted">Warehouse:</span>
+                        <span class="fw-medium text-success"><?= safe_output($invoice['warehouse_name']) ?></span>
+                    </div>
+                    <?php endif; ?>
+
                     <?php if (!empty($invoice['payment_terms'])): ?>
                     <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
                         <span class="text-muted">Payment Terms:</span>

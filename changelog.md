@@ -1,5 +1,52 @@
 # BMS Changelog
 
+## 2026-07-17 (feat) — Warehouse clearly labeled on every sales/procurement document (list, view, print)
+
+**Files:** `app/bms/sales/sales_orders.php`, `api/account/get_sales_orders.php`,
+`app/bms/invoice/{invoice_view,invoice_print,invoice_print_summit,invoice_print_wave,invoice_print_onyx}.php`,
+`app/bms/sales/lpo/{lpo_view,print_lpo}.php`, `api/customer/get_lpo.php`,
+`app/bms/sales/credit_notes/{credit_note_view,print_credit_note,print_credit_note_ember,print_credit_note_horizon,print_credit_note_ledger}.php`,
+`app/bms/sales/sales_returns/{sales_return_view,print_sales_return,print_sales_return_intake,print_sales_return_meridian,print_sales_return_register}.php`,
+`app/bms/purchase/purchase_return_view.php`, `api/pos/print_receipt.php`
+
+Two related user-reported gaps:
+
+1. **Sales Order list didn't show the warehouse a non-admin selected when
+   creating it.** `get_sales_orders.php` never joined `warehouses` at all.
+   Added the join + a Warehouse column to the list (matching the existing
+   Project column's pattern).
+2. **Warehouse was invisible on view/print for most sales & procurement
+   documents**, making it hard to tell which warehouse a document actually
+   concerns — especially now that POS and reports are correctly warehouse-
+   scoped, a document with no visible warehouse looked like a black box.
+   Audited every list/view/print surface across both sides:
+   - **Procurement side was already fully covered** — RFQ, Purchase Order,
+     GRN, Purchase Return (print), Debit Note all already showed it.
+   - **Gaps found and fixed:** Invoice (all 4 print templates + view — zero
+     warehouse join existed anywhere), LPO (view + print), Credit Note (all
+     4 print templates + view), Sales Return (all 4 print templates + view),
+     Purchase Return's *view* page specifically (its print already had it,
+     but the AJAX-rendered view page never displayed the field it was
+     already receiving), and the POS receipt (`print_receipt.php`).
+   - Credit Note and Sales Return carry no `warehouse_id` of their own (only
+     `invoice_id`/`sales_order_id`), so their warehouse is resolved via
+     `COALESCE(invoice.warehouse_id, sales_order.warehouse_id)` through the
+     source document — and gated with the same `userCan('warehouse', …)`
+     check used everywhere else in Phase 6, since these pages had never been
+     warehouse-scoped before (only project-scoped, when linked to one).
+
+Verified against real data: `invoice_print.php` and `invoice_view.php` both
+correctly show "new warehouse" for a real invoice with `warehouse_id` set;
+the Sales Order list now returns `warehouse_name` for all 10 real orders
+tested (e.g. "Main Warehouse" for BMS-SO-0001). One credit note was checked
+and correctly shows *no* warehouse line — its source invoice and sales order
+both genuinely have no warehouse assigned, confirming the conditional
+display (not a bug) rather than a broken join.
+
+Full regression: 319 checks across `test_warehouse_scope_cli.php` (137),
+`test_warehouse_project_filter_cli.php` (84), `test_pos_dashboard_cli.php`
+(98) — all green.
+
 ## 2026-07-17 (fix) — Full warehouse-scope sweep: warehouse management, products, stock, NIP materials
 
 **Files:** `app/bms/stock/warehouses.php`, `ajax_delete_warehouse.php`,

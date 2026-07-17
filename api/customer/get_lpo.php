@@ -31,10 +31,12 @@ try {
                     THEN c.company_name ELSE c.customer_name END AS customer_display_name,
                c.email AS customer_email, c.phone AS customer_phone, c.address AS customer_address,
                p.project_name,
+               w.warehouse_name,
                u.username AS created_by_name
         FROM customer_lpos l
         LEFT JOIN customers c ON l.customer_id = c.customer_id
         LEFT JOIN projects p ON l.project_id = p.project_id
+        LEFT JOIN warehouses w ON l.warehouse_id = w.warehouse_id
         LEFT JOIN users u ON l.created_by = u.user_id
         WHERE l.lpo_id = ? AND l.status != 'deleted'
     ");

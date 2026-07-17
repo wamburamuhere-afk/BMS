@@ -167,6 +167,7 @@ try {
             so.currency, so.payment_terms, so.reference, so.total_ordered, so.notes,
             so.total_delivered, so.total_invoiced,
             proj.project_name,
+            w.warehouse_name,
             c.customer_name,
             c.company_name,
             c.phone as customer_phone,
@@ -193,6 +194,7 @@ try {
         FROM sales_orders so
         LEFT JOIN customers c ON so.customer_id = c.customer_id
         LEFT JOIN projects proj ON so.project_id = proj.project_id
+        LEFT JOIN warehouses w ON so.warehouse_id = w.warehouse_id
         LEFT JOIN users u1 ON so.created_by = u1.user_id
         LEFT JOIN users u2 ON so.salesperson_id = u2.user_id
         LEFT JOIN users u3 ON so.updated_by = u3.user_id

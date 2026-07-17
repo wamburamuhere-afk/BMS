@@ -5,6 +5,7 @@ ini_set('display_errors', 0);
 require_once __DIR__ . '/../../../../roots.php';
 require_once __DIR__ . '/../../../../core/permissions.php';
 require_once __DIR__ . '/../../../../core/workflow.php';
+require_once __DIR__ . '/../../../../core/warehouse_scope.php';
 
 if (!isAuthenticated()) die("Unauthorized");
 if (!canView('lpo')) die("Access Denied");
@@ -21,17 +22,25 @@ $stmt = $pdo->prepare("
            c.tax_id AS c_tin, c.vat_number AS c_vrn,
            u.username, u.first_name AS creator_first, u.last_name AS creator_last,
            COALESCE(u.user_role, u.role) AS creator_role,
-           pr.project_name
+           pr.project_name, w.warehouse_name
     FROM customer_lpos l
     LEFT JOIN customers c ON l.customer_id = c.customer_id
     LEFT JOIN users u ON l.created_by = u.user_id
     LEFT JOIN projects pr ON l.project_id = pr.project_id
+    LEFT JOIN warehouses w ON l.warehouse_id = w.warehouse_id
     WHERE l.lpo_id = ?
 ");
 $stmt->execute([$lpo_id]);
 $lpo = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$lpo) die("LPO not found");
+
+// Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope, not just
+// project — a user granted only some of a project's warehouses shouldn't be
+// able to print an LPO drawn from a different one.
+if (!empty($lpo['warehouse_id']) && !userCan('warehouse', (int)$lpo['warehouse_id'])) {
+    die("Access denied: this warehouse is not in your assigned scope.");
+}
 
 $stmtItems = $pdo->prepare("SELECT * FROM customer_lpo_items WHERE lpo_id = ? ORDER BY sort_order, item_id");
 $stmtItems->execute([$lpo_id]);
@@ -181,6 +190,7 @@ try {
             <h3>LPO Information</h3>
             <p><strong>Expiry Date:</strong> <?= !empty($lpo['expiry_date']) ? date('d M Y', strtotime($lpo['expiry_date'])) : 'Not specified' ?></p>
             <?php if (!empty($lpo['project_name'])): ?><p><strong>Project:</strong> <?= htmlspecialchars($lpo['project_name']) ?></p><?php endif; ?>
+            <?php if (!empty($lpo['warehouse_name'])): ?><p><strong>Warehouse:</strong> <?= htmlspecialchars($lpo['warehouse_name']) ?></p><?php endif; ?>
             <?php if (!empty($lpo['description'])): ?><p><strong>Description:</strong> <?= htmlspecialchars($lpo['description']) ?></p><?php endif; ?>
             <p><strong>Created By:</strong> <?= htmlspecialchars($lpo['username'] ?? 'N/A') ?></p>
         </div>

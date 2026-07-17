@@ -123,6 +123,7 @@ $dn_create_qs = $return_project_id ? ('&project=' . $return_project_id) : '';
                                 <h6 class="text-muted text-uppercase small fw-bold mb-3">Return Details</h6>
                                 <p class="mb-1"><strong id="referenceLabel">Reference:</strong> <span id="orderReference"></span></p>
                                 <p class="mb-1"><strong>Return Reason:</strong> <span id="returnReason" class="text-capitalize"></span></p>
+                                <p class="mb-1" id="warehouseRow" style="display:none;"><strong>Warehouse:</strong> <span id="warehouseName" class="text-primary fw-bold"></span></p>
                                 <p class="mb-1"><strong>Prepared By:</strong> <span id="createdBy"></span></p>
                                 <p class="mb-1"><strong>Last Updated:</strong> <span id="updatedAt"></span></p>
                             </div>
@@ -295,6 +296,7 @@ function renderReturn(data) {
     $('#orderReference').html(refHtml);
 
     $('#returnReason').text(data.reason.replace(/_/g, ' '));
+    if (data.warehouse_name) { $('#warehouseName').text(data.warehouse_name); $('#warehouseRow').show(); }
     $('#createdBy').text(data.created_by_name || 'System');
     $('#updatedAt').text(data.updated_at ? formatDateTime(data.updated_at) : 'N/A');
     $('#reasonDetails').text(data.reason_details || 'No detailed reason provided.');
