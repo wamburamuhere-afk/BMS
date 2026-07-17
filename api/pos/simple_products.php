@@ -79,17 +79,24 @@ try {
             LEFT JOIN product_stocks ps ON p.product_id = ps.product_id $ps_warehouse_filter
             WHERE p.status = 'active'";
 
-    // A specific warehouse was chosen: only list products actually stocked
-    // there (services aren't warehouse-bound and stay visible everywhere).
-    // Without this, the LEFT JOIN above still lets every company-wide
-    // product through with a zero quantity instead of excluding it.
+    // A specific warehouse was chosen: only list products actually available
+    // there — a physical product needs a product_stocks row for THIS
+    // warehouse; a service needs either no warehouse tag at all (products.
+    // warehouse_id NULL — a general, location-agnostic service like
+    // "delivery fee") or a warehouse_id matching the one selected. Without
+    // this, the LEFT JOIN above still lets every company-wide product/service
+    // through with a zero quantity instead of excluding it.
     if ($warehouse_id > 0) {
-        $sql .= " AND (p.is_service = 1 OR ps.warehouse_id IS NOT NULL)";
+        $sql .= " AND (
+                    ps.warehouse_id IS NOT NULL
+                    OR (p.is_service = 1 AND (p.warehouse_id IS NULL OR p.warehouse_id = :warehouse_svc))
+                  )";
     }
 
     $params = [];
     if ($warehouse_id > 0) {
-        $params[':warehouse_ps'] = $warehouse_id;
+        $params[':warehouse_ps']  = $warehouse_id;
+        $params[':warehouse_svc'] = $warehouse_id;
         if ($project_id > 0) $params[':warehouse_sm'] = $warehouse_id;
     }
     if ($project_id > 0) $params[':project_id'] = $project_id;

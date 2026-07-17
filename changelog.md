@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-07-17 (fix) — POS: services also now respect per-warehouse tagging
+
+**Files:** `api/pos/simple_products.php`
+
+Follow-up to the previous same-day fix: that pass correctly stopped physical
+products from other warehouses leaking into the POS grid, but deliberately let
+every "service" product through regardless of warehouse — services don't hold
+`product_stocks` rows so there was nothing to filter on. Turns out `products`
+carries its own `warehouse_id` column separate from per-warehouse stock, and
+real data already uses it: some services are tagged to one specific warehouse,
+others are left untagged (general, location-agnostic services like a delivery
+fee). Now a service only shows for a selected warehouse if it's untagged or
+tagged to that exact warehouse — a service tied to Warehouse A no longer shows
+up for a cashier working Warehouse B. Verified against real data: warehouse 5
+now returns 3 items (1 stocked product + 2 untagged services) vs warehouse 14's
+10 (its own stocked products + its own tagged services + the same 2 untagged
+services). Full `tests/test_warehouse_scope_cli.php` suite (81 checks) still
+passes.
+
 ## 2026-07-17 (fix) — POS product list leaked products from other warehouses
 
 **Files:** `api/pos/simple_products.php`
