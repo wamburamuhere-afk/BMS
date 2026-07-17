@@ -3,6 +3,7 @@
 // File: api/get_product_stock.php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/warehouse_scope.php';
 global $pdo;
 
 if (!isset($_SESSION['user_id'])) {
@@ -13,9 +14,12 @@ if (!isset($_SESSION['user_id'])) {
 try {
     $product_id = $_GET['product_id'] ?? 0;
     $warehouse_id = $_GET['warehouse_id'] ?? 0;
-    
+
     if (!$product_id) {
         throw new Exception('Product ID is required');
+    }
+    if ($warehouse_id && !userCan('warehouse', (int)$warehouse_id)) {
+        throw new Exception('Access denied: this warehouse is not in your assigned scope.');
     }
     
     // Get product details

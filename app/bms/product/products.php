@@ -179,9 +179,10 @@ if ($low_stock === 'yes') {
 }
 
 // Project scope: NULL = global (visible to all); set = only users assigned to that project.
-// Carries its own leading AND, so it is appended to each query rather than pushed
-// into $conditions (which are joined with " AND ").
-$scope_sql = scopeFilterSqlNullable('project', 'p');
+// Warehouse scope (Phase 6, pos_upgrade_plan.md): NULL = global; set = only
+// users granted that warehouse. Both carry their own leading AND, so they are
+// appended to each query rather than pushed into $conditions (joined with " AND ").
+$scope_sql = scopeFilterSqlNullable('project', 'p') . scopeFilterSqlNullable('warehouse', 'p');
 
 if (!empty($conditions)) {
     $query .= " AND " . implode(" AND ", $conditions);
@@ -274,7 +275,10 @@ $categories = $pdo->query("SELECT category_id, category_name FROM categories WHE
 $suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
 $brands = $pdo->query("SELECT brand_id, brand_name FROM brands WHERE status = 'active' ORDER BY brand_name")->fetchAll(PDO::FETCH_ASSOC);
 $tax_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage FROM tax_rates WHERE status = 'active' ORDER BY rate_name")->fetchAll(PDO::FETCH_ASSOC);
-$warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+// Shared helper — also respects the user's direct warehouse grant (Phase 6,
+// pos_upgrade_plan.md), not just project membership.
+require_once ROOT_DIR . '/core/warehouse_scope.php';
+$warehouses = warehousesForSelect($pdo);
 
 // Measurement units from DB
 $units = $pdo->query("SELECT unit_code, unit_name FROM product_units WHERE status = 'active' ORDER BY unit_name ASC")->fetchAll(PDO::FETCH_ASSOC);

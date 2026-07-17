@@ -39,7 +39,10 @@ try {
 }
 
 try {
-    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
+    // Shared helper — also respects the user's direct warehouse grant
+    // (Phase 6, pos_upgrade_plan.md), not just project membership.
+    require_once ROOT_DIR . '/core/warehouse_scope.php';
+    $warehouses = warehousesForSelect($pdo);
 } catch (PDOException $e) {
     $warehouses = [];
 }

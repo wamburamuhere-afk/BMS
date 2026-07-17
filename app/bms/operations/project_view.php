@@ -2,6 +2,7 @@
 // File: app/bms/operations/project_view.php
 define('BMS_SUPPRESS_PRINT_HEADER', true);
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
 require_once __DIR__ . '/../../../core/payment_source.php';
 
 // Phase 5b — enforce view permission on project detail
@@ -131,8 +132,9 @@ $supplier_categories = $pdo->query("SELECT category_id, category_name FROM suppl
 // Fetch All Projects for supplier linking
 $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status != 'deleted' ORDER BY project_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Warehouses for returns
-$warehouses = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch Warehouses for returns — shared helper, also respects the user's
+// direct warehouse grant (Phase 6, pos_upgrade_plan.md).
+$warehouses = warehousesForSelect($pdo);
 
 // Fetch project details for print display
 $stmt = $pdo->prepare("SELECT project_name, contract_number FROM projects WHERE project_id = ?");
@@ -148,8 +150,9 @@ $company_logo = getSetting('company_logo', '');
 // Fetch tax rates for NIP edit modal
 $tax_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage FROM tax_rates WHERE status='active' ORDER BY rate_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch warehouses scoped to this project (for Non-inventory Products tab)
-$nipWh = $pdo->prepare("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status='active' AND project_id = ? ORDER BY warehouse_name ASC");
+// Fetch warehouses scoped to this project (for Non-inventory Products tab) —
+// also filtered by the user's own warehouse grant (Phase 6, pos_upgrade_plan.md).
+$nipWh = $pdo->prepare("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status='active' AND project_id = ?" . scopeFilterSqlNullable('warehouse') . " ORDER BY warehouse_name ASC");
 $nipWh->execute([$project_id]);
 $proj_warehouses = $nipWh->fetchAll(PDO::FETCH_ASSOC);
 

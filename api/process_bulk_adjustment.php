@@ -6,6 +6,7 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/warehouse_scope.php';
 
 // Suppress errors to ensure only clean JSON is returned
 error_reporting(0);
@@ -77,6 +78,12 @@ try {
         if ($warehouse_id <= 0) {
             $failed_count++;
             $errors[] = "Row $processed: Invalid Warehouse ID for SKU $sku";
+            continue;
+        }
+
+        if (!userCan('warehouse', $warehouse_id)) {
+            $failed_count++;
+            $errors[] = "Row $processed: Access denied — warehouse $warehouse_id is not in your assigned scope (SKU $sku)";
             continue;
         }
 

@@ -2,6 +2,7 @@
 // File: app/bms/purchase/edit_nip_materials.php
 // scope-audit: skip — NIP material edit form; scope by project_id pending Phase G-2
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
 
 // Enforce permission — must match the other NIP pages (nip_materials, view_nip_materials,
 // view_material_list) so canEdit('nip_materials') in the list page agrees with the actual gate here.
@@ -40,8 +41,18 @@ if (!$row) {
     exit;
 }
 
-// Fetch Lists for dropdowns
-$warehouses_all = $pdo->query("SELECT warehouse_id, warehouse_name, project_id FROM warehouses WHERE status='active' OR warehouse_id = " . intval($row['warehouse_id'] ?? 0) . " ORDER BY warehouse_name ASC")->fetchAll();
+// Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope — a user
+// granted only some warehouses shouldn't be able to open a NIP created
+// under a different one.
+if (!empty($row['warehouse_id']) && !userCan('warehouse', (int)$row['warehouse_id'])) {
+    echo "<div class='container mt-5'><div class='alert alert-danger'>Access denied: this warehouse is not in your assigned scope.</div></div>";
+    includeFooter();
+    exit;
+}
+
+// Fetch Lists for dropdowns — shared helper, also respects the user's direct
+// warehouse grant.
+$warehouses_all = warehousesForSelect($pdo);
 $tax_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage FROM tax_rates WHERE status='active' OR rate_id = " . intval($row['tax_id'] ?? 0) . " ORDER BY rate_percentage ASC")->fetchAll();
 
 // Fetch Components

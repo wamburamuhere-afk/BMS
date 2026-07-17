@@ -1,6 +1,7 @@
 <?php
 // File: stock_adjustments.php
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
 
 autoEnforcePermission('stock_adjustments');
 includeHeader();
@@ -17,6 +18,10 @@ $date_from        = isset($_GET['date_from'])        ? $_GET['date_from']       
 $date_to          = isset($_GET['date_to'])          ? $_GET['date_to']                  : '';
 $project_id_filter= isset($_GET['project_id'])       ? intval($_GET['project_id'])       : 0;
 $page             = isset($_GET['page'])             ? max(1, intval($_GET['page']))     : 1;
+
+if ($warehouse_id > 0 && !userCan('warehouse', $warehouse_id)) {
+    $warehouse_id = 0; // ignore an out-of-scope filter rather than error on a list page
+}
 $per_page         = isset($_GET['per_page'])         ? max(1, intval($_GET['per_page'])) : 25;
 if ($per_page > 500) $per_page = 500;
 
@@ -58,6 +63,7 @@ if ($project_id_filter > 0)  { $conditions[] = "sm.project_id = :project_id";   
 
 if (!empty($conditions)) $query .= " AND " . implode(" AND ", $conditions);
 $query .= scopeFilterSqlNullable('project', 'sm');
+$query .= scopeFilterSqlNullable('warehouse', 'sm');
 $paged_query = $query . " ORDER BY sm.created_at DESC LIMIT :limit OFFSET :offset";
 
 try {
@@ -76,6 +82,7 @@ try {
         WHERE sm.movement_type IN ('adjustment_in','adjustment_out','correction','damaged','expired','found','theft','adjustment','stock_adjustment')";
     if (!empty($conditions)) $sq .= " AND " . implode(" AND ", $conditions);
     $sq .= scopeFilterSqlNullable('project', 'sm');
+    $sq .= scopeFilterSqlNullable('warehouse', 'sm');
     $ss = $pdo->prepare($sq);
     foreach ($params as $k => $v) $ss->bindValue($k, $v);
     $ss->execute();
@@ -93,7 +100,12 @@ try {
 }
 
 try { $products   = $pdo->query("SELECT product_id, product_name, sku FROM products WHERE status='active' AND is_service = 0 ORDER BY product_name")->fetchAll(PDO::FETCH_ASSOC); } catch(Exception $e){ $products=[]; }
-try { $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, IFNULL(project_id,0) as project_id FROM warehouses WHERE status='active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC); } catch(Exception $e){ $warehouses=[]; }
+// Shared helper — also respects the user's direct warehouse grant (Phase 6,
+// pos_upgrade_plan.md). The client-side project cascade below (its own
+// verified copy, not yet migrated to warehouse-project-filter.js — see
+// tests/test_warehouse_project_filter_cli.php) narrows this already-scoped
+// set further by project; it is untouched by this change.
+try { $warehouses = warehousesForSelect($pdo); } catch(Exception $e){ $warehouses=[]; }
 try { $users      = $pdo->query("SELECT user_id, username FROM users WHERE status='active' ORDER BY username")->fetchAll(PDO::FETCH_ASSOC); } catch(Exception $e){ $users=[]; }
 
 $enable_projects = getSetting('enable_projects', 0);
