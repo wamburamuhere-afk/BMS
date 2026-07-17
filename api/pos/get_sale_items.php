@@ -11,6 +11,7 @@
  */
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';   // loads core/project_scope.php
+require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
 
@@ -23,7 +24,7 @@ if ($sale_id <= 0) { echo json_encode(['success' => false, 'message' => 'Invalid
 try {
     global $pdo;
 
-    $st = $pdo->prepare("SELECT sale_id, receipt_number, customer_name, project_id, sale_status, is_return_sale, grand_total
+    $st = $pdo->prepare("SELECT sale_id, receipt_number, customer_name, project_id, warehouse_id, sale_status, is_return_sale, grand_total
                            FROM pos_sales WHERE sale_id = ?");
     $st->execute([$sale_id]);
     $sale = $st->fetch(PDO::FETCH_ASSOC);
@@ -33,6 +34,12 @@ try {
     $pid = $sale['project_id'] !== null && $sale['project_id'] !== '' ? (int)$sale['project_id'] : null;
     if ($pid !== null && !userCan('project', $pid)) {
         http_response_code(403); echo json_encode(['success' => false, 'message' => 'This sale is not in your project scope.']); exit;
+    }
+
+    // Warehouse-scope guard: a non-admin may only see a sale drawn from their assigned warehouse(s).
+    $wid = $sale['warehouse_id'] !== null && $sale['warehouse_id'] !== '' ? (int)$sale['warehouse_id'] : null;
+    if ($wid !== null && !userCan('warehouse', $wid)) {
+        http_response_code(403); echo json_encode(['success' => false, 'message' => 'This sale is not in your assigned warehouse scope.']); exit;
     }
 
     $li = $pdo->prepare("SELECT sale_item_id, product_id, product_name, quantity, unit_price, tax_rate,

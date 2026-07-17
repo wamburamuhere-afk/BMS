@@ -1,5 +1,65 @@
 # BMS Changelog
 
+## 2026-07-17 (feat) — POS + reports + dashboard: per-warehouse access control (pos_upgrade_plan.md Phase 6)
+
+**New:** `migrations/2026_07_17_user_scope_overrides_unique_key.php`,
+`tests/test_warehouse_scope_cli.php`
+**Files:** `core/warehouse_scope.php` (new `hasAllWarehouseAccess()`),
+`app/constant/settings/user_projects.php` (warehouse assignment UI — project-linked
++ external warehouse checkboxes, "grant all warehouses" toggle, one combined save),
+`app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php` (lock the POS warehouse
+dropdown to the cashier's scope; auto-select when exactly one),
+`api/pos/simple_products.php`, `api/pos/process_sale.php`, `api/pos/create_return.php`,
+`api/pos/void_sale.php`, `api/pos/receive_payment.php`, `api/pos/print_receipt.php`
+(also added a missing `isAuthenticated()`/`canView()` gate — this file had none),
+`api/pos/get_sale_items.php`, `api/pos/get_dashboard.php`, `api/pos/get_sales.php`,
+`api/account/get_sales_report.php`, `api/account/get_purchase_report.php`,
+`api/account/get_inventory_report.php`, `api/account/get_stock_movements.php`,
+`api/account/get_stock_transfers.php`, `api/account/get_stock_adjustments.php`,
+`api/get_warehouse_stock_detail.php` (also added a missing scope check — this file
+had none), `api/get_product_warehouses.php`, `app/constant/reports/sales_report.php`,
+`app/constant/reports/purchase_report.php`, `app/constant/reports/inventory_report.php`,
+`app/bms/operations/warehouse_stock_view.php`, `app/bms/stock/warehouse_view.php`,
+`app/dashboard.php`
+
+Closes gap G10: a company running multiple POS terminals had no way to confine a
+cashier to their assigned warehouse — any authenticated POS user could post a sale,
+process a return/void, or pull stock/sales figures against *any* warehouse's data,
+and the same gap existed in the sales/purchase/inventory reports and the main
+dashboard. Reuses existing, previously-unused infrastructure: `user_scope_overrides`
+(zero rows before this) and `core/project_scope.php`'s generic `userCan('warehouse', …)`
+/ `scopeFilterSql(Nullable)('warehouse', …)` helpers, which already treated
+`warehouse` as a first-class resource type with no call sites anywhere in the
+codebase. A `resource_id = NULL` row grants all warehouses (for roles that need
+full multi-warehouse visibility) without a separate permission system.
+
+- **Assignment UI** (`user_projects.php`) — after picking a user: project
+  checkboxes (unchanged) each expand inline to their own warehouses, plus a
+  separate "external warehouses" panel and a "grant all" toggle. One transaction
+  saves projects and warehouses together — the two panels cannot be silently
+  desynced by a partial save.
+- **POS** — warehouse dropdown constrained to the cashier's scope (auto-selected
+  and locked when there's exactly one); `process_sale.php`, `create_return.php`,
+  `void_sale.php`, `receive_payment.php`, `print_receipt.php`, `get_sale_items.php`,
+  and `simple_products.php` all reject an out-of-scope `warehouse_id` server-side,
+  not just hide it in the UI.
+- **Reports** — Sales, Purchase, and Inventory reports gained a warehouse filter
+  (scoped dropdown) and a server-side guard on the `warehouse_id` GET param;
+  stock Movements/Transfers/Adjustments views got the same treatment.
+- **Dashboard** — POS revenue tile, inventory value/low-stock count, and low/negative-stock
+  alerts now aggregate only from the viewer's assigned warehouse(s) instead of
+  company-wide.
+
+Verified via `tests/test_warehouse_scope_cli.php` (81 checks: required files,
+helper signatures, a static regression guard confirming every touched
+enforcement point still calls the scope check, `php -l` on every file, and a
+live DB test granting/denying real warehouse access via `user_scope_overrides`)
+plus a live in-process call to `api/pos/simple_products.php` against a real user
+showing both the granted-warehouse success path and the denied-warehouse 403.
+Pre-existing regression guards (`test_warehouse_project_filter_cli.php`,
+`test_pos_dashboard_cli.php`) re-run clean — no breakage to the existing
+project/warehouse cascade or dashboard reconciliation.
+
 ## 2026-07-17 (feat) — Document comments/notes + per-user document sharing (WorkDo gap closure #1 and #2)
 
 **New:** `migrations/2026_07_17_document_comments_notes_assignees.php`,

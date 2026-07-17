@@ -1,8 +1,8 @@
 <?php
-// scope-audit: skip — warehouse lookup for product; warehouse scope deferred to Phase G-2
 // File: api/get_product_warehouses.php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/warehouse_scope.php';
 global $pdo;
 
 if (!isset($_SESSION['user_id'])) {
@@ -13,15 +13,16 @@ if (!isset($_SESSION['user_id'])) {
 $product_id = $_GET['product_id'] ?? 0;
 
 try {
-    // Fetch warehouses and current stock for the product
+    // Fetch warehouses and current stock for the product, scoped to the
+    // requesting user's assigned warehouse(s) — Phase 6 (pos_upgrade_plan.md).
     $sql = "
-        SELECT 
+        SELECT
             w.warehouse_id,
             w.warehouse_name,
             COALESCE(ps.stock_quantity, 0) as stock_quantity
         FROM warehouses w
         LEFT JOIN product_stocks ps ON w.warehouse_id = ps.warehouse_id AND ps.product_id = ?
-        WHERE w.status = 'active'
+        WHERE w.status = 'active' " . scopeFilterSqlNullable('warehouse', 'w') . "
         ORDER BY w.warehouse_name ASC
     ";
     

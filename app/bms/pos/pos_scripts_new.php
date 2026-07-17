@@ -21,6 +21,23 @@ $(document).ready(function() {
     // Load cart from localStorage
     loadCartFromStorage();
 
+    // Phase 6 (pos_upgrade_plan.md): the dropdown's <option> list is already
+    // narrowed server-side to this cashier's own warehouse assignment. If
+    // that leaves exactly one choice, lock it — no illusion of a choice that
+    // isn't really there. More than one (e.g. a supervisor covering several
+    // warehouses) stays a real dropdown, just constrained to their set.
+    (function () {
+        const $realOptions = $('#posWarehouseId option').filter(function () { return $(this).val() !== ''; });
+        if ($realOptions.length === 1) {
+            $('#posWarehouseId').val($realOptions.first().val()).prop('disabled', true);
+        } else if ($realOptions.length === 0) {
+            $('#posWarehouseId').after(
+                '<div class="text-danger small mt-1" id="posNoWarehouseWarning">' +
+                '<i class="bi bi-exclamation-triangle"></i> No warehouse is assigned to your account — contact an administrator.</div>'
+            );
+        }
+    })();
+
     // Shared Project → Warehouse cascade (assets/js/warehouse-project-filter.js):
     // no project -> only warehouses not assigned to any project;
     // project selected -> only that project's warehouses.

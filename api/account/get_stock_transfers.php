@@ -33,6 +33,12 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from) || !preg_match('/^\d{4}-\d{
 if ($project_id !== null && !userCan('project', $project_id)) {
     http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access denied: project not in your scope.']); exit;
 }
+if ($from_wh !== null && !userCan('warehouse', $from_wh)) {
+    http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access denied: the source warehouse is not in your assigned scope.']); exit;
+}
+if ($to_wh !== null && !userCan('warehouse', $to_wh)) {
+    http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access denied: the destination warehouse is not in your assigned scope.']); exit;
+}
 
 try {
     global $pdo;
@@ -45,16 +51,19 @@ try {
     if ($product_id !== null) { $where[] = "sti.product_id = ?";       $params[] = $product_id; }
     if ($status     !== '')   { $where[] = "st.status = ?";            $params[] = $status; }
 
-    // Scope: visible if EITHER endpoint warehouse is in scope. For an explicit
-    // project filter, match either endpoint to that project.
-    $scope_sql = '';
+    // Scope: visible if EITHER endpoint warehouse is in scope. An explicit
+    // project filter narrows both endpoints to that project; an explicit
+    // from/to warehouse is already verified above and needs no extra scoping
+    // (that endpoint being in-scope already satisfies the "either" rule).
     if ($project_id !== null) {
         $where[]  = "(fw.project_id = ? OR tw.project_id = ?)";
         $params[] = $project_id;
         $params[] = $project_id;
-    } else {
-        $f = scopeFilterSqlNullable('project', 'fw');
-        $t = scopeFilterSqlNullable('project', 'tw');
+    }
+    $scope_sql = '';
+    if ($from_wh === null && $to_wh === null) {
+        $f = scopeFilterSqlNullable('warehouse', 'fw');
+        $t = scopeFilterSqlNullable('warehouse', 'tw');
         // Either endpoint in scope (admins → both helpers return '' → no clause).
         if ($f !== '' || $t !== '') {
             $scope_sql = " AND ((1=1$f) OR (1=1$t))";

@@ -35,6 +35,7 @@ $salesperson_id = $_GET['salesperson_id'] ?? '';
 $status         = $_GET['status']         ?? '';
 $source         = $_GET['source']         ?? '';   // '' | 'invoice' | 'pos'
 $project_id     = (isset($_GET['project_id']) && $_GET['project_id'] !== '') ? (int)$_GET['project_id'] : null;
+$warehouse_id   = (isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '') ? (int)$_GET['warehouse_id'] : null;
 
 // Sanitise source to known values only
 if (!in_array($source, ['', 'invoice', 'pos'], true)) $source = '';
@@ -47,6 +48,11 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from) || !preg_match('/^\d{4}-\d{
 if ($project_id !== null && !userCan('project', $project_id)) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your assigned scope.']);
+    exit;
+}
+if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
     exit;
 }
 
@@ -65,7 +71,9 @@ try {
     else                { $inv_where[] = "i.status != 'cancelled'"; }
     $inv_scope = '';
     if ($project_id !== null) { $inv_where[] = "i.project_id = ?"; $inv_params[] = $project_id; }
-    else                      { $inv_scope   = scopeFilterSqlNullable('project', 'i'); }
+    else                      { $inv_scope  .= scopeFilterSqlNullable('project', 'i'); }
+    if ($warehouse_id !== null) { $inv_where[] = "i.warehouse_id = ?"; $inv_params[] = $warehouse_id; }
+    else                        { $inv_scope  .= scopeFilterSqlNullable('warehouse', 'i'); }
     $inv_where_sql = implode(' AND ', $inv_where) . $inv_scope;
 
     // ── POS WHERE ─────────────────────────────────────────────────────────
@@ -77,7 +85,9 @@ try {
     if ($salesperson_id !== '') { $pos_where[] = "ps.user_id = ?";     $pos_params[] = (int)$salesperson_id; }
     $pos_scope = '';
     if ($project_id !== null) { $pos_where[] = "ps.project_id = ?"; $pos_params[] = $project_id; }
-    else                      { $pos_scope   = scopeFilterSqlNullable('project', 'ps'); }
+    else                      { $pos_scope  .= scopeFilterSqlNullable('project', 'ps'); }
+    if ($warehouse_id !== null) { $pos_where[] = "ps.warehouse_id = ?"; $pos_params[] = $warehouse_id; }
+    else                        { $pos_scope  .= scopeFilterSqlNullable('warehouse', 'ps'); }
     $pos_where_sql = implode(' AND ', $pos_where) . $pos_scope;
 
     // When a source is excluded use WHERE 1=0 so its subquery contributes nothing,

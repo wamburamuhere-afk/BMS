@@ -18,7 +18,14 @@ if ($warehouse_id <= 0 || $project_id <= 0) {
     includeFooter(); exit;
 }
 
-assertScopeForRecordHtml('warehouses', 'warehouse_id', $warehouse_id);
+// Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope, not the
+// warehouse's project — a user's project assignment no longer implies access
+// to every warehouse tied to it.
+require_once __DIR__ . '/../../../core/warehouse_scope.php';
+if (!userCan('warehouse', $warehouse_id)) {
+    if (!headers_sent()) http_response_code(403);
+    die('Access denied: this warehouse is not in your assigned scope.');
+}
 
 // Validate warehouse belongs to project
 $wh_stmt = $pdo->prepare("
