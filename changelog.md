@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-07-17 (fix) — POS Dashboard: Low Stock tile now respects warehouse + project scope
+
+**Files:** `api/pos/get_dashboard.php`, `tests/test_pos_dashboard_cli.php`
+
+Every other tile on the POS Workspace dashboard (net sales, trend, top products,
+recent sales) already respected the viewer's project + warehouse scope. The
+"Low Stock" tile was the one exception — it read `products.current_stock`, a
+company-wide rollup column, with no scope filter at all, so every user saw the
+exact same low-stock list regardless of which warehouse they're assigned to.
+
+Rewrote it to aggregate from `product_stocks` (the real per-warehouse balance)
+scoped by the viewer's warehouse access, plus the product's own project tag —
+`product_stocks` carries no `project_id` of its own, so project scope applies
+via the joined `products` row instead. Verified against real data: a user
+granted only warehouse 5 (no low-stock items there) now sees `low_stock_count:
+0`; a user granted warehouse 14 sees exactly its own 2 low-stock items (`CAR`,
+`hellow`), not the company-wide list.
+
+Also updated `tests/test_pos_dashboard_cli.php`'s own reconciliation query,
+which was still comparing against the old company-wide definition — a
+different, less accurate metric than the corrected per-warehouse one, not a
+scope regression. Full suite: 319 checks across
+`test_warehouse_scope_cli.php` (137), `test_pos_dashboard_cli.php` (98), and
+`test_warehouse_project_filter_cli.php` (84) — all green.
+
 ## 2026-07-17 (fix) — Non-Inventory Products: warehouse scope on list + create dropdown
 
 **Files:** `app/bms/product/services.php`

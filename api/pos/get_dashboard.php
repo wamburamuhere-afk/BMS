@@ -94,12 +94,35 @@ try {
         'name' => $r['name'] ?: '—', 'qty' => (float)$r['qty'], 'revenue' => round((float)$r['revenue'], 2),
     ], $st->fetchAll(PDO::FETCH_ASSOC));
 
-    // Low stock (stocked products only; products aren't project-scoped).
-    $low_count = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE COALESCE(is_service,0)=0 AND current_stock <= min_stock_level")->fetchColumn();
-    $low_stock = $pdo->query("SELECT product_name, current_stock, min_stock_level
-                                FROM products
-                               WHERE COALESCE(is_service,0)=0 AND current_stock <= min_stock_level
-                            ORDER BY (current_stock - min_stock_level) ASC LIMIT 8")->fetchAll(PDO::FETCH_ASSOC);
+    // Low stock — per-warehouse balance from product_stocks, scoped by the
+    // viewer's warehouse access (product_stocks carries no project_id of its
+    // own, so warehouse scope applies there) AND by the product's own
+    // project tag on the products row — not the company-wide
+    // products.current_stock rollup this used to read.
+    $lowStockScope = scopeFilterSqlNullable('warehouse', 'lps') . scopeFilterSqlNullable('project', 'p');
+    $lowStockBase = "
+        FROM product_stocks lps
+        JOIN products p ON lps.product_id = p.product_id
+       WHERE p.status = 'active' AND COALESCE(p.is_service,0) = 0 $lowStockScope
+    ";
+    $lowStockHaving = "HAVING SUM(lps.stock_quantity) <= MAX(COALESCE(NULLIF(lps.min_stock_level,0), p.reorder_level, 0))";
+
+    $low_count = (int)$pdo->query("
+        SELECT COUNT(*) FROM (
+            SELECT p.product_id $lowStockBase GROUP BY p.product_id $lowStockHaving
+        ) t
+    ")->fetchColumn();
+
+    $low_stock = $pdo->query("
+        SELECT p.product_name,
+               SUM(lps.stock_quantity) AS current_stock,
+               MAX(COALESCE(NULLIF(lps.min_stock_level,0), p.reorder_level, 0)) AS min_stock_level
+        $lowStockBase
+        GROUP BY p.product_id, p.product_name
+        $lowStockHaving
+        ORDER BY (SUM(lps.stock_quantity) - MAX(COALESCE(NULLIF(lps.min_stock_level,0), p.reorder_level, 0))) ASC
+        LIMIT 8
+    ")->fetchAll(PDO::FETCH_ASSOC);
     $low_stock = array_map(fn($r) => [
         'name' => $r['product_name'], 'current' => (float)$r['current_stock'], 'min' => (float)$r['min_stock_level'],
     ], $low_stock);
