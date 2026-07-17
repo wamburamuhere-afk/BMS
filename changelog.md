@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-07-17 (fix) — Non-Inventory Products: warehouse scope on list + create dropdown
+
+**Files:** `app/bms/product/services.php`
+
+Follow-up to the same-day stat-card fix. Two more gaps in this page, found while
+investigating a reported POS visibility issue (see the changelog entry above this
+one, and the analysis note in `pos_upgrade_plan.md`):
+
+1. The table/count/stat-card `$scope_sql` only filtered by project, never by
+   warehouse — extended to `scopeFilterSqlNullable('project','p') .
+   scopeFilterSqlNullable('warehouse','p')`, one shared variable so the table
+   and all four cards stay consistent with each other automatically.
+2. The Add/Edit modal's warehouse dropdown was hand-rolled and returned **zero
+   warehouses** for any user with no project assignment — even one explicitly
+   granted an external warehouse directly (Phase 6b). Replaced with the shared
+   `warehousesForSelect()` helper, matching every other create/edit page fixed
+   earlier today.
+
+Confirmed non-bug along the way: the "Inactive" stat card and the table
+appearing to disagree was not a bug — the table defaults to `status=active`
+and the one inactive item in scope only appears once the status filter is
+switched to "Inactive" or "All", which was verified to work correctly.
+
 ## 2026-07-17 (fix) — Non-Inventory Products stat cards + POS service warehouse strictness
 
 **Files:** `app/bms/product/services.php`, `api/pos/simple_products.php`

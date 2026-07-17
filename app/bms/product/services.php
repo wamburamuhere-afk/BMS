@@ -62,9 +62,12 @@ if ($category_id > 0) {
 }
 
 // Project scope: NULL = global (visible to all); set = only users assigned to that project.
-// Carries its own leading AND, so it is appended to each query rather than pushed
-// into $conditions (which are joined with " AND ").
-$scope_sql = scopeFilterSqlNullable('project', 'p');
+// Warehouse scope (Phase 6, pos_upgrade_plan.md): NULL = global; set = only
+// users granted that warehouse. Both carry their own leading AND, so they are
+// appended to each query rather than pushed into $conditions (joined with " AND ").
+// This single $scope_sql feeds the table, the count, AND all four stat cards,
+// so they can never disagree with each other.
+$scope_sql = scopeFilterSqlNullable('project', 'p') . scopeFilterSqlNullable('warehouse', 'p');
 
 if (!empty($conditions)) {
     $query .= " AND " . implode(" AND ", $conditions);
@@ -102,22 +105,23 @@ if (empty($units)) $units = [['unit_code'=>'pcs','unit_name'=>'Pieces']];
 // Projects dropdown — admins see all; non-admins see only their assigned projects
 if (!empty($_SESSION['scope']['is_admin'])) {
     $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status='active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
-    $warehouses = $pdo->query("SELECT warehouse_id, warehouse_name, project_id FROM warehouses WHERE status='active' ORDER BY warehouse_name")->fetchAll(PDO::FETCH_ASSOC);
 } else {
     $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
     if (empty($assigned)) {
-        $projects   = [];
-        $warehouses = [];
+        $projects = [];
     } else {
         $ph = implode(',', array_fill(0, count($assigned), '?'));
         $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status='active' AND project_id IN ($ph) ORDER BY project_name");
         $pstmt->execute($assigned);
         $projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
-        $wstmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, project_id FROM warehouses WHERE status='active' AND (project_id IS NULL OR project_id IN ($ph)) ORDER BY warehouse_name");
-        $wstmt->execute($assigned);
-        $warehouses = $wstmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
+// Warehouses: shared helper — covers project-derived AND explicitly-granted
+// external warehouses (Phase 6, pos_upgrade_plan.md). The hand-rolled version
+// this replaced returned zero warehouses for any user with no project
+// assignment, even if they'd been explicitly granted one directly.
+require_once ROOT_DIR . '/core/warehouse_scope.php';
+$warehouses = warehousesForSelect($pdo);
 
 // Pagination URL helper
 function svc_pagination_url($p) {
