@@ -1,5 +1,49 @@
 # BMS Changelog
 
+## 2026-07-18 (fix) — Invoice-from-SO: customer not auto-filled + LPO/DN reference pickers over-exposed
+
+**New:** `tests/test_invoice_create_scope_cli.php`
+**Files:** `app/bms/invoice/invoice_create.php`
+
+User-reported: creating an Invoice from an approved Sales Order, as a
+non-admin under an assigned external project, showed (1) the Customer field
+not auto-filled, and (2) more LPOs in the "Customer LPO" reference dropdown
+than the user's actual scope (expected 1, saw more). Investigation found a
+third, unreported instance of the same class of bug in the same file.
+
+**Customer not auto-filled:** the customer was already correctly resolved
+server-side (`$customer_id` from the SO's `customer_id`), but the Customer
+`<select>` was populated by a *separately*-scoped query filtering on
+`customers.project_id` — that field is the customer's own independent
+"linked project" setting, unrelated to the SO's project. A customer whose
+own project link isn't in the user's assigned projects got silently
+excluded from the option list even though the user's legitimate access to
+the SO already implies legitimate access to its customer here. Fixed by
+force-including the resolved `$customer` as an option whenever it's missing
+from the scoped list.
+
+**LPO reference dropdown over-exposed:** built from a completely unscoped
+inline query (`SELECT ... FROM customer_lpos WHERE status != 'deleted'
+LIMIT 500`), never wired to the proven-correct, scoped query already used
+by the real LPO list page (`api/customer/get_lpos_list.php`). Fixed with
+the same `scopeFilterSqlNullable('project', 'l') .
+scopeFilterSqlNullable('warehouse', 'l')` pattern.
+
+**Delivery Note reference dropdown (bonus, same file, same bug class, not
+explicitly reported):** built the same unscoped way. Fixed identically
+using the pattern from `api/get_delivery_notes_list.php`
+(`scopeFilterSqlNullable('project'|'warehouse', 'd')`).
+
+**Verification:** `tests/test_invoice_create_scope_cli.php` (13 checks) —
+`php -l`; static checks that the old unscoped query is gone and the new
+scoped/force-include code is present; live tests creating a real project +
+warehouse-scoped test user plus real LPO/DN rows in both an in-scope and an
+out-of-scope project, proving the picker queries now return only the
+in-scope rows; and a live reproduction of the customer cross-link exclusion
+bug proving the force-include fix closes it. `scratch/project_scope_audit.php`
+re-run: `unscoped_count` unchanged at 4 (same 4 pre-existing, unrelated
+files flagged earlier this session — nothing new introduced).
+
 ## 2026-07-18 (fix) — Bills invisible to warehouse-only users + Purchase Return "no supplier available"
 
 **New:** `tests/test_bills_grn_return_scope_cli.php`

@@ -129,16 +129,21 @@ if ($delivery_id > 0) {
     }
 }
 
-// Customer LPOs for the optional "Customer LPO" reference dropdown
+// Customer LPOs for the optional "Customer LPO" reference dropdown — scoped
+// by project/warehouse for non-admins (same helper as the real LPO list page,
+// api/customer/get_lpos_list.php).
+require_once ROOT_DIR . '/core/project_scope.php';
 $customer_lpos_for_select = [];
 try {
-    $customer_lpos_for_select = $pdo->query("SELECT lpo_id, lpo_number, customer_id FROM customer_lpos WHERE status != 'deleted' ORDER BY issue_date DESC LIMIT 500")->fetchAll(PDO::FETCH_ASSOC);
+    $_ic_lpo_scope = scopeFilterSqlNullable('project', 'l') . scopeFilterSqlNullable('warehouse', 'l');
+    $customer_lpos_for_select = $pdo->query("SELECT lpo_id, lpo_number, customer_id FROM customer_lpos l WHERE status != 'deleted' $_ic_lpo_scope ORDER BY issue_date DESC LIMIT 500")->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {}
 
-// Outbound Delivery Notes for the optional "Delivery Note" reference dropdown
+// Outbound Delivery Notes for the optional "Delivery Note" reference dropdown — same scoping.
 $delivery_notes_for_select = [];
 try {
-    $delivery_notes_for_select = $pdo->query("SELECT delivery_id, delivery_number FROM deliveries WHERE dn_type = 'outbound' AND status = 'approved' ORDER BY delivery_date DESC LIMIT 500")->fetchAll(PDO::FETCH_ASSOC);
+    $_ic_dn_scope = scopeFilterSqlNullable('project', 'd') . scopeFilterSqlNullable('warehouse', 'd');
+    $delivery_notes_for_select = $pdo->query("SELECT delivery_id, delivery_number FROM deliveries d WHERE dn_type = 'outbound' AND status = 'approved' $_ic_dn_scope ORDER BY delivery_date DESC LIMIT 500")->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {}
 
 // Scope: assigned project IDs for current user
@@ -154,6 +159,16 @@ if (isAdmin()) {
     $customers = $_ic_cstmt->fetchAll(PDO::FETCH_ASSOC);
 } else {
     $customers = $pdo->query("SELECT customer_id, customer_name, company_name FROM customers WHERE status = 'active' AND project_id IS NULL ORDER BY customer_name")->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Guarantee the customer resolved from the source SO/DN is always selectable.
+// customers.project_id is that customer's own "linked project" field — an
+// independent, optional setting distinct from the SO/DN's own project — so a
+// customer whose SO the user is legitimately viewing can still fail that
+// unrelated check and be missing from the list above.
+if ($customer && !in_array((int)$customer['customer_id'], array_column($customers, 'customer_id'))) {
+    $customers[] = $customer;
+    usort($customers, fn($a, $b) => strcasecmp($a['customer_name'] ?? '', $b['customer_name'] ?? ''));
 }
 
 // Warehouses for dropdown — scoped by project for non-admins; JS filters further
