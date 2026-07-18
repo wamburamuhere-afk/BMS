@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-07-18 (feat) — Create Document: reference number now visible on the actual letter (Phase A of 3)
+
+**File:** `app/constant/document/create_document.php`
+
+First of a 3-phase plan to bring Create Document's output up to the same
+professional standard as the rest of BMS's printed documents (gap analysis
+against WorkDo-standard document creation).
+
+Every created letter already gets a real, sequential reference number
+(`document_code`, e.g. `BMS-LTR-0042`) — but it was only ever shown in a
+screen-only toolbar field, explicitly excluded from print, and never
+existed anywhere inside `#letterPaper` (the element actually captured into
+the saved PDF). A recipient receiving the letter had no way to see or quote
+its reference number unless the author manually pasted the `{{document_code}}`
+merge token into the body text themselves.
+
+Added a `Ref: {{document_code}}` line into the sender/date column of the
+letterhead (right above the date, matching its existing right-aligned
+typography) — reusing the same `$document_code` variable already used
+everywhere else in this file (the toolbar field, the merge-token map), so
+there's no new data source, just a new place it's displayed. Correctly
+hidden along with the rest of the address block when "Include letterhead"
+is switched off (existing `.no-letterhead` rule already covers the whole
+`.letter-addr-row`, no separate rule needed).
+
+Verified visually via a standalone reproduction of the real letterhead
+markup/CSS at real dimensions — reference number renders cleanly, doesn't
+crowd the date or sender info.
+
 ## 2026-07-18 (fix) — Budget Details print report: Bank/Cash badges bled into the Ref# column
 
 **File:** `app/constant/accounts/budget_details.php`

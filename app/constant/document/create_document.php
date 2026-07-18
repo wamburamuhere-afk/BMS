@@ -381,6 +381,7 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
                 <div id="senderInfoCustomWrap" style="<?= $custom_sender_info !== null ? '' : 'display:none;' ?>">
                     <div id="senderInfoCustom"><?= $custom_sender_info !== null ? $custom_sender_info : '<div>' . implode('</div><div>', array_map('htmlspecialchars', $sender_lines)) . '</div>' ?></div>
                 </div>
+                <div class="letter-refno" id="letter-refno-display">Ref: <?= htmlspecialchars($document_code) ?></div>
                 <div class="letter-date" id="letter-date-display"><?= htmlspecialchars(date('d M Y', strtotime($letter_date))) ?></div>
             </div>
         </div>
@@ -556,6 +557,7 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
 #senderInfoCustomWrap { text-align: right; }
 #senderInfoCustomWrap .note-editable { font-size: 10pt; color: #333; }
 #senderInfoCustomWrap .note-toolbar { justify-content: flex-end; }
+.letter-refno { margin-top: 1mm; font-weight: 600; }
 .letter-date { margin-top: 1mm; }
 
 .letter-subject { font-size: 11pt; margin-bottom: 8mm; text-decoration: underline; }
