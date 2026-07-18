@@ -6,6 +6,7 @@
 // LPO (Optional)" dropdowns. Same eligibility rules as the existing
 // ?order=/?lpo_id= URL-arrival paths in dn_outbound.php itself.
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/project_scope.php';
 
 header('Content-Type: application/json');
 
@@ -24,10 +25,13 @@ if ($customer_id <= 0) {
 try {
     global $pdo;
 
+    // Found 2026-07-18: this picker had no project/warehouse scoping at all —
+    // same class of bug as the GRN PO-picker fix, just on the sales side.
     $soStmt = $pdo->prepare("
         SELECT sales_order_id, order_number, order_date
         FROM sales_orders
         WHERE customer_id = ? AND status IN ('approved', 'processing', 'shipped')
+        " . scopeFilterSqlNullable('project') . scopeFilterSqlNullable('warehouse') . "
         ORDER BY order_date DESC
     ");
     $soStmt->execute([$customer_id]);
@@ -37,6 +41,7 @@ try {
         SELECT lpo_id, lpo_number, issue_date
         FROM customer_lpos
         WHERE customer_id = ? AND status IN ('approved', 'partially_fulfilled')
+        " . scopeFilterSqlNullable('project') . scopeFilterSqlNullable('warehouse') . "
         ORDER BY issue_date DESC
     ");
     $lpoStmt->execute([$customer_id]);

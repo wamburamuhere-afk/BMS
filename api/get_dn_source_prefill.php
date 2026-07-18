@@ -9,6 +9,7 @@
 // mandatory on the DN form; this only supplies defaults the user can still
 // edit freely.
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/project_scope.php';
 
 header('Content-Type: application/json');
 
@@ -34,6 +35,21 @@ try {
         $so = $sostmt->fetch(PDO::FETCH_ASSOC);
         if (!$so) {
             echo json_encode(['success' => false, 'message' => 'Sales Order not found or not eligible']);
+            exit;
+        }
+        // Found 2026-07-18 (IDOR): this endpoint returned full order data —
+        // project, warehouse, delivery address, items — for ANY sales_order_id
+        // with no ownership check at all. A guessed/incremented id could pull
+        // another project's order details even though it never appeared in
+        // this user's own (now-scoped) picker list.
+        if (!empty($so['project_id']) && !userCan('project', (int)$so['project_id'])) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Access denied: this Sales Order is not in your scope']);
+            exit;
+        }
+        if (!empty($so['warehouse_id']) && !userCan('warehouse', (int)$so['warehouse_id'])) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Access denied: this Sales Order is not in your scope']);
             exit;
         }
 
@@ -71,6 +87,17 @@ try {
         $lpo = $lstmt->fetch(PDO::FETCH_ASSOC);
         if (!$lpo || !in_array($lpo['status'], ['approved', 'partially_fulfilled'], true)) {
             echo json_encode(['success' => false, 'message' => 'Customer LPO not found or not eligible']);
+            exit;
+        }
+        // Same IDOR fix as the Sales Order branch above.
+        if (!empty($lpo['project_id']) && !userCan('project', (int)$lpo['project_id'])) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Access denied: this Customer LPO is not in your scope']);
+            exit;
+        }
+        if (!empty($lpo['warehouse_id']) && !userCan('warehouse', (int)$lpo['warehouse_id'])) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Access denied: this Customer LPO is not in your scope']);
             exit;
         }
 

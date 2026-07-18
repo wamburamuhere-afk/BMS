@@ -1,6 +1,5 @@
 <?php
 // File: grn_create.php
-// scope-audit: skip — GRN edit form; scope enforced at save level
 require_once __DIR__ . '/../../../roots.php';
 
 // Enforce permission BEFORE any output
@@ -167,12 +166,16 @@ $suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get warehouses for dropdown — scoped by project for non-admins (shared helper)
 require_once ROOT_DIR . '/core/warehouse_scope.php';
+require_once ROOT_DIR . '/core/project_scope.php';
 $warehouses = warehousesForSelect($pdo);
 
 // Get projects for dropdown
 $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
 
-// Get pending purchase orders
+// Get pending purchase orders — scoped to the current user's project +
+// warehouse access (found 2026-07-18: this picker had NO scoping at all,
+// showing every approved PO in the company regardless of warehouse/project).
+$_grne_po_scope = scopeFilterSqlNullable('project', 'po') . scopeFilterSqlNullable('warehouse', 'po');
 $po_query = "
     SELECT po.purchase_order_id, po.order_number, po.order_date, s.supplier_name, s.supplier_id,
            COUNT(poi.order_item_id) as total_items,
@@ -186,6 +189,7 @@ $po_query = "
         GROUP BY purchase_order_item_id
     ) pri ON poi.order_item_id = pri.purchase_order_item_id
     WHERE po.status IN ('pending', 'ordered', 'partially_received')
+    $_grne_po_scope
 ";
 
 $po_params = [];

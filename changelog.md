@@ -1,5 +1,83 @@
 # BMS Changelog
 
+## 2026-07-18 (fix) — Cross-warehouse/project leaks in document-reference pickers (GRN, DN, received invoices)
+
+**New:** `tests/test_document_reference_pickers_cli.php`
+**Files:** `app/bms/grn/grn_create.php`, `app/bms/grn/grn_edit.php`,
+`api/get_customer_dn_sources.php`, `api/get_dn_source_prefill.php`,
+`api/received_invoices.php`, `api/get_warehouse_supplier_grns.php`,
+`api/operations/get_return_grns.php`
+**Removed:** `api/get_supplier_purchase_orders.php` (confirmed dead — only
+reference anywhere in the repo was a changelog mention, not called from any
+page or JS)
+
+User-reported: creating a GRN and referencing a Purchase Order showed POs
+that don't belong to the selected warehouse at all. Root cause: GRN's
+"select a Purchase Order" picker query had **zero project or warehouse
+filtering** — it pulled every approved PO in the entire company, from every
+warehouse. The file carried a `// scope-audit: skip` comment whose stated
+justification ("scope enforced at save level") is true for the GRN row
+being created but doesn't cover this specific *read* of `purchase_orders` —
+which is exactly why the automated scope-coverage audit
+(`tests/test_project_scope_cli.php`, `unscoped_count ≤ 0`) never caught it:
+a file-level skip exempts the whole file, hiding the real gap.
+
+Same class of gap found in four more places while investigating, one of
+which is a genuine IDOR, not just a picker showing too much:
+
+- **`grn_create.php` / `grn_edit.php`** — the exact reported bug. Added
+  `scopeFilterSqlNullable('project', 'po')` +
+  `scopeFilterSqlNullable('warehouse', 'po')` to the PO-picker query (same
+  call shape already proven correct in `api/account/get_purchase_orders.php`).
+  Removed the incorrect skip comment from both files.
+- **`get_customer_dn_sources.php`** — Delivery Note's Sales-Order/Customer-LPO
+  picker had the identical gap on the sales side; scoped both queries the
+  same way.
+- **`get_dn_source_prefill.php` (IDOR)** — given any `sales_order_id`/
+  `lpo_id`, this returned the full order — customer, project, warehouse,
+  delivery address, items — with only a status check, no ownership check at
+  all. A guessed/incremented id could pull another project's order data
+  even though it would never appear in that user's own (now-scoped) picker
+  list. Added `userCan('project', ...)` / `userCan('warehouse', ...)` checks
+  after fetching the record, for both the Sales Order and Customer LPO
+  branches.
+- **`received_invoices.php`'s PO-reference picker (`get_pos` action)** — the
+  project/warehouse filters were previously applied *only if the client
+  happened to send them*; a user who didn't explicitly filter saw every
+  supplier's PO company-wide. Made the scope filter unconditional
+  (`scopeFilterSqlNullable()`), still additionally narrowable by the
+  optional explicit params as before.
+- **`get_warehouse_supplier_grns.php` / `get_return_grns.php`** (GRN pickers
+  feeding Purchase Return's "Select GRN" dropdown) — normal UI flow always
+  pre-scopes the `warehouse_id` via `warehousesForSelect()`, but neither
+  endpoint checked it server-side, so a crafted direct request with an
+  out-of-scope `warehouse_id` still returned that warehouse's GRNs. Added
+  `userCan('warehouse', $warehouse_id)` to both. Removed their incorrect
+  skip comments too.
+
+Verified: `tests/test_document_reference_pickers_cli.php` (new, 22 checks)
+— static checks confirming every fix is actually present in the source,
+plus a **live test that creates two real POs in two different warehouses**
+and proves the scoped picker query returns the granted-warehouse PO and
+correctly excludes the other one — the exact leak reported. Re-ran every
+related suite: `test_warehouse_scope_cli.php` (137),
+`test_warehouse_project_filter_cli.php` (84),
+`test_grn_create_only_full_group_by_cli.php` (4),
+`test_unit_autofill_lock_cli.php` (24) — 249 checks, all green, no
+regressions (confirms the added scope filter doesn't break MySQL's
+`ONLY_FULL_GROUP_BY` mode the GRN query already runs under).
+
+Also re-ran `scratch/project_scope_audit.php` live: `unscoped_count` dropped
+from 6 to 4 as a result of these fixes. **The remaining 4 are pre-existing
+and unrelated to this bug** (`duplicate_created_document.php` — already
+reviewed separately as a benign name lookup, not a leak;
+`app/bms/pos/inactive_employees.php` and `leave_types.php` — POS/HR,
+unconnected to purchase/delivery documents; `app/bms/invoice/received_invoices.php`
+— a different file from the one fixed above, a benign project-name lookup).
+`tests/test_project_scope_cli.php`'s `$CEILING = 0` therefore still fails
+on these 4 — flagged separately, not silently expanded into this fix's
+scope.
+
 ## 2026-07-18 (fix) — Documents: private-document access-control gap + Create Document correctness gaps
 
 **New:** `core/document_access.php`, `api/document/cancel_external_signature.php`,
