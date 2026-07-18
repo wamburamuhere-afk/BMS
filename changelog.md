@@ -1,5 +1,87 @@
 # BMS Changelog
 
+## 2026-07-18 (feat) — Documents: external-party signing — send a document to a client/supplier to sign (Phase C of 3)
+
+**New:** `migrations/2026_07_18_document_signature_external_signer.php`,
+`api/document/request_external_signature.php`,
+`api/document/submit_external_signature.php`, `sign_document.php`,
+`tests/test_external_signature_cli.php`
+**Files:** `roots.php`, `app/constant/document/select_document_add_esignature.php`,
+`api/get_pending_signatures.php`, `api/get_signature_history.php`,
+`app/constant/document/e_signatures.php`
+
+Last of the 3-phase Create Document plan. Signing was hardcoded to "the
+document's creator signs their own document" — no way to name anyone
+else, which meant an *external* document (a contract, an agreement) could
+never actually collect the outside party's signature inside the system.
+`document_signatures` already had separate `requested_by`/`signed_by`
+columns for exactly this distinction, but every write path set both to the
+same session user — the plumbing existed, it had just never been used as
+designed.
+
+- **Migration** — `signer_name`/`signer_email`/`signer_type` on
+  `document_signatures` (an external signer has no `users` row to point
+  `signed_by` at), plus a new `document_signature_tokens` table: single-use,
+  expiring public-link tokens, same convention as `csrf_token()`
+  (`bin2hex(random_bytes(32))`, only the SHA-256 hash is ever stored).
+- **Signer choice** — the existing signing wizard
+  (`select_document_add_esignature.php`) gained a toggle at step 2: "I will
+  sign this document" (unchanged default behaviour) vs. "Send to someone
+  else to sign" (name + email). Choosing external sends the request via
+  AJAX right there — the wizard never advances into steps 3/4 (positioning/
+  embedding a *local* signature image), since that's for signing yourself.
+- **`request_external_signature.php`** — creates the pending
+  `document_signatures` row + token, emails the signer a link via the
+  existing `sendEmail()` helper (`core/mailer.php`, already production-ready,
+  no new mail infrastructure needed).
+- **`sign_document.php`** — new public, unauthenticated page (added to
+  `$routes` as `sign-document`/`sign_document`). Deliberately skips
+  `includeHeader()` (that's what forces every other page's login redirect)
+  and instead mirrors `login.php`'s standalone-page pattern, just via the
+  full `roots.php` bootstrap (which itself enforces no authentication —
+  that only happens inside `includeHeader()`/`header.php`) so `getUrl()`/
+  `get_setting()`/etc. are available. Validates the token, shows only that
+  one document (the now-real, server-rendered PDF from Phase B, via a plain
+  `<embed>` — no app navigation, nothing else reachable), a draw-signature
+  canvas, and a consent checkbox. Stamps the signature onto the PDF
+  client-side via `pdf-lib` — the same technique the internal wizard already
+  uses (fixed bottom-right position for this flow rather than
+  drag-to-position, a deliberate MVP scope reduction).
+- **`submit_external_signature.php`** — token-authenticated instead of
+  session-authenticated: the single-use, hashed, expiring token IS the
+  credential here, playing the same role a session + CSRF token plays on
+  every other write endpoint. Mirrors `save_signed_pdf.php`'s integrity/audit
+  approach exactly (server-side SHA-256 of before/after, consent required,
+  ordered event log) so an externally-signed document is exactly as legally
+  defensible as an internally-signed one. Marks the token used immediately
+  on success.
+- **Pending/history views** — `get_pending_signatures.php` and
+  `get_signature_history.php` both filtered strictly by `signed_by = me`,
+  which can never match an external signature (`signed_by` stays NULL —
+  there's no user account to attribute it to). Extended both to also surface
+  `requested_by = me AND signer_type = 'external'` rows, so a requester can
+  see "awaiting external signer jane@client.com" instead of the row simply
+  never appearing. `e_signatures.php`'s pending table now shows an
+  "Awaiting external signer" badge instead of a "Sign" button on those rows
+  (signing your own copy would be the wrong action there).
+
+Verified two ways: `tests/test_external_signature_cli.php` (new, 24 checks)
+exercises the real token lifecycle against the live DB — a fresh token
+resolves as valid, a guessed/wrong token matches nothing, a token marked
+used is correctly rejected (single-use enforced), an expired token is
+correctly rejected — plus static checks confirming the security properties
+(hashed storage, real-MIME validation, permission gates, no `includeHeader()`
+on the public page) are actually present in the source. Also visually
+verified: served `sign_document.php` with real test data through a local
+PHP server and screenshotted the rendered page — signer name/email, the
+embedded document, the signature canvas, and the consent statement (with
+the signer's own name correctly interpolated) all render correctly.
+
+**Scope note (deliberate, stated up front in the plan):** this is a working
+first version, not full multi-party chain-signing — one external signer per
+request, fixed signature position (no drag-to-position like the internal
+flow), 7-day link expiry. A reasonable follow-up, not part of "fix first."
+
 ## 2026-07-18 (feat) — Create Document: real server-rendered PDF, not a rasterized screenshot (Phase B of 3)
 
 **New:** `core/document_letter_render.php`, `core/document_letter_pdf.php`,

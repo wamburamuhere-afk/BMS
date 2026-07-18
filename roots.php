@@ -115,6 +115,10 @@ $routes = [
     'activity_log'   => ROOT_DIR . '/app/activity_log.php',
     'profile'        => PROFILE_DIR . '/profile.php',
     'unauthorized'   => ROOT_DIR . '/unauthorized.php',
+    // Public, unauthenticated — reached only via the single-use signing
+    // token emailed by api/document/request_external_signature.php.
+    'sign-document'  => ROOT_DIR . '/sign_document.php',
+    'sign_document'  => ROOT_DIR . '/sign_document.php',
 
     // ========================================================================
     // ACCOUNTS MODULE (App Directory)

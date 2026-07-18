@@ -136,9 +136,53 @@ $signerEmail = $signer['email'] ?? '';
                 <div class="alert alert-info py-2 m-0 mb-3">
                     <i class="bi bi-file-earmark-check"></i> Selected Document: <strong id="selected-doc-name">-</strong>
                 </div>
-                <h5 class="mb-3">Choose Your Signature</h5>
-                <div class="row g-3" id="wizardSignatureGrid">
-                    <!-- Loaded via AJAX -->
+
+                <!-- Who signs this? Internal (default, unchanged flow below) vs
+                     external (a client/supplier with no BMS login — emailed a
+                     single-use link to sign_document.php instead). -->
+                <div class="mb-4">
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="signerType" id="signerTypeInternal" checked>
+                        <label class="btn btn-outline-primary" for="signerTypeInternal"><i class="bi bi-person-check"></i> I will sign this document</label>
+                        <input type="radio" class="btn-check" name="signerType" id="signerTypeExternal">
+                        <label class="btn btn-outline-primary" for="signerTypeExternal"><i class="bi bi-send"></i> Send to someone else to sign</label>
+                    </div>
+                </div>
+
+                <div id="internalSignerPanel">
+                    <h5 class="mb-3">Choose Your Signature</h5>
+                    <div class="row g-3" id="wizardSignatureGrid">
+                        <!-- Loaded via AJAX -->
+                    </div>
+                </div>
+
+                <div id="externalSignerPanel" class="d-none">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Signer Name</label>
+                            <input type="text" class="form-control" id="extSignerName" placeholder="e.g. Jane Doe, ABC Suppliers Ltd">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Signer Email</label>
+                            <input type="email" class="form-control" id="extSignerEmail" placeholder="jane@abcsuppliers.com">
+                        </div>
+                    </div>
+                    <p class="small text-muted mt-2 mb-3">
+                        They'll receive an emailed link, valid for 7 days and usable once, to view and sign this
+                        document — no BMS account required.
+                    </p>
+                    <div id="extSignerMessage"></div>
+                    <div id="extSignerSendRow">
+                        <button type="button" class="btn btn-primary" id="btnSendExternalRequest">
+                            <i class="bi bi-send"></i> Send Signature Request
+                        </button>
+                    </div>
+                    <div id="extSignerSentRow" class="d-none text-center py-4">
+                        <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+                        <h5 class="mt-3">Request sent</h5>
+                        <p class="text-muted" id="extSignerSentMessage"></p>
+                        <a href="e_signatures.php" class="btn btn-outline-secondary mt-2"><i class="bi bi-house"></i> Done</a>
+                    </div>
                 </div>
             </div>
 
@@ -514,11 +558,15 @@ function updateButtons() {
     const onLast = currentStep === 4;
     const onSign = currentStep === 3;
 
-    // Back button — hidden only on step 4, disabled only on step 1
-    $('#btnBack').toggleClass('d-none', onLast).prop('disabled', currentStep === 1);
+    // On step 2, external-signer mode has its own Send Request action inside
+    // the panel — the normal Previous/Next footer doesn't apply there.
+    const onExternalStep2 = currentStep === 2 && isExternalMode();
+
+    // Back button — hidden only on step 4 or external-mode step 2, disabled only on step 1
+    $('#btnBack').toggleClass('d-none', onLast || onExternalStep2).prop('disabled', currentStep === 1);
 
     // Next / Sign / hidden on step 4
-    if (onLast) {
+    if (onLast || onExternalStep2) {
         $('#btnNext').addClass('d-none');
         $('#btnFinalSign').addClass('d-none');
     } else if (onSign) {
@@ -535,11 +583,71 @@ function updateButtons() {
 function validateStep() {
     let valid = false;
     if (currentStep === 1) valid = selectedDocId !== null;
-    if (currentStep === 2) valid = selectedSigId !== null;
+    if (currentStep === 2) valid = isExternalMode() ? false : selectedSigId !== null;
     if (currentStep === 3) valid = $('#wizardLegalCheck').is(':checked');
 
     $('#btnNext').prop('disabled', !valid);
 }
+
+// ── External signer (send-to-client) ──────────────────────────────────────
+// Self-contained within step 2: sending the request happens right here via
+// AJAX, so the wizard never advances into steps 3/4 (positioning/embedding
+// a LOCAL signature image) for a document someone else is going to sign.
+function isExternalMode() {
+    return $('#signerTypeExternal').is(':checked');
+}
+
+$(document).on('change', 'input[name="signerType"]', function () {
+    const external = isExternalMode();
+    $('#internalSignerPanel').toggleClass('d-none', external);
+    $('#externalSignerPanel').toggleClass('d-none', !external);
+    // The normal step footer (Previous/Next Step) doesn't apply once sending
+    // an external request — that action lives entirely inside the panel.
+    $('#btnBack').toggleClass('d-none', external);
+    $('#btnNext').toggleClass('d-none', external);
+    validateStep();
+});
+
+$(document).on('click', '#btnSendExternalRequest', function () {
+    const $btn = $(this);
+    const name = $('#extSignerName').val().trim();
+    const email = $('#extSignerEmail').val().trim();
+    const $msg = $('#extSignerMessage');
+    $msg.html('');
+
+    if (!name) { $msg.html('<div class="alert alert-warning py-2">Please enter the signer\'s name.</div>'); return; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { $msg.html('<div class="alert alert-warning py-2">Please enter a valid email address.</div>'); return; }
+    if (!selectedDocId) { $msg.html('<div class="alert alert-warning py-2">Please go back and select a document first.</div>'); return; }
+
+    const orig = $btn.html();
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Sending...');
+
+    $.ajax({
+        url: '<?= buildUrl("api/document/request_external_signature.php") ?>',
+        type: 'POST',
+        data: {
+            document_id: selectedDocId,
+            signer_name: name,
+            signer_email: email,
+            _csrf: CSRF_TOKEN,
+        },
+        dataType: 'json',
+        success: function (res) {
+            if (!res.success) {
+                $msg.html('<div class="alert alert-danger py-2">' + (res.message || 'Could not send the request.') + '</div>');
+                $btn.prop('disabled', false).html(orig);
+                return;
+            }
+            $('#extSignerSendRow').addClass('d-none');
+            $('#extSignerSentMessage').text(res.message);
+            $('#extSignerSentRow').removeClass('d-none');
+        },
+        error: function () {
+            $msg.html('<div class="alert alert-danger py-2">Server error while sending the request.</div>');
+            $btn.prop('disabled', false).html(orig);
+        }
+    });
+});
 
 function loadSignatures() {
     const grid = $('#wizardSignatureGrid');

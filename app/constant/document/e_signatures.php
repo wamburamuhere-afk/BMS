@@ -681,14 +681,19 @@ $(document).ready(function() {
                 data: null,
                 orderable: false,
                 className: 'text-end',
-                render: (data, t, row) => `
-                    <button class="btn btn-sm btn-primary" onclick="signDocument(${row.document_id}, ${row.id})">
-                        <i class="bi bi-pen"></i> Sign
-                    </button>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="previewDocument(${row.document_id})">
-                        <i class="bi bi-eye"></i> Preview
-                    </button>
-                `
+                render: (data, t, row) => row.signer_type === 'external'
+                    // This row is a request WE sent to an outside party — we
+                    // can't sign it ourselves, just wait for them.
+                    ? `<span class="badge bg-secondary-subtle text-secondary border px-3">Awaiting external signer</span>
+                       <button class="btn btn-sm btn-outline-secondary" onclick="previewDocument(${row.document_id})">
+                           <i class="bi bi-eye"></i> Preview
+                       </button>`
+                    : `<button class="btn btn-sm btn-primary" onclick="signDocument(${row.document_id}, ${row.id})">
+                           <i class="bi bi-pen"></i> Sign
+                       </button>
+                       <button class="btn btn-sm btn-outline-secondary" onclick="previewDocument(${row.document_id})">
+                           <i class="bi bi-eye"></i> Preview
+                       </button>`
             }
         ],
         order: [[3, 'asc']]
