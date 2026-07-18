@@ -1,5 +1,40 @@
 # BMS Changelog
 
+## 2026-07-18 (fix) — Sales Order "Created By" signature not captured when converted from a Quotation
+
+**Files:** `api/account/convert_quote_to_order.php`
+**New:** `tests/test_convert_quote_created_signature_cli.php`
+**Extended:** `tests/test_quotations_cli.php` (2 new static checks)
+
+User-reported: printing a Sales Order showed "Created By" without an
+e-signature stamp while "Reviewed By"/"Approved By" showed correctly.
+Investigated and confirmed real.
+
+Root cause: `save_sales_order.php` (direct-create path) has always called
+`workflowCaptureSignature($pdo, 'sales_order', $id, 'created', ...)`, which
+`review_sales_order.php` and `approve_sales_order.php` mirror for their own
+actions — but `convert_quote_to_order.php` (the "Convert Quotation to
+Sales Order" path) is a *separate* insert path that only set
+`sales_orders.created_by` directly, never calling
+`workflowCaptureSignature`. The print page's name resolution still worked
+(it reads `created_by` via a JOIN, independent of the signature table), so
+the name showed — but with no signature image/timestamp, unlike
+Reviewed/Approved which always go through their own dedicated endpoints
+regardless of how the SO originated.
+
+**Fix:** added the identical `workflowActorSnapshot()` +
+`workflowCaptureSignature(..., 'created', ...)` call used by
+`save_sales_order.php`, right after the new sales order's insert, inside
+the existing transaction.
+
+**Verification:** `tests/test_convert_quote_created_signature_cli.php` —
+`php -l`, plus a live test reproducing the endpoint's own
+insert-then-capture sequence against a real quotation, confirming
+`workflow_signatures` now gets a `created` row for the converted SO with
+the correct actor name. `tests/test_quotations_cli.php` extended with 2
+static checks confirming the call is present with the right entity/action.
+All checks pass (130 + 4 = 134 total across both suites).
+
 ## 2026-07-18 (fix) — Debit Note "Product" column showed literal "Item" instead of the real product name
 
 **Files:** `api/purchase/get_debit_note_source.php`

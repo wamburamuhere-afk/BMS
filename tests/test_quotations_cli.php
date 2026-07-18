@@ -135,6 +135,11 @@ want($conv, 'INSERT INTO sales_orders', 'convert: creates a real row in sales_or
 want($conv, 'INSERT INTO sales_order_items', 'convert: copies items into sales_order_items', 'convert: does not copy items into sales_order_items');
 want($conv, "!== 'approved'",     'convert: only an approved quotation may be converted', 'convert: does not require approved status');
 want($conv, 'converted_to_so_id', 'convert: tags the quotation with the new sales order id (blocks double-convert)', 'convert: does not record converted_to_so_id');
+// User-reported 2026-07-18: print_sales_order.php's "Created By" column showed
+// a name but no e-signature stamp for SOs converted from a quote, unlike
+// save_sales_order.php's direct-create path which always captures it.
+want($conv, "workflowCaptureSignature",              'convert: captures the "Created By" e-signature (was previously missing)', 'convert: still does not call workflowCaptureSignature');
+want($conv, "'sales_order', (int)\$new_so_id, 'created'", 'convert: captures it against the NEW sales order id with action \'created\'', 'convert: signature capture is missing the correct entity_id/action');
 
 // ─────────────────────────────────────────────────────────────────────────────
 section('7. quotation_view.php — dedicated details page');
