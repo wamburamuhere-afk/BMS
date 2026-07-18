@@ -4,6 +4,7 @@ ob_start();
 
 // Include roots which sets up paths and authentication
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/document_access.php';
 
 // Handle document actions (Delete/Download) - MUST BE BEFORE HEADER for downloads
 $action = $_GET['action'] ?? '';
@@ -13,8 +14,22 @@ $document_id = isset($_GET['document_id']) ? (int)$_GET['document_id'] : 0;
 // pre-select the "Expiring Soon (<=30d)" filter so only expiring documents show.
 $attention = (isset($_GET['attention']) && $_GET['attention'] === '1');
 
-if ($action === 'download' && $document_id > 0) {
-    downloadDocumentLocal($pdo, $document_id);
+// Serving a file bypasses includeHeader() below (that's where
+// autoEnforcePermission() normally runs) — download/view previously ran
+// with NO authorization check at all beyond the row existing, so a
+// "restricted" document was downloadable/viewable by anyone who had its
+// URL, forever, even after access was revoked. Gate both actions the same
+// way get_document_activity.php already does for the same table.
+if (($action === 'download' || $action === 'view') && $document_id > 0) {
+    if (!isAuthenticated() || !canView('documents')) {
+        http_response_code(403);
+        die('Access Denied');
+    }
+    if (!userCanAccessDocument($pdo, $document_id)) {
+        http_response_code(403);
+        die('Access Denied: this document is not shared with you');
+    }
+    serveDocumentLocal($pdo, $document_id, $action === 'view');
     exit;
 }
 
@@ -130,7 +145,15 @@ function deleteDocumentLocal($pdo, $document_id) {
     }
 }
 
-function downloadDocumentLocal($pdo, $document_id) {
+/**
+ * Streams a document's file — authorization for BOTH modes must already be
+ * checked by the caller before this runs (see the action dispatch above);
+ * this function only handles I/O, not access control.
+ *
+ * @param bool $inline true = "View Online" (Content-Disposition: inline),
+ *                      false = "Download" (attachment).
+ */
+function serveDocumentLocal($pdo, $document_id, $inline = false) {
     try {
         $stmt = $pdo->prepare("SELECT * FROM documents WHERE id = ?");
         $stmt->execute([$document_id]);
@@ -150,21 +173,25 @@ function downloadDocumentLocal($pdo, $document_id) {
             die("Physical file not found at: " . $file_path);
         }
 
-        $pdo->prepare("INSERT INTO document_downloads (document_id, user_id, ip_address, user_agent) VALUES (?, ?, ?, ?)")
-            ->execute([$document_id, $_SESSION['user_id'], $_SERVER['REMOTE_ADDR'], $_SERVER['HTTP_USER_AGENT']]);
-        
-        $pdo->prepare("UPDATE documents SET download_count = download_count + 1 WHERE id = ?")->execute([$document_id]);
+        if (!$inline) {
+            $pdo->prepare("INSERT INTO document_downloads (document_id, user_id, ip_address, user_agent) VALUES (?, ?, ?, ?)")
+                ->execute([$document_id, $_SESSION['user_id'], $_SERVER['REMOTE_ADDR'], $_SERVER['HTTP_USER_AGENT']]);
 
-        // Audit Log for download
-        logAudit($pdo, $_SESSION['user_id'], 'download_document', [
-            'activity_type' => 'download',
-            'description' => "Downloaded document: '{$document['document_name']}' (ID: $document_id)",
-            'entity_type' => 'document',
-            'entity_id' => $document_id
-        ]);
+            $pdo->prepare("UPDATE documents SET download_count = download_count + 1 WHERE id = ?")->execute([$document_id]);
 
-        // General Activity Log
-        logActivity($pdo, $_SESSION['user_id'], 'DOWNLOAD DOCUMENT', "Downloaded document: '{$document['document_name']}'");
+            // Audit Log for download
+            logAudit($pdo, $_SESSION['user_id'], 'download_document', [
+                'activity_type' => 'download',
+                'description' => "Downloaded document: '{$document['document_name']}' (ID: $document_id)",
+                'entity_type' => 'document',
+                'entity_id' => $document_id
+            ]);
+
+            // General Activity Log
+            logActivity($pdo, $_SESSION['user_id'], 'DOWNLOAD DOCUMENT', "Downloaded document: '{$document['document_name']}'");
+        } else {
+            logActivity($pdo, $_SESSION['user_id'], 'VIEW DOCUMENT', "Viewed document online: '{$document['document_name']}'");
+        }
 
         // IMPORTANT: Clean ALL buffers to prevent corruption
         while (ob_get_level()) {
@@ -182,17 +209,17 @@ function downloadDocumentLocal($pdo, $document_id) {
 
         header('Content-Description: File Transfer');
         header('Content-Type: ' . ($mime_type ?: 'application/octet-stream'));
-        header('Content-Disposition: attachment; filename="' . $document['original_filename'] . '"');
+        header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . $document['original_filename'] . '"');
         header('Expires: 0');
         header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
         header('Pragma: public');
         header('Content-Length: ' . filesize($file_path));
-        
+
         // Final check to ensure no output
         if (headers_sent()) {
             die("Headers already sent. Cannot download file.");
         }
-        
+
         readfile($file_path);
         exit;
     } catch (Exception $e) {
@@ -625,7 +652,7 @@ $(document).ready(function() {
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item" href="${APP_URL}/document_library?action=download&document_id=${row.id}"><i class="bi bi-download"></i> Download</a></li>
-                            <li><a class="dropdown-item" href="${APP_URL}/${row.file_path}" target="_blank" onclick="logReportAction('Viewed Document Online', 'User viewed document: ${escapeHtml(row.document_name).replace(/'/g, '&apos;')} in browser')"><i class="bi bi-eye"></i> View Online</a></li>
+                            <li><a class="dropdown-item" href="${APP_URL}/document_library?action=view&document_id=${row.id}" target="_blank" onclick="logReportAction('Viewed Document Online', 'User viewed document: ${escapeHtml(row.document_name).replace(/'/g, '&apos;')} in browser')"><i class="bi bi-eye"></i> View Online</a></li>
                             <li><a class="dropdown-item" href="#" onclick="openDocActivity(${row.id}, '${escapeHtml(row.document_name).replace(/'/g, '&apos;')}'); return false;"><i class="bi bi-chat-square-text"></i> Comments &amp; Access</a></li>`;
 
                     // "Create Document" letters only — the creator (or an admin) can
@@ -743,7 +770,7 @@ function renderDocsCards() {
     }
     rows.each(function(row) {
         const downloadUrl = `${APP_URL}/document_library?action=download&document_id=${row.id}`;
-        const viewUrl = `${APP_URL}/${row.file_path}`;
+        const viewUrl = `${APP_URL}/document_library?action=view&document_id=${row.id}`;
         const date = new Date(row.uploaded_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
         const categoryHtml = row.category_name
             ? `<span class="badge" style="background-color:${row.category_color || '#6c757d'};font-size:0.68rem;">${escapeHtml(row.category_name)}</span>`

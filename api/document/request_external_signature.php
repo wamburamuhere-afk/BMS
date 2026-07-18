@@ -48,6 +48,24 @@ try {
         throw new Exception('Document not found');
     }
 
+    // Without this, repeated clicks (or a scripted spam) could generate an
+    // unlimited number of simultaneously-valid, independent signing links
+    // for the same document. One outstanding external request at a time —
+    // cancel it first (api/document/cancel_external_signature.php) to send
+    // a new one.
+    $existing = $pdo->prepare("
+        SELECT id, signer_name, signer_email FROM document_signatures
+        WHERE document_id = ? AND signer_type = 'external' AND status = 'pending'
+        LIMIT 1
+    ");
+    $existing->execute([$document_id]);
+    if ($pending = $existing->fetch(PDO::FETCH_ASSOC)) {
+        throw new Exception(
+            'A signature request is already pending for this document (sent to ' . $pending['signer_email']
+            . '). Cancel it from the Pending tab before sending a new one.'
+        );
+    }
+
     $pdo->beginTransaction();
     try {
         $ins = $pdo->prepare("

@@ -95,6 +95,16 @@ $company_name = get_setting('company_name', 'Business Management System');
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearSig"><i class="bi bi-eraser"></i> Clear</button>
             </div>
 
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="identityCheck">
+                <label class="form-check-label small" for="identityCheck">
+                    I confirm that I am <strong><?= htmlspecialchars($signature['signer_name']) ?></strong>
+                    (<?= htmlspecialchars($signature['signer_email']) ?>) and am authorised to sign this document.
+                    <span class="text-muted">(If this link was forwarded to you and you are not this person, please close this
+                    page and contact the sender.)</span>
+                </label>
+            </div>
+
             <div class="form-check mb-3">
                 <input class="form-check-input" type="checkbox" id="consentCheck">
                 <label class="form-check-label small" for="consentCheck">
@@ -163,6 +173,10 @@ $company_name = get_setting('company_name', 'Business Management System');
             $msg.innerHTML = '<div class="alert alert-warning py-2">Please draw your signature first.</div>';
             return;
         }
+        if (!document.getElementById('identityCheck').checked) {
+            $msg.innerHTML = '<div class="alert alert-warning py-2">Please confirm your identity to continue.</div>';
+            return;
+        }
         if (!document.getElementById('consentCheck').checked) {
             $msg.innerHTML = '<div class="alert alert-warning py-2">Please confirm the consent statement to continue.</div>';
             return;
@@ -197,9 +211,12 @@ $company_name = get_setting('company_name', 'Business Management System');
             const signedBytes = await pdfDoc.save();
             const blob = new Blob([signedBytes], { type: 'application/pdf' });
 
+            const identityStatement = document.querySelector('label[for="identityCheck"]').textContent.trim();
+            const consentStatement = document.querySelector('label[for="consentCheck"]').textContent.trim();
+
             const fd = new FormData();
             fd.append('token', <?= json_encode($token) ?>);
-            fd.append('consent_text', document.querySelector('label[for="consentCheck"]').textContent.trim());
+            fd.append('consent_text', identityStatement + ' | ' + consentStatement);
             fd.append('signed_pdf_file', blob, 'signed.pdf');
 
             const res = await fetch('<?= buildUrl('api/document/submit_external_signature.php') ?>', { method: 'POST', body: fd }).then(r => r.json());

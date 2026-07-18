@@ -4,6 +4,7 @@
 // document's comments, notes, and assignee list, plus what the current user
 // is allowed to do with them.
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/document_access.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -34,14 +35,11 @@ try {
 
     // Defense in depth: the row only appears in the caller's list once
     // get_documents.php's own visibility filter already applies, but never
-    // trust the client — re-check here too.
-    if ($document['access_level'] !== 'public' && !isAdmin() && !$isOwner) {
-        $chk = $pdo->prepare("SELECT COUNT(*) FROM document_assignees WHERE document_id = ? AND user_id = ?");
-        $chk->execute([$document_id, $currentUserId]);
-        if (!$chk->fetchColumn()) {
-            http_response_code(403);
-            throw new Exception('Access Denied: this document is not shared with you');
-        }
+    // trust the client — re-check here too. Shared with document_library.php's
+    // download/view gate (core/document_access.php) so the rule can't drift.
+    if (!userCanAccessDocument($pdo, $document_id, $document)) {
+        http_response_code(403);
+        throw new Exception('Access Denied: this document is not shared with you');
     }
 
     $stmtC = $pdo->prepare("

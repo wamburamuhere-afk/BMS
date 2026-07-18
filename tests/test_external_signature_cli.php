@@ -35,6 +35,7 @@ foreach ([
     'migrations/2026_07_18_document_signature_external_signer.php',
     'api/document/request_external_signature.php',
     'api/document/submit_external_signature.php',
+    'api/document/cancel_external_signature.php',
     'sign_document.php',
     'app/constant/document/select_document_add_esignature.php',
     'api/get_pending_signatures.php',
@@ -64,6 +65,16 @@ $publicSrc = file_get_contents("$root/sign_document.php");
 check(!preg_match('/^\s*includeHeader\(\);/m', $publicSrc), 'public sign page does not call includeHeader() (would force a login redirect)', 'public sign page calls includeHeader() — would redirect external signers to login');
 check(strpos($publicSrc, "used_at'] === null") !== false, 'public page only shows the signing UI for an unused token', 'public page does not check used_at');
 check(strpos($publicSrc, 'expires_at') !== false, 'public page checks token expiry', 'public page does not check expiry');
+check(strpos($publicSrc, 'identityCheck') !== false, 'public page has a separate identity-confirmation checkbox (mitigates a forwarded link being signed by the wrong person)', 'public page is missing the identity-confirmation checkbox');
+
+$cancelSrc = file_get_contents("$root/api/document/cancel_external_signature.php");
+check(strpos($cancelSrc, "status = 'rejected'") !== false, 'cancel endpoint sets status to rejected', 'cancel endpoint does not update status');
+check(strpos($cancelSrc, 'used_at = NOW()') !== false, 'cancel endpoint invalidates any outstanding token immediately', 'cancel endpoint does not invalidate the token');
+check(strpos($cancelSrc, 'requested_by') !== false && strpos($cancelSrc, 'isAdmin()') !== false, 'cancel endpoint is restricted to the requester or an admin', 'cancel endpoint does not check who is allowed to cancel');
+
+check(strpos($requestSrc, "status = 'pending'") !== false && strpos($requestSrc, "already pending") !== false,
+    'request endpoint blocks a second concurrent pending request on the same document (anti-spam guard)',
+    'request endpoint has no guard against duplicate concurrent pending requests');
 
 section('3. Live — the token lifecycle actually behaves as designed');
 
@@ -149,6 +160,72 @@ if (!$isLive) {
 
     } catch (Throwable $e) {
         fail('Live token-lifecycle test threw: ' . $e->getMessage());
+    }
+}
+
+section('4. Live — cancel endpoint + anti-spam guard behave as designed');
+
+if (!$isLive) {
+    echo "  \033[33m⊘\033[0m  Skipped (no includes/config.php — not a live install)\n";
+} else {
+    global $pdo;
+    try {
+        $docStmt = $pdo->prepare("
+            INSERT INTO documents (document_name, file_path, file_type, version, uploaded_by, access_level, source)
+            VALUES ('TEST — cancel/anti-spam regression', 'uploads/documents/test_ext_sig2.pdf', 'pdf', '1.0', 1, 'private', 'created')
+        ");
+        $docStmt->execute();
+        $testDocId2 = (int)$pdo->lastInsertId();
+
+        $sigStmt = $pdo->prepare("
+            INSERT INTO document_signatures (document_id, requested_by, signed_by, signer_name, signer_email, signer_type, status)
+            VALUES (?, 1, NULL, 'Test Signer Two', 'ext2-test@example.com', 'external', 'pending')
+        ");
+        $sigStmt->execute([$testDocId2]);
+        $testSigId2 = (int)$pdo->lastInsertId();
+
+        $token3 = bin2hex(random_bytes(32));
+        $pdo->prepare("INSERT INTO document_signature_tokens (signature_id, token_hash, expires_at) VALUES (?, ?, ?)")
+            ->execute([$testSigId2, hash('sha256', $token3), date('Y-m-d H:i:s', strtotime('+7 days'))]);
+
+        // Anti-spam guard: the exact query request_external_signature.php runs
+        // before creating a new request — must find the one already pending.
+        $spamCheck = $pdo->prepare("
+            SELECT id FROM document_signatures
+            WHERE document_id = ? AND signer_type = 'external' AND status = 'pending'
+            LIMIT 1
+        ");
+        $spamCheck->execute([$testDocId2]);
+        check(
+            (bool)$spamCheck->fetch(),
+            'a document with an already-pending external request is correctly detected — a second request would be blocked',
+            'the anti-spam guard query did not find the existing pending request'
+        );
+
+        // Cancel: the exact updates cancel_external_signature.php performs.
+        $pdo->prepare("UPDATE document_signatures SET status = 'rejected', updated_at = NOW() WHERE id = ?")->execute([$testSigId2]);
+        $pdo->prepare("UPDATE document_signature_tokens SET used_at = NOW() WHERE signature_id = ? AND used_at IS NULL")->execute([$testSigId2]);
+
+        $afterCancel = $pdo->prepare("SELECT status FROM document_signatures WHERE id = ?");
+        $afterCancel->execute([$testSigId2]);
+        check($afterCancel->fetchColumn() === 'rejected', 'cancelling sets status to rejected', 'status was not updated to rejected');
+
+        $tokenAfterCancel = $pdo->prepare("SELECT used_at FROM document_signature_tokens WHERE signature_id = ?");
+        $tokenAfterCancel->execute([$testSigId2]);
+        check($tokenAfterCancel->fetchColumn() !== null, 'cancelling immediately invalidates the outstanding token — the link stops working right away', 'the token was not invalidated by cancelling');
+
+        // After cancelling, the anti-spam guard must no longer see this as
+        // "already pending" — a new request should be allowed.
+        $spamCheck->execute([$testDocId2]);
+        check(!$spamCheck->fetch(), 'after cancelling, the document no longer blocks a new request (status is rejected, not pending)', 'a cancelled request still incorrectly blocks a new one');
+
+        $pdo->prepare("DELETE FROM document_signature_tokens WHERE signature_id = ?")->execute([$testSigId2]);
+        $pdo->prepare("DELETE FROM document_signatures WHERE id = ?")->execute([$testSigId2]);
+        $pdo->prepare("DELETE FROM documents WHERE id = ?")->execute([$testDocId2]);
+        pass('test data cleaned up (self-contained, no residue left in the DB)');
+
+    } catch (Throwable $e) {
+        fail('Live cancel/anti-spam test threw: ' . $e->getMessage());
     }
 }
 
