@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-07-17 (fix) — Signature block no longer splits across a page break on print
+
+**File:** `includes/workflow_signature_row.php`
+
+Follow-up to the print auto-fit feature: on a document long enough that even the
+75% shrink floor couldn't keep it on one page, the Created/Reviewed/Approved
+signature block could land right on the page boundary and get torn apart —
+one or two columns printing at the bottom of page 1, the rest starting fresh
+on page 2, each with its own stray label. Added `page-break-inside: avoid` /
+`break-inside: avoid-page` to `.signature-box` and `.signature-line` — the
+standard CSS print-pagination technique for keeping a block indivisible. If
+the block fits in the remaining space it prints there as before; if it
+doesn't, the whole block (all three columns together) moves as one unit to
+the top of the next page instead of splitting. Applies everywhere via the
+one shared partial every print page already includes. The fixed-position
+footer is a separate element and is unaffected.
+
 ## 2026-07-17 (feat) — Print pages auto-shrink to fit one A4 sheet (procurement + sales)
 
 **New files:** `includes/print_autofit.php`

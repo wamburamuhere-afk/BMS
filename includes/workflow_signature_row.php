@@ -33,6 +33,8 @@ if (!empty($wf['__include_css'])):
         display: flex;
         justify-content: space-around;
         gap: 40px;
+        page-break-inside: avoid;
+        break-inside: avoid-page;
     }
     .signature-line {
         width: 210px;
@@ -41,6 +43,8 @@ if (!empty($wf['__include_css'])):
         font-size: 11px;
         color: #1a252f;
         font-weight: 600;
+        page-break-inside: avoid;
+        break-inside: avoid-page;
     }
     .signature-line small {
         display: block;
