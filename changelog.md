@@ -1,5 +1,77 @@
 # BMS Changelog
 
+## 2026-07-18 (fix) — Bills invisible to warehouse-only users + Purchase Return "no supplier available"
+
+**New:** `tests/test_bills_grn_return_scope_cli.php`
+**Files:** `api/received_invoices.php`, `api/get_warehouse_suppliers.php`,
+`api/get_warehouse_supplier_grns.php`, `app/bms/purchase/purchase_returns.php`
+
+User-reported: a non-admin assigned only a specific warehouse (no project)
+saw nothing when creating a Bill, and their own already-created, approved
+invoice was invisible to them — even though its GRN and inbound DN (both
+approved/delivered) *were* visible. Separately, Purchase Return creation
+showed no supplier available even though a real, approved GRN existed for
+that supplier/warehouse. Investigation found these are **two unrelated
+bugs** that happened to surface in the same report.
+
+**Bills invisible (both symptoms, same root cause) —
+`api/received_invoices.php:109`:** the Bills list used the *strict* scope
+helper (`scopeFilterSql('project', 'si')` — a hard `AND 0` for anyone with
+zero project assignments) instead of the nullable variant, and applied
+**no warehouse scoping at all** — same bug class as the earlier
+`get_purchase_orders.php`/`get_sales_orders.php` fixes, just in a file that
+wasn't caught then. For a warehouse-only user this meant the entire Bills
+list returned zero rows, unconditionally — including their own. Fixed with
+the same proven pattern: `scopeFilterSqlNullable('project', 'si') .
+scopeFilterSqlNullable('warehouse', 'si')` (`supplier_invoices` already has
+its own `warehouse_id` column — confirmed via live schema — so this is a
+direct fix, not an indirect join). Also added a matching
+`userCan('warehouse', ...)` check to the single-Bill fetch (`action=get`),
+which only checked project before, for the same defense-in-depth reason as
+today's earlier fixes.
+
+**Purchase Return "no supplier available" — NOT a scoping bug, affects
+*every* user including admins:** `api/get_warehouse_suppliers.php` and
+`api/get_warehouse_supplier_grns.php` (which populate the Return-creation
+supplier and GRN pickers) both hard-required `purchase_receipts.status =
+'completed'`. But `'completed'` is a **legacy status** — the GRN workflow
+moved to a three-stage `pending → reviewed → approved` model, and
+`approve_grn.php` now performs the same stock-posting side effect
+`'completed'` used to represent when a GRN reaches `'approved'`; no current
+code path ever sets a GRN to `'completed'` anymore. Confirmed the actual
+Purchase Return save endpoint (`api/create_purchase_return.php`) never
+checks GRN status at all — only these two picker queries did, using the
+dead status. Widened both to `status IN ('approved', 'completed')`. Also
+added the same `userCan('warehouse', ...)` server-side check to
+`get_warehouse_suppliers.php` that its sibling `get_warehouse_supplier_grns.php`
+already got in an earlier fix today — same gap, same fix, file simply
+hadn't been reached yet.
+
+**Related consistency fix:** `purchase_returns.php`'s page-level supplier
+filter dropdown hand-rolled its own nullable-project fallback instead of
+using `scopeFilterSqlNullable()` — same effective behaviour, just replaced
+with the shared, mandated helper (`.claude/security.md §23`) so it can't
+drift from the proven-correct implementation.
+
+Verified: `tests/test_bills_grn_return_scope_cli.php` (new, 17 checks) —
+live tests create a real Bill in a warehouse-only user's granted warehouse
+and confirm it's now visible, create a second Bill in a *different*
+warehouse and confirm it's correctly still excluded (proving warehouse
+scope specifically, not just the nullable-project fallback, is what closed
+the gap), and create a real `'approved'`-status GRN and confirm it now
+surfaces its supplier and itself in both pickers. Re-ran every related
+suite — `test_warehouse_scope_cli.php` (137), `test_debit_notes_cli.php`
+(90), `test_money_safety_master_cli.php` (54), `test_po_invoice_report_cli.php`
+(35), `test_po_invoicing_cli.php` (19), `test_print_created_by_resolution_cli.php`
+(91), `test_purchase_return_posting_cli.php` (15),
+`test_received_invoice_items_cli.php` (42),
+`test_received_invoice_payment_money_safety_cli.php` (9),
+`test_sc_details_cli.php` (22), `test_wht_received_invoice_cli.php` (15),
+`test_csrf_token_redeclaration_cli.php` (10) — 539 checks, all green, no
+regressions. Re-ran `scratch/project_scope_audit.php`: `unscoped_count`
+unchanged at 4 (the same pre-existing, unrelated files flagged in the
+previous fix — nothing new introduced).
+
 ## 2026-07-18 (fix) — Cross-warehouse/project leaks in document-reference pickers (GRN, DN, received invoices)
 
 **New:** `tests/test_document_reference_pickers_cli.php`

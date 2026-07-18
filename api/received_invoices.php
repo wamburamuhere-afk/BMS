@@ -105,8 +105,17 @@ if ($method === 'GET') {
         if ($status)      { $where[] = 'si.status = ?';        $params[] = $status; }
         if ($project_id)  { $where[] = 'si.project_id = ?';   $params[] = $project_id; }
 
-        // Phase C — project-scope filter appended after the array WHERE
-        $scopeSI = scopeFilterSql('project', 'si');
+        // Found 2026-07-18: this used the STRICT scope helper (hard AND 0 for
+        // a user with zero project assignments) and applied NO warehouse
+        // scoping at all — a warehouse-only user (no project) saw zero Bills,
+        // including their own, regardless of whether the Bill's warehouse
+        // matched theirs. Same fix pattern already proven correct in
+        // api/account/get_purchase_orders.php: nullable-project (falls back
+        // to "project_id IS NULL", not a blanket deny) PLUS warehouse scope —
+        // switching to nullable alone would have started leaking OTHER
+        // warehouses' project-less Bills, since nothing constrained
+        // warehouse_id before either.
+        $scopeSI = scopeFilterSqlNullable('project', 'si') . scopeFilterSqlNullable('warehouse', 'si');
 
         $sql = "
             SELECT si.*,
@@ -167,6 +176,16 @@ if ($method === 'GET') {
             if (!empty($row['project_id']) && !userCan('project', (int)$row['project_id'])) {
                 http_response_code(403);
                 echo json_encode(['success' => false, 'message' => 'Access denied: this invoice belongs to a project not in your scope.']);
+                exit;
+            }
+            // Found 2026-07-18: same gate was missing for warehouse — a
+            // warehouse-only user's own invoice would pass the project check
+            // (project_id is empty) but nothing verified the WAREHOUSE side
+            // either, and a user with no warehouse grant matching this
+            // invoice could still fetch it directly by id.
+            if (!empty($row['warehouse_id']) && !userCan('warehouse', (int)$row['warehouse_id'])) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access denied: this invoice belongs to a warehouse not in your scope.']);
                 exit;
             }
             // Line items (supplier invoices) for edit / view / print.
