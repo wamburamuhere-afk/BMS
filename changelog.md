@@ -1,5 +1,63 @@
 # BMS Changelog
 
+## 2026-07-18 (feat) — Create Document: real server-rendered PDF, not a rasterized screenshot (Phase B of 3)
+
+**New:** `core/document_letter_render.php`, `core/document_letter_pdf.php`,
+`tests/test_create_document_pdf_cli.php`
+**Files:** `api/document/save_created_document.php`,
+`app/constant/document/create_document.php`
+
+Second of the 3-phase Create Document plan. Every saved letter was, until
+now, a picture — html2canvas screenshotted the live `#letterPaper` DOM at
+2x scale and html2pdf.js wrapped that image into a PDF container. Not
+selectable, not searchable, larger than it needed to be, and the only
+document type in BMS built this way (every other print page in the system
+is server-rendered HTML the browser turns into real text-based print
+output).
+
+TCPDF (already vendored in the repo at `TCPDF/`, previously only used from
+one-off scripts under `scratch/`, never wired into the live app — no
+Composer/package manager exists in this project at all) now generates the
+saved PDF server-side instead:
+
+- `core/document_letter_render.php` — the one place that defines "what a
+  finished letter looks like" for the PDF: letterhead, the recipient/sender
+  +Ref+date table (TCPDF's HTML parser reliably supports tables, not
+  flexbox/grid, so this is a distinct table-based layout from the on-screen
+  editor's flexbox version — visually equivalent, not byte-identical),
+  subject, merge-resolved body, signature block, and the shared audit
+  footer.
+- `core/document_letter_pdf.php` — `generateLetterPdf()` gathers the same
+  company-settings/sender-lines/signature-preview data
+  `create_document.php`'s editor already computes, builds the HTML via the
+  above, and writes a real PDF through TCPDF. Wrapped TCPDF's own
+  `writeHTML()`/`Output()` calls in a temporary `set_error_handler()` no-op —
+  TCPDF's bundled config unconditionally re-declares a constant and its font
+  subsystem can emit stray notices, and with this project's global
+  `display_errors=1` any of those would have been echoed straight into this
+  JSON endpoint's response and corrupted it. Genuine TCPDF failures still
+  throw and are still caught normally.
+- `api/document/save_created_document.php` — no longer accepts/validates an
+  uploaded `pdf_file`; it calls `generateLetterPdf()` itself after resolving
+  merge tokens (the existing "authoritative pass" was already happening
+  here). The server generating the PDF itself, rather than trusting a
+  client-rendered blob, is also the more correct architecture — the
+  reference number and signature can never be missing or client-tampered.
+- `create_document.php` — removed the `html2pdf.js`/`html2canvas` capture
+  block and CDN script tag entirely; the client now just POSTs the same
+  structured fields it already sent, no PDF rendering happens in the
+  browser at all anymore.
+
+Verified two ways: `tests/test_create_document_pdf_cli.php` (new, 12
+checks) calls `generateLetterPdf()` against the real DB with realistic
+field data, then **decompresses the generated PDF's own content streams
+and searches for the literal body-text characters** — direct proof the
+output contains real embedded text (a raster/image PDF could never contain
+those bytes, only pixels inside a compressed image blob). Also
+visually verified: rendered the same HTML `renderLetterHtml()` produces in
+a browser and confirmed the letterhead/recipient/sender+ref/date
+table/subject/signature layout matches the intended design.
+
 ## 2026-07-18 (feat) — Create Document: reference number now visible on the actual letter (Phase A of 3)
 
 **File:** `app/constant/document/create_document.php`
