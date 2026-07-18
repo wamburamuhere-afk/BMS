@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-07-18 (fix) — Budget Details print report: stop printing the mobile card view under the table
+
+**File:** `app/constant/accounts/budget_details.php`
+
+User-reported: printing Project Details > Finance > Budget > View Details >
+Print Report showed the expense table correctly, then the same rows again
+as a card grid directly underneath — never wanted on a printed page.
+
+Root cause: this page doesn't build its own card view — `bms-mobile-cards.js`
+auto-injects a mobile card grid under *any* DataTable that doesn't already
+have one (`#expensesTable` qualifies), wrapped in a `.row` for its own
+layout. `responsive.css` already force-hides that auto-card grid globally on
+print via `.bms-auto-cards { display: none !important; }`, but this page's
+own print stylesheet — further down the file — redefines a generic
+`.row { display: flex !important; }`, meant only for the unrelated Budget
+Overview info grid. Both rules are single-class selectors (identical
+specificity) with `!important`; on a tie, the one declared later in the
+document wins, and since this page's inline `<style>` block sits after the
+shared `responsive.css` `<link>`, its `.row` rule won and silently un-hid
+the card grid at print time.
+
+Fix: added an ID-targeted print rule (`#expensesTable-bms-cards,
+.bms-auto-cards { display: none !important; }`) — an ID selector always
+beats a class selector regardless of source order, so this reliably wins the
+tie. Same defensive pattern already used on `sub_contractors.php`
+(`#scCardGrid { display: none !important; }`), which is why that page never
+had this problem. Print output is now table-only, as intended.
+
 ## 2026-07-17 (fix) — Signature block no longer splits across a page break on print
 
 **File:** `includes/workflow_signature_row.php`
