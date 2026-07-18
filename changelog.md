@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-07-18 (fix) — E-signature wizard: restore btnBack CI regression guard broken by Phase C
+
+**File:** `app/constant/document/select_document_add_esignature.php`
+
+Phase C's external-signer-mode footer change merged an extra condition
+directly into the existing `$('#btnBack').toggleClass('d-none', onLast)`
+line (`onLast || onExternalStep2`). `tests/test_esignatures_wizard_cli.php`
+(pre-existing, not touched by Phase C) does a literal string-match on that
+exact original pattern as a regression guard from a past bug fix — the
+inline edit broke the match, failing PHP Lint Check on both the feature
+branch and, since GitHub auto-merged before the failure was caught, on
+`develop` and then `main` (deployed to production despite the failing
+check, per the workflow log).
+
+Not a behavioural bug — `#btnBack` still correctly hides on step 4 and
+now also on external-signer-mode step 2 — but the *test* needed the exact
+original line intact. Restored `updateButtons()`'s original
+`toggleClass('d-none', onLast)` untouched, and moved the external-mode
+override to a separate statement applied afterward instead of merging it
+into the existing condition. `tests/test_esignatures_wizard_cli.php` now
+passes all 141 checks again; behaviour is otherwise identical to what
+Phase C shipped.
+
 ## 2026-07-18 (feat) — Documents: external-party signing — send a document to a client/supplier to sign (Phase C of 3)
 
 **New:** `migrations/2026_07_18_document_signature_external_signer.php`,

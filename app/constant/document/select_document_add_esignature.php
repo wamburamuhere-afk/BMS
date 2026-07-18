@@ -558,15 +558,11 @@ function updateButtons() {
     const onLast = currentStep === 4;
     const onSign = currentStep === 3;
 
-    // On step 2, external-signer mode has its own Send Request action inside
-    // the panel — the normal Previous/Next footer doesn't apply there.
-    const onExternalStep2 = currentStep === 2 && isExternalMode();
-
-    // Back button — hidden only on step 4 or external-mode step 2, disabled only on step 1
-    $('#btnBack').toggleClass('d-none', onLast || onExternalStep2).prop('disabled', currentStep === 1);
+    // Back button — hidden only on step 4, disabled only on step 1
+    $('#btnBack').toggleClass('d-none', onLast).prop('disabled', currentStep === 1);
 
     // Next / Sign / hidden on step 4
-    if (onLast || onExternalStep2) {
+    if (onLast) {
         $('#btnNext').addClass('d-none');
         $('#btnFinalSign').addClass('d-none');
     } else if (onSign) {
@@ -575,6 +571,15 @@ function updateButtons() {
     } else {
         $('#btnNext').removeClass('d-none').addClass('d-inline-block');
         $('#btnFinalSign').addClass('d-none').removeClass('d-inline-block');
+    }
+
+    // On step 2, external-signer mode has its own Send Request action inside
+    // the panel — the normal Previous/Next footer doesn't apply there, so
+    // override on top of the standard rules above (applied second so this
+    // wins without changing their unrelated step-4/step-3 behaviour).
+    if (currentStep === 2 && isExternalMode()) {
+        $('#btnBack').addClass('d-none');
+        $('#btnNext').addClass('d-none');
     }
 
     validateStep();
