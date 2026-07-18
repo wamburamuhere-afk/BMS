@@ -165,14 +165,17 @@ $accent = getSetting('print_template_color_dn_depot', '#e05a1c');
         }
     </style>
     <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
+    <?php require_once ROOT_DIR . '/includes/print_autofit.php'; ?>
 </head>
-<body onload="window.print()">
+<body onload="bmsAutoFitPrint()">
 
     <div class="no-print" style="margin-bottom:16px; display:flex; gap:8px;">
         <button onclick="window.print()" style="padding:6px 16px; cursor:pointer; font-weight:600; background:#f8f9fa; border:1px solid #dee2e6; border-radius:4px;">Print Document</button>
         <button onclick="window.close()" style="padding:6px 16px; cursor:pointer; font-weight:600; background:#fff; border:1px solid #dee2e6; border-radius:4px;">Close Tab</button>
     </div>
 
+
+    <div class="print-scale-wrapper">
     <div class="company-block">
         <?php if (!empty($comp['logo'])): ?>
         <img src="<?= htmlspecialchars('../../' . $comp['logo']) ?>" alt="Logo">
@@ -299,6 +302,8 @@ $accent = getSetting('print_template_color_dn_depot', '#e05a1c');
     </style>
 
     <div class="accent-bar"></div>
+    </div>
+
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 

@@ -295,14 +295,17 @@ $wf = [
         }
     </style>
 <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
+    <?php require_once ROOT_DIR . '/includes/print_autofit.php'; ?>
 </head>
-<body onload="window.print()">
+<body onload="bmsAutoFitPrint()">
 
     <div class="no-print" style="margin-bottom:20px; display:flex; gap:8px;">
         <button onclick="window.print()" style="padding:6px 16px; cursor:pointer;">Print</button>
         <button onclick="window.close()" style="padding:6px 16px; cursor:pointer;">Close</button>
     </div>
 
+
+    <div class="print-scale-wrapper">
     <!-- HEADER -->
     <div class="header">
         <div class="company-info">
@@ -488,6 +491,8 @@ $wf = [
         #dnSigRow .signature-box { gap: 20px; }
         #dnSigRow .signature-line { width: 160px; }
     </style>
+    </div>
+
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 

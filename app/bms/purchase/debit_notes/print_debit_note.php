@@ -147,13 +147,16 @@ $wf = [
         @media print { .no-print { display: none !important; } body { margin: 0 !important; } .box, .totals, .notes-section > div { box-shadow: none; border: 1px solid #e0e0e0; } }
     </style>
 <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
+    <?php require_once ROOT_DIR . '/includes/print_autofit.php'; ?>
 </head>
-<body onload="window.print()">
+<body onload="bmsAutoFitPrint()">
     <div class="no-print" style="margin-bottom:20px; display:flex; gap:8px;">
         <button onclick="window.print()" style="padding:6px 16px; cursor:pointer; font-weight:600; background:#f8f9fa; border:1px solid #dee2e6; border-radius:4px;">Print Document</button>
         <button onclick="window.close()" style="padding:6px 16px; cursor:pointer; font-weight:600; background:#fff; border:1px solid #dee2e6; border-radius:4px;">Close Tab</button>
     </div>
 
+
+    <div class="print-scale-wrapper">
     <div class="header">
         <div class="company-info">
             <h1><?= htmlspecialchars($comp['name']) ?></h1>
@@ -245,6 +248,8 @@ $wf = [
 
     <!-- SIGNATURE — canonical partial (Created / Reviewed / Approved + e-signatures) -->
     <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
+    </div>
+
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 </body>
