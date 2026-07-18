@@ -3,6 +3,7 @@
 // scope-audit: skip — stat counts only in PHP; list data loaded via AJAX from api/get_purchase_returns.php which is scoped (Phase G); stat queries deferred to Phase G-2
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/warehouse_scope.php';
+require_once __DIR__ . '/../../../core/project_scope.php';
 
 // Enforce permission BEFORE any output
 autoEnforcePermission('purchase_returns');
@@ -14,21 +15,21 @@ $can_create = canCreate('purchase_returns') ? 'true' : 'false';
 $can_delete = hasPermission('delete_purchase_returns') ? 'true' : 'false';
 $can_approve = hasPermission('approve_purchase_returns') ? 'true' : 'false';
 
-// Get suppliers and warehouses for filter dropdowns — scoped by project for non-admins
-$_pr_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
+// Get suppliers and warehouses for filter dropdowns.
 // Warehouses: shared helper — also respects the user's direct warehouse
 // grant (Phase 6, pos_upgrade_plan.md), not just project membership.
 $warehouses = warehousesForSelect($pdo);
-if (isAdmin()) {
-    $suppliers = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
-} elseif (!empty($_pr_assigned)) {
-    $_pr_ph = implode(',', array_fill(0, count($_pr_assigned), '?'));
-    $_pr_ss = $pdo->prepare("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' AND (project_id IS NULL OR project_id IN ($_pr_ph)) ORDER BY supplier_name");
-    $_pr_ss->execute($_pr_assigned);
-    $suppliers = $_pr_ss->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $suppliers = $pdo->query("SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active' AND project_id IS NULL ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
-}
+// Suppliers: found 2026-07-18 — this used to hand-roll the same nullable-
+// project fallback scopeFilterSqlNullable() already provides, instead of
+// the shared helper mandated by .claude/security.md §23. Same effective
+// behaviour (a project-less user still sees project-less suppliers, never
+// a hard-blocked empty list), just via the one proven-correct mechanism
+// instead of a bespoke copy of it. (suppliers has no warehouse_id column —
+// only project scoping applies here.)
+$suppliers = $pdo->query(
+    "SELECT supplier_id, supplier_name, company_name FROM suppliers WHERE status = 'active'"
+    . scopeFilterSqlNullable('project') . " ORDER BY supplier_name"
+)->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch initial stats for first paint and print
 $stats_counts = $pdo->query("
