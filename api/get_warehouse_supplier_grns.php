@@ -1,7 +1,7 @@
 <?php
-// scope-audit: skip — dropdown helper returning GRNs for a given warehouse+supplier combination; used in purchase-return create forms; scope enforced on the parent GRN list
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/permissions.php';
+require_once __DIR__ . '/../core/project_scope.php';
 
 header('Content-Type: application/json');
 
@@ -17,6 +17,13 @@ try {
 
     if ($warehouse_id <= 0 || $supplier_id <= 0) {
         throw new Exception("Missing parameters");
+    }
+    // Found 2026-07-18: normal UI flow always pre-scopes warehouse_id via
+    // warehousesForSelect(), but nothing stopped a crafted request supplying
+    // any warehouse_id from returning that warehouse's GRNs regardless.
+    if (!userCan('warehouse', $warehouse_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: this warehouse is not in your scope');
     }
 
     $stmt = $pdo->prepare("

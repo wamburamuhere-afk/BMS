@@ -1,7 +1,7 @@
 <?php
 // File: api/operations/get_return_grns.php
-// scope-audit: skip — operations module helper; returns GRNs for a specific project goods-return; project scope is implicit (called within a project context)
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/project_scope.php';
 
 header('Content-Type: application/json');
 
@@ -15,6 +15,13 @@ $supplier_id = intval($_GET['supplier_id'] ?? 0);
 
 if (!$warehouse_id || !$supplier_id) {
     echo json_encode(['success' => false, 'message' => 'Missing parameters']);
+    exit();
+}
+// Found 2026-07-18: same gap as get_warehouse_supplier_grns.php — normal UI
+// flow pre-scopes warehouse_id, but nothing checked it server-side.
+if (!userCan('warehouse', $warehouse_id)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your scope']);
     exit();
 }
 
