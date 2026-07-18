@@ -1,5 +1,45 @@
 # BMS Changelog
 
+## 2026-07-18 (fix) — Received-Invoice print now follows the standard BMS print template
+
+**New:** `app/bms/invoice/print_received_invoice.php`, `tests/test_print_received_invoice_cli.php`
+**Files:** `roots.php`, `app/bms/invoice/received_invoices_view.php`
+
+User-reported: printing a received invoice (Bill) didn't follow the same
+print rules/layout as every other document type (compared to
+`print_lpo.php`). Investigated: every other document (LPO, PO, Sales
+Order, Quotation, Invoice, GRN, DN, Debit Note, Returns) has a dedicated
+standalone print page built on one canonical template; `received_invoices_view.php`
+was the one outlier — its Print buttons just called `window.print()` on the
+live, fully-chromed app view, relying on `d-print-none` to hide navigation.
+That's why it paginated awkwardly and looked structurally different — and,
+found while comparing against a live production printout, it also
+duplicated the audit footer (two different "Printed by" stamps stacked,
+each with different date formatting), since printing the raw app page
+picked up both the print-only footer partial and the app's own page
+chrome.
+
+**Fix:** added `print_received_invoice.php`, built on the exact canonical
+template `print_lpo.php` uses (standalone `<!DOCTYPE html>`, `@page`
+margin rule, `includes/print_footer_css.php`/`print_autofit.php`/
+`workflow_draft_watermark.php`/`workflow_signature_row.php`/
+`print_footer_html.php`), porting the same fields already shown on the
+view page (invoice info, items, notes, payment history, signatures) with
+no content changes. Registered the `print_received_invoice` route in
+`roots.php` and rewired both existing Print buttons to
+`window.open(...)` it instead of self-printing — the same pattern
+`lpo_view.php` already uses. The old duplicate-footer bug can't recur on
+the new page since it's a standalone document, not the app-chromed view.
+
+**Verification:** `tests/test_print_received_invoice_cli.php` (21 checks)
+— `php -l`, static checks confirming the new page includes every
+canonical shared partial and both Print buttons now target it, and a live
+section proving the new page's queries return the same figures as the
+view page (no field regressions). Also manually rendered the page
+end-to-end (real DB row, full include chain) to confirm no runtime errors
+despite the file's `error_reporting(0)` swallowing notices that `php -l`
+alone wouldn't catch.
+
 ## 2026-07-18 (fix) — Sales Order "Created By" signature not captured when converted from a Quotation
 
 **Files:** `api/account/convert_quote_to_order.php`
