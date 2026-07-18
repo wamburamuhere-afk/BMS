@@ -1,5 +1,68 @@
 # BMS Changelog
 
+## 2026-07-18 (fix) — Create-Document letter PDF: footer now pinned to the page bottom, signature block matches the approved editor design
+
+**Files:** `core/document_letter_pdf.php`, `core/document_letter_render.php`
+**New:** `tests/test_letter_pdf_footer_signature_cli.php`
+
+User-reported: opening a created document via `library.php` → View
+Online/Print, the footer wasn't placed at the end of the page like every
+other document, and the signature didn't look as professional as agreed.
+Both confirmed real, root-caused, and fixed:
+
+**Footer not pinned to the page bottom.** The letter PDF is generated
+server-side via TCPDF (`generateLetterPdf()`), using HTML from
+`renderLetterHtml()`. The shared audit footer was embedded as normal
+flowing HTML content, relying on `includes/print_footer_css.php`'s
+`position: fixed; bottom: 0` — which works on every *browser-rendered*
+print page (`print_lpo.php` etc.) but TCPDF's `writeHTML()` does not
+support `position:fixed` at all, so the footer just landed wherever the
+letter content happened to end, not at the true bottom of the page (and
+wouldn't repeat correctly across a multi-page letter). Fixed by adding a
+`BmsLetterPdf` subclass of TCPDF with a native `Footer()` callback
+(`setPrintFooter(true)`) — the technically-correct, TCPDF-native
+equivalent of a per-page fixed footer. `renderLetterHtml()` no longer
+accepts or embeds `footer_html` at all.
+
+**Signature block didn't match the already-approved editor design.**
+`create_document.php`'s live editor (the "as we have agreed" reference)
+renders the signature inside a bordered box (`.letter-signature-box`)
+with the "PREVIEW" watermark inside it, and the signer's name on a
+bordered signature line. The PDF's `renderLetterHtml()` rendered none of
+that — just a bare image, a plain caption line, then plain text. Rebuilt
+as a TCPDF-compatible bordered table cell (this file's own docblock
+already documents TCPDF only reliably renders table-based layouts, not
+flexbox/absolute-position CSS) matching the same visual language.
+
+**Verification:** `tests/test_letter_pdf_footer_signature_cli.php` (15
+checks) — `php -l`; static checks confirming the old `ob_start()`/
+`footer_html` embedding and `setPrintFooter(false)` are gone and the new
+`BmsLetterPdf`/bordered-box markup are present; a live call to
+`generateLetterPdf()` confirming a valid PDF is still produced. Also
+manually generated a real multi-page letter and visually confirmed (via
+direct PDF inspection) the footer now repeats correctly, identically
+positioned, at the bottom of *every* page, and the signature renders in
+the new bordered box with the PREVIEW caption inside it and the name on a
+signature line. Re-ran `tests/test_create_document_pdf_cli.php`,
+`tests/test_document_access_gate_cli.php`,
+`tests/test_external_signature_cli.php`, and
+`tests/test_esignatures_wizard_cli.php` — all still pass unchanged (12,
+15, 35, 141 respectively), confirming nothing else in the document/
+e-signature flow was disturbed.
+
+**Separate, pre-existing bug found (not part of this fix, flagged for a
+future session):** while visually verifying the signature box, at least
+two of the on-file signature images render corrupted in the generated
+PDF — canvas-drawn signature PNGs (`signature_drawn_*.png`, RGBA with a
+transparent background) come out as a solid black rectangle, and two
+other stored "signature" files render as an unrelated company logo and a
+certificate graphic respectively. Confirmed this reproduces identically
+with the *old* pre-fix plain `<img>` markup too, so it's unrelated to
+today's change — most likely a PNG-alpha-channel handling quirk in this
+TCPDF/GD combination, or corrupted/mismatched files in
+`uploads/signatures/`. Left untouched — out of scope for the two issues
+fixed here.
+
 ## 2026-07-18 (fix) — Sales Order "Created By" signature not captured when converted from a Quotation
 
 **Files:** `api/account/convert_quote_to_order.php`

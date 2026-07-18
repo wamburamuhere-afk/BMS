@@ -34,10 +34,13 @@ if (!function_exists('renderLetterHtml')) {
      *   bool     signature_is_preview true = stamp a "PREVIEW" watermark label
      *   string   signer_name
      *   string   signer_role
-     *   string   footer_html         pre-rendered shared audit footer (see
-     *                                includes/print_footer_html.php), inserted
-     *                                as-is at the bottom of the last page.
      * }
+     *
+     * Note: the shared audit footer ("Printed by ... / Powered By BJP
+     * Technologies") is NOT part of this HTML — it's rendered separately by
+     * BmsLetterPdf::Footer() (core/document_letter_pdf.php) via TCPDF's
+     * native per-page footer callback, since TCPDF's writeHTML() doesn't
+     * support the CSS `position:fixed` the browser-print version relies on.
      */
     function renderLetterHtml(array $d): string
     {
@@ -85,31 +88,36 @@ if (!function_exists('renderLetterHtml')) {
         // TCPDF's HTML parser handles this common subset directly.
         $html .= '<div style="font-size:11pt; line-height:1.6;">' . $d['body_html'] . '</div>';
 
-        // Signature block — same three alignments as the live editor.
+        // Signature block — same three alignments as the live editor, and now
+        // visually matched to the editor's already-approved design
+        // (.letter-signature-box in create_document.php): a bordered box
+        // around the signature image with the PREVIEW caption inside it, and
+        // the signer's name sitting on a signature line. TCPDF's HTML parser
+        // only reliably renders table-based layouts (same constraint the
+        // recipient/sender table above already works around), so the box is
+        // a bordered table cell rather than the editor's flexbox/absolute-
+        // position CSS, which TCPDF can't reproduce.
         $align = in_array($d['signature_align'] ?? 'left', ['left', 'center', 'right'], true)
             ? $d['signature_align'] : 'left';
         $cellAlign = ['left' => 'left', 'center' => 'center', 'right' => 'right'][$align];
+        $boxMargin = ['left' => 'margin-right:auto;', 'center' => 'margin-left:auto; margin-right:auto;', 'right' => 'margin-left:auto;'][$align];
+
         $html .= '<div style="margin-top:14mm; text-align:' . $cellAlign . ';">';
+        $html .= '<table cellpadding="4" cellspacing="0" style="' . $boxMargin . '"><tr>'
+            . '<td style="border:1px dashed #adb5bd; background-color:#fbfbfb; width:65mm; height:24mm; text-align:center; vertical-align:middle;">';
         if (!empty($d['signature_image_path']) && is_file($d['signature_image_path'])) {
-            $html .= '<img src="' . $esc($d['signature_image_path']) . '" height="18mm"><br>';
+            $html .= '<img src="' . $esc($d['signature_image_path']) . '" height="15mm">';
             if (!empty($d['signature_is_preview'])) {
-                $html .= '<span style="font-size:7pt; color:#c00; letter-spacing:1px;">PREVIEW &mdash; not a legally applied signature</span><br>';
+                $html .= '<br><span style="font-size:6.5pt; font-weight:bold; letter-spacing:0.5px; color:#c00;">PREVIEW &mdash; NOT LEGALLY APPLIED</span>';
             }
         }
-        $html .= '<div style="margin-top:2mm;">' . $esc($d['signer_name'] ?: 'Signed by') . '</div>';
+        $html .= '</td></tr></table>';
+        $html .= '<div style="margin-top:2mm; border-top:1px solid #333333; padding-top:2mm; display:inline-block; min-width:55mm;">'
+            . $esc($d['signer_name'] ?: 'Signed by') . '</div>';
         if (!empty($d['signer_role'])) {
-            $html .= '<div style="font-size:9pt; color:#555;">' . $esc($d['signer_role']) . '</div>';
+            $html .= '<div style="font-size:9pt; color:#555555;">' . $esc($d['signer_role']) . '</div>';
         }
         $html .= '</div>';
-
-        if (!empty($d['footer_html'])) {
-            // print_footer_html.php's own CSS (print_footer_css.php) targets
-            // browser @media print, which TCPDF's HTML parser doesn't apply —
-            // restate the same small/muted styling inline so the audit line
-            // still reads the same as every other BMS print page's footer.
-            $html .= '<div style="margin-top:10mm; font-size:7pt; color:#2c3e50; text-align:center;">'
-                . $d['footer_html'] . '</div>';
-        }
 
         return $html;
     }
