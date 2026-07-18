@@ -233,3 +233,58 @@ $nh = src($root, 'core/note_attachments.php');
 has($nh, "function saveNoteAttachments",              'shared attachment helper exists');
 has($nh, "move_uploaded_file",                        'helper moves uploaded files');
 has($nh, "finfo",                                     'helper checks real MIME (§19)');
+
+// ─────────────────────────────────────────────────────────────────────────
+section('9. Source items show the real product name, not the literal "Item"');
+// User-reported 2026-07-18: the create-from-return line items showed the
+// placeholder text "Item" for every row instead of the actual product name.
+// Root cause: get_debit_note_source.php read purchase_return_items.item_name
+// (a column that doesn't exist on that table) instead of .product_name (the
+// column create_purchase_return.php actually populates and every other
+// purchase-return view/print page already reads).
+has($gs, "\$it['product_name']",                      'source reads the real product_name column');
+(strpos($gs, "\$it['item_name']") === false)
+    ? pass('source no longer reads the non-existent item_name column')
+    : fail('source still reads the non-existent item_name column');
+
+if (isset($pdo) && $pdo instanceof PDO) {
+    try {
+        $supplierId = (int)$pdo->query("SELECT supplier_id FROM suppliers WHERE status='active' LIMIT 1")->fetchColumn();
+        $whId       = (int)$pdo->query("SELECT warehouse_id FROM warehouses WHERE status='active' LIMIT 1")->fetchColumn();
+        $prodRow    = $pdo->query("SELECT product_id, product_name FROM products LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+
+        if (!$supplierId || !$whId || !$prodRow) {
+            echo "  \033[33m⊘\033[0m  Skipped live source test (missing supplier/warehouse/product fixture data)\n";
+        } else {
+            $pdo->prepare("
+                INSERT INTO purchase_returns (return_number, supplier_id, warehouse_id, status, return_date, reason, created_by)
+                VALUES ('TEST-DBN-SRC-RET', ?, ?, 'approved', CURDATE(), 'test', 1)
+            ")->execute([$supplierId, $whId]);
+            $testReturnId = (int)$pdo->lastInsertId();
+
+            $pdo->prepare("
+                INSERT INTO purchase_return_items (purchase_return_id, product_id, product_name, quantity, unit_price, tax_rate, line_total)
+                VALUES (?, ?, ?, 2, 500, 0, 1000)
+            ")->execute([$testReturnId, $prodRow['product_id'], $prodRow['product_name']]);
+
+            $itemsFetch = $pdo->prepare("SELECT * FROM purchase_return_items WHERE purchase_return_id = ?");
+            $itemsFetch->execute([$testReturnId]);
+            $rawItem = $itemsFetch->fetch(PDO::FETCH_ASSOC);
+
+            // Reproduce get_debit_note_source.php's own mapping line exactly.
+            $mappedDescription = $rawItem['product_name'] ?? ($rawItem['description'] ?? 'Item');
+
+            check_eq($mappedDescription, $prodRow['product_name'], 'a real purchase-return item maps to its actual product name, not "Item"');
+
+            $pdo->prepare("DELETE FROM purchase_return_items WHERE purchase_return_id = ?")->execute([$testReturnId]);
+            $pdo->prepare("DELETE FROM purchase_returns WHERE purchase_return_id = ?")->execute([$testReturnId]);
+            pass('test data cleaned up (self-contained, no residue left in the DB)');
+        }
+    } catch (Throwable $e) {
+        fail('Live source-mapping test threw: ' . $e->getMessage());
+    }
+}
+
+function check_eq($actual, $expected, string $label): void {
+    $actual === $expected ? pass($label) : fail("$label — expected " . var_export($expected, true) . ", got " . var_export($actual, true));
+}

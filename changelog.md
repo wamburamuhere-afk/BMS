@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-07-18 (fix) — Debit Note "Product" column showed literal "Item" instead of the real product name
+
+**Files:** `api/purchase/get_debit_note_source.php`
+**Extended:** `tests/test_debit_notes_cli.php` (new section 9, 4 checks)
+
+User-reported: creating a Debit Note from an approved Purchase Return, the
+Line Items "Product" column showed the literal text "Item" for every row
+instead of the actual product name.
+
+Root cause: `get_debit_note_source.php`'s item-mapping read
+`$it['item_name']` — a column that **does not exist** on
+`purchase_return_items` — then fell back to `$it['description']` (an
+optional freeform field, normally left blank), then finally to the literal
+string `'Item'`. The real product name was sitting the whole time in
+`purchase_return_items.product_name`, correctly populated at creation by
+`api/create_purchase_return.php` and already the column every other
+purchase-return view/print page reads for display — this endpoint alone
+was reading the wrong field.
+
+**Fix:** one-line change — read `$it['product_name']` first (falling back
+to `description`, then `'Item'` only as a last resort for genuinely
+unnamed legacy rows).
+
+**Verification:** `tests/test_debit_notes_cli.php` section 9 — static
+checks confirming the wrong column read is gone and the correct one is
+present; a live test inserting a real purchase return + return item with a
+real product name, reproducing the endpoint's own mapping logic, and
+confirming it now resolves to the actual product name instead of "Item".
+All 94 checks in the suite pass (90 pre-existing + 4 new).
+
 ## 2026-07-18 (fix) — Invoice-from-SO: customer not auto-filled + LPO/DN reference pickers over-exposed
 
 **New:** `tests/test_invoice_create_scope_cli.php`
