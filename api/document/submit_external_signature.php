@@ -12,6 +12,8 @@
  * internally-signed one.
  */
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/notify.php';
+require_once __DIR__ . '/../../core/mailer.php';
 
 header('Content-Type: application/json');
 
@@ -147,6 +149,38 @@ try {
             'signing_reference'  => $signing_reference,
         ],
     ]);
+
+    // The requester previously had no way to learn a document was signed
+    // except by manually re-checking the pending list — notify them now,
+    // both in-app and by email, the same two channels the ORIGINAL request
+    // used to reach the external signer.
+    if (function_exists('createNotification')) {
+        createNotification($pdo, (int)$row['requested_by'], [
+            'title'      => 'Document signed: ' . $row['document_name'],
+            'message'    => "{$row['signer_name']} ({$row['signer_email']}) has signed \"{$row['document_name']}\".",
+            'type'       => 'system',
+            'event_key'  => 'external_signature_completed',
+            'category'   => 'Documents',
+            'priority'   => 'medium',
+            'document_id' => $new_document_id,
+            'action_url' => function_exists('getUrl') ? getUrl('e_signatures') : '/e_signatures',
+        ]);
+    }
+    if (function_exists('sendEmail')) {
+        $reqStmt = $pdo->prepare("SELECT email, first_name FROM users WHERE user_id = ?");
+        $reqStmt->execute([(int)$row['requested_by']]);
+        $requester = $reqStmt->fetch(PDO::FETCH_ASSOC);
+        if ($requester && !empty($requester['email'])) {
+            sendEmail(
+                $requester['email'],
+                'Document signed: ' . $row['document_name'],
+                '<p>Hello ' . htmlspecialchars($requester['first_name'] ?? '') . ',</p>'
+                . '<p><strong>' . htmlspecialchars($row['signer_name']) . '</strong> (' . htmlspecialchars($row['signer_email']) . ') has signed '
+                . '<strong>' . htmlspecialchars($row['document_name']) . '</strong>.</p>'
+                . '<p>Signing reference: ' . htmlspecialchars($signing_reference) . '</p>'
+            );
+        }
+    }
 
     echo json_encode([
         'success'           => true,

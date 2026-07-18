@@ -683,8 +683,11 @@ $(document).ready(function() {
                 className: 'text-end',
                 render: (data, t, row) => row.signer_type === 'external'
                     // This row is a request WE sent to an outside party — we
-                    // can't sign it ourselves, just wait for them.
+                    // can't sign it ourselves, just wait for them (or cancel it).
                     ? `<span class="badge bg-secondary-subtle text-secondary border px-3">Awaiting external signer</span>
+                       <button class="btn btn-sm btn-outline-danger" onclick="cancelExternalRequest(${row.id})" title="Cancel this signature request">
+                           <i class="bi bi-x-circle"></i> Cancel
+                       </button>
                        <button class="btn btn-sm btn-outline-secondary" onclick="previewDocument(${row.document_id})">
                            <i class="bi bi-eye"></i> Preview
                        </button>`
@@ -1093,6 +1096,30 @@ function confirmDeleteSignature(id) {
 function previewDocument(docId) {
     logReportAction('Previewed Document (Signing)', 'User opened preview for document ID: ' + docId + ' before signing');
     window.open('document_preview.php?id=' + docId, '_blank');
+}
+
+function cancelExternalRequest(signatureId) {
+    Swal.fire({
+        title: 'Cancel this signature request?',
+        text: "The link already sent to the external signer will stop working immediately.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, cancel it'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post(`${APP_URL}/api/document/cancel_external_signature.php`, { signature_id: signatureId }, function(res) {
+                if (res.success) {
+                    logReportAction('Cancelled External Signature Request', 'Signature request ID: ' + signatureId);
+                    $('#pendingTable').DataTable().ajax.reload();
+                    Swal.fire('Cancelled', res.message, 'success');
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            }, 'json').fail(() => Swal.fire('Error', 'Server error while cancelling.', 'error'));
+        }
+    });
 }
 
 function viewSignedDocument(docId) {
