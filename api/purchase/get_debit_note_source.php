@@ -54,7 +54,7 @@ try {
         $rate = (float)($it['tax_rate'] ?? 0);
         $items[] = [
             'product_id'  => isset($it['product_id']) && $it['product_id'] !== null ? (int)$it['product_id'] : null,
-            'description' => $it['item_name'] ?? ($it['description'] ?? 'Item'),
+            'description' => $it['product_name'] ?? ($it['description'] ?? 'Item'),
             'quantity'    => (float)($it['quantity'] ?? 0),
             'unit_price'  => (float)($it['unit_price'] ?? 0),
             'tax_rate'    => ($rate == 18) ? 18 : 0,
