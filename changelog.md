@@ -1,5 +1,110 @@
 # BMS Changelog
 
+## 2026-07-18 (fix) — Documents: private-document access-control gap + Create Document correctness gaps
+
+**New:** `core/document_access.php`, `api/document/cancel_external_signature.php`,
+`tests/test_document_access_gate_cli.php`
+**Files:** `app/constant/document/document_library.php`,
+`api/document/get_document_activity.php`,
+`api/document/duplicate_created_document.php`,
+`api/document/submit_external_signature.php`,
+`api/document/request_external_signature.php`,
+`app/constant/document/e_signatures.php`, `sign_document.php`,
+`tests/test_external_signature_cli.php`
+
+A deeper, second-pass re-scout of the Documents module (after the earlier
+Create Document professional-output work) found a real security gap plus
+several correctness gaps in features that existed but were left
+half-finished. Fixed both.
+
+### Security (High): private/restricted documents were downloadable by anyone with the URL
+
+`document_library.php`'s `?action=download` dispatch, and its "View Online"
+links (dropdown + card view), served a document's file with **no
+authorization check at all** — not even a `canView('documents')` permission
+check, let alone `access_level`/`document_assignees`. A document marked
+"Restricted — shared with 2 people" was downloadable/viewable by any other
+authenticated user who got hold of its URL (visible in the page's own JSON,
+browser history, a forwarded link) — and stayed reachable **forever**, even
+after access was revoked, since nothing ever re-checked. Other parts of the
+same module (`get_document_activity.php`) already enforced this correctly,
+so this was a real inconsistency, not a blanket design choice — and
+`.claude/security.md §19` already documents the required pattern for
+exactly this case ("serve via a PHP gatekeeper, never link directly").
+
+- New shared `core/document_access.php` → `userCanAccessDocument()`,
+  extracted from the exact check already proven correct in
+  `get_document_activity.php` (admin → allow; public → allow; owner →
+  allow; else must be in `document_assignees`) — one function so the rule
+  can't drift between call sites again.
+- `document_library.php`: added `isAuthenticated()` + `canView('documents')`
+  + the new helper before any file I/O on both `download` and a new `view`
+  action (inline `Content-Disposition`, for the "View Online" links). The
+  streaming logic was refactored into one `serveDocumentLocal($pdo, $id,
+  $inline)` so the fix applies to both paths, not just one.
+- The "View Online" dropdown link and card-view eye icon now route through
+  `?action=view` instead of linking directly to the raw file path — a gate
+  on the download action alone wouldn't have closed this, since the direct
+  link bypassed PHP (and therefore any authorization) entirely.
+- `get_document_activity.php` refactored to call the same shared helper
+  (light cleanup, same behavior, removes what would have become a third
+  copy of this check).
+
+Verified live: `tests/test_document_access_gate_cli.php` (new, 15 checks)
+proves an unrelated, non-assigned, non-admin user is correctly **denied** a
+restricted document — the exact scenario the gap allowed — while owner,
+admin, and explicitly-assigned users are correctly allowed, and a public
+document remains open to everyone.
+
+**Related, NOT fixed (out of this scope, flagged for later):** the same
+direct-file-path-link pattern exists in `customer_documents.php`,
+`project_view.php`, `document_templates.php`, and `e_signatures.php`'s
+signature-image preview — different tables, different sensitivity, a
+separate piece of work.
+
+### Correctness/completeness gaps (Medium)
+
+- **`duplicate_created_document.php` now regenerates the PDF** via the
+  existing `generateLetterPdf()` (from the earlier Phase B work) instead of
+  copying the source file's bytes verbatim — previously the clone got a
+  fresh `document_code` but the actual PDF still showed the *old* one until
+  the next edit+save. Verified live: the new PDF's decompressed content
+  contains the new reference number and does **not** contain the old one.
+- **Duplicating now also copies `document_assignees`** — previously a
+  restricted document shared with 5 people, once duplicated, was shared
+  with nobody.
+- **The requester of an external signature is now notified when it's
+  signed** — both in-app (`createNotification()`, `core/notify.php` — was
+  already built for exactly this, just never called from this flow) and by
+  email (`sendEmail()`), instead of only finding out by manually
+  re-checking the pending list.
+- **New `cancel_external_signature.php`** — requester-or-admin can withdraw
+  a sent request; sets `status='rejected'` (existing enum value, no schema
+  change) and immediately invalidates any outstanding token so a
+  wrong-address or leaked link stops working right away instead of staying
+  live for its full 7-day window. Wired a "Cancel" button into
+  `e_signatures.php`'s pending table next to the "Awaiting external signer"
+  badge.
+- **`request_external_signature.php` now blocks a second concurrent pending
+  request** on the same document — previously repeated clicks could
+  generate unlimited simultaneously-valid signing links for one document.
+- **`sign_document.php` gained a second, separate required checkbox** — "I
+  confirm I am {name} ({email}) and am authorised to sign this document" —
+  alongside the existing legal-consent checkbox, both recorded in the audit
+  trail. A deliberate, lightweight mitigation (an explicit, logged identity
+  assertion) for the fact that token possession alone doesn't prove
+  identity if a link is forwarded — not full OTP/email verification, which
+  would be a materially larger feature.
+
+Verified: `tests/test_external_signature_cli.php` extended with 11 new
+checks (cancel endpoint's status/token-invalidation logic, the anti-spam
+guard actually blocking/unblocking correctly) — 35 checks total, all green.
+Re-ran every related suite together to confirm no regressions:
+`test_esignatures_wizard_cli.php` (141), `test_create_document_pdf_cli.php`
+(12), `test_document_categories_cli.php` (26),
+`test_document_expiry_cli.php` (50) — 279 checks across the whole Documents
+module, all passing.
+
 ## 2026-07-18 (fix) — E-signature wizard: restore btnBack CI regression guard broken by Phase C
 
 **File:** `app/constant/document/select_document_add_esignature.php`
