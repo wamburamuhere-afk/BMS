@@ -831,6 +831,21 @@ function rejectBudget(budgetId) {
             width: 100% !important;
             margin: 0 !important;
         }
+
+        /* bms-mobile-cards.js auto-injects a mobile card view under every
+           DataTable that doesn't already have one (including #expensesTable
+           above), wrapped in a `.row` for its own grid layout. responsive.css
+           already force-hides it globally on print via `.bms-auto-cards`,
+           but the generic `.row { display: flex !important; }` rule right
+           above this — meant only for the Budget Overview info grid — ties
+           on specificity and wins on source order, silently un-hiding it and
+           printing the card view under the table. ID selector always wins
+           regardless of order, so this reliably keeps print to table-only. */
+        #expensesTable-bms-cards,
+        .bms-auto-cards {
+            display: none !important;
+        }
+
         .col-md-4 {
             flex: 0 0 33.333333% !important;
             max-width: 33.333333% !important;
