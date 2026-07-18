@@ -1,5 +1,38 @@
 # BMS Changelog
 
+## 2026-07-18 (fix) — Budget Details print report: Bank/Cash badges bled into the Ref# column
+
+**File:** `app/constant/accounts/budget_details.php`
+
+Same-day follow-up, and this time actually caught by testing rather than
+reasoning about the CSS: built a standalone reproduction of the real print
+layout (exact column widths, exact A4 print content width, real Bootstrap
+badge markup, real data from the reported screenshots — `Opening Balance
+Equity`, `CRDB Bank - Main Account`, `TSh 12,577,989,000.00`) and rendered
+it to confirm what actually happens, rather than trusting the CSS in
+isolation. Screenshot confirmed the header/amount fix above worked, but
+surfaced a real remaining bug: the Bank/Cash badges visibly overflowed
+their column and bled into Ref#.
+
+Root cause: Bootstrap's `.badge` class sets `white-space: nowrap` directly
+on the element itself — the parent `td`'s `white-space: normal` does not
+override this (it's not inherited, it's an explicit rule on the badge).
+A long value like "Opening Balance Equity" or "CRDB Bank - Main Account"
+therefore ignored the column width entirely and rendered past its border,
+visually intersecting with the neighbouring Ref# cell. Exact same bug
+already diagnosed and fixed on `sub_contractors.php`'s `#scTable` back on
+2026-07-11 — this table just never got the same treatment.
+
+Fix: `#expensesTable td .badge { white-space: normal; word-break:
+break-word; display: inline-block; }` so the badge itself wraps inside its
+column instead of refusing to. Added `overflow: hidden` on every
+`#expensesTable th`/`td` as a hard per-column boundary — the same
+belt-and-braces pattern already proven on `sub_contractors.php` — so no
+cell's content can bleed into its neighbour even in an edge case the
+wrap rule doesn't catch. Re-rendered the same reproduction after the fix:
+badges now wrap cleanly inside their own column border, headers and
+amounts stay on one line as already fixed, no intersection anywhere.
+
 ## 2026-07-18 (fix) — Budget Details print report: header labels and amounts were wrapping mid-word
 
 **File:** `app/constant/accounts/budget_details.php`
