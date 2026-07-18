@@ -1,5 +1,70 @@
 # BMS Changelog
 
+## 2026-07-17 (feat) — Print pages auto-shrink to fit one A4 sheet (procurement + sales)
+
+**New files:** `includes/print_autofit.php`
+**Changed:** `includes/workflow_signature_row.php` (tighter baseline spacing)
+**Changed (44 print pages — autofit wired in):**
+Procurement — `api/account/print_purchase_order.php` (+`_navy`/`_corporate`/`_banded`),
+`api/account/print_rfq.php` (+`_navy`/`_corporate`/`_banded`),
+`api/account/print_delivery_note.php` (+`_depot`/`_transit`/`_custody`),
+`app/bms/grn/grn_print.php`,
+`app/bms/purchase/print_purchase_return.php` (+`_navy`/`_corporate`/`_banded`),
+`app/bms/purchase/debit_notes/print_debit_note.php` (+`_navy`/`_corporate`/`_banded`).
+Sales — `app/bms/sales/quotations/print_quotation.php` (+`_terra`/`_noir`/`_meadow`),
+`app/bms/sales/print_sales_order.php` (+`_confirmation`/`_ledger`/`_studio`),
+`app/bms/sales/lpo/print_lpo.php`,
+`app/bms/invoice/invoice_print.php` (+`_onyx`/`_wave`/`_summit`),
+`app/bms/sales/sales_returns/print_sales_return.php` (+`_register`/`_meridian`/`_intake`),
+`app/bms/sales/credit_notes/print_credit_note.php` (+`_ledger`/`_horizon`/`_ember`),
+`app/constant/accounts/payment_voucher_print.php`, `app/bms/operations/print_ipc.php`.
+
+User request: large POs/quotations/invoices with many line items were spilling
+onto a second printed page; wanted every print document to always fit one A4
+sheet regardless of item count, without removing any content.
+
+Built one shared mechanism (`includes/print_autofit.php`) rather than a
+per-page hack: on `<body onload>`, it measures the printable content block
+(`.print-scale-wrapper`, everything from the header through the signature
+row — not the fixed footer) against the real usable A4 content height for
+the canonical `@page { margin: 10mm 8mm 16mm 8mm; }`, and shrinks it via CSS
+`zoom` (not `transform`, which doesn't affect print pagination) down to a
+75% floor before calling `window.print()`. Fonts, spacing, table row height,
+and the signature block all scale together since they're one wrapped block —
+nothing is hidden or truncated.
+
+The theoretical mm→px target (~993px) was insufficient in practice — verified
+headlessly (`chrome --headless --print-to-pdf` + PDF page-count check) that a
+content block measuring under the theoretical target still overflowed to a
+second page, because Chrome's print pagination doesn't perfectly match the
+on-screen `scrollHeight` (print-only borders, sub-pixel/row-height rounding).
+Empirically calibrated: real one-page ceiling ≈ 986px, safety buffer raised
+from 20px to 90px (target ≈ 903px) so the shrink reliably lands under the
+real threshold instead of the theoretical one.
+
+Tightened `includes/workflow_signature_row.php` baseline spacing as part of
+the same request (`.signature-box` margin-top 46px→24px, signature image
+max-height 45px→30px, etc.) so the Created/Reviewed/Approved block takes less
+vertical room by default, on top of the auto-shrink.
+
+**Known limit (by design, per user's own choice of the 75% floor):** documents
+that need more than a 25% shrink to fit still spill to a 2nd page rather than
+becoming illegibly small. Verified via the same headless method: for the
+reference quotation template, that's roughly 15–17 line items — beyond that,
+the floor is hit and the page overflows. Wanted a smaller floor to guarantee
+one page unconditionally is a follow-up option if this limit turns out to
+matter in practice.
+
+Payment voucher (`payment_voucher_print.php`) keeps its existing conditional
+print trigger (`onload="if(...print=true...) bmsAutoFitPrint()"`) — only the
+call target changed from `window.print()`.
+
+Not yet tested against live DB-backed pages in a real browser (no Claude in
+Chrome extension connected this session) — verified via a standalone headless
+Chrome harness replicating the canonical CSS/structure instead. Recommend a
+real-browser print check on a large PO/quotation before relying on this in
+production.
+
 ## 2026-07-17 (fix) — Warehouse-only users couldn't see their own Purchase/Sales Orders
 
 **Files:** `api/account/get_purchase_orders.php`, `api/account/get_sales_orders.php`

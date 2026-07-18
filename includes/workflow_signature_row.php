@@ -29,14 +29,14 @@ if (!empty($wf['__include_css'])):
 <style>
     /* ── SIGNATURE ROW ── canonical source — do not duplicate in host pages */
     .signature-box {
-        margin-top: 46px;
+        margin-top: 24px;
         display: flex;
         justify-content: space-around;
         gap: 40px;
     }
     .signature-line {
         width: 210px;
-        padding-top: 7px;
+        padding-top: 5px;
         text-align: center;
         font-size: 11px;
         color: #1a252f;
@@ -44,21 +44,21 @@ if (!empty($wf['__include_css'])):
     }
     .signature-line small {
         display: block;
-        margin-top: 4px;
+        margin-top: 3px;
         font-size: 10px;
         font-weight: 400;
         color: #495057;
     }
     .sig-img-wrap {
-        min-height: 48px;
+        min-height: 32px;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: flex-end;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
     }
     .sig-img-wrap img {
-        max-height: 45px;
+        max-height: 30px;
         max-width: 150px;
         object-fit: contain;
     }

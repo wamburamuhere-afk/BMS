@@ -187,14 +187,17 @@ $accent = getSetting('print_template_color_sr_intake', '#5f7052');
         @media print { .no-print { display: none !important; } body { margin: 0 !important; } }
     </style>
 <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
+    <?php require_once ROOT_DIR . '/includes/print_autofit.php'; ?>
 </head>
-<body onload="window.print()">
+<body onload="bmsAutoFitPrint()">
 
     <div class="no-print" style="margin:16px 0; display:flex; gap:8px;">
         <button onclick="window.print()" style="padding:6px 16px; cursor:pointer; font-weight:600; background:#f8f9fa; border:1px solid #dee2e6; border-radius:4px;">Print Document</button>
         <button onclick="window.close()" style="padding:6px 16px; cursor:pointer; font-weight:600; background:#fff; border:1px solid #dee2e6; border-radius:4px;">Close Tab</button>
     </div>
 
+
+    <div class="print-scale-wrapper">
     <div class="top-strip">
         <span><?= htmlspecialchars($comp['name']) ?></span>
         <span><?php if (!empty($comp['website'])): ?><?= htmlspecialchars($comp['website']) ?><?php elseif (!empty($comp['email'])): ?><?= htmlspecialchars($comp['email']) ?><?php endif; ?></span>
@@ -310,6 +313,8 @@ $accent = getSetting('print_template_color_sr_intake', '#5f7052');
     <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
 
     <div class="bottom-bar"></div>
+    </div>
+
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 

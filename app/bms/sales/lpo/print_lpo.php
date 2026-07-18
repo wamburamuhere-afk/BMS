@@ -133,14 +133,17 @@ try {
         @media print { .no-print { display: none !important; } body { margin: 0 !important; } .box, .totals, .notes-section > div { box-shadow: none; border: 1px solid #e0e0e0; } }
     </style>
     <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
+    <?php require_once ROOT_DIR . '/includes/print_autofit.php'; ?>
 </head>
-<body onload="window.print()">
+<body onload="bmsAutoFitPrint()">
 
     <div class="no-print" style="margin-bottom:20px; display:flex; gap:8px;">
         <button onclick="window.print()" style="padding:6px 16px; cursor:pointer;">Print</button>
         <button onclick="window.close()" style="padding:6px 16px; cursor:pointer;">Close</button>
     </div>
 
+
+    <div class="print-scale-wrapper">
     <div class="header">
         <div class="company-info">
             <h1><?= htmlspecialchars($comp['name']) ?></h1>
@@ -238,6 +241,8 @@ try {
     <div style="clear: both;">
         <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
     </div>
+    </div>
+
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 
