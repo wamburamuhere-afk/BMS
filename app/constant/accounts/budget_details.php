@@ -865,6 +865,41 @@ function rejectBudget(budgetId) {
             border: 1px solid #dee2e6 !important;
             padding: 8px !important;
         }
+
+        /* ─── Portrait-safe expenses table: fixed layout + percentage widths ───
+           table-layout:auto (the .table default above) let long values (Vendor
+           & Description, Bank/Cash badges, currency amounts) push the Ref#/
+           Status/Created By columns past the paper edge in Portrait, forcing
+           a horizontal scrollbar and clipping them out of the printed page.
+           Fixed layout + widths summing to 100%, plus letting .table-responsive
+           actually show overflow instead of scrolling it, fixes both
+           orientations — same recipe already proven on invoices.php. ID
+           selector (#expensesTable) beats the plain .table class above
+           regardless of source order, so this reliably wins. */
+        .table-responsive { overflow: visible !important; }
+        #expensesTable {
+            width: 100% !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
+            font-size: 8pt !important;
+        }
+        #expensesTable th, #expensesTable td {
+            border: 1px solid #dee2e6 !important;
+            padding: 4px 5px !important;
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            vertical-align: middle !important;
+        }
+        #expensesTable td .badge, #expensesTable td code { font-size: 7pt !important; }
+        <?php
+        // 9 columns: control, S/NO, Date, Vendor & Description, Amount, Bank/Cash, Ref #, Status, Created By
+        $budget_print_widths = [3, 4, 10, 24, 16, 15, 8, 8, 12]; // sums to 100
+        foreach ($budget_print_widths as $bpw_i => $bpw_w):
+        ?>
+        #expensesTable th:nth-child(<?= $bpw_i + 1 ?>), #expensesTable td:nth-child(<?= $bpw_i + 1 ?>) { width: <?= $bpw_w ?>% !important; }
+        <?php endforeach; ?>
+
         .alert-info { border: 1px solid #bee5eb !important; background: #f8f9fa !important; color: #31708f !important; }
         .text-success { color: #198754 !important; }
         .text-primary { color: #0d6efd !important; }

@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-07-18 (fix) — Budget Details print report: expense table columns clipped in Portrait
+
+**File:** `app/constant/accounts/budget_details.php`
+
+Follow-up to the same-day card-view print fix. User-reported: with the card
+view gone, the expense table itself printed with a horizontal scrollbar in
+Portrait — Ref #, Status, and Created By ran off the right edge of the page
+instead of wrapping to fit.
+
+Root cause: the page's generic print rule (`.table th, .table td { padding:
+8px }`) leaves `table-layout: auto` (the browser default), which lets long
+values — the Vendor & Description text, Bank/Cash account-name badges,
+large currency amounts — claim as much width as they want and push the
+later columns past the paper edge. `.table-responsive`'s horizontal
+scroll wasn't neutralised for print either, so the overflow just became a
+literal scrollbar on the printed page instead of wrapping.
+
+Fix: added an ID-scoped `#expensesTable` print rule — `table-layout: fixed`,
+8pt type, tight 4px/5px padding, forced word-wrap, and explicit percentage
+widths for all 9 columns (control, S/NO, Date, Vendor & Description, Amount,
+Bank/Cash, Ref #, Status, Created By) summing to 100%, plus
+`.table-responsive { overflow: visible }` so nothing gets clipped into a
+scrollbar. Same portrait-safe recipe already proven on `invoices.php`,
+`suppliers.php`, and `inactive_employees.php`; the ID selector reliably
+wins over the page's existing generic `.table` rule regardless of source
+order, matching the same pattern used in the card-view fix above.
+
 ## 2026-07-18 (fix) — Budget Details print report: stop printing the mobile card view under the table
 
 **File:** `app/constant/accounts/budget_details.php`
