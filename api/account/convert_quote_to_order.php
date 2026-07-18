@@ -7,6 +7,7 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/code_generator.php';
+require_once __DIR__ . '/../../core/workflow.php';
 
 header('Content-Type: application/json');
 
@@ -82,6 +83,16 @@ try {
     $pdo->prepare("INSERT INTO sales_orders ($colSql) VALUES ($ph)")
         ->execute(array_values($header));
     $new_so_id = $pdo->lastInsertId();
+
+    // e-signature capture (Created By) — this is a distinct SO-creation path
+    // from save_sales_order.php (which already captures it), so it needs its
+    // own call; without it, the print page's "Created By" column shows a name
+    // (from created_by) but no signature stamp, unlike Reviewed/Approved.
+    $wfActor = workflowActorSnapshot();
+    workflowCaptureSignature(
+        $pdo, 'sales_order', (int)$new_so_id, 'created',
+        (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']
+    );
 
     // Copy the items into sales_order_items.
     foreach ($items as $item) {
