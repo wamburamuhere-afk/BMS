@@ -890,6 +890,20 @@ function rejectBudget(budgetId) {
             word-wrap: break-word !important;
             overflow-wrap: break-word !important;
             vertical-align: middle !important;
+            overflow: hidden !important;
+        }
+        /* Bootstrap's .badge sets white-space:nowrap on itself, which the
+           parent td's white-space:normal does NOT override (it's declared
+           directly on the badge, not inherited) — a long Bank/Cash value
+           like "Opening Balance Equity" or "CRDB Bank - Main Account"
+           ignored the column width and visually bled into Ref#. Forced the
+           badge itself to wrap, and overflow:hidden above is a hard
+           per-column boundary as a second line of defence. Same fix already
+           proven on sub_contractors.php's #scTable. */
+        #expensesTable td .badge {
+            white-space: normal !important;
+            word-break: break-word !important;
+            display: inline-block !important;
         }
         #expensesTable td .badge, #expensesTable td code { font-size: 7pt !important; }
 
