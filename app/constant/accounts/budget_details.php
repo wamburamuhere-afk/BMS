@@ -892,9 +892,21 @@ function rejectBudget(budgetId) {
             vertical-align: middle !important;
         }
         #expensesTable td .badge, #expensesTable td code { font-size: 7pt !important; }
+
+        /* Header labels (S/NO, DATE, AMOUNT...) are short — never break them
+           mid-word. The Amount column and the Total Expenses figure are
+           numbers, not prose: they must stay on one line regardless of how
+           many digits, so their column is sized generously up front (below)
+           rather than left to wrap. */
+        #expensesTable th { white-space: nowrap !important; }
+        #expensesTable td:nth-child(5),
+        #expensesTable tfoot td.text-end {
+            white-space: nowrap !important;
+        }
         <?php
         // 9 columns: control, S/NO, Date, Vendor & Description, Amount, Bank/Cash, Ref #, Status, Created By
-        $budget_print_widths = [3, 4, 10, 24, 16, 15, 8, 8, 12]; // sums to 100
+        // Amount widened (16→20) so long totals (TSh 12,577,989,000.00) fit on one line without wrapping.
+        $budget_print_widths = [3, 5, 9, 21, 20, 13, 7, 8, 14]; // sums to 100
         foreach ($budget_print_widths as $bpw_i => $bpw_w):
         ?>
         #expensesTable th:nth-child(<?= $bpw_i + 1 ?>), #expensesTable td:nth-child(<?= $bpw_i + 1 ?>) { width: <?= $bpw_w ?>% !important; }

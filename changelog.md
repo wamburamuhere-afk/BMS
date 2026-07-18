@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-07-18 (fix) — Budget Details print report: header labels and amounts were wrapping mid-word
+
+**File:** `app/constant/accounts/budget_details.php`
+
+Same-day follow-up to the Portrait-columns fix above: forcing `white-space:
+normal` + `word-wrap: break-word` on every cell (needed so long Vendor &
+Description text wraps instead of overflowing) also wrapped things that
+should never wrap — the "S/NO" header broke into "S/N" / "O", and any
+Amount past ~9 digits (e.g. `TSh 12,577,989,000.00`, and the Total Expenses
+figure) broke across 2–3 lines instead of staying on one row.
+
+Fix: header cells (`#expensesTable th`) now get `white-space: nowrap` —
+column labels are short, single-line by nature. The Amount column and the
+Total Expenses footer cell (`tfoot td.text-end`) also get `white-space:
+nowrap`, and the Amount column's width was widened (16%→20%, rebalanced
+from Vendor & Description, Bank/Cash, Date, and Ref# so the 9 columns still
+sum to 100%) so a full "TSh 12,577,989,000.00" comfortably fits on one line
+at the print font size instead of needing to wrap. Text-heavy columns
+(Vendor & Description, Bank/Cash) keep normal word-wrap, unaffected.
+
 ## 2026-07-18 (fix) — Budget Details print report: expense table columns clipped in Portrait
 
 **File:** `app/constant/accounts/budget_details.php`
