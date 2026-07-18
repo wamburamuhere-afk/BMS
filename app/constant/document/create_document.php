@@ -370,9 +370,10 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
                      Custom mode (opt-in via f_custom_sender): freely editable, its
                      own small Summernote toolbar — never shares #letterToolbar with
                      the letter body, so the two editors can't fight over one ribbon.
-                     html2pdf captures the live screen DOM (it ignores @media print),
-                     so the toolbar chrome is hidden via JS right before each save,
-                     the same established pattern #letterFooterWrap already uses. -->
+                     Its toolbar chrome is hidden on print via the generic
+                     .note-toolbar rule in @media print below; the saved PDF is
+                     generated server-side from the resolved text content only,
+                     so this editor's own toolbar was never part of it either. -->
                 <div class="letter-sender-info" id="senderInfoAuto" style="<?= $custom_sender_info !== null ? 'display:none;' : '' ?>">
                     <?php foreach ($sender_lines as $line): ?>
                         <div><?= nl2br(htmlspecialchars($line)) ?></div>
@@ -381,6 +382,7 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
                 <div id="senderInfoCustomWrap" style="<?= $custom_sender_info !== null ? '' : 'display:none;' ?>">
                     <div id="senderInfoCustom"><?= $custom_sender_info !== null ? $custom_sender_info : '<div>' . implode('</div><div>', array_map('htmlspecialchars', $sender_lines)) . '</div>' ?></div>
                 </div>
+                <div class="letter-refno" id="letter-refno-display">Ref: <?= htmlspecialchars($document_code) ?></div>
                 <div class="letter-date" id="letter-date-display"><?= htmlspecialchars(date('d M Y', strtotime($letter_date))) ?></div>
             </div>
         </div>
@@ -475,7 +477,6 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
 
 <link href="https://cdn.jsdelivr.net/npm/summernote@0.9.1/dist/summernote-bs5.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/summernote@0.9.1/dist/summernote-bs5.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <style>
 /* Canonical BMS print page margin (i_e_print.md §1) — the 16mm bottom band
@@ -556,6 +557,7 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
 #senderInfoCustomWrap { text-align: right; }
 #senderInfoCustomWrap .note-editable { font-size: 10pt; color: #333; }
 #senderInfoCustomWrap .note-toolbar { justify-content: flex-end; }
+.letter-refno { margin-top: 1mm; font-weight: 600; }
 .letter-date { margin-top: 1mm; }
 
 .letter-subject { font-size: 11pt; margin-bottom: 8mm; text-decoration: underline; }
@@ -712,8 +714,9 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
 }
 
 /* Shared footer content — hidden while editing, shown only for the native
-   browser print dialog (d-print-block) and briefly toggled visible via JS
-   right before html2pdf captures the page, so the saved PDF carries it too. */
+   browser print dialog (@media print rule below sets display:block). The
+   saved PDF always includes it too — it's rendered server-side (TCPDF)
+   unconditionally, with no "hidden while editing" concept to toggle. */
 .letter-footer-wrap { display: none; }
 </style>
 <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
@@ -729,8 +732,8 @@ let currentDocumentId = <?= (int)($existing['id'] ?? 0) ?>;
 // Same reason as currentDocumentId above: saveDocument() (a top-level function,
 // outside this ready block) reads this flag, so it can't be block-scoped to
 // $(document).ready — that raised "senderCustomInited is not defined" on every
-// single save (the html2pdf .then() callback that builds the upload wraps both
-// Save Draft and Save & Print), not just an intermittent PDF-render failure.
+// single save (both Save Draft and Save & Print read it), not just an
+// intermittent failure.
 let senderCustomInited = false;
 
 $(document).ready(function () {
@@ -1075,97 +1078,59 @@ function saveDocument(mode) {
     const orig = $btn.html();
     $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Saving...');
 
-    // Render the letter-paper (letterhead + body) to a real PDF client-side —
-    // every save keeps a downloadable/previewable file in step with the
-    // editable content, matching how every other document in the library
-    // already behaves.
-    const opt = {
-        // Bottom margin reserved on EVERY page (not just the last) — the
-        // page div's own 20mm padding only covers the very start/end of the
-        // whole content flow, not each internal page-break slice, so
-        // without this the shared footer (revealed below) could land right
-        // on top of body text on interior pages.
-        margin: [0, 0, 15, 0],
-        filename: subject + '.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'avoid-all'] }
-    };
-
     const useLetterhead = $('#f_use_letterhead').is(':checked');
     const useCustomSender = $('#f_custom_sender').is(':checked');
 
-    // The shared footer (#letterFooterWrap) is hidden while editing and only
-    // revealed for print — html2pdf captures the DOM as currently rendered
-    // on screen (it doesn't apply @media print styles), so it has to be
-    // shown right before capture and hidden again straight after. Same
-    // reasoning applies to the custom sender editor's own toolbar — it must
-    // never appear in the printed PDF, only its text content should.
-    $('#letterFooterWrap').css('display', 'block');
-    $('#senderInfoCustomWrap .note-toolbar').css('display', 'none');
-    html2pdf().set(opt).from(document.getElementById('letterPaper')).outputPdf('blob').then(function (blob) {
-        $('#letterFooterWrap').css('display', '');
-        $('#senderInfoCustomWrap .note-toolbar').css('display', '');
-        const fd = new FormData();
-        fd.append('document_id', currentDocumentId);
-        fd.append('subject', subject);
-        fd.append('recipient', $('#f_recipient').val().trim());
-        fd.append('recipient_address', $('#f_recipient_address').val().trim());
-        fd.append('letter_date', $('#f_letter_date').val());
-        fd.append('category_id', $('#f_category_id').val() || '');
-        fd.append('access_level', $('#f_access_level').val() || 'private');
-        fd.append('use_letterhead', useLetterhead ? '1' : '0');
-        fd.append('signature_align', $('#f_signature_align').val() || 'left');
-        fd.append('project_id', '<?= (int)($project_id ?? 0) ?>');
-        fd.append('content', $('#letterBody').summernote('code'));
-        fd.append('use_custom_sender', useCustomSender ? '1' : '0');
-        fd.append('custom_sender_info', senderCustomInited ? $('#senderInfoCustom').summernote('code') : '');
-        fd.append('_csrf', CSRF_TOKEN);
-        fd.append('pdf_file', blob, subject + '.pdf');
+    // The PDF is now generated server-side (TCPDF, see
+    // core/document_letter_render.php) from these same structured fields —
+    // the client just posts them, it no longer renders/uploads a PDF itself.
+    const fd = new FormData();
+    fd.append('document_id', currentDocumentId);
+    fd.append('subject', subject);
+    fd.append('recipient', $('#f_recipient').val().trim());
+    fd.append('recipient_address', $('#f_recipient_address').val().trim());
+    fd.append('letter_date', $('#f_letter_date').val());
+    fd.append('category_id', $('#f_category_id').val() || '');
+    fd.append('access_level', $('#f_access_level').val() || 'private');
+    fd.append('use_letterhead', useLetterhead ? '1' : '0');
+    fd.append('signature_align', $('#f_signature_align').val() || 'left');
+    fd.append('project_id', '<?= (int)($project_id ?? 0) ?>');
+    fd.append('content', $('#letterBody').summernote('code'));
+    fd.append('use_custom_sender', useCustomSender ? '1' : '0');
+    fd.append('custom_sender_info', senderCustomInited ? $('#senderInfoCustom').summernote('code') : '');
+    fd.append('_csrf', CSRF_TOKEN);
 
-        $.ajax({
-            url: '<?= buildUrl('api/document/save_created_document.php') ?>',
-            type: 'POST',
-            data: fd,
-            processData: false,
-            contentType: false,
-            dataType: 'json',
-            success: function (res) {
-                if (!res.success) {
-                    Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not save the document.' });
-                    $btn.prop('disabled', false).html(orig);
-                    return;
-                }
-                currentDocumentId = res.document_id;
-                if (mode === 'draft') {
-                    Swal.fire({ icon: 'success', title: 'Draft saved', text: 'Reference: ' + res.document_code, timer: 1800, showConfirmButton: false })
-                        .then(function () {
-                            const url = new URL(window.location.href);
-                            url.searchParams.set('document_id', res.document_id);
-                            window.history.replaceState({}, '', url);
-                            $btn.prop('disabled', false).html(orig);
-                        });
-                } else {
-                    $btn.prop('disabled', false).html(orig);
-                    window.print();
-                }
-            },
-            error: function () {
-                Swal.fire({ icon: 'error', title: 'Error', text: 'Server error while saving.' });
+    $.ajax({
+        url: '<?= buildUrl('api/document/save_created_document.php') ?>',
+        type: 'POST',
+        data: fd,
+        processData: false,
+        contentType: false,
+        dataType: 'json',
+        success: function (res) {
+            if (!res.success) {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Could not save the document.' });
                 $btn.prop('disabled', false).html(orig);
+                return;
             }
-        });
-    }).catch(function (err) {
-        // Surface the real html2canvas/html2pdf failure reason (e.g. a
-        // cross-origin image tainting the canvas) instead of only a generic
-        // message — the console line is for developers, the appended detail
-        // is so a report of this error is actionable without DevTools.
-        console.error('html2pdf generation failed:', err);
-        $('#letterFooterWrap').css('display', '');
-        const detail = err && err.message ? ' (' + err.message + ')' : '';
-        Swal.fire({ icon: 'error', title: 'Error', text: 'Could not generate the PDF.' + detail });
-        $btn.prop('disabled', false).html(orig);
+            currentDocumentId = res.document_id;
+            if (mode === 'draft') {
+                Swal.fire({ icon: 'success', title: 'Draft saved', text: 'Reference: ' + res.document_code, timer: 1800, showConfirmButton: false })
+                    .then(function () {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('document_id', res.document_id);
+                        window.history.replaceState({}, '', url);
+                        $btn.prop('disabled', false).html(orig);
+                    });
+            } else {
+                $btn.prop('disabled', false).html(orig);
+                window.print();
+            }
+        },
+        error: function () {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Server error while saving.' });
+            $btn.prop('disabled', false).html(orig);
+        }
     });
 }
 </script>

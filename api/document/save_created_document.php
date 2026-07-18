@@ -3,10 +3,13 @@
  * save_created_document.php — persists a letter/memo written with the
  * "Create Document" editor (app/constant/document/create_document.php).
  *
- * Every save — draft or final — uploads a rendered PDF (built client-side via
- * html2pdf.js from the letter-paper markup) so the row behaves exactly like
- * every other row in `documents` (previewable, downloadable, and pickable
- * from the existing e-signature wizard). The raw editable HTML is kept in
+ * Every save — draft or final — generates a real, server-rendered PDF (via
+ * TCPDF, see core/document_letter_render.php) so the row behaves exactly
+ * like every other row in `documents` (previewable, downloadable, and
+ * pickable from the existing e-signature wizard). The server generating the
+ * PDF itself — rather than trusting a client-uploaded blob — is also the
+ * single source of truth: the reference number and signature can't be
+ * missing or tampered with client-side. The raw editable HTML is kept in
  * `content` so a draft can be reopened and edited further before it's ever
  * signed. A reference code (e.g. BFS-LTR-0001) is allocated ONCE, on the
  * first save of a given letter, and then kept for every subsequent re-save —
@@ -17,6 +20,7 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/code_generator.php';
 require_once __DIR__ . '/../../core/project_scope.php';
 require_once __DIR__ . '/../../core/document_merge.php';
+require_once __DIR__ . '/../../core/document_letter_pdf.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -89,34 +93,15 @@ try {
         }
     }
 
-    // The rendered PDF (letterhead + body, generated client-side).
-    if (!isset($_FILES['pdf_file']) || $_FILES['pdf_file']['error'] !== UPLOAD_ERR_OK) {
-        throw new Exception('The document PDF could not be generated for upload');
-    }
-    $file = $_FILES['pdf_file'];
-    if (strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)) !== 'pdf') {
-        throw new Exception('Unexpected file type');
-    }
-    $finfo     = new finfo(FILEINFO_MIME_TYPE);
-    $real_mime = $finfo->file($file['tmp_name']);
-    if ($real_mime !== 'application/pdf') {
-        throw new Exception('File content does not match PDF');
-    }
-    $max_size = 20 * 1024 * 1024; // 20MB
-    if ($file['size'] > $max_size) {
-        throw new Exception('Generated PDF exceeds the 20MB limit');
-    }
-
+    // The PDF is now generated server-side (generateLetterPdf(), below) —
+    // reserve its target path here; nothing is uploaded by the client anymore.
     $upload_dir = __DIR__ . '/../../uploads/documents/';
     if (!file_exists($upload_dir) && !mkdir($upload_dir, 0755, true)) {
         throw new Exception('Failed to create upload directory');
     }
     $safe_name = bin2hex(random_bytes(16)) . '.pdf';
     $target    = $upload_dir . $safe_name;
-    if (!move_uploaded_file($file['tmp_name'], $target)) {
-        throw new Exception('Failed to save the generated PDF');
-    }
-    $db_path = 'uploads/documents/' . $safe_name;
+    $db_path   = 'uploads/documents/' . $safe_name;
 
     if ($document_id > 0) {
         // Re-saving an existing letter — must be one this user created via
@@ -139,6 +124,17 @@ try {
         $merge_ctx['document_code'] = $existing['document_code'] ?? '';
         $content = resolveDocumentVariables($content, $merge_ctx);
 
+        $file_size = generateLetterPdf($pdo, [
+            'document_code'     => $existing['document_code'] ?? '',
+            'letter_date'       => $letter_date,
+            'use_letterhead'    => $use_letterhead,
+            'recipient'         => $recipient,
+            'recipient_address' => $recipient_address,
+            'subject'           => $subject,
+            'content'           => $content,
+            'signature_align'   => $signature_align,
+        ], $target);
+
         $upd = $pdo->prepare("
             UPDATE documents SET
                 document_name = ?, description = ?, content = ?, file_path = ?,
@@ -154,7 +150,7 @@ try {
             $content,
             $db_path,
             $subject . '.pdf',
-            $file['size'],
+            $file_size,
             $category_id,
             $project_id,
             $letter_date ?: null,
@@ -199,6 +195,17 @@ try {
         $merge_ctx['document_code'] = $document_code;
         $content = resolveDocumentVariables($content, $merge_ctx);
 
+        $file_size = generateLetterPdf($pdo, [
+            'document_code'     => $document_code,
+            'letter_date'       => $letter_date,
+            'use_letterhead'    => $use_letterhead,
+            'recipient'         => $recipient,
+            'recipient_address' => $recipient_address,
+            'subject'           => $subject,
+            'content'           => $content,
+            'signature_align'   => $signature_align,
+        ], $target);
+
         $ins = $pdo->prepare("
             INSERT INTO documents (
                 document_name, description, content, file_path, original_filename,
@@ -213,7 +220,7 @@ try {
             $content,
             $db_path,
             $subject . '.pdf',
-            $file['size'],
+            $file_size,
             $category_id,
             $document_code,
             $letter_date ?: null,
@@ -229,8 +236,8 @@ try {
         $pdo->commit();
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
-        // The uploaded PDF was already saved to disk before this transaction —
-        // clean it up so a failed save doesn't leave an orphaned file behind.
+        // The generated PDF may already have been written to disk before the
+        // failure — clean it up so a failed save doesn't leave an orphaned file.
         if (is_file($target)) @unlink($target);
         throw $e;
     }

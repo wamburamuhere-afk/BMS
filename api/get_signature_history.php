@@ -15,29 +15,38 @@ try {
     $length = intval($_GET['length'] ?? 10);
     $userId = $_SESSION['user_id'];
 
+    // Same two-kind logic as get_pending_signatures.php: documents THIS user
+    // signed themselves (signed_by = them), plus external requests THEY sent
+    // that the outside party has now completed (signed_by stays NULL for an
+    // external signature — there's no user account to attribute it to — so
+    // those rows can only be found via requested_by + signer_type).
     $countStmt = $pdo->prepare("
         SELECT COUNT(*)
         FROM document_signatures ds
         JOIN documents d ON d.id = ds.document_id
-        WHERE ds.signed_by = ? AND ds.status = 'signed'
+        WHERE ds.status = 'signed'
+          AND (ds.signed_by = ? OR (ds.requested_by = ? AND ds.signer_type = 'external'))
     ");
-    $countStmt->execute([$userId]);
+    $countStmt->execute([$userId, $userId]);
     $total = (int) $countStmt->fetchColumn();
 
     $dataStmt = $pdo->prepare("
         SELECT ds.id, ds.document_id, ds.signature_position, ds.ip_address, ds.signed_at,
+               ds.signer_type, ds.signer_name,
                d.document_name,
                d.file_type AS document_type,
-               NULL        AS customer_name
+               ds.signer_email AS customer_name
         FROM document_signatures ds
         JOIN documents d ON d.id = ds.document_id
-        WHERE ds.signed_by = ? AND ds.status = 'signed'
+        WHERE ds.status = 'signed'
+          AND (ds.signed_by = ? OR (ds.requested_by = ? AND ds.signer_type = 'external'))
         ORDER BY ds.signed_at DESC
         LIMIT ?, ?
     ");
     $dataStmt->bindValue(1, $userId, PDO::PARAM_INT);
-    $dataStmt->bindValue(2, $start,  PDO::PARAM_INT);
-    $dataStmt->bindValue(3, $length, PDO::PARAM_INT);
+    $dataStmt->bindValue(2, $userId, PDO::PARAM_INT);
+    $dataStmt->bindValue(3, $start,  PDO::PARAM_INT);
+    $dataStmt->bindValue(4, $length, PDO::PARAM_INT);
     $dataStmt->execute();
     $rows = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
 
