@@ -12,6 +12,35 @@
 require_once __DIR__ . '/document_letter_render.php';
 require_once ROOT_DIR . '/TCPDF/tcpdf.php';
 
+if (!class_exists('BmsLetterPdf')) {
+    /**
+     * TCPDF's writeHTML() does not support CSS `position: fixed` — the shared
+     * browser print footer (includes/print_footer_css.php) relies entirely on
+     * that to pin itself to the page bottom, which is why embedding its HTML
+     * as flowing body content (the old approach) left it wherever the letter
+     * content happened to end, not at the true bottom of the page. This
+     * subclass uses TCPDF's own per-page Footer() callback instead — the
+     * correct, native way to pin content to the same position on every page,
+     * matching how every browser-rendered print page achieves it via CSS.
+     */
+    class BmsLetterPdf extends TCPDF
+    {
+        public string $bmsFooterLine1 = '';
+        public string $bmsFooterLine2 = '';
+
+        public function Footer(): void
+        {
+            $this->SetY(-12);
+            $this->SetFont('helvetica', '', 7);
+            $this->SetTextColor(44, 62, 80);
+            $this->Cell(0, 3, $this->bmsFooterLine1, 0, 1, 'C');
+            $this->SetFont('helvetica', 'B', 7);
+            $this->SetTextColor(52, 152, 219);
+            $this->Cell(0, 3, $this->bmsFooterLine2, 0, 0, 'C');
+        }
+    }
+}
+
 if (!function_exists('generateLetterPdf')) {
     /**
      * Gathers the same letterhead data create_document.php's editor computes
@@ -54,11 +83,13 @@ if (!function_exists('generateLetterPdf')) {
         $my_signature = $sig_stmt->fetch(PDO::FETCH_ASSOC);
         $signature_rel_path = $my_signature ? ($my_signature['thumbnail_path'] ?: $my_signature['file_path']) : null;
 
-        ob_start();
+        // Same defaulting logic as includes/print_footer_html.php, computed
+        // directly (not captured via ob_start()) since the footer is now
+        // rendered through TCPDF's native Footer() callback below, not
+        // embedded as flowing HTML in the letter body.
         $printed_by   = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?: ($_SESSION['username'] ?? 'System');
         $printed_role = $_SESSION['user_role'] ?? $_SESSION['role'] ?? 'User';
-        require ROOT_DIR . '/includes/print_footer_html.php';
-        $footer_html = ob_get_clean();
+        $printed_at   = date('d M, Y') . ' at ' . date('H:i:s');
 
         $letterHtml = renderLetterHtml([
             'company_name'         => $company_name,
@@ -76,7 +107,6 @@ if (!function_exists('generateLetterPdf')) {
             'signature_is_preview' => true,
             'signer_name'          => trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')),
             'signer_role'          => $_SESSION['user_role'] ?? '',
-            'footer_html'          => $footer_html,
         ]);
 
         // TCPDF's bundled config unconditionally re-defines
@@ -89,12 +119,15 @@ if (!function_exists('generateLetterPdf')) {
         // swallowed, and only for the duration of PDF generation.
         $prevErrorHandler = set_error_handler(function () { return true; });
         try {
-            $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
+            $pdf = new BmsLetterPdf('P', 'mm', 'A4', true, 'UTF-8', false);
             $pdf->SetCreator('BMS');
             $pdf->SetAuthor($company_name);
             $pdf->SetTitle($fields['subject']);
             $pdf->setPrintHeader(false);
-            $pdf->setPrintFooter(false);
+            $pdf->setPrintFooter(true);
+            $pdf->bmsFooterLine1 = 'This document was Printed by ' . $printed_by . ' - ' . ucfirst($printed_role) . ' on ' . $printed_at;
+            $pdf->bmsFooterLine2 = 'Powered By BJP Technologies (c) ' . date('Y') . ', All Rights Reserved';
+            $pdf->setFooterMargin(10);
             // Canonical BMS print margins (i_e_print.md §1), same as every
             // other print page — 10/8/16/8mm top/right/bottom/left.
             $pdf->SetMargins(8, 10, 8);
