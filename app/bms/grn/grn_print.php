@@ -329,13 +329,16 @@ $wf = [
         }
     </style>
 <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
+    <?php require_once ROOT_DIR . '/includes/print_autofit.php'; ?>
 </head>
-<body onload="window.print()">
+<body onload="bmsAutoFitPrint()">
 
     <div class="no-print" style="margin-bottom:20px; display:flex; gap:8px;">
         <button onclick="window.print()" style="padding:6px 16px; cursor:pointer;">Print</button>
         <button onclick="closePrintWindow()" style="padding:6px 16px; cursor:pointer;">Close</button>
     </div>
+
+    <div class="print-scale-wrapper">
     <script>
     // window.close() only works on windows opened by script (window.open).
     // When the page is reached via target="_blank" or a direct link, fall
@@ -505,6 +508,8 @@ $wf = [
 
     <!-- SIGNATURE — three_approval.md §6.3 canonical block (Created/Reviewed/Approved By) -->
     <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
+    </div>
+
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 

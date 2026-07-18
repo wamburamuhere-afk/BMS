@@ -248,14 +248,17 @@ $hasPayment      = $hasBankTransfer || $hasMobile || $hasCheque;
         }
     </style>
 <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
+    <?php require_once ROOT_DIR . '/includes/print_autofit.php'; ?>
 </head>
-<body onload="if(window.location.search.includes('print=true')) window.print()">
+<body onload="if(window.location.search.includes('print=true')) bmsAutoFitPrint()">
 
     <div class="no-print" style="position:fixed; top:0; left:0; right:0; background:#333; padding:10px; display:flex; gap:10px; z-index:9999;">
         <button onclick="window.print()" style="padding:6px 16px; cursor:pointer; background:#3498db; color:#fff; border:none; border-radius:4px; font-weight:bold;">Print Voucher</button>
         <button onclick="window.close()" style="padding:6px 16px; cursor:pointer; background:#eee; border:none; border-radius:4px;">Close</button>
     </div>
 
+
+    <div class="print-scale-wrapper">
     <!-- HEADER -->
     <div class="header">
         <div class="company-info">
@@ -369,6 +372,8 @@ $hasPayment      = $hasBankTransfer || $hasMobile || $hasCheque;
 
     <!-- SIGNATURES — same canonical Created/Reviewed/Approved By row as Invoice/PO -->
     <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
+    </div>
+
 
     <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
 
