@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/project_scope.php';
 require_once __DIR__ . '/../core/workflow.php';
 require_once __DIR__ . '/../core/payment_source.php';
 require_once __DIR__ . '/../core/money_guard.php';      // postOutflowOrFail / accountFundsWarning
@@ -365,13 +366,17 @@ if ($method === 'GET') {
         $warehouse_id = intval($_GET['warehouse_id']?? 0);   // optional
         if (!$supplier_id) { echo json_encode(['success' => true, 'data' => []]); exit; }
 
-        // PO Reference shows only POs for this supplier, optionally narrowed by
-        // the chosen project and warehouse.
+        // PO Reference shows only POs for this supplier, always within the
+        // current user's own project/warehouse scope, optionally narrowed
+        // further by the chosen project and warehouse. Found 2026-07-18: the
+        // scope filters here were previously CLIENT-OPTIONAL — a user who
+        // didn't pick a project/warehouse saw every supplier's PO company-wide.
         $sql = "SELECT purchase_order_id AS id,
                        CONCAT(order_number, ' — TZS ', FORMAT(grand_total, 0)) AS text,
                        order_number, grand_total, order_date
                 FROM purchase_orders
-                WHERE supplier_id = ? AND status NOT IN ('cancelled')";
+                WHERE supplier_id = ? AND status NOT IN ('cancelled')"
+                . scopeFilterSqlNullable('project') . scopeFilterSqlNullable('warehouse');
         $params = [$supplier_id];
         if ($project_id)   { $sql .= " AND project_id = ?";   $params[] = $project_id; }
         if ($warehouse_id) { $sql .= " AND warehouse_id = ?"; $params[] = $warehouse_id; }
