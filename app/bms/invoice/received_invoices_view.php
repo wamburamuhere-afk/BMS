@@ -172,7 +172,7 @@ $paid_pct     = $inv_total > 0 ? min(100, round($amount_paid / $inv_total * 100)
                 <i class="bi bi-pencil me-1"></i> Edit
             </a>
             <?php endif; ?>
-            <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+            <button class="btn btn-outline-secondary btn-sm" onclick="window.open('<?= getUrl('print_received_invoice') ?>?id=<?= $id ?>', '_blank')">
                 <i class="bi bi-printer me-1"></i> Print
             </button>
         </div>
@@ -469,7 +469,7 @@ $paid_pct     = $inv_total > 0 ? min(100, round($amount_paid / $inv_total * 100)
                     <a href="<?= getUrl('received_invoices') ?>" class="btn btn-outline-secondary btn-sm">
                         <i class="bi bi-list-ul me-1"></i> All Invoices
                     </a>
-                    <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+                    <button class="btn btn-outline-secondary btn-sm" onclick="window.open('<?= getUrl('print_received_invoice') ?>?id=<?= $id ?>', '_blank')">
                         <i class="bi bi-printer me-1"></i> Print
                     </button>
                 </div>
