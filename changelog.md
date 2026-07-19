@@ -1,5 +1,43 @@
 # BMS Changelog
 
+## 2026-07-19 (fix) — Same account-inclusion drift found + fixed on Trial Balance and General Ledger
+
+**Files:** `app/constant/reports/trial_balance.php`, `app/constant/reports/ledger_report.php`
+
+Follow-up to the Balance Sheet fix above: swept every report page for the same pattern
+(hand-rolled SQL against `journal_entries`/`journal_entry_items`/`accounts` instead of
+calling `core/financial_reports.php`, the intended single "one door" every statutory
+report is supposed to read through per `.claude/reporting-source.md`). Found the identical
+`WHERE a.status = 'active'` defect live in two more routed reports:
+
+- **`trial_balance.php`** (route `trial_balance`) — was hand-rolling its own account query;
+  confirmed live it currently showed **"TRIAL BALANCE DOES NOT BALANCE — Difference =
+  TSh 100.00"**, same root cause (`PC-UNCAT`, see above). **Fixed with a real rewire, not a
+  patch**: it now calls `core/financial_reports.php::_gl_account_activity()` directly
+  (the exact function `glTrialBalance()`/`glBalanceSheet()`/`assertLedgerBalanced()` all
+  already share) instead of a separate copy of the same query — so this file can no longer
+  drift from the canonical engine even if the inclusion rule changes again later. All
+  downstream section/subtotal/contra/P&L-buildup rendering logic is untouched, only the
+  data source changed. Verified live: Grand Total Dr = Cr = 2,250,429,018.83, matching
+  `glTrialBalance()` exactly; "DOES NOT BALANCE" banner gone.
+- **`ledger_report.php`** ("All Accounts" summary view, no account selected) — same
+  `a.status = 'active'` defect on its Dr/Cr footer, **plus** a second, independent bug in
+  the same query: the LEFT JOIN to `journal_entry_items` had no `je.entry_id IS NOT NULL`
+  guard, so void/draft/out-of-range journal lines could leak into the period's Dr/Cr sums
+  (the exact leak class `_gl_account_activity()`'s own code comment warns about — I made
+  this identical mistake myself in a throwaway diagnostic query while investigating, which
+  is how I caught it here). This file's opening-balance subquery doesn't map onto
+  `_gl_account_activity()`'s simpler date-range model, so it keeps its own query but now
+  applies the same inclusion criteria + guard by hand. Verified live: `PC-UNCAT` now
+  correctly appears in the "All Accounts" summary table.
+
+Not routed / no live impact: `cash_flow.php` has the same old pattern in its source, but
+the `cash_flow` route already points at `cash_flow_gl.php` (the correct GL-derived report)
+— `cash_flow.php` is dead code, unreachable from the app. Left alone (cleanup, not a bug).
+
+Still open, different root cause (wrong table, not a status filter): `consolidated_expenses.php`
+reads the legacy `transactions`/`books_transactions` mirror directly instead of the ledger.
+
 ## 2026-07-19 (fix) — Balance Sheet report drifted from the canonical ledger for deactivated accounts holding posted history
 
 **Files:** `app/constant/reports/balance_sheet.php`
