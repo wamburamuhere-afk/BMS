@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-07-19 (fix) — Balance Sheet report drifted from the canonical ledger for deactivated accounts holding posted history
+
+**Files:** `app/constant/reports/balance_sheet.php`
+
+User reported the Balance Sheet showing "DOES NOT BALANCE — Difference = 100.00". Traced the
+100.00 to a real, correctly-balanced 2-leg journal entry (`entry_id 71092`: Dr `PC-UNCAT`
+"Petty Cash – Uncategorised" 100.00 / Cr `2-1500` Accrued Expenses 100.00, posted from Payment
+Voucher `PV-0004`). `core/financial_reports.php`'s canonical engine (`glBalanceSheet` /
+`assertLedgerBalanced`) already included it correctly and reported the ledger as balanced —
+the bug was isolated to this report page: it hand-rolls its own SQL for both (a) the
+assets/liabilities/equity account list and (b) the Retained-Earnings/net-income calculation,
+and both filtered `WHERE a.status = 'active'`. Since `PC-UNCAT` was deactivated after the
+voucher was created, its posted debit silently dropped out of Retained Earnings while the
+liability leg (an active account) stayed counted — a $100 asymmetry.
+
+**Fix:** both queries now use the same inclusion rule as
+`core/financial_reports.php::_gl_account_activity()` — an account counts when it is active,
+OR carries a non-zero `opening_balance`, OR has any posted `journal_entry_items` row —
+instead of `status = 'active'` alone. This is criteria-based (no hard-coded account ids),
+so it applies identically on production regardless of what other data exists there, and
+closes the whole class of bug (any future deactivated-but-posted account, on either the
+BS or the P&L side) rather than just today's one entry. Verified live: the page's Retained
+Earnings now ties exactly to `glBalanceSheet()`'s (-404,997,081.43) and the "DOES NOT
+BALANCE" banner clears; Total Current Assets 689,030,559.20 = Total Current Liabilities
+134,027,556.63 + Capital Employed 555,003,002.57.
+
+Not addressed here (data decision, not code): Payment Voucher `PV-0004` still points at the
+inactive `PC-UNCAT` placeholder account instead of a real expense category — left for
+finance staff to re-categorize.
+
 ## 2026-07-19 (feature) — Received Invoices: dedicated print template matching print_lpo.php's design
 
 **New:** `app/bms/invoice/print_received_invoice.php`
