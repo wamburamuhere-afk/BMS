@@ -25,6 +25,7 @@ ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
 require_once __DIR__ . '/../../../core/financial_classification.php';
+require_once __DIR__ . '/../../../core/financial_reports.php';
 
 includeHeader();
 
@@ -69,37 +70,17 @@ $contra_count      = 0;
 $error_message     = null;
 
 try {
-    // One row per active account: opening_balance + cumulative posted Dr/Cr
-    // up to and including the as-of date. POSTED entries only — the SUM guards
-    // `je.entry_id IS NOT NULL` so the LEFT JOIN's unmatched rows (draft /
-    // unposted / future-dated items, where je.* is NULL) are NOT summed. Without
-    // this guard the totals absorb un-posted journal lines, which do not balance,
-    // and the trial balance reports a phantom out-of-balance figure.
-    $sql = "
-        SELECT
-            a.account_id,
-            a.account_code,
-            a.account_name,
-            a.opening_balance,
-            at.category    AS category,
-            at.normal_side AS normal_side,
-            COALESCE(SUM(CASE WHEN je.entry_id IS NOT NULL AND jei.type = 'debit'  THEN jei.amount ELSE 0 END), 0) AS posted_debit,
-            COALESCE(SUM(CASE WHEN je.entry_id IS NOT NULL AND jei.type = 'credit' THEN jei.amount ELSE 0 END), 0) AS posted_credit
-        FROM accounts a
-        LEFT JOIN account_types at ON a.account_type_id = at.type_id
-        LEFT JOIN journal_entry_items jei ON jei.account_id = a.account_id
-        LEFT JOIN journal_entries je
-               ON je.entry_id   = jei.entry_id
-              AND je.status      = 'posted'
-              AND je.entry_date <= ?
-        WHERE a.status = 'active'
-        GROUP BY a.account_id, a.account_code, a.account_name,
-                 a.opening_balance, at.category, at.normal_side
-        ORDER BY a.account_code ASC
-    ";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$as_of_date]);
-    $accounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Single source of truth: core/financial_reports.php::_gl_account_activity()
+    // is the ONE function every statutory report (Balance Sheet, P&L, Cash Flow,
+    // assertLedgerBalanced) reads through — it already implements the correct
+    // account-inclusion rule (active, OR has a non-zero opening_balance, OR has
+    // ANY posted journal_entry_items row, regardless of current active/inactive
+    // status) so a deactivated account's posted history can never silently drop
+    // out of the Trial Balance and desync it from every other report. This page
+    // used to hand-roll an equivalent (but WHERE a.status='active'-only) query —
+    // that copy is retired in favour of calling the shared engine directly, so
+    // it can never drift from it again.
+    $accounts = _gl_account_activity($pdo, null, $as_of_date, null, '');
 
     foreach ($accounts as $acc) {
         $category    = $acc['category'] ?: null;
@@ -115,8 +96,8 @@ try {
         $opening_dr = $normal_side === 'debit'  ? $opening : 0.0;
         $opening_cr = $normal_side === 'credit' ? $opening : 0.0;
 
-        $total_dr = $opening_dr + (float)$acc['posted_debit'];
-        $total_cr = $opening_cr + (float)$acc['posted_credit'];
+        $total_dr = $opening_dr + (float)$acc['debit'];
+        $total_cr = $opening_cr + (float)$acc['credit'];
 
         // Skip dormant accounts (nothing opening, nothing posted).
         if (abs($total_dr) < 0.001 && abs($total_cr) < 0.001) continue;
