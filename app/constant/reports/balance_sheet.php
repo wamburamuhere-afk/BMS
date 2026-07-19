@@ -92,8 +92,22 @@ try {
                ON jei.entry_id = je.entry_id
               AND je.entry_date <= ?
               AND je.status = 'posted'
-        WHERE a.status = 'active'
-          AND at.category IN ('asset','liability','equity')
+        WHERE at.category IN ('asset','liability','equity')
+          -- Same inclusion rule as core/financial_reports.php::_gl_account_activity():
+          -- an account must count here whenever it carries a real balance, not only
+          -- when it's currently 'active'. Deactivating an account must never make its
+          -- posted history vanish from the Balance Sheet (see money.md F1/F3).
+          AND (
+              a.status = 'active'
+              OR COALESCE(a.opening_balance, 0) <> 0
+              OR EXISTS (
+                     SELECT 1
+                       FROM journal_entry_items jx
+                       JOIN journal_entries     jy ON jy.entry_id = jx.entry_id
+                      WHERE jx.account_id = a.account_id
+                        AND jy.status = 'posted'
+                 )
+          )
         GROUP BY a.account_id, a.account_name, a.account_code, a.opening_balance, at.type_name, at.category, at.normal_side$liqGroup
         ORDER BY a.account_code ASC
     ";
@@ -197,7 +211,21 @@ try {
                AND je.entry_date <= ?
                AND je.status = 'posted'
              WHERE a.account_type_id IN ($ph)
-               AND a.status = 'active'
+               -- Same inclusion rule as the assets/liabilities/equity query above and
+               -- core/financial_reports.php::_gl_account_activity() — a deactivated
+               -- P&L account with posted history must still count toward Retained
+               -- Earnings, or this figure silently drifts from glBalanceSheet()'s.
+               AND (
+                   a.status = 'active'
+                   OR COALESCE(a.opening_balance, 0) <> 0
+                   OR EXISTS (
+                          SELECT 1
+                            FROM journal_entry_items jx
+                            JOIN journal_entries     jy ON jy.entry_id = jx.entry_id
+                           WHERE jx.account_id = a.account_id
+                             AND jy.status = 'posted'
+                      )
+               )
           GROUP BY at.category
         ";
         $stmt = $pdo->prepare($is_sql);
