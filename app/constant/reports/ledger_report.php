@@ -161,8 +161,13 @@ try {
                               AND je2.status = 'posted'
                        ), 0)
                    ) AS opening,
-                   COALESCE(SUM(CASE WHEN jei.type='debit'  THEN jei.amount ELSE 0 END), 0) AS dr,
-                   COALESCE(SUM(CASE WHEN jei.type='credit' THEN jei.amount ELSE 0 END), 0) AS cr
+                   -- Guard on je.entry_id IS NOT NULL: the LEFT JOIN above keeps a jei
+                   -- row even when its parent entry falls outside the posted/date
+                   -- window, so summing jei.amount unguarded leaks void/draft/
+                   -- out-of-range amounts into this period's Dr/Cr (the same class of
+                   -- bug the Trial Balance's own query comment warns about).
+                   COALESCE(SUM(CASE WHEN je.entry_id IS NOT NULL AND jei.type='debit'  THEN jei.amount ELSE 0 END), 0) AS dr,
+                   COALESCE(SUM(CASE WHEN je.entry_id IS NOT NULL AND jei.type='credit' THEN jei.amount ELSE 0 END), 0) AS cr
               FROM accounts a
          LEFT JOIN account_types at ON a.account_type_id = at.type_id
          LEFT JOIN journal_entry_items jei ON jei.account_id = a.account_id
@@ -170,7 +175,21 @@ try {
                 ON je.entry_id = jei.entry_id
                AND je.entry_date BETWEEN ? AND ?
                AND je.status = 'posted'
-             WHERE a.status='active'
+             -- Same inclusion rule as core/financial_reports.php::_gl_account_activity()
+             -- and the Trial Balance / Balance Sheet: a deactivated account with real
+             -- posted history must still appear here, or this summary's Dr/Cr footer
+             -- silently disagrees with every other statutory report.
+             WHERE (
+                 a.status = 'active'
+                 OR COALESCE(a.opening_balance, 0) <> 0
+                 OR EXISTS (
+                        SELECT 1
+                          FROM journal_entry_items jx
+                          JOIN journal_entries     jy ON jy.entry_id = jx.entry_id
+                         WHERE jx.account_id = a.account_id
+                           AND jy.status = 'posted'
+                    )
+             )
           GROUP BY a.account_id, a.account_code, a.account_name, a.opening_balance, at.category, at.normal_side
             HAVING ABS(opening) > 0.001 OR ABS(dr) > 0.001 OR ABS(cr) > 0.001
           ORDER BY a.account_code ASC
