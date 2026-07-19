@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-07-19 (feature) — Received Invoices: dedicated print template matching print_lpo.php's design
+
+**New:** `app/bms/invoice/print_received_invoice.php`
+**Files:** `roots.php`, `app/bms/invoice/received_invoices_view.php`
+
+Received Invoices (`received_invoices_view.php`) previously printed the raw
+in-app Bootstrap page via `window.print()` — no company header/logo, no
+branded layout. Added a standalone print page cloned from `print_lpo.php`'s
+proven template (company header + logo, blue title box, Supplier/Invoice
+Info boxes, items table with per-line tax, totals incl. Paid/Due for
+partial/paid invoices, notes, DRAFT/PENDING watermark, Created/Reviewed/
+Approved signature row, shared print footer) and the same
+`bmsAutoFitPrint()` scale-to-one-page script `print_lpo.php` uses. Falls
+back to a single "Invoice Amount" row when no `supplier_invoice_items`
+exist (legacy records / sub-contractor invoices). New route
+`print_received_invoice`; both Print buttons on `received_invoices_view.php`
+now open it in a new tab instead of printing the page in place. Scoped to
+the detail page only per user's choice — the invoices list page was left
+untouched.
+
 ## 2026-07-18 (fix) — Create-Document letter PDF: footer now pinned to the page bottom, signature block matches the approved editor design
 
 **Files:** `core/document_letter_pdf.php`, `core/document_letter_render.php`
