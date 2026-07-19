@@ -74,15 +74,39 @@ function recordGlobalTransaction($data, $pdo) {
         }
 
         // 4. Mirror the same legs into the canonical journal_entries ledger that every
-        //    report + the Chart of Accounts read. ADDITIVE & balance-neutral; best-effort
-        //    so a mirror failure can NEVER fail the legacy write that already succeeded.
-        //    Manual-journal callers (which write journal_entries themselves) pass
-        //    skip_journal_mirror=true to avoid a duplicate entry.
+        //    report + the Chart of Accounts read. Manual-journal callers (which write
+        //    journal_entries themselves) pass skip_journal_mirror=true to avoid a
+        //    duplicate entry — for those, mirroring is correctly never attempted.
+        //
+        //    For every other caller (postOutflow/postInflow's 2-leg payments, and
+        //    add_bank_transfer.php's compound journal_items), a failed or skipped
+        //    mirror here used to be swallowed and reported as success=true — the
+        //    legacy transactions/books_transactions write would go through while the
+        //    canonical journal_entries ledger silently never received the entry.
+        //    Every caller already checks this function's success flag and rolls back
+        //    its own transaction on failure (record_payment, add_expense/pay,
+        //    add_supplier_payment, save petty cash transaction, add_bank_transfer all
+        //    wrap this call in $pdo->beginTransaction()/commit()) — that safety net
+        //    was just never wired to the one signal that actually matters. Failing
+        //    here now makes it real: no mirror, no "posted".
         if (empty($data['skip_journal_mirror'])) {
             try {
-                mirrorTransactionToJournal($pdo, (int)$transaction_id, $description, $transaction_date, $data['project_id'] ?? null);
+                $mirrorEntryId = mirrorTransactionToJournal($pdo, (int)$transaction_id, $description, $transaction_date, $data['project_id'] ?? null);
             } catch (Throwable $e) {
                 error_log("recordGlobalTransaction: journal mirror failed for txn $transaction_id: " . $e->getMessage());
+                return [
+                    'success' => false,
+                    'error' => 'Ledger mirror failed: ' . $e->getMessage(),
+                    'transaction_id' => $transaction_id,
+                ];
+            }
+            if (!$mirrorEntryId) {
+                error_log("recordGlobalTransaction: journal mirror returned no entry for txn $transaction_id (malformed/unbalanced legs)");
+                return [
+                    'success' => false,
+                    'error' => 'Ledger mirror did not post — the double entry was missing or unbalanced.',
+                    'transaction_id' => $transaction_id,
+                ];
             }
         }
 
