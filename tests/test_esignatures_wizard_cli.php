@@ -64,6 +64,13 @@ $applyApi     = readSrc('api/document/apply_signature.php');
 $uploadApi    = readSrc('api/document/quick_upload_document.php');
 $saveApi      = readSrc('api/document/save_signed_pdf.php');
 $wizard       = readSrc('app/constant/document/select_document_add_esignature.php');
+// The SHA-256 helper, Certificate of Completion generator, and the
+// "draw signature + label" routine now live here — shared with
+// create_document.php's one-click Save & Sign path so both produce
+// byte-for-byte the same certificate/hash logic instead of two copies
+// that could drift apart. The wizard calls into these, it no longer
+// defines them inline.
+$esignShared  = readSrc('assets/js/bms-esign-shared.js');
 
 // ── 3. api/get_documents.php — SQL correctness ────────────────────────────────
 section('3. api/get_documents.php — SQL correctness');
@@ -149,6 +156,7 @@ if (file_exists($pdfLibPath)) {
 }
 has($wizard, "assets/js/pdf-lib.min.js",    'wizard: pdf-lib.min.js <script> tag present');
 has($wizard, 'pdf.min.js',                  'wizard: pdf.min.js (PDF.js) still present');
+has($wizard, 'assets/js/bms-esign-shared.js', 'wizard: bms-esign-shared.js <script> tag present');
 
 // ── 11. PDF embedding logic — wizard JS ──────────────────────────────────────
 section('11. PDF embedding logic — wizard JS');
@@ -161,7 +169,8 @@ has($wizard, 'pdfLibDoc.getPage',                    'wizard: retrieves target p
 has($wizard, 'pdfPage.getSize',                      'wizard: reads page dimensions for coordinate conversion');
 has($wizard, 'embedPng',                             'wizard: embeds PNG signature images');
 has($wizard, 'embedJpg',                             'wizard: embeds JPG signature images');
-has($wizard, 'pdfPage.drawImage',                    'wizard: draws signature onto PDF page');
+has($wizard, 'bmsDrawSignatureWithLabel',            'wizard: draws signature onto PDF page (via shared helper)');
+has($esignShared, 'pdfPage.drawImage',               'bms-esign-shared.js: signature draw routine present');
 has($wizard, 'pdfRenderScale',                       'wizard: uses PDF.js render scale for coordinate conversion');
 has($wizard, 'pageH - (posY',                        'wizard: flips Y axis (PDF origin is bottom-left)');
 has($wizard, 'pdfLibDoc.save()',                     'wizard: serialises modified PDF');
@@ -228,9 +237,11 @@ hasNot($sigUploadApi, "in_array(\$file['type']", 'upload_signature.php: no longe
 
 // ── 16. Wizard — certificate, consent & integrity wiring ─────────────────────
 section('16. Wizard — certificate, consent & integrity wiring');
-has($wizard, 'async function sha256Hex',             'wizard: client-side SHA-256 helper present');
-has($wizard, 'async function appendCertificatePage', 'wizard: Certificate of Completion generator present');
-has($wizard, 'CERTIFICATE OF COMPLETION',            'wizard: certificate page is titled');
+has($wizard, 'bmsSha256Hex(',                          'wizard: calls the shared client-side SHA-256 helper');
+has($esignShared, 'async function bmsSha256Hex',       'bms-esign-shared.js: client-side SHA-256 helper present');
+has($wizard, 'bmsAppendCertificatePage(',               'wizard: calls the shared Certificate of Completion generator');
+has($esignShared, 'async function bmsAppendCertificatePage', 'bms-esign-shared.js: Certificate of Completion generator present');
+has($esignShared, 'CERTIFICATE OF COMPLETION',          'bms-esign-shared.js: certificate page is titled');
 has($wizard, 'CONSENT_TEXT',                         'wizard: canonical consent statement defined');
 has($wizard, "fd.append('consent_text'",             'wizard: submits consent text to the server');
 has($wizard, "fd.append('signing_reference'",        'wizard: submits a signing reference');

@@ -70,6 +70,12 @@ try {
     // on-screen preview, never the real PDF — fixed here).
     $custom_sender_info = trim((string)($_POST['custom_sender_info'] ?? '')) !== ''
         ? (string)$_POST['custom_sender_info'] : null;
+    // Set only by the one-click "Save & Sign" path (create_document.php) —
+    // it's about to embed a REAL signature into this same PDF client-side
+    // right after this save, so the watermarked "PREVIEW — NOT LEGALLY
+    // APPLIED" stamp generateLetterPdf() normally draws must be skipped here,
+    // otherwise the signed letter would carry both a fake and a real signature.
+    $suppress_signature_box = ($_POST['suppress_signature_box'] ?? '') === '1';
 
     if ($subject === '') {
         throw new Exception('Subject is required');
@@ -144,6 +150,7 @@ try {
             'content'             => $content,
             'signature_align'     => $signature_align,
             'custom_sender_info'  => $custom_sender_info,
+            'suppress_signature_box' => $suppress_signature_box,
         ], $target);
 
         $upd = $pdo->prepare("
@@ -215,6 +222,7 @@ try {
             'content'             => $content,
             'signature_align'     => $signature_align,
             'custom_sender_info'  => $custom_sender_info,
+            'suppress_signature_box' => $suppress_signature_box,
         ], $target);
 
         $ins = $pdo->prepare("

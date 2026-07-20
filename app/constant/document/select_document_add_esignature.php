@@ -22,6 +22,25 @@ $signerStmt->execute([$_SESSION['user_id']]);
 $signer      = $signerStmt->fetch(PDO::FETCH_ASSOC) ?: ['first_name' => '', 'last_name' => '', 'email' => ''];
 $signerName  = trim(($signer['first_name'] ?? '') . ' ' . ($signer['last_name'] ?? ''));
 $signerEmail = $signer['email'] ?? '';
+
+// Optional preselect — arriving here via "Save & Sign" from the letter editor
+// (create_document.php) passes the just-saved letter's id so the wizard can
+// skip straight to picking a signature instead of making the user re-find it
+// in the whole document library table (Step 1).
+$preselect_document = null;
+$preselect_document_id = isset($_GET['document_id']) ? (int)$_GET['document_id'] : 0;
+if ($preselect_document_id > 0) {
+    $preStmt = $pdo->prepare("SELECT id, document_name, file_path, uploaded_by FROM documents WHERE id = ?");
+    $preStmt->execute([$preselect_document_id]);
+    $preRow = $preStmt->fetch(PDO::FETCH_ASSOC);
+    if ($preRow && ((int)$preRow['uploaded_by'] === (int)$_SESSION['user_id'] || isAdmin())) {
+        $preselect_document = [
+            'id'   => (int)$preRow['id'],
+            'name' => $preRow['document_name'],
+            'path' => $preRow['file_path'],
+        ];
+    }
+}
 ?>
 
 <div class="container mt-4">
@@ -421,6 +440,7 @@ $signerEmail = $signer['email'] ?? '';
 <script src="<?= getUrl('assets/js/interact.min.js') ?>"></script>
 <script src="<?= getUrl('assets/js/pdf.min.js') ?>"></script>
 <script src="<?= getUrl('assets/js/pdf-lib.min.js') ?>"></script>
+<script src="<?= getUrl('assets/js/bms-esign-shared.js') ?>"></script>
 <!-- DataTables JS is handled by footer.php -->
 
 <script>
@@ -445,6 +465,7 @@ let ctx = canvas.getContext('2d');
 const CONSENT_TEXT = 'I agree that my electronic signature applied to this document is legally binding and the electronic equivalent of my handwritten signature.';
 const SIGNER_NAME  = <?= json_encode($signerName) ?>;
 const SIGNER_EMAIL = <?= json_encode($signerEmail) ?>;
+const PRESELECT_DOC = <?= json_encode($preselect_document) ?>;
 let viewedAt = null;          // ISO time the signer first previewed the document (step 3)
 let consentAt = null;         // ISO time the signer accepted the consent statement
 let signingReference = null;  // unique reference printed on the certificate
@@ -492,6 +513,16 @@ $(document).ready(function() {
             consentAt = new Date().toISOString();
         }
     });
+
+    // Arrived from "Save & Sign" with a specific letter already in hand —
+    // skip the library re-selection and go straight to picking a signature.
+    if (PRESELECT_DOC) {
+        selectedDocId = PRESELECT_DOC.id;
+        selectedDocName = PRESELECT_DOC.name;
+        selectedDocPath = PRESELECT_DOC.path;
+        $('#selected-doc-name').text(selectedDocName);
+        changeStep(1);
+    }
 });
 
 function initDataTable() {
@@ -846,83 +877,6 @@ async function processFinalSign() {
     }
 }
 
-// SHA-256 of an ArrayBuffer -> lowercase hex. Returns null if Web Crypto is unavailable.
-async function sha256Hex(buffer) {
-    if (!window.crypto || !crypto.subtle) return null;
-    try {
-        const digest = await crypto.subtle.digest('SHA-256', buffer);
-        return Array.from(new Uint8Array(digest))
-            .map(b => b.toString(16).padStart(2, '0')).join('');
-    } catch (e) {
-        return null;
-    }
-}
-
-// Append a Certificate of Completion page to the signed PDF (pure pdf-lib).
-async function appendCertificatePage(pdfLibDoc, cert) {
-    const { StandardFonts, rgb } = PDFLib;
-    const font     = await pdfLibDoc.embedFont(StandardFonts.Helvetica);
-    const fontBold = await pdfLibDoc.embedFont(StandardFonts.HelveticaBold);
-
-    const page = pdfLibDoc.addPage([595.28, 841.89]); // A4 portrait
-    const W = 595.28, H = 841.89, M = 56;
-    const ink   = rgb(0.13, 0.13, 0.13);
-    const muted = rgb(0.42, 0.42, 0.42);
-    const brand = rgb(0.05, 0.43, 0.99);
-
-    let y = H - M;
-    page.drawText('CERTIFICATE OF COMPLETION', { x: M, y, size: 18, font: fontBold, color: brand });
-    y -= 20;
-    page.drawText('Electronic Signature Record', { x: M, y, size: 10, font, color: muted });
-    y -= 16;
-    page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 1, color: brand });
-    y -= 34;
-
-    // Word-wrap helper — strips characters the standard PDF font cannot encode
-    const wrap = (text, size, f, maxW) => {
-        const safe  = String(text).replace(/[^\x20-\x7E\xA0-\xFF–—]/g, '?');
-        const words = safe.split(/\s+/);
-        const lines = [];
-        let line = '';
-        words.forEach(w => {
-            const test = line ? line + ' ' + w : w;
-            if (f.widthOfTextAtSize(test, size) > maxW && line) {
-                lines.push(line); line = w;
-            } else { line = test; }
-        });
-        if (line) lines.push(line);
-        return lines;
-    };
-
-    const row = (label, value) => {
-        page.drawText(label.toUpperCase(), { x: M, y, size: 8, font: fontBold, color: muted });
-        y -= 14;
-        wrap(value || '—', 11, font, W - 2 * M).forEach(ln => {
-            page.drawText(ln, { x: M, y, size: 11, font, color: ink });
-            y -= 15;
-        });
-        y -= 10;
-    };
-
-    row('Document', cert.documentName);
-    row('Digitally signed by', cert.signerName + (cert.signerEmail ? '  <' + cert.signerEmail + '>' : ''));
-    row('Date & time', cert.signedAt + '  (server-recorded, tamper-evident)');
-    row('Signing reference', cert.signingReference);
-    row('Original document fingerprint (SHA-256)',
-        cert.originalHash || 'Recorded in the BMS signature register');
-    row('Consent statement accepted', cert.consentText);
-
-    y -= 6;
-    page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 0.5, color: muted });
-    y -= 18;
-    wrap('This certificate page is part of the signed PDF. The document\'s integrity can be ' +
-         'verified at any time inside BMS — any change to the file after signing will be detected.',
-         9, font, W - 2 * M).forEach(ln => {
-        page.drawText(ln, { x: M, y, size: 9, font, color: muted });
-        y -= 13;
-    });
-}
-
 async function embedSignatureIntoPdf() {
     const pdfRenderScale = 1.5; // must match the scale variable used by PDF.js
     const userSigScale   = parseInt($('#sig-scale').val()) / 100;
@@ -938,7 +892,7 @@ async function embedSignatureIntoPdf() {
     const pdfBytes = await pdfResp.arrayBuffer();
 
     // 1b. Fingerprint the original document (SHA-256) for the certificate page
-    const originalHash = await sha256Hex(pdfBytes.slice(0));
+    const originalHash = await bmsSha256Hex(pdfBytes.slice(0));
 
     // 2. Load with pdf-lib
     const pdfLibDoc = await PDFLib.PDFDocument.load(pdfBytes);
@@ -974,44 +928,11 @@ async function embedSignatureIntoPdf() {
     const pdfX = posX / pdfRenderScale;
     const pdfY = pageH - (posY / pdfRenderScale) - sigHPdf;
 
-    // 8. Draw the signature onto the page
-    pdfPage.drawImage(embeddedSig, {
-        x:      pdfX,
-        y:      pdfY,
-        width:  sigWPdf,
-        height: sigHPdf,
-    });
-
-    // 8b. "Digitally signed by..." protocol label rendered below the signature image
-    {
-        const { StandardFonts, rgb } = PDFLib;
-        const lblFont  = await pdfLibDoc.embedFont(StandardFonts.Helvetica);
-        const lblBold  = await pdfLibDoc.embedFont(StandardFonts.HelveticaBold);
-        const inkBlue  = rgb(0.05, 0.43, 0.99);
-        const inkGray  = rgb(0.30, 0.30, 0.30);
-        const now      = new Date();
-        const dateFmt  = now.toLocaleDateString('en-GB',  { day: '2-digit', month: 'short', year: 'numeric' });
-        const timeFmt  = now.toLocaleTimeString('en-GB',  { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        const lSize    = 7;
-        const lh       = 9;
-        const lx       = pdfX;
-        let   ly       = pdfY - 4;  // just below the signature image bottom edge
-
-        pdfPage.drawText('Digitally signed by: ' + (SIGNER_NAME || 'BMS User'), {
-            x: lx, y: ly, size: lSize, font: lblBold, color: inkBlue,
-        });
-        pdfPage.drawText(dateFmt + '  ·  ' + timeFmt, {
-            x: lx, y: ly - lh, size: lSize - 0.5, font: lblFont, color: inkGray,
-        });
-        if (signingReference) {
-            pdfPage.drawText('Ref: ' + signingReference, {
-                x: lx, y: ly - lh * 2, size: lSize - 0.5, font: lblFont, color: inkGray,
-            });
-        }
-    }
+    // 8. Draw the signature onto the page, plus the "Digitally signed by..." label
+    await bmsDrawSignatureWithLabel(pdfLibDoc, pdfPage, embeddedSig, pdfX, pdfY, sigWPdf, sigHPdf, SIGNER_NAME, signingReference);
 
     // 9. Append the Certificate of Completion page
-    await appendCertificatePage(pdfLibDoc, {
+    await bmsAppendCertificatePage(pdfLibDoc, {
         documentName:     selectedDocName,
         signerName:       SIGNER_NAME || 'BMS User',
         signerEmail:      SIGNER_EMAIL,
