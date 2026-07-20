@@ -37,6 +37,11 @@ if (!function_exists('renderLetterHtml')) {
      *   string   signature_align     left|center|right
      *   ?string  signature_image_path absolute filesystem path, or null
      *   bool     signature_is_preview true = stamp a "PREVIEW" watermark label
+     *   bool     suppress_signature_box true = skip the whole signature block
+     *                                 (image, box, name, role) — used when a
+     *                                 real signature is about to be embedded
+     *                                 on top client-side (see create_document.php's
+     *                                 one-click Save & Sign)
      *   string   signer_name
      *   string   signer_role
      * }
@@ -108,27 +113,36 @@ if (!function_exists('renderLetterHtml')) {
         // recipient/sender table above already works around), so the box is
         // a bordered table cell rather than the editor's flexbox/absolute-
         // position CSS, which TCPDF can't reproduce.
-        $align = in_array($d['signature_align'] ?? 'left', ['left', 'center', 'right'], true)
-            ? $d['signature_align'] : 'left';
-        $cellAlign = ['left' => 'left', 'center' => 'center', 'right' => 'right'][$align];
-        $boxMargin = ['left' => 'margin-right:auto;', 'center' => 'margin-left:auto; margin-right:auto;', 'right' => 'margin-left:auto;'][$align];
+        //
+        // Skipped entirely when suppress_signature_box is set — used by the
+        // one-click "Save & Sign" path (create_document.php), which fetches
+        // THIS generated PDF and embeds the creator's REAL signature into it
+        // client-side (pdf-lib) right afterwards. Without this flag every
+        // signed letter would carry both TCPDF's own watermarked "PREVIEW —
+        // NOT LEGALLY APPLIED" stamp AND the real signature on the same page.
+        if (empty($d['suppress_signature_box'])) {
+            $align = in_array($d['signature_align'] ?? 'left', ['left', 'center', 'right'], true)
+                ? $d['signature_align'] : 'left';
+            $cellAlign = ['left' => 'left', 'center' => 'center', 'right' => 'right'][$align];
+            $boxMargin = ['left' => 'margin-right:auto;', 'center' => 'margin-left:auto; margin-right:auto;', 'right' => 'margin-left:auto;'][$align];
 
-        $html .= '<div style="margin-top:14mm; text-align:' . $cellAlign . ';">';
-        $html .= '<table cellpadding="4" cellspacing="0" style="' . $boxMargin . '"><tr>'
-            . '<td style="border:1px dashed #adb5bd; background-color:#fbfbfb; width:65mm; height:24mm; text-align:center; vertical-align:middle;">';
-        if (!empty($d['signature_image_path']) && is_file($d['signature_image_path'])) {
-            $html .= '<img src="' . $esc($d['signature_image_path']) . '" height="15mm">';
-            if (!empty($d['signature_is_preview'])) {
-                $html .= '<br><span style="font-size:6.5pt; font-weight:bold; letter-spacing:0.5px; color:#c00;">PREVIEW &mdash; NOT LEGALLY APPLIED</span>';
+            $html .= '<div style="margin-top:14mm; text-align:' . $cellAlign . ';">';
+            $html .= '<table cellpadding="4" cellspacing="0" style="' . $boxMargin . '"><tr>'
+                . '<td style="border:1px dashed #adb5bd; background-color:#fbfbfb; width:65mm; height:24mm; text-align:center; vertical-align:middle;">';
+            if (!empty($d['signature_image_path']) && is_file($d['signature_image_path'])) {
+                $html .= '<img src="' . $esc($d['signature_image_path']) . '" height="15mm">';
+                if (!empty($d['signature_is_preview'])) {
+                    $html .= '<br><span style="font-size:6.5pt; font-weight:bold; letter-spacing:0.5px; color:#c00;">PREVIEW &mdash; NOT LEGALLY APPLIED</span>';
+                }
             }
+            $html .= '</td></tr></table>';
+            $html .= '<div style="margin-top:2mm; border-top:1px solid #333333; padding-top:2mm; display:inline-block; min-width:55mm;">'
+                . $esc($d['signer_name'] ?: 'Signed by') . '</div>';
+            if (!empty($d['signer_role'])) {
+                $html .= '<div style="font-size:9pt; color:#555555;">' . $esc($d['signer_role']) . '</div>';
+            }
+            $html .= '</div>';
         }
-        $html .= '</td></tr></table>';
-        $html .= '<div style="margin-top:2mm; border-top:1px solid #333333; padding-top:2mm; display:inline-block; min-width:55mm;">'
-            . $esc($d['signer_name'] ?: 'Signed by') . '</div>';
-        if (!empty($d['signer_role'])) {
-            $html .= '<div style="font-size:9pt; color:#555555;">' . $esc($d['signer_role']) . '</div>';
-        }
-        $html .= '</div>';
 
         return $html;
     }

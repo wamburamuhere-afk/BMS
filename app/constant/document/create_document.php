@@ -730,6 +730,7 @@ let currentDocumentId = <?= (int)($existing['id'] ?? 0) ?>;
 const SAVE_SIGN_CONSENT_TEXT = 'I agree that my electronic signature applied to this document is legally binding and the electronic equivalent of my handwritten signature.';
 const SAVE_SIGN_SIGNER_NAME  = <?= json_encode($signer_name) ?>;
 const SAVE_SIGN_SIGNER_EMAIL = <?= json_encode($signer_email) ?>;
+const SAVE_SIGN_SIGNER_ROLE  = <?= json_encode($signer_role) ?>;
 
 
 $(document).ready(function () {
@@ -1043,6 +1044,10 @@ function saveDocument(mode) {
     fd.append('signature_align', $('#f_signature_align').val() || 'left');
     fd.append('project_id', '<?= (int)($project_id ?? 0) ?>');
     fd.append('content', $('#letterBody').summernote('code'));
+    // Save & Sign is about to embed a REAL signature into this same PDF right
+    // after this save — tell the server to skip drawing its own watermarked
+    // "PREVIEW" signature stamp, so the two never end up on the same page.
+    if (mode === 'sign') fd.append('suppress_signature_box', '1');
     fd.append('_csrf', CSRF_TOKEN);
 
     $.ajax({
@@ -1153,7 +1158,7 @@ async function signWithMostRecentSignature(documentId, documentName, $btn, origB
             : margin;
         const sigY = 130; // clears the printed audit footer and the label lines drawn beneath the image
 
-        await bmsDrawSignatureWithLabel(pdfLibDoc, pdfPage, embeddedSig, sigX, sigY, sigW, sigH, SAVE_SIGN_SIGNER_NAME, signingReference);
+        await bmsDrawSignatureWithLabel(pdfLibDoc, pdfPage, embeddedSig, sigX, sigY, sigW, sigH, SAVE_SIGN_SIGNER_NAME, signingReference, SAVE_SIGN_SIGNER_ROLE);
 
         // 5. Append the Certificate of Completion page
         await bmsAppendCertificatePage(pdfLibDoc, {

@@ -86,7 +86,9 @@ async function bmsAppendCertificatePage(pdfLibDoc, cert) {
 
 // Draw the embedded signature image plus the "Digitally signed by ..." label
 // block directly beneath it, in raw PDF point coordinates (bottom-left origin).
-async function bmsDrawSignatureWithLabel(pdfLibDoc, pdfPage, embeddedSig, x, y, width, height, signerName, signingReference) {
+// signerRole is optional — the wizard's generic "sign any document" flow has
+// no consistent notion of a role, but create_document.php's letters do.
+async function bmsDrawSignatureWithLabel(pdfLibDoc, pdfPage, embeddedSig, x, y, width, height, signerName, signingReference, signerRole) {
     pdfPage.drawImage(embeddedSig, { x, y, width, height });
 
     const { StandardFonts, rgb } = PDFLib;
@@ -104,6 +106,12 @@ async function bmsDrawSignatureWithLabel(pdfLibDoc, pdfPage, embeddedSig, x, y, 
     pdfPage.drawText('Digitally signed by: ' + (signerName || 'BMS User'), {
         x, y: ly, size: lSize, font: lblBold, color: inkBlue,
     });
+    if (signerRole) {
+        pdfPage.drawText(signerRole, {
+            x, y: ly - lh, size: lSize - 0.5, font: lblFont, color: inkGray,
+        });
+        ly -= lh;
+    }
     pdfPage.drawText(dateFmt + '  ·  ' + timeFmt, {
         x, y: ly - lh, size: lSize - 0.5, font: lblFont, color: inkGray,
     });
