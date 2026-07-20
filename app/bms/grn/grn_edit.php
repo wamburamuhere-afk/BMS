@@ -747,10 +747,11 @@ $(document).ready(function() {
 });
 
 function loadProductsCache() {
+    const warehouseId = $('#warehouse_id').val() || 0;
     $.ajax({
-        url: '<?= getUrl('api/pos/get_products') ?>',
+        url: '<?= buildUrl('api/account/get_products.php') ?>',
         type: 'GET',
-        data: { type: 'inventory' },
+        data: { limit: 1000, is_service: 0, warehouse_id: warehouseId },
         dataType: 'json',
         success: function(response) {
             if (response.success) {
@@ -762,6 +763,10 @@ function loadProductsCache() {
         }
     });
 }
+
+// Reload the product cache whenever the warehouse changes, so stock levels
+// shown in the product search reflect the newly-selected warehouse.
+$('#warehouse_id').on('change', loadProductsCache);
 
 function updateSerialNumbers() {
     $('#itemsBody tr').each(function(index) {
