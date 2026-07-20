@@ -164,10 +164,11 @@ if ($project_id) {
 require_once ROOT_DIR . '/core/document_merge.php';
 $merge_variables = documentMergeVariables();
 
-$default_body = '<p>Dear ' . ($recipient !== '' ? htmlspecialchars($recipient) : 'Sir/Madam') . ',</p>'
-    . '<p>&nbsp;</p>'
-    . '<p>&nbsp;</p>'
-    . '<p>Yours faithfully,</p>';
+// A brand-new blank letter (no template, no existing draft) starts as a truly
+// empty canvas — no "Dear Sir/Madam... Yours faithfully" boilerplate pre-filled
+// for the user to delete first. A template's own content (see $content above)
+// is unaffected by this — only the from-scratch case was ever auto-filled.
+$default_body = '';
 
 // Sender info block (top-right, under the date) — one line per field, only
 // the ones actually filled in under Company Profile. Replaces the old
@@ -299,11 +300,6 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
                 <label class="form-check-label small fw-bold" for="f_use_letterhead">Include letterhead (logo &amp; sender address)</label>
                 <div class="form-text">Turn off if printing onto physical pre-printed letterhead paper. The "Printed by" footer always stays &mdash; that's an audit line, not letterhead branding.</div>
             </div>
-            <div class="form-check form-switch mt-2" id="customSenderToggleWrap" style="<?= $use_letterhead ? '' : 'display:none;' ?>">
-                <input class="form-check-input" type="checkbox" id="f_custom_sender" <?= $custom_sender_info !== null ? 'checked' : '' ?>>
-                <label class="form-check-label small fw-bold" for="f_custom_sender">Customize sender address for this letter</label>
-                <div class="form-text">Off = always follows Company Profile automatically. On = write/format your own sender address just for this letter, using its own small toolbar — the rest of Company Profile stays unaffected.</div>
-            </div>
         </div>
     </div>
 
@@ -369,20 +365,17 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
                 </div>
             </div>
             <div class="letter-addr-col letter-addr-sender">
-                <!-- Auto mode (default): follows Company Profile, read-only here.
-                     Custom mode (opt-in via f_custom_sender): freely editable, its
-                     own small Summernote toolbar — never shares #letterToolbar with
-                     the letter body, so the two editors can't fight over one ribbon.
-                     Its toolbar chrome is hidden on print via the generic
-                     .note-toolbar rule in @media print below; the saved PDF is
-                     generated server-side from the resolved text content only,
-                     so this editor's own toolbar was never part of it either. -->
-                <div class="letter-sender-info" id="senderInfoAuto" style="<?= $custom_sender_info !== null ? 'display:none;' : '' ?>">
-                    <?php foreach ($sender_lines as $line): ?>
-                        <div><?= nl2br(htmlspecialchars($line)) ?></div>
-                    <?php endforeach; ?>
-                </div>
-                <div id="senderInfoCustomWrap" style="<?= $custom_sender_info !== null ? '' : 'display:none;' ?>">
+                <!-- Always directly editable, right from page load — no toggle to
+                     click first. Pre-filled from Company Profile as a convenient
+                     starting point (or the letter's own previously-saved override),
+                     but every letter can freely edit/reposition its own copy without
+                     an extra step. Its own small Summernote toolbar — never shares
+                     #letterToolbar with the letter body, so the two editors can't
+                     fight over one ribbon. Toolbar chrome is hidden on print via the
+                     generic .note-toolbar rule in @media print below; the saved PDF
+                     is generated server-side from the resolved text content only, so
+                     this editor's own toolbar was never part of it either. -->
+                <div id="senderInfoCustomWrap" class="letter-sender-info" style="<?= $use_letterhead ? '' : 'display:none;' ?>">
                     <div id="senderInfoCustom"><?= $custom_sender_info !== null ? $custom_sender_info : '<div>' . implode('</div><div>', array_map('htmlspecialchars', $sender_lines)) . '</div>' ?></div>
                 </div>
                 <div class="letter-refno" id="letter-refno-display">Ref: <?= htmlspecialchars($document_code) ?></div>
@@ -760,14 +753,14 @@ $(document).ready(function () {
         fontSizes: ['8', '9', '10', '11', '12', '14', '16', '18', '24', '32']
     });
 
-    // Custom sender-address editor — deliberately its OWN Summernote instance
-    // with its own small inline toolbar (no toolbarContainer redirect), never
+    // Sender-address editor — deliberately its OWN Summernote instance with
+    // its own small inline toolbar (no toolbarContainer redirect), never
     // sharing #letterToolbar with the letter body. Two instances pointed at
     // the same external toolbar would fight over it; a small dedicated
     // toolbar, scoped to what an address block actually needs, is the robust
-    // choice. Initialized lazily (only when custom mode is actually turned
-    // on) rather than on page load, since Summernote initializing on a
-    // display:none element is a known source of layout/rendering quirks.
+    // choice. Always initialized on page load — directly editable from the
+    // first paint, no toggle to click first (per feedback: the address
+    // shouldn't be locked behind an extra "customize" step).
     // senderCustomInited itself is declared at module scope above (top of
     // the <script> block) — saveDocument() needs to read it too.
     function initSenderCustomEditor() {
@@ -777,17 +770,12 @@ $(document).ready(function () {
             height: 90,
             toolbar: [
                 ['font', ['bold', 'italic', 'underline', 'clear']],
-                ['para', ['ul']],
+                ['para', ['ul', 'paragraph']],
                 ['history', ['undo', 'redo']]
             ]
         });
     }
-    if (<?= $custom_sender_info !== null ? 'true' : 'false' ?>) {
-        // Reopening a draft that already has a custom override — the block
-        // is visible from the very first paint, so init immediately instead
-        // of waiting for a toggle event that won't fire.
-        initSenderCustomEditor();
-    }
+    initSenderCustomEditor();
 
     $('#f_recipient').on('input', function () {
         $('#letter-recipient-display').html($('<div>').text($(this).val()).html().replace(/\n/g, '<br>'));
@@ -818,29 +806,11 @@ $(document).ready(function () {
             .html($('<div>').text(v).html().replace(/\n/g, '<br>'));
     });
 
-    // Letterhead toggle — header + footer both follow the same switch, like
-    // the equivalent control in the sister vikundi project.
+    // Letterhead toggle — header, sender address, and footer all follow the
+    // same switch, like the equivalent control in the sister vikundi project.
     $('#f_use_letterhead').on('change', function () {
         $('#letterPaper').toggleClass('no-letterhead', !this.checked);
-        // Customizing a sender address that's hidden (letterhead off) has no
-        // visible effect — hide that control too so it can't confuse anyone.
-        $('#customSenderToggleWrap').toggle(this.checked);
-    });
-
-    // Customize sender address — off (default) always mirrors Company
-    // Profile; on lets this one letter override it freely. Switching on
-    // starts from whatever is currently showing (either the saved custom
-    // text from a previous save, or today's Company Profile lines) rather
-    // than a blank box, since "customize" means edit-what's-there, not
-    // start over.
-    $('#f_custom_sender').on('change', function () {
-        const on = this.checked;
-        initSenderCustomEditor();
-        $('#senderInfoAuto').toggle(!on);
-        // Toggle the wrapper DIV we control, not Summernote's own generated
-        // markup — its exact DOM shape (which element it hides/replaces) is
-        // an implementation detail this code shouldn't have to know.
-        $('#senderInfoCustomWrap').toggle(on);
+        $('#senderInfoCustomWrap').toggle(this.checked);
     });
 
     // Signature position — full-block vs modified-block letter styles
@@ -1083,7 +1053,6 @@ function saveDocument(mode) {
     $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Saving...');
 
     const useLetterhead = $('#f_use_letterhead').is(':checked');
-    const useCustomSender = $('#f_custom_sender').is(':checked');
 
     // The PDF is now generated server-side (TCPDF, see
     // core/document_letter_render.php) from these same structured fields —
@@ -1100,8 +1069,12 @@ function saveDocument(mode) {
     fd.append('signature_align', $('#f_signature_align').val() || 'left');
     fd.append('project_id', '<?= (int)($project_id ?? 0) ?>');
     fd.append('content', $('#letterBody').summernote('code'));
-    fd.append('use_custom_sender', useCustomSender ? '1' : '0');
-    fd.append('custom_sender_info', senderCustomInited ? $('#senderInfoCustom').summernote('code') : '');
+    // Always directly editable now (no "customize" toggle to opt into) — the
+    // sender editor is initialized on page load, so its current content is
+    // always this letter's real sender address, whether left as the
+    // Company Profile default or edited.
+    fd.append('use_custom_sender', '1');
+    fd.append('custom_sender_info', $('#senderInfoCustom').summernote('code'));
     fd.append('_csrf', CSRF_TOKEN);
 
     $.ajax({
