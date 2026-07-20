@@ -35,7 +35,7 @@ try {
         SELECT so.*, c.customer_name, c.company_name
         FROM sales_orders so
         LEFT JOIN customers c ON so.customer_id = c.customer_id
-        WHERE so.project_id = ? AND so.is_quote = 0
+        WHERE so.project_id = ? AND so.is_quote = 0" . scopeFilterSqlNullable('warehouse', 'so') . "
         ORDER BY so.order_date DESC
     ");
     $stmt->execute([$id]);
@@ -46,7 +46,7 @@ try {
         SELECT i.*, c.customer_name, c.company_name
         FROM invoices i
         LEFT JOIN customers c ON i.customer_id = c.customer_id
-        WHERE i.project_id = ?
+        WHERE i.project_id = ?" . scopeFilterSqlNullable('warehouse', 'i') . "
         ORDER BY i.invoice_date DESC
     ");
     $stmt->execute([$id]);
@@ -70,7 +70,7 @@ try {
         FROM rfq r
         LEFT JOIN suppliers s ON r.supplier_id = s.supplier_id
         LEFT JOIN warehouses w ON r.warehouse_id = w.warehouse_id
-        WHERE r.project_id = ?
+        WHERE r.project_id = ?" . scopeFilterSqlNullable('warehouse', 'r') . "
         ORDER BY r.rfq_id DESC
     ");
     $stmt->execute([$id]);
@@ -81,7 +81,7 @@ try {
         SELECT po.*, s.supplier_name
         FROM purchase_orders po
         LEFT JOIN suppliers s ON po.supplier_id = s.supplier_id
-        WHERE po.project_id = ?
+        WHERE po.project_id = ?" . scopeFilterSqlNullable('warehouse', 'po') . "
         ORDER BY po.order_date DESC
     ");
     $stmt->execute([$id]);
@@ -93,7 +93,7 @@ try {
         FROM purchase_receipts pr
         LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
         LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
-        WHERE pr.project_id = ?
+        WHERE pr.project_id = ?" . scopeFilterSqlNullable('warehouse', 'pr') . "
         ORDER BY pr.receipt_date DESC
     ");
     $stmt->execute([$id]);
@@ -113,7 +113,7 @@ try {
             FROM deliveries d
             LEFT JOIN suppliers s  ON d.supplier_id  = s.supplier_id
             LEFT JOIN warehouses w ON d.warehouse_id = w.warehouse_id
-            WHERE d.project_id = ?
+            WHERE d.project_id = ?" . scopeFilterSqlNullable('warehouse', 'd') . "
             ORDER BY d.created_at DESC
         ");
         $stmt->execute([$id]);
@@ -137,7 +137,7 @@ try {
             LEFT JOIN deliveries dn ON do.dn_id       = dn.delivery_id
             LEFT JOIN suppliers s   ON do.supplier_id  = s.supplier_id
             LEFT JOIN warehouses w  ON do.warehouse_id = w.warehouse_id
-            WHERE do.project_id = ?
+            WHERE do.project_id = ?" . scopeFilterSqlNullable('warehouse', 'do') . "
             ORDER BY do.created_at DESC
         ");
         $stmt->execute([$id]);
@@ -155,7 +155,7 @@ try {
         FROM purchase_returns pr
         LEFT JOIN purchase_orders po ON pr.purchase_order_id = po.purchase_order_id
         LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
-        WHERE pr.project_id = ?
+        WHERE pr.project_id = ?" . scopeFilterSqlNullable('warehouse', 'pr') . "
         ORDER BY pr.return_date DESC
     ");
     $stmt->execute([$id]);
@@ -182,7 +182,7 @@ try {
              LEFT JOIN purchase_returns pr ON dn.purchase_return_id = pr.purchase_return_id
              LEFT JOIN suppliers s         ON dn.supplier_id        = s.supplier_id
                  WHERE dn.status != 'deleted'
-                   AND {$projClause}
+                   AND {$projClause}" . scopeFilterSqlNullable('warehouse', 'pr') . "
               ORDER BY dn.debit_date DESC, dn.debit_note_id DESC
             ");
             $stmt->execute([$id]);
