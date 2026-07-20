@@ -1046,9 +1046,11 @@ function saveDocument(mode) {
                 $btn.prop('disabled', false).html(orig);
                 window.print();
             } else {
-                // Save & Sign — hand straight into the e-signature wizard, same
-                // destination the original Phase 1 "Save & Sign" shortcut used.
-                window.location.href = '<?= buildUrl('select_document_add_esignature') ?>';
+                // Save & Sign — hand straight into the e-signature wizard, passing
+                // this letter's id so the wizard preselects it and skips straight
+                // to "Select Signature" instead of making the user re-find it in
+                // the whole document library table (Step 1).
+                window.location.href = '<?= buildUrl('select_document_add_esignature') ?>' + '?document_id=' + encodeURIComponent(currentDocumentId);
             }
         },
         error: function () {

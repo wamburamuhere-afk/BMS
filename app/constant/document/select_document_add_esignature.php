@@ -22,6 +22,25 @@ $signerStmt->execute([$_SESSION['user_id']]);
 $signer      = $signerStmt->fetch(PDO::FETCH_ASSOC) ?: ['first_name' => '', 'last_name' => '', 'email' => ''];
 $signerName  = trim(($signer['first_name'] ?? '') . ' ' . ($signer['last_name'] ?? ''));
 $signerEmail = $signer['email'] ?? '';
+
+// Optional preselect — arriving here via "Save & Sign" from the letter editor
+// (create_document.php) passes the just-saved letter's id so the wizard can
+// skip straight to picking a signature instead of making the user re-find it
+// in the whole document library table (Step 1).
+$preselect_document = null;
+$preselect_document_id = isset($_GET['document_id']) ? (int)$_GET['document_id'] : 0;
+if ($preselect_document_id > 0) {
+    $preStmt = $pdo->prepare("SELECT id, document_name, file_path, uploaded_by FROM documents WHERE id = ?");
+    $preStmt->execute([$preselect_document_id]);
+    $preRow = $preStmt->fetch(PDO::FETCH_ASSOC);
+    if ($preRow && ((int)$preRow['uploaded_by'] === (int)$_SESSION['user_id'] || isAdmin())) {
+        $preselect_document = [
+            'id'   => (int)$preRow['id'],
+            'name' => $preRow['document_name'],
+            'path' => $preRow['file_path'],
+        ];
+    }
+}
 ?>
 
 <div class="container mt-4">
@@ -445,6 +464,7 @@ let ctx = canvas.getContext('2d');
 const CONSENT_TEXT = 'I agree that my electronic signature applied to this document is legally binding and the electronic equivalent of my handwritten signature.';
 const SIGNER_NAME  = <?= json_encode($signerName) ?>;
 const SIGNER_EMAIL = <?= json_encode($signerEmail) ?>;
+const PRESELECT_DOC = <?= json_encode($preselect_document) ?>;
 let viewedAt = null;          // ISO time the signer first previewed the document (step 3)
 let consentAt = null;         // ISO time the signer accepted the consent statement
 let signingReference = null;  // unique reference printed on the certificate
@@ -492,6 +512,16 @@ $(document).ready(function() {
             consentAt = new Date().toISOString();
         }
     });
+
+    // Arrived from "Save & Sign" with a specific letter already in hand —
+    // skip the library re-selection and go straight to picking a signature.
+    if (PRESELECT_DOC) {
+        selectedDocId = PRESELECT_DOC.id;
+        selectedDocName = PRESELECT_DOC.name;
+        selectedDocPath = PRESELECT_DOC.path;
+        $('#selected-doc-name').text(selectedDocName);
+        changeStep(1);
+    }
 });
 
 function initDataTable() {

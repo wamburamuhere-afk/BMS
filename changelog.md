@@ -1,5 +1,36 @@
 # BMS Changelog
 
+## 2026-07-20 (feature) — Save & Sign now preselects the just-saved letter in the e-signature wizard
+
+**Files:** `app/constant/document/create_document.php`, `app/constant/document/select_document_add_esignature.php`
+
+User asked to research how Vikundi obtains a signature on a printed document and match it. Scouted
+`https://vikundi.bjptechnologies.co.tz/select_document_add_esignature` — same route name BMS already
+has — and found Vikundi's version is actually the simpler one: three fixed position buttons and a
+size slider, no drag-to-position, no tamper-evident certificate, no integrity verification. BMS's
+existing wizard (`select_document_add_esignature.php`) already has all of that and more (live
+drag-positioning on a rendered PDF via interact.js/pdf.js/pdf-lib, a Certificate of Completion page
+with SHA-256 fingerprinting, an external-signer email flow) — there was no feature gap to port over.
+
+The real gap: `create_document.php`'s "Save & Sign" button already existed and already redirected
+into this wizard, but landed on Step 1 and made the user re-find their just-saved letter by hand in
+the whole document library table before they could even pick a signature — not the one smooth
+"print → obtain signature" motion the user described.
+
+- `create_document.php` — Save & Sign now appends `?document_id=<id>` to the wizard redirect.
+- `select_document_add_esignature.php` — reads that `document_id`, and if it resolves to a document
+  owned by the current user (or the user is admin — same ownership rule already used by
+  `save_created_document.php`), passes it to the page as `PRESELECT_DOC`. On load, the wizard sets
+  `selectedDocId`/`selectedDocName`/`selectedDocPath` from it and calls the existing `changeStep(1)`
+  to jump straight to Step 2 (Select Signature) — no new step-transition logic, reuses what Step 1's
+  own "Next Step" button already calls internally. Missing/foreign/invalid `document_id` degrades to
+  `PRESELECT_DOC = null`, i.e. today's normal Step-1 landing — unchanged for every other entry point
+  into this wizard (the standalone "Sign Document" button on the signatures page, etc).
+
+Verified live: rendered the wizard with a forged session for the letter's actual owner and
+`document_id` pointing at a real, just-created letter — `PRESELECT_DOC` resolved correctly with the
+right id/name/path and the page rendered with no PHP errors. `php -l` clean on both files.
+
 ## 2026-07-20 (feature) — Create Document: recipient and sender folded into a single canvas with one toolbar, matching Vikundi
 
 **Files:** `app/constant/document/create_document.php`
