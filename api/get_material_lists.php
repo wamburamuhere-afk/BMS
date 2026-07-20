@@ -1,5 +1,5 @@
 <?php
-// scope-audit: skip — NIP material lists lookup for forms; filtered by project_id param where provided
+// Project + warehouse scope enforced below via userCan()/scopeFilterSqlNullable()
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 global $pdo;
@@ -11,7 +11,30 @@ try {
     try { $pdo->exec("ALTER TABLE nip_material_lists ADD COLUMN warehouse_id INT NULL DEFAULT NULL"); } catch (Exception $e) {}
     try { $pdo->exec("ALTER TABLE nip_material_lists ADD COLUMN list_no VARCHAR(50) NULL DEFAULT NULL"); } catch (Exception $e) {}
 
-    $project_id = isset($_GET['project_id']) && $_GET['project_id'] !== '' ? intval($_GET['project_id']) : null;
+    $project_id = isset($_GET['project_id']) && $_GET['project_id'] !== '' ? (int)$_GET['project_id'] : null;
+
+    // A chosen project_id is verified before use — a hand-crafted request
+    // can't read another project's material lists.
+    if ($project_id !== null && !userCan('project', $project_id)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your scope.']);
+        exit;
+    }
+
+    $where  = [];
+    $params = [];
+    if ($project_id !== null) {
+        $where[] = "ml.project_id = ?";
+        $params[] = $project_id;
+    } else {
+        // No project chosen — default-scope to the user's assigned projects
+        // (+ untagged) so the list can never leak another project's rows.
+        $where[] = "1=1" . scopeFilterSqlNullable('project', 'ml');
+    }
+    // Warehouse scope always applies, same as every other list in the app —
+    // a user restricted to one warehouse inside their project must not see
+    // material lists tied to a different warehouse.
+    $where[] = "1=1" . scopeFilterSqlNullable('warehouse', 'ml');
 
     $sql = "
         SELECT
@@ -30,16 +53,14 @@ try {
         LEFT JOIN projects   p ON ml.project_id   = p.project_id
         LEFT JOIN warehouses w ON ml.warehouse_id = w.warehouse_id
         LEFT JOIN nip_material_list_nips mln ON mln.material_list_id = ml.id
-    ";
-    if ($project_id !== null) {
-        $sql .= " WHERE ml.project_id = " . $project_id;
-    }
-    $sql .= "
+        WHERE " . implode(' AND ', $where) . "
         GROUP BY ml.id, ml.name, ml.list_no, ml.project_id, p.project_name,
                  ml.warehouse_id, w.warehouse_name, ml.created_at
         ORDER BY ml.created_at DESC
     ";
-    $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode(['success' => true, 'lists' => $rows]);
 

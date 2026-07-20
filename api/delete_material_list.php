@@ -20,10 +20,17 @@ try {
         assertScopeForRecord('nip_material_lists', 'id', $id);
     }
 
-    $row = $pdo->prepare("SELECT name FROM nip_material_lists WHERE id=?");
+    $row = $pdo->prepare("SELECT name, warehouse_id FROM nip_material_lists WHERE id=?");
     $row->execute([$id]);
     $ml = $row->fetch(PDO::FETCH_ASSOC);
     if (!$ml) throw new Exception('Material list not found.');
+
+    // Warehouse-scope gate — a user restricted to one warehouse must not
+    // delete a list belonging to a different warehouse in the same project.
+    if (!empty($ml['warehouse_id']) && function_exists('userCan') && !userCan('warehouse', (int)$ml['warehouse_id'])) {
+        http_response_code(403);
+        throw new Exception('Access denied: this material list is not in your warehouse scope.');
+    }
 
     // nip_material_list_nips has ON DELETE CASCADE — so deleting the list removes its NIPs
     $pdo->prepare("DELETE FROM nip_material_lists WHERE id=?")->execute([$id]);
