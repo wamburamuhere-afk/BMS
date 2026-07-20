@@ -26,6 +26,17 @@ try {
         assertScopeForRecord('products', 'product_id', $product_id);
     }
 
+    // Warehouse-scope gate — a user restricted to one warehouse must not
+    // edit a NIP product currently sitting in a different warehouse, even
+    // within the same project.
+    $curWh = $pdo->prepare("SELECT warehouse_id FROM products WHERE product_id = ?");
+    $curWh->execute([$product_id]);
+    $curWarehouseId = $curWh->fetchColumn();
+    if (!empty($curWarehouseId) && function_exists('userCan') && !userCan('warehouse', (int)$curWarehouseId)) {
+        http_response_code(403);
+        throw new Exception('Access denied: this product is not in your warehouse scope.');
+    }
+
     $pdo->beginTransaction();
 
     $selling_price = floatval($_POST['selling_price'] ?? 0);

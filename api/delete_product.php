@@ -35,12 +35,21 @@ try {
     $pdo->beginTransaction();
 
     // Get product name before deleting
-    $stmt = $pdo->prepare("SELECT product_name, sku FROM products WHERE product_id = ?");
+    $stmt = $pdo->prepare("SELECT product_name, sku, warehouse_id FROM products WHERE product_id = ?");
     $stmt->execute([$product_id]);
     $product = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$product) {
         echo json_encode(['success' => false, 'message' => 'Product not found']);
+        exit();
+    }
+
+    // Warehouse-scope gate — a user restricted to one warehouse must not
+    // delete a product sitting in a different warehouse, even within the
+    // same project (global/unwarehoused products pass through, as above).
+    if (!empty($product['warehouse_id']) && function_exists('userCan') && !userCan('warehouse', (int)$product['warehouse_id'])) {
+        $pdo->rollBack();
+        echo json_encode(['success' => false, 'message' => 'Access denied: this product is not in your warehouse scope.']);
         exit();
     }
 
