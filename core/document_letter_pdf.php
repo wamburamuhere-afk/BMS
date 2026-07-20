@@ -49,9 +49,12 @@ if (!function_exists('generateLetterPdf')) {
      * real PDF to $targetPath via TCPDF. Returns the file size in bytes.
      *
      * @param array $fields {
-     *   string document_code, letter_date, recipient, recipient_address,
-     *          subject, content, signature_align
-     *   bool   use_letterhead
+     *   string  document_code, letter_date, recipient, subject, content,
+     *           signature_align
+     *   bool    use_letterhead
+     *   ?string custom_sender_info  this letter's own freely-written sender
+     *           block (Summernote HTML); when non-empty it overrides the
+     *           live-recomputed Company Profile sender_lines below
      * }
      */
     function generateLetterPdf(PDO $pdo, array $fields, string $targetPath): int
@@ -99,7 +102,7 @@ if (!function_exists('generateLetterPdf')) {
             'letter_date'          => $fields['letter_date'] !== '' ? date('d M Y', strtotime($fields['letter_date'])) : date('d M Y'),
             'use_letterhead'       => $fields['use_letterhead'],
             'recipient'            => $fields['recipient'],
-            'recipient_address'    => $fields['recipient_address'],
+            'sender_html'          => $fields['custom_sender_info'] ?? null,
             'subject'              => $fields['subject'],
             'body_html'            => $fields['content'],
             'signature_align'      => $fields['signature_align'],

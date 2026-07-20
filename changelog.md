@@ -1,5 +1,44 @@
 # BMS Changelog
 
+## 2026-07-20 (feature) — Create Document: recipient is now one free-written block too; fixed a real bug where the custom sender never reached the actual PDF
+
+**Files:** `app/constant/document/create_document.php`, `api/document/save_created_document.php`,
+`core/document_letter_pdf.php`, `core/document_letter_render.php`
+
+Follow-up to the sender-address fix above. User's ask, explicitly: nothing in the letter should
+be "constant" — only the letterhead (logo/company name) and the signature stay as distinct,
+toggle-gated elements; everything else (recipient, address, whatever) should be written
+directly, positioned however the user wants, same as the sender fix. Explicitly removed the
+"Recipient" input and the "Add recipient address" toggle+textarea, and required doing this
+completely, not partially — so every place that read/wrote those fields was found and updated,
+not just the visible UI:
+
+- **`create_document.php`** — removed `#f_recipient` input, `#btnToggleRecipientAddress`,
+  `#f_recipient_address` textarea, `#recipientAddressRow` entirely. The recipient block in the
+  letter preview is now one always-editable Summernote instance (`#recipientInfoCustom`),
+  mirroring the sender pattern exactly — initialized on page load, no toggle, with alignment
+  control. Updated all four places that referenced the old fields: the "Use Template" apply
+  logic, "Save as Template", the client-side merge-token resolver, and `saveDocument()` itself.
+  Backward-compat: reopening a letter/template saved before this change (plain-text recipient +
+  separate address) is detected via a has-HTML-tags heuristic and escaped/merged into the new
+  block's starting content; anything saved after this change is already real HTML and passes
+  through as-is.
+
+- **Found and fixed a real, pre-existing bug while tracing this end-to-end**: `custom_sender_info`
+  (the per-letter sender override from the previous fix) was saved to the database but **never
+  actually passed to `generateLetterPdf()`** — it only ever affected the on-screen preview; the
+  real generated PDF silently kept using freshly-recomputed Company Profile settings regardless
+  of what the user had typed. `document_letter_pdf.php` now passes it through as `sender_html`;
+  `document_letter_render.php` renders it raw (same trust level as the letter body) instead of
+  the live-recomputed `sender_lines` array when present, falling back to `sender_lines` when it
+  isn't. Recipient is treated the same way — raw HTML, not escaped plain text — so formatting
+  and positioning the user chooses actually survives into the real PDF.
+
+Verified with real generated PDFs, not just the preview: decompressed a freshly-generated PDF's
+content streams and confirmed a unique custom-sender marker string and the typed recipient text
+both appear in the actual file bytes — this is the exact gap that was silently broken before, now
+proven closed end-to-end, not just at the HTML-string level.
+
 ## 2026-07-20 (feature) — Create Document: sender address directly editable, no more auto-filled body boilerplate
 
 **Files:** `app/constant/document/create_document.php`
