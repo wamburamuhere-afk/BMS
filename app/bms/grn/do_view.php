@@ -36,10 +36,14 @@ $dns_stmt = $pdo->prepare("
 $dns_stmt->execute([$do_id]);
 $linked_dns = $dns_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Load attachments
-$att_stmt = $pdo->prepare("SELECT do_attachment_id, attachment_name, file_path FROM do_attachments WHERE do_id = ? ORDER BY do_attachment_id");
-$att_stmt->execute([$do_id]);
-$attachments = $att_stmt->fetchAll(PDO::FETCH_ASSOC);
+// Load attachments (graceful if the table doesn't exist yet — mirrors the
+// delivery_order_items guard below, so a pending migration can't crash the page)
+$attachments = [];
+try {
+    $att_stmt = $pdo->prepare("SELECT do_attachment_id, attachment_name, file_path FROM do_attachments WHERE do_id = ? ORDER BY do_attachment_id");
+    $att_stmt->execute([$do_id]);
+    $attachments = $att_stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {}
 
 // Load items (graceful if table doesn't exist yet)
 $do_items      = [];
