@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-07-19 (feature) — Create Document: restored the "Save & Sign" shortcut
+
+**Files:** `app/constant/document/create_document.php`
+
+User asked to bring back a "Save & Sign" mechanism they remembered from Create Document.
+Traced it in git history: the original Phase 1 build (commit `4e81b1f`) shipped with three
+buttons — Save Draft, Save & Print, and Save & Sign, the last hand-ing straight into the
+e-signature wizard (`select_document_add_esignature.php`). It was deliberately removed one
+day later in commit `5601478` ("Replaces the old direct 'Save & Sign' shortcut with the
+standard Docs > E-Sign flow"), bundled into the same commit that added the letterhead
+toggle/recipient address/signature alignment options — a conscious design change, not a
+regression. User confirmed they want it back.
+
+Re-added the third button and wired it into today's save flow (which now generates the PDF
+server-side, via `core/document_letter_render.php`, unlike the original's client-side
+`html2pdf.js` — so this is a re-implementation against the current flow, not a literal
+revert): on successful save, `Save & Sign` redirects to `select_document_add_esignature.php`,
+same bare-URL hand-off the original used (that page is a document picker, not a deep-link
+target — no query param to pass). Updated the header hint text to match. Verified live:
+page renders with no PHP errors, button/label/redirect target all present in the output.
+
 ## 2026-07-19 (fix) — Money-out ledger posting: a failed canonical-ledger mirror no longer reports success
 
 **Files:** `api/helpers/transaction_helper.php`, `api/update_supplier_payment.php`
