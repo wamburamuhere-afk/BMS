@@ -146,12 +146,20 @@ if ($recipient !== '' || $recipient_address !== '') {
 
 $signer_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
 $signer_role = $_SESSION['user_role'] ?? '';
+$signer_email = $_SESSION['email'] ?? (function () use ($pdo) {
+    $stmt = $pdo->prepare("SELECT email FROM users WHERE user_id = ?");
+    $stmt->execute([$_SESSION['user_id'] ?? 0]);
+    return (string)($stmt->fetchColumn() ?: '');
+})();
 
 // The creator's own on-file signature (drawn/uploaded/typed via e_signatures.php)
 // — shown here as a WATERMARKED PREVIEW ONLY, so the letter never looks blank
-// while it's still a draft. This is never the legally-applied signature: that
-// only happens through select_document_add_esignature.php, which is the one
-// place that records consent, IP, hash and the audit event log. Rendering it
+// while it's still a draft. This is never the legally-applied signature: real
+// application happens only via api/document/save_signed_pdf.php, the one place
+// that records consent, IP, hash and the audit event log — reached either from
+// the "Save & Sign" one-click path below (uses the creator's most recent saved
+// signature, no extra screens) or the full wizard (select_document_add_esignature.php)
+// for picking a different signature or a custom position. Rendering the preview
 // here too would let a "signed-looking" PDF leave the building without ever
 // going through that audit trail.
 $sig_stmt = $pdo->prepare("
@@ -698,6 +706,14 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
 </style>
 <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 
+<!-- pdf-lib embeds the real signature into the saved letter's PDF client-side,
+     same library the full signing wizard uses; bms-esign-shared.js is the
+     certificate-page/hashing logic shared with that wizard so both paths
+     produce an identical audit trail. No pdf.js here — Save & Sign never
+     shows a rendered preview to position against, so there's nothing to render. -->
+<script src="<?= getUrl('assets/js/pdf-lib.min.js') ?>"></script>
+<script src="<?= getUrl('assets/js/bms-esign-shared.js') ?>"></script>
+
 <script>
 // Mutable — starts from the page-load value but is updated after the first
 // successful save. saveDocument() must read THIS, not re-embed the PHP value,
@@ -705,6 +721,16 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
 // history.replaceState) would still send the original 0 and the server would
 // create a brand new row instead of updating the one just saved.
 let currentDocumentId = <?= (int)($existing['id'] ?? 0) ?>;
+
+// Save & Sign consent state — matches select_document_add_esignature.php's own
+// consent statement verbatim, so a letter signed either way records the exact
+// same legal text. Here, clicking "Save & Sign" itself IS the consent (no
+// separate checkbox screen) — the timestamp is captured the instant the click
+// handler runs, before the save/sign request goes out.
+const SAVE_SIGN_CONSENT_TEXT = 'I agree that my electronic signature applied to this document is legally binding and the electronic equivalent of my handwritten signature.';
+const SAVE_SIGN_SIGNER_NAME  = <?= json_encode($signer_name) ?>;
+const SAVE_SIGN_SIGNER_EMAIL = <?= json_encode($signer_email) ?>;
+const SAVE_SIGN_SIGNER_ROLE  = <?= json_encode($signer_role) ?>;
 
 
 $(document).ready(function () {
@@ -1018,6 +1044,10 @@ function saveDocument(mode) {
     fd.append('signature_align', $('#f_signature_align').val() || 'left');
     fd.append('project_id', '<?= (int)($project_id ?? 0) ?>');
     fd.append('content', $('#letterBody').summernote('code'));
+    // Save & Sign is about to embed a REAL signature into this same PDF right
+    // after this save — tell the server to skip drawing its own watermarked
+    // "PREVIEW" signature stamp, so the two never end up on the same page.
+    if (mode === 'sign') fd.append('suppress_signature_box', '1');
     fd.append('_csrf', CSRF_TOKEN);
 
     $.ajax({
@@ -1046,9 +1076,12 @@ function saveDocument(mode) {
                 $btn.prop('disabled', false).html(orig);
                 window.print();
             } else {
-                // Save & Sign — hand straight into the e-signature wizard, same
-                // destination the original Phase 1 "Save & Sign" shortcut used.
-                window.location.href = '<?= buildUrl('select_document_add_esignature') ?>';
+                // Save & Sign — the click itself is the authority to sign: apply
+                // the creator's own most-recently-saved signature right here, no
+                // wizard, no re-picking a signature or a document that's already
+                // known. If they have no saved signature yet, that's a one-time
+                // setup gap, not a per-letter step — send them to create one.
+                signWithMostRecentSignature(currentDocumentId, subject, $btn, orig);
             }
         },
         error: function () {
@@ -1056,6 +1089,129 @@ function saveDocument(mode) {
             $btn.prop('disabled', false).html(orig);
         }
     });
+}
+
+// One-click Save & Sign: fetches the creator's most recent saved signature,
+// embeds it at the bottom of the just-saved letter (position follows the
+// letter's own Signature Align setting), appends the same tamper-evident
+// Certificate of Completion the full wizard produces, and uploads the result
+// through the same audited endpoint (api/document/save_signed_pdf.php) —
+// identical integrity guarantees, zero extra screens.
+async function signWithMostRecentSignature(documentId, documentName, $btn, origBtnHtml) {
+    try {
+        const signatures = await $.get('<?= buildUrl('api/document/get_user_signatures_list.php') ?>');
+        if (!signatures || signatures.length === 0) {
+            $btn.prop('disabled', false).html(origBtnHtml);
+            Swal.fire({
+                icon: 'info',
+                title: 'No saved signature yet',
+                html: 'The letter was saved. Create a signature once and it will be used automatically ' +
+                      'every time you click <strong>Save &amp; Sign</strong> from here on.',
+                confirmButtonText: 'Create my signature'
+            }).then(function (r) {
+                if (r.isConfirmed) window.location.href = '<?= buildUrl('e_signatures') ?>';
+            });
+            return;
+        }
+        const sig = signatures[0]; // most recent — get_user_signatures_list.php orders by created_at DESC
+        const sigPath = (sig.thumbnail_path || sig.file_path || '').replace(/^\//, '');
+        const sigUrl = '<?= rtrim(getUrl(""), "/") ?>/' + sigPath;
+
+        const consentAt = new Date().toISOString();
+        const signingReference = 'SIG-' + (
+            (window.crypto && crypto.randomUUID)
+                ? crypto.randomUUID().split('-')[0].toUpperCase()
+                : Math.random().toString(16).slice(2, 10).toUpperCase()
+        );
+
+        // 1. Fetch the just-saved letter's real PDF bytes
+        const pdfUrl = '<?= buildUrl("document_library") ?>?action=download&document_id=' + documentId;
+        const pdfResp = await fetch(pdfUrl, { credentials: 'include' });
+        if (!pdfResp.ok) throw new Error('Could not fetch the saved letter (HTTP ' + pdfResp.status + ')');
+        const pdfBytes = await pdfResp.arrayBuffer();
+        const originalHash = await bmsSha256Hex(pdfBytes.slice(0));
+
+        // 2. Load with pdf-lib, target the last page (where the letter's own
+        //    signature block naturally sits, right after the body content).
+        const pdfLibDoc = await PDFLib.PDFDocument.load(pdfBytes);
+        const pdfPage = pdfLibDoc.getPage(pdfLibDoc.getPageCount() - 1);
+        const { width: pageW } = pdfPage.getSize();
+
+        // 3. Fetch and embed the signature image
+        const sigResp = await fetch(sigUrl, { credentials: 'include' });
+        if (!sigResp.ok) throw new Error('Could not fetch the saved signature image');
+        const sigBytes = await sigResp.arrayBuffer();
+        const sigUrlLower = sigUrl.toLowerCase();
+        const embeddedSig = sigUrlLower.endsWith('.png')
+            ? await pdfLibDoc.embedPng(sigBytes)
+            : await pdfLibDoc.embedJpg(sigBytes);
+
+        // 4. Size and position — width fixed, height keeps the image's own
+        //    aspect ratio; horizontal position follows this letter's own
+        //    Signature Align setting, same three positions the wizard offers.
+        const sigW = 130;
+        const sigH = sigW * (embeddedSig.height / embeddedSig.width);
+        const margin = 56;
+        const align = $('#f_signature_align').val() || 'left';
+        const sigX = align === 'right' ? (pageW - margin - sigW)
+            : align === 'center' ? ((pageW - sigW) / 2)
+            : margin;
+        const sigY = 130; // clears the printed audit footer and the label lines drawn beneath the image
+
+        await bmsDrawSignatureWithLabel(pdfLibDoc, pdfPage, embeddedSig, sigX, sigY, sigW, sigH, SAVE_SIGN_SIGNER_NAME, signingReference, SAVE_SIGN_SIGNER_ROLE);
+
+        // 5. Append the Certificate of Completion page
+        await bmsAppendCertificatePage(pdfLibDoc, {
+            documentName:     documentName,
+            signerName:       SAVE_SIGN_SIGNER_NAME || 'BMS User',
+            signerEmail:      SAVE_SIGN_SIGNER_EMAIL,
+            signedAt:         new Date().toLocaleString(),
+            signingReference: signingReference,
+            originalHash:     originalHash,
+            consentText:      SAVE_SIGN_CONSENT_TEXT
+        });
+
+        // 6. Serialise and upload through the same audited endpoint the wizard uses
+        const signedBytes = await pdfLibDoc.save();
+        const blob = new Blob([signedBytes], { type: 'application/pdf' });
+
+        const fd = new FormData();
+        fd.append('original_document_id', documentId);
+        fd.append('signature_id', sig.id);
+        fd.append('signature_position', align === 'right' ? 'bottom_right' : align === 'center' ? 'bottom_center' : 'bottom_left');
+        fd.append('consent_text', SAVE_SIGN_CONSENT_TEXT);
+        fd.append('consent_accepted_at', consentAt);
+        fd.append('viewed_at', consentAt);
+        fd.append('signing_reference', signingReference);
+        fd.append('signed_pdf_file', blob, 'signed.pdf');
+
+        const saveResp = await fetch('<?= buildUrl("api/document/save_signed_pdf.php") ?>', {
+            method: 'POST',
+            body: fd,
+            credentials: 'include',
+            headers: { 'X-CSRF-Token': CSRF_TOKEN },
+        });
+        const saveData = await saveResp.json();
+        if (!saveData.success) throw new Error(saveData.message || 'Failed to save the signed document');
+
+        $btn.prop('disabled', false).html(origBtnHtml);
+        Swal.fire({
+            icon: 'success',
+            title: 'Signed',
+            html: 'Reference: <code>' + (saveData.signing_reference || signingReference) + '</code>',
+            confirmButtonText: 'Download signed PDF',
+            showCancelButton: true,
+            cancelButtonText: 'Done'
+        }).then(function (r) {
+            if (r.isConfirmed) {
+                window.location.href = '<?= buildUrl("document_library") ?>?action=download&document_id=' + saveData.new_document_id;
+            }
+        });
+
+    } catch (err) {
+        $btn.prop('disabled', false).html(origBtnHtml);
+        Swal.fire('Signing failed', err.message || 'Signing failed. Please try again.', 'error');
+    }
 }
 </script>
 

@@ -55,6 +55,11 @@ if (!function_exists('generateLetterPdf')) {
      *   ?string custom_sender_info  this letter's own freely-written sender
      *           block (Summernote HTML); when non-empty it overrides the
      *           live-recomputed Company Profile sender_lines below
+     *   bool    suppress_signature_box  true = skip the watermarked signature
+     *           preview entirely — the caller is about to embed a REAL
+     *           signature on top (create_document.php's one-click Save & Sign)
+     *           and a "PREVIEW — NOT LEGALLY APPLIED" stamp must never end up
+     *           on the same page as the real one
      * }
      */
     function generateLetterPdf(PDO $pdo, array $fields, string $targetPath): int
@@ -108,6 +113,7 @@ if (!function_exists('generateLetterPdf')) {
             'signature_align'      => $fields['signature_align'],
             'signature_image_path' => $signature_rel_path ? (ROOT_DIR . '/' . ltrim($signature_rel_path, '/')) : null,
             'signature_is_preview' => true,
+            'suppress_signature_box' => !empty($fields['suppress_signature_box']),
             'signer_name'          => trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')),
             'signer_role'          => $_SESSION['user_role'] ?? '',
         ]);
