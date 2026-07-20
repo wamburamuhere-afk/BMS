@@ -17927,6 +17927,49 @@ function smartPrint() {
                 break-before: page !important;
                 margin-top: 2cm !important;
             }
+
+            /* Scope tables (Original/Revised/Variation/Additional/History) —
+               the screen-sized fixed px widths on S/NO..TOTAL AMOUNT (80-160px
+               each) sum to more than a portrait page's printable width, so
+               DESCRIPTION (the one column with no explicit width) was squeezed
+               to only a few px — narrow enough that even its own header
+               ("DESCRIPTION") had to wrap one letter per line. That abnormally
+               tall header didn't fit in whatever space was left on page 1
+               below the report title, so the whole table (its header must stay
+               attached, thead is a repeating group) deferred entirely to page
+               2, leaving page 1 blank underneath the title. Percentage widths,
+               sized per column exactly like the same fix already applied to
+               suppliers.php, fix both symptoms in one shot: Description gets
+               the largest share so it never collapses, and everything fits
+               page 1 immediately below the title. */
+            .scope-table thead th {
+                font-size: 6.5pt !important;
+                line-height: 1.15 !important;
+                letter-spacing: 0 !important;
+                padding: 3px 2px !important;
+                white-space: normal !important;
+                word-break: normal !important;
+            }
+            .scope-table th:nth-child(1), .scope-table td:nth-child(1) { width: 5%  !important; white-space: nowrap !important; }
+            .scope-table th:nth-child(2), .scope-table td:nth-child(2) { width: 30% !important; }
+            .scope-table th:nth-child(3), .scope-table td:nth-child(3) { width: 8%  !important; }
+            .scope-table th:nth-child(4), .scope-table td:nth-child(4) { width: 12% !important; }
+            .scope-table th:nth-child(5), .scope-table td:nth-child(5) { width: 14% !important; }
+            .scope-table th:nth-child(6), .scope-table td:nth-child(6) { width: 10% !important; }
+            .scope-table th:nth-child(7), .scope-table td:nth-child(7) { width: 21% !important; }
+
+            /* TAX (%) is a live <select> on screen — show its current value as
+               plain text in print instead of a boxed dropdown with an arrow. */
+            .scope-table select.s-tax-rate {
+                -webkit-appearance: none !important;
+                appearance: none !important;
+                border: none !important;
+                background: transparent !important;
+                box-shadow: none !important;
+                pointer-events: none !important;
+                padding: 0 !important;
+                text-align: center !important;
+            }
         }
     </style>
 
