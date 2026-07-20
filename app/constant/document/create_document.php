@@ -185,7 +185,7 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2 d-print-none">
         <div>
             <h4 class="mb-0"><i class="bi bi-file-earmark-plus me-2 text-primary"></i>Create Document</h4>
-            <p class="text-muted mb-0 small">Write a letter or memo — save as a draft or print it. To e-sign it, use Docs &gt; E-Sign once saved.</p>
+            <p class="text-muted mb-0 small">Write a letter or memo — save as a draft, print it, or send it straight into e-signing.</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <a href="<?= $project_id ? getUrl('project_view') . '?id=' . (int)$project_id : getUrl('document_library') ?>" class="btn btn-outline-secondary">
@@ -232,6 +232,9 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
             </button>
             <button type="button" class="btn btn-primary" id="btnSavePrint">
                 <i class="bi bi-printer me-1"></i> Save &amp; Print
+            </button>
+            <button type="button" class="btn btn-primary" id="btnSaveSign">
+                <i class="bi bi-pen me-1"></i> Save &amp; Sign
             </button>
         </div>
     </div>
@@ -849,6 +852,7 @@ $(document).ready(function () {
 
     $('#btnSaveDraft').on('click', function () { saveDocument('draft'); });
     $('#btnSavePrint').on('click', function () { saveDocument('print'); });
+    $('#btnSaveSign').on('click', function () { saveDocument('sign'); });
     $('#btnDuplicate').on('click', duplicateDocument);
 
     // Insert Variable — drop a {{token}} at the cursor in the letter body.
@@ -1074,7 +1078,7 @@ function saveDocument(mode) {
     // storing — idempotent, so running it on already-resolved text is a no-op.
     $('#letterBody').summernote('code', resolveMergeTokens($('#letterBody').summernote('code')));
 
-    const $btn = mode === 'draft' ? $('#btnSaveDraft') : $('#btnSavePrint');
+    const $btn = mode === 'draft' ? $('#btnSaveDraft') : (mode === 'print' ? $('#btnSavePrint') : $('#btnSaveSign'));
     const orig = $btn.html();
     $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Saving...');
 
@@ -1122,9 +1126,13 @@ function saveDocument(mode) {
                         window.history.replaceState({}, '', url);
                         $btn.prop('disabled', false).html(orig);
                     });
-            } else {
+            } else if (mode === 'print') {
                 $btn.prop('disabled', false).html(orig);
                 window.print();
+            } else {
+                // Save & Sign — hand straight into the e-signature wizard, same
+                // destination the original Phase 1 "Save & Sign" shortcut used.
+                window.location.href = '<?= buildUrl('select_document_add_esignature') ?>';
             }
         },
         error: function () {
