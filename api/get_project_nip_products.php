@@ -34,7 +34,7 @@ try {
         LEFT JOIN warehouses wh ON p.warehouse_id = wh.warehouse_id
         WHERE p.is_service = 1
           AND p.status     != 'deleted'
-          AND (p.project_id = ? OR (p.project_id IS NULL AND wh.project_id = ?))
+          AND (p.project_id = ? OR (p.project_id IS NULL AND wh.project_id = ?))" . scopeFilterSqlNullable('warehouse', 'p') . "
         ORDER BY p.product_name ASC
     ");
     $stmt->execute([$project_id, $project_id]);
