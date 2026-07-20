@@ -738,9 +738,10 @@ $(document).ready(function() {
         createGRN('completed');
     });
     
-    // Load products cache
-    loadProductsCache();
-    
+    // Product cache is loaded once a warehouse is actually known — see the
+    // warehouse-init ready block below and the #warehouse_id change handler,
+    // so the very first load is never an unfiltered "all warehouses" fetch.
+
     // Auto-focus barcode input when modal opens
     $('#barcodeScannerModal').on('shown.bs.modal', function() {
         $('#barcodeInput').focus();
@@ -971,7 +972,12 @@ function openProductSearch(index, term) {
 function searchProducts(term = '') {
     const tbody = $('#productsSearchBody');
     tbody.empty();
-    
+
+    if (!$('#warehouse_id').val()) {
+        tbody.html('<tr><td colspan="4" class="text-center text-warning p-3"><i class="bi bi-exclamation-triangle me-1"></i>Please select a warehouse first</td></tr>');
+        return;
+    }
+
     const searchTerm = term.toLowerCase().trim();
     let results = productsCache;
     
@@ -1119,6 +1125,11 @@ function filterGrnWarehouses(projectId) {
     });
     if (filtered.length === 1) sel.value = filtered[0].warehouse_id;
     $sel.select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'Select Warehouse' });
+    // Whatever warehouse ended up selected (retained, auto-picked, or none),
+    // reload the product cache scoped to it — rebuilding the <option> list
+    // above doesn't fire a native 'change' event, so this can't rely on the
+    // #warehouse_id change handler alone.
+    loadProductsCache();
 }
 
 // Run warehouse filter on page load
@@ -1127,6 +1138,7 @@ $(document).ready(function() {
     const initWarehouse = <?= $warehouse_id ?: 0 ?>;
     filterGrnWarehouses(initProject);
     if (initWarehouse) $('#warehouse_id').val(initWarehouse);
+    loadProductsCache();
 });
 
 function loadSupplierInfo() {
@@ -1213,7 +1225,9 @@ function loadPurchaseOrderItems() {
                 }
 
                 // Now that supplier + warehouse are set, load matching DNs
+                // and the product cache scoped to this warehouse.
                 loadDNsForSupplier();
+                loadProductsCache();
 
                 // Add PO items
                 if (response.data.items && response.data.items.length > 0) {
@@ -1318,6 +1332,7 @@ function loadDNItems() {
         if (res.success) {
             if (res.data.warehouse_id && !$('#warehouse_id').val()) {
                 $('#warehouse_id').val(res.data.warehouse_id);
+                loadProductsCache();
             }
             if (res.data.project_id && !$('#project_id').val()) {
                 $('#project_id').val(res.data.project_id).trigger('change.select2');
