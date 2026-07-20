@@ -1,35 +1,44 @@
 # BMS Changelog
 
-## 2026-07-20 (feature) — Save & Sign now preselects the just-saved letter in the e-signature wizard
+## 2026-07-20 (feature) — Save & Sign now signs in one click with the creator's existing signature — no wizard
 
-**Files:** `app/constant/document/create_document.php`, `app/constant/document/select_document_add_esignature.php`
+**Files:** `app/constant/document/create_document.php`, `app/constant/document/select_document_add_esignature.php`,
+`assets/js/bms-esign-shared.js`
 
-User asked to research how Vikundi obtains a signature on a printed document and match it. Scouted
-`https://vikundi.bjptechnologies.co.tz/select_document_add_esignature` — same route name BMS already
-has — and found Vikundi's version is actually the simpler one: three fixed position buttons and a
-size slider, no drag-to-position, no tamper-evident certificate, no integrity verification. BMS's
-existing wizard (`select_document_add_esignature.php`) already has all of that and more (live
-drag-positioning on a rendered PDF via interact.js/pdf.js/pdf-lib, a Certificate of Completion page
-with SHA-256 fingerprinting, an external-signer email flow) — there was no feature gap to port over.
+Follow-up to the entry directly below (which made "Save & Sign" preselect the letter in the full
+wizard). User's feedback on that: going through the wizard is still the wrong shape — a user who
+already has a signature on file shouldn't have to re-select it or re-position it every time; clicking
+"Save & Sign" is itself the authority to apply the signature they already have, same as Vikundi.
 
-The real gap: `create_document.php`'s "Save & Sign" button already existed and already redirected
-into this wizard, but landed on Step 1 and made the user re-find their just-saved letter by hand in
-the whole document library table before they could even pick a signature — not the one smooth
-"print → obtain signature" motion the user described.
+- `create_document.php` — "Save & Sign" no longer redirects anywhere. After the letter saves, a new
+  `signWithMostRecentSignature()` fetches the creator's most-recently-saved signature (already ordered
+  `created_at DESC` by `get_user_signatures_list.php`), embeds it client-side (pdf-lib) at the bottom
+  of the just-saved letter's real PDF, horizontally positioned by the letter's own Signature Align
+  setting (left/center/right — the same three positions the wizard offers), appends the same
+  tamper-evident Certificate of Completion page, and uploads through the same audited endpoint
+  (`api/document/save_signed_pdf.php`) the wizard uses — identical SHA-256 integrity/consent/audit
+  trail, zero extra screens. The button click itself is the recorded consent timestamp. A user with
+  no saved signature yet gets a clear one-time prompt to create one (linked to `e_signatures.php`) —
+  after that, every future Save & Sign just works.
+- Extracted the certificate-page builder and the SHA-256 helper out of
+  `select_document_add_esignature.php`'s inline script into a new shared file,
+  `assets/js/bms-esign-shared.js`, so the wizard's drag-and-position flow and this one-click flow
+  produce byte-for-byte the same certificate page instead of two copies that could drift apart. The
+  wizard's own behavior is unchanged — same drag-to-position UI, same output — it just calls the
+  shared functions instead of its own inline copies.
+- The previous entry's `?document_id=` preselect on `select_document_add_esignature.php` is left in
+  place (harmless, still exercised by its own tests) — useful if a future "reposition" or "use a
+  different signature" option ever needs to jump into the full wizard with a document already in
+  hand, even though the everyday Save & Sign path no longer needs it.
 
-- `create_document.php` — Save & Sign now appends `?document_id=<id>` to the wizard redirect.
-- `select_document_add_esignature.php` — reads that `document_id`, and if it resolves to a document
-  owned by the current user (or the user is admin — same ownership rule already used by
-  `save_created_document.php`), passes it to the page as `PRESELECT_DOC`. On load, the wizard sets
-  `selectedDocId`/`selectedDocName`/`selectedDocPath` from it and calls the existing `changeStep(1)`
-  to jump straight to Step 2 (Select Signature) — no new step-transition logic, reuses what Step 1's
-  own "Next Step" button already calls internally. Missing/foreign/invalid `document_id` degrades to
-  `PRESELECT_DOC = null`, i.e. today's normal Step-1 landing — unchanged for every other entry point
-  into this wizard (the standalone "Sign Document" button on the signatures page, etc).
-
-Verified live: rendered the wizard with a forged session for the letter's actual owner and
-`document_id` pointing at a real, just-created letter — `PRESELECT_DOC` resolved correctly with the
-right id/name/path and the page rendered with no PHP errors. `php -l` clean on both files.
+Verified: `php -l` clean on both PHP files; `node --check` clean on the new shared JS file and on
+both pages' full inline `<script>` blocks (extracted and checked verbatim); live-rendered
+`create_document.php` with a forged session and confirmed `pdf-lib.min.js` and
+`bms-esign-shared.js` load, `SAVE_SIGN_SIGNER_EMAIL` resolves to the real user's email, and
+`signWithMostRecentSignature` is defined, with no PHP errors. Manual browser click-through not done
+this pass — the local WAMP vhost for this checkout isn't routing to the app (serves the WAMP
+homepage instead), so this was verified at the render/logic level only, same bar as the other
+document-editor changes earlier in this session.
 
 ## 2026-07-20 (feature) — Create Document: recipient and sender folded into a single canvas with one toolbar, matching Vikundi
 
