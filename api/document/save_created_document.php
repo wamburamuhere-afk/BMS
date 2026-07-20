@@ -40,8 +40,18 @@ try {
 
     $document_id = intval($_POST['document_id'] ?? 0);
     $subject     = trim((string)($_POST['subject'] ?? ''));
-    $recipient   = trim((string)($_POST['recipient'] ?? ''));
-    $recipient_address = trim((string)($_POST['recipient_address'] ?? ''));
+    // Recipient is now a freely-written rich-text block (Summernote HTML) —
+    // name, address, whatever the user typed, however they positioned it —
+    // not a plain-text single-line field paired with a separate address
+    // textarea. Kept as HTML end to end (stored, merge-resolved, and passed
+    // to the PDF renderer raw) — same trust level as the letter body.
+    $recipient   = (string)($_POST['recipient'] ?? '');
+    // No longer collected as its own field from the editor (folded into
+    // $recipient above) — kept as an empty string purely so the
+    // {{recipient_address}} merge-token still resolves to blank instead of
+    // breaking on any template still referencing it, and so the DB column
+    // read by older saved letters is left alone.
+    $recipient_address = '';
     $content     = (string)($_POST['content'] ?? '');
     $letter_date = trim((string)($_POST['letter_date'] ?? ''));
     $category_id = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
@@ -51,13 +61,14 @@ try {
     $use_letterhead = ($_POST['use_letterhead'] ?? '1') === '1' ? 1 : 0;
     $signature_align = in_array(($_POST['signature_align'] ?? ''), ['left', 'center', 'right'], true)
         ? $_POST['signature_align'] : 'left';
-    // NULL = always follow Company Profile automatically (default). Only
-    // persisted when the "Customize sender address" toggle was actually on —
-    // if the client sends the flag off, this document reverts to auto on
-    // every future load/render regardless of what was typed into the (now
-    // hidden) custom editor.
-    $use_custom_sender = ($_POST['use_custom_sender'] ?? '0') === '1';
-    $custom_sender_info = ($use_custom_sender && trim((string)($_POST['custom_sender_info'] ?? '')) !== '')
+    // The sender-address editor is always directly editable now (no
+    // "customize" toggle to opt into) — whatever it currently holds IS this
+    // letter's real sender address, whether left as the Company Profile
+    // default or edited, and now also reaches the actual generated PDF
+    // (previously custom_sender_info was saved but never passed to
+    // generateLetterPdf(), so an edited sender only ever showed in the
+    // on-screen preview, never the real PDF — fixed here).
+    $custom_sender_info = trim((string)($_POST['custom_sender_info'] ?? '')) !== ''
         ? (string)$_POST['custom_sender_info'] : null;
 
     if ($subject === '') {
@@ -125,14 +136,14 @@ try {
         $content = resolveDocumentVariables($content, $merge_ctx);
 
         $file_size = generateLetterPdf($pdo, [
-            'document_code'     => $existing['document_code'] ?? '',
-            'letter_date'       => $letter_date,
-            'use_letterhead'    => $use_letterhead,
-            'recipient'         => $recipient,
-            'recipient_address' => $recipient_address,
-            'subject'           => $subject,
-            'content'           => $content,
-            'signature_align'   => $signature_align,
+            'document_code'       => $existing['document_code'] ?? '',
+            'letter_date'         => $letter_date,
+            'use_letterhead'      => $use_letterhead,
+            'recipient'           => $recipient,
+            'subject'             => $subject,
+            'content'             => $content,
+            'signature_align'     => $signature_align,
+            'custom_sender_info'  => $custom_sender_info,
         ], $target);
 
         $upd = $pdo->prepare("
@@ -146,7 +157,7 @@ try {
         ");
         $upd->execute([
             $subject,
-            $recipient !== '' ? ('To: ' . $recipient) : null,
+            trim(strip_tags($recipient)) !== '' ? ('To: ' . trim(strip_tags($recipient))) : null,
             $content,
             $db_path,
             $subject . '.pdf',
@@ -196,14 +207,14 @@ try {
         $content = resolveDocumentVariables($content, $merge_ctx);
 
         $file_size = generateLetterPdf($pdo, [
-            'document_code'     => $document_code,
-            'letter_date'       => $letter_date,
-            'use_letterhead'    => $use_letterhead,
-            'recipient'         => $recipient,
-            'recipient_address' => $recipient_address,
-            'subject'           => $subject,
-            'content'           => $content,
-            'signature_align'   => $signature_align,
+            'document_code'       => $document_code,
+            'letter_date'         => $letter_date,
+            'use_letterhead'      => $use_letterhead,
+            'recipient'           => $recipient,
+            'subject'             => $subject,
+            'content'             => $content,
+            'signature_align'     => $signature_align,
+            'custom_sender_info'  => $custom_sender_info,
         ], $target);
 
         $ins = $pdo->prepare("
@@ -216,7 +227,7 @@ try {
         ");
         $ins->execute([
             $subject,
-            $recipient !== '' ? ('To: ' . $recipient) : null,
+            trim(strip_tags($recipient)) !== '' ? ('To: ' . trim(strip_tags($recipient))) : null,
             $content,
             $db_path,
             $subject . '.pdf',

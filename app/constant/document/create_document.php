@@ -115,7 +115,7 @@ if (isset($existing['use_letterhead'])) {
     $use_letterhead = ($prefill_template_id > 0);
 }
 // Not every letter type needs a full recipient address block (an internal
-// memo doesn't) — this stays empty unless the user (or the template) sets one.
+// memo doesn't) — this stays empty unless an older draft/template set one.
 $recipient_address = $existing['recipient_address'] ?? ($prefill_template['recipient_address'] ?? '');
 // Signature style genuinely differs by letter format (full-block vs
 // modified-block) — a per-letter choice; honours the template's if it stored one.
@@ -123,11 +123,26 @@ $signature_align = in_array(($existing['signature_align'] ?? ''), ['left', 'cent
     ? $existing['signature_align']
     : (in_array(($prefill_template['signature_align'] ?? ''), ['left', 'center', 'right'], true)
         ? $prefill_template['signature_align'] : 'left');
-// NULL = always follow Company Profile automatically (default, unchanged
-// behaviour). Non-null = this specific letter overrides it with its own
-// freely-written/formatted sender address.
-$custom_sender_info = (isset($existing['custom_sender_info']) && $existing['custom_sender_info'] !== null && $existing['custom_sender_info'] !== '')
-    ? $existing['custom_sender_info'] : null;
+
+// Backward-compat only: a draft/template saved before there was one shared
+// writable canvas stored recipient/recipient_address separately from the
+// body. There's no separate field to show them in any more, so fold them in
+// as the opening lines of the body once, here, at load time — after that
+// they simply become part of $content like everything else the user writes.
+// Detect plain text (no tags, the old format) vs already-HTML the same way
+// applyTemplate() does client-side.
+if ($recipient !== '' || $recipient_address !== '') {
+    $recipient_prepend = '';
+    if ($recipient !== '') {
+        $recipient_prepend .= (strip_tags($recipient) === $recipient)
+            ? '<div>' . nl2br(htmlspecialchars($recipient)) . '</div>'
+            : $recipient;
+    }
+    if ($recipient_address !== '') {
+        $recipient_prepend .= '<div>' . nl2br(htmlspecialchars($recipient_address)) . '</div>';
+    }
+    $content = $recipient_prepend . $content;
+}
 
 $signer_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
 $signer_role = $_SESSION['user_role'] ?? '';
@@ -240,19 +255,15 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
         </div>
     </div>
 
+    <!-- Recipient is no longer a separate input here — write it directly
+         into the letter itself, in the address block below (same always-
+         editable pattern as the sender address). -->
     <div class="row g-3 mb-2 d-print-none">
-        <div class="col-md-3">
-            <label class="form-label small fw-bold">Recipient</label>
-            <input type="text" class="form-control" id="f_recipient" value="<?= htmlspecialchars($recipient) ?>" placeholder="e.g. The Manager, ABC Ltd">
-            <button type="button" class="btn btn-link btn-sm p-0 mt-1" id="btnToggleRecipientAddress">
-                <i class="bi bi-<?= $recipient_address !== '' ? 'dash' : 'plus' ?>-circle me-1"></i><span id="btnToggleRecipientAddressLabel"><?= $recipient_address !== '' ? 'Remove' : 'Add' ?> recipient address</span>
-            </button>
-        </div>
-        <div class="col-md-2">
+        <div class="col-md-4">
             <label class="form-label small fw-bold">Date</label>
             <input type="date" class="form-control" id="f_letter_date" value="<?= htmlspecialchars($letter_date) ?>">
         </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
             <label class="form-label small fw-bold">Category</label>
             <select class="form-select select2-static" id="f_category_id">
                 <option value="">Select Category</option>
@@ -272,15 +283,6 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
         <div class="col-md-2">
             <label class="form-label small fw-bold">Reference No.</label>
             <input type="text" class="form-control" value="<?= htmlspecialchars($document_code) ?>" readonly>
-        </div>
-    </div>
-
-    <!-- Optional — not every letter type needs a full postal address (an
-         internal memo doesn't); hidden unless the user opts to add one. -->
-    <div class="row g-3 mb-3 d-print-none <?= $recipient_address === '' ? 'd-none' : '' ?>" id="recipientAddressRow">
-        <div class="col-md-6">
-            <label class="form-label small fw-bold">Recipient Address <span class="text-muted fw-normal">(optional — printed only if filled in)</span></label>
-            <textarea class="form-control" id="f_recipient_address" rows="2" placeholder="e.g. P.O. Box 123, Dar es Salaam"><?= htmlspecialchars($recipient_address) ?></textarea>
         </div>
     </div>
 
@@ -350,33 +352,18 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
             <div class="letter-company"><?= htmlspecialchars($company_name) ?></div>
         </div>
 
-        <!-- Recipient (left) / sender + date (right) — standard business-letter
-             block layout. Never stack these under the signature; the
-             recipient's address always precedes the body, and the date
-             always sits directly under the sender's address, never floating
-             on its own. -->
+        <!-- Sender info + Ref + Date — auto, read-only, follows Company Profile
+             (toggled as one unit with the logo/name above via "Include
+             letterhead"). No per-letter editing here and no recipient column
+             either — the recipient's name/address is just written directly
+             at the top of the one letter body below, same as everything
+             else in it, with no separate field/toolbar to fight over. -->
         <div class="letter-addr-row">
-            <div class="letter-addr-col letter-addr-recipient">
-                <div class="letter-recipient" id="letter-recipient-display">
-                    <?= $recipient !== '' ? nl2br(htmlspecialchars($recipient)) : '' ?>
-                </div>
-                <div class="letter-recipient-address <?= $recipient_address === '' ? 'd-none' : '' ?>" id="letter-recipient-address-display">
-                    <?= $recipient_address !== '' ? nl2br(htmlspecialchars($recipient_address)) : '' ?>
-                </div>
-            </div>
             <div class="letter-addr-col letter-addr-sender">
-                <!-- Always directly editable, right from page load — no toggle to
-                     click first. Pre-filled from Company Profile as a convenient
-                     starting point (or the letter's own previously-saved override),
-                     but every letter can freely edit/reposition its own copy without
-                     an extra step. Its own small Summernote toolbar — never shares
-                     #letterToolbar with the letter body, so the two editors can't
-                     fight over one ribbon. Toolbar chrome is hidden on print via the
-                     generic .note-toolbar rule in @media print below; the saved PDF
-                     is generated server-side from the resolved text content only, so
-                     this editor's own toolbar was never part of it either. -->
-                <div id="senderInfoCustomWrap" class="letter-sender-info" style="<?= $use_letterhead ? '' : 'display:none;' ?>">
-                    <div id="senderInfoCustom"><?= $custom_sender_info !== null ? $custom_sender_info : '<div>' . implode('</div><div>', array_map('htmlspecialchars', $sender_lines)) . '</div>' ?></div>
+                <div class="letter-sender-info">
+                    <?php foreach ($sender_lines as $line): ?>
+                        <div><?= nl2br(htmlspecialchars($line)) ?></div>
+                    <?php endforeach; ?>
                 </div>
                 <div class="letter-refno" id="letter-refno-display">Ref: <?= htmlspecialchars($document_code) ?></div>
                 <div class="letter-date" id="letter-date-display"><?= htmlspecialchars(date('d M Y', strtotime($letter_date))) ?></div>
@@ -387,6 +374,10 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
             <strong>RE: <span id="letter-subject-display"><?= htmlspecialchars($subject ?: '(Subject)') ?></span></strong>
         </div>
 
+        <!-- The ONE writable canvas — recipient, salutation, body, everything.
+             Write it all from the top, positioned/aligned however you want,
+             using the one toolbar above. Starts genuinely blank; nothing is
+             pre-filled here to delete first. -->
         <div id="letterBody"><?= $content !== '' ? $content : $default_body ?></div>
 
         <div class="letter-signoff align-<?= htmlspecialchars($signature_align) ?>" id="letterSignoff">
@@ -533,26 +524,16 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
 .letter-logo { max-height: 70px; width: auto; display: block; margin: 0 auto 6px; }
 .letter-company { font-size: 16pt; font-weight: 800; color: #0d6efd; text-transform: uppercase; letter-spacing: 1px; }
 
-/* Recipient (left) / sender + date (right) block — each field its own line,
-   never compacted together, matching how each is a separate setting. */
-.letter-addr-row { display: flex; justify-content: space-between; gap: 10mm; margin-bottom: 8mm; }
-.letter-addr-col { flex: 1 1 50%; font-size: 10pt; color: #333; }
-.letter-addr-recipient { text-align: left; }
+/* Sender + Ref + Date block — auto, read-only, right-aligned under the
+   letterhead. No recipient column any more — the recipient is written
+   directly at the top of the one letter body instead. */
+.letter-addr-row { display: flex; justify-content: flex-end; margin-bottom: 8mm; }
+.letter-addr-col { font-size: 10pt; color: #333; }
 .letter-addr-sender { text-align: right; }
-.letter-recipient { font-size: 11pt; white-space: pre-line; min-height: 1em; }
-.letter-recipient-address { font-size: 10pt; color: #444; white-space: pre-line; margin-top: 1mm; }
 /* Sender info block — postal/physical address, phone, email, TIN, VRN, each
    its own line, matching how each is its own separate Company Profile
    setting. Only the fields actually filled in render (see $sender_lines). */
 .letter-sender-info div { white-space: pre-line; margin-top: 1mm; }
-/* Custom sender editor — match the auto block's typography so switching
-   between the two modes doesn't visibly jump in size/colour. The generic
-   .note-editor.note-frame / .note-editable rules already strip Summernote's
-   default border/shadow/padding (see the letterBody rules below), so only
-   font sizing needs restating here. */
-#senderInfoCustomWrap { text-align: right; }
-#senderInfoCustomWrap .note-editable { font-size: 10pt; color: #333; }
-#senderInfoCustomWrap .note-toolbar { justify-content: flex-end; }
 .letter-refno { margin-top: 1mm; font-weight: 600; }
 .letter-date { margin-top: 1mm; }
 
@@ -725,12 +706,6 @@ if ($company_vrn !== '')     { $sender_lines[] = 'VRN: ' . $company_vrn; }
 // create a brand new row instead of updating the one just saved.
 let currentDocumentId = <?= (int)($existing['id'] ?? 0) ?>;
 
-// Same reason as currentDocumentId above: saveDocument() (a top-level function,
-// outside this ready block) reads this flag, so it can't be block-scoped to
-// $(document).ready — that raised "senderCustomInited is not defined" on every
-// single save (both Save Draft and Save & Print read it), not just an
-// intermittent failure.
-let senderCustomInited = false;
 
 $(document).ready(function () {
     $('#f_category_id').select2({ theme: 'bootstrap-5', placeholder: 'Select...', allowClear: true, width: '100%' });
@@ -753,33 +728,14 @@ $(document).ready(function () {
         fontSizes: ['8', '9', '10', '11', '12', '14', '16', '18', '24', '32']
     });
 
-    // Sender-address editor — deliberately its OWN Summernote instance with
-    // its own small inline toolbar (no toolbarContainer redirect), never
-    // sharing #letterToolbar with the letter body. Two instances pointed at
-    // the same external toolbar would fight over it; a small dedicated
-    // toolbar, scoped to what an address block actually needs, is the robust
-    // choice. Always initialized on page load — directly editable from the
-    // first paint, no toggle to click first (per feedback: the address
-    // shouldn't be locked behind an extra "customize" step).
-    // senderCustomInited itself is declared at module scope above (top of
-    // the <script> block) — saveDocument() needs to read it too.
-    function initSenderCustomEditor() {
-        if (senderCustomInited) return;
-        senderCustomInited = true;
-        $('#senderInfoCustom').summernote({
-            height: 90,
-            toolbar: [
-                ['font', ['bold', 'italic', 'underline', 'clear']],
-                ['para', ['ul', 'paragraph']],
-                ['history', ['undo', 'redo']]
-            ]
-        });
-    }
-    initSenderCustomEditor();
+    // No separate sender or recipient editors — per feedback (and matching
+    // the sister vikundi project's own editor), there is exactly ONE writable
+    // canvas from the top of the letter to the bottom: recipient, sender
+    // mention if the user wants one, salutation, body — all of it typed
+    // directly into #letterBody, sharing the one #letterToolbar above.
+    // Sender's own contact details (when letterhead is on) are auto-filled
+    // from Company Profile and shown read-only, not part of any editor.
 
-    $('#f_recipient').on('input', function () {
-        $('#letter-recipient-display').html($('<div>').text($(this).val()).html().replace(/\n/g, '<br>'));
-    });
     $('#f_subject').on('input', function () {
         $('#letter-subject-display').text($(this).val() || '(Subject)');
     });
@@ -788,29 +744,12 @@ $(document).ready(function () {
         $('#letter-date-display').text(isNaN(d) ? '' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }));
     });
 
-    // Recipient address — optional; not every letter type needs one, so it
-    // stays a collapsed extra field rather than a permanent fixture.
-    $('#btnToggleRecipientAddress').on('click', function () {
-        const $row = $('#recipientAddressRow');
-        const nowOpen = $row.hasClass('d-none');
-        $row.toggleClass('d-none', !nowOpen);
-        $(this).find('i').attr('class', 'bi bi-' + (nowOpen ? 'dash' : 'plus') + '-circle me-1');
-        $('#btnToggleRecipientAddressLabel').text((nowOpen ? 'Remove' : 'Add') + ' recipient address');
-        if (!nowOpen) { $('#f_recipient_address').val(''); $('#letter-recipient-address-display').addClass('d-none').empty(); }
-        else { $('#f_recipient_address').trigger('focus'); }
-    });
-    $('#f_recipient_address').on('input', function () {
-        const v = $(this).val();
-        $('#letter-recipient-address-display')
-            .toggleClass('d-none', v.trim() === '')
-            .html($('<div>').text(v).html().replace(/\n/g, '<br>'));
-    });
-
-    // Letterhead toggle — header, sender address, and footer all follow the
-    // same switch, like the equivalent control in the sister vikundi project.
+    // Letterhead toggle — header, sender address block, and RE: subject line
+    // all follow the same switch (the .no-letterhead CSS rule below already
+    // hides .letter-head/.letter-addr-row/.letter-subject together), like
+    // the equivalent control in the sister vikundi project.
     $('#f_use_letterhead').on('change', function () {
         $('#letterPaper').toggleClass('no-letterhead', !this.checked);
-        $('#senderInfoCustomWrap').toggle(this.checked);
     });
 
     // Signature position — full-block vs modified-block letter styles
@@ -873,19 +812,27 @@ $(document).ready(function () {
         renderTemplateList(templatesCache.filter(t => t.template_name.toLowerCase().includes(q)));
     });
     // Restore a template's full structure — body (tokens kept intact so they
-    // auto-fill afresh at save) plus subject, recipient, letterhead and
-    // signature alignment — so reusing a template reproduces the whole letter,
-    // not just its body. Fields the template didn't store (NULL) are left as-is.
+    // auto-fill afresh at save) plus subject, letterhead and signature
+    // alignment — so reusing a template reproduces the whole letter, not
+    // just its body. Fields the template didn't store (NULL) are left as-is.
     window.applyTemplate = function (tpl) {
-        $('#letterBody').summernote('code', tpl.content || '');
-        if (tpl.subject != null && tpl.subject !== '')   { $('#f_subject').val(tpl.subject).trigger('input'); }
-        if (tpl.recipient != null && tpl.recipient !== '') { $('#f_recipient').val(tpl.recipient).trigger('input'); }
-        if (tpl.recipient_address != null && tpl.recipient_address !== '') {
-            $('#recipientAddressRow').removeClass('d-none');
-            $('#btnToggleRecipientAddress').find('i').attr('class', 'bi bi-dash-circle me-1');
-            $('#btnToggleRecipientAddressLabel').text('Remove recipient address');
-            $('#f_recipient_address').val(tpl.recipient_address).trigger('input');
+        // Backward-compat: an OLDER template may still carry a recipient/
+        // recipient_address it stored before there was one shared writable
+        // canvas — there's no separate recipient field to put those into any
+        // more, so fold them in as the opening lines of the body instead of
+        // silently dropping them. Detect plain text (no tags) vs already-HTML
+        // the same way the server does when reopening an old letter.
+        const looksLikeHtml = (s) => /<[a-z][\s\S]*>/i.test(s);
+        let recipientHtml = '';
+        if (tpl.recipient != null && tpl.recipient !== '') {
+            recipientHtml += looksLikeHtml(tpl.recipient) ? tpl.recipient
+                : ('<div>' + $('<div>').text(tpl.recipient).html().replace(/\n/g, '<br>') + '</div>');
         }
+        if (tpl.recipient_address != null && tpl.recipient_address !== '') {
+            recipientHtml += '<div>' + $('<div>').text(tpl.recipient_address).html().replace(/\n/g, '<br>') + '</div>';
+        }
+        $('#letterBody').summernote('code', recipientHtml + (tpl.content || ''));
+        if (tpl.subject != null && tpl.subject !== '')   { $('#f_subject').val(tpl.subject).trigger('input'); }
         if (tpl.use_letterhead != null && tpl.use_letterhead !== '') {
             $('#f_use_letterhead').prop('checked', String(tpl.use_letterhead) === '1').trigger('change');
         }
@@ -942,8 +889,6 @@ $(document).ready(function () {
                 // captured too, so reusing it reproduces the whole letter.
                 content: $('#letterBody').summernote('code'),
                 subject: $('#f_subject').val().trim(),
-                recipient: $('#f_recipient').val().trim(),
-                recipient_address: $('#f_recipient_address').val().trim(),
                 use_letterhead: $('#f_use_letterhead').is(':checked') ? '1' : '0',
                 signature_align: $('#f_signature_align').val(),
                 _csrf: CSRF_TOKEN
@@ -1016,8 +961,11 @@ function currentMergeValues() {
         company_vrn:     <?= json_encode($company_vrn) ?>,
         document_code:   <?= json_encode($document_code) ?>,
         subject:            $('#f_subject').val().trim(),
-        recipient:          $('#f_recipient').val().trim(),
-        recipient_address:  $('#f_recipient_address').val().trim(),
+        // No dedicated recipient field any more — the user writes the
+        // recipient directly into the body itself, so these two tokens just
+        // resolve to blank rather than anything circular.
+        recipient:          '',
+        recipient_address:  '',
         date:               dateOut,
         sender_name:     <?= json_encode($signer_name) ?>,
         sender_role:     <?= json_encode($signer_role) ?>,
@@ -1057,11 +1005,12 @@ function saveDocument(mode) {
     // The PDF is now generated server-side (TCPDF, see
     // core/document_letter_render.php) from these same structured fields —
     // the client just posts them, it no longer renders/uploads a PDF itself.
+    // No separate recipient/sender fields — the one letter body (everything
+    // the user wrote, from the top down) is the whole content; sender info
+    // (when letterhead is on) is auto-filled from Company Profile server-side.
     const fd = new FormData();
     fd.append('document_id', currentDocumentId);
     fd.append('subject', subject);
-    fd.append('recipient', $('#f_recipient').val().trim());
-    fd.append('recipient_address', $('#f_recipient_address').val().trim());
     fd.append('letter_date', $('#f_letter_date').val());
     fd.append('category_id', $('#f_category_id').val() || '');
     fd.append('access_level', $('#f_access_level').val() || 'private');
@@ -1069,12 +1018,6 @@ function saveDocument(mode) {
     fd.append('signature_align', $('#f_signature_align').val() || 'left');
     fd.append('project_id', '<?= (int)($project_id ?? 0) ?>');
     fd.append('content', $('#letterBody').summernote('code'));
-    // Always directly editable now (no "customize" toggle to opt into) — the
-    // sender editor is initialized on page load, so its current content is
-    // always this letter's real sender address, whether left as the
-    // Company Profile default or edited.
-    fd.append('use_custom_sender', '1');
-    fd.append('custom_sender_info', $('#senderInfoCustom').summernote('code'));
     fd.append('_csrf', CSRF_TOKEN);
 
     $.ajax({
