@@ -21,12 +21,17 @@ if (!function_exists('renderLetterHtml')) {
      * @param array $d {
      *   string   company_name
      *   ?string  company_logo_path   absolute filesystem path, or null
-     *   string[] sender_lines        one line per filled-in company field
+     *   string[] sender_lines        fallback: one line per filled-in company
+     *                                 field, used only when sender_html is empty
+     *   ?string  sender_html         this letter's own freely-written sender
+     *                                 block (Summernote HTML), takes priority
+     *                                 over sender_lines when non-empty
      *   string   document_code
      *   string   letter_date         already formatted, e.g. "18 Jul 2026"
      *   bool     use_letterhead
-     *   string   recipient
-     *   string   recipient_address
+     *   string   recipient           freely-written recipient block (Summernote
+     *                                 HTML) — name, address, whatever the user
+     *                                 typed, however they positioned it
      *   string   subject
      *   string   body_html           already merge-token-resolved
      *   string   signature_align     left|center|right
@@ -61,18 +66,24 @@ if (!function_exists('renderLetterHtml')) {
 
             // Recipient (left) / sender + Ref + date (right) — a table is the
             // one two-column layout TCPDF's HTML parser renders reliably.
+            // Both recipient and sender are now freely-written, per-letter
+            // rich-text (Summernote HTML) — passed through as-is, same trust
+            // level as body_html below, so the user's own positioning/
+            // alignment/formatting choices survive into the real PDF instead
+            // of the PDF silently falling back to plain escaped lines.
             $html .= '<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:6mm;"><tr>';
-            $html .= '<td width="50%" style="font-size:10pt; vertical-align:top;">';
-            if ($d['recipient'] !== '') {
-                $html .= '<div style="font-size:11pt;">' . nl2br($esc($d['recipient'])) . '</div>';
-            }
-            if (!empty($d['recipient_address'])) {
-                $html .= '<div style="font-size:10pt; color:#444;">' . nl2br($esc($d['recipient_address'])) . '</div>';
+            $html .= '<td width="50%" style="font-size:11pt; vertical-align:top;">';
+            if (trim((string)$d['recipient']) !== '') {
+                $html .= $d['recipient'];
             }
             $html .= '</td>';
             $html .= '<td width="50%" style="font-size:10pt; text-align:right; vertical-align:top;">';
-            foreach ($d['sender_lines'] as $line) {
-                $html .= '<div>' . nl2br($esc($line)) . '</div>';
+            if (!empty(trim((string)($d['sender_html'] ?? '')))) {
+                $html .= $d['sender_html'];
+            } else {
+                foreach ($d['sender_lines'] as $line) {
+                    $html .= '<div>' . nl2br($esc($line)) . '</div>';
+                }
             }
             $html .= '<div style="font-weight:bold;">Ref: ' . $esc($d['document_code']) . '</div>';
             $html .= '<div>' . $esc($d['letter_date']) . '</div>';
