@@ -21,6 +21,71 @@ same bare-URL hand-off the original used (that page is a document picker, not a 
 target — no query param to pass). Updated the header hint text to match. Verified live:
 page renders with no PHP errors, button/label/redirect target all present in the output.
 
+## 2026-07-19 (fix) — Money-out ledger posting: a failed canonical-ledger mirror no longer reports success
+
+**Files:** `api/helpers/transaction_helper.php`, `api/update_supplier_payment.php`
+
+User asked me to verify, one flow at a time, whether every money-in/money-out event that
+posts through the legacy `postOutflow()`/`postInflow()` → `recordGlobalTransaction()` path
+(expenses, supplier payments, petty cash, bank transfers) actually reaches the canonical
+`journal_entries` ledger once real money moves — not just at accrual. Traced live data and
+code for each:
+
+- **Expense payment (OUT-1)** — current code already validates and fails loudly on missing
+  accounts; the 3 broken historical examples found predate that safeguard.
+- **Supplier payment (OUT-3)** — **confirmed a real, current, isolated bug**:
+  `update_supplier_payment.php` called `postOutflow()` and saved the result straight into
+  `transaction_id` without ever checking whether it succeeded. If posting failed for any
+  reason, the payment saved anyway with `transaction_id = NULL` — exactly matching 3 live
+  examples found (payment_id 16/17/18) with no error shown to the user.
+- **Petty cash (OUT-6)** — current code already fails loudly; inconsistent old examples
+  found are historical.
+- **Bank transfer (OUT-11)** — current code already checks `recordGlobalTransaction()`'s
+  `success` flag correctly — but that flag was blind to mirror failures (see root cause).
+
+**Root cause common to all of them:** `recordGlobalTransaction()`'s step 4 (mirroring the
+legacy `transactions`/`books_transactions` legs into the canonical `journal_entries` ledger)
+wrapped the mirror call in a try/catch that only logged the error and always returned
+`success => true` regardless of whether the mirror actually posted. Every caller (expense
+pay, supplier payment, petty cash, bank transfer, credit note, statutory remittance,
+sub-contractor payment) already does the right thing and checks this function's `success`
+flag before proceeding — that safety net was just never wired to the one signal that
+actually mattered, so a mirror failure could leave a transaction recorded in the legacy
+table while silently never reaching the ledger every report reads.
+
+**Fix — one shared source, not four separate patches:**
+1. `recordGlobalTransaction()` now returns `success => false` (with a clear `error` message)
+   whenever the mirror is attempted (i.e. `skip_journal_mirror` not set) and fails or
+   returns no entry — instead of swallowing it. Manual-journal callers (`save_journal.php`,
+   `add_compound_journal.php`, `reverse_journal.php`, `update_journal.php`) already pass
+   `skip_journal_mirror => true` and write `journal_entries` themselves, so they're
+   unaffected. Every other money-movement caller already wraps this call in
+   `$pdo->beginTransaction()`/`commit()` (verified for all of: `add_expense.php`,
+   `update_expense_status.php`, `add_supplier_payment.php`, `update_supplier_payment.php`,
+   `record_voucher_payment.php`, `save_transaction.php` (petty cash), `add_bank_transfer.php`,
+   `received_invoices.php`, `remit_statutory.php`, `pay_credit_note.php`, `sc/add_payment.php`)
+   — so a now-surfaced failure correctly rolls back the whole operation instead of leaving a
+   half-posted record.
+2. `update_supplier_payment.php` — added the missing `if (!$new_txn) throw` check, and
+   broadened its catch from `PDOException`-only to `Throwable` so this new exception (and any
+   other business-logic failure) returns a clear JSON error and rolls back, instead of an
+   uncaught fatal.
+
+**Verified live** (all in a rolled-back transaction, nothing persisted): a valid expense
+payment, supplier payment, petty-cash top-up, and bank transfer all still post correctly
+end-to-end after the fix (no regression) — each producing a real `posted` `journal_entries`
+row. A deliberately malformed post (invalid account id) now correctly returns
+`success: false` instead of silently reporting success. `defaultPayableAccountId()` is
+confirmed configured, so supplier payments post cleanly today; Fix B guards the case where
+that config is ever missing or an account gets deactivated.
+
+**Not done here (explicitly deferred, per user's own caution against touching real financial
+data):** no historical record was backfilled, corrected, or deleted. This closes the gap
+for everything posted from now on; the historical debris found earlier (135 legacy/junk
+`transactions` rows, 4 orphaned `voucher_payments` references, ~1,260 deleted `payments`
+rows whose journal entries survive) remains exactly as found, pending the user's own
+per-record review.
+
 ## 2026-07-19 (fix) — Same account-inclusion drift found + fixed on Trial Balance and General Ledger
 
 **Files:** `app/constant/reports/trial_balance.php`, `app/constant/reports/ledger_report.php`

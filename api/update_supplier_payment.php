@@ -108,6 +108,9 @@ try {
         "Supplier payment {$old['payment_number']} to supplier #{$supplier_id}", $resolved_project_id,
         $wht_amt, $wht_acc
     );
+    if (!$new_txn) {
+        throw new Exception('Ledger posting failed — check the Paid-From account and that Accounts Payable is configured. Nothing was saved.');
+    }
 
     // Update payment record (WHT re-synced: NULL when none applies now)
     $pdo->prepare("
@@ -148,8 +151,8 @@ try {
 
     echo json_encode(['success' => true, 'message' => 'Payment updated successfully']);
 
-} catch (PDOException $e) {
+} catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     error_log("update_supplier_payment: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Database error.']);
+    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
