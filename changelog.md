@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-07-20 (feature) — Create Document: sender address directly editable, no more auto-filled body boilerplate
+
+**Files:** `app/constant/document/create_document.php`
+
+User's complaint: opening a new letter, content "appears automatically" instead of writing from
+a blank canvas, and the sender address could only be edited after first clicking a separate
+"Customize sender address for this letter" toggle. Traced both to the letter's rendering code:
+
+1. **Body pre-filled boilerplate.** A brand-new blank letter (no template) had
+   `$default_body = '<p>Dear Sir/Madam,</p><p>&nbsp;</p><p>&nbsp;</p><p>Yours faithfully,</p>'`
+   injected into the editor before the user typed anything. Now `$default_body = ''` — a
+   from-scratch letter starts genuinely empty. Templates are unaffected (they already
+   supply their own `$content`, never touched this variable).
+2. **Sender address was gated behind a toggle.** It shipped as two mutually-exclusive divs:
+   a read-only `#senderInfoAuto` (default) and an editable `#senderInfoCustom`, switched by
+   a "Customize sender address" checkbox that had to be clicked before you could touch it —
+   requiring an extra step just to move or edit the address. Removed the toggle and the
+   read-only div entirely; the sender block is now a single always-initialized Summernote
+   editor, pre-filled from Company Profile as a convenient starting point but directly
+   editable from first paint, same as the letter body. Also added the `paragraph` toolbar
+   button (left/center/right/justify) to that editor, since "edit it" alone didn't give any
+   way to actually choose alignment.
+
+Backend (`api/document/save_created_document.php`, `core/document_letter_render.php`) needed
+no changes — `custom_sender_info` was already stored as free-form per-letter text; the client
+now always sends `use_custom_sender=1` and the editor's live content instead of conditionally
+sending it only when the (now-removed) toggle was on. `duplicate_created_document.php` already
+just carries the stored value forward, unaffected.
+
+Investigated against a comparable system ("Vikundi") at the user's request first, but its
+Document Writer route returned HTTP 500 (confirmed via network inspection, not a guess) —
+implemented from the user's description of the desired behaviour plus this page's own code,
+not a like-for-like clone of a system I couldn't actually load.
+
 ## 2026-07-19 (feature) — Create Document: restored the "Save & Sign" shortcut
 
 **Files:** `app/constant/document/create_document.php`
