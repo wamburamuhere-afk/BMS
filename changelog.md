@@ -1,5 +1,45 @@
 # BMS Changelog
 
+## 2026-07-20 (feature) — Create Document: recipient and sender folded into a single canvas with one toolbar, matching Vikundi
+
+**Files:** `app/constant/document/create_document.php`
+
+Follow-up to the two entries below. Those still left the letter as three separate Summernote
+instances (recipient, sender, body), each with its own mini-toolbar — a screenshot of the working
+reference (`https://vikundi.bjptechnologies.co.tz/edit_document`) showed that's not what "flexible,
+one writable area" means there: Vikundi is one canvas from top to bottom with a single toolbar at
+the top, no per-block toolbars scattered through the layout.
+
+- Removed the `#recipientInfoCustom` and `#senderInfoCustom` Summernote instances entirely, along
+  with `initRecipientCustomEditor()` / `initSenderCustomEditor()` and their init flags. The address
+  block above the body is now static output only — the sender's on-file company details, the
+  reference number, and the date — rendered once from PHP, not user-editable there.
+  `#f_use_letterhead` now just toggles the existing `.no-letterhead` CSS class, which already hides
+  the whole letterhead/address/subject block.
+- `#letterBody` is now the single editable canvas for everything the user writes, from the
+  recipient's name/address at the top through the closing line — one Summernote instance, one
+  toolbar, matching the reference exactly.
+- `applyTemplate()` now prepends a saved template's old `recipient`/`recipient_address` fields
+  (detecting HTML vs. legacy plain text the same way as before) directly into `#letterBody`'s
+  starting content instead of routing them to a separate editor. "Save as Template" no longer
+  sends those fields at all — a template is now just its body content.
+- `saveDocument()` simplified to match: sends one `content` field (the whole letter body) plus
+  subject/date/category/access/letterhead/signature-align/project — no more separate
+  recipient/custom-sender payload or merge-token resolution against removed fields.
+- Old-format letters (saved before this change, with `recipient`/`recipient_address` stored
+  separately in the DB) still open correctly: the PHP prefill detects them and prepends the same
+  content into `$content` server-side before the page renders, so nothing already saved is lost.
+
+Verified live: rendered the page with a forged session and confirmed exactly one `.summernote({`
+init call remains (down from three), no leftover references to any of the removed
+recipient/sender editor elements, and no PHP errors. Verified end-to-end with a real generated
+PDF: decompressed a freshly-generated PDF's content streams and confirmed recipient text typed at
+the top of the body, a unique body marker further down, and the sender/ref/date block all appear
+correctly in the actual output bytes — `api/document/save_created_document.php`,
+`core/document_letter_pdf.php`, and `core/document_letter_render.php` needed no changes, since
+their existing null/empty-safe handling of `recipient` and `custom_sender_info` already degrades
+correctly now that the frontend never sends those fields.
+
 ## 2026-07-20 (feature) — Create Document: recipient is now one free-written block too; fixed a real bug where the custom sender never reached the actual PDF
 
 **Files:** `app/constant/document/create_document.php`, `api/document/save_created_document.php`,
