@@ -2942,7 +2942,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <?php endif; ?>
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">REVISED PROJECT SCOPE</h3>
-                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important; word-break: break-all; white-space: normal;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
                             <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
@@ -3012,7 +3012,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <?php endif; ?>
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">VARIATION PROJECT SCOPE - ADDENDUM NO: <span id="print-variation-no">1</span></h3>
-                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important; word-break: break-all; white-space: normal;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
                             <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
@@ -3080,7 +3080,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <?php endif; ?>
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">VARIATION PROJECT SCOPE - ADDENDUM NO: <span id="print-variation-history-no">1</span></h3>
-                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important; word-break: break-all; white-space: normal;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
                             <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
@@ -3169,7 +3169,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <?php endif; ?>
                             <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                             <h3 class="fw-bold mb-1" style="color: #000 !important; text-transform: uppercase;">ADDITIONAL PROJECT SCOPE</h3>
-                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important; word-break: break-all; white-space: normal;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                            <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
                             <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($project_name) ?></h5>
                             <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
                         </div>
@@ -3345,7 +3345,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <?php endif; ?>
                                     <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
                                     <h3 class="fw-bold mb-1" id="performanceReportTitle" style="color: #000 !important; text-transform: uppercase;">PROJECT PROGRESS REPORT</h3>
-                                    <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important; word-break: break-all; white-space: normal;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
+                                    <h6 class="text-muted fw-bold mb-0 mt-1" style="color: #666 !important;">Contract No: <?= htmlspecialchars($contract_no) ?></h6>
                                     <h5 class="text-dark fw-bold mb-1" id="projectNameReport"><?= htmlspecialchars($project_name) ?></h5>
                                     <p class="text-muted small text-uppercase fw-bold letter-spacing-1 mb-2" id="performanceReportSubtitle">DAILY UPDATE</p>
                                     <div class="mx-auto bg-primary" style="width: 60px; height: 3px; border-radius: 2px;"></div>
@@ -17970,6 +17970,19 @@ function smartPrint() {
                 padding: 0 !important;
                 text-align: center !important;
             }
+
+            /* Every tab's print header (.report-header, incl. the 5 Scope tabs)
+               trimmed down — a landscape page is ~30% shorter than portrait, so
+               the same header that leaves comfortable room in portrait can eat
+               enough of a landscape page that the table right after it doesn't
+               fit what's left and gets deferred whole to page 2. Smaller logo
+               + tighter line spacing gives every orientation more headroom. */
+            .report-header { margin-bottom: 0.6rem !important; }
+            .report-header img { max-height: 50px !important; }
+            .report-header h2 { font-size: 1.05rem !important; margin-bottom: 2px !important; }
+            .report-header h3 { font-size: 0.95rem !important; margin: 2px 0 !important; }
+            .report-header h5 { font-size: 0.9rem  !important; margin-bottom: 2px !important; }
+            .report-header h6 { font-size: 0.78rem !important; margin: 2px 0 !important; }
         }
     </style>
 
