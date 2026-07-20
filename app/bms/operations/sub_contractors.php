@@ -33,7 +33,10 @@ if (!empty($_SESSION['scope']['is_admin'])) {
 } else {
     $sp_ids = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
     if (empty($sp_ids)) {
-        $sc_scope_sql = ' AND 0 ';
+        // No project assignments — still show company-wide/untagged sub-contractors
+        // (those with no primary project and no sub_contractor_projects link), just
+        // not anything tied to a specific project the user isn't assigned to.
+        $sc_scope_sql = " AND (s.project_id IS NULL AND NOT EXISTS (SELECT 1 FROM sub_contractor_projects x WHERE x.supplier_id = s.supplier_id)) ";
     } else {
         $ids = implode(',', $sp_ids);
         $sc_scope_sql = " AND (
