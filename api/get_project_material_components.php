@@ -1,12 +1,20 @@
 <?php
-// scope-audit: skip — project material components; project_id required param
+// Project + warehouse scope enforced below via userCan()/scopeFilterSqlNullable()
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 global $pdo;
 
 try {
+    if (!isset($_SESSION['user_id'])) throw new Exception('Unauthorized');
+
     $project_id = intval($_GET['project_id'] ?? 0);
     if (!$project_id) throw new Exception('Invalid project ID.');
+
+    // A hand-crafted project_id can't read another project's material demand.
+    if (!userCan('project', $project_id)) {
+        http_response_code(403);
+        throw new Exception('Access denied: this project is not in your scope.');
+    }
 
     $rows = $pdo->prepare("
         SELECT
@@ -22,7 +30,7 @@ try {
         JOIN product_assembly_components pac ON pac.parent_product_id = mln.nip_product_id
         JOIN products cp ON pac.component_product_id = cp.product_id
         LEFT JOIN nip_material_component_status nmcs ON nmcs.component_product_id = cp.product_id
-        WHERE ml.project_id = ?
+        WHERE ml.project_id = ?" . scopeFilterSqlNullable('warehouse', 'ml') . "
         GROUP BY cp.product_id, cp.product_name, cp.sku
         ORDER BY cp.product_name ASC
     ");

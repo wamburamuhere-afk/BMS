@@ -1,5 +1,5 @@
 <?php
-// scope-audit: skip — NIP material list view; scope by project_id pending Phase G-2
+// Project/warehouse scope enforced below via assertScopeForRecordHtml()
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('nip_materials');
 logActivity($pdo, $_SESSION['user_id'], 'VIEW', '[View Material List] Page viewed');
@@ -12,6 +12,20 @@ $id = intval($_GET['id'] ?? 0);
 if (!$id) {
     echo "<script>window.location.href='" . getUrl('nip_materials') . "';</script>";
     exit();
+}
+
+// Blocks a non-admin from opening another project's material list by URL —
+// mirrors update_material_list.php / delete_material_list.php's existing gate.
+assertScopeForRecordHtml('nip_material_lists', 'id', $id);
+
+// Warehouse-scope gate — a user restricted to one warehouse must not open
+// a list belonging to a different warehouse in the same project.
+$whChk = $pdo->prepare("SELECT warehouse_id FROM nip_material_lists WHERE id = ?");
+$whChk->execute([$id]);
+$curWarehouseId = $whChk->fetchColumn();
+if (!empty($curWarehouseId) && function_exists('userCan') && !userCan('warehouse', (int)$curWarehouseId)) {
+    http_response_code(403);
+    die('Access denied: this material list is not in your warehouse scope.');
 }
 
 // Load list header
