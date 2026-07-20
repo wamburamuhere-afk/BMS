@@ -6,8 +6,14 @@
  *
  *   ledger source  = journal_entry_items joined to POSTED journal_entries
  *                    (entry_date <= as_of_date)
- *   opening source = accounts.opening_balance, allocated to Dr/Cr by the
- *                    account's normal_side (debit-natural -> Dr, credit -> Cr)
+ *
+ * accounts.opening_balance is deliberately NOT folded in here — it's a legacy,
+ * one-sided field (no matching journal leg, never validated to net to zero)
+ * that Balance Sheet / Income Statement / Cash Flow also ignore (see
+ * core/financial_reports.php's $includeOpening default). Reading only the
+ * posted journal keeps this report mathematically guaranteed to balance
+ * (postLedgerEntry() never allows an unbalanced entry to post) and in
+ * agreement with the other three statements.
  *
  * Each account's net balance is placed in the column where it actually sits
  * (by sign), so Sum(Dr) must equal Sum(Cr). When it doesn't, the report says
@@ -92,14 +98,11 @@ try {
         }
         $normal_side = $normal_side ?: 'debit';
 
-        $opening    = (float)$acc['opening_balance'];
-        $opening_dr = $normal_side === 'debit'  ? $opening : 0.0;
-        $opening_cr = $normal_side === 'credit' ? $opening : 0.0;
+        // accounts.opening_balance is intentionally excluded — see file header.
+        $total_dr = (float)$acc['debit'];
+        $total_cr = (float)$acc['credit'];
 
-        $total_dr = $opening_dr + (float)$acc['debit'];
-        $total_cr = $opening_cr + (float)$acc['credit'];
-
-        // Skip dormant accounts (nothing opening, nothing posted).
+        // Skip dormant accounts (nothing posted).
         if (abs($total_dr) < 0.001 && abs($total_cr) < 0.001) continue;
 
         // Net balance, debit-positive. Place it in the column where it lands.
