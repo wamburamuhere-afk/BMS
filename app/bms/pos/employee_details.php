@@ -377,7 +377,7 @@ $sr_status_badge = [
                         <a href="#attendanceHistoryCard" class="btn btn-outline-primary">
                             <i class="bi bi-clock"></i> View Attendance
                         </a>
-                        <a href="<?= getUrl('payroll') ?>?employee=<?= $employee['employee_id'] ?>" class="btn btn-outline-info">
+                        <a href="#payrollHistoryCard" class="btn btn-outline-info">
                             <i class="bi bi-cash-stack"></i> View Payroll
                         </a>
                     </div>
@@ -1427,7 +1427,7 @@ $sr_status_badge = [
                     return '<span class="badge" style="' . $st . 'padding:5px 10px;border-radius:20px;">' . ucfirst($s ?: 'pending') . '</span>';
                 };
             ?>
-             <div class="card shadow-sm mb-4">
+             <div class="card shadow-sm mb-4" id="payrollHistoryCard" style="scroll-margin-top: 90px;">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="bi bi-cash-stack text-primary me-2"></i>Payroll &amp; Payment History</h5>
                     <span class="small text-muted"><?= count($all_payrolls) ?> record(s) · Paid to date: <strong><?= format_currency($paid_total) ?></strong></span>
@@ -1633,14 +1633,16 @@ function editEmployee(id) {
     window.location.href = APP_URL + '/employees?edit_id=' + id;
 }
 
-// Deep-link support for #attendanceHistoryCard (Actions → Attendance from the employee
-// list, and the "View Attendance" sidebar button here). The browser's native anchor-jump
-// runs before this page's async content above the card finishes rendering/resizing, so it
-// lands short. Re-run it after everything has settled.
+// Deep-link support for same-page card anchors (#attendanceHistoryCard,
+// #payrollHistoryCard — used by the employee list's Actions/mobile buttons and the
+// sidebar's "View Attendance"/"View Payroll" buttons here). The browser's native
+// anchor-jump runs before this page's async content above the card finishes
+// rendering/resizing, so it lands short. Re-run it after everything has settled.
 window.addEventListener('load', function () {
-    if (window.location.hash === '#attendanceHistoryCard') {
+    var hash = window.location.hash;
+    if (hash === '#attendanceHistoryCard' || hash === '#payrollHistoryCard') {
         setTimeout(function () {
-            var el = document.getElementById('attendanceHistoryCard');
+            var el = document.getElementById(hash.slice(1));
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 300);
     }

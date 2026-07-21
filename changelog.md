@@ -1,5 +1,42 @@
 # BMS Changelog
 
+## 2026-07-21 (fix) — Payroll Records link was completely dead; scoped it to the profile's existing history card, then dropped the redundant shortcut
+
+**Files:** `app/bms/pos/employee_details.php`, `app/bms/pos/employees.php`, `api/get_employees.php`
+
+Same root problem as Attendance, checked the same way — but worse: `payroll.php` never
+reads `$_GET['employee']` anywhere (PHP or JS). So Employees → Actions → "Payroll Records"
+(and the mobile card's Payroll button) always landed on the exact same generic, unfiltered,
+current-month company payroll dashboard, no matter which employee's row you clicked from.
+It never worked, not even once — this isn't a leak-after-first-interaction like Attendance
+was, the scoping attempt didn't exist at all.
+
+Unlike Attendance, this fix does **not** add a "process payroll" action to the profile.
+Payroll runs are inherently a batch, period-wide operation (`payroll.php`'s "Process
+Payroll" modal computes a whole department/company together for tax/statutory consistency
+— it has no per-employee mode at all), which doesn't belong on an individual's page.
+WorkDo's own docs describe employee-profile Payroll the same way — an information tab
+("Payroll provides information on employee salaries and payments"), not a place to run
+payroll from. `employee_details.php` already had exactly that: a correctly-scoped,
+read-only "Payroll & Payment History" card with a per-record print-payslip link — it just
+needed to be reachable.
+
+- Gave that card `id="payrollHistoryCard"` (generalized the Attendance deep-link's
+  `window.load` re-scroll handler to cover both hashes instead of duplicating it).
+- Repointed `employee_details.php`'s own "View Payroll" sidebar button to
+  `#payrollHistoryCard` instead of the dead `payroll.php?employee=id`.
+- Dropped "Payroll Records" from the desktop Actions dropdown (`api/get_employees.php`,
+  removed the now-unused `$payrollUrl`) and the mobile card's Payroll button
+  (`employees.php`) — same call already made for Attendance: once the destination is the
+  employee's own profile, "View Details" is the only entry point needed.
+
+Verified live: `api/get_employees.php`'s AJAX response no longer contains "Payroll Records"
+or "Attendance" while "View Details" and "View Account" remain; `employees.php`'s rendered
+HTML has no remaining `payroll.php?employee=` link anywhere; `employee_details.php`'s
+sidebar buttons correctly target `#attendanceHistoryCard`/`#payrollHistoryCard`, both ids
+appear exactly once each, and the deep-linked card's bounding rect confirmed it lands
+inside the viewport on load.
+
 ## 2026-07-21 (fix) — Drop the now-redundant "Attendance" action button from the employee list
 
 **Files:** `api/get_employees.php`, `app/bms/pos/employees.php`
