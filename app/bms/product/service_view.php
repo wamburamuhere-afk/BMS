@@ -204,20 +204,43 @@ $company_logo = getSetting('company_logo', '');
        governs print. The printed page's content box (A4/Letter minus the
        @page margins above) is narrower than 768px, so every col-md-* here
        was silently collapsing to 100% width and stacking vertically instead
-       of sitting side by side. That's what pushed the layout past one page
-       as soon as a 2-line product name or a second material row added a
-       little more height: the name/stat row, the two info boxes, and the
-       three stat cards were each taking 2-3x their intended height. Forcing
-       the desktop widths back on for print (regardless of physical page
-       width) restores the compact side-by-side layout so it fits on page 1. */
-    .row > .col-md-5 { flex: 0 0 auto !important; width: 41.6667% !important; max-width: 41.6667% !important; }
-    .row > .col-md-7 { flex: 0 0 auto !important; width: 58.3333% !important; max-width: 58.3333% !important; }
+       of sitting side by side, ballooning the header/info-box height. Forcing
+       the desktop width back on for the info boxes below keeps them compact
+       and side by side so the page fits on page 1. */
     .row > .col-md-6 { flex: 0 0 auto !important; width: 50% !important; max-width: 50% !important; }
-    .dashboard-stat-col { flex: 0 0 auto !important; width: 33.3333% !important; max-width: 33.3333% !important; }
 
-    /* Compacting the 3 stat cards into one row (above) leaves each card only
-       ~19% of the page width. A large TZS figure or a big negative margin %
-       sat label-left/value-right with nowrap, so it ran past the card's own
+    /* Per request: the SELLING/COST/MARGIN row prints as its own full-width
+       row at the top (like the stat-card row on invoices.php), with the
+       product name below it — not side by side. flex-direction:column
+       stacks the two halves of the header row and `order` puts the stats
+       first; each then gets the full row width instead of splitting it.
+       This is print-only — the on-screen dashboard keeps its normal
+       name-left/stats-right layout. */
+    .row.align-items-center.g-3 { flex-direction: column !important; }
+    .row.align-items-center.g-3 > .col-md-7 {
+        order: -1 !important;
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    .row.align-items-center.g-3 > .col-md-5 {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-top: 10px !important;
+    }
+
+    /* Stat cards: always one row of 3, left to right, in both Portrait and
+       Landscape — same technique invoices.php uses for its top stat row
+       (flex-wrap:nowrap + a fixed % basis instead of relying on the md
+       breakpoint, which print's page width sits under). Now that the row
+       is full width instead of squeezed into 58% next to the name, each
+       card also gets roughly 3x the room it had before. */
+    .row.g-2.justify-content-md-end { flex-wrap: nowrap !important; justify-content: flex-start !important; }
+    .dashboard-stat-col { flex: 0 0 33.3333% !important; width: 33.3333% !important; max-width: 33.3333% !important; }
+
+    /* A large TZS figure or a big negative margin % sat label-left/
+       value-right with nowrap, so it could still run past the card's own
        border instead of shrinking. Stacking label above value inside each
        card removes the side-by-side width fight — the value gets the full
        card width to itself and wraps within its own border if it's still

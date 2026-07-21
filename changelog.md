@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-07-21 (fix) — Non-inventory product print: SELLING/COST/MARGIN row moved above the name, full width
+
+**Files:** `app/bms/product/service_view.php`
+
+Follow-up to the print fixes below. User asked for the stat row to sit at the top of the print,
+spanning the full page width left-to-right like the top stat row on `invoices.php`, with the
+product name below it instead of sharing a row — and to keep working in both Portrait and
+Landscape without breaking page 1.
+
+- `@media print`: the header row (`.row.align-items-center.g-3`) is now `flex-direction: column`
+  with `order: -1` on the stats column, so the 3 stat cards render first at full width and the
+  name+icon block renders second, full width, below them. Screen view is unaffected — the
+  dashboard still shows name-left/stats-right there.
+- The stat cards' own row gets `flex-wrap: nowrap` and each card a fixed 33.33% basis — the same
+  technique `invoices.php` already uses (`#invoiceStatsRow { flex-wrap: nowrap }`) to keep a stat
+  row on one line in Portrait instead of dropping to 2-per-row under Bootstrap's md breakpoint.
+- Since the stat row is now full width instead of squeezed into the name column's other half,
+  each card also has roughly 3x the room it had before, on top of the earlier label-over-value
+  stacking fix.
+
+Verified in isolated iframes at both A4 Portrait (718px) and Landscape (1047px) content widths,
+with the reported large values (TZS 123,000,000 / TZS 488,000,000 / -396,647.97%) and the long
+unbroken product name: stat row renders as one full-width row in both orientations with no value
+overflow, and the name wraps cleanly below it.
+
 ## 2026-07-21 (fix) — Non-inventory product print: large SELLING/COST/MARGIN values no longer overflow their card
 
 **Files:** `app/bms/product/service_view.php`
