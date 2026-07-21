@@ -55,32 +55,12 @@ if ($hasItemsTable) {
     $do_items = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-$company_name = getSetting('company_name', 'BMS');
-$company_logo = getSetting('company_logo', '');
-$print_user   = ucwords(trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')));
-$print_role   = ucwords($_SESSION['user_role'] ?? 'Staff');
-$print_date   = date('d M, Y \a\t h:i A');
 $project_id   = $do['project_id'];
 $return_url   = getUrl('project_view') . '?id=' . $project_id . '&tab=procurement';
 
 $status_colors = ['draft'=>'secondary','pending'=>'warning','approved'=>'success'];
 $status_color  = $status_colors[$do['status']] ?? 'secondary';
 ?>
-
-<!-- PRINT HEADER -->
-<div class="d-none d-print-block text-center mb-4">
-    <?php if (!empty($company_logo)): ?>
-    <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height:70px;width:auto;"></div>
-    <?php endif; ?>
-    <h1 style="color:#0d6efd;font-weight:800;text-transform:uppercase;font-size:18pt;margin:0;"><?= safe_output($company_name) ?></h1>
-    <h2 style="font-weight:700;text-transform:uppercase;font-size:13pt;margin:4px 0;">DELIVERY ORDER</h2>
-    <p style="margin:0;font-size:8pt;color:#555;">DO# <?= safe_output($do['do_number']) ?> — <?= safe_output($do['project_name']) ?></p>
-    <div style="border-bottom:3px solid #0d6efd;margin:10px 0 16px;"></div>
-</div>
-<div class="print-footer d-none d-print-block">
-    <p class="mb-1" style="font-size:7pt;">Printed by <strong><?= safe_output($print_user) ?> — <?= safe_output($print_role) ?></strong> on <strong><?= $print_date ?></strong></p>
-    <p class="mb-0 fw-bold text-primary" style="font-size:8pt;">Powered By BJP Technologies &copy; 2026</p>
-</div>
 
 <div class="container-fluid mt-3">
     <!-- Breadcrumb -->
@@ -112,9 +92,21 @@ $status_color  = $status_colors[$do['status']] ?? 'secondary';
                 <i class="bi bi-check2-all me-1"></i> Approve
             </button>
             <?php endif; ?>
-            <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
-                <i class="bi bi-printer me-1"></i> Print
-            </button>
+            <div class="btn-group btn-group-sm shadow-sm">
+                <button onclick="printDO(<?= $do_id ?>)" class="btn btn-outline-secondary">
+                    <i class="bi bi-printer me-1"></i> Print
+                </button>
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Choose print template</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><h6 class="dropdown-header">Print Template</h6></li>
+                    <li><a class="dropdown-item" href="#" onclick="printDO(<?= $do_id ?>, 'standard'); return false;"><i class="bi bi-check2 me-2"></i>Standard (default)</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printDO(<?= $do_id ?>, 'manifest'); return false;">Manifest</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printDO(<?= $do_id ?>, 'convoy'); return false;">Convoy</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="printDO(<?= $do_id ?>, 'waybill'); return false;">Waybill</a></li>
+                </ul>
+            </div>
             <a href="<?= $return_url ?>" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-arrow-left me-1"></i> Back
             </a>
@@ -384,12 +376,16 @@ function changeDOStatus(doId, newStatus) {
 }
 
 // No DataTable needed on this page
-</script>
 
-<style>
-@page { size: A4; margin: 0.5in 0.5in 1.8cm 0.5in; }
-body { padding-bottom: 2cm !important; }
-.print-footer { position:fixed !important; bottom:0 !important; left:0; right:0; height:1.4cm; display:flex !important; flex-direction:column; justify-content:center; text-align:center; background:#fff !important; border-top:2px solid #0d6efd !important; font-size:7.5px; z-index:999999; -webkit-print-color-adjust:exact; }
-@media print { .d-print-none { display:none !important; } .card { border:1px solid #dee2e6 !important; box-shadow:none !important; } }
-</style>
+const DO_PRINT_TEMPLATES = {
+    standard: '<?= getUrl('print_delivery_order') ?>',
+    manifest: '<?= getUrl('print_delivery_order_manifest') ?>',
+    convoy:   '<?= getUrl('print_delivery_order_convoy') ?>',
+    waybill:  '<?= getUrl('print_delivery_order_waybill') ?>'
+};
+function printDO(id, template) {
+    const base = DO_PRINT_TEMPLATES[template] || DO_PRINT_TEMPLATES.standard;
+    window.open(base + '?id=' + id, '_blank');
+}
+</script>
 <?php includeFooter(); ?>
