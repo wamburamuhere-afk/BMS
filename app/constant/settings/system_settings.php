@@ -152,6 +152,10 @@ if ($_POST) {
                 'print_template_color_rfq_striped' => '#d9601a',
                 'print_template_color_rfq_minimal' => '#1a7ea8',
                 'print_template_color_rfq_radiant' => '#e07b1e',
+                // Purchase Side — Delivery Order's own family
+                'print_template_color_do_manifest' => '#b45309',
+                'print_template_color_do_convoy'   => '#374151',
+                'print_template_color_do_waybill'  => '#0f766e',
                 // Sales Side — Sales Order's own family
                 'print_template_color_so_confirmation' => '#c8981f',
                 'print_template_color_so_ledger'       => '#14213d',
@@ -1032,6 +1036,26 @@ if ($_POST) {
                             <div class="col-md-4">
                                 <label for="print_template_color_rfq_radiant" class="form-label">Radiant Template</label>
                                 <input type="color" class="form-control form-control-color w-100" id="print_template_color_rfq_radiant" name="print_template_color_rfq_radiant" value="<?= get_setting('print_template_color_rfq_radiant', '#e07b1e') ?>">
+                            </div>
+                        </div>
+
+                        <!-- Delivery Order Print Template Colors (own family) -->
+                        <div class="mb-3">
+                            <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-palette2 me-1"></i> Delivery Order Print Template Colors</h6>
+                            <p class="text-muted small mb-2">Delivery Order uses its own Manifest/Convoy/Waybill colors, separate from every other document.</p>
+                        </div>
+                        <div class="row g-4 mb-3">
+                            <div class="col-md-4">
+                                <label for="print_template_color_do_manifest" class="form-label">Manifest Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_do_manifest" name="print_template_color_do_manifest" value="<?= get_setting('print_template_color_do_manifest', '#b45309') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_do_convoy" class="form-label">Convoy Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_do_convoy" name="print_template_color_do_convoy" value="<?= get_setting('print_template_color_do_convoy', '#374151') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="print_template_color_do_waybill" class="form-label">Waybill Template</label>
+                                <input type="color" class="form-control form-control-color w-100" id="print_template_color_do_waybill" name="print_template_color_do_waybill" value="<?= get_setting('print_template_color_do_waybill', '#0f766e') ?>">
                             </div>
                         </div>
 
