@@ -838,24 +838,32 @@ $sr_status_badge = [
                         <div class="col-6 col-md-3"><div class="border rounded p-2 text-center" style="background:#e7f0ff;border:1px solid #b6ccfe;"><div class="small text-muted text-uppercase fw-bold" style="font-size:.62rem;">Net (est.)</div><div class="fw-bold" style="color:#052c65;"><?= number_format($struct_net, 2) ?></div></div></div>
                     </div>
                     <div class="table-responsive">
-                        <table class="table table-sm align-middle mb-0">
+                        <table class="table table-sm align-middle mb-0" id="salaryStructureTable">
                             <thead class="table-light">
-                                <tr><th class="ps-3">Component</th><th>Type</th><th>Basis</th><th class="text-end">Value</th><th class="text-end pe-3 d-print-none">Action</th></tr>
+                                <tr><th class="ps-3 no-sort">S/NO</th><th>Component</th><th>Type</th><th>Basis</th><th class="text-end">Value</th><th class="text-end pe-3 d-print-none no-sort">Action</th></tr>
                             </thead>
                             <tbody>
                                 <?php if (!$sc_rows): ?>
-                                <tr><td colspan="5" class="text-center text-muted py-3">No components assigned. Payroll will use this employee's basic salary (and any legacy allowances/deductions).</td></tr>
-                                <?php else: foreach ($sc_rows as $r):
+                                <tr><td colspan="6" class="text-center text-muted py-3">No components assigned. Payroll will use this employee's basic salary (and any legacy allowances/deductions).</td></tr>
+                                <?php else: $sn = 1; foreach ($sc_rows as $r):
                                     $val = ($r['calculation_type'] === 'percentage') ? round($basic * (float)$r['amount'] / 100, 2) : (float)$r['amount'];
                                     $isDed = $r['component_type'] === 'deduction'; ?>
                                 <tr>
-                                    <td class="ps-3 fw-semibold"><?= safe_output($r['component_name']) ?></td>
+                                    <td class="ps-3"><?= $sn++ ?></td>
+                                    <td class="fw-semibold"><?= safe_output($r['component_name']) ?></td>
                                     <td><span class="badge-status" style="background:<?= $isDed ? '#dc3545' : '#0d6efd' ?>;color:#fff;font-size:.62rem;padding:.3em .55em;border-radius:6px;"><?= strtoupper($r['component_type']) ?></span></td>
                                     <td class="small"><?= $r['calculation_type'] === 'percentage' ? number_format((float)$r['amount'], 2) . '% of basic' : 'Fixed' ?></td>
                                     <td class="text-end <?= $isDed ? 'text-danger' : '' ?>"><?= ($isDed ? '−' : '') . number_format($val, 2) ?></td>
                                     <td class="text-end pe-3 d-print-none">
                                         <?php if ($can_edit_salary): ?>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="removeComponent(<?= (int)$r['employee_component_id'] ?>)" title="Remove"><i class="bi bi-trash"></i></button>
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-light border shadow-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="bi bi-gear-fill text-primary"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-2">
+                                                <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="removeComponent(<?= (int)$r['employee_component_id'] ?>)"><i class="bi bi-trash me-2"></i> Remove</a></li>
+                                            </ul>
+                                        </div>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -932,12 +940,12 @@ $sr_status_badge = [
                             <table class="table table-sm align-middle" id="empDocsTable">
                                 <thead>
                                     <tr>
-                                        <th>Type</th><th>Name</th><th>Issued</th><th>Expires</th><th></th>
-                                        <th class="text-end d-print-none">Actions</th>
+                                        <th class="no-sort">S/NO</th><th>Type</th><th>Name</th><th>Issued</th><th>Expires</th><th></th>
+                                        <th class="text-end d-print-none no-sort">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                <?php foreach ($emp_documents as $d):
+                                <?php $sn = 1; foreach ($emp_documents as $d):
                                     $chip = '';
                                     if (!empty($d['expire_date'])) {
                                         $dte = (int)$d['days_to_expiry'];
@@ -947,21 +955,24 @@ $sr_status_badge = [
                                     }
                                 ?>
                                     <tr>
+                                        <td><?= $sn++ ?></td>
                                         <td><?= safe_output($d['type_name']) ?></td>
                                         <td><?= safe_output($d['document_name']) ?></td>
                                         <td><?= safe_output($d['issue_date'], '—') ?></td>
                                         <td><?= safe_output($d['expire_date'], '—') ?></td>
                                         <td><?= $chip ?></td>
                                         <td class="text-end d-print-none">
-                                            <a href="<?= buildUrl('api/download_employee_document.php') ?>?emp_doc_id=<?= (int)$d['emp_doc_id'] ?>"
-                                               class="btn btn-sm btn-outline-primary" target="_blank" title="Download">
-                                                <i class="bi bi-download"></i>
-                                            </a>
-                                            <?php if ($can_delete_documents): ?>
-                                            <button class="btn btn-sm btn-outline-danger" onclick="deleteEmpDoc(<?= (int)$d['emp_doc_id'] ?>)" title="Delete">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                            <?php endif; ?>
+                                            <div class="dropdown">
+                                                <button class="btn btn-sm btn-light border shadow-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    <i class="bi bi-gear-fill text-primary"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-2">
+                                                    <li><a class="dropdown-item py-2" href="<?= buildUrl('api/download_employee_document.php') ?>?emp_doc_id=<?= (int)$d['emp_doc_id'] ?>" target="_blank"><i class="bi bi-download text-primary me-2"></i> Download</a></li>
+                                                    <?php if ($can_delete_documents): ?>
+                                                    <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteEmpDoc(<?= (int)$d['emp_doc_id'] ?>)"><i class="bi bi-trash me-2"></i> Delete</a></li>
+                                                    <?php endif; ?>
+                                                </ul>
+                                            </div>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -1096,12 +1107,12 @@ $sr_status_badge = [
                     <p class="text-muted mb-0"><i class="bi bi-file-earmark-x me-1"></i> No contracts recorded for this employee.</p>
                     <?php else: ?>
                     <div class="table-responsive">
-                        <table class="table table-sm align-middle">
+                        <table class="table table-sm align-middle" id="empContractsTable">
                             <thead>
-                                <tr><th>Type</th><th>Start</th><th>End</th><th>Status</th></tr>
+                                <tr><th class="no-sort">S/NO</th><th>Type</th><th>Start</th><th>End</th><th>Status</th></tr>
                             </thead>
                             <tbody>
-                            <?php foreach ($emp_contracts as $c):
+                            <?php $sn = 1; foreach ($emp_contracts as $c):
                                 $isActive = ($c['status'] === 'active');
                                 $chip = '';
                                 if ($isActive && !empty($c['end_date'])) {
@@ -1113,6 +1124,7 @@ $sr_status_badge = [
                                 $status_color = $status_colors[$c['status']] ?? 'secondary';
                             ?>
                                 <tr <?= $isActive ? 'class="table-primary"' : '' ?>>
+                                    <td><?= $sn++ ?></td>
                                     <td><?= safe_output($c['contract_type']) ?></td>
                                     <td><?= safe_output($c['start_date']) ?></td>
                                     <td><?= safe_output($c['end_date'], 'Open-ended') ?> <?= $chip ?></td>
@@ -1213,10 +1225,10 @@ $sr_status_badge = [
                     <p class="text-muted mb-0"><i class="bi bi-mortarboard me-1"></i> No training records yet.</p>
                     <?php else: ?>
                     <div class="table-responsive">
-                        <table class="table table-sm align-middle">
-                            <thead><tr><th>Training</th><th>Type</th><th>Date</th><th>Result</th><th class="d-print-none">Certificate</th></tr></thead>
+                        <table class="table table-sm align-middle" id="empTrainingTable">
+                            <thead><tr><th class="no-sort">S/NO</th><th>Training</th><th>Type</th><th>Date</th><th>Result</th><th class="d-print-none no-sort">Certificate</th></tr></thead>
                             <tbody>
-                            <?php foreach ($training_history as $th):
+                            <?php $sn = 1; foreach ($training_history as $th):
                                 $pmap = ['enrolled'=>'secondary','attended'=>'info','completed'=>'success','failed'=>'danger','withdrawn'=>'dark'];
                                 $pcolor = $pmap[$th['part_status']] ?? 'secondary';
                                 $cchip = '';
@@ -1227,13 +1239,21 @@ $sr_status_badge = [
                                 }
                             ?>
                                 <tr>
+                                    <td><?= $sn++ ?></td>
                                     <td><?= safe_output($th['title']) ?></td>
                                     <td><?= safe_output($th['type_name'], '—') ?></td>
                                     <td><?= safe_output($th['start_date']) ?></td>
                                     <td><span class="badge bg-<?= $pcolor ?>"><?= ucfirst($th['part_status']) ?></span></td>
                                     <td class="d-print-none">
                                         <?php if (!empty($th['certificate_path'])): ?>
-                                        <a href="<?= buildUrl('api/download_training_certificate.php') ?>?participant_id=<?= (int)$th['participant_id'] ?>" target="_blank" class="btn btn-sm btn-outline-primary py-0"><i class="bi bi-download"></i></a>
+                                        <div class="dropdown d-inline-block">
+                                            <button class="btn btn-sm btn-light border shadow-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="bi bi-gear-fill text-primary"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-2">
+                                                <li><a class="dropdown-item py-2" href="<?= buildUrl('api/download_training_certificate.php') ?>?participant_id=<?= (int)$th['participant_id'] ?>" target="_blank"><i class="bi bi-download text-primary me-2"></i> Download Certificate</a></li>
+                                            </ul>
+                                        </div>
                                         <?= $cchip ?>
                                         <?php else: ?><span class="text-muted">—</span><?php endif; ?>
                                     </td>
@@ -1377,11 +1397,11 @@ $sr_status_badge = [
                         <?php endif; ?>
                     </div>
                 </div>
-                <div class="table-responsive" style="max-height:420px;overflow:auto;">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light" style="position:sticky;top:0;z-index:1;">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="attendanceHistoryTable">
+                        <thead class="table-light">
                             <tr>
-                                <th class="ps-3">S/NO</th>
+                                <th class="ps-3 no-sort">S/NO</th>
                                 <th>Date</th>
                                 <th>Check In</th>
                                 <th>Check Out</th>
@@ -1503,11 +1523,11 @@ $sr_status_badge = [
                     <h5 class="mb-0"><i class="bi bi-cash-stack text-primary me-2"></i>Payroll &amp; Payment History</h5>
                     <span class="small text-muted"><?= count($all_payrolls) ?> record(s) · Paid to date: <strong><?= format_currency($paid_total) ?></strong></span>
                 </div>
-                <div class="table-responsive" style="max-height:420px;overflow:auto;">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light" style="position:sticky;top:0;z-index:1;">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="payrollHistoryTable">
+                        <thead class="table-light">
                             <tr>
-                                <th class="ps-3">S/NO</th>
+                                <th class="ps-3 no-sort">S/NO</th>
                                 <th>Period</th>
                                 <th>Date Paid</th>
                                 <th class="text-end">Gross</th>
@@ -1516,7 +1536,7 @@ $sr_status_badge = [
                                 <th class="text-end">Net Salary</th>
                                 <th>Status</th>
                                 <th>Paid From</th>
-                                <th class="d-print-none">Action</th>
+                                <th class="d-print-none no-sort">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1536,7 +1556,14 @@ $sr_status_badge = [
                                 <td><?= $statusBadge($pay['payment_status'] ?? 'pending') ?></td>
                                 <td><?= !empty($pay['paid_from_name']) ? safe_output($pay['paid_from_name']) : '<span class="text-muted">—</span>' ?></td>
                                 <td class="d-print-none">
-                                    <a href="<?= getUrl('payslip') ?>?id=<?= $pay['payroll_id'] ?>" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-printer"></i></a>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-light border shadow-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-gear-fill text-primary"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-2">
+                                            <li><a class="dropdown-item py-2" href="<?= getUrl('payslip') ?>?id=<?= $pay['payroll_id'] ?>" target="_blank"><i class="bi bi-printer text-primary me-2"></i> Print Payslip</a></li>
+                                        </ul>
+                                    </div>
                                 </td>
                             </tr>
                             <?php endforeach; else: ?>
@@ -1584,17 +1611,17 @@ $sr_status_badge = [
                         <?php endif; ?>
                     </div>
                 </div>
-                <div class="table-responsive" style="max-height:420px;overflow:auto;">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light" style="position:sticky;top:0;z-index:1;">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="leaveHistoryTable">
+                        <thead class="table-light">
                             <tr>
-                                <th class="ps-3">S/NO</th>
+                                <th class="ps-3 no-sort">S/NO</th>
                                 <th>Type</th>
                                 <th>Start</th>
                                 <th>End</th>
                                 <th class="text-end">Days</th>
                                 <th>Status</th>
-                                <th class="d-print-none">Action</th>
+                                <th class="d-print-none no-sort">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1611,15 +1638,20 @@ $sr_status_badge = [
                                 <td class="text-end"><?= $lv['total_days'] ?></td>
                                 <td><?= $leaveStatusBadge($lv['status']) ?></td>
                                 <td class="d-print-none">
-                                    <div class="d-flex gap-1">
-                                        <a href="<?= getUrl('leave_details') ?>?id=<?= $lv['leave_id'] ?>" target="_blank" class="btn btn-sm btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>
-                                        <?php if ($can_approve_leaves && $lv['status'] === 'pending'): ?>
-                                        <button type="button" class="btn btn-sm btn-outline-success" title="Approve" onclick="approveEmpLeave(<?= $lv['leave_id'] ?>)"><i class="bi bi-check-circle"></i></button>
-                                        <button type="button" class="btn btn-sm btn-outline-danger" title="Reject" onclick="rejectEmpLeave(<?= $lv['leave_id'] ?>)"><i class="bi bi-x-circle"></i></button>
-                                        <?php endif; ?>
-                                        <?php if ($can_delete_leaves): ?>
-                                        <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" onclick="deleteEmpLeave(<?= $lv['leave_id'] ?>)"><i class="bi bi-trash"></i></button>
-                                        <?php endif; ?>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-light border shadow-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-gear-fill text-primary"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-2">
+                                            <li><a class="dropdown-item py-2" href="<?= getUrl('leave_details') ?>?id=<?= $lv['leave_id'] ?>" target="_blank"><i class="bi bi-eye text-primary me-2"></i> View</a></li>
+                                            <?php if ($can_approve_leaves && $lv['status'] === 'pending'): ?>
+                                            <li><a class="dropdown-item py-2 text-success" href="javascript:void(0)" onclick="approveEmpLeave(<?= $lv['leave_id'] ?>)"><i class="bi bi-check-circle me-2"></i> Approve</a></li>
+                                            <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="rejectEmpLeave(<?= $lv['leave_id'] ?>)"><i class="bi bi-x-circle me-2"></i> Reject</a></li>
+                                            <?php endif; ?>
+                                            <?php if ($can_delete_leaves): ?>
+                                            <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteEmpLeave(<?= $lv['leave_id'] ?>)"><i class="bi bi-trash me-2"></i> Delete</a></li>
+                                            <?php endif; ?>
+                                        </ul>
                                     </div>
                                 </td>
                             </tr>
@@ -1753,6 +1785,49 @@ $(document).ready(function() {
     window.printEmployeeReport = function() {
         window.print();
     };
+
+    // ── Tab-content tables → DataTables (search/sort/pagination) ────────
+    // Every table on this page that actually has rows becomes a DataTable; sections that
+    // are lists/cards/timelines (Service Record, Performance, Onboarding, Meetings & Trips,
+    // Notes) are left alone since there's no table there to upgrade.
+    var empTableIds = [
+        'salaryStructureTable', 'empDocsTable', 'empContractsTable', 'empTrainingTable',
+        'attendanceHistoryTable', 'payrollHistoryTable', 'leaveHistoryTable'
+    ];
+    // Plain for-loop with a try/catch per table, not .forEach() — an exception thrown
+    // while processing one table would otherwise abort the whole forEach and silently
+    // skip every table after it.
+    for (var __i = 0; __i < empTableIds.length; __i++) {
+        try {
+            var __id = empTableIds[__i];
+            var $t = $('#' + __id);
+            if ($t.length && !$.fn.DataTable.isDataTable($t)) {
+                $t.DataTable({
+                    responsive: false,
+                    dom: 'frtip',
+                    pageLength: 10,
+                    order: [],
+                    columnDefs: [{ orderable: false, targets: 'no-sort' }],
+                    language: { search: "_INPUT_", searchPlaceholder: "Search..." }
+                });
+            }
+        } catch (e) {
+            console.error('DataTable init failed for #' + empTableIds[__i], e);
+        }
+    }
+    // Every one of these tables lives inside a Bootstrap tab-pane that's hidden
+    // (display:none) at the point .DataTable() runs above — only the first tab
+    // (Service Record, which has no table) starts active. DataTables measures column
+    // widths against the container's visible width, so a table built while hidden ends
+    // up with collapsed/zero-width columns the moment its tab is shown. Re-measure via
+    // columns.adjust() whenever a pill tab becomes active.
+    $('#employeeExtrasTabs button[data-bs-toggle="pill"]').on('shown.bs.tab', function (e) {
+        var pane = document.querySelector(e.target.getAttribute('data-bs-target'));
+        if (!pane) return;
+        $(pane).find('table').each(function () {
+            if ($.fn.DataTable.isDataTable(this)) $(this).DataTable().columns.adjust();
+        });
+    });
 
     // ── Salary Structure (Plan H1) ──────────────────────────────────────
     const SC_ASSIGN_URL = '<?= buildUrl('api/pos/assign_salary_component.php') ?>';
