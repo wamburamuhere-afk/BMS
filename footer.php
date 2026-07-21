@@ -50,6 +50,25 @@ echo '
     });
 </script>
 
+<!-- Global fix: Bootstrap action-menu dropdowns clipped inside overflow containers.
+     Row-action menus (products, services, invoices, etc.) live inside .table-responsive
+     and often a rounded .card wrapper, both of which clip absolutely-positioned menus —
+     so a menu only rendered in full for rows near the top; every row below got its menu
+     cut off until the table was filtered/scrolled to bring that row into the unclipped
+     area. Setting 'fixed' as the DEFAULT Popper strategy for every dropdown — present and
+     future, however created — makes menus position against the viewport instead of their
+     clipping ancestor, so they always render fully on top. No container overflow is
+     touched, so tables never jump. Same technique as the modal focus-trap fix above. -->
+<script>
+    try {
+        if (window.bootstrap && bootstrap.Dropdown && bootstrap.Dropdown.Default) {
+            bootstrap.Dropdown.Default.popperConfig = function (defaultBsPopperConfig) {
+                return Object.assign({}, defaultBsPopperConfig, { strategy: 'fixed' });
+            };
+        }
+    } catch (e) { /* no-op */ }
+</script>
+
 <!-- Global Modal Close on Success -->
 <script>
 $(document).ajaxSuccess(function(event, xhr, settings, data) {
