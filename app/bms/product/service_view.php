@@ -81,7 +81,7 @@ $company_logo = getSetting('company_logo', '');
 ?>
 
 <style>
-@media (max-width: 768px) {
+@media screen and (max-width: 768px) {
     /* Stack Dashboard Stats */
     .dashboard-stat-col {
         width: 100% !important;
