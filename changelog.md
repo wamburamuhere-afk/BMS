@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-07-21 (fix) — Non-inventory product print no longer spills onto page 2 with a wrapped name or 2+ materials
+
+**Files:** `app/bms/product/service_view.php`
+
+Follow-up to the same-day overlap fix below. User reported the print layout still broke onto a
+second page whenever the product name wrapped to 2 lines, or the Material Components List had
+more than one row.
+
+Root cause: Bootstrap 5's `col-md-*` grid classes switch to their multi-column widths only at
+viewports >= 768px, and that breakpoint rule carries no `screen`-only qualifier — so it also
+governs print layout. The actual printed page's content box (A4/Letter minus this page's `@page`
+margins) is under 768px wide, so every `col-md-*` row on this page (name+stats header, the two
+info boxes, the three stat cards) was silently collapsing to single-column and stacking full-height
+instead of sitting side by side — visually confirmed by reproducing the exact same collapse in an
+isolated 740px-wide iframe (SELLING/COST/MARGIN rendered as 3 stacked full-width rows, matching the
+user's original bug screenshot). With everything stacked, page 1 was already nearly full before any
+real content — so a 2-line name or a second material row was enough to push content to page 2.
+
+Fix: added explicit `flex`/`width` overrides inside the existing `@media print` block for
+`.col-md-5`, `.col-md-7`, `.col-md-6`, and `.dashboard-stat-col`, forcing the intended desktop
+column widths regardless of the page's physical width. Verified by re-injecting the same override
+into the narrow test iframe: the header stats and info boxes snapped back to their compact
+side-by-side layout, freeing the vertical space needed to keep everything on page 1.
+
 ## 2026-07-21 (fix) — Non-inventory product name no longer overlaps Selling/Cost/Margin cards on view + print
 
 **Files:** `app/bms/product/service_view.php`

@@ -198,6 +198,22 @@ $company_logo = getSetting('company_logo', '');
         print-color-adjust: exact !important;
     }
     #svcViewCompTable th, #svcViewCompTable td { padding: 4px 6px !important; font-size: 9pt !important; }
+
+    /* Bootstrap's col-md-* grid only switches to a multi-column layout at
+       viewports >= 768px — a rule with no "screen" qualifier, so it also
+       governs print. The printed page's content box (A4/Letter minus the
+       @page margins above) is narrower than 768px, so every col-md-* here
+       was silently collapsing to 100% width and stacking vertically instead
+       of sitting side by side. That's what pushed the layout past one page
+       as soon as a 2-line product name or a second material row added a
+       little more height: the name/stat row, the two info boxes, and the
+       three stat cards were each taking 2-3x their intended height. Forcing
+       the desktop widths back on for print (regardless of physical page
+       width) restores the compact side-by-side layout so it fits on page 1. */
+    .row > .col-md-5 { flex: 0 0 auto !important; width: 41.6667% !important; max-width: 41.6667% !important; }
+    .row > .col-md-7 { flex: 0 0 auto !important; width: 58.3333% !important; max-width: 58.3333% !important; }
+    .row > .col-md-6 { flex: 0 0 auto !important; width: 50% !important; max-width: 50% !important; }
+    .dashboard-stat-col { flex: 0 0 auto !important; width: 33.3333% !important; max-width: 33.3333% !important; }
 }
 </style>
 
