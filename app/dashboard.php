@@ -1154,6 +1154,11 @@ function get_progress_color($percentage) {
                                                             case 'cash_shift_open':    $nav_link = getUrl('cash_register'); break;
                                                             case 'bank_recon_overdue': $nav_link = getUrl('bank_reconciliation'); break;
                                                             case 'payroll_due':        $nav_link = getUrl('payroll'); break;
+                                                            // General Notifications (smart notification engine) — each row already
+                                                            // carries the exact record's own URL from notifications.action_url;
+                                                            // use it directly instead of falling through to the generic modal
+                                                            // (which had no case for this type and rendered blank).
+                                                            case 'engine_action':      $nav_link = $item['action_url'] ?? ''; break;
                                                         }
                                                         ?>
                                                         <?php if ($nav_link !== ''): ?>
@@ -2225,8 +2230,32 @@ function handleAlertAction(alert) {
         btnView.href = `product_view?id=${alert.id}`;
         btnView.innerHTML = '<i class="bi bi-eye"></i> View Product';
         footer.appendChild(btnView);
+
+    } else if (alert.type === 'engine_action') {
+        // Defensive fallback only — the PHP list normally links this type
+        // straight to alert.action_url and never reaches this modal at all.
+        // Only a General Notification with no action_url on record falls
+        // through to here, so still show what we have instead of a blank box.
+        title.innerHTML = '<i class="bi bi-bell-fill text-info"></i> ' + (alert.title || 'Notification');
+        body.innerHTML = `
+            <div class="text-center mb-3">
+                <i class="bi bi-bell text-info" style="font-size: 3rem;"></i>
+                <p class="mt-3">${alert.message || 'No further details available for this notification.'}</p>
+            </div>
+        `;
+        if (alert.action_url) {
+            const btnView = document.createElement('a');
+            btnView.className = 'btn btn-primary';
+            btnView.href = alert.action_url;
+            btnView.innerHTML = '<i class="bi bi-eye"></i> View';
+            footer.appendChild(btnView);
+        }
+    } else {
+        // Unknown/unhandled alert type — never leave the modal blank.
+        title.innerHTML = '<i class="bi bi-info-circle text-secondary"></i> Notification';
+        body.innerHTML = `<p class="text-center text-muted py-3">${alert.message || 'No further details available.'}</p>`;
     }
-    
+
     new bootstrap.Modal(document.getElementById('alertDetailsModal')).show();
 }
 
