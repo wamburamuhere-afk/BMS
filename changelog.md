@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-07-21 (fix) — Drop the now-redundant "Attendance" action button from the employee list
+
+**Files:** `api/get_employees.php`, `app/bms/pos/employees.php`
+
+Follow-up to the fix below. Since "Attendance" and "View Details" now point at the exact
+same page (`employee_details.php` — Attendance is just `#attendanceHistoryCard` on that
+same page), keeping both in the Actions dropdown and mobile card row was pure duplication.
+Removed the "Attendance" entry from the desktop Actions dropdown (`api/get_employees.php`,
+including the now-unused `$attendanceUrl` variable) and the mobile card-view Attendance
+button (`employees.php`) — "View Details" is the only way in now, matching a leaner
+Actions row. `employee_details.php` itself is untouched: its own "View Attendance"
+sidebar button (a same-page jump to the Attendance History card) stays, since that's a
+legitimate quick-nav within an otherwise long profile page, not a duplicate entry point.
+
+Verified live: `api/get_employees.php`'s AJAX response no longer contains an "Attendance"
+link while "View Details" and "Payroll Records" are still present.
+
 ## 2026-07-21 (feat) — Per-employee Attendance is now a self-contained profile tab, not a leaky global-page link
 
 **Files:** `app/bms/pos/employee_details.php`, `app/bms/pos/employees.php`, `api/get_employees.php`
