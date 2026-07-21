@@ -70,6 +70,15 @@ if (!empty($emp_project_id) && function_exists('userCan') && !userCan('project',
 // profile (matches the API's own gate in api/mark_attendance.php).
 $can_mark_attendance = canCreate('attendance');
 
+// Leave — apply for / review this employee's own leave directly from their profile.
+// Mirrors leaves.php's own gates exactly (api/apply_leave.php checks canCreate('leaves');
+// approve/reject/delete on leaves.php are gated on canEdit/canDelete('leaves')).
+$can_apply_leave    = canCreate('leaves');
+$can_approve_leaves = isAdmin() || canEdit('leaves');
+$can_delete_leaves  = isAdmin() || canDelete('leaves');
+$leave_types = $pdo->query("SELECT * FROM leave_types WHERE status = 'active' ORDER BY type_name")->fetchAll(PDO::FETCH_ASSOC);
+$handover_candidates = $pdo->query("SELECT employee_id, first_name, last_name FROM employees WHERE status = 'active' AND employee_id != " . (int)$employee_id . " ORDER BY first_name, last_name")->fetchAll(PDO::FETCH_ASSOC);
+
 // Salary Structure (Plan H1) — the active components assigned to this employee, and
 // the master list of components available to assign.
 $can_edit_salary = isAdmin() || canEdit('payroll');
@@ -273,6 +282,24 @@ $sr_status_badge = [
 ?>
 
 <style>
+#employeeExtrasTabs .nav-link {
+    border: 1px solid #dee2e6;
+    color: #495057;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    padding: 6px 14px;
+    white-space: nowrap;
+}
+#employeeExtrasTabs .nav-link.active,
+#employeeExtrasTabs .nav-link:hover {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+}
+@media (max-width: 576px) {
+    #employeeExtrasTabs .nav-link { font-size: 0.75rem; padding: 5px 10px; }
+}
+
 @page { margin: 10mm 8mm 16mm 8mm; }
 @media print {
     body {
@@ -374,11 +401,14 @@ $sr_status_badge = [
                             <i class="bi bi-pencil"></i> Edit Profile
                         </button>
                         <?php endif; ?>
-                        <a href="#attendanceHistoryCard" class="btn btn-outline-primary">
+                        <a href="javascript:void(0)" onclick="showEmpTab('pane-attendance')" class="btn btn-outline-primary d-print-none">
                             <i class="bi bi-clock"></i> View Attendance
                         </a>
-                        <a href="#payrollHistoryCard" class="btn btn-outline-info">
+                        <a href="javascript:void(0)" onclick="showEmpTab('pane-payroll')" class="btn btn-outline-info d-print-none">
                             <i class="bi bi-cash-stack"></i> View Payroll
+                        </a>
+                        <a href="javascript:void(0)" onclick="showEmpTab('pane-leave')" class="btn btn-outline-secondary d-print-none">
+                            <i class="bi bi-calendar-week"></i> View Leave
                         </a>
                     </div>
                 </div>
@@ -605,6 +635,114 @@ $sr_status_badge = [
                 </div>
             </div>
 
+            <!-- Compensation & Payment -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0"><i class="bi bi-cash-coin text-success me-1"></i> Compensation &amp; Payment</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Hourly Rate</label>
+                            <p class="fw-bold"><?= !empty($employee['hourly_rate']) ? format_currency($employee['hourly_rate']) : 'N/A' ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Currency</label>
+                            <p class="fw-bold"><?= safe_output($employee['currency'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Payment Frequency</label>
+                            <p class="fw-bold"><?= !empty($employee['payment_frequency']) ? ucfirst(str_replace('_', ' ', $employee['payment_frequency'])) : 'N/A' ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Payment Method</label>
+                            <p class="fw-bold"><?= !empty($employee['payment_method']) ? ucfirst(str_replace('_', ' ', $employee['payment_method'])) : 'N/A' ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Tax ID (TIN)</label>
+                            <p class="fw-bold"><?= safe_output($employee['tax_id'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Social Security Number</label>
+                            <p class="fw-bold"><?= safe_output($employee['social_security_number'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-12">
+                            <label class="text-muted small text-uppercase">Benefits</label>
+                            <p class="fw-bold">
+                                <?php
+                                $benefits = !empty($employee['benefits']) ? json_decode($employee['benefits'], true) : [];
+                                if (is_array($benefits) && count($benefits)):
+                                    foreach ($benefits as $b): ?>
+                                        <span class="badge bg-success me-1"><?= ucfirst(str_replace('_', ' ', $b)) ?></span>
+                                    <?php endforeach;
+                                else: ?>
+                                    <span class="text-muted fw-normal">None</span>
+                                <?php endif; ?>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Emergency Contact Card -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 text-danger"><i class="bi bi-person-exclamation"></i> Emergency Contact</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-sm-6 col-md-3">
+                            <label class="text-muted small text-uppercase">Contact Name</label>
+                            <p class="fw-bold"><?= safe_output($employee['emergency_contact'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-3">
+                            <label class="text-muted small text-uppercase">Relationship</label>
+                            <p class="fw-bold"><?= safe_output($employee['emergency_contact_relationship'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-3">
+                            <label class="text-muted small text-uppercase">Phone Number</label>
+                            <p class="fw-bold text-primary"><?= safe_output($employee['emergency_contact_phone'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-3">
+                            <label class="text-muted small text-uppercase">Email Address</label>
+                            <p class="fw-bold"><?= safe_output($employee['emergency_contact_email'] ?? 'N/A') ?></p>
+                        </div>
+
+                        <div class="col-12"><hr class="my-2"></div>
+
+                        <div class="col-sm-6 col-md-6">
+                            <label class="text-muted small text-uppercase">Postal Address</label>
+                            <p class="fw-bold"><?= safe_output($employee['emergency_contact_postal_address'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-6">
+                            <label class="text-muted small text-uppercase">Physical Address</label>
+                            <p class="fw-bold"><?= safe_output($employee['emergency_contact_physical_address'] ?? 'N/A') ?></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Everything below this line is NOT part of the employee's registration record —
+                 it's a separate log/module (history, uploads, HR actions) that accumulates over
+                 time. Tabbed so the page shows one thing at a time instead of a wall of tables,
+                 and entirely d-print-none: none of it — including Documents — belongs on a
+                 printed employee profile. -->
+            <ul class="nav nav-pills mb-3 d-print-none flex-wrap" id="employeeExtrasTabs" role="tablist">
+                <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-service" type="button" role="tab"><i class="bi bi-clock-history me-1"></i> Service Record</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-salary" type="button" role="tab"><i class="bi bi-sliders me-1"></i> Salary Structure</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-documents" type="button" role="tab"><i class="bi bi-folder2-open me-1"></i> Documents</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-contracts" type="button" role="tab"><i class="bi bi-file-earmark-text me-1"></i> Contracts</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-performance" type="button" role="tab"><i class="bi bi-graph-up-arrow me-1"></i> Performance</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-training" type="button" role="tab"><i class="bi bi-mortarboard me-1"></i> Training</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-onboarding" type="button" role="tab"><i class="bi bi-check2-square me-1"></i> Onboarding</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-meetings" type="button" role="tab"><i class="bi bi-calendar-event me-1"></i> Meetings &amp; Trips</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-notes" type="button" role="tab"><i class="bi bi-sticky me-1"></i> Notes</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-attendance" type="button" role="tab"><i class="bi bi-calendar-check me-1"></i> Attendance</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-payroll" type="button" role="tab"><i class="bi bi-cash-stack me-1"></i> Payroll</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-leave" type="button" role="tab"><i class="bi bi-calendar-week me-1"></i> Leave</button></li>
+            </ul>
+            <div class="tab-content d-print-none">
+            <div class="tab-pane fade show active" id="pane-service" role="tabpanel">
             <?php if ($can_view_lifecycle): ?>
             <!-- Service Record (Tier 1 — lifecycle timeline) -->
             <div class="card shadow-sm mb-4" id="serviceRecordCard">
@@ -681,55 +819,8 @@ $sr_status_badge = [
                 </div>
             </div>
             <?php endif; ?>
-
-            <!-- Compensation & Payment -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0"><i class="bi bi-cash-coin text-success me-1"></i> Compensation &amp; Payment</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row g-3">
-                        <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Hourly Rate</label>
-                            <p class="fw-bold"><?= !empty($employee['hourly_rate']) ? format_currency($employee['hourly_rate']) : 'N/A' ?></p>
-                        </div>
-                        <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Currency</label>
-                            <p class="fw-bold"><?= safe_output($employee['currency'] ?? 'N/A') ?></p>
-                        </div>
-                        <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Payment Frequency</label>
-                            <p class="fw-bold"><?= !empty($employee['payment_frequency']) ? ucfirst(str_replace('_', ' ', $employee['payment_frequency'])) : 'N/A' ?></p>
-                        </div>
-                        <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Payment Method</label>
-                            <p class="fw-bold"><?= !empty($employee['payment_method']) ? ucfirst(str_replace('_', ' ', $employee['payment_method'])) : 'N/A' ?></p>
-                        </div>
-                        <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Tax ID (TIN)</label>
-                            <p class="fw-bold"><?= safe_output($employee['tax_id'] ?? 'N/A') ?></p>
-                        </div>
-                        <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Social Security Number</label>
-                            <p class="fw-bold"><?= safe_output($employee['social_security_number'] ?? 'N/A') ?></p>
-                        </div>
-                        <div class="col-12">
-                            <label class="text-muted small text-uppercase">Benefits</label>
-                            <p class="fw-bold">
-                                <?php
-                                $benefits = !empty($employee['benefits']) ? json_decode($employee['benefits'], true) : [];
-                                if (is_array($benefits) && count($benefits)):
-                                    foreach ($benefits as $b): ?>
-                                        <span class="badge bg-success me-1"><?= ucfirst(str_replace('_', ' ', $b)) ?></span>
-                                    <?php endforeach;
-                                else: ?>
-                                    <span class="text-muted fw-normal">None</span>
-                                <?php endif; ?>
-                            </p>
-                        </div>
-                    </div>
-                </div>
             </div>
+            <div class="tab-pane fade" id="pane-salary" role="tabpanel">
 
             <!-- Salary Structure (Plan H1) -->
             <div class="card shadow-sm mb-4" id="salaryStructureCard">
@@ -822,44 +913,8 @@ $sr_status_badge = [
                 </div>
             </div>
             <?php endif; ?>
-
-            <!-- Emergency Contact Card -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0 text-danger"><i class="bi bi-person-exclamation"></i> Emergency Contact</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row g-3">
-                        <div class="col-sm-6 col-md-3">
-                            <label class="text-muted small text-uppercase">Contact Name</label>
-                            <p class="fw-bold"><?= safe_output($employee['emergency_contact'] ?? 'N/A') ?></p>
-                        </div>
-                        <div class="col-sm-6 col-md-3">
-                            <label class="text-muted small text-uppercase">Relationship</label>
-                            <p class="fw-bold"><?= safe_output($employee['emergency_contact_relationship'] ?? 'N/A') ?></p>
-                        </div>
-                        <div class="col-sm-6 col-md-3">
-                            <label class="text-muted small text-uppercase">Phone Number</label>
-                            <p class="fw-bold text-primary"><?= safe_output($employee['emergency_contact_phone'] ?? 'N/A') ?></p>
-                        </div>
-                        <div class="col-sm-6 col-md-3">
-                            <label class="text-muted small text-uppercase">Email Address</label>
-                            <p class="fw-bold"><?= safe_output($employee['emergency_contact_email'] ?? 'N/A') ?></p>
-                        </div>
-                        
-                        <div class="col-12"><hr class="my-2"></div>
-                        
-                        <div class="col-sm-6 col-md-6">
-                            <label class="text-muted small text-uppercase">Postal Address</label>
-                            <p class="fw-bold"><?= safe_output($employee['emergency_contact_postal_address'] ?? 'N/A') ?></p>
-                        </div>
-                        <div class="col-sm-6 col-md-6">
-                            <label class="text-muted small text-uppercase">Physical Address</label>
-                            <p class="fw-bold"><?= safe_output($employee['emergency_contact_physical_address'] ?? 'N/A') ?></p>
-                        </div>
-                    </div>
-                </div>
             </div>
+            <div class="tab-pane fade" id="pane-documents" role="tabpanel">
 
             <!-- Documents Card -->
             <div class="card shadow-sm mb-4">
@@ -1024,6 +1079,8 @@ $sr_status_badge = [
                 </div>
             </div>
             <?php endif; ?>
+            </div>
+            <div class="tab-pane fade" id="pane-contracts" role="tabpanel">
 
             <?php if ($can_view_contracts): ?>
             <!-- Contracts Card (Tier 2, Phase 2.3) -->
@@ -1069,6 +1126,8 @@ $sr_status_badge = [
                 </div>
             </div>
             <?php endif; ?>
+            </div>
+            <div class="tab-pane fade" id="pane-performance" role="tabpanel">
 
             <?php if ($can_view_performance): ?>
             <!-- Performance Card (Tier 3, Phase 3.3) -->
@@ -1137,6 +1196,8 @@ $sr_status_badge = [
                 </div>
             </div>
             <?php endif; ?>
+            </div>
+            <div class="tab-pane fade" id="pane-training" role="tabpanel">
 
             <?php if ($can_view_training): ?>
             <!-- Training Card (Tier 3, Phase 3.5) -->
@@ -1185,6 +1246,8 @@ $sr_status_badge = [
                 </div>
             </div>
             <?php endif; ?>
+            </div>
+            <div class="tab-pane fade" id="pane-onboarding" role="tabpanel">
 
             <?php if ($can_view_checklists && !empty($emp_checklists)): ?>
             <!-- Active Checklist Card (Tier 4, Phase 4.4) -->
@@ -1208,6 +1271,8 @@ $sr_status_badge = [
                 </div>
             </div>
             <?php endif; ?>
+            </div>
+            <div class="tab-pane fade" id="pane-meetings" role="tabpanel">
 
             <?php if (($can_view_meetings && !empty($emp_meetings)) || ($can_view_trips && !empty($emp_trips))): ?>
             <!-- Meetings & Trips Card (Tier 4, Phase 4.3) -->
@@ -1244,6 +1309,8 @@ $sr_status_badge = [
                 </div>
             </div>
             <?php endif; ?>
+            </div>
+            <div class="tab-pane fade" id="pane-notes" role="tabpanel">
 
             <?php $notes_text = trim(($employee['notes'] ?? '') . "\n" . ($employee['additional_notes'] ?? '')); ?>
             <?php if ($notes_text !== ''): ?>
@@ -1262,6 +1329,8 @@ $sr_status_badge = [
                 </div>
             </div>
             <?php endif; ?>
+            </div>
+            <div class="tab-pane fade" id="pane-attendance" role="tabpanel">
 
             <!-- Full Attendance History (all records, since day one) — attendance.php's
                  capture/history view only lists active employees, so this is the only
@@ -1294,7 +1363,7 @@ $sr_status_badge = [
                     return '<span class="badge" style="' . $st . 'padding:5px 10px;border-radius:20px;">' . ucfirst(str_replace('_', ' ', $s ?: '—')) . '</span>';
                 };
             ?>
-            <div class="card shadow-sm mb-4" id="attendanceHistoryCard" style="scroll-margin-top: 90px;">
+            <div class="card shadow-sm mb-4" id="attendanceHistoryCard">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <h5 class="mb-0"><i class="bi bi-calendar-check text-primary me-2"></i>Attendance History</h5>
                     <div class="d-flex align-items-center gap-3">
@@ -1402,6 +1471,8 @@ $sr_status_badge = [
                 </div>
             </div>
             <?php endif; ?>
+            </div>
+            <div class="tab-pane fade" id="pane-payroll" role="tabpanel">
 
             <!-- Full Payroll & Payment History (all records, since day one) -->
             <?php
@@ -1427,7 +1498,7 @@ $sr_status_badge = [
                     return '<span class="badge" style="' . $st . 'padding:5px 10px;border-radius:20px;">' . ucfirst($s ?: 'pending') . '</span>';
                 };
             ?>
-             <div class="card shadow-sm mb-4" id="payrollHistoryCard" style="scroll-margin-top: 90px;">
+             <div class="card shadow-sm mb-4" id="payrollHistoryCard">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="bi bi-cash-stack text-primary me-2"></i>Payroll &amp; Payment History</h5>
                     <span class="small text-muted"><?= count($all_payrolls) ?> record(s) · Paid to date: <strong><?= format_currency($paid_total) ?></strong></span>
@@ -1475,14 +1546,198 @@ $sr_status_badge = [
                     </table>
                 </div>
             </div>
-            
+            </div>
+            <div class="tab-pane fade" id="pane-leave" role="tabpanel">
+
+            <!-- Full Leave History (all records, since day one) -->
+            <?php
+                $stmt_leave = $pdo->prepare("
+                    SELECT l.*, lt.type_name AS official_type
+                      FROM leaves l
+                      LEFT JOIN leave_types lt ON lt.type_id = l.leave_type_id
+                     WHERE l.employee_id = ?
+                  ORDER BY l.start_date DESC
+                ");
+                $stmt_leave->execute([$employee_id]);
+                $all_leaves = $stmt_leave->fetchAll(PDO::FETCH_ASSOC);
+                $leaveStatusBadge = function ($s) {
+                    $map = [
+                        'pending'   => 'background:#ffc107;color:#000;',
+                        'approved'  => 'background:#198754;color:#fff;',
+                        'rejected'  => 'background:#dc3545;color:#fff;',
+                        'cancelled' => 'background:#6c757d;color:#fff;',
+                        'taken'     => 'background:#0d6efd;color:#fff;',
+                    ];
+                    $st = $map[$s] ?? 'background:#e9ecef;color:#495057;';
+                    return '<span class="badge" style="' . $st . 'padding:5px 10px;border-radius:20px;">' . ucfirst($s ?: 'pending') . '</span>';
+                };
+            ?>
+            <div class="card shadow-sm mb-4" id="leaveHistoryCard">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="mb-0"><i class="bi bi-calendar-week text-primary me-2"></i>Leave History</h5>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="small text-muted"><?= count($all_leaves) ?> record(s) total</span>
+                        <?php if ($can_apply_leave): ?>
+                        <button type="button" class="btn btn-sm btn-primary d-print-none" data-bs-toggle="modal" data-bs-target="#applyEmpLeaveModal">
+                            <i class="bi bi-plus-circle me-1"></i> Apply for Leave
+                        </button>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="table-responsive" style="max-height:420px;overflow:auto;">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light" style="position:sticky;top:0;z-index:1;">
+                            <tr>
+                                <th class="ps-3">S/NO</th>
+                                <th>Type</th>
+                                <th>Start</th>
+                                <th>End</th>
+                                <th class="text-end">Days</th>
+                                <th>Status</th>
+                                <th class="d-print-none">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            if (count($all_leaves) > 0):
+                                $sn = 1;
+                                foreach ($all_leaves as $lv):
+                            ?>
+                            <tr>
+                                <td class="ps-3"><?= $sn++ ?></td>
+                                <td><?= safe_output($lv['official_type'] ?? '', '—') ?></td>
+                                <td><?= date('d M Y', strtotime($lv['start_date'])) ?></td>
+                                <td><?= date('d M Y', strtotime($lv['end_date'])) ?></td>
+                                <td class="text-end"><?= $lv['total_days'] ?></td>
+                                <td><?= $leaveStatusBadge($lv['status']) ?></td>
+                                <td class="d-print-none">
+                                    <div class="d-flex gap-1">
+                                        <a href="<?= getUrl('leave_details') ?>?id=<?= $lv['leave_id'] ?>" target="_blank" class="btn btn-sm btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>
+                                        <?php if ($can_approve_leaves && $lv['status'] === 'pending'): ?>
+                                        <button type="button" class="btn btn-sm btn-outline-success" title="Approve" onclick="approveEmpLeave(<?= $lv['leave_id'] ?>)"><i class="bi bi-check-circle"></i></button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" title="Reject" onclick="rejectEmpLeave(<?= $lv['leave_id'] ?>)"><i class="bi bi-x-circle"></i></button>
+                                        <?php endif; ?>
+                                        <?php if ($can_delete_leaves): ?>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" onclick="deleteEmpLeave(<?= $lv['leave_id'] ?>)"><i class="bi bi-trash"></i></button>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; else: ?>
+                            <tr><td colspan="7" class="text-center text-muted py-3">No leave records found.</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <?php if ($can_apply_leave): ?>
+            <!-- Apply for Leave Modal — locked to this employee (a single hidden employee_id
+                 field, no picker at all), so this can never file a leave application for
+                 anyone else. Posts to the existing api/apply_leave.php; approve/reject/delete
+                 below reuse api/approve_leave.php, api/reject_leave.php, api/delete_leave.php
+                 verbatim from leaves.php. -->
+            <div class="modal fade" id="applyEmpLeaveModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content border-0 shadow">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i> Apply for Leave — <?= safe_output($employee['first_name'] . ' ' . $employee['last_name']) ?></h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form id="applyEmpLeaveForm" autocomplete="off">
+                            <div class="modal-body">
+                                <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                                <input type="hidden" name="employee_id" value="<?= (int)$employee_id ?>">
+                                <div id="ael-message" class="mb-2"></div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label small fw-bold">Leave Type <span class="text-danger">*</span></label>
+                                        <select class="form-select select2-static" id="ael_leave_type" name="leave_type_id" required onchange="updateEmpLeaveTypeInfo()">
+                                            <option value="">Select Type</option>
+                                            <?php foreach ($leave_types as $type): ?>
+                                            <option value="<?= (int)$type['type_id'] ?>"
+                                                    data-max-days="<?= (int)$type['max_days_per_year'] ?>"
+                                                    data-requires-doc="<?= (int)$type['requires_document'] ?>"
+                                                    data-is-paid="<?= (int)$type['is_paid'] ?>">
+                                                <?= safe_output($type['type_name']) ?> (Max: <?= (int)$type['max_days_per_year'] ?> days/year, <?= (int)$type['max_consecutive_days'] ?> consecutive)
+                                            </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <div id="ael_paid_badge" class="mt-1"></div>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label small fw-bold">Start Date <span class="text-danger">*</span></label>
+                                        <input type="date" class="form-control" id="ael_start_date" name="start_date" required onchange="calculateEmpLeaveDays()">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label small fw-bold">End Date <span class="text-danger">*</span></label>
+                                        <input type="date" class="form-control" id="ael_end_date" name="end_date" required onchange="calculateEmpLeaveDays()">
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label small fw-bold">Total Days</label>
+                                        <input type="number" class="form-control" id="ael_total_days" name="total_days" readonly>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label small fw-bold">Half Day</label>
+                                        <select class="form-select" id="ael_half_day" name="half_day" onchange="calculateEmpLeaveDays()">
+                                            <option value="none">No</option>
+                                            <option value="first_half">First Half</option>
+                                            <option value="second_half">Second Half</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label small fw-bold">Contact During Leave</label>
+                                        <input type="text" class="form-control" name="contact_during_leave" placeholder="Phone number or email">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label small fw-bold">Handover To</label>
+                                        <select class="form-select select2-static" name="handover_to">
+                                            <option value="">Select Colleague</option>
+                                            <?php foreach ($handover_candidates as $hc): ?>
+                                            <option value="<?= (int)$hc['employee_id'] ?>"><?= safe_output($hc['first_name'] . ' ' . $hc['last_name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <div id="ael_documentSection" style="display:none;">
+                                            <label class="form-label small fw-bold">Supporting Document</label>
+                                            <input type="file" class="form-control" name="document" accept=".pdf,.jpg,.jpeg,.png">
+                                            <small class="text-muted">e.g. medical certificate</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 mb-2">
+                                        <label class="form-label small fw-bold">Reason <span class="text-danger">*</span></label>
+                                        <textarea class="form-control" name="reason" rows="3" required placeholder="Please provide a reason for this leave"></textarea>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="card">
+                                            <div class="card-header bg-light py-2"><h6 class="mb-0 small"><i class="bi bi-info-circle"></i> Leave Balance</h6></div>
+                                            <div class="card-body py-2" id="ael_balanceInfo">
+                                                <p class="text-muted mb-0 small">Select a leave type to view balance information.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer bg-light border-0">
+                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary btn-sm px-4"><i class="bi bi-check-circle me-1"></i> Submit Application</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+            </div>
+            </div>
+
         </div>
     </div>
 
-   
+
 </div>
 
-<?php 
+<?php
 // Include Edit Modal (Reuse logic from employees.php)
 // We need to ensure the JS for editing is available. 
 // Ideally, we move the modal and JS to a shared file or include employees.php's modal here.
@@ -1567,6 +1822,132 @@ $(document).ready(function() {
         });
     });
 
+    // ── Leave — apply for / review this employee's own leave ────────────
+    const EMP_LEAVE_ID = <?= (int)$employee_id ?>;
+
+    $('#applyEmpLeaveModal').appendTo('body');
+    $('#applyEmpLeaveModal').on('shown.bs.modal', function () {
+        $(this).find('.select2-static').each(function () {
+            if (!$(this).hasClass('select2-hidden-accessible')) $(this).select2({ theme:'bootstrap-5', dropdownParent:$('#applyEmpLeaveModal'), width:'100%' });
+        });
+    });
+    $('#applyEmpLeaveModal').on('hidden.bs.modal', function () {
+        const f = $('#applyEmpLeaveForm')[0];
+        if (f) f.reset();
+        $('#ael-message').html('');
+        $('#ael_balanceInfo').html('<p class="text-muted mb-0 small">Select a leave type to view balance information.</p>');
+    });
+
+    function empLeaveDaysFor(startDate, endDate, halfDay) {
+        const start = new Date(startDate), end = new Date(endDate);
+        if (end < start) return null;
+        const diffDays = Math.round((end - start) / 86400000) + 1;
+        if (halfDay === 'first_half' || halfDay === 'second_half') return Math.max(0.5, diffDays - 0.5);
+        return diffDays;
+    }
+
+    window.calculateEmpLeaveDays = function () {
+        const startDate = $('#ael_start_date').val(), endDate = $('#ael_end_date').val();
+        if (!startDate || !endDate) return;
+        const totalDays = empLeaveDaysFor(startDate, endDate, $('#ael_half_day').val());
+        if (totalDays === null) {
+            Swal.fire({ icon:'warning', title:'Invalid Date Range', text:'End date cannot be before the start date.' });
+            $('#ael_total_days').val(0); $('#ael_end_date').val('');
+            return;
+        }
+        $('#ael_total_days').val(totalDays);
+        updateEmpLeaveBalance();
+    };
+
+    window.updateEmpLeaveTypeInfo = function () {
+        const opt = $('#ael_leave_type').find(':selected');
+        const requiresDoc = opt.data('requires-doc') == 1;
+        const isPaid = String(opt.data('is-paid')) === '1';
+        $('#ael_documentSection').toggle(requiresDoc);
+        const $badge = $('#ael_paid_badge').empty();
+        if ($('#ael_leave_type').val()) {
+            $badge.append($('<span>').addClass('badge').css({ background:isPaid?'#0d6efd':'#6c757d', color:'#fff' }).text(isPaid?'Paid Leave':'Unpaid Leave'));
+        }
+        updateEmpLeaveBalance();
+    };
+
+    window.updateEmpLeaveBalance = function () {
+        const leaveTypeId = $('#ael_leave_type').val();
+        if (!leaveTypeId) return;
+        $.ajax({
+            url: '<?= buildUrl('api/get_leave_balance.php') ?>', type: 'GET',
+            data: { employee_id: EMP_LEAVE_ID, leave_type_id: leaveTypeId }, dataType: 'json',
+            success: function (res) {
+                if (!res.success) return;
+                const maxDays = res.max_days_per_year || 0;
+                const usedDays = parseFloat(res.balance.used_days) || 0;
+                const remaining = maxDays - usedDays;
+                $('#ael_balanceInfo').html(`
+                    <div class="row">
+                        <div class="col-4 text-center"><h5 class="text-primary mb-0">${remaining}</h5><small class="text-muted">Remaining</small></div>
+                        <div class="col-4 text-center"><h5 class="mb-0">${usedDays}</h5><small class="text-muted">Used</small></div>
+                        <div class="col-4 text-center"><h5 class="mb-0">${maxDays}</h5><small class="text-muted">Annual Limit</small></div>
+                    </div>
+                    <div class="progress mt-2" style="height:8px;"><div class="progress-bar bg-success" style="width:${maxDays>0?(usedDays/maxDays)*100:0}%"></div></div>
+                `);
+            }
+        });
+    };
+
+    $('#applyEmpLeaveForm').on('submit', function (e) {
+        e.preventDefault();
+        const btn = $(this).find('[type="submit"]'); const orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Submitting...');
+        $.ajax({
+            url: '<?= buildUrl('api/apply_leave.php') ?>', type: 'POST',
+            data: new FormData(this), contentType: false, processData: false, dataType: 'json',
+            success: function (res) {
+                if (res.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('applyEmpLeaveModal')).hide();
+                    Swal.fire({ icon:'success', title:'Submitted!', text:res.message, timer:1600, showConfirmButton:false }).then(() => location.reload());
+                } else {
+                    Swal.fire({ icon:'error', title:'Error', text: res.message || 'Could not submit leave application.' });
+                }
+            },
+            error: function () { Swal.fire({ icon:'error', title:'Error', text:'Server error.' }); },
+            complete: function () { btn.prop('disabled', false).html(orig); }
+        });
+    });
+
+    window.approveEmpLeave = function (leaveId) {
+        Swal.fire({ title:'Approve Leave?', text:'Are you sure you want to approve this leave application?', icon:'question',
+            showCancelButton:true, confirmButtonText:'Yes, Approve' })
+        .then(r => { if (!r.isConfirmed) return;
+            $.ajax({ url: '<?= buildUrl('api/approve_leave.php') ?>', type:'POST', dataType:'json',
+                data: { leave_id:leaveId, action:'approve' },
+                success:function(res){ if(res.success){ Swal.fire({icon:'success',title:'Approved!',text:res.message,timer:1500,showConfirmButton:false}).then(()=>location.reload()); } else { Swal.fire({icon:'error',title:'Error',text:res.message}); } },
+                error:function(){ Swal.fire({icon:'error',title:'Error',text:'Error approving leave.'}); } });
+        });
+    };
+
+    window.rejectEmpLeave = function (leaveId) {
+        Swal.fire({ title:'Reject Application', text:'Please provide a reason for rejection:', input:'textarea',
+            inputPlaceholder:'Reason for rejection...', showCancelButton:true, confirmButtonText:'Reject Application', confirmButtonColor:'#d33',
+            preConfirm: (reason) => { if (!reason) Swal.showValidationMessage('Reason is required for rejection'); return reason; } })
+        .then(r => { if (!r.isConfirmed) return;
+            $.ajax({ url: '<?= buildUrl('api/reject_leave.php') ?>', type:'POST', dataType:'json',
+                data: { leave_id:leaveId, reason:r.value },
+                success:function(res){ if(res.success){ Swal.fire({icon:'success',title:'Rejected!',text:res.message,timer:1500,showConfirmButton:false}).then(()=>location.reload()); } else { Swal.fire({icon:'error',title:'Error',text:res.message}); } },
+                error:function(){ Swal.fire({icon:'error',title:'Error',text:'Error rejecting leave.'}); } });
+        });
+    };
+
+    window.deleteEmpLeave = function (leaveId) {
+        Swal.fire({ title:'Delete Application?', text:'This action cannot be undone.', icon:'warning',
+            showCancelButton:true, confirmButtonColor:'#d33', confirmButtonText:'Yes, Delete' })
+        .then(r => { if (!r.isConfirmed) return;
+            $.ajax({ url: '<?= buildUrl('api/delete_leave.php') ?>', type:'POST', dataType:'json',
+                data: { leave_id:leaveId },
+                success:function(res){ if(res.success){ Swal.fire({icon:'success',title:'Deleted!',text:res.message,timer:1500,showConfirmButton:false}).then(()=>location.reload()); } else { Swal.fire({icon:'error',title:'Error',text:res.message}); } },
+                error:function(){ Swal.fire({icon:'error',title:'Error',text:'Error deleting leave.'}); } });
+        });
+    };
+
     window.removeComponent = function (id) {
         Swal.fire({ title:'Remove this component?', text:'It will no longer apply to future payslips.', icon:'warning',
             showCancelButton:true, confirmButtonColor:'#dc3545', confirmButtonText:'Yes, remove' })
@@ -1633,20 +2014,19 @@ function editEmployee(id) {
     window.location.href = APP_URL + '/employees?edit_id=' + id;
 }
 
-// Deep-link support for same-page card anchors (#attendanceHistoryCard,
-// #payrollHistoryCard — used by the employee list's Actions/mobile buttons and the
-// sidebar's "View Attendance"/"View Payroll" buttons here). The browser's native
-// anchor-jump runs before this page's async content above the card finishes
-// rendering/resizing, so it lands short. Re-run it after everything has settled.
-window.addEventListener('load', function () {
-    var hash = window.location.hash;
-    if (hash === '#attendanceHistoryCard' || hash === '#payrollHistoryCard') {
-        setTimeout(function () {
-            var el = document.getElementById(hash.slice(1));
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 300);
-    }
-});
+// Jump to one of the Attendance/Payroll/Leave tabs from the sidebar's "View..." buttons —
+// activates the pill tab directly (bootstrap.Tab), then scrolls the tab bar into view.
+// Simpler and more reliable than the old hash+scrollIntoView approach: there's no longer
+// any external link into these specific cards (the employee list's Actions dropdown and
+// mobile card buttons now only go to "View Details"), so nothing needs URL-hash support —
+// this page's own buttons can just drive the tab directly.
+function showEmpTab(paneId) {
+    var btn = document.querySelector('#employeeExtrasTabs [data-bs-target="#' + paneId + '"]');
+    if (!btn) return;
+    bootstrap.Tab.getOrCreateInstance(btn).show();
+    var tabs = document.getElementById('employeeExtrasTabs');
+    if (tabs) tabs.scrollIntoView({ behavior: 'auto', block: 'start' });
+}
 </script>
 
 <?php if ($can_create_lifecycle):
