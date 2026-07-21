@@ -1,5 +1,54 @@
 # BMS Changelog
 
+## 2026-07-21 (feat) — Employee profile: tabbed layout for everything not from registration, print shows only core info
+
+**Files:** `app/bms/pos/employee_details.php`
+
+The profile page had grown to ~15 stacked cards shown all at once (Personal Info, Service
+Record, Compensation, Salary Structure, Emergency Contact, Documents, Contracts,
+Performance, Training, Onboarding, Meetings & Trips, Notes, Attendance/Payroll/Leave
+History) — a wall of tables, and printing the page printed everything, including uploaded
+documents. Modeled the fix on `customer_details.php`'s existing pill-tab pattern.
+
+Split by data source, not just card grouping — checked each card's actual query, not just
+its header:
+- **Always visible** (comes straight from the `employees` row itself): Personal &
+  Employment Information, Compensation & Payment, Emergency Contact.
+- **Moved into click-to-reveal pill tabs** (each a separate log/module that accumulates
+  over time, not registration data) — 12 tabs: Service Record *(this one looked like core
+  info from its header but is actually a lifecycle-events timeline)*, Salary Structure,
+  Documents, Contracts, Performance, Training, Onboarding, Meetings & Trips, Notes,
+  Attendance, Payroll, Leave.
+
+Reordered the DOM so the three always-visible cards are contiguous at the top (Service
+Record used to sit between Personal Info and Compensation; Emergency Contact used to sit
+after Salary Structure) — moved both into the always-visible group, tabs start after them.
+
+**Print:** the tab nav and the entire tab-content wrapper are `d-print-none`. Printing the
+profile now only ever shows the three core cards — nothing tabbed prints, which includes
+Documents (now unreachable on a printed profile, as requested) and the Attendance/
+Payroll/Leave history added earlier this session.
+
+**Deep-linking simplified:** the sidebar's "View Attendance"/"View Payroll"/"View Leave"
+buttons used to be `href="#cardId"` anchors relying on a `window.load` + `scrollIntoView`
+handler (added earlier this session to fix a short-landing scroll bug). Since those cards
+are now behind tabs — invisible via `display:none` until their pill is active, so
+scrolling to a hidden element does nothing — replaced the whole mechanism with a
+`showEmpTab(paneId)` JS helper that activates the Bootstrap tab directly
+(`bootstrap.Tab.getOrCreateInstance(...).show()`) then scrolls the tab bar into view. Since
+`employees.php`'s Actions dropdown and mobile card no longer link into these specific cards
+(dropped earlier this session once they became redundant with "View Details"), there's no
+remaining external consumer of the old hash anchors, so no backward-compatibility need.
+
+Verified live (not just statically): all 12 pane ids render exactly once; document order
+confirmed Personal Info → Compensation → Emergency Contact → tab bar → Service Record;
+`showEmpTab()` correctly activates each of Attendance/Payroll/Leave/Documents/Salary
+Structure and only that pane; re-submitted a real Mark Attendance entry through the
+post-restructure page and confirmed it still posts to `api/mark_attendance.php` and lands
+in the database correctly (test row removed after); `.d-print-none` confirmed already a
+real, working rule in this file's own `@media print` block, and now covers both the tab
+nav and tab-content wrapper.
+
 ## 2026-07-21 (fix) — Payroll Records link was completely dead; scoped it to the profile's existing history card, then dropped the redundant shortcut
 
 **Files:** `app/bms/pos/employee_details.php`, `app/bms/pos/employees.php`, `api/get_employees.php`
