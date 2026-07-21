@@ -1,5 +1,42 @@
 # BMS Changelog
 
+## 2026-07-21 (feat) — Employee profile tables → DataTables with S/NO, row actions consolidated into one gear-dropdown per row
+
+**Files:** `app/bms/pos/employee_details.php`
+
+Follow-up to the tabbed-layout change below. Every tab that actually has a `<table>` (Salary
+Structure, Documents, Contracts, Training, Attendance, Payroll, Leave) is now a real
+DataTable — search, pagination, sorting. Tabs that are lists/cards/timelines instead of
+tables (Service Record, Performance, Onboarding, Meetings & Trips, Notes) are untouched,
+per the request to only convert what's actually a table. Every converted table now starts
+with an `S/NO` column.
+
+Wherever a row had more than one action crammed into the cell (Documents: download+delete;
+Leave: view/approve/reject/delete), consolidated them into the same single gear-icon
+dropdown pattern already used for the employees-list Actions column
+(`api/get_employees.php`) — one button, a menu with all the row's options, instead of a
+row of separate icon buttons. Applied it for consistency even to single-action columns
+(Salary Structure's Remove, Payroll's print-payslip, Training's certificate download).
+
+**Bug caught and fixed before landing:** initializing all 7 tables in a `.forEach()` loop
+silently dropped 3 of them (Attendance/Payroll/Leave never became DataTables, no console
+error) — a native `Array.prototype.forEach` aborts entirely if any iteration throws,
+silently skipping every table after the one that failed. Switched to a plain `for` loop
+with a try/catch per table, so one bad table can't take out the rest. Also caught: these
+tables live inside Bootstrap tab-panes that are `display:none` until their tab is clicked,
+and DataTables measures column widths against the visible container width at init time —
+so every table but the default-active one initialized with collapsed columns. Fixed with
+a `shown.bs.tab` handler that calls `columns.adjust()` on whichever table is inside the
+newly-shown pane. Also caught the `dom: 'rtip'` config (copied from `leaves.php`'s own
+convention) omitting the `f` (search box) component, which `leaves.php` doesn't need since
+it has its own filter form — these per-employee tables don't, so added `f` back.
+
+Verified live (dev.bms.local): all 4 non-empty tables for employee #1 (Salary Structure,
+Attendance, Payroll, Leave — Documents/Contracts/Training were empty for this employee so
+correctly don't render at all) report as real DataTables with working pagination and
+search box; the Leave row's gear-dropdown correctly showed only "View, Delete" for a
+non-pending record (Approve/Reject correctly hidden by the existing status condition).
+
 ## 2026-07-21 (feat) — Employee profile: tabbed layout for everything not from registration, print shows only core info
 
 **Files:** `app/bms/pos/employee_details.php`
