@@ -156,6 +156,49 @@ $company_logo = getSetting('company_logo', '');
     .service-header-buttons .btn { flex: 1; }
 }
 @page { margin: 10mm 8mm 16mm 8mm; }
+
+/* This page had no print-specific rules of its own, so it printed the full
+   bulky desktop dashboard (generous padding, rounded-4 cards, 60px icon
+   circle) as-is — the global print stylesheet only resets elements with the
+   literal .card/.card-body classes, and these info/stat boxes use plain
+   utility divs instead, so they kept their screen-sized spacing and left
+   large gaps between blocks in print. Shrinking them keeps everything on
+   page 1 and tightens the layout in both portrait and landscape. */
+@media print {
+    .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+    .card-body { padding: 8px !important; }
+    .bg-white.p-4.border-bottom { padding: 8px !important; }
+
+    .svc-icon-circle {
+        width: 36px !important;
+        height: 36px !important;
+        padding: 0 !important;
+    }
+    .svc-icon-circle i { font-size: 1rem !important; }
+
+    .dashboard-stat-card { padding: 4px 6px !important; }
+
+    .row.g-4, .row.g-3, .row.g-2 { --bs-gutter-x: 10px !important; --bs-gutter-y: 8px !important; }
+    .mb-4 { margin-bottom: 8px !important; }
+    .mb-3 { margin-bottom: 6px !important; }
+
+    .svc-info-box {
+        padding: 8px !important;
+        border-radius: 4px !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+    .svc-info-box h6 { margin-bottom: 6px !important; padding-bottom: 4px !important; }
+    .spec-item { padding: 2px 0 !important; }
+
+    .svc-comp-panel { border-radius: 4px !important; margin-top: 6px !important; }
+    .svc-comp-header {
+        padding: 6px 10px !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    #svcViewCompTable th, #svcViewCompTable td { padding: 4px 6px !important; font-size: 9pt !important; }
+}
 </style>
 
 <div class="container-fluid mt-4 px-4">
@@ -197,7 +240,7 @@ $company_logo = getSetting('company_logo', '');
             <div class="row align-items-center g-3">
                 <div class="col-md-5">
                     <div class="d-flex align-items-center">
-                        <div class="bg-primary bg-opacity-10 rounded-circle p-3 me-3 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                        <div class="svc-icon-circle bg-primary bg-opacity-10 rounded-circle p-3 me-3 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
                             <i class="bi bi-gear-wide-connected fs-3 text-primary"></i>
                         </div>
                         <div>
@@ -241,7 +284,7 @@ $company_logo = getSetting('company_logo', '');
             <div class="row g-4">
                 <!-- Left Column: Specs -->
                 <div class="col-md-6">
-                    <div class="p-4 bg-light rounded-4 h-100 border">
+                    <div class="svc-info-box p-4 bg-light rounded-4 h-100 border">
                         <h6 class="fw-bold text-dark text-uppercase small mb-3 border-bottom pb-2">
                             <i class="bi bi-info-circle me-2 text-primary"></i> Basic Specifications
                         </h6>
@@ -267,7 +310,7 @@ $company_logo = getSetting('company_logo', '');
 
                 <!-- Right Column: Assembly -->
                 <div class="col-md-6">
-                    <div class="p-4 bg-light rounded-4 h-100 border">
+                    <div class="svc-info-box p-4 bg-light rounded-4 h-100 border">
                         <h6 class="fw-bold text-dark text-uppercase small mb-3 border-bottom pb-2">
                             <i class="bi bi-layers me-2 text-primary"></i> Assembly Information
                         </h6>
@@ -286,8 +329,8 @@ $company_logo = getSetting('company_logo', '');
 
                 <!-- Bottom: Material List -->
                 <div class="col-12">
-                    <div class="bg-white rounded-4 border overflow-hidden mt-2">
-                        <div class="p-3 bg-primary text-white d-flex justify-content-between align-items-center">
+                    <div class="svc-comp-panel bg-white rounded-4 border overflow-hidden mt-2">
+                        <div class="svc-comp-header p-3 bg-primary text-white d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 class="mb-0 fw-bold"><i class="bi bi-list-check me-2"></i> Material Components List</h6>
                                 <small class="opacity-75" id="svcCompCount">Loading...</small>
