@@ -60,6 +60,21 @@ try {
 
     $userId = $_SESSION['user_id'];
 
+    // Guard: an invoice that already has payment(s) recorded must not be cancelled.
+    // Cancelling reverses revenue/COGS/output VAT, but the payment's own entry
+    // (Dr Bank / Cr AR) would remain untouched — leaving AR wrong and the bank
+    // overstated against revenue that no longer exists. Mirrors the equivalent
+    // guard already enforced on Bills (supplierInvoiceHasPayments() in
+    // received_invoices.php) — remove/void the payment(s) first, then cancel.
+    if ($status === 'cancelled') {
+        $payChk = $pdo->prepare("SELECT COUNT(*) FROM payments WHERE invoice_id = ? AND status = 'completed'");
+        $payChk->execute([$invoice_id]);
+        if ((int)$payChk->fetchColumn() > 0) {
+            echo json_encode(['success' => false, 'message' => 'This invoice has payment(s) recorded and cannot be cancelled. Remove or void the payment(s) first.']);
+            exit;
+        }
+    }
+
     $pdo->beginTransaction();
 
     if ($status === 'reviewed') {
