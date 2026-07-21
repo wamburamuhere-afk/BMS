@@ -198,6 +198,64 @@ $company_logo = getSetting('company_logo', '');
         print-color-adjust: exact !important;
     }
     #svcViewCompTable th, #svcViewCompTable td { padding: 4px 6px !important; font-size: 9pt !important; }
+
+    /* Bootstrap's col-md-* grid only switches to a multi-column layout at
+       viewports >= 768px — a rule with no "screen" qualifier, so it also
+       governs print. The printed page's content box (A4/Letter minus the
+       @page margins above) is narrower than 768px, so every col-md-* here
+       was silently collapsing to 100% width and stacking vertically instead
+       of sitting side by side, ballooning the header/info-box height. Forcing
+       the desktop width back on for the info boxes below keeps them compact
+       and side by side so the page fits on page 1. */
+    .row > .col-md-6 { flex: 0 0 auto !important; width: 50% !important; max-width: 50% !important; }
+
+    /* Per request: the SELLING/COST/MARGIN row prints as its own full-width
+       row at the top (like the stat-card row on invoices.php), with the
+       product name below it — not side by side. flex-direction:column
+       stacks the two halves of the header row and `order` puts the stats
+       first; each then gets the full row width instead of splitting it.
+       This is print-only — the on-screen dashboard keeps its normal
+       name-left/stats-right layout. */
+    .row.align-items-center.g-3 { flex-direction: column !important; }
+    .row.align-items-center.g-3 > .col-md-7 {
+        order: -1 !important;
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    .row.align-items-center.g-3 > .col-md-5 {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-top: 10px !important;
+    }
+
+    /* Stat cards: always one row of 3, left to right, in both Portrait and
+       Landscape — same technique invoices.php uses for its top stat row
+       (flex-wrap:nowrap + a fixed % basis instead of relying on the md
+       breakpoint, which print's page width sits under). Now that the row
+       is full width instead of squeezed into 58% next to the name, each
+       card also gets roughly 3x the room it had before. */
+    .row.g-2.justify-content-md-end { flex-wrap: nowrap !important; justify-content: flex-start !important; }
+    .dashboard-stat-col { flex: 0 0 33.3333% !important; width: 33.3333% !important; max-width: 33.3333% !important; }
+
+    /* A large TZS figure or a big negative margin % sat label-left/
+       value-right with nowrap, so it could still run past the card's own
+       border instead of shrinking. Stacking label above value inside each
+       card removes the side-by-side width fight — the value gets the full
+       card width to itself and wraps within its own border if it's still
+       too long, instead of overflowing it. Default (short) values just show
+       on one line as before, unchanged. */
+    .dashboard-stat-card .d-flex.justify-content-between {
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 2px !important;
+    }
+    .dashboard-stat-card .fw-bold {
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+    }
 }
 </style>
 
@@ -229,7 +287,7 @@ $company_logo = getSetting('company_logo', '');
     <div class="text-center mb-4 report-header d-none d-print-block">
         
         <h3 class="fw-bold mb-1" style="color:#000!important;text-transform:uppercase;">NON-INVENTORY PRODUCT DETAILS</h3>
-        <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($svc['product_name']) ?></h5>
+        <h5 class="text-dark fw-bold mb-1" style="word-break:break-word;overflow-wrap:anywhere;max-width:100%;"><?= htmlspecialchars($svc['product_name']) ?></h5>
         <div class="mx-auto bg-primary" style="width:60px;height:3px;border-radius:2px;"></div>
     </div>
 
@@ -240,11 +298,11 @@ $company_logo = getSetting('company_logo', '');
             <div class="row align-items-center g-3">
                 <div class="col-md-5">
                     <div class="d-flex align-items-center">
-                        <div class="svc-icon-circle bg-primary bg-opacity-10 rounded-circle p-3 me-3 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                        <div class="svc-icon-circle bg-primary bg-opacity-10 rounded-circle p-3 me-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 60px; height: 60px;">
                             <i class="bi bi-gear-wide-connected fs-3 text-primary"></i>
                         </div>
-                        <div>
-                            <h3 class="fw-bold mb-0 text-dark"><?= htmlspecialchars($svc['product_name']) ?></h3>
+                        <div style="min-width:0;">
+                            <h3 class="fw-bold mb-0 text-dark" style="word-break:break-word;overflow-wrap:anywhere;"><?= htmlspecialchars($svc['product_name']) ?></h3>
                             <span class="badge bg-light text-primary border border-primary border-opacity-25 mt-1">SKU: <?= htmlspecialchars($svc['sku'] ?: 'N/A') ?></span>
                         </div>
                     </div>
