@@ -229,7 +229,7 @@ $company_logo = getSetting('company_logo', '');
     <div class="text-center mb-4 report-header d-none d-print-block">
         
         <h3 class="fw-bold mb-1" style="color:#000!important;text-transform:uppercase;">NON-INVENTORY PRODUCT DETAILS</h3>
-        <h5 class="text-dark fw-bold mb-1"><?= htmlspecialchars($svc['product_name']) ?></h5>
+        <h5 class="text-dark fw-bold mb-1" style="word-break:break-word;overflow-wrap:anywhere;max-width:100%;"><?= htmlspecialchars($svc['product_name']) ?></h5>
         <div class="mx-auto bg-primary" style="width:60px;height:3px;border-radius:2px;"></div>
     </div>
 
@@ -240,11 +240,11 @@ $company_logo = getSetting('company_logo', '');
             <div class="row align-items-center g-3">
                 <div class="col-md-5">
                     <div class="d-flex align-items-center">
-                        <div class="svc-icon-circle bg-primary bg-opacity-10 rounded-circle p-3 me-3 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                        <div class="svc-icon-circle bg-primary bg-opacity-10 rounded-circle p-3 me-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 60px; height: 60px;">
                             <i class="bi bi-gear-wide-connected fs-3 text-primary"></i>
                         </div>
-                        <div>
-                            <h3 class="fw-bold mb-0 text-dark"><?= htmlspecialchars($svc['product_name']) ?></h3>
+                        <div style="min-width:0;">
+                            <h3 class="fw-bold mb-0 text-dark" style="word-break:break-word;overflow-wrap:anywhere;"><?= htmlspecialchars($svc['product_name']) ?></h3>
                             <span class="badge bg-light text-primary border border-primary border-opacity-25 mt-1">SKU: <?= htmlspecialchars($svc['sku'] ?: 'N/A') ?></span>
                         </div>
                     </div>

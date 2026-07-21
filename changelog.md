@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-07-21 (fix) — Non-inventory product name no longer overlaps Selling/Cost/Margin cards on view + print
+
+**Files:** `app/bms/product/service_view.php`
+
+User reported that on the Non-Inventory Product view page (`service_view.php`) and its print
+layout, a long product name with no spaces (e.g. `nasnxxnnnnn...hhhhh`) doesn't wrap and instead
+overflows its flex column, visually overlaying the SELLING/COST/MARGIN stat cards next to it.
+
+- Header name block: wrapped the name+SKU flex item with `min-width:0` and added
+  `word-break:break-word; overflow-wrap:anywhere;` to the `<h3>`, plus `flex-shrink-0` on the icon
+  circle so it keeps its size while the text column shrinks and wraps instead of overflowing.
+- Print-only title (`<h5>` under "NON-INVENTORY PRODUCT DETAILS"): same wrap/break styling added.
+
+Verified in-browser at `service_view?id=56` (product name is the long unbroken string from the
+bug report): name now wraps across multiple lines in both the on-screen dashboard header and the
+simulated print view, with no overlap of the stat cards. No other pages or elements touched.
+
 ## 2026-07-20 (fix) — Save & Sign no longer leaves a fake "PREVIEW — NOT LEGALLY APPLIED" stamp on a signed letter
 
 **Files:** `core/document_letter_render.php`, `core/document_letter_pdf.php`, `api/document/save_created_document.php`,
