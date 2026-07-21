@@ -424,7 +424,7 @@ $wf = [
             <?php
             $s_tv = [];
             if (!empty($grn['s_tin'])) $s_tv[] = 'TIN: ' . htmlspecialchars($grn['s_tin']);
-            if (!empty($grn['s_vrn'])) $s_tv[] = 'VRN: ' . htmlspecialchars($dn['s_vrn']); // Fixed typo from earlier context if any
+            if (!empty($grn['s_vrn'])) $s_tv[] = 'VRN: ' . htmlspecialchars($grn['s_vrn']);
             if ($s_tv): ?>
             <p><?= implode(' | ', $s_tv) ?></p>
             <?php endif; ?>
@@ -506,8 +506,14 @@ $wf = [
     <!-- DRAFT WATERMARK (position:fixed; only when status !== 'approved'/'completed') -->
     <?php require ROOT_DIR . '/includes/workflow_draft_watermark.php'; ?>
 
-    <!-- SIGNATURE — three_approval.md §6.3 canonical block (Created/Reviewed/Approved By) -->
-    <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
+    <!-- SIGNATURE — three_approval.md §6.3 canonical block (Created/Reviewed/Approved By).
+         clear: both restores the float clearance .totals (float:right, above) needs —
+         .notes-section already clears it when notes are present, but that block is
+         conditional, so without this the signature row overlapped the still-floating
+         totals box whenever a GRN had no notes. Matches print_purchase_order.php. -->
+    <div style="clear: both;">
+        <?php require ROOT_DIR . '/includes/workflow_signature_row.php'; ?>
+    </div>
     </div>
 
 
