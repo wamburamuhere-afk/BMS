@@ -1,5 +1,92 @@
 # BMS Changelog
 
+## 2026-07-21 (fix) — Non-inventory product print: SELLING/COST/MARGIN row moved above the name, full width
+
+**Files:** `app/bms/product/service_view.php`
+
+Follow-up to the print fixes below. User asked for the stat row to sit at the top of the print,
+spanning the full page width left-to-right like the top stat row on `invoices.php`, with the
+product name below it instead of sharing a row — and to keep working in both Portrait and
+Landscape without breaking page 1.
+
+- `@media print`: the header row (`.row.align-items-center.g-3`) is now `flex-direction: column`
+  with `order: -1` on the stats column, so the 3 stat cards render first at full width and the
+  name+icon block renders second, full width, below them. Screen view is unaffected — the
+  dashboard still shows name-left/stats-right there.
+- The stat cards' own row gets `flex-wrap: nowrap` and each card a fixed 33.33% basis — the same
+  technique `invoices.php` already uses (`#invoiceStatsRow { flex-wrap: nowrap }`) to keep a stat
+  row on one line in Portrait instead of dropping to 2-per-row under Bootstrap's md breakpoint.
+- Since the stat row is now full width instead of squeezed into the name column's other half,
+  each card also has roughly 3x the room it had before, on top of the earlier label-over-value
+  stacking fix.
+
+Verified in isolated iframes at both A4 Portrait (718px) and Landscape (1047px) content widths,
+with the reported large values (TZS 123,000,000 / TZS 488,000,000 / -396,647.97%) and the long
+unbroken product name: stat row renders as one full-width row in both orientations with no value
+overflow, and the name wraps cleanly below it.
+
+## 2026-07-21 (fix) — Non-inventory product print: large SELLING/COST/MARGIN values no longer overflow their card
+
+**Files:** `app/bms/product/service_view.php`
+
+Follow-up to the two print fixes below. After the previous fix compacted the 3 stat cards back
+into one row (each card only ~19% of the printed page width), a large TZS figure or a big negative
+margin percentage — sitting label-left/value-right with `white-space: nowrap` — ran past the card's
+own border instead of shrinking to fit, e.g. `-396,647.97%` printing outside its MARGIN box.
+
+- `@media print`: `.dashboard-stat-card .d-flex.justify-content-between` now stacks label above
+  value (was side-by-side), so the value gets the card's full width instead of sharing it with the
+  label.
+- `.dashboard-stat-card .fw-bold` (both label and value) gets `white-space: normal` +
+  `overflow-wrap: anywhere` so a long value wraps within its own card border if it's still too wide,
+  instead of overflowing it. Short/default values are unaffected — they still render on one line.
+
+Verified by reproducing the reported values (TZS 123,000,000 / TZS 488,000,000 / -396,647.97%) in
+an isolated narrow-width iframe with the exact print CSS applied: each value now stays inside its
+card border. This adds roughly one extra line to the stat-card row's height, which should not
+reopen the page-2 spillover fixed previously.
+
+## 2026-07-21 (fix) — Non-inventory product print no longer spills onto page 2 with a wrapped name or 2+ materials
+
+**Files:** `app/bms/product/service_view.php`
+
+Follow-up to the same-day overlap fix below. User reported the print layout still broke onto a
+second page whenever the product name wrapped to 2 lines, or the Material Components List had
+more than one row.
+
+Root cause: Bootstrap 5's `col-md-*` grid classes switch to their multi-column widths only at
+viewports >= 768px, and that breakpoint rule carries no `screen`-only qualifier — so it also
+governs print layout. The actual printed page's content box (A4/Letter minus this page's `@page`
+margins) is under 768px wide, so every `col-md-*` row on this page (name+stats header, the two
+info boxes, the three stat cards) was silently collapsing to single-column and stacking full-height
+instead of sitting side by side — visually confirmed by reproducing the exact same collapse in an
+isolated 740px-wide iframe (SELLING/COST/MARGIN rendered as 3 stacked full-width rows, matching the
+user's original bug screenshot). With everything stacked, page 1 was already nearly full before any
+real content — so a 2-line name or a second material row was enough to push content to page 2.
+
+Fix: added explicit `flex`/`width` overrides inside the existing `@media print` block for
+`.col-md-5`, `.col-md-7`, `.col-md-6`, and `.dashboard-stat-col`, forcing the intended desktop
+column widths regardless of the page's physical width. Verified by re-injecting the same override
+into the narrow test iframe: the header stats and info boxes snapped back to their compact
+side-by-side layout, freeing the vertical space needed to keep everything on page 1.
+
+## 2026-07-21 (fix) — Non-inventory product name no longer overlaps Selling/Cost/Margin cards on view + print
+
+**Files:** `app/bms/product/service_view.php`
+
+User reported that on the Non-Inventory Product view page (`service_view.php`) and its print
+layout, a long product name with no spaces (e.g. `nasnxxnnnnn...hhhhh`) doesn't wrap and instead
+overflows its flex column, visually overlaying the SELLING/COST/MARGIN stat cards next to it.
+
+- Header name block: wrapped the name+SKU flex item with `min-width:0` and added
+  `word-break:break-word; overflow-wrap:anywhere;` to the `<h3>`, plus `flex-shrink-0` on the icon
+  circle so it keeps its size while the text column shrinks and wraps instead of overflowing.
+- Print-only title (`<h5>` under "NON-INVENTORY PRODUCT DETAILS"): same wrap/break styling added.
+
+Verified in-browser at `service_view?id=56` (product name is the long unbroken string from the
+bug report): name now wraps across multiple lines in both the on-screen dashboard header and the
+simulated print view, with no overlap of the stat cards. No other pages or elements touched.
+
 ## 2026-07-20 (fix) — Save & Sign no longer leaves a fake "PREVIEW — NOT LEGALLY APPLIED" stamp on a signed letter
 
 **Files:** `core/document_letter_render.php`, `core/document_letter_pdf.php`, `api/document/save_created_document.php`,
