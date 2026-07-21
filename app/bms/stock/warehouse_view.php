@@ -48,6 +48,18 @@ if (!$warehouse) {
     exit();
 }
 
+// Project context for the print header (Project / Contract No), matching the
+// pattern used by other project-scoped print templates (do_view.php, print_purchase_order.php).
+$project_name = '';
+$contract_no  = '';
+if ($project_id > 0) {
+    $proj_stmt = $pdo->prepare("SELECT project_name, contract_number FROM projects WHERE project_id = ?");
+    $proj_stmt->execute([$project_id]);
+    $proj_row     = $proj_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    $project_name = $proj_row['project_name'] ?? '';
+    $contract_no  = $proj_row['contract_number'] ?? '';
+}
+
 // Fetch locations for this warehouse
 $query = "SELECT * FROM locations WHERE warehouse_id = ? AND status != 'deleted' ORDER BY location_name";
 $stmt = $pdo->prepare($query);
@@ -107,6 +119,12 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
 
         <h2 style="color: #000; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">WAREHOUSE INVENTORY REPORT</h2>
         <h5 class="text-muted"><?= htmlspecialchars($warehouse['warehouse_name']) ?> (<?= htmlspecialchars($warehouse['warehouse_code']) ?>)</h5>
+        <?php if (!empty($project_name)): ?>
+        <p class="mb-0" style="font-size: 11pt; font-weight: 700;">Project: <?= htmlspecialchars($project_name) ?></p>
+        <?php endif; ?>
+        <?php if (!empty($contract_no)): ?>
+        <p class="mb-0 text-muted" style="font-size: 10pt; font-weight: 600;">Contract No: <?= htmlspecialchars($contract_no) ?></p>
+        <?php endif; ?>
         <p class="small text-muted">Generated on: <?= date('F d, Y H:i') ?></p>
         <div style="border-bottom: 3px solid #0d6efd; margin-top: 10px; margin-bottom: 20px;"></div>
     </div>
@@ -502,34 +520,39 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
     }
     body { background: white !important; }
     
-    /* Stats cards in a single row for print */
+    /* Stats cards as a 2x2 grid for print — a single 4-across row leaves too
+       little width for the currency value in "Stock Value (Cost)", which wraps
+       onto two cramped lines in portrait. 2 columns gives every card, including
+       the long formatted currency figure, room to stay on one line. */
     .row.mb-5.g-4 {
         display: flex !important;
         flex-direction: row !important;
-        flex-wrap: nowrap !important;
+        flex-wrap: wrap !important;
         gap: 10px !important;
     }
     .row.mb-5.g-4 .col-md-3 {
-        width: 25% !important;
-        flex: 0 0 25% !important;
-        max-width: 25% !important;
+        width: calc(50% - 5px) !important;
+        flex: 0 0 calc(50% - 5px) !important;
+        max-width: calc(50% - 5px) !important;
+        margin-bottom: 10px !important;
     }
     .custom-stat-card {
-        padding: 5px !important;
-        background-color: #d1e7dd !important; 
+        padding: 8px !important;
+        background-color: #d1e7dd !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
-        min-height: 80px !important;
+        min-height: 70px !important;
     }
     .stats-icon {
-        font-size: 1rem !important;
-        margin-right: 0.5rem !important;
+        font-size: 1.1rem !important;
+        margin-right: 0.6rem !important;
     }
     .custom-stat-card h4 {
-        font-size: 1.2rem !important;
+        font-size: 1.15rem !important;
+        white-space: nowrap !important;
     }
     .custom-stat-card small {
-        font-size: 0.65rem !important;
+        font-size: 0.68rem !important;
     }
 }
 </style>
