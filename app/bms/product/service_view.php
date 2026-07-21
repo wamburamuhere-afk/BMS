@@ -214,6 +214,25 @@ $company_logo = getSetting('company_logo', '');
     .row > .col-md-7 { flex: 0 0 auto !important; width: 58.3333% !important; max-width: 58.3333% !important; }
     .row > .col-md-6 { flex: 0 0 auto !important; width: 50% !important; max-width: 50% !important; }
     .dashboard-stat-col { flex: 0 0 auto !important; width: 33.3333% !important; max-width: 33.3333% !important; }
+
+    /* Compacting the 3 stat cards into one row (above) leaves each card only
+       ~19% of the page width. A large TZS figure or a big negative margin %
+       sat label-left/value-right with nowrap, so it ran past the card's own
+       border instead of shrinking. Stacking label above value inside each
+       card removes the side-by-side width fight — the value gets the full
+       card width to itself and wraps within its own border if it's still
+       too long, instead of overflowing it. Default (short) values just show
+       on one line as before, unchanged. */
+    .dashboard-stat-card .d-flex.justify-content-between {
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 2px !important;
+    }
+    .dashboard-stat-card .fw-bold {
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+    }
 }
 </style>
 

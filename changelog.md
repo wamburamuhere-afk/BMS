@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-07-21 (fix) — Non-inventory product print: large SELLING/COST/MARGIN values no longer overflow their card
+
+**Files:** `app/bms/product/service_view.php`
+
+Follow-up to the two print fixes below. After the previous fix compacted the 3 stat cards back
+into one row (each card only ~19% of the printed page width), a large TZS figure or a big negative
+margin percentage — sitting label-left/value-right with `white-space: nowrap` — ran past the card's
+own border instead of shrinking to fit, e.g. `-396,647.97%` printing outside its MARGIN box.
+
+- `@media print`: `.dashboard-stat-card .d-flex.justify-content-between` now stacks label above
+  value (was side-by-side), so the value gets the card's full width instead of sharing it with the
+  label.
+- `.dashboard-stat-card .fw-bold` (both label and value) gets `white-space: normal` +
+  `overflow-wrap: anywhere` so a long value wraps within its own card border if it's still too wide,
+  instead of overflowing it. Short/default values are unaffected — they still render on one line.
+
+Verified by reproducing the reported values (TZS 123,000,000 / TZS 488,000,000 / -396,647.97%) in
+an isolated narrow-width iframe with the exact print CSS applied: each value now stays inside its
+card border. This adds roughly one extra line to the stat-card row's height, which should not
+reopen the page-2 spillover fixed previously.
+
 ## 2026-07-21 (fix) — Non-inventory product print no longer spills onto page 2 with a wrapped name or 2+ materials
 
 **Files:** `app/bms/product/service_view.php`
