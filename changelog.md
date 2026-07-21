@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-07-21 (fix) — Action-menu dropdowns hidden/clipped in datatables site-wide
+
+**Files:** `footer.php`
+
+Action-button dropdowns (the gear/kebab menu in every datatable row) sit inside
+`.table-responsive` and often a rounded `.card` wrapper, both of which clip
+absolutely-positioned menus — so only rows near the top of the table rendered their menu
+in full; rows further down had the menu cut off until the table was filtered/scrolled to
+bring that row into the unclipped area.
+
+Set `bootstrap.Dropdown.Default.popperConfig` to force Popper's positioning `strategy` to
+`'fixed'` as the site-wide default for every dropdown — present and future, however
+created (including rows rendered later by DataTables redraw/filter/page-change). Menus now
+position against the viewport instead of their clipping ancestor, so they always render
+fully on top. No container overflow is touched, so tables never jump.
+
+Verified the technique against conflicts before applying: `project_view.php`'s
+`initHrDropdowns()` already used the identical `popperConfig: { strategy: 'fixed' }` for
+its HR panel (now redundant, not conflicting); no page uses `data-bs-display="static"`
+(which would bypass Popper and this fix); no sticky/fixed header or sidebar competes with
+the dropdown menu's z-index; no table/card wrapper sets `transform`/`will-change`/`filter`
+(which would re-trap a `position: fixed` element inside the ancestor's overflow clipping).
+
+One page (`app/bms/product/products.php`) has a pre-existing `@media (max-width: 576px)`
+`!important` rule that force-positions its dropdown as a bottom-centered sheet on phones —
+left as-is; it still wins over Popper's plain inline style at that breakpoint and doesn't
+conflict with this fix.
+
 ## 2026-07-21 (fix) — Non-inventory product print: SELLING/COST/MARGIN row moved above the name, full width
 
 **Files:** `app/bms/product/service_view.php`
