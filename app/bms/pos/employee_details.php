@@ -66,6 +66,10 @@ if (!empty($emp_project_id) && function_exists('userCan') && !userCan('project',
     exit();
 }
 
+// Attendance — mark/correct this employee's own attendance directly from their
+// profile (matches the API's own gate in api/mark_attendance.php).
+$can_mark_attendance = canCreate('attendance');
+
 // Salary Structure (Plan H1) — the active components assigned to this employee, and
 // the master list of components available to assign.
 $can_edit_salary = isAdmin() || canEdit('payroll');
@@ -370,7 +374,7 @@ $sr_status_badge = [
                             <i class="bi bi-pencil"></i> Edit Profile
                         </button>
                         <?php endif; ?>
-                        <a href="<?= getUrl('attendance') ?>?employee=<?= $employee['employee_id'] ?>" class="btn btn-outline-primary">
+                        <a href="#attendanceHistoryCard" class="btn btn-outline-primary">
                             <i class="bi bi-clock"></i> View Attendance
                         </a>
                         <a href="<?= getUrl('payroll') ?>?employee=<?= $employee['employee_id'] ?>" class="btn btn-outline-info">
@@ -1290,12 +1294,19 @@ $sr_status_badge = [
                     return '<span class="badge" style="' . $st . 'padding:5px 10px;border-radius:20px;">' . ucfirst(str_replace('_', ' ', $s ?: '—')) . '</span>';
                 };
             ?>
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <div class="card shadow-sm mb-4" id="attendanceHistoryCard" style="scroll-margin-top: 90px;">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <h5 class="mb-0"><i class="bi bi-calendar-check text-primary me-2"></i>Attendance History</h5>
-                    <span class="small text-muted">
-                        <?= $attTotal ?> record(s) total<?= $attTotal > $attLimit ? " · showing most recent $attLimit" : '' ?>
-                    </span>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="small text-muted">
+                            <?= $attTotal ?> record(s) total<?= $attTotal > $attLimit ? " · showing most recent $attLimit" : '' ?>
+                        </span>
+                        <?php if ($can_mark_attendance): ?>
+                        <button type="button" class="btn btn-sm btn-primary d-print-none" data-bs-toggle="modal" data-bs-target="#markEmployeeAttendanceModal">
+                            <i class="bi bi-clock-history me-1"></i> Mark Attendance
+                        </button>
+                        <?php endif; ?>
+                    </div>
                 </div>
                 <div class="table-responsive" style="max-height:420px;overflow:auto;">
                     <table class="table table-hover align-middle mb-0">
@@ -1332,6 +1343,65 @@ $sr_status_badge = [
                     </table>
                 </div>
             </div>
+
+            <?php if ($can_mark_attendance): ?>
+            <!-- Mark Attendance Modal — locked to this employee (no employee picker),
+                 so this can never accidentally record another employee's attendance.
+                 Posts to the existing api/mark_attendance.php, which already upserts
+                 by employee_id + date (updates the day's record if one exists). -->
+            <div class="modal fade" id="markEmployeeAttendanceModal" tabindex="-1" aria-hidden="true" data-bs-focus="false">
+                <div class="modal-dialog">
+                    <div class="modal-content border-0 shadow">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title"><i class="bi bi-clock-history me-1"></i> Mark Attendance — <?= safe_output($employee['first_name'] . ' ' . $employee['last_name']) ?></h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form id="markEmpAttendanceForm" autocomplete="off">
+                            <div class="modal-body">
+                                <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                                <input type="hidden" name="employee_id" value="<?= (int)$employee_id ?>">
+                                <div id="mea-message" class="mb-2"></div>
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Date <span class="text-danger">*</span></label>
+                                    <input type="date" class="form-control" name="attendance_date" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>" required>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label small fw-bold">Check In</label>
+                                        <input type="time" class="form-control" name="check_in_time">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label small fw-bold">Check Out</label>
+                                        <input type="time" class="form-control" name="check_out_time">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Status <span class="text-danger">*</span></label>
+                                    <select class="form-select" name="status" required>
+                                        <option value="present" selected>Present</option>
+                                        <option value="absent">Absent</option>
+                                        <option value="late">Late</option>
+                                        <option value="half_day">Half Day</option>
+                                        <option value="leave">Leave</option>
+                                        <option value="holiday">Holiday</option>
+                                        <option value="weekend">Weekend</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small fw-bold">Notes</label>
+                                    <textarea class="form-control" name="notes" rows="2"></textarea>
+                                </div>
+                                <div class="form-text text-muted">If a record already exists for the selected date, it will be updated instead of duplicated.</div>
+                            </div>
+                            <div class="modal-footer bg-light border-0">
+                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary btn-sm px-4"><i class="bi bi-check-circle me-1"></i> Save</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <!-- Full Payroll & Payment History (all records, since day one) -->
             <?php
@@ -1469,6 +1539,34 @@ $(document).ready(function() {
         });
     });
 
+    // ── Attendance — mark/correct this employee's own record ────────────
+    $('#markEmployeeAttendanceModal').appendTo('body');
+    $('#markEmployeeAttendanceModal').on('hidden.bs.modal', function () {
+        const f = $('#markEmpAttendanceForm')[0];
+        if (f) f.reset();
+        $('#mea-message').html('');
+    });
+
+    $('#markEmpAttendanceForm').on('submit', function (e) {
+        e.preventDefault();
+        const btn = $(this).find('[type="submit"]'); const orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+        $.ajax({
+            url: '<?= buildUrl('api/mark_attendance.php') ?>', type: 'POST',
+            data: new FormData(this), contentType: false, processData: false, dataType: 'json',
+            success: function (res) {
+                if (res.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('markEmployeeAttendanceModal')).hide();
+                    Swal.fire({ icon:'success', title:'Saved!', text:res.message, timer:1600, showConfirmButton:false }).then(() => location.reload());
+                } else {
+                    Swal.fire({ icon:'error', title:'Error', text: res.message || 'Could not save attendance.' });
+                }
+            },
+            error: function () { Swal.fire({ icon:'error', title:'Error', text:'Server error.' }); },
+            complete: function () { btn.prop('disabled', false).html(orig); }
+        });
+    });
+
     window.removeComponent = function (id) {
         Swal.fire({ title:'Remove this component?', text:'It will no longer apply to future payslips.', icon:'warning',
             showCancelButton:true, confirmButtonColor:'#dc3545', confirmButtonText:'Yes, remove' })
@@ -1534,6 +1632,19 @@ $(document).ready(function() {
 function editEmployee(id) {
     window.location.href = APP_URL + '/employees?edit_id=' + id;
 }
+
+// Deep-link support for #attendanceHistoryCard (Actions → Attendance from the employee
+// list, and the "View Attendance" sidebar button here). The browser's native anchor-jump
+// runs before this page's async content above the card finishes rendering/resizing, so it
+// lands short. Re-run it after everything has settled.
+window.addEventListener('load', function () {
+    if (window.location.hash === '#attendanceHistoryCard') {
+        setTimeout(function () {
+            var el = document.getElementById('attendanceHistoryCard');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 300);
+    }
+});
 </script>
 
 <?php if ($can_create_lifecycle):

@@ -1,5 +1,63 @@
 # BMS Changelog
 
+## 2026-07-21 (fix) — Drop the now-redundant "Attendance" action button from the employee list
+
+**Files:** `api/get_employees.php`, `app/bms/pos/employees.php`
+
+Follow-up to the fix below. Since "Attendance" and "View Details" now point at the exact
+same page (`employee_details.php` — Attendance is just `#attendanceHistoryCard` on that
+same page), keeping both in the Actions dropdown and mobile card row was pure duplication.
+Removed the "Attendance" entry from the desktop Actions dropdown (`api/get_employees.php`,
+including the now-unused `$attendanceUrl` variable) and the mobile card-view Attendance
+button (`employees.php`) — "View Details" is the only way in now, matching a leaner
+Actions row. `employee_details.php` itself is untouched: its own "View Attendance"
+sidebar button (a same-page jump to the Attendance History card) stays, since that's a
+legitimate quick-nav within an otherwise long profile page, not a duplicate entry point.
+
+Verified live: `api/get_employees.php`'s AJAX response no longer contains an "Attendance"
+link while "View Details" and "Payroll Records" are still present.
+
+## 2026-07-21 (feat) — Per-employee Attendance is now a self-contained profile tab, not a leaky global-page link
+
+**Files:** `app/bms/pos/employee_details.php`, `app/bms/pos/employees.php`, `api/get_employees.php`
+
+Employees → Actions → "Attendance" used to link to the global `attendance.php?employee=id`
+dashboard. That page's filter form had no hidden `employee` field, so the first date/status
+change (auto-submitting) silently dropped the scope and revealed every employee — the
+opposite of what "view this employee's attendance" should do. Compared against WorkDo's
+HRM docs, which keep per-employee attendance as a tab embedded in the employee's own
+profile, never a redirect to a different module.
+
+- `employee_details.php` already had a correctly-scoped, read-only "Attendance History"
+  card (one employee, no leak possible) — it just had no way to mark/correct attendance,
+  and a "View Attendance" button right next to it that undid the safety by linking out to
+  the leaky global page anyway. Added a "Mark Attendance" button + modal to that card,
+  gated by `canCreate('attendance')` (matches `api/mark_attendance.php`'s own gate). The
+  modal has **no employee picker** — `employee_id` is a fixed hidden field — so it can
+  never record another employee's attendance. Posts to the existing
+  `api/mark_attendance.php`, which already upserts by employee_id + date; no new backend
+  code needed.
+- The "View Attendance" button now scrolls to that same card (`#attendanceHistoryCard`)
+  instead of navigating to `attendance.php?employee=id`.
+- `employees.php`'s Actions dropdown (via `api/get_employees.php`) and its mobile
+  card-view Attendance button now point to `employee_details.php?id=X#attendanceHistoryCard`
+  instead of the global page.
+- `attendance.php` (the org-wide day/week/month dashboard) is untouched — it's still the
+  right place for bulk marking and department-wide review, just no longer reachable from
+  an individual employee row.
+
+**Bug caught during testing, fixed before landing:** the `#attendanceHistoryCard` deep-link
+didn't actually scroll into view on first page load — the browser's native anchor-jump ran
+before the page's own async layout settled and landed short. Added a `window.load` handler
+that re-runs `scrollIntoView` after a short delay when that hash is present.
+
+**Verified live** (dev.bms.local, not just statically): confirmed the Attendance History
+card shows exactly the DB's 6 records for employee #1 and none of employee #2's; submitted
+a real entry through the actual `api/mark_attendance.php` endpoint via the rendered form
+and confirmed in the database that only employee #1 gained a row (test row removed after);
+confirmed the desktop Actions-dropdown link and global `attendance.php` dashboard both
+still work correctly (untouched, no regression).
+
 ## 2026-07-21 (fix) — Action-menu dropdowns hidden/clipped in datatables site-wide
 
 **Files:** `footer.php`

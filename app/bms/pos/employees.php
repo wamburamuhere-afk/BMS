@@ -495,9 +495,6 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                          <i class="bi bi-pencil"></i>
                                      </button>
                                      <?php endif; ?>
-                                     <a href="<?= getUrl('attendance') ?>?employee=<?= $employee['employee_id'] ?>" class="btn btn-sm btn-outline-success" title="Attendance" style="flex:1; min-width:0; padding:3px 4px; font-size:0.72rem;">
-                                         <i class="bi bi-clock"></i>
-                                     </a>
                                      <a href="<?= getUrl('payroll') ?>?employee=<?= $employee['employee_id'] ?>" class="btn btn-sm btn-outline-info" title="Payroll" style="flex:1; min-width:0; padding:3px 4px; font-size:0.72rem;">
                                          <i class="bi bi-cash"></i>
                                      </a>
