@@ -1011,6 +1011,7 @@ $page_title = "Activity Log";
                         <strong>Bar chart</strong> — how each user's activity splits across the six action types (hover a bar for that user's total &amp; % share).
                         <strong>Trend line</strong> — total activity over time, bucketed by whichever "Group by" you pick below.
                         The table beneath names each user and shows the exact numbers behind every chart, including each user's <strong>% share</strong> of all activity in the period.
+                        <span class="d-block mt-1"><i class="bi bi-info-circle me-1"></i>Shows <strong>current users only</strong> — accounts that have since been removed from the system are excluded from every chart and total.</span>
                     </p>
                     <div class="row g-2 mb-3" style="max-width:760px;">
                         <div class="col-md-3">

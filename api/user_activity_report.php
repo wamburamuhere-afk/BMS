@@ -54,6 +54,12 @@ try {
     $typeCaseSql = "CASE " . implode(' ', $typeCaseParts) . " ELSE 'other' END";
     $dedupExclusion = activityViewDedupExclusion();
 
+    // CURRENT USERS ONLY: restrict every aggregation (pie, bar, trend, table, and
+    // the % denominator) to activity by user_ids that still exist in `users`.
+    // Deleted / removed accounts (and old seed-data ids with no user row) are
+    // excluded entirely — the report is about who is actually in the system now.
+    // The JOIN sits inside the window-function subquery so the View-streak dedup
+    // (LAG) is computed over the same current-users-only row set.
     $baseSql = "
         SELECT user_id, action, description, created_at,
                $typeCaseSql AS vtype
@@ -61,6 +67,7 @@ try {
             SELECT al.id, al.user_id, al.action, al.description, al.created_at,
                    LAG(al.action) OVER (PARTITION BY al.user_id ORDER BY al.created_at, al.id) AS prev_action
             FROM activity_logs al
+            JOIN users cu ON cu.user_id = al.user_id
             WHERE al.created_at BETWEEN :scope_from AND :scope_to $uidSql
         ) x
         WHERE $dedupExclusion
@@ -78,14 +85,13 @@ try {
     $grandTotal = array_sum($totals);
 
     // ── 2. Per-user breakdown (bar chart + table) ───────────────────────────────
-    // Display name resolution: prefer the person's full name, then their username,
-    // and only fall back to "User #N (removed)" for a user_id that no longer has a
-    // row in `users` (a deleted account, or historical seed data) — so those read
-    // as clearly-gone accounts, not a broken lookup.
+    // Display name: full name, then username. (The base query already excludes
+    // removed accounts, so u.* is always present; the bare-id fallback only
+    // guards the rare case of a user row with no name fields set at all.)
     $nameExpr = "COALESCE(
                     NULLIF(TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))), ''),
                     NULLIF(TRIM(u.username), ''),
-                    CONCAT('User #', b.user_id, ' (removed)')
+                    CONCAT('User #', b.user_id)
                  )";
     $perUserSql = "
         SELECT b.user_id,
