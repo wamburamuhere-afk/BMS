@@ -8,7 +8,7 @@ header('Content-Type: application/json');
 if (!isAuthenticated()) { echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
 csrf_check();
-if (!canEdit('payroll')) { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access Denied: you cannot manage salary components']); exit; }
+if (!canEdit('salary_components')) { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access Denied: you cannot manage salary components']); exit; }
 
 try {
     $id     = (int)($_POST['component_id'] ?? 0);
