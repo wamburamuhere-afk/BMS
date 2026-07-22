@@ -1,5 +1,44 @@
 # BMS Changelog
 
+## 2026-07-21 (fix) — Print: Personal & Employment Info now pairs beside Contact Info; found and fixed a real structural bug along the way
+
+**Files:** `app/bms/pos/employee_details.php`
+
+Requested: on print, "Personal & Employment Information" should sit to the right of
+"Contact Info" side by side — refined to a 3/4 + 1/4 split (Personal Info wide, Contact
+Info narrow) rather than an even half/half — instead of Contact Info sitting alone on the
+left with the whole right half of the page blank.
+
+Gave both cards ids (`contactInfoCard`, `personalInfoCard`). For print, the sidebar/main
+column boxes are now unwrapped via `display: contents` (screen layout untouched — the
+column *boxes* disappear from the print render tree only, their card children become one
+flat sequence in source order: Profile Card → Contact Info → Personal & Employment Info →
+Compensation & Payment → Emergency Contact). Contact Info and Personal Info — adjacent in
+that sequence — are floated side by side at 24% (Contact Info) and 74% (Personal &
+Employment Info, ≈3/4 of the page) with a 2% gap between; Compensation & Payment gets
+`clear: both` so it drops to its own full-width line below the pair instead of squeezing
+in beside them.
+
+**Real bug found and fixed while verifying this, unrelated to print:** `#personalInfoCard`
+had one extra `</div>` closing the *main content column* (`col-md-8`) right after itself —
+live DOM inspection confirmed Compensation & Payment, Emergency Contact, and the whole
+tabbed section were all rendering as siblings of `.row` instead of children of `col-md-8`.
+The fix moves the misplaced close: removing the extra `</div>` after Personal Info lets
+the *already-present* later closing divs (previously miscounted) correctly close
+`col-md-8` → `.row` → `.container-fluid` in turn — no divs added or removed net, one
+relocated to where it always should have been. This predates the print work (likely from
+this session's earlier tab restructuring) and affected the screen layout too, just subtly
+enough not to have been visibly broken.
+
+Verified live: `col-md-8`'s child count is correct (5: Personal Info, Compensation,
+Emergency Contact, tab nav, tab content) and Emergency Contact/tabs report the correct
+parent; the float pair renders with identical `top` positions and the 74%/24% width
+ratio (measured ≈3.08:1, matching the requested 3/4 : 1/4 split); Compensation & Payment
+starts below both (confirmed cleared); confirmed no large gap in body content before the
+pair (only the pre-existing, out-of-scope shared site header sits above it — left
+untouched per instruction); re-tested tab-switching and a table's DataTable state
+post-fix, both still work.
+
 ## 2026-07-21 (fix) — Employee profile print: large gaps between sections and a stray trailing blank page, in both Portrait and Landscape
 
 **Files:** `app/bms/pos/employee_details.php`
