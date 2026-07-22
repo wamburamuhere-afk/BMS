@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-07-22 (feat) — Employee Trips: Edit action for pending requests
+
+**Files:** `api/manage_trip.php`, `app/bms/pos/employee_trips.php`
+
+Added an "Edit" option to the gear-dropdown, shown only while a trip is
+`pending` (before approval — once approved/paid/etc. the request has already
+started affecting the ledger and its own record, so it's no longer safely
+editable). New `action=edit` in `manage_trip.php`: re-validates every field the
+same way `add` does, server-side re-asserts the trip is still `pending`
+(rejects the edit otherwise, even if the button were bypassed), supports
+optionally replacing the attachment (old file deleted only after the new one
+is confirmed saved), and reuses the existing scope guard
+(`assertScopeForEmployeeRecord`). New "Edit Trip Request" modal on
+`employee_trips.php` mirrors the Add modal's fields, pre-filled via
+`get_trips.php?trip_id=`.
+
+Live-tested: created a trip, edited it (destination/purpose/cost/reference all
+persisted correctly), then confirmed editing is blocked with a clear message
+once the same trip is approved. Test data cleaned up afterward.
+
 ## 2026-07-22 (feat) — Employee Trips: full GL/journal_entries integration (accrue → pay → auto-reverse)
 
 **Files:** `api/manage_trip.php`, `api/get_trips.php`, `app/bms/pos/employee_trips.php`, `core/expense_posting.php`, `migrations/2026_07_22_employee_trips_gl_integration.php`, `migrations/2026_07_22_transactions_type_trip.php`

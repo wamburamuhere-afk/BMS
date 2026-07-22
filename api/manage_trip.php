@@ -103,6 +103,87 @@ try {
         exit;
     }
 
+    if ($action === 'edit') {
+        if (!canEdit('employee_trips')) { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Access Denied']); exit; }
+        $id = intval($_POST['trip_id'] ?? 0);
+        if (!$id) throw new Exception('Trip id is required');
+        if (function_exists('assertScopeForEmployeeRecord')) assertScopeForEmployeeRecord('employee_trips', 'trip_id', $id);
+
+        $stmt = $pdo->prepare("SELECT * FROM employee_trips WHERE trip_id=? AND status!='deleted'");
+        $stmt->execute([$id]);
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$existing) throw new Exception('Trip not found');
+        if ($existing['status'] !== 'pending') throw new Exception('Only a pending trip request can be edited');
+
+        $employee_id = intval($_POST['employee_id'] ?? 0);
+        $purpose = trim($_POST['purpose'] ?? '');
+        $destination = trim($_POST['destination'] ?? '');
+        $start = trim($_POST['start_date'] ?? '');
+        $end = trim($_POST['end_date'] ?? '');
+        $est = trim($_POST['estimated_cost'] ?? '');
+        $adv = trim($_POST['requested_advance'] ?? '');
+        $ref = trim($_POST['expense_reference'] ?? '');
+        $expense_account_id = intval($_POST['expense_account_id'] ?? 0);
+
+        if (!$employee_id) throw new Exception('Employee is required');
+        if ($purpose === '') throw new Exception('Purpose is required');
+        if ($destination === '') throw new Exception('Destination is required');
+        if (!strtotime($start) || !strtotime($end)) throw new Exception('Valid start and end dates are required');
+        if (strtotime($end) < strtotime($start)) throw new Exception('End date must be on or after the start date');
+        if ($est !== '' && (!is_numeric($est) || (float)$est < 0)) throw new Exception('Estimated cost must be a non-negative number');
+        if ($adv !== '' && (!is_numeric($adv) || (float)$adv < 0)) throw new Exception('Requested advance must be a non-negative number');
+        if ($expense_account_id > 0 && !gl_account_active($pdo, $expense_account_id)) throw new Exception('Selected expense account is not valid');
+        if (function_exists('assertScopeForEmployee')) assertScopeForEmployee($employee_id);
+
+        $emp = $pdo->prepare("SELECT first_name, last_name FROM employees WHERE employee_id=? AND (status IS NULL OR status!='deleted')");
+        $emp->execute([$employee_id]);
+        $er = $emp->fetch(PDO::FETCH_ASSOC);
+        if (!$er) throw new Exception('Employee not found');
+        $emp_name = trim($er['first_name'] . ' ' . $er['last_name']);
+
+        // Optional replacement attachment — §19 5-step. Leave the existing one alone
+        // if no new file is submitted.
+        $newAttachmentPath = null;
+        $oldAttachmentPath = $existing['attachment_path'] ?: null;
+        if (!empty($_FILES['attachment']) && $_FILES['attachment']['error'] !== UPLOAD_ERR_NO_FILE) {
+            if ($_FILES['attachment']['error'] !== UPLOAD_ERR_OK) throw new Exception('Attachment upload failed');
+            $ext = strtolower(pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION));
+            $allowed = ['pdf','doc','docx','xls','xlsx','jpg','jpeg','png','gif'];
+            if (!in_array($ext, $allowed, true)) throw new Exception('Attachment file type not allowed');
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime = $finfo->file($_FILES['attachment']['tmp_name']);
+            $allowedMime = ['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','image/jpeg','image/png','image/gif'];
+            if (!in_array($mime, $allowedMime, true)) throw new Exception('Attachment content does not match allowed types');
+            if ($_FILES['attachment']['size'] > 10*1024*1024) throw new Exception('Attachment exceeds 10MB');
+            $safe = bin2hex(random_bytes(16)) . '.' . $ext;
+            $dir = __DIR__ . '/../uploads/trips/';
+            if (!is_dir($dir)) mkdir($dir, 0755, true);
+            if (!move_uploaded_file($_FILES['attachment']['tmp_name'], $dir . $safe)) throw new Exception('Upload failed');
+            $newAttachmentPath = 'uploads/trips/' . $safe;
+            $attachment_path = $newAttachmentPath; // so a later failure cleans this up, not the old file
+        }
+
+        $pdo->prepare("UPDATE employee_trips SET employee_id=?, purpose=?, destination=?, start_date=?, end_date=?,
+                          estimated_cost=?, requested_advance=?, expense_reference=?, expense_account_id=?,
+                          attachment_path=COALESCE(?, attachment_path), attachment_name=COALESCE(?, attachment_name),
+                          updated_by=?
+                       WHERE trip_id=?")
+            ->execute([$employee_id, $purpose, $destination, $start, $end,
+                ($est !== '' ? (float)$est : null), ($adv !== '' ? (float)$adv : null), ($ref !== '' ? $ref : null),
+                ($expense_account_id > 0 ? $expense_account_id : null),
+                $newAttachmentPath, ($newAttachmentPath ? $_FILES['attachment']['name'] : null),
+                $_SESSION['user_id'], $id]);
+
+        if ($newAttachmentPath !== null && $oldAttachmentPath && file_exists(__DIR__ . '/../' . $oldAttachmentPath)) {
+            @unlink(__DIR__ . '/../' . $oldAttachmentPath);
+        }
+
+        logActivity($pdo, $_SESSION['user_id'], 'Edit trip', "trip #$id request to $destination for \"$emp_name\"");
+        logAudit($pdo, $_SESSION['user_id'], 'update', ['activity_type'=>'update','entity_type'=>'employee_trip','entity_id'=>$id,'description'=>"Trip request edited: $emp_name → $destination"]);
+        echo json_encode(['success' => true, 'message' => 'Trip request updated']);
+        exit;
+    }
+
     if ($action === 'change_status') {
         $id = intval($_POST['trip_id'] ?? 0);
         $new = trim($_POST['status'] ?? '');
