@@ -62,7 +62,7 @@ try {
         $params[] = $term;
     }
 
-    $where_sql .= scopeFilterSql('employee', 'e');
+    $where_sql .= scopeFilterSqlNullable('project', 'e');
 
     $sql = "
         SELECT 

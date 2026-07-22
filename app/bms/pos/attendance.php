@@ -67,7 +67,7 @@ $employees_query = "
     FROM employees e
     LEFT JOIN departments d ON e.department_id = d.department_id
     WHERE e.employment_status IN ('active', 'probation', 'contract', 'on_leave')
-    AND e.status = 'active'" . scopeFilterSql('employee', 'e') . "
+    AND e.status = 'active'" . scopeFilterSqlNullable('project', 'e') . "
 ";
 
 if ($selected_department) {
