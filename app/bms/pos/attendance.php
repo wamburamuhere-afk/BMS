@@ -55,12 +55,18 @@ $selected_status = isset($_GET['status']) ? $_GET['status'] : '';
 // Get departments for filtering
 $departments = $pdo->query("SELECT * FROM departments WHERE status = 'active' ORDER BY department_name")->fetchAll(PDO::FETCH_ASSOC);
 
-// Get all active employees
+// Get all currently-employed staff — matches employees.php's own definition of "still
+// employed" (status='active', any employment_status except terminated/resigned), not a
+// narrower hand-picked list. This was missing 'on_leave': an employee on approved leave
+// still needs to show up here (so the day defaults to "Leave" via the leaves-table check
+// below, and so they're markable again the moment they're back) — they were silently
+// absent from the roster entirely instead, while still showing normally everywhere else
+// in the system (employees.php's list, its "On Leave" stat card and filter, etc).
 $employees_query = "
-    SELECT e.*, d.department_name 
-    FROM employees e 
-    LEFT JOIN departments d ON e.department_id = d.department_id 
-    WHERE e.employment_status IN ('active', 'probation', 'contract')
+    SELECT e.*, d.department_name
+    FROM employees e
+    LEFT JOIN departments d ON e.department_id = d.department_id
+    WHERE e.employment_status IN ('active', 'probation', 'contract', 'on_leave')
     AND e.status = 'active'" . scopeFilterSql('employee', 'e') . "
 ";
 

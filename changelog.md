@@ -1,5 +1,89 @@
 # BMS Changelog
 
+## 2026-07-22 (feat) — Employee Trips: full GL/journal_entries integration (accrue → pay → auto-reverse)
+
+**Files:** `api/manage_trip.php`, `api/get_trips.php`, `app/bms/pos/employee_trips.php`, `core/expense_posting.php`, `migrations/2026_07_22_employee_trips_gl_integration.php`, `migrations/2026_07_22_transactions_type_trip.php`
+
+A business trip previously never moved money (D26): `estimated_cost` was purely
+informational and "Expense Reference" was a free-text string pointing at a separate
+petty-cash/expense record. Rebuilt on the same accrual-then-settle lifecycle already
+used by Expenses/Vouchers (`core/expense_posting.php`), off the same generic engine:
+
+- **Approved** → posts Dr Expense (the chosen `expense_account_id`) / Cr Accrued
+  Expenses for `estimated_cost` (`postTripAccrual()`, new wrapper added to
+  `core/expense_posting.php` alongside the existing expense/voucher ones, entity base
+  `trip_accrual`). Skipped quietly if no expense account was picked or there's no cost.
+- **Paid** (new status, new `employee_trips` columns `paid_from_account_id`,
+  `payment_date`, `paid_amount`, `transaction_id`) → settles against the accrual if one
+  exists (Dr Accrued / Cr Paid-From bank), via the canonical `postOutflow()`; also
+  writes the bank register row (`recordBankTransaction`). Requires an amount, date, and
+  Paid-From account; blocked if the trip has no expense account.
+- **Cancelled / Deleted at ANY later stage** → new `reverseTripLedger()` helper
+  (local to `api/manage_trip.php`) unconditionally reverses whatever was posted:
+  `reverseOutflow()` + `reverseBankTransaction()` if paid, then `reverseTripAccrual()`
+  if accrued — stricter than Expenses' own reject-from-paid path (which only undoes
+  cash): a cancelled/deleted trip must leave zero net trace in the ledger. Both the
+  `change_status→cancelled` transition and the `delete` action call the same helper so
+  neither path can diverge.
+- Transition map extended: `pending→approved/rejected/cancelled`,
+  `approved→completed/paid/cancelled`, `completed→paid/cancelled`, `paid→cancelled`.
+- `app/bms/pos/employee_trips.php`: "Expense Reference" free-text replaced with a
+  Select2 Expense Account picker (`expenseAccounts($pdo)`) + a separate optional
+  "Reference / Note" text field (old column kept for historical rows). New "Mark Paid"
+  modal (Paid-From via `cashBankAccounts($pdo)`, date, amount) reachable from the
+  gear-dropdown when a trip is approved/completed. Cancel now available from
+  approved/completed/paid, not just pending/approved.
+- `api/get_trips.php`: single-trip fetch now joins `accounts` to return the expense/
+  paid-from account names for the view modal.
+- **New migration** `2026_07_22_transactions_type_trip.php`: the `transactions.
+  transaction_type` ENUM didn't include `'trip'` — `postOutflow($pdo, 'trip', ...)`
+  would have failed the INSERT the first time anyone tried to mark a trip paid. Found
+  during live testing (see below), fixed before it ever reached a real trip.
+
+**Live-tested end-to-end on dev.bms.local** (test trips created and fully purged
+afterward, no residue left in `employee_trips`, `journal_entries`, `transactions`, or
+`bank_transactions`):
+- add → approve → verified accrual entry (Dr Travel & Entertainment / Cr Accrued
+  Expenses, correct amount, `journal_entries.status='posted'`).
+- → pay → verified settlement entry (Dr Accrued / Cr Petty Cash), `bank_transactions`
+  row, `employee_trips.transaction_id` set; `assertLedgerBalanced()` passed.
+- → cancel (from paid) → verified the settlement transaction/mirror/bank row were
+  fully deleted and the accrual was reversed via a contra `trip_accrual_void` entry;
+  `employee_trips` payment columns cleared back to NULL; `assertLedgerBalanced()`
+  still passed.
+- Separately verified: approve→delete (never paid) correctly reverses only the
+  accrual; approve with no expense account posts no accrual and correctly blocks
+  "mark paid" with a clear error; pending→rejected posts nothing.
+
+## 2026-07-22 (fix) — attendance.php's roster silently excluded employees on approved leave
+
+**Files:** `app/bms/pos/attendance.php`
+
+Live bug report: some real, currently-employed staff simply weren't appearing in the
+attendance-marking roster, even though the same people showed up fine everywhere else
+(`employees.php`'s own list, its "On Leave" stat card and filter dropdown both already
+treat `on_leave` as a normal, currently-employed status).
+
+Root cause: `attendance.php`'s employee query was `employment_status IN ('active',
+'probation', 'contract')` — missing `'on_leave'`, one of the six real values in the
+`employees.employment_status` ENUM (`active, probation, contract, on_leave, terminated,
+resigned`). Every other query in the system that defines "who counts as currently
+employed" (`employees.php`'s list, its stats) uses `status = 'active'` alone with no
+employment_status restriction; `attendance.php` was the only place hand-picking a
+sub-list, and it left one real status out. An employee on approved leave doesn't just
+belong on the roster incidentally — the page's own per-day logic checks the `leaves`
+table and defaults their status to "Leave" automatically, so excluding them from the
+roster entirely also silently defeated that existing feature.
+
+Fixed by adding `'on_leave'` to the inclusion list, matching `employees.php`'s broader
+"still employed" definition (only `terminated`/`resigned` are excluded, matching the
+explicit ask: employees who are no longer active shouldn't be markable, only visible in
+reports).
+
+Verified live: set a real employee to `on_leave`, confirmed they remained in the
+20-employee roster (would have dropped to 19 pre-fix) and in the Mark Attendance modal's
+employee picker; restored their original status after.
+
 ## 2026-07-22 (feat) — Progressive check-in/check-out + per-employee overtime standard
 
 **Files:** `api/mark_attendance.php`, `core/attendance_payroll.php`, `app/bms/pos/employee_details.php`, `app/bms/pos/employees.php`, `api/add_employee.php`, `api/update_employee.php`, `migrations/2026_07_22_employee_standard_working_hours.php`
