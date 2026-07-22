@@ -1043,6 +1043,19 @@ $page_title = "Activity Log";
                             </select>
                         </div>
                     </div>
+                    <div class="mb-3" style="max-width:760px;">
+                        <label class="form-label small fw-bold text-muted text-uppercase" style="font-size:.68rem;">
+                            Describe the report you need
+                            <span class="text-lowercase fw-normal text-muted" style="letter-spacing:0;">(optional — an AI writes a plain-English summary from the exact numbers below)</span>
+                        </label>
+                        <textarea class="form-control form-control-sm" id="uarPrompt" rows="2"
+                                  placeholder="e.g. Summarise what each user did this period, highlight the busiest users, and flag anyone with unusually high deletions or off-hours activity. Keep it short and management-friendly."></textarea>
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            <button class="btn btn-xs btn-outline-secondary" style="font-size:.72rem;" onclick="uarFillPrompt(this)">Summarise each user's activity</button>
+                            <button class="btn btn-xs btn-outline-secondary" style="font-size:.72rem;" onclick="uarFillPrompt(this)">Who was most active, and on what?</button>
+                            <button class="btn btn-xs btn-outline-secondary" style="font-size:.72rem;" onclick="uarFillPrompt(this)">Flag unusual deletions or off-hours access</button>
+                        </div>
+                    </div>
                     <button class="btn btn-sm fw-semibold text-white" style="background:#0891b2; border-radius:8px;"
                             onclick="loadUserActivityReport()">
                         <i class="bi bi-bar-chart-line me-1"></i> Generate Report
@@ -1100,19 +1113,28 @@ $page_title = "Activity Log";
                                     <tbody id="uarTableBody"></tbody>
                                 </table>
                             </div>
+
+                            <!-- AI written summary — built from the exact numbers above, guided
+                                 by whatever the user typed in the "Describe the report" box. -->
+                            <div id="uarAiSection" class="mt-4">
+                                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                    <span class="fw-bold small text-uppercase text-muted" style="font-size:.7rem;"><i class="bi bi-stars me-1" style="color:#0891b2;"></i>Written Summary</span>
+                                    <button class="btn btn-sm fw-semibold text-white" style="background:#0891b2; border-radius:8px; font-size:.75rem;" onclick="generateUarSummary()">
+                                        <i class="bi bi-magic me-1"></i> <span id="uarAiBtnLabel">Generate Written Summary</span>
+                                    </button>
+                                </div>
+                                <div id="uarAiHint" class="text-muted small mb-2">
+                                    Type what you want covered in the <strong>“Describe the report you need”</strong> box above, then click <strong>Generate Written Summary</strong>. The AI writes it from the exact numbers in this report — it never invents figures.
+                                </div>
+                                <div id="uarAiLoading" class="text-center py-3 d-none">
+                                    <div class="spinner-border" style="width:1.5rem;height:1.5rem;color:#0891b2;"></div>
+                                    <p class="text-muted small mt-2 mb-0">Writing your summary…</p>
+                                </div>
+                                <div id="uarAiError" class="d-none"><div class="alert alert-danger py-2 mb-0 small"><i class="bi bi-exclamation-circle me-1"></i><span id="uarAiErrorMsg"></span></div></div>
+                                <div id="uarAiText" class="d-none" style="background:#f0fdff; border:1px solid #a5f3fc; border-radius:10px; padding:1.1rem; font-size:.88rem; line-height:1.8; color:#1e293b;"></div>
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- Print-only section for the User Activity Report (charts print as-is; the
-                     company header still comes from the global renderPrintHeader(), same as
-                     every other page — no duplication here). -->
-                <div id="uarPrintSection" style="display:none;">
-                    <div class="text-center pb-3 mb-3" style="border-bottom: 2px solid #0891b2; margin-top: 8px;">
-                        <h5 style="text-transform:uppercase; letter-spacing:1px; color:#333; margin:6px 0 2px; font-size:13pt;">User Activity Report</h5>
-                        <p id="uarPrintMetaLine" style="color:#64748b; font-size:10pt; margin:0;"></p>
-                    </div>
-                    <div id="uarPrintBody"></div>
                 </div>
 
                 <!-- Result area — shared across the 4 AI narrative modes -->
@@ -1358,6 +1380,19 @@ $page_title = "Activity Log";
             <p id="aiPrintMetaLine" style="color:#64748b; font-size:10pt; margin:0;"></p>
         </div>
         <div id="aiPrintBody" style="font-size:12pt; line-height:1.7; color:#1e293b; padding-bottom:12mm;"></div>
+    </div>
+
+    <!-- User Activity Report — print-only section. MUST be a direct child of
+         .main-content (a sibling of #aiPrintSection), NOT nested inside the AI
+         panel: the print CSS hides every direct child of .main-content except
+         this one, so if it lived inside the panel its ancestor would be hidden
+         and it would print blank. -->
+    <div id="uarPrintSection" style="display:none;">
+        <div class="text-center pb-3 mb-3" style="border-bottom: 2px solid #0891b2; margin-top: 8px;">
+            <h5 style="text-transform:uppercase; letter-spacing:1px; color:#333; margin:6px 0 2px; font-size:13pt;">User Activity Report</h5>
+            <p id="uarPrintMetaLine" style="color:#64748b; font-size:10pt; margin:0;"></p>
+        </div>
+        <div id="uarPrintBody" style="font-size:11pt; color:#1e293b; padding-bottom:12mm;"></div>
     </div>
     <?php endif; ?>
 
@@ -1815,6 +1850,13 @@ async function loadUserActivityReport() {
         // container is still display:none (d-none) permanently renders at 0x0.
         document.getElementById('uarOutput').classList.remove('d-none');
 
+        // Fresh data → clear any previous AI summary; the user re-generates it
+        // against the new numbers.
+        document.getElementById('uarAiText').classList.add('d-none');
+        document.getElementById('uarAiText').innerHTML = '';
+        document.getElementById('uarAiError').classList.add('d-none');
+        document.getElementById('uarAiHint').classList.remove('d-none');
+
         // Pie: overall activity mix (skip zero-count types so the legend stays clean)
         const pieEntries = Object.entries(res.totals).filter(([, v]) => v > 0);
         [uarPieChart].forEach(c => c && c.destroy());
@@ -1886,6 +1928,66 @@ async function loadUserActivityReport() {
 
 function safeOutputUar(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 
+// Quick-fill the free-text box from a suggestion chip.
+function uarFillPrompt(btn) {
+    const box = document.getElementById('uarPrompt');
+    box.value = btn.textContent.trim();
+    box.focus();
+}
+
+// AI-written summary of THIS report, guided by whatever the admin typed in the
+// free-text box. Reuses the cost-capped ai_audit_analysis.php 'ask' endpoint,
+// scoped to the same date range + user as the charts, so the narrative is built
+// from the exact same underlying data.
+async function generateUarSummary() {
+    const prompt = ($('#uarPrompt').val() || '').trim();
+    if (!prompt) {
+        Swal.fire({ icon:'info', title:'Describe what you need first',
+            text:'Type what you want the summary to cover in the “Describe the report you need” box above, then click Generate Written Summary.' });
+        $('#uarPrompt').focus();
+        return;
+    }
+    // The report must be generated first (so date/user scope is meaningful).
+    if (document.getElementById('uarOutput').classList.contains('d-none')) {
+        Swal.fire({ icon:'info', title:'Generate the report first', text:'Click “Generate Report” to build the charts, then generate the written summary.' });
+        return;
+    }
+
+    document.getElementById('uarAiHint').classList.add('d-none');
+    document.getElementById('uarAiText').classList.add('d-none');
+    document.getElementById('uarAiError').classList.add('d-none');
+    document.getElementById('uarAiLoading').classList.remove('d-none');
+    document.getElementById('uarAiBtnLabel').textContent = 'Regenerate Summary';
+
+    try {
+        const res = await $.ajax({
+            url : '<?= buildUrl('api/ai_audit_analysis.php') ?>',
+            type: 'POST',
+            data: {
+                _csrf    : CSRF_TOKEN,
+                mode     : 'ask',
+                query    : prompt,
+                date_from: $('#uarFrom').val(),
+                date_to  : $('#uarTo').val(),
+                user_id  : $('#uarUser').val() || '',
+            },
+            dataType: 'json',
+        });
+        document.getElementById('uarAiLoading').classList.add('d-none');
+        if (res.success) {
+            document.getElementById('uarAiText').innerHTML = renderAiMarkdown(res.text || '');
+            document.getElementById('uarAiText').classList.remove('d-none');
+        } else {
+            document.getElementById('uarAiErrorMsg').textContent = res.message || 'AI request failed. Check AI Settings.';
+            document.getElementById('uarAiError').classList.remove('d-none');
+        }
+    } catch (e) {
+        document.getElementById('uarAiLoading').classList.add('d-none');
+        document.getElementById('uarAiErrorMsg').textContent = 'Request failed. Check your connection.';
+        document.getElementById('uarAiError').classList.remove('d-none');
+    }
+}
+
 function printUarResult() {
     const meta  = document.getElementById('uarResultMeta')?.textContent || '';
     const table = document.getElementById('uarTable')?.outerHTML || '';
@@ -1893,8 +1995,18 @@ function printUarResult() {
     const bar   = document.getElementById('uarBarChart');
     const trend = document.getElementById('uarTrendChart');
 
+    // Include the AI written summary in the printout when one has been generated.
+    const aiEl = document.getElementById('uarAiText');
+    const aiHtml = (aiEl && !aiEl.classList.contains('d-none') && aiEl.innerHTML.trim())
+        ? `<div style="margin-bottom:18px;">
+               <div style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#0891b2;font-size:10pt;border-bottom:1px solid #a5f3fc;padding-bottom:4px;margin-bottom:8px;">Written Summary</div>
+               <div style="font-size:10.5pt;line-height:1.7;">${aiEl.innerHTML}</div>
+           </div>`
+        : '';
+
     document.getElementById('uarPrintMetaLine').textContent = meta;
     document.getElementById('uarPrintBody').innerHTML = `
+        ${aiHtml}
         <div class="d-flex flex-wrap gap-3 justify-content-center mb-4">
             ${pie   ? `<img src="${pie.toDataURL('image/png')}" style="max-width:320px;">` : ''}
             ${bar   ? `<img src="${bar.toDataURL('image/png')}" style="max-width:420px;">` : ''}
