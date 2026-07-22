@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-07-22 (feat) — User Activity Report: current users only (exclude removed accounts)
+
+**Files:** `api/user_activity_report.php`, `app/activity_log.php`
+
+Per request, the report now shows **only users that currently exist in the system** —
+removed/deleted accounts (and old seed-data `user_id`s with no `users` row) are
+excluded entirely, not just relabelled. Added a `JOIN users` inside the report's base
+window-function subquery so every downstream aggregation — the pie (activity mix), the
+per-user bar/table, the trend line, and the % denominator — is computed over
+current-users-only activity. The View-streak dedup (LAG) runs over the same restricted
+set, so counts stay consistent.
+
+Because removed accounts no longer contribute to the denominator, each current user's
+"% Share" is now their portion **among current users** (sums to ~100% across the
+listed users). The name fallback's "(removed)" branch is gone since such rows can't
+appear anymore; the display name is full name → username. Added a one-line note under
+the tab's explanation making the "current users only" scope explicit.
+
+Verified live: the same period that previously listed 6 rows (5 of them
+"User #N (removed)") now lists only the 4 real current users (Admin Admin, WAMBURA
+MUHEREE, Judith Ngereja, Bahati Manyangali) — no removed rows in the table or the bar
+chart; grand total dropped from 29,820 to 27,698 (the ~2,100 events by removed
+accounts excluded); percentages sum to ~100% across current users. No console errors.
+
 ## 2026-07-22 (feat) — User Activity Report: real user names + per-user % share
 
 **Files:** `api/user_activity_report.php`, `app/activity_log.php`
