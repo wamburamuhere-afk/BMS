@@ -1008,9 +1008,9 @@ $page_title = "Activity Log";
                     </p>
                     <p class="text-muted small mb-3">
                         <strong>Pie chart</strong> — the overall mix of actions across the selected scope.
-                        <strong>Bar chart</strong> — how each user's activity splits across the six action types.
+                        <strong>Bar chart</strong> — how each user's activity splits across the six action types (hover a bar for that user's total &amp; % share).
                         <strong>Trend line</strong> — total activity over time, bucketed by whichever "Group by" you pick below.
-                        The table beneath has the exact numbers behind every chart.
+                        The table beneath names each user and shows the exact numbers behind every chart, including each user's <strong>% share</strong> of all activity in the period.
                     </p>
                     <div class="row g-2 mb-3" style="max-width:760px;">
                         <div class="col-md-3">
@@ -1107,7 +1107,8 @@ $page_title = "Activity Log";
                                             <th class="text-center">Delete</th>
                                             <th class="text-center">Review</th>
                                             <th class="text-center">Approve</th>
-                                            <th class="text-center pe-3">Total</th>
+                                            <th class="text-center">Total</th>
+                                            <th class="text-center pe-3">% Share</th>
                                         </tr>
                                     </thead>
                                     <tbody id="uarTableBody"></tbody>
@@ -1886,7 +1887,19 @@ async function loadUserActivityReport() {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            // Footer shows the user's overall total + % share of all
+                            // activity in the period, on top of the per-type breakdown.
+                            footer: (items) => {
+                                const u = res.per_user[items[0].dataIndex];
+                                return u ? `Total: ${u.total.toLocaleString()}  (${u.pct}% of all activity)` : '';
+                            }
+                        }
+                    }
+                }
             }
         });
 
@@ -1901,10 +1914,12 @@ async function loadUserActivityReport() {
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
         });
 
-        // Table — exact numbers behind every chart
+        // Table — exact numbers behind every chart, incl. each user's % share of
+        // all activity in the period (a small inline bar makes the share readable
+        // at a glance, and the number gives the exact figure).
         const tbody = document.getElementById('uarTableBody');
         if (!res.per_user.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No activity in this range.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No activity in this range.</td></tr>';
         } else {
             tbody.innerHTML = res.per_user.map(u => `
                 <tr>
@@ -1915,7 +1930,15 @@ async function loadUserActivityReport() {
                     <td class="text-center">${u.delete}</td>
                     <td class="text-center">${u.review}</td>
                     <td class="text-center">${u.approve}</td>
-                    <td class="text-center pe-3 fw-bold">${u.total}</td>
+                    <td class="text-center fw-bold">${u.total.toLocaleString()}</td>
+                    <td class="text-center pe-3">
+                        <div class="d-flex align-items-center gap-2" style="min-width:90px;">
+                            <div class="flex-grow-1" style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+                                <div style="height:100%;width:${Math.min(100, u.pct)}%;background:#0891b2;"></div>
+                            </div>
+                            <span class="fw-semibold" style="font-size:.78rem;white-space:nowrap;">${u.pct}%</span>
+                        </div>
+                    </td>
                 </tr>
             `).join('');
         }
