@@ -1418,6 +1418,31 @@ $sr_status_badge = [
                 ");
                 $stmt_att->execute([$employee_id]);
                 $all_attendance = $stmt_att->fetchAll(PDO::FETCH_ASSOC);
+                // Overtime/Under is judged against THIS employee's own registered working
+                // hours (set at registration, employees.standard_working_hours), not one
+                // company-wide number — a part-time employee's "full day" isn't the same
+                // length as a full-time employee's.
+                // Computed live from total_hours vs. this employee's standard, not read from
+                // the stored overtime_hours column — historical rows saved before this
+                // employee had a standard_working_hours value (or before overtime was wired
+                // up at all) can have a stale/zero overtime_hours despite total_hours clearly
+                // exceeding the standard, which would otherwise show a contradictory "0.00
+                // Overtime" or miss it entirely.
+                $empStandardHours = (float)($employee['standard_working_hours'] ?? 8);
+                $otHours = function ($totalHours) use ($empStandardHours) {
+                    return max(0.0, (float)($totalHours ?? 0) - $empStandardHours);
+                };
+                $otBadge = function ($totalHours) use ($empStandardHours) {
+                    $totalHours = (float)($totalHours ?? 0);
+                    if ($totalHours <= 0) return '';
+                    if ($totalHours > $empStandardHours) {
+                        return '<span class="badge bg-warning text-dark">Overtime</span>';
+                    }
+                    if ($totalHours < $empStandardHours) {
+                        return '<span class="badge bg-secondary">Under</span>';
+                    }
+                    return '<span class="badge bg-success-subtle text-success-emphasis">On Time</span>';
+                };
                 $attStatusBadge = function ($s) {
                     $map = [
                         'present'  => 'background:#0d6efd;color:#fff;',
@@ -1431,15 +1456,33 @@ $sr_status_badge = [
                     $st = $map[$s] ?? 'background:#e9ecef;color:#495057;';
                     return '<span class="badge" style="' . $st . 'padding:5px 10px;border-radius:20px;">' . ucfirst(str_replace('_', ' ', $s ?: '—')) . '</span>';
                 };
+
+                // Drives the Check In Now / Check Out Now buttons and the Mark Attendance
+                // modal's pre-fill — lets marking be genuinely progressive: check in now
+                // (save), come back later and check out, without needing to know both
+                // times up front.
+                $todayStr = date('Y-m-d');
+                $todayAtt = null;
+                foreach ($all_attendance as $att) {
+                    if ($att['attendance_date'] === $todayStr) { $todayAtt = $att; break; }
+                }
+                $hasCheckedInToday  = $todayAtt && !empty($todayAtt['check_in_time']);
+                $hasCheckedOutToday = $todayAtt && !empty($todayAtt['check_out_time']);
             ?>
             <div class="card shadow-sm mb-4" id="attendanceHistoryCard">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <h5 class="mb-0"><i class="bi bi-calendar-check text-primary me-2"></i>Attendance History</h5>
-                    <div class="d-flex align-items-center gap-3">
-                        <span class="small text-muted">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="small text-muted me-1">
                             <?= $attTotal ?> record(s) total<?= $attTotal > $attLimit ? " · showing most recent $attLimit" : '' ?>
                         </span>
                         <?php if ($can_mark_attendance): ?>
+                        <button type="button" class="btn btn-sm btn-outline-success d-print-none" id="btnCheckInNow" onclick="checkInNow()" <?= $hasCheckedInToday ? 'disabled' : '' ?>>
+                            <i class="bi bi-box-arrow-in-right me-1"></i> <?= $hasCheckedInToday ? 'Checked In' : 'Check In Now' ?>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger d-print-none" id="btnCheckOutNow" onclick="checkOutNow()" <?= (!$hasCheckedInToday || $hasCheckedOutToday) ? 'disabled' : '' ?>>
+                            <i class="bi bi-box-arrow-right me-1"></i> <?= $hasCheckedOutToday ? 'Checked Out' : 'Check Out Now' ?>
+                        </button>
                         <button type="button" class="btn btn-sm btn-primary d-print-none" data-bs-toggle="modal" data-bs-target="#markEmployeeAttendanceModal">
                             <i class="bi bi-clock-history me-1"></i> Mark Attendance
                         </button>
@@ -1470,7 +1513,10 @@ $sr_status_badge = [
                                 <td><?= !empty($att['check_in_time']) ? date('h:i A', strtotime($att['check_in_time'])) : '<span class="text-muted">—</span>' ?></td>
                                 <td><?= !empty($att['check_out_time']) ? date('h:i A', strtotime($att['check_out_time'])) : '<span class="text-muted">—</span>' ?></td>
                                 <td class="text-end"><?= number_format((float)($att['total_hours'] ?? 0), 2) ?></td>
-                                <td class="text-end text-muted"><?= number_format((float)($att['overtime_hours'] ?? 0), 2) ?></td>
+                                <td class="text-end text-muted">
+                                    <?= number_format($otHours($att['total_hours']), 2) ?>
+                                    <?= $otBadge($att['total_hours']) ?>
+                                </td>
                                 <td><?= $attStatusBadge($att['status']) ?></td>
                             </tr>
                             <?php endforeach; ?>
@@ -1496,23 +1542,25 @@ $sr_status_badge = [
                                 <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                                 <input type="hidden" name="employee_id" value="<?= (int)$employee_id ?>">
                                 <div id="mea-message" class="mb-2"></div>
+                                <div id="mea-existing-note" class="alert alert-info py-2 small d-none"></div>
                                 <div class="mb-3">
                                     <label class="form-label small fw-bold">Date <span class="text-danger">*</span></label>
-                                    <input type="date" class="form-control" name="attendance_date" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>" required>
+                                    <input type="date" class="form-control" id="mea_date" name="attendance_date" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>" required onchange="meaLoadExistingForDate()">
                                 </div>
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label small fw-bold">Check In</label>
-                                        <input type="time" class="form-control" name="check_in_time">
+                                        <input type="time" class="form-control" id="mea_check_in" name="check_in_time">
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label small fw-bold">Check Out</label>
-                                        <input type="time" class="form-control" name="check_out_time">
+                                        <input type="time" class="form-control" id="mea_check_out" name="check_out_time">
                                     </div>
                                 </div>
+                                <div class="form-text text-muted mt-n2 mb-3">Leave either time blank to fill it in later — e.g. check in now, come back after work to check out. Whatever's already saved for this date stays untouched.</div>
                                 <div class="mb-3">
                                     <label class="form-label small fw-bold">Status <span class="text-danger">*</span></label>
-                                    <select class="form-select" name="status" required>
+                                    <select class="form-select" id="mea_status" name="status" required>
                                         <option value="present" selected>Present</option>
                                         <option value="absent">Absent</option>
                                         <option value="late">Late</option>
@@ -1524,7 +1572,7 @@ $sr_status_badge = [
                                 </div>
                                 <div class="mb-2">
                                     <label class="form-label small fw-bold">Notes</label>
-                                    <textarea class="form-control" name="notes" rows="2"></textarea>
+                                    <textarea class="form-control" id="mea_notes" name="notes" rows="2"></textarea>
                                 </div>
                                 <div class="form-text text-muted">If a record already exists for the selected date, it will be updated instead of duplicated.</div>
                             </div>
@@ -1939,12 +1987,40 @@ $(document).ready(function() {
     });
 
     // ── Attendance — mark/correct this employee's own record ────────────
+    // Keyed by date so the modal (and checkInNow/checkOutNow below) can look up what's
+    // already saved without a round-trip — this page already loaded the full history.
+    window.EMP_ATTENDANCE_BY_DATE = <?= json_encode(array_column($all_attendance, null, 'attendance_date')) ?>;
+
     $('#markEmployeeAttendanceModal').appendTo('body');
     $('#markEmployeeAttendanceModal').on('hidden.bs.modal', function () {
         const f = $('#markEmpAttendanceForm')[0];
         if (f) f.reset();
         $('#mea-message').html('');
+        $('#mea-existing-note').addClass('d-none').text('');
     });
+    // Pre-fill whatever's already saved for the selected date — this is what makes
+    // "check in now, check out later" work from the manual form too: reopening the
+    // modal for today shows the check-in you already saved instead of a blank form
+    // that would (if the API didn't already guard against it) overwrite it with nothing.
+    $('#markEmployeeAttendanceModal').on('shown.bs.modal', function () { meaLoadExistingForDate(); });
+
+    window.meaLoadExistingForDate = function () {
+        const date = $('#mea_date').val();
+        const rec = EMP_ATTENDANCE_BY_DATE[date];
+        if (rec) {
+            $('#mea_check_in').val(rec.check_in_time ? rec.check_in_time.slice(0,5) : '');
+            $('#mea_check_out').val(rec.check_out_time ? rec.check_out_time.slice(0,5) : '');
+            $('#mea_status').val(rec.status || 'present');
+            $('#mea_notes').val(rec.notes || '');
+            $('#mea-existing-note').removeClass('d-none').html('<i class="bi bi-info-circle me-1"></i> A record already exists for this date — shown below. Saving will update it, not duplicate it.');
+        } else {
+            $('#mea_check_in').val('');
+            $('#mea_check_out').val('');
+            $('#mea_status').val('present');
+            $('#mea_notes').val('');
+            $('#mea-existing-note').addClass('d-none').text('');
+        }
+    };
 
     $('#markEmpAttendanceForm').on('submit', function (e) {
         e.preventDefault();
@@ -1965,6 +2041,42 @@ $(document).ready(function() {
             complete: function () { btn.prop('disabled', false).html(orig); }
         });
     });
+
+    // One-tap Check In / Check Out for today — the common case. Each call only sends the
+    // one field it actually has; api/mark_attendance.php fills in employee_id/date/status
+    // from what's already saved rather than requiring the caller to restate everything.
+    function empQuickMark(fields, busyBtn) {
+        const orig = busyBtn.html();
+        busyBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+        const fd = new FormData();
+        fd.append('employee_id', <?= (int)$employee_id ?>);
+        fd.append('attendance_date', '<?= date('Y-m-d') ?>');
+        Object.keys(fields).forEach(k => fd.append(k, fields[k]));
+        $.ajax({
+            url: '<?= buildUrl('api/mark_attendance.php') ?>', type: 'POST',
+            data: fd, contentType: false, processData: false, dataType: 'json',
+            success: function (res) {
+                if (res.success) {
+                    Swal.fire({ icon:'success', title:'Saved!', text:res.message, timer:1400, showConfirmButton:false }).then(() => location.reload());
+                } else {
+                    Swal.fire({ icon:'error', title:'Error', text: res.message || 'Could not save.' });
+                    busyBtn.prop('disabled', false).html(orig);
+                }
+            },
+            error: function () { Swal.fire({ icon:'error', title:'Error', text:'Server error.' }); busyBtn.prop('disabled', false).html(orig); }
+        });
+    }
+
+    window.checkInNow = function () {
+        const now = new Date();
+        const hhmm = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+        empQuickMark({ check_in_time: hhmm, status: 'present' }, $('#btnCheckInNow'));
+    };
+    window.checkOutNow = function () {
+        const now = new Date();
+        const hhmm = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+        empQuickMark({ check_out_time: hhmm }, $('#btnCheckOutNow'));
+    };
 
     // ── Leave — apply for / review this employee's own leave ────────────
     const EMP_LEAVE_ID = <?= (int)$employee_id ?>;
