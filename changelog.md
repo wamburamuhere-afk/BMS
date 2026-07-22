@@ -1,5 +1,46 @@
 # BMS Changelog
 
+## 2026-07-22 (fix) — Critical permission gaps across Payroll/Attendance/Leaves/Employees APIs
+
+**Files:** `api/export_attendance.php`, `api/process_payroll.php`, `api/preview_payroll.php`, `api/export_payroll.php`, `api/export_leaves.php`, `api/get_payrolls.php`, `api/get_payroll.php`, `api/get_payroll_details.php`, `api/get_employees.php`, `api/import_employees.php`, `api/get_leave.php`, `api/get_leave_balance.php`, `api/export_leave_applications.php`, `api/get_department_leadership.php`
+
+First PR of a two-part fix, following a full audit (via 3 parallel research passes) of every
+Create/Edit/Delete/Review/Approve API endpoint across all 15 "Human Resources" pages, checking
+whether each endpoint's permission check actually matches its page's `page_key` and the verb it
+performs. Triggered by a report that a page can look correctly locked down (View blocked via
+`autoEnforcePermission()`) while the API behind it either has no gate at all or checks something
+that has nothing to do with `role_permissions`.
+
+This PR fixes the **critical tier** — endpoints with no permission check whatsoever, or ones that
+bypass `role_permissions` entirely via a hard-coded role-name string comparison (meaning revoking
+a permission in `user_roles.php` for that role has zero effect on these specific endpoints):
+
+- **No auth/permission check at all**: `export_attendance.php` (not even a login check — the most
+  severe finding), `get_payrolls.php`/`get_payroll.php`/`get_payroll_details.php` (full salary/payslip
+  data), `get_employees.php` (the actual data source `employees.php`'s own table renders from),
+  `import_employees.php`, `get_leave.php`, `get_leave_balance.php` (shared across `leaves.php`,
+  `employee_details.php`, `project_view.php` — gated on any of those three pages' own View
+  permission so none of the three legitimate callers break), `export_leave_applications.php`,
+  `get_department_leadership.php`. All now call the matching `canView`/`canCreate` for their page.
+- **Hard-coded role-name bypass** (`in_array($user_role, ['admin','accountant','manager','hr',...])`
+  instead of the permission system): `process_payroll.php`, `preview_payroll.php` (now
+  `canCreate('payroll')`, since both are part of the generate-payroll flow), `export_payroll.php`
+  (now `canView('payroll')`), `export_leaves.php` (now `canView('leaves')`, keeping the existing
+  self-service "employee exports only their own record" path intact since that's a separate,
+  intentional access path, not a bypass of the module permission).
+
+Verified live (as admin, so all pass by the `isAdmin()` bypass baked into every `canX()` helper —
+this fix's actual protection kicks in for non-admin roles, which the app already handles correctly
+elsewhere): `get_payrolls`, `get_employees`, `export_attendance`, `get_leave_balance` all still
+return 200 + correct data after the change. Did not live-fire `process_payroll`/`preview_payroll`
+since those generate real payroll records; the fix there is a mechanical swap to the same
+`canCreate('payroll')` call already proven correct on `update_payroll.php`/`delete_payroll.php`.
+
+**Second PR to follow** for the "wrong verb" tier found in the same audit (money-movement and
+approval/delete actions gated by `canEdit` instead of `canApprove`/`canDelete`/`canSubmit` across
+payroll, leaves, recruitment, HR performance, HR checklists, and announcements) — those touch live
+approval workflows and are being handled as a separate, more carefully reviewed change.
+
 ## 2026-07-22 (fix) — Salary Components had no permission of its own, silently piggybacked on Payroll
 
 **Files:** `migrations/2026_07_22_salary_components_permission.php`, `app/bms/pos/salary_components.php`, `header.php`, `api/pos/save_salary_component.php`, `api/pos/delete_salary_component.php`

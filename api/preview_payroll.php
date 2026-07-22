@@ -17,16 +17,16 @@ if (!isset($_SESSION['user_id'])) {
 error_log("Preview Payroll - Session Data: " . print_r($_SESSION, true));
 error_log("Preview Payroll - user_role: " . ($user_role ?? 'NOT SET'));
 
-// Check permissions
-$user_role = $_SESSION['user_role'] ?? '';
-$user_role_lower = strtolower($user_role); // Convert to lowercase for comparison
-$can_process_payroll = isAdmin() || canEdit('payroll') || in_array($user_role_lower, ['admin', 'accountant', 'manager', 'hr']);
+// Check permissions — role_permissions is the single source of truth; a
+// hard-coded role-name list here would let a revoked role keep previewing
+// (and thus seeing computed salary data) regardless of user_roles.php.
+$can_process_payroll = canCreate('payroll');
 
 // DEBUG: Log permission check result
 error_log("Preview Payroll - Can process: " . ($can_process_payroll ? 'YES' : 'NO'));
 
 if (!$can_process_payroll) {
-    echo json_encode(['success' => false, 'message' => 'You do not have permission to preview payroll. Your role: ' . $user_role]);
+    echo json_encode(['success' => false, 'message' => 'You do not have permission to preview payroll.']);
     exit();
 }
 

@@ -10,9 +10,10 @@ if (!isset($_SESSION['user_id'])) {
     exit('Unauthorized');
 }
 
-// Check permissions
-$user_role = strtolower($_SESSION['user_role'] ?? '');
-if (!in_array($user_role, ['admin', 'accountant', 'hr', 'manager'])) {
+// Check permissions — role_permissions is the single source of truth; a
+// hard-coded role-name list here would let a revoked role keep exporting
+// salary data regardless of what user_roles.php says.
+if (!canView('payroll')) {
     http_response_code(403);
     exit('Forbidden');
 }

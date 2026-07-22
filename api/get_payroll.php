@@ -8,6 +8,10 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit();
 }
+if (!canView('payroll')) {
+    echo json_encode(['success' => false, 'message' => 'Access Denied']);
+    exit();
+}
 
 try {
     $payroll_id = $_GET['id'] ?? null;

@@ -6,6 +6,9 @@ require_once __DIR__ . '/../roots.php';
 if (!isset($_SESSION['user_id'])) {
     die("Unauthorized access");
 }
+if (!canView('leaves')) {
+    die("Access Denied");
+}
 
 $leave_ids_raw = $_POST['leave_ids'] ?? '[]';
 $leave_ids = json_decode($leave_ids_raw, true);

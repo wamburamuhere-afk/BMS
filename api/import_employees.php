@@ -9,6 +9,10 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
     exit();
 }
+if (!canCreate('employees')) {
+    echo json_encode(['success' => false, 'message' => 'Access Denied']);
+    exit();
+}
 
 try {
     if (!isset($_FILES['import_file']) || $_FILES['import_file']['error'] !== UPLOAD_ERR_OK) {

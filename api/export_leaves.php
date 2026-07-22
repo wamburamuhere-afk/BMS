@@ -12,7 +12,13 @@ logAudit($pdo, $user_id, 'export_leaves', [
     'description' => "Exported leaves report"
 ]);
 
-$can_view_leaves = in_array(strtolower($user_role), ['admin', 'manager', 'hr', 'supervisor']);
+// role_permissions is the single source of truth for module-level access; a
+// hard-coded role-name list here would let a revoked role keep exporting
+// leave data regardless of what user_roles.php says. A plain "employee" role
+// with no `leaves` page access at all can still export their own record only
+// (self-service), same as before — that path is intentionally separate from
+// the module permission, not a bypass of it.
+$can_view_leaves = canView('leaves');
 $is_employee = (strtolower($user_role) == 'employee');
 
 if (!$can_view_leaves && !$is_employee) {

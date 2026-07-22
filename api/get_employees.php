@@ -24,6 +24,15 @@ if (!isset($_SESSION['user_id'])) {
     ]);
     exit();
 }
+if (!canView('employees')) {
+    echo json_encode([
+        'error' => 'Access Denied',
+        'data' => [],
+        'recordsTotal' => 0,
+        'recordsFiltered' => 0
+    ]);
+    exit();
+}
 
 // Log API call for debugging
 error_log("get_employees API called by user: " . $_SESSION['user_id']);

@@ -1,6 +1,9 @@
 <?php
 require_once __DIR__ . '/../roots.php';
 
+if (!isAuthenticated()) { http_response_code(401); exit('Unauthorized'); }
+if (!canView('attendance')) { http_response_code(403); exit('Access Denied'); }
+
 // Log export action
 logAudit($pdo, $_SESSION['user_id'], 'export_attendance', [
     'activity_type' => 'export',
