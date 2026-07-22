@@ -291,7 +291,10 @@ $company_vrn = get_setting('company_vrn', '');
     if ($date_from)      { $scope_where[] = "created_at >= :sdf"; $scope_params[':sdf'] = $date_from . ' 00:00:00'; }
     if ($date_to)        { $scope_where[] = "created_at <= :sdt"; $scope_params[':sdt'] = $date_to . ' 23:59:59'; }
 
-    $stat_cols = ['created' => 'create', 'viewed' => 'view', 'updated' => 'edit', 'deleted' => 'delete'];
+    // 'viewed' is computed separately below (deduped) — created/edit/delete never
+    // run in consecutive same-user streaks the way View does, so a plain count
+    // already matches what the list shows for those three.
+    $stat_cols = ['created' => 'create', 'updated' => 'edit', 'deleted' => 'delete'];
     $statSelects = []; $statParams = $scope_params;
     foreach ($stat_cols as $col => $type) {
         [$frag, $fp] = $buildTypeSql($type, "s_{$col}_");
@@ -303,6 +306,34 @@ $company_vrn = get_setting('company_vrn', '');
     $stats_stmt = $pdo->prepare($stats_sql);
     $stats_stmt->execute($statParams);
     $today_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
+
+    // 'viewed' card — MUST match what filtering the list to Type=View actually
+    // shows. The list (server-side DataTables below) collapses consecutive
+    // View-type entries by the same user down to the first of each run, via a
+    // LAG() dedup, so a user rapidly browsing pages doesn't flood the log with
+    // near-duplicate "Viewed X" rows. The card used to count every raw row with
+    // no dedup at all, so it could read e.g. 85 while the filtered list showed
+    // barely a dozen — same data, two different counting rules. This runs the
+    // identical dedup the DataTables endpoint uses (same scope: user + date
+    // range only, no type filter, so LAG sees the true previous action).
+    [$viewFrag, $viewFragParams] = $buildTypeSql('view', 's_viewdedup_');
+    $viewedWhere = $scope_where ? ('WHERE ' . implode(' AND ', $scope_where)) : '';
+    $viewed_sql = "
+        SELECT COUNT(*) FROM (
+            SELECT action, description,
+                   LAG(action) OVER (PARTITION BY user_id ORDER BY created_at, id) AS prev_action
+            FROM activity_logs
+            $viewedWhere
+        ) v
+        WHERE $viewFrag
+          AND NOT (
+              (action LIKE 'View %' OR action LIKE 'Viewed %' OR action = 'page_view')
+              AND (prev_action LIKE 'View %' OR prev_action LIKE 'Viewed %' OR prev_action = 'page_view')
+          )
+    ";
+    $viewed_stmt = $pdo->prepare($viewed_sql);
+    $viewed_stmt->execute(array_merge($scope_params, $viewFragParams));
+    $today_stats['viewed'] = (int) $viewed_stmt->fetchColumn();
     // Card label follows the chosen Period (Today / This Week / This Month / …).
     $stats_scope_label = $period_label;
 
