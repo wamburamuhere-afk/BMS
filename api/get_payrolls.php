@@ -14,6 +14,11 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
+if (!canView('payroll')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied']);
+    exit;
+}
 
 try {
     // Get parameters

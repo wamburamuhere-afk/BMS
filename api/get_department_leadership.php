@@ -14,6 +14,10 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
     exit();
 }
+if (!canView('employee_lifecycle')) {
+    echo json_encode(['success' => false, 'message' => 'Access Denied']);
+    exit();
+}
 
 $department_id = isset($_GET['department_id']) ? (int)$_GET['department_id'] : 0;
 if (!$department_id) {
