@@ -1,5 +1,46 @@
 # BMS Changelog
 
+## 2026-07-22 (fix) — Attendance/exports used the wrong scope helper, causing same-role users to see different rosters
+
+**Files:** `app/bms/pos/attendance.php`, `api/export_attendance.php`, `api/export_payroll.php`, `api/export_leaves.php`, `api/export_leave_applications.php`
+
+Live bug report: with identical page permissions granted, two non-admin users on the
+**same role** saw different employee lists on `attendance.php` — some employees visible
+to one, invisible to another. Root cause was a completely different bug from the
+permission-check gaps fixed earlier today: these 5 files scoped their employee query
+with `scopeFilterSql('employee', 'e')` — a strict, default-deny filter keyed to a
+**per-user** list (`$_SESSION['scope']['employees']`, built from
+`user_projects` → `employees.project_id`, a table assigned per individual user, not per
+role) — while the correct reference page, `employees.php`, uses
+`scopeFilterSqlNullable('project', 'e')`, which shows every employee on the user's own
+project(s) **plus** every employee with no project at all (company-wide staff), and
+never fully empties out even for a user with zero project assignments.
+
+Two people can share the exact same role — identical `role_permissions` row, identical
+checkboxes in `user_roles.php` — yet have different individual project assignments in
+`user_projects`; the old code let that per-user difference leak into a roster that
+should have matched what `employees.php` already showed correctly. Worse, the
+`employee`-scope derivation query has no `OR project_id IS NULL` clause at all, so any
+company-wide/unassigned employee (e.g. head-office/admin/finance staff) was invisible
+to every non-admin, even one with every project assigned to them, and any user with
+zero project assignments saw literally zero employees (`scopeFilterSql` appends
+`AND 0` when the derived list is empty).
+
+Fixed by switching all 5 files to the same `scopeFilterSqlNullable('project', 'e')`
+call `employees.php` already uses — same table, same "who's currently employed"
+definition, now the same visibility rule everywhere. No admin-facing UI has ever
+existed to grant per-employee overrides for the old mechanism (confirmed: the only
+`user_scope_overrides` writer, `user_projects.php`, only ever writes
+`resource_type='warehouse'`), so this couldn't have been worked around by
+configuration — it required a code fix.
+
+Verified with real data: a simulated non-admin assigned only to project 16 went from
+seeing 7 employees (old, buggy) to 14 (new, matching what that project's roster plus
+all unassigned staff should show); a simulated non-admin with zero project assignments
+went from seeing 0 employees (old) to 7 (new — every company-wide employee, matching
+`employees.php`'s own zero-project-assignment behaviour). Admin view unaffected (20
+employees before and after, since `isAdmin()` short-circuits both helpers).
+
 ## 2026-07-22 (fix) — Critical permission gaps across Payroll/Attendance/Leaves/Employees APIs
 
 **Files:** `api/export_attendance.php`, `api/process_payroll.php`, `api/preview_payroll.php`, `api/export_payroll.php`, `api/export_leaves.php`, `api/get_payrolls.php`, `api/get_payroll.php`, `api/get_payroll_details.php`, `api/get_employees.php`, `api/import_employees.php`, `api/get_leave.php`, `api/get_leave_balance.php`, `api/export_leave_applications.php`, `api/get_department_leadership.php`
