@@ -99,6 +99,43 @@ $bank_accounts = cashBankAccounts($pdo);
 <?php endif; ?>
 
 <?php if ($can_edit): ?>
+<div class="modal fade" id="tripEditModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header bg-warning text-dark"><h5 class="modal-title"><i class="bi bi-pencil me-1"></i> Edit Trip Request</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <form id="tripEditForm">
+        <div class="modal-body">
+            <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="trip_id" id="tpe_trip_id">
+            <div class="mb-3"><label class="form-label">Employee <span class="text-danger">*</span></label><select class="form-select" name="employee_id" id="tpe_employee" required></select></div>
+            <div class="row">
+                <div class="col-md-6 mb-3"><label class="form-label">Destination <span class="text-danger">*</span></label><input class="form-control" name="destination" id="tpe_destination" required></div>
+                <div class="col-md-6 mb-3"><label class="form-label">Purpose <span class="text-danger">*</span></label><input class="form-control" name="purpose" id="tpe_purpose" required></div>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3"><label class="form-label">Start <span class="text-danger">*</span></label><input type="date" class="form-control" name="start_date" id="tpe_start" required></div>
+                <div class="col-md-6 mb-3"><label class="form-label">End <span class="text-danger">*</span></label><input type="date" class="form-control" name="end_date" id="tpe_end" required></div>
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3"><label class="form-label">Estimated Cost</label><input type="number" min="0" step="0.01" class="form-control" name="estimated_cost" id="tpe_estimated_cost"></div>
+                <div class="col-md-4 mb-3"><label class="form-label">Requested Advance</label><input type="number" min="0" step="0.01" class="form-control" name="requested_advance" id="tpe_requested_advance"></div>
+                <div class="col-md-4 mb-3"><label class="form-label">Expense Account</label>
+                    <select class="form-select select2-static" name="expense_account_id" id="tpe_expense_account">
+                        <option value="">Select account…</option>
+                        <?php foreach ($expense_accounts as $acc): ?>
+                            <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars((!empty($acc['account_code']) ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+            <div class="mb-3"><label class="form-label">Reference / Note</label><input class="form-control" name="expense_reference" id="tpe_reference" placeholder="Optional note (e.g. petty-cash slip #)"></div>
+            <div class="mb-3"><label class="form-label">Replace Attachment</label><input type="file" class="form-control" name="attachment"><div class="form-text">Leave blank to keep the existing attachment. PDF, Word, Excel or image. Max 10MB.</div></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-warning">Update Request</button></div>
+    </form>
+</div></div></div>
+<?php endif; ?>
+
+<?php if ($can_edit): ?>
 <div class="modal fade" id="tripPayModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
     <div class="modal-header bg-success text-white"><h5 class="modal-title"><i class="bi bi-cash-coin me-1"></i> Mark Trip Paid</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
     <form id="tripPayForm">
@@ -136,6 +173,7 @@ let tpTable=null, TP_ROWS=[];
 function tpStatusBadge(s){ const m={pending:['#fff3cd','#664d03'],approved:['#0d6efd','#fff'],completed:['#198754','#fff'],paid:['#0f5132','#fff'],rejected:['#dc3545','#fff'],cancelled:['#6c757d','#fff']}; const [bg,fg]=m[s]||['#e9ecef','#495057']; return `<span class="badge" style="background:${bg};color:${fg}">${s.charAt(0).toUpperCase()+s.slice(1)}</span>`; }
 function tpActions(r){
     let items = `<li><button class="dropdown-item py-2" onclick="viewTrip(${r.trip_id})"><i class="bi bi-eye text-primary me-2"></i>View</button></li>`;
+    if (r.status==='pending' && TP_CAN_EDIT) items += `<li><button class="dropdown-item py-2" onclick="editTrip(${r.trip_id})"><i class="bi bi-pencil text-warning me-2"></i>Edit</button></li>`;
     if (r.status==='pending' && TP_CAN_APPROVE) items += `<li><button class="dropdown-item py-2" onclick="tripAction(${r.trip_id},'approved')"><i class="bi bi-check2-all text-primary me-2"></i>Approve</button></li>`;
     if (r.status==='pending' && TP_CAN_REJECT) items += `<li><button class="dropdown-item py-2 text-danger" onclick="tripAction(${r.trip_id},'rejected')"><i class="bi bi-slash-circle text-danger me-2"></i>Reject</button></li>`;
     if (r.status==='approved' && TP_CAN_EDIT) items += `<li><button class="dropdown-item py-2" onclick="tripAction(${r.trip_id},'completed')"><i class="bi bi-flag text-success me-2"></i>Complete</button></li>`;
@@ -201,6 +239,39 @@ function tripAction(id, status){
 }
 function tripDelete(id){ Swal.fire({title:'Delete trip?',icon:'warning',showCancelButton:true,confirmButtonColor:'#dc3545',confirmButtonText:'Delete'}).then(r=>{ if(r.isConfirmed) $.post('<?= buildUrl('api/manage_trip.php') ?>',{action:'delete',trip_id:id,_csrf:TP_CSRF},function(res){ if(res.success) loadTrips(); else Swal.fire({icon:'error',title:'Error',text:res.message}); },'json'); }); }
 <?php if ($can_edit): ?>
+window.editTrip=function(id){
+    $.getJSON('<?= buildUrl('api/get_trips.php') ?>', { trip_id:id }, function(res){
+        if (!res.success){ Swal.fire({icon:'error',title:'Error',text:res.message}); return; }
+        const t=res.data;
+        $('#tripEditForm')[0].reset();
+        $('#tpe_trip_id').val(t.trip_id);
+        $('#tpe_destination').val(t.destination);
+        $('#tpe_purpose').val(t.purpose);
+        $('#tpe_start').val(t.start_date);
+        $('#tpe_end').val(t.end_date);
+        $('#tpe_estimated_cost').val(t.estimated_cost || '');
+        $('#tpe_requested_advance').val(t.requested_advance || '');
+        $('#tpe_reference').val(t.expense_reference || '');
+        new bootstrap.Modal(document.getElementById('tripEditModal')).show();
+        // Employee + Expense Account selects need their option present before Select2 can set a value.
+        setTimeout(function(){
+            const empOpt = new Option(t.first_name+' '+t.last_name, t.employee_id, true, true);
+            $('#tpe_employee').empty().append(empOpt).trigger('change');
+            $('#tpe_expense_account').val(t.expense_account_id || '').trigger('change');
+        }, 0);
+    });
+};
+$('#tripEditModal').on('shown.bs.modal', function(){
+    if (!$('#tpe_employee').hasClass('select2-hidden-accessible')) $('#tpe_employee').select2({ theme:'bootstrap-5',dropdownParent:$('#tripEditModal'),placeholder:'Select employee…',width:'100%',minimumInputLength:1,ajax:{url:'<?= buildUrl('api/account/search_employees.php') ?>',dataType:'json',delay:300,data:p=>({q:p.term}),processResults:d=>({results:d.results}),cache:true} });
+    if (!$('#tpe_expense_account').hasClass('select2-hidden-accessible')) $('#tpe_expense_account').select2({ theme:'bootstrap-5',dropdownParent:$('#tripEditModal'),placeholder:'Select account…',allowClear:true,width:'100%' });
+});
+$('#tripEditForm').on('submit', function(e){
+    e.preventDefault();
+    const btn=$(this).find('[type="submit"]'); btn.prop('disabled',true);
+    $.ajax({ url:'<?= buildUrl('api/manage_trip.php') ?>', type:'POST', data:new FormData(this), contentType:false, processData:false, dataType:'json',
+        success:r=>{ if (r.success){ bootstrap.Modal.getInstance(document.getElementById('tripEditModal')).hide(); loadTrips(); Swal.fire({icon:'success',title:'Updated!',text:r.message,timer:1600,showConfirmButton:false}); } else Swal.fire({icon:'error',title:'Error',text:r.message}); },
+        error:()=>Swal.fire({icon:'error',title:'Error',text:'Server error.'}), complete:()=>btn.prop('disabled',false) });
+});
 window.openTripPayModal=function(id, estCost){
     $('#tripPayForm')[0].reset();
     $('#tp_pay_trip_id').val(id);
