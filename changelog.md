@@ -1,5 +1,79 @@
 # BMS Changelog
 
+## 2026-07-21 (fix) — Employee profile print: large gaps between sections and a stray trailing blank page, in both Portrait and Landscape
+
+**Files:** `app/bms/pos/employee_details.php`
+
+Print only shows the 3 core cards now (sidebar profile card, Personal & Employment
+Information, Compensation & Payment, Emergency Contact — everything tabbed is
+`d-print-none`), but the sidebar (photo/name/stats) and main content column are laid out
+as side-by-side Bootstrap grid columns on screen. Flex/grid rows don't paginate reliably
+in print — the page-break engine treats the whole row as one block, so a short sidebar
+next to a taller main column leaves a large blank gap where the sidebar already ended,
+and can push a nearly-empty page into existence at the end. Each `.card` was also
+reserving 30px of pure bottom margin — five cards ≈ 150px of blank space before any
+content even starts.
+
+- Stack the sidebar and main content full-width instead of side-by-side for print,
+  scoped to `.container-fluid > .row` (the page's own two top-level rows) so the 8 nested
+  field-grid rows inside each card (`row g-3`/`row g-2` label/value pairs) keep their
+  normal multi-column layout — verified live these selectors match exactly the 2 intended
+  rows and none of the nested ones.
+- This fix is orientation-agnostic by construction (driven by percentage width, not a
+  fixed Portrait/Landscape media query), so it applies identically in both.
+- Compacted spacing across the board: card margin 30px → 6pt, card padding tightened,
+  heading/paragraph margins reduced, base print font-size set to 9.5pt — reduces the
+  total vertical footprint significantly, which is what actually prevents both the
+  mid-page gaps and the trailing near-empty page (both are symptoms of the same
+  underlying "wasted vertical space" problem, not two separate bugs).
+- Left `@page` margins and the shared print footer (`footer.php`) completely untouched,
+  per instruction to only touch this page's own body content.
+
+Verified live: confirmed via computed styles the sidebar/main columns now stack (top
+column's bottom edge aligns with the next column's top edge, both full page width)
+instead of sitting side by side; confirmed card margin-bottom dropped from 30px to 8px
+and card-body padding compacted to match; confirmed the stacking selector touches only
+the page's 2 top-level rows and none of its 8 nested field-grid rows.
+
+## 2026-07-21 (fix) — Employee profile crashed with a blocking alert for employees with zero attendance/payroll/salary/leave records
+
+**Files:** `app/bms/pos/employee_details.php`
+
+Live bug report from production (`demo.bjptechnologies.co.tz`, employee IDs 18 and 24):
+opening the profile threw `DataTables warning: table id=salaryStructureTable - Incorrect
+column count` as a **blocking native `alert()`** that froze the whole page, plus the same
+crash for Attendance and Payroll (`TypeError: Cannot set properties of undefined (setting
+'_DT_CellIndex')`).
+
+Root cause: Attendance, Payroll, Salary Structure, and Leave all render their `<table>`
+unconditionally, with a manual `<td colspan="N">No records found</td>` fallback row inside
+when there's no data — unlike Documents/Contracts/Training, which skip the `<table>`
+element entirely when empty (so DataTables never touches them in that case). DataTables'
+own documented error code 18 explicitly lists colspan/rowspan rows in `tbody` as a common
+trigger for exactly this crash. It only ever showed up for employees with zero rows in one
+of these four tables — employee #1 (used for all the earlier live verification this
+session) happens to have real data in all four, so the empty-table code path was never
+actually exercised until this report.
+
+Fix, two parts:
+- Removed the manual colspan fallback row from all four tables; `tbody` is now genuinely
+  empty when there's no data, and each table's DataTable init sets a matching
+  `language.emptyTable` message (DataTables generates that row itself, which is fully
+  compatible with its internal machinery — no more hand-built colspan row for it to choke
+  on).
+- Set `$.fn.dataTable.ext.errMode = 'throw'` globally before any table initializes.
+  DataTables' default error mode is `'alert'` — any future internal validation failure,
+  whatever causes it, will no longer be able to pop a page-freezing native dialog; it
+  throws a normal JS exception instead, caught by the existing per-table try/catch and
+  logged to console, so one bad table can never take down the page for everyone else.
+
+Verified live: employee #14 (confirmed zero attendance records — the exact crash
+scenario) now shows "No attendance records found." via DataTables' own empty-state
+message, `isDataTable()` reports `true`, zero console errors. Re-verified employee #1
+(real data in all four tables, including 6 attendance/payroll/leave rows each) still
+works fully post-fix — also incidentally has zero salary components, which now renders
+correctly too instead of having been untested.
+
 ## 2026-07-21 (feat) — Employee profile tables → DataTables with S/NO, row actions consolidated into one gear-dropdown per row
 
 **Files:** `app/bms/pos/employee_details.php`
