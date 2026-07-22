@@ -714,6 +714,11 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     <input type="number" class="form-control" id="hourly_rate" name="hourly_rate" step="0.01" placeholder="Hourly rate if applicable">
                                 </div>
                                 <div class="col-md-4 mb-3">
+                                    <label for="standard_working_hours" class="form-label">Working Hours (per day)</label>
+                                    <input type="number" class="form-control" id="standard_working_hours" name="standard_working_hours" step="0.5" min="0" value="8" placeholder="8">
+                                    <small class="text-muted">Attendance overtime is measured against this employee's own hours, not one company-wide number.</small>
+                                </div>
+                                <div class="col-md-4 mb-3">
                                     <label for="currency" class="form-label">Currency</label>
                                     <select class="form-select select2-static" id="currency" name="currency">
                                         <option value="TZS" selected>Tanzanian Shilling (TZS)</option>
@@ -2163,6 +2168,7 @@ function editEmployee(employeeId) {
                 $('#payment_method').val(emp.payment_method || 'bank');
                 $('#currency').val(emp.currency || 'TZS');
                 $('#hourly_rate').val(emp.hourly_rate || '');
+                $('#standard_working_hours').val(emp.standard_working_hours || 8);
                 $('#social_security_number').val(emp.social_security_number || '');
                 $('#tax_id').val(emp.tax_id || '');
 

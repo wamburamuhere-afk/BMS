@@ -1,5 +1,55 @@
 # BMS Changelog
 
+## 2026-07-22 (feat) — Progressive check-in/check-out + per-employee overtime standard
+
+**Files:** `api/mark_attendance.php`, `core/attendance_payroll.php`, `app/bms/pos/employee_details.php`, `app/bms/pos/employees.php`, `api/add_employee.php`, `api/update_employee.php`, `migrations/2026_07_22_employee_standard_working_hours.php`
+
+**Bug fixed — marking couldn't be done in two steps.** `api/mark_attendance.php` always
+wrote `check_in_time`/`check_out_time` from whatever the form submitted, `null` if left
+blank — so checking in now and coming back later to check out wiped the earlier check-in
+back to null instead of adding to it. Fixed: the record is fetched first, and any field
+not actually submitted (check-in, check-out, status, notes) falls back to what's already
+saved rather than being overwritten with nothing. `status` is now only required when
+creating a brand-new record — a check-out call doesn't need to restate the status the
+check-in call already set. `total_hours`/overtime are always recalculated from the final
+(preserved-or-new) check-in/check-out pair, never a stale client-submitted number.
+
+**New: one-tap Check In Now / Check Out Now** on the employee profile's Attendance History
+card, alongside the existing manual "Mark Attendance" modal (kept for backfilling a past
+day or an exact time). Check In disables once already checked in today; Check Out stays
+disabled until there's a check-in to close out. The manual modal now also pre-fills
+whatever's already saved for the selected date when opened, so reopening it for today
+shows the check-in you already made instead of a blank form.
+
+**Overtime is now measured against each employee's own working hours**, not one
+company-wide constant. Added `employees.standard_working_hours` (migration, defaults to
+8.00 so nothing changes for existing employees until edited) + a "Working Hours (per
+day)" field on the Add/Edit Employee form. New `employeeStandardHours($pdo, $employeeId)`
+helper falls back to the old global `payroll_settings.standard_hours_per_day` if an
+employee's own value is unset — `attendanceStandardHours()` itself is untouched, still
+used as that fallback. The Attendance History table's Overtime column now shows an
+"Overtime"/"Under"/"On Time" badge instead of a bare number.
+
+**Bugs caught and fixed while verifying, before landing:**
+- The Overtime badge originally trusted the *stored* `overtime_hours` column, which is
+  stale/zero for historical rows saved before this feature existed — a live 12-hour record
+  showed "0.00 On Time" instead of "4.00 Overtime". Fixed by computing both the badge and
+  the displayed hours live from `total_hours` vs. the employee's standard, never from the
+  stored column.
+- A JS ordering bug (`.on('shown.bs.modal', meaLoadExistingForDate)` referenced the
+  function before its `window.meaLoadExistingForDate = ...` assignment had run) threw an
+  uncaught `ReferenceError` that silently aborted the rest of that `$(document).ready`
+  callback — `checkInNow`/`checkOutNow` never got defined as a result. Fixed by wrapping
+  the reference in a closure so the lookup happens at call time, not bind time.
+
+Verified live: submitted a real check-in-only entry, confirmed check-in-only saved with
+`check_out_time` still null; submitted check-out-only for the same date, confirmed
+`check_in_time` was preserved (not wiped) and hours/status came through correctly; button
+states flip correctly after each step; Overtime badges now correctly read "4.00 Overtime"
+(12h vs 8h standard), "0.00 Under" (4h/7h), "0.00 On Time" (exactly 8h) across real
+historical data; confirmed the new Working Hours field renders, is returned by
+`get_employee.php`, and persists through `update_employee.php`.
+
 ## 2026-07-21 (fix) — Print: Personal & Employment Info now pairs beside Contact Info; found and fixed a real structural bug along the way
 
 **Files:** `app/bms/pos/employee_details.php`

@@ -5,7 +5,11 @@
  * Plan H2 — attendance → payroll helpers.
  *
  *  - attendancePayrollMode()    : 'off' (default) | 'on'  — the feature flag.
- *  - attendanceStandardHours()  : the shift standard (default 8) overtime is measured against.
+ *  - attendanceStandardHours()  : the company-wide shift standard (default 8) — fallback
+ *                                 only, used when an employee has no hours of their own.
+ *  - employeeStandardHours()    : the shift standard for ONE employee — their own
+ *                                 registered working hours, falling back to the
+ *                                 company-wide default above if unset/zero.
  *  - computeAttendanceOvertime(): overtime hours + amount for one saved day.
  *  - payrollAttendanceSummary() : present / half / absent days + overtime amount for a
  *                                 pay period, used by payroll when the flag is on.
@@ -32,6 +36,18 @@ if (!function_exists('attendanceStandardHours')) {
             if ($h > 0) return $h;
         } catch (Throwable $e) { /* fall through */ }
         return 8.0;
+    }
+}
+
+if (!function_exists('employeeStandardHours')) {
+    function employeeStandardHours(PDO $pdo, int $employeeId): float {
+        try {
+            $s = $pdo->prepare("SELECT standard_working_hours FROM employees WHERE employee_id = ?");
+            $s->execute([$employeeId]);
+            $h = (float)$s->fetchColumn();
+            if ($h > 0) return $h;
+        } catch (Throwable $e) { /* column/row absent → fall through to company default */ }
+        return attendanceStandardHours($pdo);
     }
 }
 
