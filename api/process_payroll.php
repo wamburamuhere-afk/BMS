@@ -18,17 +18,16 @@ if (!isset($_SESSION['user_id'])) {
 error_log("Process Payroll - Session Data: " . print_r($_SESSION, true));
 error_log("Process Payroll - user_role: " . ($_SESSION['user_role'] ?? 'NOT SET'));
 
-// Check permissions
-$user_role = $_SESSION['user_role'] ?? '';
-$user_role_lower = strtolower($user_role); // Convert to lowercase for comparison
-// Check against hardcoded list OR the dynamic permission system
-$can_process_payroll = isAdmin() || canEdit('payroll') || in_array($user_role_lower, ['admin', 'accountant', 'manager', 'hr', 'managing director']);
+// Check permissions — role_permissions is the single source of truth; a
+// hard-coded role-name list here would let a revoked role keep processing
+// payroll regardless of what user_roles.php says.
+$can_process_payroll = canCreate('payroll');
 
 // DEBUG: Log permission check result
 error_log("Process Payroll - Can process: " . ($can_process_payroll ? 'YES' : 'NO'));
 
 if (!$can_process_payroll) {
-    echo json_encode(['success' => false, 'message' => 'You do not have permission to process payroll. Your role: ' . $user_role]);
+    echo json_encode(['success' => false, 'message' => 'You do not have permission to process payroll.']);
     exit();
 }
 

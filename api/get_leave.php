@@ -8,6 +8,10 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
     exit();
 }
+if (!canView('leaves')) {
+    echo json_encode(['success' => false, 'message' => 'Access Denied']);
+    exit();
+}
 
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 

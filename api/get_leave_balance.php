@@ -16,6 +16,13 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
     exit();
 }
+// Shared read endpoint — called from leaves.php, employee_details.php, and
+// project_view.php, so it's gated on any of those pages' own View permission
+// rather than a single page_key that would break the other two callers.
+if (!canView('leaves') && !canView('employees') && !canView('projects')) {
+    echo json_encode(['success' => false, 'message' => 'Access Denied']);
+    exit();
+}
 
 $employee_id = isset($_GET['employee_id']) ? intval($_GET['employee_id']) : 0;
 $leave_type = isset($_GET['leave_type']) ? trim($_GET['leave_type']) : '';
