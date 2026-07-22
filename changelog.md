@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-07-22 (fix) — Salary Components had no permission of its own, silently piggybacked on Payroll
+
+**Files:** `migrations/2026_07_22_salary_components_permission.php`, `app/bms/pos/salary_components.php`, `header.php`, `api/pos/save_salary_component.php`, `api/pos/delete_salary_component.php`
+
+Audited all 15 "Human Resources" menu sections against `permissions`/`user_roles.php`
+after a report that admins couldn't independently control Salary Components access.
+Found 14 of 15 correctly defined (own `permissions` row, correctly grouped under the
+Human Resources tab, page enforces the matching key) — Salary Components was the one
+exception: it had **no `permissions` row at all**, and was hard-wired to the `payroll`
+key on both the menu (`header.php`) and the page itself
+(`autoEnforcePermission('payroll')`), plus its two master-list API endpoints
+(`save_salary_component.php`, `delete_salary_component.php`) checked `canEdit('payroll')`/
+`canDelete('payroll')`. Net effect: there was no checkbox row for it in
+`user_roles.php` at all — anyone granted Payroll automatically got full control over
+salary structures too, with no way to separate the two.
+
+Fixed: new `salary_components` permission (migration, grouped under Human Resources,
+seeded from every role's *existing* `payroll` grant so nobody loses access on deploy —
+an admin can narrow individual roles afterward via the normal UI). Menu and page now
+check `salary_components` independently of `payroll`. The two master-list API endpoints
+switched to `canEdit('salary_components')`/`canDelete('salary_components')`.
+
+**Explicitly left unchanged** (found to already be correct): `assign_salary_component.php`
+and `remove_salary_component.php` — these live on the Employee Profile's own "Salary
+Structure" tab (assigning a component to one employee's pay) and are deliberately gated
+by `payroll`, matching `employee_details.php`'s own `canEdit('payroll')` check at that
+tab (line 84) — that coupling is intentional (assigning pay components is a payroll
+act), not the bug.
+
+Verified live: migration created the permission (idempotent, re-run is a no-op),
+correctly seeded the 2 roles that currently hold Payroll, `user_roles.php` now renders
+"Salary Components" as its own row separate from "Payroll", and `canView`/`canEdit` do
+exact `page_key` lookups (confirmed no wildcard/prefix bleed between the two keys).
+
 ## 2026-07-22 (feat) — Employee Trips: full GL/journal_entries integration (accrue → pay → auto-reverse)
 
 **Files:** `api/manage_trip.php`, `api/get_trips.php`, `app/bms/pos/employee_trips.php`, `core/expense_posting.php`, `migrations/2026_07_22_employee_trips_gl_integration.php`, `migrations/2026_07_22_transactions_type_trip.php`

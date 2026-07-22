@@ -6,12 +6,12 @@
 // CSRF, mobile cards).
 require_once __DIR__ . '/../../../roots.php';
 
-autoEnforcePermission('payroll');
+autoEnforcePermission('salary_components');
 includeHeader();
 global $pdo;
 
-$can_edit   = isAdmin() || canEdit('payroll');
-$can_delete = isAdmin() || canDelete('payroll');
+$can_edit   = isAdmin() || canEdit('salary_components');
+$can_delete = isAdmin() || canDelete('salary_components');
 
 $rows = $pdo->query("SELECT * FROM salary_components WHERE status != 'deleted' ORDER BY component_type, component_name")->fetchAll(PDO::FETCH_ASSOC);
 
