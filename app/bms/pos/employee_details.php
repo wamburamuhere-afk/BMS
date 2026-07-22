@@ -305,12 +305,16 @@ $sr_status_badge = [
     body {
         padding-top: 0 !important;
         background: white !important;
+        font-size: 9.5pt !important;
     }
 
     .container-fluid {
         margin-top: 0 !important;
         padding-top: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
         margin-bottom: 0 !important;
+        max-width: 100% !important;
     }
 
     .d-print-none,
@@ -322,12 +326,43 @@ $sr_status_badge = [
         display: none !important;
     }
 
+    /* The sidebar (photo/name/stats) and main content (Personal Info, Compensation,
+       Emergency Contact) are side-by-side Bootstrap columns on screen. Flex/grid rows
+       don't paginate reliably in print — the page-break engine treats the row as one
+       block, so a short sidebar next to a tall main column leaves a large blank gap
+       where the sidebar already ended, and can push a nearly-empty trailing page.
+       Stack them full-width instead — same fix works in both Portrait and Landscape
+       since it's driven by percentage width, not a fixed orientation. Scoped to the
+       page's own top-level rows only (direct children of .container-fluid), so the
+       inner field-grid rows inside each card (e.g. "row g-3" label/value pairs) keep
+       their normal multi-column layout instead of collapsing to one field per line. */
+    .container-fluid > .row {
+        display: block !important;
+    }
+    .container-fluid > .row > [class*="col-"] {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: none !important;
+    }
+
+    /* Compact spacing — every card was reserving 30px of pure bottom margin (5 cards
+       ≈ 150px of blank space before content even starts), the single largest
+       contributor to the "large gaps" between sections. */
     .card {
         border: 1px solid #eee !important;
         box-shadow: none !important;
-        margin-bottom: 30px !important;
+        margin-bottom: 6pt !important;
         page-break-inside: avoid !important;
     }
+    .card-body, .card-header, .card-footer {
+        padding: 6pt 10pt !important;
+    }
+    h2 { font-size: 14pt !important; }
+    h4 { font-size: 12pt !important; margin-bottom: 2pt !important; }
+    h5, h6 { font-size: 10.5pt !important; margin-bottom: 3pt !important; }
+    p { margin-bottom: 3pt !important; }
+    .row.g-3 > div, .row.g-2 > div { margin-bottom: 2pt !important; }
+    hr { margin: 4pt 0 !important; }
 }
 </style>
 
@@ -843,9 +878,7 @@ $sr_status_badge = [
                                 <tr><th class="ps-3 no-sort">S/NO</th><th>Component</th><th>Type</th><th>Basis</th><th class="text-end">Value</th><th class="text-end pe-3 d-print-none no-sort">Action</th></tr>
                             </thead>
                             <tbody>
-                                <?php if (!$sc_rows): ?>
-                                <tr><td colspan="6" class="text-center text-muted py-3">No components assigned. Payroll will use this employee's basic salary (and any legacy allowances/deductions).</td></tr>
-                                <?php else: $sn = 1; foreach ($sc_rows as $r):
+                                <?php $sn = 1; foreach ($sc_rows as $r):
                                     $val = ($r['calculation_type'] === 'percentage') ? round($basic * (float)$r['amount'] / 100, 2) : (float)$r['amount'];
                                     $isDed = $r['component_type'] === 'deduction'; ?>
                                 <tr>
@@ -867,7 +900,7 @@ $sr_status_badge = [
                                         <?php endif; ?>
                                     </td>
                                 </tr>
-                                <?php endforeach; endif; ?>
+                                <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
@@ -1412,7 +1445,6 @@ $sr_status_badge = [
                         </thead>
                         <tbody>
                             <?php
-                            if (count($all_attendance) > 0):
                                 $sn = 1;
                                 foreach ($all_attendance as $att):
                             ?>
@@ -1425,9 +1457,7 @@ $sr_status_badge = [
                                 <td class="text-end text-muted"><?= number_format((float)($att['overtime_hours'] ?? 0), 2) ?></td>
                                 <td><?= $attStatusBadge($att['status']) ?></td>
                             </tr>
-                            <?php endforeach; else: ?>
-                            <tr><td colspan="7" class="text-center text-muted py-3">No attendance records found.</td></tr>
-                            <?php endif; ?>
+                            <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
@@ -1541,7 +1571,6 @@ $sr_status_badge = [
                         </thead>
                         <tbody>
                             <?php
-                            if (count($all_payrolls) > 0):
                                 $sn = 1;
                                 foreach ($all_payrolls as $pay):
                             ?>
@@ -1566,9 +1595,7 @@ $sr_status_badge = [
                                     </div>
                                 </td>
                             </tr>
-                            <?php endforeach; else: ?>
-                            <tr><td colspan="10" class="text-center text-muted py-3">No payroll records found.</td></tr>
-                            <?php endif; ?>
+                            <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
@@ -1626,7 +1653,6 @@ $sr_status_badge = [
                         </thead>
                         <tbody>
                             <?php
-                            if (count($all_leaves) > 0):
                                 $sn = 1;
                                 foreach ($all_leaves as $lv):
                             ?>
@@ -1655,9 +1681,7 @@ $sr_status_badge = [
                                     </div>
                                 </td>
                             </tr>
-                            <?php endforeach; else: ?>
-                            <tr><td colspan="7" class="text-center text-muted py-3">No leave records found.</td></tr>
-                            <?php endif; ?>
+                            <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
@@ -1790,6 +1814,16 @@ $(document).ready(function() {
     // Every table on this page that actually has rows becomes a DataTable; sections that
     // are lists/cards/timelines (Service Record, Performance, Onboarding, Meetings & Trips,
     // Notes) are left alone since there's no table there to upgrade.
+    //
+    // DataTables' default error mode is 'alert' — any internal validation failure (e.g. a
+    // row somehow having fewer cells than the header, seen live for a couple of employees'
+    // Attendance/Payroll/Salary history) pops a blocking native alert() that freezes the
+    // whole page. That is worse than the underlying data quirk itself. Switch it to 'throw'
+    // globally, once, before any table initializes: a bad table then just throws a normal
+    // JS exception, caught below per-table and logged to console — the page stays usable
+    // and every other table still works.
+    if (window.jQuery && $.fn.dataTable) { $.fn.dataTable.ext.errMode = 'throw'; }
+
     var empTableIds = [
         'salaryStructureTable', 'empDocsTable', 'empContractsTable', 'empTrainingTable',
         'attendanceHistoryTable', 'payrollHistoryTable', 'leaveHistoryTable'
@@ -1797,6 +1831,21 @@ $(document).ready(function() {
     // Plain for-loop with a try/catch per table, not .forEach() — an exception thrown
     // while processing one table would otherwise abort the whole forEach and silently
     // skip every table after it.
+    // Attendance/Payroll/Salary Structure/Leave always render their <table> even with zero
+    // rows (unlike Documents/Contracts/Training, which skip the table entirely when empty)
+    // — used to fill that gap with a manual <td colspan="N">No records found</td> row.
+    // DataTables' documented error code 18 ("Incorrect column count") explicitly lists
+    // colspan/rowspan rows in tbody as a common trigger — confirmed live, it crashed
+    // .DataTable() for exactly these 4 tables whenever a given employee had zero rows in
+    // one of them. Removed those manual rows; tbody is now genuinely empty when there's no
+    // data, and DataTables' own native `emptyTable` message (fully compatible with its
+    // internal machinery, since it generates that row itself) replaces it.
+    var empEmptyMessages = {
+        salaryStructureTable: "No components assigned. Payroll will use this employee's basic salary (and any legacy allowances/deductions).",
+        attendanceHistoryTable: 'No attendance records found.',
+        payrollHistoryTable: 'No payroll records found.',
+        leaveHistoryTable: 'No leave records found.'
+    };
     for (var __i = 0; __i < empTableIds.length; __i++) {
         try {
             var __id = empTableIds[__i];
@@ -1808,7 +1857,11 @@ $(document).ready(function() {
                     pageLength: 10,
                     order: [],
                     columnDefs: [{ orderable: false, targets: 'no-sort' }],
-                    language: { search: "_INPUT_", searchPlaceholder: "Search..." }
+                    language: {
+                        search: "_INPUT_",
+                        searchPlaceholder: "Search...",
+                        emptyTable: empEmptyMessages[__id] || 'No records found.'
+                    }
                 });
             }
         } catch (e) {
