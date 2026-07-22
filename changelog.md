@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-07-22 (fix+feat) — User Activity Report: free-text request box + fixed blank print
+
+**Files:** `app/activity_log.php`
+
+Two follow-ups to the User Activity Report tab:
+
+1. **Free-text field added.** There was no way for the admin to say, in their own
+   words, what they wanted the report to explain. Added a "Describe the report you
+   need" textarea (plus three one-tap example chips) and a "Generate Written Summary"
+   button. It sends the admin's exact wording to the existing cost-capped
+   `ai_audit_analysis.php` 'ask' endpoint, scoped to the same date range + user as the
+   charts, so the AI writes a plain-English narrative built strictly from the same real
+   numbers shown in the charts/table (it never invents figures). The written summary is
+   also included in the printout when present. Verified live: typed a custom request,
+   got back a real summary citing the actual counts (e.g. correctly flagged the admin
+   user's 692 deletions).
+
+2. **Print was blank — fixed.** `#uarPrintSection` had been placed *inside* the AI
+   panel (`#aiAuditCard`). The print CSS hides every direct child of `.main-content`
+   except `#uarPrintSection`, but since the section's ancestor (`#aiAuditCard`) is
+   itself a direct child, the whole panel — section included — was hidden, so the page
+   printed nothing. Moved `#uarPrintSection` out to be a direct sibling of the existing
+   `#aiPrintSection` (both direct children of `.main-content`), matching how the AI
+   modes' own print section is already structured. Verified by simulating the print
+   rule live: `#uarPrintSection` now computes to `display:block` with real rendered
+   content (~6,280px tall — charts as PNGs + written summary + table), while the panel
+   correctly hides. No console errors.
+
 ## 2026-07-22 (feat) — Activity Log: real "User Activity Report" with charts (5th AI Audit Intelligence tab)
 
 **Files:** `core/activity_log_helpers.php` (new), `api/user_activity_report.php` (new), `app/activity_log.php`
