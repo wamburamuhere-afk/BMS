@@ -162,3 +162,27 @@ if (!function_exists('postVoucherAccrual')) {
 if (!function_exists('reverseVoucherAccrual')) {
     function reverseVoucherAccrual(PDO $pdo, int $voucherId, int $userId): array { return reverseAccrualEntry($pdo, 'voucher_accrual', $voucherId, $userId); }
 }
+
+/* ── Employee Trip wrappers ──────────────────────────────────────────────────
+ * Trips previously never moved money (D26): estimated_cost/requested_advance were
+ * informational only, and expense_reference was a plain string pointing at a
+ * separate petty-cash/expense record. This adds real GL posting on the same
+ * accrual-then-settle lifecycle as expenses/vouchers, off the same generic engine:
+ *   Approved → Dr Expense (employee_trips.expense_account_id) / Cr Accrued Expenses
+ *   Paid     → Dr Accrued Expenses / Cr Bank (settlement; see postOutflow in
+ *              api/manage_trip.php's 'pay' action)
+ *   Cancelled/deleted at ANY later stage → reverse whatever was posted (both the
+ *   settlement and the accrual, unconditionally — a cancelled trip must leave zero
+ *   trace in the ledger, unlike an expense reject-from-paid which only undoes cash). */
+
+if (!function_exists('tripIsAccrued')) {
+    function tripIsAccrued(PDO $pdo, int $tripId): bool { return isDocAccrued($pdo, 'trip_accrual', $tripId); }
+}
+if (!function_exists('postTripAccrual')) {
+    function postTripAccrual(PDO $pdo, int $tripId, int $expenseAccountId, float $amount, string $date, ?int $projectId, int $userId, ?string $reference, ?string $description): array {
+        return postAccrualEntry($pdo, 'trip_accrual', 'Trip', $tripId, $expenseAccountId, $amount, $date, $projectId, $userId, $reference, $description);
+    }
+}
+if (!function_exists('reverseTripAccrual')) {
+    function reverseTripAccrual(PDO $pdo, int $tripId, int $userId): array { return reverseAccrualEntry($pdo, 'trip_accrual', $tripId, $userId); }
+}
