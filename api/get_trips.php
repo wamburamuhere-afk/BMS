@@ -13,10 +13,14 @@ try {
     if ($trip_id) {
         if (function_exists('assertScopeForEmployeeRecord')) assertScopeForEmployeeRecord('employee_trips', 'trip_id', $trip_id);
         $stmt = $pdo->prepare("
-            SELECT t.*, e.first_name, e.last_name, e.employee_number, au.username AS approved_by_name
+            SELECT t.*, e.first_name, e.last_name, e.employee_number, au.username AS approved_by_name,
+                   ea.account_code AS expense_account_code, ea.account_name AS expense_account_name,
+                   pa.account_code AS paid_from_account_code, pa.account_name AS paid_from_account_name
             FROM employee_trips t
             JOIN employees e ON e.employee_id = t.employee_id
             LEFT JOIN users au ON au.user_id = t.approved_by
+            LEFT JOIN accounts ea ON ea.account_id = t.expense_account_id
+            LEFT JOIN accounts pa ON pa.account_id = t.paid_from_account_id
             WHERE t.trip_id = ? AND t.status != 'deleted'
         ");
         $stmt->execute([$trip_id]);

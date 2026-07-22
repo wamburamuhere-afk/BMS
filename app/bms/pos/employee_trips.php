@@ -1,9 +1,11 @@
 <?php
 // Business Trips — Tier 4, Phase 4.3. page_key: employee_trips.
-// A trip never moves money (D26): estimated cost / requested advance are
-// informational; the real advance/reimbursement flows through Petty Cash /
-// Expenses and is referenced by a plain string here.
+// GL-integrated (D26 follow-up): approving a trip posts an accrual against the
+// chosen Expense Account; marking it paid settles that accrual against a
+// Paid-From bank/cash account; cancelling/deleting reverses whatever was posted.
+// See api/manage_trip.php + core/expense_posting.php.
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/payment_source.php'; // expenseAccounts / cashBankAccounts
 
 autoEnforcePermission('employee_trips');
 includeHeader();
@@ -15,6 +17,8 @@ $can_edit   = canEdit('employee_trips');
 $can_delete = canDelete('employee_trips');
 $can_approve = canApprove('employee_trips');
 $can_reject  = function_exists('canReject') ? canReject('employee_trips') : $can_approve;
+$expense_accounts = expenseAccounts($pdo);
+$bank_accounts = cashBankAccounts($pdo);
 ?>
 
 <div class="container-fluid mt-4">
@@ -36,7 +40,8 @@ $can_reject  = function_exists('canReject') ? canReject('employee_trips') : $can
             <div class="col-6 col-md-3"><label class="form-label small mb-1">Status</label>
                 <select class="form-select form-select-sm" id="tpf_status"><option value="">All statuses</option>
                     <option value="pending">Pending</option><option value="approved">Approved</option>
-                    <option value="completed">Completed</option><option value="rejected">Rejected</option><option value="cancelled">Cancelled</option></select></div>
+                    <option value="completed">Completed</option><option value="paid">Paid</option>
+                    <option value="rejected">Rejected</option><option value="cancelled">Cancelled</option></select></div>
             <div class="col-12 col-md-4"><label class="form-label small mb-1">Employee</label><select class="form-select form-select-sm" id="tpf_employee"><option value="">All employees</option></select></div>
             <div class="col-12 col-md-2"><button class="btn btn-sm btn-outline-secondary w-100" id="tpf_reset"><i class="bi bi-arrow-clockwise"></i></button></div>
         </div>
@@ -75,12 +80,47 @@ $can_reject  = function_exists('canReject') ? canReject('employee_trips') : $can
             <div class="row">
                 <div class="col-md-4 mb-3"><label class="form-label">Estimated Cost</label><input type="number" min="0" step="0.01" class="form-control" name="estimated_cost"></div>
                 <div class="col-md-4 mb-3"><label class="form-label">Requested Advance</label><input type="number" min="0" step="0.01" class="form-control" name="requested_advance"></div>
-                <div class="col-md-4 mb-3"><label class="form-label">Expense Reference</label><input class="form-control" name="expense_reference" placeholder="Petty-cash / expense code"></div>
+                <div class="col-md-4 mb-3"><label class="form-label">Expense Account</label>
+                    <select class="form-select select2-static" name="expense_account_id" id="tp_expense_account">
+                        <option value="">Select account…</option>
+                        <?php foreach ($expense_accounts as $acc): ?>
+                            <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars((!empty($acc['account_code']) ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
             </div>
-            <div class="alert alert-info py-2 small"><i class="bi bi-info-circle me-1"></i> The advance &amp; expenses are recorded in Petty Cash / Expenses as usual — paste the reference above.</div>
+            <div class="mb-3"><label class="form-label">Reference / Note</label><input class="form-control" name="expense_reference" placeholder="Optional note (e.g. petty-cash slip #)"></div>
+            <div class="alert alert-info py-2 small"><i class="bi bi-info-circle me-1"></i> Once approved, the estimated cost is posted to the chosen Expense Account. Marking the trip Paid settles it against a Paid-From account.</div>
             <div class="mb-3"><label class="form-label">Attachment</label><input type="file" class="form-control" name="attachment"><div class="form-text">PDF, Word, Excel or image. Max 10MB.</div></div>
         </div>
         <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Submit Request</button></div>
+    </form>
+</div></div></div>
+<?php endif; ?>
+
+<?php if ($can_edit): ?>
+<div class="modal fade" id="tripPayModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header bg-success text-white"><h5 class="modal-title"><i class="bi bi-cash-coin me-1"></i> Mark Trip Paid</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+    <form id="tripPayForm">
+        <div class="modal-body">
+            <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+            <input type="hidden" name="action" value="change_status">
+            <input type="hidden" name="status" value="paid">
+            <input type="hidden" name="trip_id" id="tp_pay_trip_id">
+            <div class="mb-3"><label class="form-label">Paid From <span class="text-danger">*</span></label>
+                <select class="form-select select2-static" name="paid_from_account_id" id="tp_pay_from" required>
+                    <option value="">Select account…</option>
+                    <?php foreach ($bank_accounts as $acc): ?>
+                        <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars((!empty($acc['account_code']) ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3"><label class="form-label">Payment Date <span class="text-danger">*</span></label><input type="date" class="form-control" name="payment_date" id="tp_pay_date" value="<?= date('Y-m-d') ?>" required></div>
+                <div class="col-md-6 mb-3"><label class="form-label">Amount Paid <span class="text-danger">*</span></label><input type="number" min="0.01" step="0.01" class="form-control" name="paid_amount" id="tp_pay_amount" required></div>
+            </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-success">Post Payment</button></div>
     </form>
 </div></div></div>
 <?php endif; ?>
@@ -93,13 +133,14 @@ const TP_CAN_EDIT=<?= json_encode($can_edit) ?>, TP_CAN_DELETE=<?= json_encode($
 const TP_MY_ID = <?= (int)$_SESSION['user_id'] ?>;
 let tpTable=null, TP_ROWS=[];
 
-function tpStatusBadge(s){ const m={pending:['#fff3cd','#664d03'],approved:['#0d6efd','#fff'],completed:['#198754','#fff'],rejected:['#dc3545','#fff'],cancelled:['#6c757d','#fff']}; const [bg,fg]=m[s]||['#e9ecef','#495057']; return `<span class="badge" style="background:${bg};color:${fg}">${s.charAt(0).toUpperCase()+s.slice(1)}</span>`; }
+function tpStatusBadge(s){ const m={pending:['#fff3cd','#664d03'],approved:['#0d6efd','#fff'],completed:['#198754','#fff'],paid:['#0f5132','#fff'],rejected:['#dc3545','#fff'],cancelled:['#6c757d','#fff']}; const [bg,fg]=m[s]||['#e9ecef','#495057']; return `<span class="badge" style="background:${bg};color:${fg}">${s.charAt(0).toUpperCase()+s.slice(1)}</span>`; }
 function tpActions(r){
     let items = `<li><button class="dropdown-item py-2" onclick="viewTrip(${r.trip_id})"><i class="bi bi-eye text-primary me-2"></i>View</button></li>`;
     if (r.status==='pending' && TP_CAN_APPROVE) items += `<li><button class="dropdown-item py-2" onclick="tripAction(${r.trip_id},'approved')"><i class="bi bi-check2-all text-primary me-2"></i>Approve</button></li>`;
     if (r.status==='pending' && TP_CAN_REJECT) items += `<li><button class="dropdown-item py-2 text-danger" onclick="tripAction(${r.trip_id},'rejected')"><i class="bi bi-slash-circle text-danger me-2"></i>Reject</button></li>`;
     if (r.status==='approved' && TP_CAN_EDIT) items += `<li><button class="dropdown-item py-2" onclick="tripAction(${r.trip_id},'completed')"><i class="bi bi-flag text-success me-2"></i>Complete</button></li>`;
-    if ((r.status==='pending'||r.status==='approved') && TP_CAN_EDIT) items += `<li><button class="dropdown-item py-2" onclick="tripAction(${r.trip_id},'cancelled')"><i class="bi bi-x-circle me-2"></i>Cancel</button></li>`;
+    if ((r.status==='approved'||r.status==='completed') && TP_CAN_EDIT) items += `<li><button class="dropdown-item py-2" onclick="openTripPayModal(${r.trip_id},${r.estimated_cost||0})"><i class="bi bi-cash-coin text-success me-2"></i>Mark Paid</button></li>`;
+    if (['pending','approved','completed','paid'].includes(r.status) && TP_CAN_EDIT) items += `<li><button class="dropdown-item py-2" onclick="tripAction(${r.trip_id},'cancelled')"><i class="bi bi-x-circle me-2"></i>Cancel</button></li>`;
     if (TP_CAN_DELETE) items += `<li><hr class="dropdown-divider"></li><li><button class="dropdown-item py-2 text-danger" onclick="tripDelete(${r.trip_id})"><i class="bi bi-trash text-danger me-2"></i>Delete</button></li>`;
     return `<div class="dropdown d-flex justify-content-end"><button class="btn btn-sm btn-outline-primary dropdown-toggle px-2" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button><ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${items}</ul></div>`;
 }
@@ -132,9 +173,11 @@ function viewTrip(id){
             <table class="table table-sm">
                 <tr><th style="width:35%">Purpose</th><td>${safeOutput(t.purpose)}</td></tr>
                 <tr><th>Dates</th><td>${safeOutput(t.start_date)} → ${safeOutput(t.end_date)}</td></tr>
-                ${t.estimated_cost?`<tr><th>Estimated cost</th><td>${Number(t.estimated_cost).toLocaleString()} <span class="text-muted small">(informational)</span></td></tr>`:''}
+                ${t.estimated_cost?`<tr><th>Estimated cost</th><td>${Number(t.estimated_cost).toLocaleString()}</td></tr>`:''}
                 ${t.requested_advance?`<tr><th>Requested advance</th><td>${Number(t.requested_advance).toLocaleString()} <span class="text-muted small">(informational)</span></td></tr>`:''}
-                ${t.expense_reference?`<tr><th>Expense ref</th><td>${safeOutput(t.expense_reference)}</td></tr>`:''}
+                ${t.expense_account_name?`<tr><th>Expense account</th><td>${safeOutput((t.expense_account_code?t.expense_account_code+' — ':'')+t.expense_account_name)}</td></tr>`:''}
+                ${t.expense_reference?`<tr><th>Reference / note</th><td>${safeOutput(t.expense_reference)}</td></tr>`:''}
+                ${t.status==='paid'?`<tr><th>Paid</th><td>${Number(t.paid_amount).toLocaleString()} from ${safeOutput((t.paid_from_account_code?t.paid_from_account_code+' — ':'')+t.paid_from_account_name)} on ${safeOutput(t.payment_date)}</td></tr>`:''}
                 ${t.report?`<tr><th>Trip report</th><td>${safeOutput(t.report)}</td></tr>`:''}
                 ${t.reject_reason?`<tr><th class="text-danger">Reject reason</th><td class="text-danger">${safeOutput(t.reject_reason)}</td></tr>`:''}
                 ${t.approved_by_name?`<tr><th>${t.status==='rejected'?'Rejected':'Approved'} by</th><td>${safeOutput(t.approved_by_name)}</td></tr>`:''}
@@ -157,6 +200,25 @@ function tripAction(id, status){
     });
 }
 function tripDelete(id){ Swal.fire({title:'Delete trip?',icon:'warning',showCancelButton:true,confirmButtonColor:'#dc3545',confirmButtonText:'Delete'}).then(r=>{ if(r.isConfirmed) $.post('<?= buildUrl('api/manage_trip.php') ?>',{action:'delete',trip_id:id,_csrf:TP_CSRF},function(res){ if(res.success) loadTrips(); else Swal.fire({icon:'error',title:'Error',text:res.message}); },'json'); }); }
+<?php if ($can_edit): ?>
+window.openTripPayModal=function(id, estCost){
+    $('#tripPayForm')[0].reset();
+    $('#tp_pay_trip_id').val(id);
+    if (estCost) $('#tp_pay_amount').val(Number(estCost).toFixed(2));
+    new bootstrap.Modal(document.getElementById('tripPayModal')).show();
+};
+$('#tripPayModal').on('shown.bs.modal', function(){
+    if (!$('#tp_pay_from').hasClass('select2-hidden-accessible')) $('#tp_pay_from').select2({ theme:'bootstrap-5',dropdownParent:$('#tripPayModal'),width:'100%' });
+});
+$('#tripPayForm').on('submit', function(e){
+    e.preventDefault();
+    const btn=$(this).find('[type="submit"]'); btn.prop('disabled',true);
+    $.post('<?= buildUrl('api/manage_trip.php') ?>', $(this).serialize(), function(r){
+        if (r.success){ bootstrap.Modal.getInstance(document.getElementById('tripPayModal')).hide(); loadTrips(); Swal.fire({icon:'success',title:'Paid!',text:r.message,timer:1600,showConfirmButton:false}); }
+        else Swal.fire({icon:'error',title:'Error',text:r.message});
+    }, 'json').fail(()=>Swal.fire({icon:'error',title:'Error',text:'Server error.'})).always(()=>btn.prop('disabled',false));
+});
+<?php endif; ?>
 
 $(function(){
     tpTable=$('#tripsTable').DataTable({ responsive:false,scrollX:true,pageLength:25,order:[[3,'desc']],dom:'rtip',columnDefs:[{targets:0,orderable:false,searchable:false,className:'text-center',render:(d,t,row,meta)=>meta.row+1+meta.settings._iDisplayStart}],language:{emptyTable:'No trips yet.'},drawCallback:function(){ tpCards(this.api().rows({page:'current'})[0].map(i=>TP_ROWS[i]).filter(Boolean)); } });
@@ -172,6 +234,7 @@ $(function(){
 window.openTripModal=function(){ $('#tripForm')[0].reset(); new bootstrap.Modal(document.getElementById('tripModal')).show(); };
 $('#tripModal').on('shown.bs.modal', function(){
     if (!$('#tp_employee').hasClass('select2-hidden-accessible')) $('#tp_employee').select2({ theme:'bootstrap-5',dropdownParent:$('#tripModal'),placeholder:'Select employee…',width:'100%',minimumInputLength:1,ajax:{url:'<?= buildUrl('api/account/search_employees.php') ?>',dataType:'json',delay:300,data:p=>({q:p.term}),processResults:d=>({results:d.results}),cache:true} });
+    if (!$('#tp_expense_account').hasClass('select2-hidden-accessible')) $('#tp_expense_account').select2({ theme:'bootstrap-5',dropdownParent:$('#tripModal'),placeholder:'Select account…',allowClear:true,width:'100%' });
 });
 $('#tripForm').on('submit', function(e){
     e.preventDefault();
