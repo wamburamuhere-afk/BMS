@@ -73,9 +73,23 @@ try {
     $totals = array_fill_keys(array_merge($verbOrder, ['other']), 0);
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) { $totals[$r['vtype']] = (int)$r['c']; }
 
+    // Grand total across EVERY user in scope (not just the top-25 shown below) —
+    // the denominator for each user's "% of activity" share.
+    $grandTotal = array_sum($totals);
+
     // ── 2. Per-user breakdown (bar chart + table) ───────────────────────────────
+    // Display name resolution: prefer the person's full name, then their username,
+    // and only fall back to "User #N (removed)" for a user_id that no longer has a
+    // row in `users` (a deleted account, or historical seed data) — so those read
+    // as clearly-gone accounts, not a broken lookup.
+    $nameExpr = "COALESCE(
+                    NULLIF(TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))), ''),
+                    NULLIF(TRIM(u.username), ''),
+                    CONCAT('User #', b.user_id, ' (removed)')
+                 )";
     $perUserSql = "
-        SELECT COALESCE(u.username, CONCAT('User#', b.user_id)) AS username,
+        SELECT b.user_id,
+               $nameExpr AS username,
                SUM(b.vtype='view')     AS view_c,
                SUM(b.vtype='create')   AS create_c,
                SUM(b.vtype='edit')     AS edit_c,
@@ -85,7 +99,7 @@ try {
                COUNT(*)                AS total_c
         FROM ($baseSql) b
         LEFT JOIN users u ON u.user_id = b.user_id
-        GROUP BY b.user_id, u.username
+        GROUP BY b.user_id, username
         ORDER BY total_c DESC
         LIMIT 25
     ";
@@ -93,6 +107,7 @@ try {
     $st->execute(array_merge($typeParams, $bp));
     $perUser = [];
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $rowTotal = (int)$r['total_c'];
         $perUser[] = [
             'username' => $r['username'],
             'view'     => (int)$r['view_c'],
@@ -101,7 +116,8 @@ try {
             'delete'   => (int)$r['delete_c'],
             'review'   => (int)$r['review_c'],
             'approve'  => (int)$r['approve_c'],
-            'total'    => (int)$r['total_c'],
+            'total'    => $rowTotal,
+            'pct'      => $grandTotal > 0 ? round($rowTotal * 100 / $grandTotal, 1) : 0,
         ];
     }
 
@@ -148,6 +164,7 @@ try {
         'success'     => true,
         'totals'      => $totals,
         'per_user'    => $perUser,
+        'grand_total' => $grandTotal,
         'trend'       => $trendOut,
         'granularity' => $granularity,
         'from'        => $date_from,
