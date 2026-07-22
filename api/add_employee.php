@@ -163,7 +163,7 @@ try {
             address, physical_address, postal_address, city, state, ward, village, country, hire_date,
             probation_end_date, contract_end_date, department_id,
             designation_id, employment_type_id, employment_status, reporting_to, reporting_to_id, work_location,
-            basic_salary, hourly_rate, currency, payment_frequency,
+            basic_salary, hourly_rate, standard_working_hours, currency, payment_frequency,
             bank_name, bank_account, bank_branch, mobile_money,
             tax_id, social_security_number, emergency_contact,
             emergency_contact_relationship, emergency_contact_phone, emergency_contact_postal_address,
@@ -176,7 +176,7 @@ try {
             ?, ?, ?, ?, ?, ?, ?, ?, ?, -- row 4: 9
             ?, ?, ?,         -- row 5: 3
             ?, ?, ?, ?, ?, ?, -- row 6: 6
-            ?, ?, ?, ?,      -- row 7: 4
+            ?, ?, ?, ?, ?,   -- row 7: 5 (basic_salary, hourly_rate, standard_working_hours, currency, payment_frequency)
             ?, ?, ?, ?,      -- row 8: 4
             ?, ?, ?,         -- row 9: 3
             ?, ?, ?, ?, ?,   -- row 10: 5
@@ -216,9 +216,10 @@ try {
         $reporting_to_name,
         $reporting_to_id,
         $_POST['work_location'] ?? null,
-        $_POST['basic_salary'] ?? 0, 
-        $_POST['hourly_rate'] ?? 0, 
-        $_POST['currency'] ?? 'TZS', 
+        $_POST['basic_salary'] ?? 0,
+        $_POST['hourly_rate'] ?? 0,
+        $_POST['standard_working_hours'] ?? 8,
+        $_POST['currency'] ?? 'TZS',
         ($_POST['payment_frequency'] === 'other') ? ($_POST['payment_frequency_other'] ?? 'other') : ($_POST['payment_frequency'] ?? 'monthly'),
         $_POST['bank_name'] ?? null, 
         $_POST['bank_account'] ?? null, 

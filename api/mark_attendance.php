@@ -29,15 +29,11 @@ try {
     if (empty($_POST['employee_id'])) {
         throw new Exception('Employee is required');
     }
-    
+
     if (empty($_POST['attendance_date'])) {
         throw new Exception('Attendance date is required');
     }
-    
-    if (empty($_POST['status'])) {
-        throw new Exception('Status is required');
-    }
-    
+
     $employee_id = intval($_POST['employee_id']);
 
     // Phase D — project-scope gate
@@ -47,14 +43,36 @@ try {
     assertEmployeeActive($pdo, $employee_id);
 
     $attendance_date = trim($_POST['attendance_date']);
-    $status = trim($_POST['status']);
-    $check_in_time = !empty($_POST['check_in_time']) ? trim($_POST['check_in_time']) : null;
-    $check_out_time = !empty($_POST['check_out_time']) ? trim($_POST['check_out_time']) : null;
-    $total_hours = !empty($_POST['total_hours']) ? floatval($_POST['total_hours']) : null;
-    $notes = !empty($_POST['notes']) ? trim($_POST['notes']) : '';
-    
-    // Calculate total hours if not provided
-    if ($total_hours === null && $check_in_time && $check_out_time) {
+
+    // Check if attendance record already exists — fetched BEFORE resolving the fields
+    // below, so a partial submission (e.g. just a check-out time, checking out after an
+    // earlier check-in-only save) can fall back to what's already saved instead of
+    // wiping it. This is what lets "check in now, check out later" work: each call only
+    // needs to supply the field it actually has.
+    $check_stmt = $pdo->prepare("
+        SELECT * FROM attendance
+        WHERE employee_id = ? AND attendance_date = ?
+    ");
+    $check_stmt->execute([$employee_id, $attendance_date]);
+    $existing = $check_stmt->fetch(PDO::FETCH_ASSOC);
+
+    // Status is required to create a brand-new record, but optional on an update — a
+    // check-out call doesn't need to (and shouldn't have to) restate the status the
+    // check-in call already set.
+    if (empty($_POST['status']) && !$existing) {
+        throw new Exception('Status is required');
+    }
+    $status = !empty($_POST['status']) ? trim($_POST['status']) : ($existing['status'] ?? 'present');
+
+    $check_in_time  = !empty($_POST['check_in_time'])  ? trim($_POST['check_in_time'])  : ($existing['check_in_time']  ?? null);
+    $check_out_time = !empty($_POST['check_out_time']) ? trim($_POST['check_out_time']) : ($existing['check_out_time'] ?? null);
+    $notes = isset($_POST['notes']) ? trim($_POST['notes']) : ($existing['notes'] ?? '');
+
+    // total_hours always derives from the final check-in/check-out pair (never trust a
+    // stale client-submitted value here) so a check-out-only call recalculates against
+    // the check-in that was actually saved earlier, not one the browser no longer knows.
+    $total_hours = null;
+    if ($check_in_time && $check_out_time) {
         $check_in = strtotime($check_in_time);
         $check_out = strtotime($check_out_time);
         $total_hours = ($check_out - $check_in) / 3600;
@@ -64,18 +82,10 @@ try {
     $rate_stmt = $pdo->prepare("SELECT COALESCE(hourly_rate, 0) FROM employees WHERE employee_id = ?");
     $rate_stmt->execute([$employee_id]);
     $hourly_rate = (float)$rate_stmt->fetchColumn();
-    $ot = computeAttendanceOvertime($total_hours, attendanceStandardHours($pdo), $hourly_rate);
+    $ot = computeAttendanceOvertime($total_hours, employeeStandardHours($pdo, $employee_id), $hourly_rate);
     $overtime_hours  = $ot['overtime_hours'];
     $overtime_amount = $ot['overtime_amount'];
 
-    // Check if attendance record already exists
-    $check_stmt = $pdo->prepare("
-        SELECT attendance_id FROM attendance 
-        WHERE employee_id = ? AND attendance_date = ?
-    ");
-    $check_stmt->execute([$employee_id, $attendance_date]);
-    $existing = $check_stmt->fetch();
-    
     if ($existing) {
         // Update existing record
         $update_stmt = $pdo->prepare("
