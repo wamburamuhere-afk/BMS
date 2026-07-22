@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-07-22 (feat) — User Activity Report: real user names + per-user % share
+
+**Files:** `api/user_activity_report.php`, `app/activity_log.php`
+
+Two refinements to the per-user breakdown, from a report that it showed generic
+"User#1 / User#2" labels and gave no sense of each person's proportion of activity:
+
+1. **Real names.** The per-user query now displays each person's **full name**
+   (first_name + last_name), falling back to their username, and only to
+   "User #N (removed)" for a `user_id` that genuinely no longer has a row in `users`
+   (a deleted account, or old seed/test data). So real people read as their actual
+   names (e.g. "Admin Admin"), and the bare-id rows are clearly labelled as removed
+   accounts rather than looking like a broken lookup. (Verified against the live data:
+   `activity_logs` contains a handful of `user_id`s — 1, 7, 8, 777001, 999920, … —
+   that have no matching `users` row at all, so no name exists to show for them; those
+   are the only ones that now read "(removed)".)
+
+2. **% share per user.** Added a "% Share" column to the table — each user's portion of
+   **all** activity in the selected period (denominator = every event in scope across
+   every user, not just the top 25 shown) — rendered as a number plus a small inline
+   bar. The stacked bar chart's tooltip footer now also shows the hovered user's total
+   and % share on top of the per-type split. The exact percentage is computed
+   server-side so it can't drift from the counts.
+
+Verified live: full names resolve ("Admin Admin" = 92.7% of activity for the period),
+removed-account rows labelled clearly, per-user percentages sum to ~100% (small
+remainder is the users beyond the top-25 cut), inline % bars render at the right width,
+and the % column flows into the printout via the existing table capture. No console
+errors.
+
 ## 2026-07-22 (fix+feat) — User Activity Report: free-text request box + fixed blank print
 
 **Files:** `app/activity_log.php`
