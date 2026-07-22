@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-07-22 (fix) — Activity Log "Viewed" stat card disagreed with its own filtered list
+
+**Files:** `app/activity_log.php`
+
+Live bug report: the "Viewed" summary card read a much higher number (e.g. 85) than
+what actually appeared when filtering the list itself to Type = View (a handful of
+rows) — the other three cards (Created/Updated/Deleted) matched their filtered lists
+fine.
+
+Root cause: the summary cards and the actual list computed "how many View events"
+two different ways. The card ran a plain `COUNT(CASE WHEN action LIKE 'View%'...)`
+over every raw `activity_logs` row. The list — always server-side DataTables, since
+the page uses `serverSide: true` — applies a `LAG()`-based dedup that deliberately
+collapses consecutive View-type events by the same user down to just the first of
+each run, so a user rapidly browsing pages doesn't flood the log with near-duplicate
+"Viewed X" rows. Created/Updated/Deleted never occur in that kind of back-to-back
+streak from the same user, so those three cards happened to already agree with their
+lists; only View was affected, and only View, which is exactly what was reported.
+
+Fixed by computing the "Viewed" card with the identical `LAG()` dedup rule the list
+already uses (same scope: user + date range, no type filter, so the previous-action
+lookup sees the true prior event) — no data is being skipped or hidden, it's counted
+by the same rule everywhere now, consistently.
+
+Verified live against the real endpoints (not just a standalone query) across every
+filter combination: Today (stat card 16, filtered list `recordsFiltered` 16 — was
+mismatched before the fix), All Time with no date filter (11,683 vs 11,683 over the
+full table), and scoped to a specific user (11,262 vs 11,262). Created/Updated/Deleted
+re-confirmed still matching their own filtered lists (19/2/2) after the change.
+
 ## 2026-07-22 (fix) — Attendance/exports used the wrong scope helper, causing same-role users to see different rosters
 
 **Files:** `app/bms/pos/attendance.php`, `api/export_attendance.php`, `api/export_payroll.php`, `api/export_leaves.php`, `api/export_leave_applications.php`
