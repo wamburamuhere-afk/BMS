@@ -326,23 +326,40 @@ $sr_status_badge = [
         display: none !important;
     }
 
-    /* The sidebar (photo/name/stats) and main content (Personal Info, Compensation,
-       Emergency Contact) are side-by-side Bootstrap columns on screen. Flex/grid rows
-       don't paginate reliably in print — the page-break engine treats the row as one
-       block, so a short sidebar next to a tall main column leaves a large blank gap
-       where the sidebar already ended, and can push a nearly-empty trailing page.
-       Stack them full-width instead — same fix works in both Portrait and Landscape
-       since it's driven by percentage width, not a fixed orientation. Scoped to the
-       page's own top-level rows only (direct children of .container-fluid), so the
-       inner field-grid rows inside each card (e.g. "row g-3" label/value pairs) keep
-       their normal multi-column layout instead of collapsing to one field per line. */
+    /* The sidebar (photo/name/stats/Contact Info) and main content (Personal Info,
+       Compensation, Emergency Contact) are side-by-side Bootstrap columns on screen.
+       Flex/grid rows don't paginate reliably in print — the page-break engine treats
+       the row as one block, so a short sidebar next to a tall main column leaves a
+       large blank gap where the sidebar already ended, and can push a nearly-empty
+       trailing page. "display: contents" removes the column boxes themselves (screen
+       layout is untouched — this is print-only) so their card children become one
+       flat, flowing sequence in source order: Profile Card, Contact Info, Personal &
+       Employment Info, Compensation & Payment, Emergency Contact. Works the same in
+       both Portrait and Landscape since nothing here is orientation-specific. */
     .container-fluid > .row {
         display: block !important;
     }
     .container-fluid > .row > [class*="col-"] {
-        width: 100% !important;
-        max-width: 100% !important;
-        flex: none !important;
+        display: contents !important;
+    }
+
+    /* Contact Info (last card of the old sidebar) and Personal & Employment Information
+       (first card of the old main column) are adjacent in that flattened sequence —
+       pair them side by side (1/4 + 3/4 of the page width) instead of Contact Info
+       sitting alone on the left with the whole right half of the page empty. */
+    #contactInfoCard {
+        float: left !important;
+        width: 24% !important;
+        margin-right: 2% !important;
+    }
+    #personalInfoCard {
+        float: left !important;
+        width: 74% !important;
+    }
+    /* Compensation & Payment must start on its own full-width line below the float
+       pair, not beside them. */
+    #personalInfoCard + .card {
+        clear: both !important;
     }
 
     /* Compact spacing — every card was reserving 30px of pure bottom margin (5 cards
@@ -496,7 +513,7 @@ $sr_status_badge = [
             </div>
 
             <!-- Contact Info -->
-            <div class="card mb-4 shadow-sm">
+            <div class="card mb-4 shadow-sm" id="contactInfoCard">
                 <div class="card-header bg-white">
                     <h5 class="card-title mb-0"><i class="bi bi-person-lines-fill"></i> Contact Info</h5>
                 </div>
@@ -573,7 +590,7 @@ $sr_status_badge = [
 
         <!-- Main Content -->
         <div class="col-md-8 col-xl-9">
-            <div class="card shadow-sm mb-4">
+            <div class="card shadow-sm mb-4" id="personalInfoCard">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
                     <h5 class="mb-0">Personal & Employment Information</h5>
                 </div>
@@ -666,7 +683,6 @@ $sr_status_badge = [
                             <p class="fw-bold"><?= safe_output($employee['mobile_money'] ?? 'N/A') ?></p>
                         </div>
                     </div>
-                </div>
                 </div>
             </div>
 
