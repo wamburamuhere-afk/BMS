@@ -1,5 +1,65 @@
 # BMS Changelog
 
+## 2026-07-22 (feat) — Activity Log: real "User Activity Report" with charts (5th AI Audit Intelligence tab)
+
+**Files:** `core/activity_log_helpers.php` (new), `api/user_activity_report.php` (new), `app/activity_log.php`
+
+User had tried asking the AI ("Audit Report" mode) for a per-user Create/Edit/Delete/
+View/Review/Approve breakdown with charts, daily/weekly/monthly/quarterly/yearly — an
+LLM can narrate numbers but cannot draw a chart, so that request could never succeed
+through an AI text call. Added a genuinely separate capability: a 5th tab, **"User
+Activity Report,"** in the same AI Audit Intelligence panel, computed directly from
+`activity_logs` with real SQL aggregation — no AI involved, so the numbers are exact
+and reproducible.
+
+- **Pie/donut chart** — overall activity mix (View/Create/Edit/Delete/Review/Approve
+  proportions) for the selected scope.
+- **Stacked bar chart** — per-user comparison, top 25 by volume, split by the same six
+  types.
+- **Trend line chart** — total activity over time, bucketed by a new Group-By selector
+  (Daily/Weekly/Monthly/Quarterly/Yearly).
+- **Data table** underneath with the exact per-user numbers behind every chart.
+- Explanation panel above the charts (what each chart means), since management reports
+  need that context, not just raw numbers.
+- Print button — captures each canvas as a PNG (`canvas.toDataURL()`) plus the table
+  into a dedicated print section, following the exact same `body.*-printing` /
+  `renderPrintHeader()` pattern the existing AI modes already use — same shared
+  header, no duplicated print logic.
+- Chart.js (CDN), matching the same charting library already used on ~22 other report
+  pages in this app.
+
+**Refactor to prevent the class of bug just fixed above from recurring**: extracted
+the six-verb classification map, the `buildTypeSql`-equivalent SQL builder, and the
+View-streak dedup condition out of `app/activity_log.php`'s inline closures into
+`core/activity_log_helpers.php` (`activityTypeMap()`, `buildActivityTypeSql()`,
+`activityViewDedupExclusion()`). Both `app/activity_log.php` (filter/stat cards) and
+the new `api/user_activity_report.php` now call the exact same functions, so this new
+report's numbers can never drift from what the rest of the page already shows — the
+same "two different counting rules for the same concept" mistake can't happen again by
+construction. Re-verified after the refactor that the page's own numbers were
+unchanged (16/16 viewed, 19/2/2 created/updated/deleted, all still matching).
+
+**Bug caught and fixed during build**: PDO rejects mixing named and positional
+placeholders in one prepared statement — `buildActivityTypeSql()` always emits named
+params, so the new endpoint's date-range/user-id parameters were switched to named
+placeholders too (`:scope_from`/`:scope_to`/`:scope_uid`) to avoid an "Invalid
+parameter number" failure.
+
+**Bug caught and fixed during build (chart sizing)**: charts were created before their
+container had `d-none` removed, so Chart.js measured a hidden (zero-size) element and
+every canvas permanently rendered at 0×0 — confirmed via live DOM inspection
+(`canvas.getAttribute('width') === '0'` even after an explicit `.resize()` call).
+Fixed by revealing the output container before constructing any `Chart` instance, and
+gave each canvas a wrapper `div` with an explicit `position:relative; height:…px` (the
+standard Chart.js responsive-sizing fix) instead of relying on canvas `height`
+attributes alone.
+
+Verified live end-to-end: all three charts render with real non-zero canvas
+dimensions; tested Day/Week/Month/Quarter/Year grouping (each returns correctly
+bucketed trend data); tested the optional single-user scope (correctly returns exactly
+one row, `user_scope` resolved to the username); Print correctly exports each canvas
+to a PNG via `toDataURL()` into the dedicated print section. No console errors.
+
 ## 2026-07-22 (fix) — Activity Log "Viewed" stat card disagreed with its own filtered list
 
 **Files:** `app/activity_log.php`

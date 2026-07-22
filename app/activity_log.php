@@ -1,6 +1,7 @@
 <?php
 // File: app/activity_log.php
 require_once __DIR__ . '/../roots.php';
+require_once ROOT_DIR . '/core/activity_log_helpers.php'; // shared verb classification + View dedup — single source of truth, also used by api/user_activity_report.php
 
 // Phase 2 of security_implementation_plan.md — anyone logged in could open
 // this page before; now only admins or roles explicitly granted 'audit_logs'
@@ -124,31 +125,11 @@ $company_vrn = get_setting('company_vrn', '');
     $conditions = [];
     $params = [];
 
-    // ── Canonical audit activities (see audit_log.md). ONE shared map drives the
-    //    filter, the summary cards AND the Type column, so they always agree.
-    //    Each canonical verb absorbs the legacy/inconsistent variants in the data
-    //    (e.g. page_view → View, update_* → Edit, Recorded → Create).
-    $activity_type_map = [
-        'view'    => ['View', 'Viewed', 'page_view'],
-        'create'  => ['Create', 'Created', 'Add', 'Added', 'Recorded'],
-        'edit'    => ['Edit', 'Edited', 'Update', 'Updated', 'update_', 'Changed'],
-        'delete'  => ['Delete', 'Deleted', 'Remove', 'Removed', 'Void', 'Voided'],
-        'review'  => ['Review', 'Reviewed'],
-        'approve' => ['Approve', 'Approved'],
-    ];
-
-    // Build a "(action LIKE … OR description LIKE …)" fragment that matches any of a
-    // canonical type's verbs at the START of action OR description. '_' is escaped
-    // so 'page_view' / 'update_' match literally (LIKE treats '_' as a wildcard).
-    $buildTypeSql = function (string $type, string $tag) use ($activity_type_map) {
-        $ors = []; $p = [];
-        foreach (($activity_type_map[$type] ?? []) as $i => $verb) {
-            $k = ":{$tag}{$i}";
-            $ors[] = "action LIKE $k OR description LIKE $k";
-            $p[$k] = str_replace('_', '\\_', $verb) . '%';
-        }
-        return [$ors ? '(' . implode(' OR ', $ors) . ')' : '1=0', $p];
-    };
+    // ── Canonical audit activities (see audit_log.md + core/activity_log_helpers.php).
+    //    ONE shared map drives the filter, the summary cards, the Type column, AND
+    //    the User Activity Report charts, so they always agree.
+    $activity_type_map = activityTypeMap();
+    $buildTypeSql = fn(string $type, string $tag) => buildActivityTypeSql($type, $tag);
 
     // Apply the Activity Type filter via the same map.
     if ($type_filter && isset($activity_type_map[$type_filter])) {
@@ -202,10 +183,7 @@ $company_vrn = get_setting('company_vrn', '');
             $innerWhere
         ) _log";
 
-        $dedup_cond = "NOT (
-            (action LIKE 'View %' OR action LIKE 'Viewed %' OR action = 'page_view')
-            AND (prev_action LIKE 'View %' OR prev_action LIKE 'Viewed %' OR prev_action = 'page_view')
-        )";
+        $dedup_cond = activityViewDedupExclusion();
 
         // ── Outer conditions: dedup + type filter (type goes outside so LAG is
         //    still computed over ALL types, not just the filtered one).
@@ -326,10 +304,7 @@ $company_vrn = get_setting('company_vrn', '');
             $viewedWhere
         ) v
         WHERE $viewFrag
-          AND NOT (
-              (action LIKE 'View %' OR action LIKE 'Viewed %' OR action = 'page_view')
-              AND (prev_action LIKE 'View %' OR prev_action LIKE 'Viewed %' OR prev_action = 'page_view')
-          )
+          AND " . activityViewDedupExclusion() . "
     ";
     $viewed_stmt = $pdo->prepare($viewed_sql);
     $viewed_stmt->execute(array_merge($scope_params, $viewFragParams));
@@ -627,6 +602,11 @@ $page_title = "Activity Log";
     body.ai-printing .main-content > *:not(#aiPrintSection) { display: none !important; }
     body.ai-printing #aiPrintSection { display: block !important; }
     body.ai-printing #aiPrintSection .bms-print-header { display: block !important; }
+
+    /* User Activity Report print mode: same pattern, its own section */
+    body.uar-printing .main-content > *:not(#uarPrintSection) { display: none !important; }
+    body.uar-printing #uarPrintSection { display: block !important; }
+    body.uar-printing #uarPrintSection canvas { max-width: 100% !important; height: auto !important; }
     
     html, body {
         margin: 0 !important;
@@ -916,10 +896,11 @@ $page_title = "Activity Log";
             <div class="d-flex border-bottom flex-wrap gap-0 px-3 pt-2" style="background:#f8fafc; border-radius:0;">
                 <?php
                 $modes = [
-                    'briefing'  => ['icon' => 'bi-file-text',            'label' => 'Daily Briefing',    'color' => '#7c3aed'],
-                    'anomalies' => ['icon' => 'bi-exclamation-triangle',  'label' => 'Anomaly Scanner',   'color' => '#dc2626'],
-                    'ask'       => ['icon' => 'bi-chat-dots',             'label' => 'Ask the Log',       'color' => '#0d6efd'],
-                    'report'    => ['icon' => 'bi-journal-bookmark-fill', 'label' => 'Audit Report',      'color' => '#059669'],
+                    'briefing'        => ['icon' => 'bi-file-text',            'label' => 'Daily Briefing',      'color' => '#7c3aed'],
+                    'anomalies'       => ['icon' => 'bi-exclamation-triangle',  'label' => 'Anomaly Scanner',     'color' => '#dc2626'],
+                    'ask'             => ['icon' => 'bi-chat-dots',             'label' => 'Ask the Log',         'color' => '#0d6efd'],
+                    'report'          => ['icon' => 'bi-journal-bookmark-fill', 'label' => 'Audit Report',        'color' => '#059669'],
+                    'activity_report' => ['icon' => 'bi-pie-chart-fill',        'label' => 'User Activity Report','color' => '#0891b2'],
                 ];
                 foreach ($modes as $mk => $mv): ?>
                 <button type="button"
@@ -1018,7 +999,123 @@ $page_title = "Activity Log";
                     </button>
                 </div>
 
-                <!-- Result area — shared across all modes -->
+                <!-- USER ACTIVITY REPORT — real computed charts, no AI narration -->
+                <div class="ai-pane d-none" id="ai-pane-activity_report">
+                    <p class="text-muted small mb-1">
+                        A real, data-computed breakdown of what every user did — Create / Edit / Delete / View /
+                        Review / Approve — as counts and charts, not an AI narrative (an AI can't draw a chart).
+                        <span class="badge bg-light text-dark border ms-1" style="font-size:.65rem;">Exact counts — no AI involved</span>
+                    </p>
+                    <p class="text-muted small mb-3">
+                        <strong>Pie chart</strong> — the overall mix of actions across the selected scope.
+                        <strong>Bar chart</strong> — how each user's activity splits across the six action types.
+                        <strong>Trend line</strong> — total activity over time, bucketed by whichever "Group by" you pick below.
+                        The table beneath has the exact numbers behind every chart.
+                    </p>
+                    <div class="row g-2 mb-3" style="max-width:760px;">
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-muted text-uppercase" style="font-size:.68rem;">User (optional)</label>
+                            <select class="form-select form-select-sm" id="uarUser">
+                                <option value="">All Users</option>
+                                <?php foreach ($users as $u): ?>
+                                <option value="<?= $u['user_id'] ?>"><?= htmlspecialchars($u['username']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-muted text-uppercase" style="font-size:.68rem;">From</label>
+                            <input type="date" class="form-control form-control-sm" id="uarFrom"
+                                   value="<?= htmlspecialchars($date_from ?: date('Y-m-01')) ?>">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-muted text-uppercase" style="font-size:.68rem;">To</label>
+                            <input type="date" class="form-control form-control-sm" id="uarTo"
+                                   value="<?= htmlspecialchars($date_to ?: date('Y-m-d')) ?>">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-muted text-uppercase" style="font-size:.68rem;">Group By</label>
+                            <select class="form-select form-select-sm" id="uarGranularity">
+                                <option value="day" selected>Daily</option>
+                                <option value="week">Weekly</option>
+                                <option value="month">Monthly</option>
+                                <option value="quarter">Quarterly</option>
+                                <option value="year">Yearly</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm fw-semibold text-white" style="background:#0891b2; border-radius:8px;"
+                            onclick="loadUserActivityReport()">
+                        <i class="bi bi-bar-chart-line me-1"></i> Generate Report
+                    </button>
+
+                    <div id="uarResultArea" class="mt-4 d-none">
+                        <div id="uarLoading" class="text-center py-4 d-none">
+                            <div class="spinner-border" style="width:1.8rem;height:1.8rem;color:#0891b2;"></div>
+                            <p class="text-muted small mt-2 mb-0">Computing activity report…</p>
+                        </div>
+                        <div id="uarError" class="d-none">
+                            <div class="alert alert-danger mb-0"><i class="bi bi-exclamation-circle me-1"></i><span id="uarErrorMsg"></span></div>
+                        </div>
+                        <div id="uarOutput" class="d-none">
+                            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                <span class="text-muted small" id="uarResultMeta"></span>
+                                <button class="btn btn-sm btn-outline-secondary" style="font-size:.75rem;" onclick="printUarResult()">
+                                    <i class="bi bi-printer me-1"></i>Print
+                                </button>
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-5">
+                                    <div class="border rounded p-3" style="background:#f8fafc;">
+                                        <div class="fw-bold small text-uppercase text-muted mb-2" style="font-size:.7rem;">Activity Mix</div>
+                                        <div style="position:relative; height:260px;"><canvas id="uarPieChart"></canvas></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-7">
+                                    <div class="border rounded p-3" style="background:#f8fafc;">
+                                        <div class="fw-bold small text-uppercase text-muted mb-2" style="font-size:.7rem;">Per-User Breakdown (top 25 by volume)</div>
+                                        <div style="position:relative; height:260px;"><canvas id="uarBarChart"></canvas></div>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="border rounded p-3" style="background:#f8fafc;">
+                                        <div class="fw-bold small text-uppercase text-muted mb-2" style="font-size:.7rem;">Activity Trend</div>
+                                        <div style="position:relative; height:180px;"><canvas id="uarTrendChart"></canvas></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle mb-0" id="uarTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th class="ps-3">User</th>
+                                            <th class="text-center">View</th>
+                                            <th class="text-center">Create</th>
+                                            <th class="text-center">Edit</th>
+                                            <th class="text-center">Delete</th>
+                                            <th class="text-center">Review</th>
+                                            <th class="text-center">Approve</th>
+                                            <th class="text-center pe-3">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="uarTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Print-only section for the User Activity Report (charts print as-is; the
+                     company header still comes from the global renderPrintHeader(), same as
+                     every other page — no duplication here). -->
+                <div id="uarPrintSection" style="display:none;">
+                    <div class="text-center pb-3 mb-3" style="border-bottom: 2px solid #0891b2; margin-top: 8px;">
+                        <h5 style="text-transform:uppercase; letter-spacing:1px; color:#333; margin:6px 0 2px; font-size:13pt;">User Activity Report</h5>
+                        <p id="uarPrintMetaLine" style="color:#64748b; font-size:10pt; margin:0;"></p>
+                    </div>
+                    <div id="uarPrintBody"></div>
+                </div>
+
+                <!-- Result area — shared across the 4 AI narrative modes -->
                 <div id="aiResultArea" class="mt-4 d-none">
                     <!-- Loading -->
                     <div id="aiLoading" class="text-center py-4 d-none">
@@ -1266,6 +1363,7 @@ $page_title = "Activity Log";
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 let acTable = null;
 $(function () {
@@ -1673,6 +1771,147 @@ function copyAiResult() {
     }).catch(() => {
         Swal.fire({ icon:'error', title:'Copy failed', text:'Please select and copy manually.' });
     });
+}
+
+// ── User Activity Report — real computed charts, no AI ────────────────────────
+const UAR_TYPE_LABELS = { view:'View', create:'Create', edit:'Edit', delete:'Delete', review:'Review', approve:'Approve', other:'Other' };
+const UAR_TYPE_COLORS = { view:'#0d6efd', create:'#198754', edit:'#f59e0b', delete:'#dc2626', review:'#0891b2', approve:'#7c3aed', other:'#94a3b8' };
+let uarPieChart = null, uarBarChart = null, uarTrendChart = null;
+
+async function loadUserActivityReport() {
+    const dateFrom    = $('#uarFrom').val();
+    const dateTo      = $('#uarTo').val();
+    const userId      = $('#uarUser').val();
+    const granularity = $('#uarGranularity').val();
+
+    const area = document.getElementById('uarResultArea');
+    area.classList.remove('d-none');
+    document.getElementById('uarLoading').classList.remove('d-none');
+    document.getElementById('uarOutput').classList.add('d-none');
+    document.getElementById('uarError').classList.add('d-none');
+
+    try {
+        const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo, granularity });
+        if (userId) params.set('user_id', userId);
+        const res = await $.ajax({
+            url: '<?= buildUrl('api/user_activity_report.php') ?>' + '?' + params.toString(),
+            type: 'GET',
+            dataType: 'json',
+        });
+        document.getElementById('uarLoading').classList.add('d-none');
+
+        if (!res.success) {
+            document.getElementById('uarErrorMsg').textContent = res.message || 'Unknown error.';
+            document.getElementById('uarError').classList.remove('d-none');
+            return;
+        }
+
+        const scopeLabel = res.user_scope ? `user: ${res.user_scope}` : 'all users';
+        document.getElementById('uarResultMeta').textContent =
+            `${res.from} to ${res.to}  ·  ${scopeLabel}  ·  grouped ${res.granularity}  ·  ${new Date().toLocaleTimeString()}`;
+
+        // Reveal the container BEFORE creating any Chart — Chart.js measures its
+        // canvas's parent at construction time, and a chart built while its
+        // container is still display:none (d-none) permanently renders at 0x0.
+        document.getElementById('uarOutput').classList.remove('d-none');
+
+        // Pie: overall activity mix (skip zero-count types so the legend stays clean)
+        const pieEntries = Object.entries(res.totals).filter(([, v]) => v > 0);
+        [uarPieChart].forEach(c => c && c.destroy());
+        uarPieChart = new Chart(document.getElementById('uarPieChart'), {
+            type: 'doughnut',
+            data: {
+                labels: pieEntries.map(([k]) => UAR_TYPE_LABELS[k] || k),
+                datasets: [{ data: pieEntries.map(([, v]) => v), backgroundColor: pieEntries.map(([k]) => UAR_TYPE_COLORS[k] || '#ccc') }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+        });
+
+        // Bar: per-user stacked breakdown
+        const verbKeys = ['view', 'create', 'edit', 'delete', 'review', 'approve'];
+        [uarBarChart].forEach(c => c && c.destroy());
+        uarBarChart = new Chart(document.getElementById('uarBarChart'), {
+            type: 'bar',
+            data: {
+                labels: res.per_user.map(u => u.username),
+                datasets: verbKeys.map(k => ({
+                    label: UAR_TYPE_LABELS[k],
+                    data: res.per_user.map(u => u[k]),
+                    backgroundColor: UAR_TYPE_COLORS[k],
+                }))
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
+            }
+        });
+
+        // Trend: total activity over time
+        [uarTrendChart].forEach(c => c && c.destroy());
+        uarTrendChart = new Chart(document.getElementById('uarTrendChart'), {
+            type: 'line',
+            data: {
+                labels: res.trend.map(t => t.label),
+                datasets: [{ label: 'Total activity', data: res.trend.map(t => t.total), borderColor: '#0891b2', backgroundColor: 'rgba(8,145,178,.15)', fill: true, tension: 0.25 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+
+        // Table — exact numbers behind every chart
+        const tbody = document.getElementById('uarTableBody');
+        if (!res.per_user.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No activity in this range.</td></tr>';
+        } else {
+            tbody.innerHTML = res.per_user.map(u => `
+                <tr>
+                    <td class="ps-3">${safeOutputUar(u.username)}</td>
+                    <td class="text-center">${u.view}</td>
+                    <td class="text-center">${u.create}</td>
+                    <td class="text-center">${u.edit}</td>
+                    <td class="text-center">${u.delete}</td>
+                    <td class="text-center">${u.review}</td>
+                    <td class="text-center">${u.approve}</td>
+                    <td class="text-center pe-3 fw-bold">${u.total}</td>
+                </tr>
+            `).join('');
+        }
+    } catch (e) {
+        document.getElementById('uarLoading').classList.add('d-none');
+        document.getElementById('uarErrorMsg').textContent = 'Request failed. Check your connection.';
+        document.getElementById('uarError').classList.remove('d-none');
+    }
+}
+
+function safeOutputUar(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
+
+function printUarResult() {
+    const meta  = document.getElementById('uarResultMeta')?.textContent || '';
+    const table = document.getElementById('uarTable')?.outerHTML || '';
+    const pie   = document.getElementById('uarPieChart');
+    const bar   = document.getElementById('uarBarChart');
+    const trend = document.getElementById('uarTrendChart');
+
+    document.getElementById('uarPrintMetaLine').textContent = meta;
+    document.getElementById('uarPrintBody').innerHTML = `
+        <div class="d-flex flex-wrap gap-3 justify-content-center mb-4">
+            ${pie   ? `<img src="${pie.toDataURL('image/png')}" style="max-width:320px;">` : ''}
+            ${bar   ? `<img src="${bar.toDataURL('image/png')}" style="max-width:420px;">` : ''}
+        </div>
+        <div class="mb-4 text-center">
+            ${trend ? `<img src="${trend.toDataURL('image/png')}" style="max-width:100%;">` : ''}
+        </div>
+        ${table}
+    `;
+
+    document.body.classList.add('uar-printing');
+    const cleanup = () => {
+        document.body.classList.remove('uar-printing');
+        window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    window.print();
 }
 </script>
 
