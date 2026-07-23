@@ -235,12 +235,28 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
         </div>
     </div>
 
-    <!-- Print Header -->
+    <!-- Print Header — company letterhead (logo + name + contact/TIN/VRN), same
+         shape as every other report's print header (project_view.php, invoice_print.php).
+         $c_web/$c_email/$c_tin/$c_vrn/$company_name/$company_logo were previously
+         undefined here — header.php sets them via `global`, but this file is
+         require_once'd from inside handleRoute(), so that global binding never
+         reaches this scope. Fetched locally, same pattern project_view.php uses. -->
+    <?php
+        $company_name = getSetting('company_name', 'BMS');
+        $company_logo = getSetting('company_logo', '');
+        $c_web   = getSetting('company_website', '');
+        $c_email = getSetting('company_email', '');
+        $c_tin   = getSetting('company_tin', '');
+        $c_vrn   = getSetting('company_vrn', '');
+    ?>
     <div class="d-none d-print-block text-center mb-4 mt-2">
-       
-        
+        <?php if (!empty($company_logo)): ?>
+            <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
+        <?php endif; ?>
+        <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
+
         <p class="text-dark mb-1 small text-uppercase text-center">
-            <?php 
+            <?php
             $web_email = [];
             if (!empty($c_web)) $web_email[] = "Web: " . safe_output($c_web);
             if (!empty($c_email)) $web_email[] = "Email: " . safe_output($c_email);
@@ -249,7 +265,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
         </p>
 
         <p class="text-dark mb-1 small text-uppercase text-center">
-            <?php 
+            <?php
             $tin_vrn = [];
             if (!empty($c_tin)) $tin_vrn[] = "TIN: " . safe_output($c_tin);
             if (!empty($c_vrn)) $tin_vrn[] = "VRN: " . safe_output($c_vrn);
@@ -346,7 +362,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
     </ul>
 
     <!-- Table Card -->
-    <div class="card border-0 shadow-sm mb-4" style="border-top-left-radius:0;">
+    <div class="card border-0 shadow-sm mb-4" id="dnTableCard" style="border-top-left-radius:0;">
         <div class="card-header bg-white py-3 border-bottom d-print-none d-flex justify-content-between align-items-center">
             <h5 class="mb-0 fw-bold" id="dnListHeading"><?= $is_outbound_view ? 'Outbound Delivery Notes — Sent' : 'Inbound Delivery Notes — Received' ?></h5>
             <div class="btn-group shadow-sm d-none d-md-flex" role="group">
@@ -884,6 +900,23 @@ function changeStatus(id, newStatus) {
         @page { margin: 10mm; size: auto; }
         .d-print-none, .btn, .dataTables_filter, .dataTables_length, .dataTables_paginate, .dataTables_info { display: none !important; }
         table.dataTable { table-layout: fixed !important; }
+
+        /* Root cause of "a lot of blank pages": the global responsive.css rule
+           `p, .card, section { page-break-inside: avoid !important }` applies to
+           the Table Card (#dnTableCard) wrapping #dnTable. With even a modest
+           number of rows the card is many times taller than one printed page, so
+           an unbreakable "avoid" block that can never fit anywhere produces
+           repeated blank pages while the browser hunts for room. A more specific
+           override (id selector) beats the class rule and lets the table flow
+           and break normally across pages, in both portrait and landscape. */
+        #dnTableCard {
+            page-break-inside: auto !important;
+            break-inside: auto !important;
+            overflow: visible !important;
+        }
+        #dnTable tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+        #dnTable thead { display: table-header-group; }
+
         #dnTable th, #dnTable td {
             font-size: 8pt !important;
             padding: 5px !important;
