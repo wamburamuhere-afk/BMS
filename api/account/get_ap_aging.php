@@ -6,10 +6,10 @@
  * Buckets every unpaid, approved supplier/sub-contractor bill by how long it has
  * been outstanding as of a chosen date: Current / 1-30 / 31-60 / 61-90 / 90+.
  *
- * BMS note: supplier_invoices carry NO due_date and no partial-payment tracking
- * (status flips straight to 'paid'). So outstanding = bills with status='approved',
- * the payable amount = amount - WHT withheld, and aging is measured from
- * date_raised. (Documented on the page.)
+ * BMS note: outstanding = approved/partial bills not yet fully paid. The payable to
+ * the supplier is net of BOTH the WHT withheld AND any amount already paid
+ * (amount - wht_amount - amount_paid), so a partially-paid bill keeps its remaining
+ * balance aged. Aging is measured from due_date (fallback date_raised).
  *
  * Project-scoped per security.md §23.
  *
@@ -51,8 +51,12 @@ if ($project_id !== null && !userCan('project', $project_id)) {
 try {
     global $pdo;
 
-    // Outstanding payable = approved (not yet paid) bills, net of any WHT withheld.
-    $where  = ["si.status = 'approved'"];
+    // Outstanding payable = approved/partial bills not yet fully paid. The remaining
+    // is COMPUTED net of both the WHT withheld and any amount already paid, so a
+    // partially-paid bill keeps its unpaid remainder aged and the report never
+    // overstates what is owed. Including 'partial' stops such bills from vanishing.
+    $remaining = "GREATEST(si.amount - COALESCE(si.wht_amount,0) - COALESCE(si.amount_paid,0), 0)";
+    $where  = ["si.status IN ('approved','partial')", "$remaining > 0"];
     $params = [$as_of];   // first ? = the DATEDIFF as-of date
     if ($vendor_id !== null) { $where[] = "si.supplier_id = ?"; $params[] = $vendor_id; }
     $scope = '';
@@ -69,7 +73,8 @@ try {
                si.payment_terms,
                si.amount,
                COALESCE(si.wht_amount, 0)                                         AS wht_amount,
-               (si.amount - COALESCE(si.wht_amount, 0))                           AS balance,
+               COALESCE(si.amount_paid, 0)                                        AS amount_paid,
+               $remaining                                                          AS balance,
                si.supplier_id                                                      AS vendor_id,
                COALESCE(s.supplier_name, 'Unknown')                               AS vendor_name,
                DATEDIFF(?, COALESCE(si.due_date, si.date_raised))                 AS days_outstanding
@@ -118,6 +123,7 @@ try {
             'days'          => $days,
             'amount'        => (float)$b['amount'],
             'wht_amount'    => (float)$b['wht_amount'],
+            'amount_paid'   => (float)$b['amount_paid'],
             'balance'       => $bal,
             'bucket'        => $bucket,
         ];
