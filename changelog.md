@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-07-23 (fix) — Project Doc Library print: show all required columns (Source/Category, Type, Date Added)
+
+**File:** `app/bms/operations/project_view.php` (print-only CSS — screen view and data untouched)
+
+The Doc Library table (`#projectDocsTable`) uses Bootstrap's `d-none d-md-table-cell` / `d-none d-lg-table-cell` on the Source/Category, Type, and Date Added columns — screen-responsive classes meant to hide them on a narrow mobile viewport. Print inherits the same breakpoints, so on a print render under those widths the columns vanished, leaving only S/NO and Document Title. Forced all 5 required columns (`th.d-none`/`td.d-none` → `table-cell`) to always show on print, and hid the Actions column instead (a dropdown menu, not useful on paper). Verified in-browser: all 5 named columns resolve to `table-cell`, Actions resolves to `none`.
+
 ## 2026-07-23 (fix) — Project Payroll print: stat cards on one row (portrait & landscape)
 
 **File:** `app/bms/operations/project_view.php` (print-only CSS — screen view and data untouched)
