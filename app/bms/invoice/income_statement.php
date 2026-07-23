@@ -342,6 +342,10 @@ function loadReport() {
 
 function renderReport(data) {
     // ── Render section lines (3 columns: Account, Previous, Current) ──
+    // Renders a section as a parent → child → sub TREE. Each row carries a `depth`
+    // (indentation), a `kind` ('header' group label / 'leaf' account / 'subtotal'
+    // rollup) and nullable amounts. Headers are bold with no amount; subtotals are
+    // bold+italic with a top rule; leaves keep the drill-down icon.
     const renderLines = ($body, lines) => {
         $body.empty();
         if (!lines || !lines.length) {
@@ -349,23 +353,36 @@ function renderReport(data) {
             return;
         }
         lines.forEach(line => {
-            const code = line.account_code ? `<small class="text-muted me-2 font-monospace">${line.account_code}</small>` : '';
-            // View icon (drill-down) — only when the line carries a drill descriptor.
-            // Hidden on print via d-print-none.
+            const depth = line.depth || 0;
+            const kind  = line.kind || 'leaf';
+            const pad   = 1.5 + depth * 1.4;                    // rem, indent by level
+            const code  = line.account_code ? `<small class="text-muted me-2 font-monospace">${line.account_code}</small>` : '';
+
+            let nameStyle = `padding-left:${pad}rem;font-size:0.88rem;`;
+            let amtStyle  = 'font-size:0.88rem;';
+            let rowStyle  = '';
+            if (kind === 'header')   { nameStyle += 'font-weight:700;'; }
+            if (kind === 'subtotal') { nameStyle += 'font-weight:700;font-style:italic;'; amtStyle += 'font-weight:700;'; rowStyle = 'border-top:1px solid #dee2e6;'; }
+
+            // Drill-down only on leaf accounts that carry a descriptor.
             let viewCell = '<td class="text-center py-1 d-print-none"></td>';
-            if (line.drill) {
-                const d = encodeURIComponent(JSON.stringify(line.drill));
+            if (line.drill && kind === 'leaf') {
+                const d  = encodeURIComponent(JSON.stringify(line.drill));
                 const nm = String(line.account_name || '').replace(/"/g, '&quot;');
                 viewCell = `<td class="text-center py-1 d-print-none">
                     <button class="btn btn-sm btn-link text-primary p-0 drill-btn" data-drill="${d}" data-name="${nm}" title="View contributing records">
                         <i class="bi bi-eye"></i>
                     </button></td>`;
             }
+
+            const curCell  = (line.current  === null || line.current  === undefined) ? '' : formatMoney(line.current);
+            const prevCell = (line.previous === null || line.previous === undefined) ? '' : formatMoney(line.previous);
+
             $body.append(
-                `<tr>
-                    <td class="ps-5 py-1" style="font-size: 0.88rem;">${code}${line.account_name}</td>
-                    <td class="text-end font-monospace text-muted py-1" style="font-size: 0.85rem;">${formatMoney(line.previous)}</td>
-                    <td class="text-end pe-4 font-monospace py-1" style="font-size: 0.88rem;">${formatMoney(line.current)}</td>
+                `<tr style="${rowStyle}">
+                    <td class="py-1" style="${nameStyle}">${code}${line.account_name}</td>
+                    <td class="text-end font-monospace text-muted py-1" style="font-size: 0.85rem;">${prevCell}</td>
+                    <td class="text-end pe-4 font-monospace py-1" style="${amtStyle}">${curCell}</td>
                     ${viewCell}
                 </tr>`
             );
