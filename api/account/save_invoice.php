@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/vat.php';
+require_once __DIR__ . '/../../core/workflow.php';          // workflowActorSnapshot / CaptureSignature
+require_once __DIR__ . '/../../core/revenue_posting.php';   // postInvoiceRevenue / postInvoiceCOGS
 
 header('Content-Type: application/json');
 error_reporting(E_ERROR | E_PARSE);
@@ -76,15 +78,16 @@ try {
     $delivery_id = !empty($_POST['delivery_id']) ? intval($_POST['delivery_id']) : null;
     $customer_lpo_id = !empty($_POST['customer_lpo_id']) ? intval($_POST['customer_lpo_id']) : null;
 
-    // Three-approval rule: every new invoice starts at 'pending'. On update,
-    // preserve the existing row's status (status transitions happen via
-    // dedicated review/approve APIs, payment recording, etc.).
+    // Invoices skip the review/approval workflow — a new invoice is born
+    // 'approved' and accrues to the GL immediately (like a bill). On update,
+    // preserve the existing row's status (transitions still happen via payment
+    // recording, void/reverse, etc.).
     if ($is_update) {
         $existing = $pdo->prepare("SELECT status FROM invoices WHERE invoice_id = ?");
         $existing->execute([$invoice_id]);
         $status = $existing->fetchColumn() ?: 'pending';
     } else {
-        $status = 'pending';
+        $status = 'approved';
     }
     $project_id   = !empty($_POST['project_id'])   ? intval($_POST['project_id'])   : null;
     $warehouse_id = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null;
@@ -189,14 +192,30 @@ try {
         $invoice_id = $pdo->lastInsertId();
 
         // ── e-signature capture (Created By) ─ Issue 1 fix
-        if (!function_exists('workflowCaptureSignature')) {
-            require_once __DIR__ . '/../../core/workflow.php';
-        }
         $wfActor = workflowActorSnapshot();
         workflowCaptureSignature(
             $pdo, 'invoice', (int)$invoice_id, 'created',
             (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']
         );
+
+        // Invoices are auto-approved (no separate review/approve steps), so stamp
+        // the creator as BOTH reviewer and approver and capture their e-signature
+        // for each stage — the printout then shows real names, not "Not yet …".
+        $stampSelf = $pdo->prepare("
+            UPDATE invoices
+               SET reviewed_by = ?, reviewed_by_name = ?, reviewed_by_role = ?, reviewed_at = NOW(),
+                   approved_by = ?, approved_by_name = ?, approved_by_role = ?, approved_at = NOW()
+             WHERE invoice_id = ?
+        ");
+        $stampSelf->execute([
+            (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role'],
+            (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role'],
+            (int)$invoice_id
+        ]);
+        workflowCaptureSignature($pdo, 'invoice', (int)$invoice_id, 'reviewed',
+            (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']);
+        workflowCaptureSignature($pdo, 'invoice', (int)$invoice_id, 'approved',
+            (int)$_SESSION['user_id'], $wfActor['name'], $wfActor['role']);
     }
 
     // Insert Items - NOTE: column name must match table `invoice_items` (line_total)
@@ -235,6 +254,15 @@ try {
          // Logic to update sales order status/invoiced amount could go here
     }
 
+    // Accrue a newly-created invoice into the ONE canonical ledger right away
+    // (invoices are auto-approved, mirroring bills): Dr Accounts Receivable /
+    // Cr Sales Revenue / Cr Output VAT, plus Dr COGS / Cr Inventory for product
+    // lines. Both are idempotent and run inside this transaction.
+    if (!$is_update) {
+        postInvoiceRevenue($pdo, (int)$invoice_id, (int)$_SESSION['user_id']);
+        postInvoiceCOGS($pdo, (int)$invoice_id, (int)$_SESSION['user_id']);
+    }
+
     $pdo->commit();
 
     // Log activity
@@ -246,19 +274,8 @@ try {
         logActivity($pdo, $_SESSION['user_id'], 'Create invoice', "User created a new invoice: $invoice_num (ID $invoice_id)");
     }
 
-    // Smart-notification: a new invoice needs review. Fail-safe + kill-switched.
-    if (!$is_update) {
-        require_once __DIR__ . '/../../core/notify.php';
-        dispatchEvent($pdo, 'invoice.needs_review', [
-            'entity_type' => 'invoice',
-            'entity_id'   => (int)$invoice_id,
-            'project_id'  => !empty($_POST['project_id']) ? (int)$_POST['project_id'] : null,
-            'customer_id' => !empty($customer_id) ? (int)$customer_id : null,
-            'title'       => 'Invoice awaiting review: ' . $invoice_num,
-            'message'     => 'A new invoice ' . $invoice_num . ' has been created and needs review.',
-            'action_url'  => 'invoice_view?id=' . (int)$invoice_id,
-        ]);
-    }
+    // Invoices are auto-approved on creation, so there is no "needs review" step
+    // to notify about (the previous invoice.needs_review dispatch was removed).
 
     echo json_encode(['success' => true, 'message' => 'Invoice saved successfully', 'invoice_id' => $invoice_id]);
 
