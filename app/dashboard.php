@@ -1869,12 +1869,14 @@ function renderChart(data) {
         }
     });
 
-    // Update the summary below the chart
+    // Update the summary below the chart.
+    // Accrual side (Sales / Net Profit) mirrors the Income Statement;
+    // cash side (Cash / Net Cash) mirrors the Cash Flow — both from the ledger.
     if (data.length > 0) {
         const last = data[data.length - 1];
-        const paperProfit = last.revenue - (last.expense || 0);
-        const actualCash = (last.collected || 0) - (last.expense || 0);
-        
+        const netProfit = (last.net_profit != null) ? last.net_profit : (last.revenue - (last.expense || 0));
+        const netCash   = (last.net_cash   != null) ? last.net_cash   : ((last.collected || 0) - (last.cash_out || 0));
+
         $('#performanceSummary').append(`
             <div class="mt-4 p-3 bg-light rounded shadow-sm border">
                 <div class="row align-items-center">
@@ -1882,22 +1884,22 @@ function renderChart(data) {
                         <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;">Latest Period (${last.period})</span>
                         <div class="d-flex align-items-center flex-wrap gap-2 mt-1">
                             <span class="badge bg-primary">Sales: TSh ${last.revenue.toLocaleString()}</span>
-                            <span class="badge bg-success">Cash: TSh ${(last.collected || 0).toLocaleString()}</span>
+                            <span class="badge bg-success">Cash In: TSh ${(last.collected || 0).toLocaleString()}</span>
                         </div>
                     </div>
                     <div class="col-md-4 border-end text-center py-2 py-md-0">
-                        <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;">Financial Reality</span>
-                        <strong class="h5 mb-0 text-${actualCash >= 0 ? 'success' : 'danger'}">
-                            Net Cash: ${actualCash >= 0 ? '+' : ''}TSh ${actualCash.toLocaleString()}
+                        <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;">Cash Flow</span>
+                        <strong class="h5 mb-0 text-${netCash >= 0 ? 'success' : 'danger'}">
+                            Net Cash: ${netCash >= 0 ? '+' : ''}TSh ${netCash.toLocaleString()}
                         </strong>
-                        <small class="d-block text-muted" style="font-size: 0.75rem;">(Actual In - Expenses)</small>
+                        <small class="d-block text-muted" style="font-size: 0.75rem;">(Cash In − Cash Out)</small>
                     </div>
                     <div class="col-md-4 text-end">
-                        <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;">Paper Profit</span>
-                        <strong class="h6 mb-0 text-${paperProfit >= 0 ? 'primary' : 'danger'}">
-                            TSh ${paperProfit.toLocaleString()}
+                        <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;">Net Profit</span>
+                        <strong class="h6 mb-0 text-${netProfit >= 0 ? 'primary' : 'danger'}">
+                            TSh ${netProfit.toLocaleString()}
                         </strong>
-                        <small class="d-block text-muted" style="font-size: 0.75rem;">(Invoiced - Expenses)</small>
+                        <small class="d-block text-muted" style="font-size: 0.75rem;">(Revenue − Expenses)</small>
                     </div>
                 </div>
             </div>
