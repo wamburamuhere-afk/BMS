@@ -254,6 +254,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 #proj-sc-stats > [class*="col-"] { flex: 0 0 25% !important; max-width: 25% !important; }
                 #proj-sc-stats .card-body { padding: 0.4rem 0.6rem !important; }
 
+                /* Inspections stat cards: same fix — keep all 4 (Total/Passed/Failed/
+                   Re-inspect) on ONE row when printing, in both portrait and landscape. */
+                #proj-insp-stats > [class*="col-"] { flex: 0 0 25% !important; max-width: 25% !important; }
+                #proj-insp-stats .card-body { padding: 0.4rem 0.6rem !important; }
+
                 /* Scope tables (Original / Revised / Variation / Additional) must
                    start on the FIRST printed page. Their table sits in a .card, and
                    responsive.css forces `.card{page-break-inside:avoid !important}` —
@@ -2201,7 +2206,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
 
                         <!-- Stat Cards -->
-                        <div class="row mb-4 g-3">
+                        <div class="row mb-4 g-3" id="proj-insp-stats">
                             <div class="col-6 col-md-3">
                                 <div class="card border-0 shadow-sm h-100" style="background-color:#d1e7dd;border-radius:12px;">
                                     <div class="card-body py-2 px-3 d-flex align-items-center">
@@ -2292,13 +2297,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                         </div>
 
-                        <!-- Print Footer -->
-                        <div class="d-none d-print-block mt-4 pt-3 border-top">
-                            <div class="row">
-                                <div class="col-6"><p class="small text-muted mb-0">Printed by: <?= htmlspecialchars($_SESSION['username'] ?? '') ?></p></div>
-                                <div class="col-6 text-end"><p class="small text-muted mb-0">Date: <?= date('d M Y, H:i') ?></p></div>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- IPC Tab -->
