@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-07-23 (fix) — HR Actions: removed the self-approval block — matches GRN/DN, fully user_roles.php-driven
+
+**Files:** `api/change_lifecycle_status.php`, `app/bms/pos/hr_actions.php`
+
+Follow-up, reversing the direction of the change below after clarifying intent: investigated
+GRN (`api/approve_grn.php`) and DN (`api/approve_dn.php`) approval and confirmed **neither
+has any segregation-of-duties check** — approval there is governed solely by the `approve`
+checkbox in `user_roles.php`, with no additional hardcoded identity restriction. HR Actions
+was the only module with an extra, code-level self-approval block, making it inconsistent
+with the rest of the system and not configurable from `user_roles.php` at all (only the
+database-level `roles.is_admin` flag — exposed nowhere in that page — could bypass it).
+
+Decision: HR Actions approval should work exactly like GRN/DN — governed solely by the
+`approve` permission checkbox in `user_roles.php`; only true Admin (`isAdmin()`) has ever
+had unrestricted access anyway, and that stays unchanged. Removed the hardcoded
+segregation-of-duties check from `api/change_lifecycle_status.php` entirely, and reverted
+the front-end `hr_actions.php` (both the desktop dropdown and mobile card view) back to the
+plain `CAN_APPROVE` gate used everywhere else — no more `canApproveThis()`/`IS_ADMIN`
+special-casing. Verified in-browser: the Approve button now renders for a record created by
+the current user, same as any other pending record.
+
 ## 2026-07-23 (fix) — HR Actions: hide Approve/Reject on your own submission (segregation of duties)
 
 **File:** `app/bms/pos/hr_actions.php` (front-end only — backend rule unchanged)
