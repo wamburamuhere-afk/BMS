@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-07-23 (fix) — Project Payroll print: stat cards on one row (portrait & landscape)
+
+**File:** `app/bms/operations/project_view.php` (print-only CSS — screen view and data untouched)
+
+The Payroll tab's stat cards (`#payrollStatCards`: Active Staff / Paid / Pending / Total Payout) are `col-6 col-md-3`, so on a printed portrait page (narrower than the `md` 768px breakpoint) they fell back to `col-6` = 2 per row, same root cause already fixed on Sub-Contractors and Inspections. Added the same `flex: 0 0 25%` print override (this row already had its `id`, unlike Inspections). Verified in-browser: all four cards share one row at a simulated 650px portrait width.
+
 ## 2026-07-23 (fix) — Project Inspections print: stat cards on one row, drop the custom "Printed by" block
 
 **File:** `app/bms/operations/project_view.php` (print-only CSS/markup — screen view and data untouched)

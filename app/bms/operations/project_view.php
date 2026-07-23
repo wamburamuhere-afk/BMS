@@ -259,6 +259,11 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 #proj-insp-stats > [class*="col-"] { flex: 0 0 25% !important; max-width: 25% !important; }
                 #proj-insp-stats .card-body { padding: 0.4rem 0.6rem !important; }
 
+                /* Payroll stat cards: same fix — keep all 4 (Active Staff/Paid/Pending/
+                   Total Payout) on ONE row when printing, in both portrait and landscape. */
+                #payrollStatCards > [class*="col-"] { flex: 0 0 25% !important; max-width: 25% !important; }
+                #payrollStatCards .card { padding: 0.35rem !important; }
+
                 /* Scope tables (Original / Revised / Variation / Additional) must
                    start on the FIRST printed page. Their table sits in a .card, and
                    responsive.css forces `.card{page-break-inside:avoid !important}` —
