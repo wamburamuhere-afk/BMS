@@ -191,7 +191,13 @@ const CAN_EDIT    = <?= json_encode($can_edit) ?>;
 const CAN_DELETE  = <?= json_encode($can_delete) ?>;
 const CAN_APPROVE = <?= json_encode($can_approve) ?>;
 const MY_USER_ID  = <?= (int)$_SESSION['user_id'] ?>;
+const IS_ADMIN    = <?= json_encode(isAdmin()) ?>;
 const CSRF        = <?= json_encode(csrf_token()) ?>;
+
+// Segregation of duties (api/change_lifecycle_status.php): the creator of an HR
+// action can never approve/reject their own submission (admins exempt). Mirrors
+// that exact rule so the button is never offered where it would only error out.
+function canApproveThis(r) { return CAN_APPROVE && (Number(r.created_by) !== MY_USER_ID || IS_ADMIN); }
 
 const TYPE_BADGES = {
     promotion:   ['#0d6efd', '#fff',    'bi-arrow-up-circle'],
@@ -253,9 +259,11 @@ function changeSummary(r) {
 function actionButtons(r) {
     let items = `<li><button class="dropdown-item py-2 rounded" onclick="viewEvent(${r.event_id})"><i class="bi bi-eye text-primary me-2"></i> View</button></li>`;
     if (r.status === 'pending') {
-        if (CAN_APPROVE) {
+        if (canApproveThis(r)) {
             items += `<li><button class="dropdown-item py-2 rounded" onclick="doAction(${r.event_id}, 'approve')"><i class="bi bi-check2-all text-primary me-2"></i> Approve</button></li>`;
             items += `<li><button class="dropdown-item py-2 rounded" onclick="doAction(${r.event_id}, 'reject')"><i class="bi bi-slash-circle text-danger me-2"></i> Reject</button></li>`;
+        } else if (CAN_APPROVE && Number(r.created_by) === MY_USER_ID) {
+            items += `<li><span class="dropdown-item-text text-muted small py-2"><i class="bi bi-info-circle me-1"></i> You created this — another approver must review it</span></li>`;
         }
         if (Number(r.created_by) === MY_USER_ID || CAN_EDIT) {
             items += `<li><button class="dropdown-item py-2 rounded" onclick="doAction(${r.event_id}, 'cancel')"><i class="bi bi-x-circle me-2"></i> Cancel</button></li>`;
@@ -441,7 +449,7 @@ function renderCards(rows) {
     let html = '';
     rows.forEach(r => {
         let btns = `<button class="btn btn-sm btn-outline-primary" onclick="viewEvent(${r.event_id})" style="flex:1;padding:3px 4px;font-size:0.72rem"><i class="bi bi-eye"></i></button>`;
-        if (r.status === 'pending' && CAN_APPROVE) {
+        if (r.status === 'pending' && canApproveThis(r)) {
             btns += `<button class="btn btn-sm btn-outline-primary" onclick="doAction(${r.event_id}, 'approve')" style="flex:1;padding:3px 4px;font-size:0.72rem"><i class="bi bi-check2-all"></i></button>`;
             btns += `<button class="btn btn-sm btn-outline-danger" onclick="doAction(${r.event_id}, 'reject')" style="flex:1;padding:3px 4px;font-size:0.72rem"><i class="bi bi-slash-circle"></i></button>`;
         }

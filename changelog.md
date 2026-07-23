@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-07-23 (fix) — HR Actions: hide Approve/Reject on your own submission (segregation of duties)
+
+**File:** `app/bms/pos/hr_actions.php` (front-end only — backend rule unchanged)
+
+A non-admin user creating an HR action (e.g. a department transfer) then clicking Approve on
+their own pending record hit "You cannot approve an HR action you created yourself" — a
+confusing runtime error. Investigated: `api/change_lifecycle_status.php` deliberately blocks
+self-approval (segregation of duties / maker-checker — admins exempt), which is correct,
+standard practice (COSO Control Activities, ISO 27001 A.6.1.2) — every mainstream HR/ERP
+system separates the initiator of a request from its approver. **Not a bug in the rule
+itself.** Confirmed no organisational deadlock: Admin, Managing Director, and (other)
+Secretary (PS) users all hold approve rights on this permission, so another approver is
+always available — only the creator's own self-approval is blocked.
+
+The actual bug: the front-end offered the Approve/Reject buttons regardless of who created
+the record — no `created_by === current user` check anywhere — so the option was always
+shown, only to fail after the click. Added `IS_ADMIN` (mirrors the backend's `isAdmin()`
+exemption) and a shared `canApproveThis(r)` helper matching the backend rule exactly; both
+render sites (desktop dropdown, mobile card view) now hide Approve/Reject on your own
+pending record (unless you're admin), replaced with an informational note ("You created
+this — another approver must review it") instead of a dead-end button.
+
+Verified in-browser: all four cases match the backend rule exactly — non-admin+own record
+blocked, non-admin+other's record allowed, admin+own record allowed (exemption), no
+approve-permission never allowed.
+
 ## 2026-07-23 (fix) — Delivery Notes list print: drop the Web/Email/TIN/VRN header lines
 
 **File:** `app/bms/grn/delivery_notes.php` (print-only markup — screen view and data untouched)
