@@ -2,6 +2,7 @@
 // scope-audit: skip — dashboard aggregates cross-system KPIs for summary display; per-module scope filtering deferred to Phase G-2
 // File: dashboard.php
 require_once __DIR__ . '/../roots.php';
+require_once ROOT_DIR . '/core/financial_reports.php';   // glProfitLoss() — ledger revenue
 require_once ROOT_DIR . '/header.php';
 
 // Enforce login
@@ -179,9 +180,20 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
     if (canView('invoices') || canView('sales_report') || hasReportsAccess()) {
         $invScope = scopeFilterSqlNullable('project', 'invoices');
 
+        // Monthly Revenue headline comes from the ONE canonical ledger (posted
+        // journal) via glProfitLoss — NOT raw invoice grand_totals. So it
+        // reconciles with the Income Statement and the Performance Overview card,
+        // includes POS revenue, and excludes output VAT. See
+        // .claude/reporting-source.md. Revenue = operating revenue + other income
+        // (same basis as the Performance card's Revenue line).
+        $jeScope = scopeFilterSqlNullable('project', 'je');
+        $pl = glProfitLoss($pdo, $start_date, $end_date, null, $jeScope);
+        $ledgerRevenue = round(($pl['total_revenue'] ?? 0) + ($pl['total_other_income'] ?? 0), 2);
+
+        // Operational sub-metric only: number of invoices raised this month
+        // (the "N Sales this month" caption + average invoice value).
         $stmt = $pdo->prepare("
             SELECT COUNT(*) as total_sales,
-                   SUM(grand_total) as total_revenue,
                    AVG(grand_total) as avg_sale_value
             FROM invoices
             WHERE status NOT IN ('cancelled', 'draft')
@@ -189,7 +201,12 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
               {$invScope}
         ");
         $stmt->execute(['start_date' => $start_date, 'end_date' => $end_date]);
-        $stats['sales'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $stats['sales'];
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $stats['sales'] = [
+            'total_sales'    => (int)($row['total_sales'] ?? 0),
+            'total_revenue'  => $ledgerRevenue,
+            'avg_sale_value' => (float)($row['avg_sale_value'] ?? 0),
+        ];
 
         $stmt = $pdo->prepare("
             SELECT COUNT(*) as today_sales, SUM(grand_total) as today_revenue
