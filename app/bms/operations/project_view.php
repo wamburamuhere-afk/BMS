@@ -223,6 +223,72 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 table tfoot { display: table-row-group !important; }
                 table thead { display: table-header-group; }
             }
+
+            /* ── Delivery Notes (#dtDNs) print column widths ──
+               Auto-layout squeezed the long-value columns (DN Number, DO Ref,
+               Supplier, Date) into narrow, badly-wrapped cells while S/NO and Items
+               got too wide. table-layout:fixed + explicit %s gives content-friendly
+               widths that adapt to BOTH portrait and landscape. */
+            @media print {
+                #dtDNs { table-layout: fixed !important; width: 100% !important; border-collapse: collapse !important; font-size: 9pt !important; }
+                #dtDNs th, #dtDNs td {
+                    white-space: normal !important; word-break: break-word !important; overflow: visible !important;
+                    padding: 6px 8px !important; border: 1px solid #dee2e6 !important; vertical-align: middle !important;
+                }
+                #dtDNs thead th { font-size: 8pt !important; font-weight: 700 !important; background-color: #f8f9fa !important; text-transform: uppercase !important; }
+                /* thin columns (small values) */
+                #dtDNs th:nth-child(1), #dtDNs td:nth-child(1) { width: 6% !important; }   /* S/NO   */
+                #dtDNs th:nth-child(6), #dtDNs td:nth-child(6) { width: 7% !important; }   /* Items  */
+                /* wide columns (long values) */
+                #dtDNs th:nth-child(2), #dtDNs td:nth-child(2) { width: 22% !important; }  /* DN Number */
+                #dtDNs th:nth-child(3), #dtDNs td:nth-child(3) { width: 20% !important; }  /* DO Ref    */
+                #dtDNs th:nth-child(4), #dtDNs td:nth-child(4) { width: 16% !important; }  /* Supplier  */
+                #dtDNs th:nth-child(5), #dtDNs td:nth-child(5) { width: 13% !important; }  /* Date      */
+                #dtDNs th:nth-child(7), #dtDNs td:nth-child(7) { width: 16% !important; }  /* Status    */
+                #dtDNs tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+
+                /* Sub-Contractors stat cards: keep all 4 on ONE row when printing.
+                   They are col-6 col-md-3, so on a portrait page (width < the md
+                   768px breakpoint) they fall back to col-6 = 2 per row. Force 25%
+                   so the row holds all four in both portrait and landscape. */
+                #proj-sc-stats > [class*="col-"] { flex: 0 0 25% !important; max-width: 25% !important; }
+                #proj-sc-stats .card-body { padding: 0.4rem 0.6rem !important; }
+
+                /* Scope tables (Original / Revised / Variation / Additional) must
+                   start on the FIRST printed page. Their table sits in a .card, and
+                   responsive.css forces `.card{page-break-inside:avoid !important}` —
+                   on a landscape page (shorter than portrait) the card doesn't fit
+                   after the print header, so it gets pushed whole to page 2. Allow it
+                   to break so it flows from page 1; overflow:visible stops the
+                   `overflow-hidden` card from clipping rows that cross a page. */
+                #scope-original .card, #scope-revised .card,
+                #scope-variation .card, #scope-additional .card {
+                    page-break-inside: auto !important;
+                    break-inside: auto !important;
+                    overflow: visible !important;
+                }
+
+                /* A digit value must NEVER wrap to a new line inside a scope cell.
+                   Keep the table's ORIGINAL fixed column widths (so the whole table
+                   still fits a portrait page) and just stop the wrapping:
+                     - nowrap every cell (numbers stay on one line),
+                     - keep the UNIT textarea (e.g. "kg") on one line,
+                     - shrink the big tfoot totals a notch so a long number
+                       (e.g. "117,247,800.00") fits inside its column on one line.
+                   Only DESCRIPTION (free text) may wrap — targeted by data-label, NOT
+                   nth-child, because the tfoot total is also the 2nd <td> (its label
+                   spans colspan=6). Applies to all four scope tables via .scope-table. */
+                .scope-table th, .scope-table td { white-space: nowrap !important; }
+                .scope-table td[data-label="DESCRIPTION"] {
+                    white-space: normal !important; word-break: break-word !important;
+                }
+                .scope-table .s-unit { white-space: nowrap !important; overflow: hidden !important; }
+                .scope-table tfoot td {
+                    font-size: 10.5pt !important;
+                    padding-top: 6px !important; padding-bottom: 6px !important;
+                    padding-right: 8px !important;
+                }
+            }
             @media (max-width: 767px) {
                 /* Hide all table/card toggle buttons on mobile — card view is always automatic */
                 [id$="-btn-tbl"], [id$="-btn-crd"] { display: none !important; }
