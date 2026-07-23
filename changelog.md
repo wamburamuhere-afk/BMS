@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-07-22 (feat) — Invoices are auto-approved + accrued on creation (like bills)
+
+**Files:** `api/account/save_invoice.php`, `migrations/2026_07_22_invoices_auto_approve_accrue.php`
+
+Invoices no longer pass through the review → approve workflow. Per request, a new
+invoice is now **born `approved` and accrues to the canonical ledger immediately**, the
+same way a bill does — delivery of goods/services is handled by its own existing
+mechanisms.
+
+`save_invoice.php` (create path only; edit path unchanged): new invoices insert with
+status `approved`; the **creator is stamped as both reviewer and approver**
+(`reviewed_by`/`approved_by` + name/role/timestamps) and their e-signature is captured
+for the "reviewed" and "approved" stages — so the printout shows real names instead of
+"Not yet reviewed/approved". After the items are written, the invoice is posted to the
+ledger via `postInvoiceRevenue()` (Dr Accounts Receivable / Cr Sales Revenue / Cr Output
+VAT) and `postInvoiceCOGS()` (Dr COGS / Cr Inventory), inside the same transaction; both
+are idempotent. The now-contradictory `invoice.needs_review` notification was removed.
+
+Migration `2026_07_22_invoices_auto_approve_accrue.php` (criteria-based + idempotent):
+every existing invoice still at `pending`/`reviewed` is flipped to `approved`, the creator
+is stamped as reviewer + approver (with e-signatures, best-effort), and it is accrued to
+the ledger. Each invoice runs in its own transaction; the posting functions skip anything
+already in the GL, so re-runs are safe.
+
+Verified live (local `bms`): 4 `reviewed` invoices → all `approved`, stamped with the
+creator; the 2 with real amounts each posted exactly 1 journal entry, the 2 zero-total
+ones posted nothing; **Trial Balance stayed balanced** (Dr = Cr = 5,269,434,923.83).
+
 ## 2026-07-22 (fix) — Dashboard "Monthly Revenue" card: read the canonical ledger
 
 **File:** `app/dashboard.php`
