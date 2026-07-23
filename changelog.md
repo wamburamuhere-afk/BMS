@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-07-22 (fix) — Dashboard "Overdue Invoices" card: match the invoices list definition
+
+**File:** `app/dashboard.php`
+
+The dashboard's Overdue Invoices card disagreed badly with the invoices list page —
+showing **1 invoice / TSh 540,000.01** while the list showed **7 / TSh 243,433,700.01**
+(undercounting by ~TSh 242.9M). Root cause: the invoices list page
+(`api/account/get_invoices.php`) auto-flips past-due invoices to `status='overdue'`, but
+the dashboard's overdue query used a status **whitelist** `IN ('pending','approved',
+'sent','partial')` that never included `'overdue'` — so every auto-flipped row silently
+dropped out of the dashboard count.
+
+Changed the `overdue_invoices` query in `get_business_stats()` to the canonical,
+status-agnostic definition the list page uses: `status NOT IN ('paid','cancelled','draft')
+AND due_date < CURDATE() AND COALESCE(paid_amount,0) < grand_total`. Verified live: the
+card now reads **7 / TSh 243,433,700.01**, an exact match with the invoices page.
+
 ## 2026-07-22 (feat) — Invoices are auto-approved + accrued on creation (like bills)
 
 **Files:** `api/account/save_invoice.php`, `migrations/2026_07_22_invoices_auto_approve_accrue.php`

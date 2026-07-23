@@ -229,12 +229,18 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
         $stmt->execute();
         $stats['pending_invoices'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $stats['pending_invoices'];
 
+        // Overdue = any OPEN invoice past its due date with an outstanding balance.
+        // Must match the invoices list page (api/account/get_invoices.php) exactly,
+        // which is status-agnostic (it even auto-flips past-due rows to
+        // status='overdue'). A status whitelist here silently dropped those rows and
+        // undercounted; balance-based + open-status is the canonical definition.
         $stmt = $pdo->prepare("
             SELECT COUNT(*) as overdue_invoices,
                    SUM(grand_total - COALESCE(paid_amount, 0)) as overdue_amount
             FROM invoices
-            WHERE status IN ('pending', 'approved', 'sent', 'partial')
+            WHERE status NOT IN ('paid', 'cancelled', 'draft')
               AND due_date < CURDATE()
+              AND COALESCE(paid_amount, 0) < grand_total
               {$invScope}
         ");
         $stmt->execute();
