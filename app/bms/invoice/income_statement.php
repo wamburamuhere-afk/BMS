@@ -358,7 +358,10 @@ function renderReport(data) {
             const pad   = 1.5 + depth * 1.4;                    // rem, indent by level
             const code  = line.account_code ? `<small class="text-muted me-2 font-monospace">${line.account_code}</small>` : '';
 
-            let nameStyle = `padding-left:${pad}rem;font-size:0.88rem;`;
+            // !important so the parent→child indentation survives PRINT: the global
+            // responsive.css rule `th,td{padding:4px 6px !important}` would otherwise
+            // reset padding-left and flatten the whole tree on the printout.
+            let nameStyle = `padding-left:${pad}rem !important;font-size:0.88rem;`;
             let amtStyle  = 'font-size:0.88rem;';
             let rowStyle  = '';
             if (kind === 'header')   { nameStyle += 'font-weight:700;'; }
@@ -716,6 +719,21 @@ window.addEventListener('afterprint', function () {
         footer, .sidebar, .navbar, nav,
         #sidebar, #topbar, #sidebarWrapper,
         [class*="navbar"], [class*="sidebar"] { display: none !important; }
+
+        /* Footer flows AFTER the content instead of sitting fixed at the page
+           bottom — a fixed, opaque footer overlaps and hides the last rows of a
+           dense table. Static placement guarantees nothing is ever hidden under
+           it (it simply follows the report). Still the same shared footer. */
+        .print-footer {
+            position: static !important;
+            height: auto !important;
+            margin-top: 8mm !important;
+            page-break-inside: avoid !important;
+        }
+        /* Keep ONE footer only: the shared report footer (includes/print_footer_html.php,
+           .print-footer) used on every other report page. The global footer.php print
+           footer (.bms-print-footer) was ALSO rendering here, giving a duplicate. */
+        .bms-print-footer { display: none !important; }
     }
     /* Canonical I/E Print margin — see i_e_print.md §1 */
     @page { margin: 10mm 8mm 16mm 8mm; }
