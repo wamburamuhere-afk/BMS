@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-07-23 (fix) — Delivery Notes list print: drop the Web/Email/TIN/VRN header lines
+
+**File:** `app/bms/grn/delivery_notes.php` (print-only markup — screen view and data untouched)
+
+Follow-up to the print fixes below: verified the reported bug directly by decoding a real
+print-to-PDF the user generated from the (pre-fix) page — confirmed page 1 was entirely
+blank except the global footer bar, and page 2 carried a truncated header ("BEJUNDAS
+FINANCI…", "WEB: HTTPS://DEV.BMS.AC.TZ | EMAIL: FINA…") immediately followed by the whole
+table, exactly matching the diagnosis. Per follow-up request, removed the Web/Email and
+TIN/VRN lines from the letterhead entirely — the header now shows only the logo, company
+name, and report title/date. Re-verified after removal: `#dnTableCard` still computes
+`break-inside: auto` (the more-specific override still wins over the generic `.card`
+`avoid` rule), logo and company name still render, and no web/email/tin/vrn text remains.
+
 ## 2026-07-23 (fix) — Delivery Notes list print: no more blank pages, real company letterhead
 
 **File:** `app/bms/grn/delivery_notes.php` (print-only CSS/markup — screen view and data untouched)

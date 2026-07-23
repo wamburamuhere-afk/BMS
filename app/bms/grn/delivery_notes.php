@@ -235,43 +235,20 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
         </div>
     </div>
 
-    <!-- Print Header — company letterhead (logo + name + contact/TIN/VRN), same
-         shape as every other report's print header (project_view.php, invoice_print.php).
-         $c_web/$c_email/$c_tin/$c_vrn/$company_name/$company_logo were previously
+    <!-- Print Header — company letterhead (logo + name only, per request — no
+         web/email/TIN/VRN lines). $company_name/$company_logo were previously
          undefined here — header.php sets them via `global`, but this file is
          require_once'd from inside handleRoute(), so that global binding never
          reaches this scope. Fetched locally, same pattern project_view.php uses. -->
     <?php
         $company_name = getSetting('company_name', 'BMS');
         $company_logo = getSetting('company_logo', '');
-        $c_web   = getSetting('company_website', '');
-        $c_email = getSetting('company_email', '');
-        $c_tin   = getSetting('company_tin', '');
-        $c_vrn   = getSetting('company_vrn', '');
     ?>
     <div class="d-none d-print-block text-center mb-4 mt-2">
         <?php if (!empty($company_logo)): ?>
             <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
         <?php endif; ?>
         <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
-
-        <p class="text-dark mb-1 small text-uppercase text-center">
-            <?php
-            $web_email = [];
-            if (!empty($c_web)) $web_email[] = "Web: " . safe_output($c_web);
-            if (!empty($c_email)) $web_email[] = "Email: " . safe_output($c_email);
-            if (!empty($web_email)) echo implode(" | ", $web_email);
-            ?>
-        </p>
-
-        <p class="text-dark mb-1 small text-uppercase text-center">
-            <?php
-            $tin_vrn = [];
-            if (!empty($c_tin)) $tin_vrn[] = "TIN: " . safe_output($c_tin);
-            if (!empty($c_vrn)) $tin_vrn[] = "VRN: " . safe_output($c_vrn);
-            if (!empty($tin_vrn)) echo implode(" | ", $tin_vrn);
-            ?>
-        </p>
 
         <div class="mt-3 text-center">
             <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">Delivery Notes Report</h2>
