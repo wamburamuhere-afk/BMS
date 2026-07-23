@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-07-23 (fix) — Income Statement print: footer repeats on every page (not just the last)
+
+**File:** `app/bms/invoice/income_statement.php` (print-only CSS — screen view and data untouched)
+
+Follow-up to the print fixes below: the shared report footer had been set to `position: static` so it would never overlap the last rows of a dense table — but that made it flow onto its own page after the content, instead of repeating on every printed page like the rest of the system. Removed the `static` override so `.print-footer` keeps its default `fixed` position from `print_footer_css.php`; the footer now appears at the bottom of every page (reserved by the existing 16mm `@page` bottom margin), matching every other report page. The duplicate-footer hide (`.bms-print-footer { display:none }`) is unchanged — still only one footer.
+
 ## 2026-07-23 (fix) — Income Statement print: keep the account tree indentation, no hidden content, single footer
 
 **File:** `app/bms/invoice/income_statement.php` (print-only CSS/markup — screen view and data untouched)

@@ -720,19 +720,12 @@ window.addEventListener('afterprint', function () {
         #sidebar, #topbar, #sidebarWrapper,
         [class*="navbar"], [class*="sidebar"] { display: none !important; }
 
-        /* Footer flows AFTER the content instead of sitting fixed at the page
-           bottom — a fixed, opaque footer overlaps and hides the last rows of a
-           dense table. Static placement guarantees nothing is ever hidden under
-           it (it simply follows the report). Still the same shared footer. */
-        .print-footer {
-            position: static !important;
-            height: auto !important;
-            margin-top: 8mm !important;
-            page-break-inside: avoid !important;
-        }
-        /* Keep ONE footer only: the shared report footer (includes/print_footer_html.php,
-           .print-footer) used on every other report page. The global footer.php print
-           footer (.bms-print-footer) was ALSO rendering here, giving a duplicate. */
+        /* The shared report footer (.print-footer, includes/print_footer_html.php)
+           keeps its default FIXED position from print_footer_css.php, so it repeats
+           at the bottom of EVERY printed page — same as every other report page. The
+           @page bottom margin (16mm) reserves the band it sits in.
+           Keep ONE footer only: hide the global footer.php print footer
+           (.bms-print-footer) that would otherwise render a duplicate here. */
         .bms-print-footer { display: none !important; }
     }
     /* Canonical I/E Print margin — see i_e_print.md §1 */
