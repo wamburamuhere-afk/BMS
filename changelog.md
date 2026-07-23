@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-07-22 (fix) — Dashboard "Monthly Revenue" card: read the canonical ledger
+
+**File:** `app/dashboard.php`
+
+The top "Monthly Revenue" stat card computed `SUM(grand_total)` from raw `invoices`,
+which (a) bypassed the ledger so it disagreed with the Income Statement and the
+Performance Overview card, (b) excluded POS revenue entirely, and (c) included output
+VAT (overstating true revenue). It also showed **TSh 0.00** for months that had real
+posted revenue.
+
+Rewired the headline figure in `get_business_stats()` to `glProfitLoss()` (posted ledger,
+`total_revenue + total_other_income`) with `scopeFilterSqlNullable('project','je')`, so it
+now matches the Income Statement and the Performance card. The invoice query is kept only
+for the operational sub-caption (number of invoices raised + average invoice value).
+Added `require_once core/financial_reports.php` to the page.
+
+Verified live against `bms`: This month **0.00 → 70,500**; Jun 2026 **0.00 → 24,018,500**
+(matches the Performance card); Feb 2026 **10,384 → 226,033,700**. The other three cards
+(Today's POS Sales, Overdue Invoices, Inventory Value) were confirmed to correctly read
+their operational subledgers and were left unchanged.
+
 ## 2026-07-22 (fix) — Dashboard Performance Overview: read the canonical ledger
 
 **Files:** `api/get_performance_data.php`, `app/dashboard.php`
