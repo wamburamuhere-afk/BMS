@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-07-22 (fix) — Dashboard Performance Overview: read the canonical ledger
+
+**Files:** `api/get_performance_data.php`, `app/dashboard.php`
+
+The dashboard "Performance Overview" card and its summary strip were computed from raw
+`invoices` + `pos_sales` + `expenses`, so the figures did not reconcile with the Income
+Statement, and the "Cash" / "Net Cash" panels were **always TSh 0** because the backend
+never returned a `collected` field for the JS to read.
+
+Rewrote `api/get_performance_data.php` to derive every figure from the ONE canonical
+ledger (`journal_entries ⨝ journal_entry_items ⨝ accounts`, `status='posted'`) per
+`.claude/reporting-source.md`. It now returns, per period: accrual `revenue` / `expense`
+/ `net_profit` (Income Statement basis) and cash `collected` (Cash In) / `cash_out` /
+`net_cash` (Cash Flow basis, cash/bank accounts via `glCashAccountIds()`). Project scope
+now applies once on the journal header (`scopeFilterSqlNullable('project','je')`).
+
+Updated the `app/dashboard.php` summary strip: "Cash" / "Net Cash" now show real
+cash-account movement (Net Cash = Cash In − Cash Out) instead of the always-undefined
+`collected`. Relabelled to industry language: "Paper Profit" → **Net Profit**,
+"Financial Reality" → **Cash Flow**, "(Actual In - Expenses)" → **(Cash In − Cash Out)**.
+Layout unchanged.
+
+Verified live against the `bms` DB: the accrual `revenue − expense` net reconciles
+**exactly** with `glProfitLoss()` (both −289,635,681.43 over the 12-month window); Cash
+In/Out/Net Cash return real per-month values. Note surfaced: `cash_out` is near-zero in
+most months — expense payments are recognised (accrual) but their cash-disbursement leg
+is largely not posting to cash/bank accounts; a separate bookkeeping-completeness issue
+the corrected card now reveals.
+
 ## 2026-07-22 (feat) — User Activity Report: current users only (exclude removed accounts)
 
 **Files:** `api/user_activity_report.php`, `app/activity_log.php`
