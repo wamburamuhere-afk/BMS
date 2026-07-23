@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-07-23 (fix) — Project Inspections print: stat cards on one row, drop the custom "Printed by" block
+
+**File:** `app/bms/operations/project_view.php` (print-only CSS/markup — screen view and data untouched)
+
+Two print fixes on the Project Details → Inspections tab:
+
+- **Stat cards (Total / Passed / Failed / Re-inspect) — one row on print.** The cards row had no `id`, unlike the already-fixed Sub-Contractors cards, so it still fell back to `col-6` = 2-per-row on a printed portrait page. Added `id="proj-insp-stats"` and the same `flex: 0 0 25%` print override used for Sub-Contractors — verified all four cards share one row in both portrait and landscape.
+- **Removed the custom "Printed by: … / Date: …" block** that rendered below the table on print — the tab has no shared report footer, so this was a bespoke, redundant line. Deleted entirely per request; nothing replaces it.
+
+Note: an identical "Printed by / Date" block still exists on the neighbouring Sub-Contractors tab print output — left untouched, as this request was scoped to Inspections only.
+
 ## 2026-07-23 (fix) — Income Statement print: footer repeats on every page (not just the last)
 
 **File:** `app/bms/invoice/income_statement.php` (print-only CSS — screen view and data untouched)
