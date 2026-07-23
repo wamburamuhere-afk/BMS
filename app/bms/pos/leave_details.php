@@ -258,14 +258,78 @@ require_once 'header.php';
             box-shadow: none !important;
             border: 1px solid #dee2e6 !important;
             border-radius: 0 !important;
-            page-break-inside: avoid;
+            /* The card holds the whole record and is taller than one page, so
+               'avoid' can't be honoured and the browser pushes the entire card
+               to page 2 — leaving a blank first page. 'auto' lets it flow from
+               page 1 and break naturally across pages. */
+            page-break-inside: auto;
         }
-        .detail-header { background: #fff !important; color: #000 !important; }
-        .stat-mini-card { border: 1px solid #dee2e6 !important; box-shadow: none !important; }
-        /* The -3rem overlap onto the header is a screen-only hero effect; with
-           .leave-dashboard's own offset gone above, keeping it would pull the
-           stat cards up over the header text instead. */
-        .stats-container { margin-top: 1rem !important; }
+        /* ── Compact print: shrink the screen-sized hero/cards/spacing so the whole
+              record fits on ONE well-aligned page (the screen sizes leave big gaps). */
+        body { font-size: 9.5pt; }
+
+        /* Shared company letterhead — cap the oversized logo so it doesn't eat half a page. */
+        .bms-print-header { padding: 4px 0 8px !important; }
+        .bms-print-header img { max-height: 90px !important; width: auto !important; }
+
+        /* Hero band — was padding:4rem 3rem, the big empty space above the cards. */
+        .detail-header {
+            background: #fff !important; color: #000 !important;
+            padding: 0.4rem 1rem !important; border-bottom: none !important;
+        }
+        .detail-header::before { display: none !important; }
+        .detail-header .mb-3 { margin-bottom: 0.3rem !important; }
+        .detail-header .mt-4 { margin-top: 0.4rem !important; }
+        .detail-header .display-5 { font-size: 17pt !important; margin-bottom: 0.1rem !important; }
+        .detail-header .lead { font-size: 8.5pt !important; margin-bottom: 0 !important; }
+        .status-badge-lg { padding: 3px 12px !important; font-size: 7.5pt !important; box-shadow: none !important; }
+        .detail-header .badge { font-size: 8pt !important; padding: 4px 9px !important; }
+
+        /* Stat cards — smaller pad/icons, tighter grid, no screen overlap. */
+        .stats-container { margin-top: 0.5rem !important; padding: 0 1rem !important; gap: 0.6rem !important; }
+        .stat-mini-card { padding: 0.55rem 0.75rem !important; border-radius: 8px !important; border: 1px solid #dee2e6 !important; box-shadow: none !important; }
+        .stat-icon { width: 30px !important; height: 30px !important; font-size: 1rem !important; margin-right: 0.6rem !important; border-radius: 8px !important; }
+        .stat-mini-card h4 { font-size: 10.5pt !important; }
+
+        /* Body — tighter section padding, margins, and 4-up alignment for info fields. */
+        .info-section { padding: 0.9rem 1.25rem !important; }
+        .info-section .mb-5 { margin-bottom: 0.85rem !important; }
+        .info-section .g-4 { --bs-gutter-y: 0.5rem !important; --bs-gutter-x: 0.75rem !important; }
+        .info-section .row > [class*="col-"] { flex: 0 0 25% !important; max-width: 25% !important; }
+        .info-label { font-size: 7pt !important; margin-bottom: 0.05rem !important; }
+        .info-value { font-size: 9.5pt !important; }
+        .section-title { font-size: 8pt !important; margin-bottom: 0.5rem !important; }
+        .reason-box { padding: 0.7rem 1rem !important; font-size: 9.5pt !important; border-left-width: 4px !important; }
+        .audit-trail { padding: 0.55rem 0.75rem !important; }
+        .audit-trail .fs-4 { font-size: 1rem !important; }
+    }
+
+    /* ── Landscape: the page is SHORTER than portrait, so squeeze harder so the
+          record still fits on ONE page. Applies only when the user picks Landscape
+          in the print dialog. Everything scales down a notch from the portrait set. */
+    @media print and (orientation: landscape) {
+        body { font-size: 8.5pt; }
+        .bms-print-header { padding: 2px 0 4px !important; }
+        .bms-print-header img { max-height: 55px !important; }
+        .detail-header { padding: 0.25rem 1rem !important; }
+        .detail-header .display-5 { font-size: 14pt !important; }
+        .detail-header .lead { font-size: 7.5pt !important; }
+        .detail-header .mb-3 { margin-bottom: 0.2rem !important; }
+        .detail-header .mt-4 { margin-top: 0.25rem !important; }
+        .status-badge-lg { padding: 2px 10px !important; font-size: 7pt !important; }
+        .detail-header .badge { font-size: 7.5pt !important; padding: 3px 8px !important; }
+        .stats-container { margin-top: 0.35rem !important; gap: 0.5rem !important; }
+        .stat-mini-card { padding: 0.35rem 0.6rem !important; }
+        .stat-icon { width: 24px !important; height: 24px !important; font-size: 0.85rem !important; margin-right: 0.5rem !important; }
+        .stat-mini-card h4 { font-size: 9.5pt !important; }
+        .info-section { padding: 0.5rem 1.25rem !important; }
+        .info-section .mb-5 { margin-bottom: 0.45rem !important; }
+        .info-section .g-4 { --bs-gutter-y: 0.3rem !important; }
+        .info-value { font-size: 8.5pt !important; }
+        .info-label { font-size: 6.5pt !important; }
+        .section-title { font-size: 7.5pt !important; margin-bottom: 0.35rem !important; }
+        .reason-box { padding: 0.5rem 0.85rem !important; font-size: 8.5pt !important; }
+        .audit-trail { padding: 0.4rem 0.6rem !important; }
     }
 </style>
 <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
@@ -586,5 +650,8 @@ function processAction(action, id, notes) {
 }
 </script>
 
-<?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
+<!-- Shared print footer — print-only, same wiring as every other print page -->
+<div class="d-none d-print-block">
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
+</div>
 <?php includeFooter(); ?>
