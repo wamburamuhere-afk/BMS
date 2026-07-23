@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-07-22 (fix) — AP Aging: partial-payment aware, net of payments made
+
+**File:** `api/account/get_ap_aging.php`
+
+The Accounts-Payable (Bill) Aging report computed each payable as `amount - wht_amount`
+and filtered `status = 'approved'` only — so it (a) **ignored `amount_paid`**, overstating
+what's owed the moment a bill is part-paid, and (b) **excluded `'partial'` bills**, making a
+partially-paid bill vanish from the report entirely. The `supplier_invoices` table gained
+`due_date`, `amount_paid`, and a `'partial'` status via later migrations, but this report
+was never updated to use them (its docblock still wrongly claimed bills have no partial
+tracking).
+
+Now the remaining payable is COMPUTED as
+`GREATEST(amount - wht_amount - COALESCE(amount_paid,0), 0)` (net of both WHT withheld and
+any amount already paid to the supplier), over `status IN ('approved','partial')` with
+remaining `> 0`. So a partially-paid bill keeps its unpaid remainder aged, mirroring the AR
+aging fix. Stale docblock corrected; `amount_paid` exposed in the row payload.
+
+Report-only (no data writes, no GL) — the Balance Sheet and all financial statements are
+untouched by construction. Verified live: today's total unchanged at TSh 8,343,422.97
+across 7 approved bills (no partial payments exist yet), confirming no regression.
+
 ## 2026-07-22 (fix) — AR Aging tells the truth (compute remaining, repair balance_due drift)
 
 **Files:** `api/account/get_ar_aging.php`, `migrations/2026_07_22_repair_invoice_balance_due.php`
