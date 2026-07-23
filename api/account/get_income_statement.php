@@ -90,33 +90,102 @@ try {
     $cur = glProfitLoss($pdo, $start_date, $end_date, $project_id, $scopeSql);
     $prv = glProfitLoss($pdo, $prev_start_date, $prev_end_date, $project_id, $scopeSql);
 
-    // Index previous-period account amounts by account id for the comparative column.
-    $prevBy = [];
+    // ── Per-account amount maps (current + previous), keyed by account_id ──────
+    $curBy = []; $prvBy = [];
     foreach (['revenue', 'other_income', 'cogs', 'expense', 'finance_cost'] as $bucket) {
-        foreach ($prv[$bucket] as $l) $prevBy[(int)$l['account_id']] = (float)$l['amount'];
+        foreach ($cur[$bucket] as $l) $curBy[(int)$l['account_id']] = (float)$l['amount'];
+        foreach ($prv[$bucket] as $l) $prvBy[(int)$l['account_id']] = (float)$l['amount'];
     }
 
-    // Build a section's lines (current + comparative) from a glProfitLoss bucket.
-    $mkSection = function (array $curLines, float $totalCur, float $totalPrv) use ($prevBy): array {
-        $lines = [];
-        foreach ($curLines as $l) {
-            $lines[] = [
-                'account_code' => $l['account_code'],
-                'account_name' => $l['account_name'],
-                'current'      => (float)$l['amount'],
-                'previous'     => $prevBy[(int)$l['account_id']] ?? 0.0,
-                'drill'        => ['source' => 'journal', 'account_id' => (int)$l['account_id']],
-            ];
+    // ── Chart-of-accounts hierarchy so each section renders as a parent → child →
+    //    sub tree (every account nested under its header, with a rolled-up subtotal).
+    //    Amounts come ONLY from glProfitLoss above; this query supplies STRUCTURE
+    //    (parent/category), never figures — so section totals stay authoritative.
+    $acctRows = $pdo->query("
+        SELECT a.account_id, a.account_code, a.account_name,
+               COALESCE(a.parent_account_id, 0) AS parent_id,
+               at.category
+          FROM accounts a
+          JOIN account_types at ON a.account_type_id = at.type_id
+         WHERE at.category IN ('revenue','other_income','cogs','expense','finance_cost')
+    ")->fetchAll(PDO::FETCH_ASSOC);
+
+    $nodes = [];
+    foreach ($acctRows as $r) {
+        $id = (int)$r['account_id'];
+        $nodes[$id] = [
+            'code'         => $r['account_code'],
+            'name'         => $r['account_name'],
+            'parent_id'    => (int)$r['parent_id'],
+            'category'     => $r['category'],
+            'own_current'  => $curBy[$id] ?? 0.0,
+            'own_previous' => $prvBy[$id] ?? 0.0,
+        ];
+    }
+
+    // Flatten ONE category into an ordered, indented row list:
+    //   group header → [header's own direct postings, if any] → children… → subtotal.
+    // Parent/child links are honoured only WITHIN the category, so each section's
+    // rollups sum exactly to that category's glProfitLoss total. Empty subtrees pruned.
+    $buildTree = function (string $category) use ($nodes): array {
+        $ids = [];
+        foreach ($nodes as $id => $n) if ($n['category'] === $category) $ids[$id] = $n;
+
+        $childrenOf = []; $roots = [];
+        foreach ($ids as $id => $n) {
+            $pid = $n['parent_id'];
+            if ($pid && isset($ids[$pid])) $childrenOf[$pid][] = $id;
+            else                           $roots[] = $id;
         }
-        return ['lines' => $lines, 'total_current' => round($totalCur, 2), 'total_previous' => round($totalPrv, 2)];
+
+        $rollup = function ($id) use (&$rollup, $ids, $childrenOf) {
+            $c = $ids[$id]['own_current']; $p = $ids[$id]['own_previous'];
+            foreach ($childrenOf[$id] ?? [] as $ch) { [$cc, $pp] = $rollup($ch); $c += $cc; $p += $pp; }
+            return [$c, $p];
+        };
+
+        $rows = [];
+        $emit = function ($id, $depth) use (&$emit, &$rows, $ids, $childrenOf, $rollup) {
+            [$rc, $rp] = $rollup($id);
+            if (abs($rc) < 0.005 && abs($rp) < 0.005) return;   // prune empty subtree
+            $n    = $ids[$id];
+            $kids = $childrenOf[$id] ?? [];
+            usort($kids, fn($a, $b) => strcmp($ids[$a]['code'], $ids[$b]['code']));
+
+            if ($kids) {
+                $rows[] = ['account_code' => $n['code'], 'account_name' => $n['name'],
+                           'current' => null, 'previous' => null, 'depth' => $depth,
+                           'kind' => 'header', 'drill' => null];
+                if (abs($n['own_current']) >= 0.005 || abs($n['own_previous']) >= 0.005) {
+                    $rows[] = ['account_code' => '', 'account_name' => $n['name'] . ' — direct postings',
+                               'current' => $n['own_current'], 'previous' => $n['own_previous'],
+                               'depth' => $depth + 1, 'kind' => 'leaf',
+                               'drill' => ['source' => 'journal', 'account_id' => $id]];
+                }
+                foreach ($kids as $ch) $emit($ch, $depth + 1);
+                $rows[] = ['account_code' => '', 'account_name' => 'Subtotal — ' . $n['name'],
+                           'current' => round($rc, 2), 'previous' => round($rp, 2),
+                           'depth' => $depth, 'kind' => 'subtotal', 'drill' => null];
+            } else {
+                $rows[] = ['account_code' => $n['code'], 'account_name' => $n['name'],
+                           'current' => $n['own_current'], 'previous' => $n['own_previous'],
+                           'depth' => $depth, 'kind' => 'leaf',
+                           'drill' => ['source' => 'journal', 'account_id' => $id]];
+            }
+        };
+        usort($roots, fn($a, $b) => strcmp($ids[$a]['code'], $ids[$b]['code']));
+        foreach ($roots as $rid) $emit($rid, 0);
+        return $rows;
     };
 
-    $sec_revenue       = $mkSection($cur['revenue'],      $cur['total_revenue'],      $prv['total_revenue']);
-    $sec_cogs          = $mkSection($cur['cogs'],         $cur['total_cogs'],         $prv['total_cogs']);
-    $sec_expense       = $mkSection($cur['expense'],      $cur['total_expense'],      $prv['total_expense']);
-    $sec_finance       = $mkSection($cur['finance_cost'], $cur['total_finance_cost'], $prv['total_finance_cost']);
-    // Other Income / Gains — now fed from the real GL bucket (was hardcoded empty).
-    $sec_other_income  = $mkSection($cur['other_income'], $cur['total_other_income'], $prv['total_other_income']);
+    $mkSection = fn(array $lines, float $tc, float $tp): array =>
+        ['lines' => $lines, 'total_current' => round($tc, 2), 'total_previous' => round($tp, 2)];
+
+    $sec_revenue      = $mkSection($buildTree('revenue'),      $cur['total_revenue'],      $prv['total_revenue']);
+    $sec_cogs         = $mkSection($buildTree('cogs'),         $cur['total_cogs'],         $prv['total_cogs']);
+    $sec_expense      = $mkSection($buildTree('expense'),      $cur['total_expense'],      $prv['total_expense']);
+    $sec_finance      = $mkSection($buildTree('finance_cost'), $cur['total_finance_cost'], $prv['total_finance_cost']);
+    $sec_other_income = $mkSection($buildTree('other_income'), $cur['total_other_income'], $prv['total_other_income']);
 
     // ── Totals + margins (same contract as before) ───────────────────────
     $tr  = round($cur['total_revenue'], 2);
