@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-07-23 (fix) — Leave details print: no blank first page, shared footer, fits one page (portrait & landscape)
+
+**File:** `app/bms/pos/leave_details.php` (print-only CSS — screen view and data untouched)
+
+Three print fixes on the individual leave-details page:
+
+- **Blank first page removed.** `.premium-card` had `page-break-inside: avoid` on print; the card holds the whole record and is taller than the space left on page 1 (after the shared letterhead), so the browser pushed the entire card to page 2, leaving page 1 blank. Changed to `page-break-inside: auto` so it flows from page 1.
+- **Shared footer restored.** The `print_footer_html.php` include was placed bare; wrapped it in `<div class="d-none d-print-block">` exactly like every other print page (`customer_statement.php`, `ar_aging.php`). It now prints the standard "Printed by … / Powered By BJP Technologies" footer and is hidden on screen (previously it leaked in as a fixed bar).
+- **Fits one page, both orientations.** The screen-sized hero/stat-cards/spacing left large gaps and overflowed. Added a print compaction block (smaller hero title/badges, tighter stat cards & icons, capped letterhead logo, reduced section margins, 4-up field alignment) so portrait fits one page, plus a dedicated `@media print and (orientation: landscape)` block that squeezes a notch further (landscape pages are shorter). Flexible — the right amount of compaction applies to whichever orientation is chosen.
+
+Verified live in-browser on `dev.bms.local/leave_details?id=768`: portrait content 766px (≤ ~1009px page), landscape 648px (≤ ~680px page) — both one page, footer visible, no console errors.
+
 ## 2026-07-23 (feat) — Income Statement: hierarchical parent → sub account tree
 
 **Files:** `api/account/get_income_statement.php`, `app/bms/invoice/income_statement.php`
