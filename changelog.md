@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-07-22 (fix) — AR Aging tells the truth (compute remaining, repair balance_due drift)
+
+**Files:** `api/account/get_ar_aging.php`, `migrations/2026_07_22_repair_invoice_balance_due.php`
+
+The Accounts-Receivable Aging report trusted the denormalised `invoices.balance_due`
+column, which had drifted stale — e.g. invoice `BMS-INV-0002` still owed 9,706,500 (paid 0)
+but its `balance_due` read 0, so the report **silently hid real debt** and understated
+receivables.
+
+`get_ar_aging.php`: the outstanding balance is now **computed** as
+`GREATEST(grand_total - paid_amount, 0)` — for both the filter and the displayed balance —
+instead of reading the stored column, and the status filter is the open-invoice set
+(`NOT IN ('cancelled','draft','void')`). This guarantees a partially-paid invoice keeps
+its unpaid remainder aged by its due date (verified: `INV-20260421-867`, paid 64,614.99 →
+remaining 540,000.01 aged in the 61–90 bucket), and un-hides drifted debt.
+
+Migration `2026_07_22_repair_invoice_balance_due.php`: heals every row where the stored
+`balance_due` disagrees with `GREATEST(grand_total - paid_amount, 0)` (the same formula the
+payment endpoints already maintain). Criteria-based + idempotent.
+
+SUBLEDGER-ONLY — proven safe: no GL/report engine reads `balance_due` (grepped
+financial_reports / ledger_post / revenue_posting / gl_accounts = 0 references), and the
+migration writes no journal_entries. Verified live: Trial Balance byte-identical before and
+after (Dr = Cr = 5,408,221,224.83, balanced=YES); AR aging total went from a hidden
+4,737,200 to the true 14,443,700.01 across 6 invoices. (The subledger↔GL reconciliation
+gap remains until the separate GL Trade Debtors pollution — 425 asset-disposal entries
+mis-posted to 1-1200 — is cleaned; this change does not touch or worsen that.)
+
 ## 2026-07-22 (fix) — Dashboard "Overdue Invoices" card: match the invoices list definition
 
 **File:** `app/dashboard.php`

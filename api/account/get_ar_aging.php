@@ -48,8 +48,13 @@ if ($project_id !== null && !userCan('project', $project_id)) {
 try {
     global $pdo;
 
-    // Outstanding = issued invoices (approved/overdue/partial/paid) still carrying a balance.
-    $where  = ["i.balance_due > 0", "i.status IN ('approved','overdue','partial','paid')"];
+    // Outstanding = any ISSUED invoice (not cancelled/draft/void) whose remaining
+    // balance is still positive. The remaining balance is COMPUTED as
+    // grand_total - paid_amount, NOT read from the denormalised balance_due column,
+    // which can drift stale and silently hide real debt. This also guarantees a
+    // partially-paid invoice keeps its unpaid remainder aged by its due date.
+    $remaining = "GREATEST(i.grand_total - COALESCE(i.paid_amount, 0), 0)";
+    $where  = ["$remaining > 0", "i.status NOT IN ('cancelled','draft','void')"];
     $params = [$as_of];   // first ? is the DATEDIFF as-of date
     if ($customer_id !== null) { $where[] = "i.customer_id = ?"; $params[] = $customer_id; }
     $scope = '';
@@ -63,8 +68,8 @@ try {
                i.invoice_date,
                COALESCE(i.due_date, i.invoice_date)               AS due_date,
                i.grand_total,
-               i.paid_amount,
-               i.balance_due                                      AS balance,
+               COALESCE(i.paid_amount, 0)                         AS paid_amount,
+               $remaining                                         AS balance,
                i.customer_id,
                COALESCE(c.customer_name, 'Unknown')               AS customer_name,
                DATEDIFF(?, COALESCE(i.due_date, i.invoice_date))  AS days_overdue
