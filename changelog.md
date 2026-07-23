@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-07-23 (feat) — Income Statement: hierarchical parent → sub account tree
+
+**Files:** `api/account/get_income_statement.php`, `app/bms/invoice/income_statement.php`
+
+Each P&L section (Revenue, COGS, Expenses, Other Income, Finance Costs) now renders every
+account nested under its chart-of-accounts header, with rolled-up subtotals and indentation
+by level — instead of a flat list. So `6-0000 Expenses → 6-2400 Employment Expenses →
+6-2410 Wages / 6-2430 SDL → Subtotal Employment → Subtotal Expenses` is visible at a glance,
+making the statement easy to trace parent → sub → sub-sub. Any direct postings on a HEADER
+account (e.g. the bank-reconciliation entries sitting on `4-0000 Income`) now surface as a
+visible "— direct postings" line instead of hiding in a flat total.
+
+Implementation is presentation-only: `get_income_statement.php` builds the tree from the
+existing `glProfitLoss()` per-account amounts plus a structure-only hierarchy query
+(`accounts.parent_account_id` + `account_types.category`) — it supplies nesting, never
+figures. Section totals and Net Profit remain sourced from `glProfitLoss`. The view's
+`renderLines` renders header (bold) / leaf (drill-down kept) / subtotal (bold-italic, ruled)
+rows, indented by depth; applies to both screen and print. Zero-activity subtrees are pruned.
+
+No GL writes, no data source change. Verified live (2025-08 → today): all five section
+rollups tie EXACTLY to `glProfitLoss` totals (Revenue 744,127,577.20; COGS 3,951,042,090.00;
+Expenses 348,744,318.63; Other Income 0; Finance 0), so Net Profit is unchanged; 3-level
+nesting and header subtotals confirmed correct.
+
 ## 2026-07-22 (fix) — AP Aging: partial-payment aware, net of payments made
 
 **File:** `api/account/get_ap_aging.php`
