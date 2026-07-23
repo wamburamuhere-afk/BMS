@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-07-23 (fix) — Income Statement print: keep the account tree indentation, no hidden content, single footer
+
+**File:** `app/bms/invoice/income_statement.php` (print-only CSS/markup — screen view and data untouched)
+
+Three print fixes on the hierarchical Income Statement:
+
+- **Parent → child indentation now survives print.** The tree's indentation is set via inline `padding-left`, but the global `responsive.css` rule `th,td{padding:4px 6px !important}` (with `!important`) was resetting it on print, flattening the hierarchy. Made the row indentation `!important` inline so it wins the cascade — the printout now shows parent-out / child-in exactly as on screen. Verified in-browser: with the responsive rule active, parent rows compute to 18px and child rows to 34.8px (were all flattened to 6px before).
+- **Nothing hidden under the footer.** The shared `.print-footer` (`includes/print_footer_html.php`) was fixed at the page bottom; a fixed, opaque footer overlaps and hides the last rows of a dense table. Set it to `position: static` for this page's print so it flows after the report — nothing is ever hidden under it.
+- **One footer, not two.** The page rendered BOTH the shared report footer (`.print-footer`) and the global `footer.php` print footer (`.bms-print-footer`, shown on print by `responsive.css`), giving a duplicate. Hid `.bms-print-footer` on this page (override wins the cascade — verified: later `display:none !important` beats responsive.css's `display:flex !important`), leaving only the shared report footer used on every other report page.
+
 ## 2026-07-23 (fix) — Leave details print: no blank first page, shared footer, fits one page (portrait & landscape)
 
 **File:** `app/bms/pos/leave_details.php` (print-only CSS — screen view and data untouched)
