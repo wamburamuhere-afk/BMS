@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-07-23 (fix) — Project View print: Delivery Notes columns, Sub-Contractor cards, Scope tables (page-break + no-wrap numbers)
+
+**File:** `app/bms/operations/project_view.php` (print-only CSS — screen view and data untouched)
+
+Four print fixes on the Project Details workspace, verified in-browser one after another:
+
+- **Delivery Notes table (`#dtDNs`) — content-friendly column widths.** Auto-layout squeezed the long-value columns (DN Number, DO Ref, Supplier, Date) into narrow, badly-wrapped cells while S/NO and Items were too wide. Added `table-layout: fixed` with explicit percentage widths (thin for S/NO 6% / Items 7%, wide for DN Number 22% / DO Ref 20% / Supplier 16% / Date 13%) — percentage-based so it adapts to both portrait and landscape. Verified: `DN-20260509-106` now fits on one line.
+- **Sub-Contractors stat cards — one row on print.** The four cards (Total/Active/Suspended/Blacklisted) are `col-6 col-md-3`; on a printed portrait page (narrower than the `md` 768px breakpoint) they fell back to `col-6` = 2 per row. Forced `flex:0 0 25%` on print so all four stay on one row in both orientations. Verified: all four cards share the same row at a simulated 650px portrait width.
+- **Scope tables (Original / Revised / Variation / Additional) — start on page 1, not page 2.** Each scope table sits inside a `.card`, and the global `responsive.css` rule `.card{page-break-inside:avoid !important}` couldn't be satisfied on a landscape page (shorter than portrait), pushing the whole card to page 2 and leaving page 1 blank. Added a more-specific override (`#scope-original .card`, etc.) with `page-break-inside:auto` + `overflow:visible`, which wins the cascade — verified computed `break-inside` resolves to `auto` on all four scope cards.
+- **Scope tables — digit values never wrap to a new line.** Long totals (e.g. `117,247,800.00`, `8,018,000.00`) were breaking across two lines inside their cell. Kept the table's original fixed column widths (so it still fits a portrait page) and added `white-space: nowrap` to every cell except DESCRIPTION (targeted by `data-label`, not column position, since the tfoot total is also the 2nd `<td>`), plus `nowrap` on the UNIT textarea (was `pre-wrap`) and a slightly smaller tfoot font so a long grand-total fits its column on one line. Verified at both a real portrait (750px) and landscape (1050px) width: table fits, UNIT stays on one line, both scope and grand totals render as a single line.
+
 ## 2026-07-23 (fix) — Income Statement print: keep the account tree indentation, no hidden content, single footer
 
 **File:** `app/bms/invoice/income_statement.php` (print-only CSS/markup — screen view and data untouched)
