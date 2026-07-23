@@ -264,6 +264,20 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                 #payrollStatCards > [class*="col-"] { flex: 0 0 25% !important; max-width: 25% !important; }
                 #payrollStatCards .card { padding: 0.35rem !important; }
 
+                /* Doc Library table (#projectDocsTable): Source/Category, Type, and Date
+                   Added use Bootstrap's d-none d-md-table-cell / d-none d-lg-table-cell —
+                   screen-responsive classes meant to hide columns on a NARROW MOBILE
+                   viewport. Print inherits the same breakpoints, so on a print render
+                   under those widths these columns vanish, leaving only S/NO and
+                   Document Title. Force all 5 required columns to always show on print;
+                   Actions (a dropdown menu, not useful on paper) is hidden instead. */
+                #projectDocsTable th.d-none, #projectDocsTable td.d-none {
+                    display: table-cell !important;
+                }
+                #projectDocsTable th:last-child, #projectDocsTable td:last-child {
+                    display: none !important;
+                }
+
                 /* Scope tables (Original / Revised / Variation / Additional) must
                    start on the FIRST printed page. Their table sits in a .card, and
                    responsive.css forces `.card{page-break-inside:avoid !important}` —
