@@ -63,7 +63,17 @@ try {
         "reactivated employee \"{$emp_name}\"");
 
     $pdo->commit();
-    echo json_encode(['success' => true, 'message' => 'Employee reactivated successfully.']);
+
+    $message = 'Employee reactivated successfully.';
+    if (!$result['has_live_contract']) {
+        $message .= ' Note: this employee has no active or draft contract on file — '
+                   . 'create one before running attendance, leave, or payroll for them.';
+    }
+    echo json_encode([
+        'success'            => true,
+        'message'            => $message,
+        'has_live_contract'  => $result['has_live_contract'],
+    ]);
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {
