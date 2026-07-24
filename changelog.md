@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-07-24 (fix) — Dashboard: 3 purchase-order widgets now narrow by assigned warehouse
+
+**Files:** `app/dashboard.php`, `tests/test_warehouse_scope_cli.php`
+
+An audit of warehouse-scope enforcement found `app/dashboard.php` only applied project
+scope (`scopeFilterSqlNullable('project', ...)`) to its purchase-order-based widgets,
+never warehouse scope — even though `purchase_orders.warehouse_id` exists and is already
+correctly scoped everywhere else (the real Purchase Orders and GRN pages). A user
+restricted to one warehouse could still see/act on company-wide purchase data via the
+dashboard:
+
+1. **"Total Purchases / Total Spent" stat card** — company-wide totals regardless of
+   warehouse assignment.
+2. **Pending Purchase Order Approvals widget** — the more serious one, since it's an
+   approval queue: a warehouse-restricted approver could see and approve POs for a
+   warehouse they don't manage.
+3. **"Goods Receipt Pending" alert** — overdue-PO alerts for every warehouse, not just theirs.
+
+Fixed by adding `scopeFilterSqlNullable('warehouse', ...)` alongside the existing project
+scope in all three (matching the pattern already used for `product_stocks`/`pos_sales`
+elsewhere in the same file). No new payroll/attendance/leave-style gating logic needed —
+just applying the existing helper.
+
+`tests/test_warehouse_scope_cli.php` extended with a new live section that runs the real
+`dashboard.php` page (not a hand-rolled SQL re-check) under a warehouse-A-scoped user and
+an admin, with real fixture purchase orders split across two warehouses, and confirms each
+widget narrows correctly. 147/147 assertions passing (was 137).
+
 ## 2026-07-23 (fix) — Attendance: removed duplicate "View Details" action, fixed employee filter dropping on view/date change
 
 **Files:** `app/bms/pos/attendance.php`

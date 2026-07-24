@@ -248,15 +248,17 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
     }
 
     // ── 2. Purchase stats ─────────────────────────────────────────────────────
-    // Gate: purchase_orders module; scope: po.project_id (nullable)
+    // Gate: purchase_orders module; scope: po.project_id (nullable) + po.warehouse_id
     if (canView('purchase_orders')) {
         $poScope = scopeFilterSqlNullable('project', 'purchase_orders');
+        $whScope = scopeFilterSqlNullable('warehouse', 'purchase_orders');
         $stmt = $pdo->prepare("
             SELECT COUNT(*) as total_purchases, SUM(grand_total) as total_spent
             FROM purchase_orders
             WHERE status = 'received'
               AND order_date BETWEEN :start_date AND :end_date
               {$poScope}
+              {$whScope}
         ");
         $stmt->execute(['start_date' => $start_date, 'end_date' => $end_date]);
         $stats['purchases'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $stats['purchases'];
@@ -410,6 +412,7 @@ function get_pending_approvals($pdo, $permissions = []) {
     // Get pending purchase orders if they have permission
     if ($permissions['can_approve_purchases'] ?? false) {
         $poScope = scopeFilterSqlNullable('project', 'po');
+        $whScope = scopeFilterSqlNullable('warehouse', 'po');
         $stmt = $pdo->prepare("
             SELECT
                 'purchase' as type,
@@ -422,6 +425,7 @@ function get_pending_approvals($pdo, $permissions = []) {
             JOIN suppliers s ON po.supplier_id = s.supplier_id
             WHERE po.status = 'pending_approval'
             {$poScope}
+            {$whScope}
             LIMIT 5
         ");
         $stmt->execute();
@@ -720,10 +724,11 @@ function get_system_alerts($pdo, $user_id) {
     }
 
     // ── 10. GRN pending for overdue purchase orders ───────────────────────────
-    // Gate: GRN module access; scoped via po.project_id
+    // Gate: GRN module access; scoped via po.project_id + po.warehouse_id
     $grn_pending_alerts = [];
     if (canView('grn') || canView('purchase_orders')) {
         $poScope = scopeFilterSqlNullable('project', 'po');
+        $whScope = scopeFilterSqlNullable('warehouse', 'po');
         try {
             $stmt = $pdo->prepare("
                 SELECT 'grn_pending' as type,
@@ -741,6 +746,7 @@ function get_system_alerts($pdo, $user_id) {
                   AND po.status IN ('ordered','approved','partially_received')
                   AND pr.receipt_id IS NULL
                   {$poScope}
+                  {$whScope}
                 GROUP BY po.purchase_order_id, po.order_number, s.supplier_name, po.expected_date
                 ORDER BY po.expected_date ASC
                 LIMIT 5
