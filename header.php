@@ -1124,6 +1124,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i> Settings</a></li>
                                 <?php if (isAdmin()): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('ai_settings') ?>"><i class="bi bi-stars"></i> AI Assistant</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('zoom_settings') ?>"><i class="bi bi-camera-video"></i> Zoom Integration</a></li>
                                 <?php endif; ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('company_profile') ?>"><i class="bi bi-building"></i> Company Profile</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('backup_restore') ?>"><i class="bi bi-database"></i> Backup</a></li>

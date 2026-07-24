@@ -1,5 +1,48 @@
 # BMS Changelog
 
+## 2026-07-24 (feat) — Zoom video-conferencing integration for Meetings (Phases 1–6)
+
+**Files:** `migrations/2026_07_24_zoom_integration_settings.php`, `migrations/2026_07_24_zoom_meeting_columns.php`,
+`migrations/2026_07_24_zoom_meeting_notification_event.php`, `core/zoom_service.php`,
+`app/constant/settings/zoom_settings.php`, `api/zoom/save_zoom_settings.php`, `api/zoom/test_zoom_config.php`,
+`api/manage_meeting.php`, `api/get_meetings.php`, `app/bms/pos/meetings.php`, `header.php`, `roots.php`,
+`tests/test_zoom_foundation_cli.php`, `tests/test_zoom_service_cli.php`, `tests/test_zoom_meeting_sync_cli.php`,
+`tests/test_zoom_notifications_cli.php`
+
+Added real Zoom meeting capability inside the existing Meetings module, using Zoom's
+Server-to-Server OAuth (the mechanism Zoom recommends for a single-company internal
+system — no per-user Zoom login). Plan in `zoom.md`; Phase 7 (live verification against a
+real Zoom account) and Phase 8 (PR/merge) intentionally left for after this review, per plan.
+
+1. **Settings** — new admin-only "Zoom Integration" panel (mirrors AI Assistant settings
+   exactly): Account ID / Client ID / encrypted Client Secret / enable toggle / Test
+   Connection. New `zoom_*` `system_settings` rows + `zoom_settings` permission, ships OFF.
+2. **Service layer** (`core/zoom_service.php`) — `zoomGetAccessToken()` (cached, auto-refresh),
+   `zoomCreateMeeting/zoomUpdateMeeting/zoomDeleteMeeting`, uniform
+   `{success,message,data}` shape; a Zoom failure is data, never an uncaught exception.
+3. **Schema** — additive `meetings` columns: `meeting_type`, `host_user_id`,
+   `zoom_meeting_id/join_url/start_url/password`, video/waiting-room/recording toggles,
+   `zoom_sync_status`.
+4. **Backend** (`api/manage_meeting.php`) — add/update sync to Zoom after the local save
+   commits; cancel deletes the Zoom-side meeting first; a Zoom failure never blocks the
+   local save (`zoom_sync_status='failed'` + new `retry_zoom` action); switching a meeting
+   from Zoom back to in-person removes the now-orphaned Zoom meeting so it never drifts.
+5. **UI** (`meetings.php`) — In-Person/Zoom type switch (disabled with a tooltip when the
+   integration isn't enabled), host/password/video settings replace Venue in Zoom mode,
+   Join URL shown to all attendees, Start URL shown only to the host/creator, a visible
+   "Zoom sync failed — Retry" state in both the list and the view modal.
+6. **Notifications** — attendees' existing meeting notification now includes the Zoom join
+   link; registered the (previously unregistered) `hr_meeting` event into
+   `notification_events` so per-user mute preferences are honoured. Kept the existing
+   attendee-targeted delivery rather than switching to `dispatchEvent()` as originally
+   planned — that engine resolves recipients as "everyone who can view Meetings," which
+   would have broadcast the Zoom join link past the actual invitees.
+
+89 new CLI assertions across 4 new suites (foundation, service-layer with a mocked HTTP
+seam, manage_meeting.php orchestration, notifications), all against real mocked Zoom
+responses — no live Zoom account needed for Phases 1–6. Existing meetings/trips regression
+suite (23 assertions) and HR talent foundation suite (83 assertions) both still pass.
+
 ## 2026-07-24 (fix) — Dashboard: 3 purchase-order widgets now narrow by assigned warehouse
 
 **Files:** `app/dashboard.php`, `tests/test_warehouse_scope_cli.php`
