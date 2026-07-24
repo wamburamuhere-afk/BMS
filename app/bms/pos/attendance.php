@@ -51,6 +51,7 @@ if ($view_mode == 'week') {
 
 $selected_department = isset($_GET['department']) ? (int)$_GET['department'] : null;
 $selected_status = isset($_GET['status']) ? $_GET['status'] : '';
+$selected_employee = isset($_GET['employee']) ? (int)$_GET['employee'] : null;
 
 // Get departments for filtering
 $departments = $pdo->query("SELECT * FROM departments WHERE status = 'active' ORDER BY department_name")->fetchAll(PDO::FETCH_ASSOC);
@@ -73,9 +74,9 @@ $employees_query = "
 if ($selected_department) {
     $employees_query .= " AND e.department_id = ?";
     $employees_params = [$selected_department];
-} elseif (isset($_GET['employee'])) {
+} elseif ($selected_employee) {
     $employees_query .= " AND e.employee_id = ?";
-    $employees_params = [$_GET['employee']];
+    $employees_params = [$selected_employee];
 } else {
     $employees_params = [];
 }
@@ -509,6 +510,9 @@ if ($employees) {
                     <!-- View Mode Selection -->
                     
                     <input type="hidden" name="view" value="<?= $view_mode ?>">
+                    <?php if ($selected_employee): ?>
+                    <input type="hidden" name="employee" value="<?= $selected_employee ?>">
+                    <?php endif; ?>
 
                     <div class="row g-3">
                         <div class="col-md-3">
@@ -613,9 +617,10 @@ if ($employees) {
             </div>
             
             <div class="btn-group shadow-sm w-100 w-md-auto" role="group">
-                <a href="?view=day&date=<?= $selected_date ?>" class="btn btn-sm py-2 <?= $view_mode == 'day' ? 'btn-primary' : 'btn-light border' ?>">Daily</a>
-                <a href="?view=week&week=<?= $selected_week ?>" class="btn btn-sm py-2 <?= $view_mode == 'week' ? 'btn-primary' : 'btn-light border' ?>">Weekly</a>
-                <a href="?view=month&month=<?= $selected_month ?>" class="btn btn-sm py-2 <?= $view_mode == 'month' ? 'btn-primary' : 'btn-light border' ?>">Monthly</a>
+                <?php $employee_qs = $selected_employee ? '&employee=' . $selected_employee : ''; ?>
+                <a href="?view=day&date=<?= $selected_date . $employee_qs ?>" class="btn btn-sm py-2 <?= $view_mode == 'day' ? 'btn-primary' : 'btn-light border' ?>">Daily</a>
+                <a href="?view=week&week=<?= $selected_week . $employee_qs ?>" class="btn btn-sm py-2 <?= $view_mode == 'week' ? 'btn-primary' : 'btn-light border' ?>">Weekly</a>
+                <a href="?view=month&month=<?= $selected_month . $employee_qs ?>" class="btn btn-sm py-2 <?= $view_mode == 'month' ? 'btn-primary' : 'btn-light border' ?>">Monthly</a>
             </div>
         </div>
     </div>
@@ -801,13 +806,8 @@ if ($employees) {
                                                 </a>
                                             </li>
                                             <?php endif; ?>
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li>
-                                                <a class="dropdown-item" href="#" onclick="viewAttendanceDetails(<?= $record['employee_id'] ?>, '<?= $selected_date ?>')">
-                                                    <i class="bi bi-eye"></i> View Details
-                                                </a>
-                                            </li>
                                             <?php if ($can_edit_attendance && $record['existing_record']): ?>
+                                            <li><hr class="dropdown-divider"></li>
                                             <li>
                                                 <a class="dropdown-item text-danger" href="#" onclick="deleteAttendanceRecord(<?= $record['employee_id'] ?>, '<?= $selected_date ?>')">
                                                     <i class="bi bi-trash"></i> Delete Record
@@ -1264,7 +1264,7 @@ function changeDate(offset) {
 
 function goToToday() {
     const viewMode = '<?= $view_mode ?>';
-    const baseUrl = `?view=${viewMode}&department=<?= $selected_department ?>&status=<?= $selected_status ?>`;
+    const baseUrl = `?view=${viewMode}&department=<?= $selected_department ?>&status=<?= $selected_status ?><?= $selected_employee ? '&employee=' . $selected_employee : '' ?>`;
     
     if (viewMode === 'week') {
         window.location.href = baseUrl + `&week=<?= date('Y-\nW') ?>`;
@@ -1700,10 +1700,6 @@ function quickMarkLate(employeeId) {
             });
         }
     });
-}
-
-function viewAttendanceDetails(employeeId, date) {
-    window.location.href = APP_URL + '/attendance?employee=' + employeeId + '&date=' + date;
 }
 
 function deleteAttendanceRecord(employeeId, date) {
