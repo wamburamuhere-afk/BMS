@@ -1,5 +1,77 @@
 # BMS Changelog
 
+## 2026-07-23 (fix) — HR Actions: removed the self-approval block — matches GRN/DN, fully user_roles.php-driven
+
+**Files:** `api/change_lifecycle_status.php`, `app/bms/pos/hr_actions.php`
+
+Follow-up, reversing the direction of the change below after clarifying intent: investigated
+GRN (`api/approve_grn.php`) and DN (`api/approve_dn.php`) approval and confirmed **neither
+has any segregation-of-duties check** — approval there is governed solely by the `approve`
+checkbox in `user_roles.php`, with no additional hardcoded identity restriction. HR Actions
+was the only module with an extra, code-level self-approval block, making it inconsistent
+with the rest of the system and not configurable from `user_roles.php` at all (only the
+database-level `roles.is_admin` flag — exposed nowhere in that page — could bypass it).
+
+Decision: HR Actions approval should work exactly like GRN/DN — governed solely by the
+`approve` permission checkbox in `user_roles.php`; only true Admin (`isAdmin()`) has ever
+had unrestricted access anyway, and that stays unchanged. Removed the hardcoded
+segregation-of-duties check from `api/change_lifecycle_status.php` entirely, and reverted
+the front-end `hr_actions.php` (both the desktop dropdown and mobile card view) back to the
+plain `CAN_APPROVE` gate used everywhere else — no more `canApproveThis()`/`IS_ADMIN`
+special-casing. Verified in-browser: the Approve button now renders for a record created by
+the current user, same as any other pending record.
+
+## 2026-07-23 (fix) — HR Actions: hide Approve/Reject on your own submission (segregation of duties)
+
+**File:** `app/bms/pos/hr_actions.php` (front-end only — backend rule unchanged)
+
+A non-admin user creating an HR action (e.g. a department transfer) then clicking Approve on
+their own pending record hit "You cannot approve an HR action you created yourself" — a
+confusing runtime error. Investigated: `api/change_lifecycle_status.php` deliberately blocks
+self-approval (segregation of duties / maker-checker — admins exempt), which is correct,
+standard practice (COSO Control Activities, ISO 27001 A.6.1.2) — every mainstream HR/ERP
+system separates the initiator of a request from its approver. **Not a bug in the rule
+itself.** Confirmed no organisational deadlock: Admin, Managing Director, and (other)
+Secretary (PS) users all hold approve rights on this permission, so another approver is
+always available — only the creator's own self-approval is blocked.
+
+The actual bug: the front-end offered the Approve/Reject buttons regardless of who created
+the record — no `created_by === current user` check anywhere — so the option was always
+shown, only to fail after the click. Added `IS_ADMIN` (mirrors the backend's `isAdmin()`
+exemption) and a shared `canApproveThis(r)` helper matching the backend rule exactly; both
+render sites (desktop dropdown, mobile card view) now hide Approve/Reject on your own
+pending record (unless you're admin), replaced with an informational note ("You created
+this — another approver must review it") instead of a dead-end button.
+
+Verified in-browser: all four cases match the backend rule exactly — non-admin+own record
+blocked, non-admin+other's record allowed, admin+own record allowed (exemption), no
+approve-permission never allowed.
+
+## 2026-07-23 (fix) — Delivery Notes list print: drop the Web/Email/TIN/VRN header lines
+
+**File:** `app/bms/grn/delivery_notes.php` (print-only markup — screen view and data untouched)
+
+Follow-up to the print fixes below: verified the reported bug directly by decoding a real
+print-to-PDF the user generated from the (pre-fix) page — confirmed page 1 was entirely
+blank except the global footer bar, and page 2 carried a truncated header ("BEJUNDAS
+FINANCI…", "WEB: HTTPS://DEV.BMS.AC.TZ | EMAIL: FINA…") immediately followed by the whole
+table, exactly matching the diagnosis. Per follow-up request, removed the Web/Email and
+TIN/VRN lines from the letterhead entirely — the header now shows only the logo, company
+name, and report title/date. Re-verified after removal: `#dnTableCard` still computes
+`break-inside: auto` (the more-specific override still wins over the generic `.card`
+`avoid` rule), logo and company name still render, and no web/email/tin/vrn text remains.
+
+## 2026-07-23 (fix) — Delivery Notes list print: no more blank pages, real company letterhead
+
+**File:** `app/bms/grn/delivery_notes.php` (print-only CSS/markup — screen view and data untouched)
+
+Two print fixes on the Delivery Notes list:
+
+- **Many blank pages, fixed.** The DN table's wrapping card had no `id`, so the global `responsive.css` rule `p, .card, section { page-break-inside: avoid !important }` applied to it — and the card was measured at ~5,300px tall (just 20 rows), many times taller than one printed page. An "avoid" block that can never fit anywhere on a single page causes the browser to repeatedly hunt for room, producing several blank pages before the table finally prints. Added `id="dnTableCard"` and a more-specific print override (`page-break-inside: auto`, `overflow: visible`) — verified computed `break-inside` resolves to `auto`. Also added `#dnTable tr { page-break-inside: avoid }` so individual rows never split mid-row, and repeated the `<thead>` on every page.
+- **Missing company letterhead, fixed.** The print header referenced `$c_web`, `$c_email`, `$c_tin`, `$c_vrn` — variables that were never defined anywhere in the file, so those lines always rendered empty — and never referenced `$company_name` / `$company_logo` at all (no logo, no company name heading), unlike every other report's print header. Root cause: this file is `require_once`'d from inside `handleRoute()`, so `header.php`'s `global $company_name` binding never reaches this scope (confirmed via a PHP undefined-variable warning caught in-browser). Fetched `company_name`, `company_logo`, `company_website`, `company_email`, `company_tin`, `company_vrn` locally via `getSetting()` — the same pattern `project_view.php` already uses — so the printout now shows the full letterhead (logo, company name, web/email, TIN/VRN) like every other report.
+
+Verified in-browser: `#dnTableCard` computed `break-inside: auto`, `overflow: visible`; print header renders the real logo, "BEJUNDAS FINANCIAL SERVICES LTD", web/email line, and TIN/VRN line — all previously blank/absent.
+
 ## 2026-07-23 (fix) — Project Doc Library print: show all required columns (Source/Category, Type, Date Added)
 
 **File:** `app/bms/operations/project_view.php` (print-only CSS — screen view and data untouched)
