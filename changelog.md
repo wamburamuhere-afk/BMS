@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-07-24 (feat) — Zoom Attendees: Role → linked-user picker (replaces employee search for Zoom meetings)
+
+**Files:** `api/zoom/get_attendee_roles.php`, `app/bms/pos/meetings.php`, `tests/test_zoom_attendee_roles_cli.php`
+
+Follow-up to the Zoom integration above. Root cause found in production data: several
+leadership logins (Director, 2× Managing Director, Credit Manager, Secretary) were created
+directly as `users` rows with no matching `employees` record at all — so the Attendees
+field's employee search could never surface them, and even if it had, the notification
+system (keyed off `employee_id`) would have had nothing to notify.
+
+For **Zoom meetings only** (in-person attendee picker is untouched), the Attendees field
+now offers a "Add attendees by role" picker: pick a role, then pick specific people or
+"Select all in this role", added as removable chips alongside the existing field — you can
+add from multiple roles before saving. A role appears **only if both** are true: it has
+`can_view=1` on `meetings`, and at least one of its active users has a linked employee
+record — so a role is never shown if picking it would produce an empty, dead-end list.
+Selections still resolve to `employee_id` under the hood — no schema change, and
+attendance-marking/notifications are unaffected.
+
+8 new CLI assertions in `test_zoom_attendee_roles_cli.php` (role filtering both directions,
+employee_id correctness, no dead-end roles, permission gating). Built on a fresh branch off
+`develop` since the original Zoom integration PR (#1536) had already been merged.
+
 ## 2026-07-24 (feat) — Zoom video-conferencing integration for Meetings (Phases 1–6)
 
 **Files:** `migrations/2026_07_24_zoom_integration_settings.php`, `migrations/2026_07_24_zoom_meeting_columns.php`,
