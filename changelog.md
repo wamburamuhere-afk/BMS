@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-07-23 (fix) — Attendance: removed duplicate "View Details" action, fixed employee filter dropping on view/date change
+
+**Files:** `app/bms/pos/attendance.php`
+
+"View History" and "View Details" in the row actions dropdown did the same thing (both
+navigated to `attendance?employee=X`) — removed "View Details" and its now-unused
+`viewAttendanceDetails()` JS function. Separately, once scoped to a single employee via
+`?employee=X`, switching Daily/Weekly/Monthly or changing the date silently dropped the
+`employee` param and fell back to showing all employees — the toggle links, the filter
+form, and `goToToday()` never carried it through. Added `$selected_employee` and threaded
+it into the filter form (hidden field), the three view-mode links, and `goToToday()` so the
+single-employee scope survives view/date changes.
+
 ## 2026-07-23 (fix) — Employee contracts: closed two follow-on gaps in the contract-cascade work
 
 **Files:** `cron/check_hr_expiry.php`, `core/employee_status.php`, `api/reactivate_employee.php`,
