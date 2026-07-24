@@ -195,6 +195,8 @@ head('Phase 2 — api/reactivate_employee.php');
 
 $r3 = run_endpoint($root, "$root/api/reactivate_employee.php", ['employee_id' => $eid]);
 ok(!empty($r3['success']), 'reactivate_employee.php succeeds (got: ' . json_encode($r3) . ')');
+ok(($r3['has_live_contract'] ?? null) === false, "has_live_contract=false — fixture has no contract row (got: " . json_encode($r3) . ")");
+ok(stripos($r3['message'] ?? '', 'no active or draft contract') !== false, "message warns about the missing contract");
 
 $row = $pdo->query("SELECT status, employment_status, inactivation_reason FROM employees WHERE employee_id=$eid")->fetch(PDO::FETCH_ASSOC);
 ok($row['status'] === 'active', "status=active (got: {$row['status']})");
@@ -213,6 +215,38 @@ $attCount2 = (int)$pdo->query("SELECT COUNT(*) FROM attendance WHERE employee_id
 $leaveCount2 = (int)$pdo->query("SELECT COUNT(*) FROM leaves WHERE employee_id=$eid")->fetchColumn();
 ok($payCount2 === 1 && $attCount2 === 1 && $leaveCount2 === 1,
     "history still intact after the full inactivate->reactivate round trip (payroll=$payCount2, attendance=$attCount2, leaves=$leaveCount2)");
+
+// ── Phase 2b — reactivating an employee WITH a live contract: no warning ──
+head('Phase 2b — reactivate with a live contract on file (no warning)');
+
+$eid2 = null;
+$hasContractsTable = (bool)$pdo->query("SHOW TABLES LIKE 'employee_contracts'")->fetch();
+if ($hasContractsTable) {
+    $vals2 = $vals; // reuse the same forced-column scaffolding as the main fixture
+    $vals2['email'] = "eitest2+$ts@example.test";
+    $vals2['employee_code'] = "EI2-$ts";
+    $vals2['employee_number'] = "EI2-$ts";
+    $vals2['first_name'] = '__EITest2';
+    $names2 = array_keys($vals2);
+    $pdo->prepare("INSERT INTO employees (" . implode(',', $names2) . ") VALUES (" .
+        implode(',', array_fill(0, count($names2), '?')) . ")")->execute(array_values($vals2));
+    $eid2 = (int)$pdo->lastInsertId();
+
+    $pdo->prepare("INSERT INTO employee_contracts (employee_id, contract_type, start_date, end_date, status, activated_by, activated_at, created_by)
+                   VALUES (?, 'Permanent', ?, NULL, 'active', 4, NOW(), 4)")->execute([$eid2, date('Y-m-d')]);
+
+    $pdo->prepare("UPDATE employees SET status = 'inactive', employment_status = 'terminated' WHERE employee_id = ?")->execute([$eid2]);
+
+    $r5 = run_endpoint($root, "$root/api/reactivate_employee.php", ['employee_id' => $eid2]);
+    ok(!empty($r5['success']), 'reactivate_employee.php succeeds for the contracted fixture (got: ' . json_encode($r5) . ')');
+    ok(($r5['has_live_contract'] ?? null) === true, "has_live_contract=true — fixture has an active contract (got: " . json_encode($r5) . ")");
+    ok(stripos($r5['message'] ?? '', 'no active or draft contract') === false, "no missing-contract warning when a live contract exists");
+
+    $pdo->exec("DELETE FROM employee_contracts WHERE employee_id = $eid2");
+    $pdo->exec("DELETE FROM employees WHERE employee_id = $eid2");
+} else {
+    ok(true, 'employee_contracts table not present — skipping Phase 2b (has_live_contract defaults false, covered by Phase 2)');
+}
 
 // ── Cleanup ──────────────────────────────────────────────────────────────
 head('Cleanup');

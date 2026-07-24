@@ -59,7 +59,8 @@ function render($page, $uid, $empId = 0) {
 }
 function noErr($html) { foreach (['Fatal error', 'Parse error', 'Uncaught', 'Unknown column', 'SQLSTATE', 'Call to a member function', 'Call to undefined'] as $e) if (stripos($html, $e) !== false) return false; return true; }
 
-$emp_id = 0; $emp2_id = 0; $emp3_id = 0; $contract_a = 0; $contract_b = 0; $contract_c = 0;
+$emp_id = 0; $emp2_id = 0; $emp3_id = 0; $emp4_id = 0; $emp5_id = 0;
+$contract_a = 0; $contract_b = 0; $contract_c = 0; $contract_d = 0; $contract_e = 0; $contract_f = 0;
 $test_start = date('Y-m-d H:i:s');
 try {
     $admin_uid = (int)$pdo->query("SELECT u.user_id FROM users u JOIN roles r ON r.role_id = u.role_id WHERE r.is_admin = 1 LIMIT 1")->fetchColumn();
@@ -145,6 +146,30 @@ try {
     $statusB = $pdo->query("SELECT status FROM employee_contracts WHERE contract_id = $contract_b")->fetchColumn();
     ok($statusB === 'terminated', "contract B status stamped terminated");
 
+    // Cascade: contract B was the employee's only remaining draft/active
+    // contract (A is 'renewed') — terminating it must deactivate the employee.
+    ok(stripos($r['message'], 'marked inactive') !== false, "terminate response reports the employee-deactivation cascade");
+    $empAfter = $pdo->query("SELECT status, employment_status FROM employees WHERE employee_id = $emp_id")->fetch(PDO::FETCH_ASSOC);
+    ok($empAfter['status'] === 'inactive' && $empAfter['employment_status'] === 'terminated',
+        "cascade: employee deactivated after their only contract was terminated");
+
+    // ── 4b. No cascade when another draft/active contract remains ──────────────
+    $pdo->exec("INSERT INTO employees (first_name, last_name, employee_number, employment_status, created_at)
+                VALUES ('__EC4', 'Renewing', '__EC-TEST-4', 'active', NOW())");
+    $emp4_id = (int)$pdo->lastInsertId();
+    $r = call('add_contract', ['employee_id' => $emp4_id, 'contract_type' => 'Fixed-term', 'start_date' => date('Y-m-d', strtotime('-10 days')), 'end_date' => date('Y-m-d', strtotime('+2 days'))], $ADMIN);
+    $contract_d = (int)($r['contract_id'] ?? 0);
+    call('change_contract_status', ['contract_id' => $contract_d, 'action' => 'activate'], $ADMIN);
+    $r = call('add_contract', ['employee_id' => $emp4_id, 'contract_type' => 'Permanent', 'start_date' => date('Y-m-d', strtotime('+3 days'))], $ADMIN);
+    $contract_e = (int)($r['contract_id'] ?? 0);
+    ok($contract_d > 0 && $contract_e > 0, "renewal-in-progress fixtures ready (active #$contract_d, draft #$contract_e)");
+
+    $r = call('change_contract_status', ['contract_id' => $contract_d, 'action' => 'terminate'], $ADMIN);
+    ok(!empty($r['success']) && stripos($r['message'], 'marked inactive') === false,
+        "terminating one contract while a draft renewal exists does NOT report a cascade: " . ($r['message'] ?? ''));
+    $emp4Status = $pdo->query("SELECT status FROM employees WHERE employee_id = $emp4_id")->fetchColumn();
+    ok($emp4Status === 'active', "no cascade: employee stays active while a draft renewal contract remains");
+
     // ── 5. get_contract / get_contracts ───────────────────────────────────────
     $r = call('get_contract', ['contract_id' => $contract_b], $ADMIN, 'GET');
     ok(!empty($r['success']) && $r['data']['status'] === 'terminated', "get_contract returns the terminated row");
@@ -174,10 +199,33 @@ try {
         ->execute([$emp2_id, date('Y-m-d', strtotime('-60 days')), $endC, $admin_uid, $admin_uid]);
     $contract_c = (int)$pdo->lastInsertId();
 
+    // Fixture for the auto-close path: an active contract whose end_date is
+    // already in the past (as if nobody ran this cron for a few days).
+    $pdo->exec("INSERT INTO employees (first_name, last_name, employee_number, employment_status, created_at)
+                VALUES ('__EC5', 'Expired', '__EC-TEST-5', 'active', NOW())");
+    $emp5_id = (int)$pdo->lastInsertId();
+    $endF = date('Y-m-d', strtotime('-3 days'));
+    $pdo->prepare("INSERT INTO employee_contracts (employee_id, contract_type, start_date, end_date, status, activated_by, activated_at, created_by)
+                   VALUES (?, 'Fixed-term', ?, ?, 'active', ?, NOW(), ?)")
+        ->execute([$emp5_id, date('Y-m-d', strtotime('-90 days')), $endF, $admin_uid, $admin_uid]);
+    $contract_f = (int)$pdo->lastInsertId();
+
     $beforeC = (int)$pdo->query("SELECT COUNT(*) FROM notification_log WHERE event_key = 'hr_contract_expiry' AND entity_id = $contract_c")->fetchColumn();
     require_once "$root/cron/check_hr_expiry.php";
     $afterC = (int)$pdo->query("SELECT COUNT(*) FROM notification_log WHERE event_key = 'hr_contract_expiry' AND entity_id = $contract_c")->fetchColumn();
     ok($afterC > $beforeC, "D13: hr-expiry cron fired for the expiring contract via the shared notification engine");
+
+    // ── D13b. Auto-close: contract F's end_date already passed ──────────────
+    $statusF = $pdo->query("SELECT status FROM employee_contracts WHERE contract_id = $contract_f")->fetchColumn();
+    ok($statusF === 'expired', "auto-close: past-due contract flipped to 'expired'");
+    $emp5After = $pdo->query("SELECT status, employment_status FROM employees WHERE employee_id = $emp5_id")->fetch(PDO::FETCH_ASSOC);
+    ok($emp5After['status'] === 'inactive' && $emp5After['employment_status'] === 'terminated',
+        "auto-close: employee deactivated (no other draft/active contract)");
+    $autoNotif = (int)$pdo->query("SELECT COUNT(*) FROM notification_log WHERE event_key = 'hr_contract_expired_autoclosed' AND entity_id = $contract_f")->fetchColumn();
+    ok($autoNotif > 0, "auto-close: hr_contract_expired_autoclosed notification fired");
+
+    $reRunF = run_hr_expiry_check($pdo);
+    ok(($reRunF['contracts_autoclosed'] ?? -1) === 0, "auto-close: re-run does not re-process an already-'expired' contract");
 
     $beforeP = (int)$pdo->query("SELECT COUNT(*) FROM notification_log WHERE event_key = 'hr_probation_end' AND entity_id = $emp2_id")->fetchColumn();
     ok($beforeP > 0, "D13: probation-ending notification also fired in the same run");
@@ -207,7 +255,7 @@ try {
 } catch (Throwable $e) {
     ok(false, "exception: " . $e->getMessage());
 } finally {
-    foreach ([$emp_id, $emp2_id, $emp3_id] as $id) {
+    foreach ([$emp_id, $emp2_id, $emp3_id, $emp4_id, $emp5_id] as $id) {
         if ($id) {
             $pdo->exec("DELETE FROM employee_contracts WHERE employee_id = $id");
             $pdo->exec("DELETE FROM employees WHERE employee_id = $id");
@@ -217,11 +265,15 @@ try {
         $pdo->exec("DELETE FROM notification_log WHERE event_key = 'hr_contract_expiry' AND entity_id = $contract_c");
         $pdo->exec("DELETE FROM notification_dedupe WHERE dedupe_key LIKE 'hr_contract_expiry|employee_contract|$contract_c|%'");
     }
+    if ($contract_f) {
+        $pdo->exec("DELETE FROM notification_log WHERE event_key = 'hr_contract_expired_autoclosed' AND entity_id = $contract_f");
+        $pdo->exec("DELETE FROM notification_dedupe WHERE dedupe_key LIKE 'hr_contract_expired_autoclosed|employee_contract|$contract_f|%'");
+    }
     if ($emp2_id) {
         $pdo->exec("DELETE FROM notification_log WHERE event_key = 'hr_probation_end' AND entity_id = $emp2_id");
         $pdo->exec("DELETE FROM notification_dedupe WHERE dedupe_key LIKE 'hr_probation_end|employee|$emp2_id|%'");
     }
-    $pdo->prepare("DELETE FROM notifications WHERE event_key IN ('hr_contract_expiry','hr_probation_end') AND created_at >= ?")
+    $pdo->prepare("DELETE FROM notifications WHERE event_key IN ('hr_contract_expiry','hr_probation_end','hr_contract_expired_autoclosed') AND created_at >= ?")
         ->execute([$test_start]);
     echo "  (fixtures cleaned)\n";
 }
