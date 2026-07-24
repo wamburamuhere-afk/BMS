@@ -76,12 +76,10 @@ try {
         throw new Exception('Only the creator (or an editor) can cancel this event');
     }
 
-    // Segregation of duties — you cannot approve your own event (admins exempt)
-    if ($action === 'approve'
-        && (int)$ev['created_by'] === (int)$_SESSION['user_id']
-        && !isAdmin()) {
-        throw new Exception('You cannot approve an HR action you created yourself');
-    }
+    // Approve gate is the 'approve' permission alone (canApprove('employee_lifecycle'),
+    // checked above) — same model as GRN/DN approval (api/approve_grn.php,
+    // api/approve_dn.php), neither of which restricts approving your own submission.
+    // No self-approval block here by design, per that decision.
 
     $emp = $pdo->prepare("SELECT first_name, last_name FROM employees WHERE employee_id = ?");
     $emp->execute([(int)$ev['employee_id']]);
