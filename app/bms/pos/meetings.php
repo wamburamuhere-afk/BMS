@@ -97,7 +97,25 @@ $zoom_hosts = $pdo->query("SELECT user_id, username, first_name, last_name FROM 
                     <div class="col-6 col-md-3 mb-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="zoom_auto_recording" id="mt_zoom_auto_recording" value="1"><label class="form-check-label" for="mt_zoom_auto_recording">Auto-record (cloud)</label></div></div>
                 </div>
             </div>
-            <div class="mb-3"><label class="form-label">Attendees</label><select class="form-select" name="attendees[]" id="mt_attendees" multiple style="width:100%"></select></div>
+            <div class="mb-3">
+                <label class="form-label">Attendees</label>
+                <select class="form-select" name="attendees[]" id="mt_attendees" multiple style="width:100%"></select>
+                <div class="d-none border rounded p-2 mt-2 bg-light" id="mt_role_picker_wrap">
+                    <label class="form-label small fw-bold mb-1">Add attendees by role</label>
+                    <select class="form-select form-select-sm" id="mt_role_select" style="max-width:280px">
+                        <option value="">Choose a role…</option>
+                    </select>
+                    <div class="d-none mt-2" id="mt_role_users_wrap">
+                        <div class="form-check mb-1">
+                            <input class="form-check-input" type="checkbox" id="mt_role_select_all">
+                            <label class="form-check-label small fw-bold" for="mt_role_select_all">Select all in this role</label>
+                        </div>
+                        <div id="mt_role_users_list" class="mb-2" style="max-height:150px;overflow-y:auto;"></div>
+                        <button type="button" class="btn btn-sm btn-primary" id="mt_role_add_btn"><i class="bi bi-plus-lg"></i> Add selected</button>
+                    </div>
+                    <div class="d-none small text-muted mt-1" id="mt_role_none_msg">No roles are currently set up with both Meetings access and a linked-employee login — see Users / User Roles &amp; Permissions.</div>
+                </div>
+            </div>
         </div>
         <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
     </form>
@@ -220,16 +238,71 @@ $(function(){
 <?php if ($can_create): ?>
 function attendeeSelect2(){ if (!$('#mt_attendees').hasClass('select2-hidden-accessible')) $('#mt_attendees').select2({ theme:'bootstrap-5',dropdownParent:$('#meetingModal'),placeholder:'Search employees…',width:'100%',minimumInputLength:1,ajax:{url:'<?= buildUrl('api/account/search_employees.php') ?>',dataType:'json',delay:300,data:p=>({q:p.term}),processResults:d=>({results:d.results}),cache:true} }); }
 function hostSelect2(){ if (!$('#mt_host').hasClass('select2-hidden-accessible')) $('#mt_host').select2({ theme:'bootstrap-5', dropdownParent:$('#meetingModal'), width:'100%' }); }
+
+// Zoom-only Attendees picker: Role -> linked-user checklist (in-person meetings
+// keep the free-text employee search above, untouched). Loaded once per page
+// load and cached — the eligible-roles list changes rarely (role permission /
+// user-link admin actions), not per meeting.
+let MT_ROLE_DATA = null;
+function mtLoadRoleData(cb){
+    if (MT_ROLE_DATA !== null) { cb(); return; }
+    $.getJSON('<?= buildUrl('api/zoom/get_attendee_roles.php') ?>', function(res){
+        MT_ROLE_DATA = (res.success ? res.roles : []);
+        cb();
+    }).fail(function(){ MT_ROLE_DATA = []; cb(); });
+}
+function mtRenderRoleSelect(){
+    const $sel = $('#mt_role_select');
+    $sel.find('option:not(:first)').remove();
+    MT_ROLE_DATA.forEach(r => $sel.append(`<option value="${r.role_id}">${safeOutput(r.role_name)} (${r.users.length})</option>`));
+    $('#mt_role_none_msg').toggleClass('d-none', MT_ROLE_DATA.length > 0);
+    $sel.toggleClass('d-none', MT_ROLE_DATA.length === 0);
+}
+function mtResetRolePicker(){
+    $('#mt_role_select').val('');
+    $('#mt_role_users_wrap').addClass('d-none');
+    $('#mt_role_select_all').prop('checked', false);
+    $('#mt_role_users_list').empty();
+}
+$(document).on('change', '#mt_role_select', function(){
+    const roleId = $(this).val();
+    if (!roleId) { $('#mt_role_users_wrap').addClass('d-none'); return; }
+    const role = MT_ROLE_DATA.find(r => String(r.role_id) === String(roleId));
+    const existing = new Set(($('#mt_attendees').val() || []).map(String));
+    const users = (role ? role.users : []).filter(u => !existing.has(String(u.employee_id)));
+    $('#mt_role_select_all').prop('checked', false);
+    if (!users.length) {
+        $('#mt_role_users_list').html('<div class="text-muted small">Everyone in this role is already added.</div>');
+    } else {
+        $('#mt_role_users_list').html(users.map(u => `
+            <div class="form-check"><input class="form-check-input mt-role-user-chk" type="checkbox" value="${u.employee_id}" data-name="${safeOutput(u.name)}" id="mt_ru_${u.employee_id}">
+            <label class="form-check-label small" for="mt_ru_${u.employee_id}">${safeOutput(u.name)}</label></div>`).join(''));
+    }
+    $('#mt_role_users_wrap').removeClass('d-none');
+});
+$(document).on('change', '#mt_role_select_all', function(){
+    $('.mt-role-user-chk').prop('checked', $(this).is(':checked'));
+});
+$(document).on('click', '#mt_role_add_btn', function(){
+    $('.mt-role-user-chk:checked').each(function(){
+        const eid = $(this).val(), name = $(this).data('name');
+        if (!$(`#mt_attendees option[value="${eid}"]`).length) $('#mt_attendees').append(new Option(name, eid, true, true));
+    });
+    $('#mt_attendees').trigger('change');
+    mtResetRolePicker();
+});
 function mtToggleType(){
     const isZoom = $('#mt_type_zoom').is(':checked');
     $('#mt_venue_wrap').toggleClass('d-none', isZoom);
     $('#mt_zoom_wrap').toggleClass('d-none', !isZoom);
     $('#mt_host').prop('required', isZoom);
+    $('#mt_role_picker_wrap').toggleClass('d-none', !isZoom);
+    if (isZoom) mtLoadRoleData(mtRenderRoleSelect);
 }
 $(document).on('change', 'input[name="meeting_type"]', mtToggleType);
 window.openMeetingModal=function(){
     $('#meetingForm')[0].reset(); $('#mt_id').val(''); $('#mt_attendees').empty().val(null).trigger('change');
-    $('#mt_type_person').prop('checked', true); mtToggleType();
+    $('#mt_type_person').prop('checked', true); mtToggleType(); mtResetRolePicker();
     $('#meetingModalTitle').text('New Meeting'); new bootstrap.Modal(document.getElementById('meetingModal')).show();
 };
 window.editMeeting=function(id){
@@ -244,7 +317,7 @@ window.editMeeting=function(id){
         $('#mt_zoom_participant_video').prop('checked', Number(m.zoom_participant_video)===1);
         $('#mt_zoom_waiting_room').prop('checked', Number(m.zoom_waiting_room)===1);
         $('#mt_zoom_auto_recording').prop('checked', Number(m.zoom_auto_recording)===1);
-        mtToggleType();
+        mtToggleType(); mtResetRolePicker();
         new bootstrap.Modal(document.getElementById('meetingModal')).show();
         setTimeout(function(){
             attendeeSelect2(); $('#mt_attendees').empty(); res.attendees.forEach(a=>{ $('#mt_attendees').append(new Option(a.first_name+' '+a.last_name, a.employee_id, true, true)); }); $('#mt_attendees').trigger('change');
