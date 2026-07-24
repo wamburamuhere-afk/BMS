@@ -18,6 +18,35 @@
  */
 error_reporting(E_ALL & ~E_DEPRECATED);
 $root = dirname(__DIR__);
+
+if (($argv[1] ?? '') === 'dashboard_worker') {
+    // Renders app/dashboard.php's real top-level code once under a specific
+    // simulated session, then dumps the resulting $dashboard_stats /
+    // $pending_approvals / $alerts as JSON so the parent process can assert
+    // on the actual computed values instead of re-deriving the SQL by hand.
+    require_once "$root/roots.php";
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $cfg = json_decode(file_get_contents($argv[2]), true);
+    foreach (($cfg['session'] ?? []) as $k => $v) { $_SESSION[$k] = $v; }
+    foreach (($cfg['get'] ?? []) as $k => $v) { $_GET[$k] = $v; }
+    ob_start();
+    try {
+        require "$root/app/dashboard.php";
+    } catch (Throwable $e) {
+        ob_end_clean();
+        echo json_encode(['_error' => $e->getMessage()]);
+        exit;
+    }
+    ob_end_clean();
+    echo json_encode([
+        'total_purchases'  => $dashboard_stats['purchases']['total_purchases'] ?? null,
+        'total_spent'      => $dashboard_stats['purchases']['total_spent'] ?? null,
+        'approval_orders'  => array_values(array_column($pending_approvals ?? [], 'reference')),
+        'grn_pending_refs' => array_values(array_column(array_filter($alerts ?? [], fn($a) => ($a['type'] ?? '') === 'grn_pending'), 'reference')),
+    ]);
+    exit;
+}
+
 require_once "$root/roots.php";
 require_once "$root/core/project_scope.php";
 require_once "$root/core/warehouse_scope.php";
@@ -260,6 +289,125 @@ try {
         $reset();
     }
 
+    // ── G. LIVE — app/dashboard.php's 3 purchase-order widgets now narrow by
+    //      warehouse (2026-07-24 fix): Purchase stats card, Pending Approvals
+    //      widget, GRN-pending alert. Runs the real dashboard.php top-level
+    //      code in a subprocess (not a hand-rolled re-derivation of the SQL)
+    //      under two personas — a user granted only warehouse A, and an
+    //      admin — and checks the ACTUAL resulting values differ correctly.
+    section('G. Live — dashboard.php purchase widgets narrow by warehouse');
+
+    $whRow = $pdo->query("SELECT warehouse_id FROM warehouses WHERE status = 'active' ORDER BY warehouse_id ASC LIMIT 2")
+                 ->fetchAll(PDO::FETCH_COLUMN);
+    $supplierId = (int)$pdo->query("SELECT supplier_id FROM suppliers LIMIT 1")->fetchColumn();
+
+    if (count($whRow) < 2 || !$supplierId) {
+        ok(false, 'Need 2 active warehouses + 1 supplier to run test G — skipping');
+    } else {
+        [$gWhA, $gWhB] = $whRow;
+        // Far-future order_date so the "Purchase stats" aggregate window is
+        // guaranteed clean (no real production POs on this date) regardless
+        // of how much live data exists — avoids noisy-data false negatives.
+        $farDate = '2099-06-15';
+
+        $insPo = $pdo->prepare("
+            INSERT INTO purchase_orders (order_number, supplier_id, order_date, warehouse_id, status, expected_date, grand_total, project_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
+        ");
+        $insPo->execute(['TESTWHSTAT-A', $supplierId, $farDate, $gWhA, 'received', null, 1000, ]);
+        $poStatA = (int)$pdo->lastInsertId();
+        $insPo->execute(['TESTWHSTAT-B', $supplierId, $farDate, $gWhB, 'received', null, 2000, ]);
+        $poStatB = (int)$pdo->lastInsertId();
+        $insPo->execute(['TESTWHAPPR-A', $supplierId, date('Y-m-d'), $gWhA, 'pending_approval', null, 500, ]);
+        $poApprA = (int)$pdo->lastInsertId();
+        $insPo->execute(['TESTWHAPPR-B', $supplierId, date('Y-m-d'), $gWhB, 'pending_approval', null, 600, ]);
+        $poApprB = (int)$pdo->lastInsertId();
+        $insPo->execute(['TESTWHGRN-A', $supplierId, date('Y-m-d'), $gWhA, 'ordered', date('Y-m-d', strtotime('-1 day')), 700, ]);
+        $poGrnA = (int)$pdo->lastInsertId();
+        $insPo->execute(['TESTWHGRN-B', $supplierId, date('Y-m-d'), $gWhB, 'ordered', date('Y-m-d', strtotime('-1 day')), 800, ]);
+        $poGrnB = (int)$pdo->lastInsertId();
+
+        function _dashboard_worker_run($root, $session, $get) {
+            $cfgFile = tempnam(sys_get_temp_dir(), 'whg');
+            file_put_contents($cfgFile, json_encode(['session' => $session, 'get' => $get]));
+            $out = shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' dashboard_worker ' . escapeshellarg($cfgFile) . ' 2>&1');
+            @unlink($cfgFile);
+            $s = strpos((string)$out, '{');
+            return $s === false ? ['_raw' => (string)$out] : json_decode(substr($out, $s), true);
+        }
+
+        // header.php re-derives role_id/permissions from a REAL `users` row on
+        // every request (JOINs on user_id) — a fake, out-of-range user_id like
+        // TEST_UID_GRANTED works for the earlier sections (which call
+        // loadUserScope()/userCan() directly), but running the actual
+        // dashboard.php page needs header.php to find a real user. Create one
+        // throwaway row, tied to a real non-admin role that already has
+        // view+approve on purchase_orders and view on grn (found live).
+        $roleRow = $pdo->query("
+            SELECT rp.role_id
+            FROM role_permissions rp
+            JOIN permissions p ON p.permission_id = rp.permission_id
+            JOIN roles r ON r.role_id = rp.role_id AND r.is_admin = 0
+            GROUP BY rp.role_id
+            HAVING MAX(CASE WHEN p.page_key = 'purchase_orders' THEN rp.can_view END) = 1
+               AND MAX(CASE WHEN p.page_key = 'purchase_orders' THEN rp.can_approve END) = 1
+               AND MAX(CASE WHEN p.page_key = 'grn' THEN rp.can_view END) = 1
+            LIMIT 1
+        ")->fetchColumn();
+
+        $gUid = 0;
+        if (!$roleRow) {
+            ok(false, 'No non-admin role with purchase_orders view+approve and grn view found — skipping section G');
+        } else {
+        $pdo->prepare("DELETE FROM users WHERE username = '__wh_scope_test'")->execute();
+        $pdo->prepare("INSERT INTO users (username, role_id) VALUES ('__wh_scope_test', ?)")->execute([(int)$roleRow]);
+        $gUid = (int)$pdo->lastInsertId();
+
+        $pdo->prepare("DELETE FROM user_scope_overrides WHERE user_id = ?")->execute([$gUid]);
+        $pdo->prepare("INSERT INTO user_scope_overrides (user_id, resource_type, resource_id, granted_by) VALUES (?, 'warehouse', ?, 1)")
+            ->execute([$gUid, $gWhA]);
+
+        $scopedSession = [
+            'user_id' => $gUid, 'username' => 'wh_scope_test', 'is_admin' => false, 'role_id' => (int)$roleRow,
+        ];
+        $adminSession = ['user_id' => 4, 'username' => 'admin', 'is_admin' => true, 'role_id' => 1];
+        $farDateGet = ['start_date' => $farDate, 'end_date' => $farDate];
+
+        $scoped = _dashboard_worker_run($root, $scopedSession, $farDateGet);
+        $admin  = _dashboard_worker_run($root, $adminSession, $farDateGet);
+
+        ok(empty($scoped['_error']), 'dashboard.php renders for a warehouse-A-scoped user with no fatal error' . (!empty($scoped['_error']) ? ' — ' . $scoped['_error'] : ''));
+        ok(empty($admin['_error']), 'dashboard.php renders for admin with no fatal error' . (!empty($admin['_error']) ? ' — ' . $admin['_error'] : ''));
+
+        if (empty($scoped['_error']) && empty($admin['_error'])) {
+            ok((int)($scoped['total_purchases'] ?? -1) === 1, "Purchase stats: warehouse-A-scoped user sees total_purchases=1 (only their warehouse), got " . json_encode($scoped['total_purchases'] ?? null));
+            ok(abs((float)($scoped['total_spent'] ?? -1) - 1000.0) < 0.01, "Purchase stats: warehouse-A-scoped user's total_spent=1000 (only PO A's amount), got " . json_encode($scoped['total_spent'] ?? null));
+            ok((int)($admin['total_purchases'] ?? -1) >= 2, "Purchase stats: admin sees both fixture POs (total_purchases >= 2), got " . json_encode($admin['total_purchases'] ?? null));
+
+            $scopedApprovals = $scoped['approval_orders'] ?? [];
+            ok(in_array('TESTWHAPPR-A', $scopedApprovals, true), 'Pending Approvals: warehouse-A-scoped user sees the warehouse-A PO awaiting approval');
+            ok(!in_array('TESTWHAPPR-B', $scopedApprovals, true), 'Pending Approvals: warehouse-A-scoped user does NOT see the warehouse-B PO awaiting approval');
+
+            $scopedGrn = $scoped['grn_pending_refs'] ?? [];
+            ok(in_array('TESTWHGRN-A', $scopedGrn, true), 'GRN Pending: warehouse-A-scoped user sees the overdue warehouse-A PO');
+            ok(!in_array('TESTWHGRN-B', $scopedGrn, true), 'GRN Pending: warehouse-A-scoped user does NOT see the overdue warehouse-B PO');
+
+            $adminApprovals = $admin['approval_orders'] ?? [];
+            ok(in_array('TESTWHAPPR-A', $adminApprovals, true) && in_array('TESTWHAPPR-B', $adminApprovals, true),
+                'Pending Approvals: admin sees both warehouse-A and warehouse-B POs (proves the fixtures themselves are valid, not just hidden)');
+        }
+        } // end role-found else
+
+        // Cleanup fixtures.
+        foreach ([$poStatA, $poStatB, $poApprA, $poApprB, $poGrnA, $poGrnB] as $id) {
+            $pdo->prepare("DELETE FROM purchase_orders WHERE purchase_order_id = ?")->execute([$id]);
+        }
+        if ($gUid) {
+            $pdo->prepare("DELETE FROM user_scope_overrides WHERE user_id = ?")->execute([$gUid]);
+            $pdo->prepare("DELETE FROM users WHERE user_id = ?")->execute([$gUid]);
+        }
+    }
+
 } catch (Throwable $e) {
     echo "\n\033[31mFATAL: {$e->getMessage()}\033[0m\n";
     // Best-effort cleanup even on failure.
@@ -267,6 +415,12 @@ try {
         $pdo->prepare("DELETE FROM user_scope_overrides WHERE user_id IN (?,?,?)")
             ->execute([TEST_UID_GRANTED, TEST_UID_GRANTALL, TEST_UID_NONE]);
         $pdo->prepare("DELETE FROM user_projects WHERE user_id = ?")->execute([TEST_UID_GRANTED]);
+        $pdo->prepare("DELETE FROM purchase_orders WHERE order_number IN ('TESTWHSTAT-A','TESTWHSTAT-B','TESTWHAPPR-A','TESTWHAPPR-B','TESTWHGRN-A','TESTWHGRN-B')")->execute();
+        $throwawayUid = (int)$pdo->query("SELECT user_id FROM users WHERE username = '__wh_scope_test'")->fetchColumn();
+        if ($throwawayUid) {
+            $pdo->prepare("DELETE FROM user_scope_overrides WHERE user_id = ?")->execute([$throwawayUid]);
+            $pdo->prepare("DELETE FROM users WHERE user_id = ?")->execute([$throwawayUid]);
+        }
     } catch (Throwable $e2) {}
     $fail++;
 }
