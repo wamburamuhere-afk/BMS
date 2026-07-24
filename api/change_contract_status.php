@@ -9,6 +9,7 @@
 // are dual-written (D12) so every existing reader of those columns keeps working.
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../core/employee_status.php';
 
 header('Content-Type: application/json');
 
@@ -147,6 +148,39 @@ try {
             "terminated {$contract['contract_type']} contract for \"$emp_name\"");
 
         $message = 'Contract terminated';
+
+        // Cascade: if the employee has no other draft/active contract left,
+        // they have no live employment contract — deactivate them so
+        // attendance/payroll/leave/Operations (which all key off
+        // employees.status) stop treating them as employed. Skip if a
+        // renewal is already in flight (another draft/active contract exists).
+        $remaining = $pdo->prepare("SELECT COUNT(*) FROM employee_contracts
+                                     WHERE employee_id = ? AND status IN ('draft', 'active') AND contract_id != ?");
+        $remaining->execute([(int)$contract['employee_id'], $contract_id]);
+        $has_other_contract = (int)$remaining->fetchColumn() > 0;
+
+        if (!$has_other_contract) {
+            $emp_status_stmt = $pdo->prepare("SELECT status FROM employees WHERE employee_id = ?");
+            $emp_status_stmt->execute([(int)$contract['employee_id']]);
+            if ($emp_status_stmt->fetchColumn() === 'active') {
+                $change = inactivateEmployee(
+                    $pdo, (int)$contract['employee_id'], (int)$_SESSION['user_id'], 'terminated',
+                    "Contract #$contract_id terminated — no remaining active/draft contract"
+                );
+                logAudit($pdo, $_SESSION['user_id'], 'update_status', [
+                    'activity_type' => 'status_change',
+                    'entity_type'   => 'employee',
+                    'entity_id'     => (int)$contract['employee_id'],
+                    'description'   => "Employee deactivated — contract #$contract_id terminated with no remaining contract",
+                    'old_values'    => $change['old'],
+                    'new_values'    => $change['new'],
+                ]);
+                logActivity($pdo, $_SESSION['user_id'], 'Deactivate employee',
+                    "deactivated \"$emp_name\" — contract #$contract_id terminated, no remaining contract");
+
+                $message .= ' — employee marked inactive (no remaining contract)';
+            }
+        }
     }
 
     $pdo->commit();

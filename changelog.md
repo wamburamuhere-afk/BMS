@@ -1,5 +1,70 @@
 # BMS Changelog
 
+## 2026-07-23 (fix) — Employee contracts: closed two follow-on gaps in the contract-cascade work
+
+**Files:** `cron/check_hr_expiry.php`, `core/employee_status.php`, `api/reactivate_employee.php`,
+`app/bms/pos/inactive_employees.php`, `tests/test_employee_contracts_cli.php`, `tests/test_employee_inactivation_cli.php`
+
+Follow-up self-review of the same-day contract-cascade change, tracing both directions
+(what triggers the write, and what reads it afterward) to make sure nothing was left
+dangling:
+
+1. **Race condition in the auto-close cron.** The "is this employee currently active?"
+   check used a snapshot taken by the initial batch `SELECT` at the start of the run, not
+   re-checked at the moment of the actual write — a concurrent status change elsewhere
+   (e.g. an HR Actions termination landing mid-run) could act on stale data. Now re-fetches
+   `employees.status` fresh with `FOR UPDATE` inside the same transaction, matching what
+   `api/change_contract_status.php`'s manual-terminate path already did correctly.
+
+2. **Reactivating an auto-deactivated employee silently recreated the original gap.**
+   `reactivateEmployee()` only ever flipped `employees.status` back — it never touched
+   `employee_contracts`, so reactivating someone whose contract expired/was terminated put
+   them back into attendance/payroll/leave pickers with zero live contract on file, exactly
+   the state the cascade exists to prevent. Fixed at the source, not the call site: the
+   shared `reactivateEmployee()` in `core/employee_status.php` now always reports
+   `has_live_contract` in its return value (computed there so no future caller can forget
+   to check), `api/reactivate_employee.php` passes it through in the JSON response, and
+   `inactive_employees.php`'s reactivate flow shows a distinct warning dialog — "no
+   active/draft contract — create one before running payroll" — with a direct link to
+   Employee Contracts, instead of a generic success toast.
+
+Extended `tests/test_employee_contracts_cli.php` (43 assertions, was 33) and
+`tests/test_employee_inactivation_cli.php` (32 assertions, was 27) to cover both fixes,
+including the positive case (reactivating someone who *does* have a live contract gets no
+warning). All three affected suites green: 43 + 56 + 32 = 131 assertions, 0 failures.
+
+## 2026-07-23 (feat) — Employee contracts: ending a contract now cascades to the employee's active status
+
+**Files:** `api/change_contract_status.php`, `cron/check_hr_expiry.php`,
+`migrations/2026_07_23_hr_contract_autoclose_event.php`, `tests/test_employee_contracts_cli.php`
+
+`employee_contracts` was an isolated table — terminating a contract (or letting its
+`end_date` quietly pass) never touched `employees.status`, the single field attendance,
+payroll, leave, and Operations all key off. Result: an employee whose contract had ended
+kept appearing on the attendance roster, kept being included in payroll runs, and kept
+being leave-eligible, indefinitely.
+
+Two cascades added, both reusing the existing `core/employee_status.php::inactivateEmployee()`
+(same mechanism the HR Actions termination workflow uses — soft, reversible via
+`reactivateEmployee()`, never deletes):
+
+1. **Manual termination** (`api/change_contract_status.php`, terminate action) — if the
+   employee has no other `draft`/`active` contract left after this one is terminated
+   (i.e. no renewal in flight), they're deactivated in the same transaction.
+2. **Natural expiry** (`cron/check_hr_expiry.php`, new step) — contracts whose `end_date`
+   has already passed with nobody terminating them are flipped to the real `'expired'`
+   status (the ENUM value already existed, unused) and cascade the same way. Always
+   notified via a new `hr_contract_expired_autoclosed` event (migration seeds it) so an
+   automated status change on a real person is never silent.
+
+No changes needed in payroll/attendance/leave/Operations — they already correctly gate on
+`employees.status='active'`; the fix was making the contract lifecycle actually update that
+field instead of duplicating contract-awareness into every downstream module.
+
+`tests/test_employee_contracts_cli.php` extended: cascade-on-terminate, no-cascade-when-
+renewal-in-progress, and auto-close-on-expiry (43 assertions, was 33, all passing). No
+regressions in `tests/test_hr_compliance_foundation_cli.php` (56 assertions).
+
 ## 2026-07-23 (fix) — HR Actions: removed the self-approval block — matches GRN/DN, fully user_roles.php-driven
 
 **Files:** `api/change_lifecycle_status.php`, `app/bms/pos/hr_actions.php`

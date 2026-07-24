@@ -417,13 +417,32 @@ function confirmReactivate(employeeId, employeeName) {
                 dataType: 'json',
                 success: function (response) {
                     if (response.success) {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Success!',
-                            text: 'Employee has been reactivated.',
-                            confirmButtonText: 'OK',
-                            confirmButtonColor: '#0d6efd'
-                        }).then(() => location.reload());
+                        if (response.has_live_contract === false) {
+                            Swal.fire({
+                                icon: 'warning',
+                                title: 'Reactivated — no contract on file',
+                                html: '<p class="text-start mb-2">' + safeName + ' is active again and will now appear in attendance, leave, and payroll pickers — but they have <strong>no active or draft contract</strong> on record.</p>'
+                                    + '<p class="text-start mb-0">Create one before running payroll for them.</p>',
+                                confirmButtonText: 'Create Contract',
+                                showCancelButton: true,
+                                cancelButtonText: 'Later',
+                                confirmButtonColor: '#ffc107'
+                            }).then((r) => {
+                                if (r.isConfirmed) {
+                                    window.location.href = APP_URL + '/employee_contracts';
+                                } else {
+                                    location.reload();
+                                }
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Success!',
+                                text: 'Employee has been reactivated.',
+                                confirmButtonText: 'OK',
+                                confirmButtonColor: '#0d6efd'
+                            }).then(() => location.reload());
+                        }
                     } else {
                         Swal.fire({ icon: 'error', title: 'Reactivate Failed', text: response.message });
                     }

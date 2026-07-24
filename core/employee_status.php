@@ -76,7 +76,18 @@ if (!function_exists('reactivateEmployee')) {
      * D3: auto-sets both fields to 'active', no prompt for the new
      * employment_status.
      *
-     * @return array{old: array, new: array} for audit logging
+     * Reactivation never touches employee_contracts — it's a separate
+     * concern (someone reactivated for an unrelated reason may not need a
+     * fresh contract right now). But since attendance/payroll/leave/
+     * Operations all key off status='active' alone, reactivating without a
+     * live contract silently recreates the exact "active but not really
+     * employed under any contract" gap the contract-termination cascade
+     * (api/change_contract_status.php, cron/check_hr_expiry.php) exists to
+     * close. So the caller is always told, via 'has_live_contract', whether
+     * this employee has zero draft/active contracts after reactivation —
+     * baked in here rather than left to each call site to remember to check.
+     *
+     * @return array{old: array, new: array, has_live_contract: bool} for audit logging + caller warning
      */
     function reactivateEmployee(PDO $pdo, int $employee_id, int $actor): array
     {
@@ -90,9 +101,18 @@ if (!function_exists('reactivateEmployee')) {
         $pdo->prepare("UPDATE employees SET status = 'active', employment_status = 'active', inactivation_reason = NULL, updated_by = ? WHERE employee_id = ?")
             ->execute([$actor, $employee_id]);
 
+        $hasContract = false;
+        $tableExists = $pdo->query("SHOW TABLES LIKE 'employee_contracts'")->fetch();
+        if ($tableExists) {
+            $c = $pdo->prepare("SELECT COUNT(*) FROM employee_contracts WHERE employee_id = ? AND status IN ('draft', 'active')");
+            $c->execute([$employee_id]);
+            $hasContract = (int)$c->fetchColumn() > 0;
+        }
+
         return [
             'old' => ['status' => $before['status'], 'employment_status' => $before['employment_status']],
             'new' => ['status' => 'active', 'employment_status' => 'active'],
+            'has_live_contract' => $hasContract,
         ];
     }
 }
