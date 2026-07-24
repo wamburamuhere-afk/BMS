@@ -29,6 +29,7 @@ try {
 
     $stmt = $pdo->prepare("
         SELECT m.meeting_id, m.title, m.meeting_date, m.start_time, m.end_time, m.venue, m.status,
+               m.meeting_type, m.zoom_sync_status,
                (SELECT COUNT(*) FROM meeting_attendees ma WHERE ma.meeting_id = m.meeting_id) AS attendee_count
         FROM meetings m
         WHERE " . implode(' AND ', $where) . "
