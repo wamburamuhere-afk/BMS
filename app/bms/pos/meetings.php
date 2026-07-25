@@ -241,7 +241,21 @@ $(function(){
 });
 
 <?php if ($can_create): ?>
-function attendeeSelect2(){ if (!$('#mt_attendees').hasClass('select2-hidden-accessible')) $('#mt_attendees').select2({ theme:'bootstrap-5',dropdownParent:$('#meetingModal'),placeholder:'Search employees…',width:'100%',minimumInputLength:1,ajax:{url:'<?= buildUrl('api/account/search_employees.php') ?>',dataType:'json',delay:300,data:p=>({q:p.term}),processResults:d=>({results:d.results}),cache:true} }); }
+// Zoom attendees must be logged-in BMS users (see the Role picker below) — the
+// free-text employee search is for in-person meetings only. Re-configures
+// (destroy + reinit) whenever the meeting type toggles, so switching between
+// In-Person and Zoom mid-edit never leaves the wrong search behavior active.
+// Already-added chips are untouched either way — this only changes whether
+// NEW people can be found by typing a name.
+function attendeeSelect2(){
+    const isZoom = $('#mt_type_zoom').is(':checked');
+    if ($('#mt_attendees').hasClass('select2-hidden-accessible')) $('#mt_attendees').select2('destroy');
+    if (isZoom) {
+        $('#mt_attendees').select2({ theme:'bootstrap-5', dropdownParent:$('#meetingModal'), width:'100%', minimumResultsForSearch: Infinity, placeholder:'Use "Add attendees by role" below' });
+    } else {
+        $('#mt_attendees').select2({ theme:'bootstrap-5',dropdownParent:$('#meetingModal'),placeholder:'Search employees…',width:'100%',minimumInputLength:1,ajax:{url:'<?= buildUrl('api/account/search_employees.php') ?>',dataType:'json',delay:300,data:p=>({q:p.term}),processResults:d=>({results:d.results}),cache:true} });
+    }
+}
 // Host is never picked — it's whoever creates the meeting, always. This just
 // updates the read-only display: "you" for a new meeting, or the original
 // host's name when editing an existing Zoom meeting (which may not be you).
@@ -310,6 +324,7 @@ function mtToggleType(){
     $('#mt_venue_wrap').toggleClass('d-none', isZoom);
     $('#mt_zoom_wrap').toggleClass('d-none', !isZoom);
     $('#mt_role_picker_wrap').toggleClass('d-none', !isZoom);
+    attendeeSelect2();
     if (isZoom) mtLoadRoleData(mtRenderRoleSelect);
 }
 $(document).on('change', 'input[name="meeting_type"]', mtToggleType);

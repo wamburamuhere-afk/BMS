@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-07-25 (fix) — Zoom Attendees: removed the free-text employee search entirely
+
+**Files:** `app/bms/pos/meetings.php`
+
+Feedback from live testing: the old "Search employees…" AJAX box was still active for
+Zoom meetings alongside the new Role → User picker, which is exactly backwards — Zoom
+attendees must be logged-in BMS users found through the role picker, not arbitrary
+employees who may have no login at all. `attendeeSelect2()` now reconfigures itself
+whenever the meeting type toggles (destroy + reinit): in-person keeps the original
+AJAX employee search unchanged, Zoom mode disables new searches entirely
+(`minimumResultsForSearch: Infinity`, no ajax source) while existing chips stay visible
+and removable — "Add attendees by role" becomes the only way to add someone. This also
+resolves a reported "search box opens then closes" glitch, which no longer has anything
+to interact with in Zoom mode.
+
 ## 2026-07-25 (fix) — Zoom Attendees role picker: full-access roles (is_admin=1) were wrongly excluded
 
 **Files:** `api/zoom/get_attendee_roles.php`, `tests/test_zoom_attendee_roles_cli.php`
