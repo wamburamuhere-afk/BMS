@@ -50,6 +50,7 @@ function zsSetCreds(PDO $pdo, string $tokenEnc = '', string $expiresAt = '0'): v
     $up->execute(['acct-123', 'zoom_account_id']);
     $up->execute(['client-123', 'zoom_client_id']);
     $up->execute([encryptSecret('s3cr3t'), 'zoom_client_secret_enc']);
+    $up->execute(['ceo@bjptech.co.tz', 'zoom_host_email']);
     $up->execute([$tokenEnc, 'zoom_access_token_enc']);
     $up->execute([$expiresAt, 'zoom_token_expires_at']);
 }

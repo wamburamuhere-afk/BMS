@@ -40,6 +40,10 @@ function notifyMeetingAttendees(PDO $pdo, int $meeting_id, string $title, string
     ");
     $rows->execute([$meeting_id, $meeting_id]);
     $message = $joinUrl ? ('You are listed as an attendee. Join: ' . $joinUrl) : 'You are listed as an attendee.';
+    $meetingsUrl = function_exists('getUrl') ? getUrl('meetings') : '/meetings';
+    // Deep-links straight to this meeting (meetings.php reads ?meeting_id= on load
+    // and opens it), not just the general Meetings list.
+    $actionUrl = $meetingsUrl . (str_contains($meetingsUrl, '?') ? '&' : '?') . 'meeting_id=' . $meeting_id;
     foreach ($rows->fetchAll(PDO::FETCH_ASSOC) as $r) {
         $uid = (int)$r['user_id'];
         if (function_exists('notifUserMuted') && notifUserMuted($r['notification_preferences'] ?? null, 'hr_meeting', 'Human Resources')) continue;
@@ -47,7 +51,7 @@ function notifyMeetingAttendees(PDO $pdo, int $meeting_id, string $title, string
         if (function_exists('createNotification')) createNotification($pdo, $uid, [
             'title' => 'Meeting ' . $verb . ': ' . $title, 'message' => $message,
             'type' => 'system', 'event_key' => 'hr_meeting', 'category' => 'Human Resources', 'priority' => 'medium',
-            'action_url' => function_exists('getUrl') ? getUrl('meetings') : '/meetings',
+            'action_url' => $actionUrl,
         ]);
     }
 }
@@ -68,13 +72,13 @@ function zoomComputeSchedule(string $date, ?string $start, ?string $end): array 
     return ['start_time' => $startDt->format('Y-m-d\TH:i:s\Z'), 'duration' => $duration];
 }
 
-// Look up the Zoom host's email from the BMS user selected as host (plan 0.2 —
-// Zoom "host" = that user's email; must be a real user in the connected Zoom account).
-function zoomResolveHostEmail(PDO $pdo, int $hostUserId): ?string {
-    $stmt = $pdo->prepare("SELECT email FROM users WHERE user_id = ? AND is_active = 1");
-    $stmt->execute([$hostUserId]);
-    $email = $stmt->fetchColumn();
-    return $email !== false && $email !== '' ? $email : null;
+// Every Zoom meeting is created under the one shared Zoom account email
+// (Settings -> Zoom Integration), never the individual BMS user's own email --
+// staff don't need their own Zoom seat. host_user_id is BMS-side attribution
+// only (who organized it) and never reaches the Zoom API.
+function zoomResolveHostEmail(): ?string {
+    $email = zoomSettings()['host_email'];
+    return $email !== '' ? $email : null;
 }
 
 // Create/update the Zoom-side meeting for a row already saved locally, then persist
@@ -82,10 +86,10 @@ function zoomResolveHostEmail(PDO $pdo, int $hostUserId): ?string {
 // failure never re-throws — it's recorded as zoom_sync_status='failed' so the local
 // save always stands (plan 4.3: graceful degradation, never silent).
 function zoomSyncMeetingRow(PDO $pdo, int $meetingId, array $row, array $formData): array {
-    $hostEmail = zoomResolveHostEmail($pdo, (int)$formData['host_user_id']);
+    $hostEmail = zoomResolveHostEmail();
     if ($hostEmail === null) {
         $pdo->prepare("UPDATE meetings SET zoom_sync_status='failed' WHERE meeting_id=?")->execute([$meetingId]);
-        return ['ok' => false, 'message' => 'Zoom host must be an active BMS user with an email address.'];
+        return ['ok' => false, 'message' => 'No Zoom host email is configured. Ask an administrator to set it in Settings -> Zoom Integration.'];
     }
 
     $sched = zoomComputeSchedule($formData['meeting_date'], $formData['start_time'] ?: null, $formData['end_time'] ?: null);

@@ -19,6 +19,7 @@ $enabled     = getSetting('zoom_enabled', '0') === '1';
 $accountId   = getSetting('zoom_account_id', '');
 $clientId    = getSetting('zoom_client_id', '');
 $hasSecret   = getSetting('zoom_client_secret_enc', '') !== '';
+$hostEmail   = getSetting('zoom_host_email', '');
 ?>
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -65,6 +66,16 @@ $hasSecret   = getSetting('zoom_client_secret_enc', '') !== '';
                             <div class="form-text">
                                 <i class="bi bi-shield-lock"></i> Stored encrypted on this server. We never display it again.
                                 <?= $hasSecret ? '<span class="text-success">A secret is currently set.</span>' : '<span class="text-warning">No secret set yet.</span>' ?>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Zoom Host Email</label>
+                            <input type="email" class="form-control" name="zoom_host_email" value="<?= htmlspecialchars($hostEmail) ?>" placeholder="e.g. meetings@yourcompany.co.tz">
+                            <div class="form-text">
+                                The one Zoom account BMS creates every meeting under. It must be a real user in this Zoom account
+                                (the one tied to the Account ID above) — usually the email you used to set up the Zoom app.
+                                Staff scheduling meetings in BMS do <strong>not</strong> need their own Zoom login.
                             </div>
                         </div>
 
