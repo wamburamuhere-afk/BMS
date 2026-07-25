@@ -128,7 +128,6 @@ try {
             $venue = trim($_POST['venue'] ?? '');
             $attendees = $_POST['attendees'] ?? [];
             $meetingType = ($_POST['meeting_type'] ?? 'in_person') === 'zoom' ? 'zoom' : 'in_person';
-            $hostUserId = intval($_POST['host_user_id'] ?? 0);
             $zoomHostVideo = !empty($_POST['zoom_host_video']) ? 1 : 0;
             $zoomParticipantVideo = !empty($_POST['zoom_participant_video']) ? 1 : 0;
             $zoomWaitingRoom = isset($_POST['zoom_waiting_room']) ? (!empty($_POST['zoom_waiting_room']) ? 1 : 0) : 1;
@@ -136,25 +135,37 @@ try {
             if ($title === '') throw new Exception('Title is required');
             if (!strtotime($date)) throw new Exception('A valid meeting date is required');
             if (!is_array($attendees)) $attendees = [];
-            if ($meetingType === 'zoom') {
-                if (!zoomConfigured()) throw new Exception('Zoom is not enabled. Ask an administrator to configure it in Zoom Integration settings.');
-                if (!$hostUserId) throw new Exception('Select a meeting host for a Zoom meeting.');
-            }
+            if ($meetingType === 'zoom' && !zoomConfigured()) throw new Exception('Zoom is not enabled. Ask an administrator to configure it in Zoom Integration settings.');
             $zoomSyncStatus = $meetingType === 'zoom' ? 'pending' : null;
 
-            $oldRow = ['meeting_type' => 'in_person', 'zoom_meeting_id' => null];
+            $oldRow = ['meeting_type' => 'in_person', 'zoom_meeting_id' => null, 'host_user_id' => null];
+            if ($action === 'update') {
+                if (!$id) throw new Exception('Meeting id is required');
+                $chk = $pdo->prepare("SELECT meeting_type, zoom_meeting_id, host_user_id FROM meetings WHERE meeting_id=? AND status!='deleted'");
+                $chk->execute([$id]);
+                $found = $chk->fetch(PDO::FETCH_ASSOC);
+                if (!$found) throw new Exception('Meeting not found');
+                $oldRow = $found;
+            }
+
+            // Host is never taken from client input — it's always the person creating
+            // the meeting, for a brand-new Zoom meeting (or one just switched to Zoom).
+            // A meeting that was ALREADY Zoom keeps its original host on every re-save,
+            // so editing/rescheduling never silently hands the Zoom-side meeting (and
+            // its Start URL) to whoever happens to be doing the edit.
+            $hostUserId = 0;
+            if ($meetingType === 'zoom') {
+                $hostUserId = ($oldRow['meeting_type'] === 'zoom' && !empty($oldRow['host_user_id']))
+                    ? (int)$oldRow['host_user_id']
+                    : (int)$_SESSION['user_id'];
+            }
+
             if ($action === 'add') {
                 $pdo->beginTransaction();
                 $pdo->prepare("INSERT INTO meetings (title, agenda, meeting_date, start_time, end_time, venue, meeting_type, host_user_id, zoom_host_video, zoom_participant_video, zoom_waiting_room, zoom_auto_recording, zoom_sync_status, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?)")
                     ->execute([$title, ($agenda!==''?$agenda:null), $date, ($start!==''?$start:null), ($endt!==''?$endt:null), ($venue!==''?$venue:null), $meetingType, ($hostUserId?:null), $zoomHostVideo, $zoomParticipantVideo, $zoomWaitingRoom, $zoomAutoRecording, $zoomSyncStatus, $_SESSION['user_id']]);
                 $id = (int)$pdo->lastInsertId();
             } else {
-                if (!$id) throw new Exception('Meeting id is required');
-                $chk = $pdo->prepare("SELECT meeting_type, zoom_meeting_id FROM meetings WHERE meeting_id=? AND status!='deleted'");
-                $chk->execute([$id]);
-                $found = $chk->fetch(PDO::FETCH_ASSOC);
-                if (!$found) throw new Exception('Meeting not found');
-                $oldRow = $found;
                 $pdo->beginTransaction();
                 // Switching away from Zoom keeps zoom_sync_status clean (not carried over as stale 'failed'/'synced').
                 $pdo->prepare("UPDATE meetings SET title=?, agenda=?, meeting_date=?, start_time=?, end_time=?, venue=?, meeting_type=?, host_user_id=?, zoom_host_video=?, zoom_participant_video=?, zoom_waiting_room=?, zoom_auto_recording=?, zoom_sync_status=?, updated_by=? WHERE meeting_id=? AND status!='deleted'")
