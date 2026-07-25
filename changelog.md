@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-07-25 (feat) — Tenders Registry: converted to a client-side DataTable + customers.php-style toolbar
+
+**Files:** `api/get_tenders.php`, `app/bms/tenders/tenders.php`, `tests/test_tenders_datatable_cli.php`,
+`tests/test_ui_constants_group_a_cli.php`
+
+`tenders.php` previously used hand-rolled AJAX pagination (`loadTenders()`/`renderPagination()`,
+one page fetched per request). Converted to a client-side DataTable — one call fetches every
+tender matching the current filters, then DataTables handles Show/paging/sort in the browser
+(same pattern as `meetings.php`). Server-side search/status/category/date filters are
+unchanged and still trigger a re-fetch (they reach joined fields like customer name a
+client-only search wouldn't); the "Show" dropdown now only changes the client page length,
+no server round-trip. `api/get_tenders.php` gained a `limit=-1` mode ("fetch everything" —
+the same convention customers.php's Show dropdown already uses) with its default
+paginated behavior otherwise untouched; confirmed nothing else in the codebase calls this
+endpoint.
+
+Action toolbar restyled to match `customers.php`'s segmented Copy/CSV/Print layout —
+deliberately *not* copied wholesale (no Import button; tenders has no bulk-import feature).
+The existing formatted PDF export (jsPDF) and print stylesheet were kept as-is, since they
+were already purpose-built for this page and still work unchanged (they read whatever rows
+are currently in the DOM, same as before — actually more capable now, since selecting
+"Show: All" renders every row at once for a full export).
+
+Updated the pre-existing `test_ui_constants_group_a_cli.php` guard, which had asserted
+tenders.php must stay AJAX-paginated with no DataTable (an earlier, now-superseded decision)
+— its spec for tenders.php now reflects the new intentional state. New
+`test_tenders_datatable_cli.php` (20 assertions) covers the `limit=-1` contract, the
+unchanged default-pagination path, and that every pre-existing workflow feature (staff
+assignment, PDF export, status-action generator) survived the conversion.
+
 ## 2026-07-25 (feat) — Zoom Attendees: dropped the linked-employee requirement entirely
 
 **Files:** `migrations/2026_07_25_meeting_attendees_user_id.php`, `api/zoom/get_attendee_roles.php`,
