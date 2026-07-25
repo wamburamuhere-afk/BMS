@@ -17,7 +17,19 @@ try {
         $stmt->execute([$meeting_id]);
         $m = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$m) { echo json_encode(['success' => false, 'message' => 'Meeting not found']); exit; }
-        $at = $pdo->prepare("SELECT ma.employee_id, ma.attended, e.first_name, e.last_name FROM meeting_attendees ma JOIN employees e ON e.employee_id = ma.employee_id WHERE ma.meeting_id = ? ORDER BY e.first_name, e.last_name");
+        // Covers both attendee identity types (migration 2026_07_25_meeting_attendees_user_id):
+        // in-person attendees carry employee_id (attendance-markable), Zoom attendees
+        // carry user_id (no employee record required, so no attendance tracking for them).
+        $at = $pdo->prepare("
+            SELECT ma.employee_id, ma.user_id, ma.attended,
+                   COALESCE(e.first_name, u.first_name) AS first_name,
+                   COALESCE(e.last_name, u.last_name) AS last_name
+            FROM meeting_attendees ma
+            LEFT JOIN employees e ON e.employee_id = ma.employee_id
+            LEFT JOIN users u ON u.user_id = ma.user_id
+            WHERE ma.meeting_id = ?
+            ORDER BY first_name, last_name
+        ");
         $at->execute([$meeting_id]);
         echo json_encode(['success' => true, 'data' => $m, 'attendees' => $at->fetchAll(PDO::FETCH_ASSOC)]);
         exit;
