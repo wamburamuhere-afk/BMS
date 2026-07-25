@@ -8,6 +8,11 @@
  *     linked to an employee record (both conditions, not either alone)
  *   - a role with meetings access but no linkable users is excluded
  *   - a role with linkable users but no meetings access is excluded
+ *   - a role flagged roles.is_admin=1 ("full system access") is included even
+ *     with ZERO row in role_permissions for 'meetings' — the same bypass
+ *     canView()/isAdmin() apply everywhere else in the app (regression test
+ *     for a real bug: Director/Managing Director-style full-access roles were
+ *     wrongly excluded because the query only checked role_permissions)
  *   - each returned user carries the correct employee_id (not user_id)
  *   - non-admin without create/edit meetings permission is denied
  * All fixtures cleaned up in a finally block. Exit 0 = pass.
@@ -57,12 +62,22 @@ try {
     $pdo->prepare("INSERT INTO users (username,password,email,is_admin,role_id,employee_id,first_name,last_name,is_active,created_at) VALUES ('__zar_staff','x','zarb@example.local',0,4,?,'__ZAR','NoAccess',1,NOW())")->execute([$empB]);
     $userB = (int)$pdo->lastInsertId(); $fixtures[] = ['users', $userB];
 
+    // Fixture C: a brand-new role flagged is_admin=1 (full access) with ZERO row in
+    // role_permissions for anything, + a linked active user -> must appear anyway.
+    $pdo->exec("INSERT INTO roles (role_name, description, is_admin, created_at) VALUES ('__ZAR Full Access Role', 'test fixture', 1, NOW())");
+    $roleC = (int)$pdo->lastInsertId(); $fixtures[] = ['roles', $roleC];
+    $pdo->exec("INSERT INTO employees (first_name,last_name,employee_number,employment_status,created_at) VALUES ('__ZAR','FullAccess','__ZAR-E3','active',NOW())");
+    $empC = (int)$pdo->lastInsertId(); $fixtures[] = ['employees', $empC];
+    $pdo->prepare("INSERT INTO users (username,password,email,is_admin,role_id,employee_id,first_name,last_name,is_active,created_at) VALUES ('__zar_full','x','zarc@example.local',0,?,?,'__ZAR','FullAccess',1,NOW())")->execute([$roleC, $empC]);
+    $userC = (int)$pdo->lastInsertId(); $fixtures[] = ['users', $userC];
+
     section('1. Admin call — role filtering');
     $res = callEndpoint(['user_id'=>$admin_uid,'is_admin'=>true,'role_id'=>1]);
     ok(!empty($res['success']), 'endpoint responds successfully');
     $roleNames = array_column($res['roles'] ?? [], 'role_name');
     ok(in_array('Admin', $roleNames, true), "'Admin' (has meetings access + a linked user) is included");
     ok(!in_array('Staff', $roleNames, true), "'Staff' (no meetings access) is excluded even though it has a linked user");
+    ok(in_array('__ZAR Full Access Role', $roleNames, true), "a role with roles.is_admin=1 is included even with NO role_permissions row at all");
 
     $adminRole = null;
     foreach (($res['roles'] ?? []) as $r) if ($r['role_name'] === 'Admin') $adminRole = $r;
@@ -88,7 +103,7 @@ try {
     ok(false, 'test threw: ' . $e->getMessage());
 } finally {
     foreach (array_reverse($fixtures) as [$table, $id]) {
-        $col = $table === 'users' ? 'user_id' : 'employee_id';
+        $col = $table === 'users' ? 'user_id' : ($table === 'roles' ? 'role_id' : 'employee_id');
         $pdo->exec("DELETE FROM $table WHERE $col = $id");
     }
     echo "  (fixtures cleaned)\n";
