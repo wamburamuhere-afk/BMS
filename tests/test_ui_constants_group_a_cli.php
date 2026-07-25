@@ -63,8 +63,11 @@ $specs = [
         'keep' => ["addCategoryForm"],
     ],
     'app/bms/tenders/tenders.php' => [
-        'has'  => ["tender-emp-s2", "quickAddEmployeeModal').on('shown"],
-        'keep' => ["function loadTenders", "staff_select_input').html(html).select2"],
+        // 2026-07-25: tenders.php was intentionally converted TO a client-side
+        // DataTable (Copy/CSV/Print/PDF toolbar, customers.php-style) — no longer
+        // AJAX-paginated. This supersedes the original Group A "no DataTable" call.
+        'has'  => ["tender-emp-s2", "quickAddEmployeeModal').on('shown", "tenderTable').DataTable", "function initTendersTable", "function reloadTenders"],
+        'keep' => ["staff_select_input').html(html).select2", "function exportPDF", "function copyTendersTable", "function exportTendersCSV"],
     ],
     'app/constant/accounts/payment_vouchers.php' => [ // already compliant
         'has'  => ["voucher_expense_account", "voucher_project", "get_vouchers.php"],   // expense "category" is now a real expense account
@@ -119,11 +122,12 @@ section('Global invariants');
 
 // No file added a client DataTable to a server/AJAX-paginated list (those
 // pages must stay free of .DataTable on their main list — guarded by spec).
+// tenders.php is deliberately NOT in this list anymore (see its spec above) —
+// it was intentionally converted to a client-side DataTable on 2026-07-25.
 $ajaxPaged = [
     'app/bms/sales/sales_returns/sales_returns.php',
     'app/constant/accounts/payment_vouchers.php',
     'app/constant/accounts/petty_cash.php',
-    'app/bms/tenders/tenders.php',
 ];
 foreach ($ajaxPaged as $rel) {
     $src = file_get_contents("$root/" . str_replace('/', DIRECTORY_SEPARATOR, $rel));
