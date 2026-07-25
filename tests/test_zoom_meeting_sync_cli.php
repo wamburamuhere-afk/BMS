@@ -134,9 +134,41 @@ try {
     ok($row3['meeting_type']==='in_person', 'meeting_type switched to in_person');
     ok($row3['zoom_meeting_id']===null, 'zoom_meeting_id cleared after switching away from Zoom');
 
-    section('6. Guardrails');
-    $r = call('manage_meeting', ['action'=>'add','title'=>'No host','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'meeting_type'=>'zoom'], $ADMIN, 'ok');
-    ok(empty($r['success']) && stripos($r['message'],'host')!==false, 'rejects a Zoom meeting with no host selected');
+    section('6. Host is fixed at creation — a different editor can never reassign it');
+    // Fixture: a second admin-role account acting as "someone else" editing m1's replacement.
+    $pdo->exec("INSERT INTO users (username,password,email,is_admin,role_id,is_active,created_at) VALUES ('__zms_editor','x','zmseditor@example.local',1,1,1,NOW())");
+    $editorUid = (int)$pdo->lastInsertId();
+    $r = call('manage_meeting', ['action'=>'add','title'=>'Host Lock Test','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'meeting_type'=>'zoom'], $ADMIN, 'ok');
+    $mLock = (int)($r['meeting_id'] ?? 0);
+    ok(!empty($r['success']) && $mLock, 'meeting created by admin_uid');
+    $EDITOR = ['user_id'=>$editorUid,'username'=>'__zms_editor','is_admin'=>true,'role_id'=>1];
+    $r = call('manage_meeting', ['action'=>'update','meeting_id'=>$mLock,'title'=>'Host Lock Test (edited)','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'meeting_type'=>'zoom'], $EDITOR, 'ok');
+    ok(!empty($r['success']), 'a different admin can edit the meeting');
+    $lockedHost = (int)$pdo->query("SELECT host_user_id FROM meetings WHERE meeting_id=$mLock")->fetchColumn();
+    ok($lockedHost === $admin_uid, 'host_user_id stays the ORIGINAL creator, not the editor, after a re-save by someone else');
+    $pdo->exec("DELETE FROM meeting_attendees WHERE meeting_id=$mLock");
+    $pdo->exec("DELETE FROM meetings WHERE meeting_id=$mLock");
+    $pdo->exec("DELETE FROM users WHERE user_id=$editorUid");
+
+    section('7. Guardrails');
+    // Host is never client-supplied (plan follow-up) — it's always whoever creates the
+    // meeting, so omitting host_user_id from the request must NOT fail; it should
+    // auto-fill to the requesting session user instead of erroring.
+    $r = call('manage_meeting', ['action'=>'add','title'=>'No Host Field Submitted','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'meeting_type'=>'zoom'], $ADMIN, 'ok');
+    $mHost = (int)($r['meeting_id'] ?? 0);
+    ok(!empty($r['success']) && $mHost, 'a Zoom meeting saves fine with no host_user_id submitted at all');
+    $storedHost = (int)$pdo->query("SELECT host_user_id FROM meetings WHERE meeting_id=$mHost")->fetchColumn();
+    ok($storedHost === $admin_uid, 'host auto-fills to the requesting user, ignoring any client input');
+    $pdo->exec("DELETE FROM meeting_attendees WHERE meeting_id=$mHost");
+    $pdo->exec("DELETE FROM meetings WHERE meeting_id=$mHost");
+
+    // A malicious/stale client trying to submit someone else's host_user_id must be ignored.
+    $r = call('manage_meeting', ['action'=>'add','title'=>'Spoofed Host Attempt','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'meeting_type'=>'zoom','host_user_id'=>999999], $ADMIN, 'ok');
+    $mSpoof = (int)($r['meeting_id'] ?? 0);
+    $storedSpoof = (int)$pdo->query("SELECT host_user_id FROM meetings WHERE meeting_id=$mSpoof")->fetchColumn();
+    ok($storedSpoof === $admin_uid, 'a spoofed host_user_id in the request is ignored — always the real session user');
+    $pdo->exec("DELETE FROM meeting_attendees WHERE meeting_id=$mSpoof");
+    $pdo->exec("DELETE FROM meetings WHERE meeting_id=$mSpoof");
 
     $pdo->prepare("UPDATE system_settings SET setting_value='0' WHERE setting_key='zoom_enabled'")->execute();
     $r = call('manage_meeting', ['action'=>'add','title'=>'Disabled','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'meeting_type'=>'zoom','host_user_id'=>$admin_uid], $ADMIN, 'ok');
@@ -147,7 +179,8 @@ try {
 } catch (Throwable $e) {
     ok(false, "exception: " . $e->getMessage());
 } finally {
-    foreach ([$m1,$m2,$m3,$m4] as $mid) if ($mid) { $pdo->exec("DELETE FROM meeting_attendees WHERE meeting_id=$mid"); $pdo->exec("DELETE FROM meetings WHERE meeting_id=$mid"); }
+    foreach ([$m1,$m2,$m3,$m4,$mHost??0,$mSpoof??0,$mLock??0] as $mid) if ($mid) { $pdo->exec("DELETE FROM meeting_attendees WHERE meeting_id=$mid"); $pdo->exec("DELETE FROM meetings WHERE meeting_id=$mid"); }
+    if (!empty($editorUid)) $pdo->exec("DELETE FROM users WHERE user_id=" . (int)$editorUid);
     if ($emp) { $pdo->exec("DELETE FROM meeting_attendees WHERE employee_id=$emp"); $pdo->exec("DELETE FROM employees WHERE employee_id=$emp"); }
     $pdo->exec("DELETE FROM notification_dedupe WHERE dedupe_key LIKE 'meeting_%'");
     foreach ($origSettings as $k => $v) $pdo->prepare("UPDATE system_settings SET setting_value=? WHERE setting_key=?")->execute([$v, $k]);
