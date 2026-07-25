@@ -1,5 +1,60 @@
 # BMS Changelog
 
+## 2026-07-25 (feat) — Meetings: Zoom join-click attendance tracking, join-info visibility scoping, notification deep link
+
+**Files:** `migrations/2026_07_25_meeting_attendees_joined_at.php`, `api/join_meeting.php` (new),
+`api/get_meetings.php`, `api/manage_meeting.php`, `app/bms/pos/meetings.php`,
+`tests/test_join_meeting_cli.php` (new)
+
+Three gaps found while verifying the shared-host-email fix below, before push:
+
+1. **Attendance tracking.** Zoom attendees had no attendance signal at all — the manual
+   Present/Absent checkbox only ever worked for in-person (employee_id) attendees. New
+   `api/join_meeting.php` is a click-through redirect: an invited attendee's "Join Meeting"
+   link now routes through it, stamps `meeting_attendees.attended=1`/`joined_at=NOW()`, then
+   302s to the real Zoom URL. The View/Attendance modal shows a "Joined" badge for Zoom
+   attendees instead of "—". Approximate signal (proves they clicked, not that they stayed) —
+   an accurate Zoom Participant Report sync was scoped out for now, tracked as a possible v2.
+
+2. **Join-info exposure.** `zoom_join_url` / `zoom_password` / `zoom_start_url` were returned
+   by `get_meetings.php` to *any* user with generic Meetings view access, not just people
+   actually invited — the password was shown inline to non-attendees too. Now nulled out
+   server-side unless the viewer is the host, an invited attendee, an admin, or has edit
+   rights on Meetings (the last is needed because this same endpoint feeds the Edit form's
+   password pre-fill — an editor who can already reschedule/cancel the meeting gains nothing
+   from a blanked-out password field).
+
+3. **Notification deep link.** A "Meeting scheduled/cancelled" notification's "View Details"
+   always landed on the general Meetings list. `notifyMeetingAttendees()`'s `action_url` now
+   carries `?meeting_id=`, and `meetings.php` auto-opens that specific meeting on load.
+
+New `tests/test_join_meeting_cli.php` (22 assertions) covers invited-attendee/host/outsider/
+admin/editor authorization paths for the redirect, the attendance stamp, and the
+`get_meetings.php` visibility nulling. Verified against a real MySQL run, not just lint —
+caught and fixed 2 bugs in the test harness itself along the way (see PR).
+
+## 2026-07-25 (fix) — Zoom meetings now sync under one shared host email, not the creator's own
+
+**Files:** `migrations/2026_07_25_zoom_host_email_setting.php`, `core/zoom_service.php`,
+`api/manage_meeting.php`, `api/zoom/save_zoom_settings.php`, `app/constant/settings/zoom_settings.php`,
+`tests/test_zoom_foundation_cli.php`, `tests/test_zoom_meeting_sync_cli.php`,
+`tests/test_zoom_notifications_cli.php`, `tests/test_zoom_service_cli.php`
+
+Every Zoom meeting was being created under the individual BMS user's own email as Zoom host
+(`zoomResolveHostEmail()` looked up `users.email` for whoever was set as host). Zoom's API only
+accepts a host that's an actual member of the connected Zoom account, so any staff member
+without their own Zoom seat got a live "User does not exist" error on sync — this is what
+surfaced the bug. This also contradicted the plan's own stated intent
+(`core/zoom_service.php`'s header comment: "one company, one Zoom account... no per-user Zoom
+login needed").
+
+Added a single `zoom_host_email` setting (Settings → Zoom Integration, new required field) that
+every meeting now syncs under regardless of who created it in BMS — no other staff need a Zoom
+seat of their own. `zoomConfigured()` now also requires this field to be set; existing Account
+ID / Client ID / Client Secret are untouched. The "Host" field in the meeting form stays exactly
+as it already was (BMS-side organizer attribution, auto-filled to the creator) — it never
+reaches the Zoom API.
+
 ## 2026-07-25 (feat) — Tenders Registry: converted to a client-side DataTable + customers.php-style toolbar
 
 **Files:** `api/get_tenders.php`, `app/bms/tenders/tenders.php`, `tests/test_tenders_datatable_cli.php`,
