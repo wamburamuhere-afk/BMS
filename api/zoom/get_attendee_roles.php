@@ -4,7 +4,11 @@
  * Zoom meeting Attendees field (plan: zoom.md, attendee-picker follow-up).
  *
  * Returns only roles that are BOTH:
- *   1. Granted view access to 'meetings' (role_permissions.can_view = 1)
+ *   1. Have 'meetings' view access — either an explicit role_permissions row
+ *      (can_view = 1), OR roles.is_admin = 1 (the same "full system access"
+ *      bypass canView()/isAdmin() apply everywhere else in the app — a role
+ *      like Managing Director can be flagged is_admin=1 with NO row at all in
+ *      role_permissions, and still correctly have access to everything).
  *   2. Have at least one active user linked to an employee record
  * A role with meetings access but zero linkable users, or linkable users but
  * no meetings access, is excluded entirely — every role returned always has
@@ -24,10 +28,14 @@ try {
     $rows = $pdo->query("
         SELECT r.role_id, r.role_name, u.employee_id, e.first_name, e.last_name
         FROM roles r
-        JOIN role_permissions rp ON rp.role_id = r.role_id AND rp.can_view = 1
-        JOIN permissions p ON p.permission_id = rp.permission_id AND p.page_key = 'meetings'
         JOIN users u ON u.role_id = r.role_id AND u.is_active = 1 AND u.employee_id IS NOT NULL
         JOIN employees e ON e.employee_id = u.employee_id AND (e.status IS NULL OR e.status != 'deleted')
+        WHERE r.is_admin = 1
+           OR EXISTS (
+                SELECT 1 FROM role_permissions rp
+                JOIN permissions p ON p.permission_id = rp.permission_id AND p.page_key = 'meetings'
+                WHERE rp.role_id = r.role_id AND rp.can_view = 1
+           )
         ORDER BY r.role_name, e.first_name, e.last_name
     ")->fetchAll(PDO::FETCH_ASSOC);
 
