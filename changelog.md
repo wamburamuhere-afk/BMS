@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-07-25 (fix) — Zoom Attendees role picker: full-access roles (is_admin=1) were wrongly excluded
+
+**Files:** `api/zoom/get_attendee_roles.php`, `tests/test_zoom_attendee_roles_cli.php`
+
+Found live on the demo site: roles marked "Full system access" (`roles.is_admin=1` —
+e.g. Director, Managing Director) never appeared in the Zoom Attendees role picker, even
+with linked users, because the query only checked for an explicit `role_permissions` row.
+That's not how access actually works elsewhere in the app — `canView()`/`isAdmin()` treat
+`roles.is_admin=1` as an automatic bypass with no permissions-matrix row required at all
+(that's why those roles show "Full system access" with nothing configurable on the Roles
+page). The query now mirrors that exact bypass: a role qualifies if EITHER
+`roles.is_admin=1` OR it has an explicit `can_view=1` row for `meetings`. Ticking the
+"Zoom Integration" permission (a different, unrelated page — the admin settings screen)
+does nothing for this picker; the permission that matters is `meetings`.
+
+New regression test creates a fixture role flagged `is_admin=1` with zero rows in
+`role_permissions` at all, confirms it's still returned. 9/9 on this suite (up from 8);
+all other Zoom suites unaffected (103 total Zoom assertions across 5 suites).
+
 ## 2026-07-24 (feat) — Zoom Host: auto-filled to the meeting creator, no longer selectable
 
 **Files:** `app/bms/pos/meetings.php`, `api/manage_meeting.php`, `tests/test_zoom_meeting_sync_cli.php`
