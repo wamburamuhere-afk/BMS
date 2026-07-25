@@ -25,12 +25,16 @@ if (($argv[1] ?? '') === 'worker') {
 
     $mode = $cfg['zoom_mock'] ?? '';
     if ($mode !== '') {
-        $GLOBALS['ZOOM_HTTP_MOCK'] = function ($method, $url, $headers, $body) use ($mode) {
+        $capture = $cfg['capture'] ?? '';
+        $GLOBALS['ZOOM_HTTP_MOCK'] = function ($method, $url, $headers, $body) use ($mode, $capture) {
             if (strpos($url, 'oauth/token') !== false) {
                 if ($mode === 'token_fail') return ['ok'=>false,'json'=>null,'http_code'=>401,'error'=>'Invalid client_id or client_secret'];
                 return ['ok'=>true,'json'=>['access_token'=>'tok-test','expires_in'=>3600],'http_code'=>200,'error'=>null];
             }
             if ($method === 'POST') { // create
+                // Host email is in the URL path (/v2/users/{email}/meetings), not the
+                // body -- zoomCreateMeeting() never puts it in $body.
+                if ($capture !== '') file_put_contents($capture, $url);
                 if ($mode === 'create_fail') return ['ok'=>false,'json'=>null,'http_code'=>500,'error'=>'Zoom is having issues, please try again later'];
                 return ['ok'=>true,'json'=>['id'=>778899001,'join_url'=>'https://zoom.us/j/778899001','start_url'=>'https://zoom.us/s/778899001','password'=>'zx12ab'],'http_code'=>201,'error'=>null];
             }
@@ -58,9 +62,9 @@ global $pdo;
 $pass = 0; $fail = 0;
 function ok($c, $m) { global $pass, $fail; if ($c) { $pass++; echo "  \033[32m✅\033[0m $m\n"; } else { $fail++; echo "  \033[31m❌ $m\033[0m\n"; } }
 function section($t){ echo "\n\033[1m── $t ──\033[0m\n"; }
-function call($ep, $payload, $session, $zoomMock = '') {
+function call($ep, $payload, $session, $zoomMock = '', $captureCreatePath = '') {
     global $root;
-    $cfg = ['session' => $session, 'method' => 'POST', 'post' => $payload, 'endpoint' => $ep, 'zoom_mock' => $zoomMock];
+    $cfg = ['session' => $session, 'method' => 'POST', 'post' => $payload, 'endpoint' => $ep, 'zoom_mock' => $zoomMock, 'capture' => $captureCreatePath];
     $f = tempnam(sys_get_temp_dir(), 'zms'); file_put_contents($f, json_encode($cfg));
     $o = shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' worker ' . escapeshellarg($f));
     @unlink($f);
@@ -83,19 +87,24 @@ try {
     $attUser = (int)$pdo->lastInsertId();
 
     section('Setup — enable Zoom with fake credentials');
-    $keys = ['zoom_enabled','zoom_account_id','zoom_client_id','zoom_client_secret_enc'];
+    $keys = ['zoom_enabled','zoom_account_id','zoom_client_id','zoom_client_secret_enc','zoom_host_email'];
     foreach ($keys as $k) $origSettings[$k] = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key='$k'")->fetchColumn();
     $pdo->prepare("UPDATE system_settings SET setting_value=? WHERE setting_key=?")->execute(['1','zoom_enabled']);
     $pdo->prepare("UPDATE system_settings SET setting_value=? WHERE setting_key=?")->execute(['acct-test','zoom_account_id']);
     $pdo->prepare("UPDATE system_settings SET setting_value=? WHERE setting_key=?")->execute(['client-test','zoom_client_id']);
     $pdo->prepare("UPDATE system_settings SET setting_value=? WHERE setting_key=?")->execute([encryptSecret('s3cr3t'),'zoom_client_secret_enc']);
+    $pdo->prepare("UPDATE system_settings SET setting_value=? WHERE setting_key=?")->execute(['shared@bjptech.co.tz','zoom_host_email']);
     ok(true, 'zoom_* settings switched on for this run (will be restored)');
 
     section('1. Create — Zoom API succeeds');
-    $r = call('manage_meeting', ['action'=>'add','title'=>'Board Sync','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'start_time'=>'09:00','end_time'=>'10:00','meeting_type'=>'zoom','host_user_id'=>$admin_uid,'zoom_waiting_room'=>1,'attendees'=>[$attUser]], $ADMIN, 'ok');
+    $capture1 = tempnam(sys_get_temp_dir(), 'zmscap');
+    $r = call('manage_meeting', ['action'=>'add','title'=>'Board Sync','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'start_time'=>'09:00','end_time'=>'10:00','meeting_type'=>'zoom','host_user_id'=>$admin_uid,'zoom_waiting_room'=>1,'attendees'=>[$attUser]], $ADMIN, 'ok', $capture1);
     $m1 = (int)($r['meeting_id'] ?? 0);
     ok(!empty($r['success']) && $m1, 'meeting saved successfully');
     ok(stripos($r['message'] ?? '','failed')===false, 'no failure text in response message');
+    $sentUrl1 = (string)@file_get_contents($capture1);
+    ok($sentUrl1 === 'https://api.zoom.us/v2/users/' . rawurlencode('shared@bjptech.co.tz') . '/meetings', 'Zoom API call used the shared zoom_host_email setting, NOT the creating admin\'s own email');
+    @unlink($capture1);
     $row = $pdo->query("SELECT * FROM meetings WHERE meeting_id=$m1")->fetch(PDO::FETCH_ASSOC);
     ok($row['zoom_sync_status']==='synced', "zoom_sync_status='synced'");
     ok($row['zoom_meeting_id']==='778899001', 'zoom_meeting_id stored');
@@ -153,6 +162,18 @@ try {
     ok($lockedHost === $admin_uid, 'host_user_id stays the ORIGINAL creator, not the editor, after a re-save by someone else');
     $pdo->exec("DELETE FROM meeting_attendees WHERE meeting_id=$mLock");
     $pdo->exec("DELETE FROM meetings WHERE meeting_id=$mLock");
+
+    // A completely different BMS user (editor, no Zoom account of their own) creating
+    // a Zoom meeting must still sync fine, using the same shared Zoom host email.
+    $captureEditor = tempnam(sys_get_temp_dir(), 'zmscap');
+    $r = call('manage_meeting', ['action'=>'add','title'=>'Editor-Created Zoom Meeting','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'meeting_type'=>'zoom'], $EDITOR, 'ok', $captureEditor);
+    $mEditor = (int)($r['meeting_id'] ?? 0);
+    ok(!empty($r['success']) && $mEditor, 'a non-admin-owned BMS user can create+sync a Zoom meeting despite having no Zoom account of their own');
+    $sentUrlEditor = (string)@file_get_contents($captureEditor);
+    ok($sentUrlEditor === 'https://api.zoom.us/v2/users/' . rawurlencode('shared@bjptech.co.tz') . '/meetings', 'still uses the shared zoom_host_email, not the editor\'s own email');
+    @unlink($captureEditor);
+    $pdo->exec("DELETE FROM meeting_attendees WHERE meeting_id=$mEditor");
+    $pdo->exec("DELETE FROM meetings WHERE meeting_id=$mEditor");
     $pdo->exec("DELETE FROM users WHERE user_id=$editorUid");
 
     section('7. Guardrails');
@@ -180,6 +201,13 @@ try {
     $m4 = (int)($r['meeting_id'] ?? 0);
     ok(empty($r['success']) && stripos($r['message'],'not enabled')!==false, 'rejects a Zoom meeting when the integration is disabled');
     $pdo->prepare("UPDATE system_settings SET setting_value='1' WHERE setting_key='zoom_enabled'")->execute();
+
+    // No zoom_host_email configured -> zoomConfigured() goes false too, same
+    // "not enabled" guardrail as a missing credential (never a raw Zoom API error).
+    $pdo->prepare("UPDATE system_settings SET setting_value='' WHERE setting_key='zoom_host_email'")->execute();
+    $r = call('manage_meeting', ['action'=>'add','title'=>'No Host Email Configured','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'meeting_type'=>'zoom'], $ADMIN, 'ok');
+    ok(empty($r['success']) && stripos($r['message'],'not enabled')!==false, 'rejects a Zoom meeting when no zoom_host_email is configured');
+    $pdo->prepare("UPDATE system_settings SET setting_value='shared@bjptech.co.tz' WHERE setting_key='zoom_host_email'")->execute();
 
 } catch (Throwable $e) {
     ok(false, "exception: " . $e->getMessage());

@@ -41,16 +41,17 @@ if (!function_exists('zoomSettings')) {
             'account_id'    => trim(getSetting('zoom_account_id', '')),
             'client_id'     => trim(getSetting('zoom_client_id', '')),
             'client_secret' => $enc !== '' ? (decryptSecret($enc) ?? '') : '',
+            'host_email'    => trim(getSetting('zoom_host_email', '')),
         ];
     }
 }
 
 if (!function_exists('zoomConfigured')) {
-    /** True when Zoom is enabled AND has all three S2S OAuth credentials. */
+    /** True when Zoom is enabled AND has all three S2S OAuth credentials AND a host email. */
     function zoomConfigured(): bool
     {
         $s = zoomSettings();
-        return $s['enabled'] && $s['account_id'] !== '' && $s['client_id'] !== '' && $s['client_secret'] !== '';
+        return $s['enabled'] && $s['account_id'] !== '' && $s['client_id'] !== '' && $s['client_secret'] !== '' && $s['host_email'] !== '';
     }
 }
 

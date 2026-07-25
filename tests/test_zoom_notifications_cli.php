@@ -58,13 +58,14 @@ try {
     $attUser = (int)$pdo->lastInsertId();
     ok($emp > 0 && $attUser > 0, "fixture attendee employee (#$emp) + linked user (#$attUser) ready");
 
-    $keys = ['zoom_enabled','zoom_account_id','zoom_client_id','zoom_client_secret_enc'];
+    $keys = ['zoom_enabled','zoom_account_id','zoom_client_id','zoom_client_secret_enc','zoom_host_email'];
     foreach ($keys as $k) $origSettings[$k] = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key='$k'")->fetchColumn();
     require_once "$root/core/crypto.php";
     $pdo->prepare("UPDATE system_settings SET setting_value=? WHERE setting_key=?")->execute(['1','zoom_enabled']);
     $pdo->prepare("UPDATE system_settings SET setting_value=? WHERE setting_key=?")->execute(['acct-test','zoom_account_id']);
     $pdo->prepare("UPDATE system_settings SET setting_value=? WHERE setting_key=?")->execute(['client-test','zoom_client_id']);
     $pdo->prepare("UPDATE system_settings SET setting_value=? WHERE setting_key=?")->execute([encryptSecret('s3cr3t'),'zoom_client_secret_enc']);
+    $pdo->prepare("UPDATE system_settings SET setting_value=? WHERE setting_key=?")->execute(['shared@bjptech.co.tz','zoom_host_email']);
 
     section('1. notification_events registration (Phase 6)');
     $ev = $pdo->query("SELECT is_active, page_key, required_verb FROM notification_events WHERE event_key='hr_meeting'")->fetch(PDO::FETCH_ASSOC);
@@ -78,6 +79,7 @@ try {
     ok(count($notifs)===1, 'exactly one notification created for the attendee');
     ok(!empty($notifs) && strpos($notifs[0]['message'],'https://zoom.us/j/445566778')!==false, 'notification message includes the Zoom join link');
     ok(!empty($notifs) && $notifs[0]['event_key']==='hr_meeting', "notification tagged with event_key='hr_meeting'");
+    ok(!empty($notifs) && strpos((string)$notifs[0]['action_url'], 'meeting_id='.$m1)!==false, 'action_url deep-links to this specific meeting_id, not just the general Meetings page');
 
     section('3. No-op re-save — dedupe prevents a duplicate notification');
     $r = call('manage_meeting', ['action'=>'update','meeting_id'=>$m1,'title'=>'ZNT Sync Call','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'meeting_type'=>'zoom','host_user_id'=>$admin_uid,'attendees'=>[$attUser]], $ADMIN);
