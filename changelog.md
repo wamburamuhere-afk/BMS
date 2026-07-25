@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-07-25 (feat) — Zoom Attendees: dropped the linked-employee requirement entirely
+
+**Files:** `migrations/2026_07_25_meeting_attendees_user_id.php`, `api/zoom/get_attendee_roles.php`,
+`api/manage_meeting.php`, `api/get_meetings.php`, `app/bms/pos/meetings.php`,
+`tests/test_zoom_attendee_roles_cli.php`, `tests/test_zoom_meeting_sync_cli.php`,
+`tests/test_zoom_notifications_cli.php`
+
+Explicit decision: a Zoom attendee only needs a BMS login — HR employee-record linkage,
+which the picker required as of the last two fixes, is no longer a condition at all.
+`meeting_attendees.employee_id` (NOT NULL, part of the primary key) couldn't hold a Zoom
+attendee with no employee record, so this required a real schema change: a new nullable
+`user_id` column, a surrogate `attendee_id` primary key (the old composite PK can't allow
+NULLs), and its own FK + unique constraint. A meeting's attendees are always ONE identity
+type — in-person keeps storing `employee_id` exactly as before (zero behavior change,
+zero risk to that path); Zoom meetings now store `user_id` directly. The role picker's
+only two conditions are now: the role has `meetings` access, and it has ≥1 active user —
+full stop, no employee link needed.
+
+Downstream effects handled: `notifyMeetingAttendees()` now UNIONs both identity types so
+notifications reach either kind of attendee row; the View modal's attendance table only
+shows a checkbox for employee-based (in-person) rows — a Zoom-only attendee has nothing to
+mark, shown as "—" rather than an error, since attendance tracking is an HR concept that
+simply doesn't apply to a login-only invitee.
+
+104 Zoom assertions across 5 suites, all updated/passing; in-person meeting flow
+(`meeting scheduled with an attendee`, `attendance marked present`) untouched and
+confirmed via the existing regression suite.
+
 ## 2026-07-25 (fix) — Zoom Attendees: removed the free-text employee search entirely
 
 **Files:** `app/bms/pos/meetings.php`
