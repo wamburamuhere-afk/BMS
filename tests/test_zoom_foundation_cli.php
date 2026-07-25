@@ -23,7 +23,7 @@ register_shutdown_function(function(){ global $pass,$fail,$pdo; if($pdo && $pdo-
 try {
     section('1. Schema + seeds');
     $keys = $pdo->query("SELECT setting_key FROM system_settings WHERE setting_group='zoom'")->fetchAll(PDO::FETCH_COLUMN);
-    foreach (['zoom_enabled','zoom_account_id','zoom_client_id','zoom_client_secret_enc'] as $k) {
+    foreach (['zoom_enabled','zoom_account_id','zoom_client_id','zoom_client_secret_enc','zoom_host_email'] as $k) {
         ok(in_array($k,$keys,true), "setting '$k' seeded");
     }
     ok(in_array(getSetting('zoom_enabled','0'),['0','1'],true), 'zoom_enabled is a valid 0/1 flag');
@@ -34,7 +34,8 @@ try {
     $rawAccount = trim((string)$pdo->query("SELECT setting_value FROM system_settings WHERE setting_key='zoom_account_id'")->fetchColumn());
     $rawClient  = trim((string)$pdo->query("SELECT setting_value FROM system_settings WHERE setting_key='zoom_client_id'")->fetchColumn());
     $rawSecret  = (string)$pdo->query("SELECT setting_value FROM system_settings WHERE setting_key='zoom_client_secret_enc'")->fetchColumn();
-    $expectConfigured = $rawEnabled && $rawAccount !== '' && $rawClient !== '' && $rawSecret !== '' && decryptSecret($rawSecret) !== null && decryptSecret($rawSecret) !== '';
+    $rawHostEmail = trim((string)$pdo->query("SELECT setting_value FROM system_settings WHERE setting_key='zoom_host_email'")->fetchColumn());
+    $expectConfigured = $rawEnabled && $rawAccount !== '' && $rawClient !== '' && $rawSecret !== '' && $rawHostEmail !== '' && decryptSecret($rawSecret) !== null && decryptSecret($rawSecret) !== '';
     ok(is_bool(zoomConfigured()), 'zoomConfigured() returns a boolean');
     ok(zoomConfigured() === $expectConfigured, 'zoomConfigured() reflects the stored config');
 
@@ -75,13 +76,14 @@ try {
             ->execute([encryptSecret('s2s-secret-'.bin2hex(random_bytes(4)))]);
         $pdo->prepare("UPDATE system_settings SET setting_value='acct-test' WHERE setting_key='zoom_account_id'")->execute();
         $pdo->prepare("UPDATE system_settings SET setting_value='client-test' WHERE setting_key='zoom_client_id'")->execute();
+        $pdo->prepare("UPDATE system_settings SET setting_value='host@bjptech.co.tz' WHERE setting_key='zoom_host_email'")->execute();
         $pdo->prepare("UPDATE system_settings SET setting_value='1' WHERE setting_key='zoom_enabled'")->execute();
         $stored=$pdo->query("SELECT setting_value FROM system_settings WHERE setting_key='zoom_client_secret_enc'")->fetchColumn();
         ok(isEncryptedSecret($stored) && decryptSecret($stored)!==null, 'stored secret is encrypted + decryptable');
         // getSetting() caches once per request (see helpers.php get_setting()), so
         // zoomConfigured() won't see this in-request write — verified via raw SQL instead.
-        $rowsNow = $pdo->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('zoom_enabled','zoom_account_id','zoom_client_id')")->fetchAll(PDO::FETCH_KEY_PAIR);
-        ok(($rowsNow['zoom_enabled']??'')==='1' && ($rowsNow['zoom_account_id']??'')==='acct-test' && ($rowsNow['zoom_client_id']??'')==='client-test', 'all 3 credential fields + enabled flag persisted together');
+        $rowsNow = $pdo->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('zoom_enabled','zoom_account_id','zoom_client_id','zoom_host_email')")->fetchAll(PDO::FETCH_KEY_PAIR);
+        ok(($rowsNow['zoom_enabled']??'')==='1' && ($rowsNow['zoom_account_id']??'')==='acct-test' && ($rowsNow['zoom_client_id']??'')==='client-test' && ($rowsNow['zoom_host_email']??'')==='host@bjptech.co.tz', 'all credential fields + host email + enabled flag persisted together');
         $pdo->rollBack();
         ok(!$pdo->inTransaction(),'rolled back — settings restored');
     } catch (Throwable $e){ if($pdo->inTransaction())$pdo->rollBack(); ok(false,'save probe threw: '.$e->getMessage()); }

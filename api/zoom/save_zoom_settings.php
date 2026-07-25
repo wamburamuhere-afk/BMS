@@ -18,9 +18,18 @@ try {
     $accountId = trim($_POST['zoom_account_id'] ?? '');
     $clientId  = trim($_POST['zoom_client_id'] ?? '');
     $newSecret = trim($_POST['zoom_client_secret'] ?? '');
+    $hostEmail = trim($_POST['zoom_host_email'] ?? '');
 
     if ($enabled === '1' && ($accountId === '' || $clientId === '')) {
         echo json_encode(['success' => false, 'message' => 'Account ID and Client ID are required to enable Zoom.']);
+        exit;
+    }
+    if ($enabled === '1' && $hostEmail === '') {
+        echo json_encode(['success' => false, 'message' => 'A Zoom Host Email is required to enable Zoom.']);
+        exit;
+    }
+    if ($hostEmail !== '' && !filter_var($hostEmail, FILTER_VALIDATE_EMAIL)) {
+        echo json_encode(['success' => false, 'message' => 'Zoom Host Email is not a valid email address.']);
         exit;
     }
 
@@ -34,6 +43,7 @@ try {
     $set('zoom_enabled', $enabled);
     $set('zoom_account_id', $accountId);
     $set('zoom_client_id', $clientId);
+    $set('zoom_host_email', $hostEmail);
 
     // Only replace the secret when a new one is actually entered.
     if ($newSecret !== '') {
