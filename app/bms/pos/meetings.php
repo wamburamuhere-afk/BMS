@@ -14,6 +14,13 @@ $can_edit   = canEdit('meetings');
 $can_delete = canDelete('meetings');
 $zoom_enabled = zoomConfigured();
 $zoom_hosts = $pdo->query("SELECT user_id, username, first_name, last_name FROM users WHERE is_active = 1 ORDER BY first_name, last_name")->fetchAll(PDO::FETCH_ASSOC);
+// Zoom host is never picked — it's always whoever is creating the meeting (see
+// api/manage_meeting.php, which derives host_user_id from the session, never
+// from client input). Only used to label the read-only "Host" line in the UI.
+$current_user_stmt = $pdo->prepare("SELECT first_name, last_name, username FROM users WHERE user_id = ?");
+$current_user_stmt->execute([$_SESSION['user_id']]);
+$current_user_row = $current_user_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+$current_user_name = trim(($current_user_row['first_name'] ?? '') . ' ' . ($current_user_row['last_name'] ?? '')) ?: ($current_user_row['username'] ?? 'You');
 ?>
 
 <div class="container-fluid mt-4">
@@ -76,14 +83,10 @@ $zoom_hosts = $pdo->query("SELECT user_id, username, first_name, last_name FROM 
             <div class="d-none" id="mt_zoom_wrap">
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label class="form-label">Host <span class="text-danger">*</span></label>
-                        <select class="form-select select2-static" name="host_user_id" id="mt_host">
-                            <option value="">Select host…</option>
-                            <?php foreach ($zoom_hosts as $h): ?>
-                            <option value="<?= (int)$h['user_id'] ?>"><?= safe_output(trim($h['first_name'].' '.$h['last_name']) ?: $h['username']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <div class="form-text">The BMS user whose Zoom account will host this meeting.</div>
+                        <label class="form-label">Host</label>
+                        <div class="form-control-plaintext fw-bold py-1" id="mt_host_display"><i class="bi bi-person-check text-primary me-1"></i><?= safe_output($current_user_name) ?> (you)</div>
+                        <input type="hidden" id="mt_host" value="<?= (int)($_SESSION['user_id'] ?? 0) ?>">
+                        <div class="form-text">The meeting host is always whoever creates it — it can't be reassigned here.</div>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Password <span class="text-muted small">(optional)</span></label>
@@ -128,6 +131,8 @@ function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c 
 const MT_CSRF = <?= json_encode(csrf_token()) ?>;
 const MT_CAN_EDIT=<?= json_encode($can_edit) ?>, MT_CAN_DELETE=<?= json_encode($can_delete) ?>;
 const MT_USER_ID = <?= json_encode((int)$_SESSION['user_id']) ?>;
+const MT_CURRENT_USER_NAME = <?= json_encode($current_user_name) ?>;
+const MT_ZOOM_HOSTS = <?= json_encode(array_map(fn($h) => ['user_id'=>(int)$h['user_id'],'name'=>trim($h['first_name'].' '.$h['last_name']) ?: $h['username']], $zoom_hosts)) ?>;
 let mtTable=null, MT_ROWS=[], MT_CUR=null;
 
 function mtBadge(s){ const m={scheduled:['#0d6efd','#fff'],completed:['#198754','#fff'],cancelled:['#6c757d','#fff']}; const [bg,fg]=m[s]||['#e9ecef','#495057']; return `<span class="badge" style="background:${bg};color:${fg}">${s.charAt(0).toUpperCase()+s.slice(1)}</span>`; }
@@ -237,7 +242,16 @@ $(function(){
 
 <?php if ($can_create): ?>
 function attendeeSelect2(){ if (!$('#mt_attendees').hasClass('select2-hidden-accessible')) $('#mt_attendees').select2({ theme:'bootstrap-5',dropdownParent:$('#meetingModal'),placeholder:'Search employees…',width:'100%',minimumInputLength:1,ajax:{url:'<?= buildUrl('api/account/search_employees.php') ?>',dataType:'json',delay:300,data:p=>({q:p.term}),processResults:d=>({results:d.results}),cache:true} }); }
-function hostSelect2(){ if (!$('#mt_host').hasClass('select2-hidden-accessible')) $('#mt_host').select2({ theme:'bootstrap-5', dropdownParent:$('#meetingModal'), width:'100%' }); }
+// Host is never picked — it's whoever creates the meeting, always. This just
+// updates the read-only display: "you" for a new meeting, or the original
+// host's name when editing an existing Zoom meeting (which may not be you).
+function mtSetHostDisplay(hostUserId){
+    const isMe = !hostUserId || Number(hostUserId) === MT_USER_ID;
+    const host = MT_ZOOM_HOSTS.find(h => h.user_id === Number(hostUserId));
+    const label = isMe ? `${safeOutput(MT_CURRENT_USER_NAME)} (you)` : safeOutput(host ? host.name : 'Unknown user');
+    $('#mt_host_display').html(`<i class="bi bi-person-check text-primary me-1"></i>${label}`);
+    $('#mt_host').val(hostUserId || MT_USER_ID);
+}
 
 // Zoom-only Attendees picker: Role -> linked-user checklist (in-person meetings
 // keep the free-text employee search above, untouched). Loaded once per page
@@ -295,14 +309,13 @@ function mtToggleType(){
     const isZoom = $('#mt_type_zoom').is(':checked');
     $('#mt_venue_wrap').toggleClass('d-none', isZoom);
     $('#mt_zoom_wrap').toggleClass('d-none', !isZoom);
-    $('#mt_host').prop('required', isZoom);
     $('#mt_role_picker_wrap').toggleClass('d-none', !isZoom);
     if (isZoom) mtLoadRoleData(mtRenderRoleSelect);
 }
 $(document).on('change', 'input[name="meeting_type"]', mtToggleType);
 window.openMeetingModal=function(){
     $('#meetingForm')[0].reset(); $('#mt_id').val(''); $('#mt_attendees').empty().val(null).trigger('change');
-    $('#mt_type_person').prop('checked', true); mtToggleType(); mtResetRolePicker();
+    $('#mt_type_person').prop('checked', true); mtToggleType(); mtResetRolePicker(); mtSetHostDisplay(MT_USER_ID);
     $('#meetingModalTitle').text('New Meeting'); new bootstrap.Modal(document.getElementById('meetingModal')).show();
 };
 window.editMeeting=function(id){
@@ -317,15 +330,14 @@ window.editMeeting=function(id){
         $('#mt_zoom_participant_video').prop('checked', Number(m.zoom_participant_video)===1);
         $('#mt_zoom_waiting_room').prop('checked', Number(m.zoom_waiting_room)===1);
         $('#mt_zoom_auto_recording').prop('checked', Number(m.zoom_auto_recording)===1);
-        mtToggleType(); mtResetRolePicker();
+        mtToggleType(); mtResetRolePicker(); mtSetHostDisplay(m.host_user_id);
         new bootstrap.Modal(document.getElementById('meetingModal')).show();
         setTimeout(function(){
             attendeeSelect2(); $('#mt_attendees').empty(); res.attendees.forEach(a=>{ $('#mt_attendees').append(new Option(a.first_name+' '+a.last_name, a.employee_id, true, true)); }); $('#mt_attendees').trigger('change');
-            hostSelect2(); $('#mt_host').val(m.host_user_id||'').trigger('change');
         }, 300);
     });
 };
-$('#meetingModal').on('shown.bs.modal', function(){ attendeeSelect2(); hostSelect2(); });
+$('#meetingModal').on('shown.bs.modal', function(){ attendeeSelect2(); });
 $('#meetingForm').on('submit', function(e){
     e.preventDefault();
     const btn=$(this).find('[type="submit"]'); btn.prop('disabled',true);

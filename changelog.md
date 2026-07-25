@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-07-24 (feat) — Zoom Host: auto-filled to the meeting creator, no longer selectable
+
+**Files:** `app/bms/pos/meetings.php`, `api/manage_meeting.php`, `tests/test_zoom_meeting_sync_cli.php`
+
+The Host field for Zoom meetings is now a read-only display ("You" on create, or the
+original host's name when editing someone else's meeting) instead of a dropdown. The
+backend never trusts a client-submitted `host_user_id` — it's always derived server-side:
+the session user for a brand-new Zoom meeting (or one just switched to Zoom), and the
+**preserved original host** on every re-save of a meeting that was already Zoom, so editing
+or rescheduling never silently hands the Zoom-side meeting (and its Start URL) to whoever
+happens to be doing the edit. `test_zoom_meeting_sync_cli.php` grew from 26 to 31
+assertions (replaced the now-obsolete "no host selected" guardrail with auto-fill,
+spoofed-input, and host-lock-on-edit checks); all other Zoom suites re-run clean
+(102 total Zoom assertions across 5 suites now).
+
 ## 2026-07-24 (feat) — Zoom Attendees: Role → linked-user picker (replaces employee search for Zoom meetings)
 
 **Files:** `api/zoom/get_attendee_roles.php`, `app/bms/pos/meetings.php`, `tests/test_zoom_attendee_roles_cli.php`
