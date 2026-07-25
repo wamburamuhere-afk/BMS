@@ -27,8 +27,18 @@ if (!$ok) { http_response_code(403); echo json_encode(['success' => false, 'mess
 // while still respecting the same per-user mute preferences dispatchEvent()
 // would have applied, via the now-registered 'hr_meeting' notification_events row.
 function notifyMeetingAttendees(PDO $pdo, int $meeting_id, string $title, string $verb, ?string $joinUrl = null): void {
-    $rows = $pdo->prepare("SELECT u.user_id, u.notification_preferences FROM meeting_attendees ma JOIN users u ON u.employee_id = ma.employee_id WHERE ma.meeting_id = ? AND u.is_active = 1");
-    $rows->execute([$meeting_id]);
+    // Covers both attendee identity types (see migration 2026_07_25_meeting_attendees_user_id):
+    // in-person attendees linked via employee_id -> users.employee_id, Zoom attendees
+    // stored directly by user_id. A given meeting only ever has one type populated,
+    // but the UNION means this never needs to know which — it just works either way.
+    $rows = $pdo->prepare("
+        SELECT u.user_id, u.notification_preferences FROM meeting_attendees ma
+            JOIN users u ON u.employee_id = ma.employee_id WHERE ma.meeting_id = ? AND ma.employee_id IS NOT NULL AND u.is_active = 1
+        UNION
+        SELECT u.user_id, u.notification_preferences FROM meeting_attendees ma
+            JOIN users u ON u.user_id = ma.user_id WHERE ma.meeting_id = ? AND ma.user_id IS NOT NULL AND u.is_active = 1
+    ");
+    $rows->execute([$meeting_id, $meeting_id]);
     $message = $joinUrl ? ('You are listed as an attendee. Join: ' . $joinUrl) : 'You are listed as an attendee.';
     foreach ($rows->fetchAll(PDO::FETCH_ASSOC) as $r) {
         $uid = (int)$r['user_id'];
@@ -175,13 +185,27 @@ try {
                 }
                 $pdo->prepare("DELETE FROM meeting_attendees WHERE meeting_id=?")->execute([$id]);
             }
-            $ins = $pdo->prepare("INSERT IGNORE INTO meeting_attendees (meeting_id, employee_id) VALUES (?, ?)");
-            foreach ($attendees as $eid) {
-                $eid = (int)$eid; if (!$eid) continue;
-                if (function_exists('assertScopeForEmployee')) assertScopeForEmployee($eid);
-                $chk2 = $pdo->prepare("SELECT employee_id FROM employees WHERE employee_id=? AND (status IS NULL OR status!='deleted')");
-                $chk2->execute([$eid]);
-                if ($chk2->fetch()) $ins->execute([$id, $eid]);
+            // Zoom attendees are picked as BMS users (Role picker — no employee record
+            // required); in-person attendees are picked as employees (search box) —
+            // one meeting's attendees are always ONE type, never mixed, so this branches
+            // once on meetingType rather than needing a per-item type tag.
+            if ($meetingType === 'zoom') {
+                $ins = $pdo->prepare("INSERT IGNORE INTO meeting_attendees (meeting_id, user_id) VALUES (?, ?)");
+                foreach ($attendees as $uid) {
+                    $uid = (int)$uid; if (!$uid) continue;
+                    $chk2 = $pdo->prepare("SELECT user_id FROM users WHERE user_id=? AND is_active=1");
+                    $chk2->execute([$uid]);
+                    if ($chk2->fetch()) $ins->execute([$id, $uid]);
+                }
+            } else {
+                $ins = $pdo->prepare("INSERT IGNORE INTO meeting_attendees (meeting_id, employee_id) VALUES (?, ?)");
+                foreach ($attendees as $eid) {
+                    $eid = (int)$eid; if (!$eid) continue;
+                    if (function_exists('assertScopeForEmployee')) assertScopeForEmployee($eid);
+                    $chk2 = $pdo->prepare("SELECT employee_id FROM employees WHERE employee_id=? AND (status IS NULL OR status!='deleted')");
+                    $chk2->execute([$eid]);
+                    if ($chk2->fetch()) $ins->execute([$id, $eid]);
+                }
             }
             $pdo->commit();
 

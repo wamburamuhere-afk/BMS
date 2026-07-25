@@ -71,7 +71,7 @@ try {
     ok($ev && (int)$ev['is_active']===1, "'hr_meeting' is registered in notification_events and active");
 
     section('2. Create — attendee gets a notification with the Join link');
-    $r = call('manage_meeting', ['action'=>'add','title'=>'ZNT Sync Call','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'meeting_type'=>'zoom','host_user_id'=>$admin_uid,'attendees'=>[$emp]], $ADMIN);
+    $r = call('manage_meeting', ['action'=>'add','title'=>'ZNT Sync Call','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'meeting_type'=>'zoom','host_user_id'=>$admin_uid,'attendees'=>[$attUser]], $ADMIN);
     $m1 = (int)($r['meeting_id'] ?? 0);
     ok(!empty($r['success']) && $m1, 'zoom meeting created with an attendee');
     $notifs = $pdo->query("SELECT * FROM notifications WHERE user_id=$attUser AND title LIKE 'Meeting scheduled: ZNT Sync Call%'")->fetchAll(PDO::FETCH_ASSOC);
@@ -80,14 +80,14 @@ try {
     ok(!empty($notifs) && $notifs[0]['event_key']==='hr_meeting', "notification tagged with event_key='hr_meeting'");
 
     section('3. No-op re-save — dedupe prevents a duplicate notification');
-    $r = call('manage_meeting', ['action'=>'update','meeting_id'=>$m1,'title'=>'ZNT Sync Call','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'meeting_type'=>'zoom','host_user_id'=>$admin_uid,'attendees'=>[$emp]], $ADMIN);
+    $r = call('manage_meeting', ['action'=>'update','meeting_id'=>$m1,'title'=>'ZNT Sync Call','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'meeting_type'=>'zoom','host_user_id'=>$admin_uid,'attendees'=>[$attUser]], $ADMIN);
     ok(!empty($r['success']), 're-save succeeds');
     $count2 = (int)$pdo->query("SELECT COUNT(*) FROM notifications WHERE user_id=$attUser AND title LIKE 'Meeting scheduled: ZNT Sync Call%'")->fetchColumn();
     ok($count2===1, 'still exactly one notification after a no-op re-save (existing dedupe mechanism)');
 
     section('4. Muted attendee — no notification at all');
     $pdo->prepare("UPDATE users SET notification_preferences=? WHERE user_id=?")->execute([json_encode(['muted_events'=>['hr_meeting']]), $attUser]);
-    $r = call('manage_meeting', ['action'=>'add','title'=>'ZNT Muted Call','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'meeting_type'=>'zoom','host_user_id'=>$admin_uid,'attendees'=>[$emp]], $ADMIN);
+    $r = call('manage_meeting', ['action'=>'add','title'=>'ZNT Muted Call','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'meeting_type'=>'zoom','host_user_id'=>$admin_uid,'attendees'=>[$attUser]], $ADMIN);
     $m2 = (int)($r['meeting_id'] ?? 0);
     ok(!empty($r['success']) && $m2, 'second zoom meeting created');
     $count3 = (int)$pdo->query("SELECT COUNT(*) FROM notifications WHERE user_id=$attUser AND title LIKE 'Meeting scheduled: ZNT Muted Call%'")->fetchColumn();

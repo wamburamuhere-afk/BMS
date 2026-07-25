@@ -182,7 +182,10 @@ function viewMeeting(id){
         MT_CUR=res.data;
         const m=res.data;
         const editable = MT_CAN_EDIT && m.status==='scheduled';
-        let prows = res.attendees.map(a=>`<tr><td>${safeOutput(a.first_name+' '+a.last_name)}</td><td>${editable?`<input type="checkbox" class="att-chk" data-eid="${a.employee_id}" ${Number(a.attended)===1?'checked':''}>`:(a.attended===null?'<span class="text-muted">—</span>':(Number(a.attended)?'<span class="badge bg-success">Present</span>':'<span class="badge bg-secondary">Absent</span>'))}</td></tr>`).join('');
+        // Attendance is an employee/HR concept — only rows with an employee_id (in-person
+        // attendees) get a checkbox; a Zoom attendee (user_id only, no employee record)
+        // simply has nothing to track here, shown as "—" rather than a checkbox.
+        let prows = res.attendees.map(a=>`<tr><td>${safeOutput(a.first_name+' '+a.last_name)}</td><td>${!a.employee_id?'<span class="text-muted">—</span>':(editable?`<input type="checkbox" class="att-chk" data-eid="${a.employee_id}" ${Number(a.attended)===1?'checked':''}>`:(a.attended===null?'<span class="text-muted">—</span>':(Number(a.attended)?'<span class="badge bg-success">Present</span>':'<span class="badge bg-secondary">Absent</span>')))}</td></tr>`).join('');
         if (!res.attendees.length) prows = '<tr><td colspan="2" class="text-muted text-center">No attendees.</td></tr>';
         let zoomBlock = '';
         if (m.meeting_type==='zoom'){
@@ -203,7 +206,7 @@ function viewMeeting(id){
             ${m.agenda?`<div class="mb-2"><strong>Agenda:</strong> ${safeOutput(m.agenda)}</div>`:''}
             ${m.minutes?`<div class="mb-2"><strong>Minutes:</strong><div style="white-space:pre-wrap">${safeOutput(m.minutes)}</div></div>`:''}
             <table class="table table-sm"><thead><tr><th>Attendee</th><th>Attended</th></tr></thead><tbody>${prows}</tbody></table>
-            ${editable && res.attendees.length ? `<button class="btn btn-sm btn-primary" onclick="saveAttendance(${m.meeting_id})"><i class="bi bi-save me-1"></i>Save Attendance</button>` : ''}`);
+            ${editable && res.attendees.some(a=>a.employee_id) ? `<button class="btn btn-sm btn-primary" onclick="saveAttendance(${m.meeting_id})"><i class="bi bi-save me-1"></i>Save Attendance</button>` : ''}`);
         new bootstrap.Modal(document.getElementById('meetingViewModal')).show();
     });
 }
@@ -297,14 +300,14 @@ $(document).on('change', '#mt_role_select', function(){
     if (!roleId) { $('#mt_role_users_wrap').addClass('d-none'); return; }
     const role = MT_ROLE_DATA.find(r => String(r.role_id) === String(roleId));
     const existing = new Set(($('#mt_attendees').val() || []).map(String));
-    const users = (role ? role.users : []).filter(u => !existing.has(String(u.employee_id)));
+    const users = (role ? role.users : []).filter(u => !existing.has(String(u.user_id)));
     $('#mt_role_select_all').prop('checked', false);
     if (!users.length) {
         $('#mt_role_users_list').html('<div class="text-muted small">Everyone in this role is already added.</div>');
     } else {
         $('#mt_role_users_list').html(users.map(u => `
-            <div class="form-check"><input class="form-check-input mt-role-user-chk" type="checkbox" value="${u.employee_id}" data-name="${safeOutput(u.name)}" id="mt_ru_${u.employee_id}">
-            <label class="form-check-label small" for="mt_ru_${u.employee_id}">${safeOutput(u.name)}</label></div>`).join(''));
+            <div class="form-check"><input class="form-check-input mt-role-user-chk" type="checkbox" value="${u.user_id}" data-name="${safeOutput(u.name)}" id="mt_ru_${u.user_id}">
+            <label class="form-check-label small" for="mt_ru_${u.user_id}">${safeOutput(u.name)}</label></div>`).join(''));
     }
     $('#mt_role_users_wrap').removeClass('d-none');
 });
@@ -312,9 +315,13 @@ $(document).on('change', '#mt_role_select_all', function(){
     $('.mt-role-user-chk').prop('checked', $(this).is(':checked'));
 });
 $(document).on('click', '#mt_role_add_btn', function(){
+    // Attendee ids are user_id here (Zoom picker) — a different id space from the
+    // employee_id used by the in-person search, but #mt_attendees is a shared,
+    // opaque multi-select: whichever meeting_type is active decides how
+    // manage_meeting.php interprets every submitted value, so mixing never happens.
     $('.mt-role-user-chk:checked').each(function(){
-        const eid = $(this).val(), name = $(this).data('name');
-        if (!$(`#mt_attendees option[value="${eid}"]`).length) $('#mt_attendees').append(new Option(name, eid, true, true));
+        const uid = $(this).val(), name = $(this).data('name');
+        if (!$(`#mt_attendees option[value="${uid}"]`).length) $('#mt_attendees').append(new Option(name, uid, true, true));
     });
     $('#mt_attendees').trigger('change');
     mtResetRolePicker();
@@ -348,7 +355,7 @@ window.editMeeting=function(id){
         mtToggleType(); mtResetRolePicker(); mtSetHostDisplay(m.host_user_id);
         new bootstrap.Modal(document.getElementById('meetingModal')).show();
         setTimeout(function(){
-            attendeeSelect2(); $('#mt_attendees').empty(); res.attendees.forEach(a=>{ $('#mt_attendees').append(new Option(a.first_name+' '+a.last_name, a.employee_id, true, true)); }); $('#mt_attendees').trigger('change');
+            attendeeSelect2(); $('#mt_attendees').empty(); res.attendees.forEach(a=>{ $('#mt_attendees').append(new Option(a.first_name+' '+a.last_name, a.employee_id || a.user_id, true, true)); }); $('#mt_attendees').trigger('change');
         }, 300);
     });
 };

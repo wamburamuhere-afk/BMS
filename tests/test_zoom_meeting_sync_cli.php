@@ -68,7 +68,7 @@ function call($ep, $payload, $session, $zoomMock = '') {
     return $s === false ? ['_raw' => (string)$o] : json_decode(substr($o, $s), true);
 }
 
-$emp = 0; $m1 = 0; $m2 = 0; $m3 = 0; $m4 = 0;
+$attUser = 0; $m1 = 0; $m2 = 0; $m3 = 0; $m4 = 0;
 $origSettings = [];
 try {
     $admin_uid = (int)$pdo->query("SELECT u.user_id FROM users u JOIN roles r ON r.role_id=u.role_id WHERE r.is_admin=1 LIMIT 1")->fetchColumn();
@@ -76,8 +76,11 @@ try {
     $ADMIN = ['user_id' => $admin_uid, 'username' => 'admin', 'is_admin' => true, 'role_id' => 1];
     ok($admin_uid > 0 && $hostEmail !== '', "fixture admin/host ready (#$admin_uid, $hostEmail)");
 
-    $pdo->exec("INSERT INTO employees (first_name,last_name,employee_number,employment_status,created_at) VALUES ('__ZMS','Emp','__ZMS-E1','active',NOW())");
-    $emp = (int)$pdo->lastInsertId();
+    // Zoom attendees are picked as BMS users (Role picker) -- no employee record
+    // required at all, unlike in-person attendees. Plain user, deliberately not
+    // linked to any employee, to prove that's genuinely optional now.
+    $pdo->exec("INSERT INTO users (username,password,email,is_admin,role_id,is_active,created_at) VALUES ('__zms_attendee','x','zmsatt@example.local',0,1,1,NOW())");
+    $attUser = (int)$pdo->lastInsertId();
 
     section('Setup — enable Zoom with fake credentials');
     $keys = ['zoom_enabled','zoom_account_id','zoom_client_id','zoom_client_secret_enc'];
@@ -89,7 +92,7 @@ try {
     ok(true, 'zoom_* settings switched on for this run (will be restored)');
 
     section('1. Create — Zoom API succeeds');
-    $r = call('manage_meeting', ['action'=>'add','title'=>'Board Sync','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'start_time'=>'09:00','end_time'=>'10:00','meeting_type'=>'zoom','host_user_id'=>$admin_uid,'zoom_waiting_room'=>1,'attendees'=>[$emp]], $ADMIN, 'ok');
+    $r = call('manage_meeting', ['action'=>'add','title'=>'Board Sync','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'start_time'=>'09:00','end_time'=>'10:00','meeting_type'=>'zoom','host_user_id'=>$admin_uid,'zoom_waiting_room'=>1,'attendees'=>[$attUser]], $ADMIN, 'ok');
     $m1 = (int)($r['meeting_id'] ?? 0);
     ok(!empty($r['success']) && $m1, 'meeting saved successfully');
     ok(stripos($r['message'] ?? '','failed')===false, 'no failure text in response message');
@@ -99,6 +102,8 @@ try {
     ok($row['zoom_join_url']==='https://zoom.us/j/778899001', 'zoom_join_url stored');
     ok($row['zoom_start_url']==='https://zoom.us/s/778899001', 'zoom_start_url stored');
     ok($row['zoom_password']==='zx12ab', 'zoom_password stored');
+    $attRow = $pdo->query("SELECT employee_id, user_id FROM meeting_attendees WHERE meeting_id=$m1")->fetch(PDO::FETCH_ASSOC);
+    ok($attRow && (int)$attRow['user_id']===$attUser && $attRow['employee_id']===null, 'Zoom attendee stored by user_id, employee_id left NULL — no employee record needed at all');
 
     section('2. Create — Zoom API fails (graceful degradation, plan 4.3)');
     $r = call('manage_meeting', ['action'=>'add','title'=>'Failing Meeting','meeting_date'=>date('Y-m-d',strtotime('+1 day')),'meeting_type'=>'zoom','host_user_id'=>$admin_uid], $ADMIN, 'create_fail');
@@ -181,7 +186,7 @@ try {
 } finally {
     foreach ([$m1,$m2,$m3,$m4,$mHost??0,$mSpoof??0,$mLock??0] as $mid) if ($mid) { $pdo->exec("DELETE FROM meeting_attendees WHERE meeting_id=$mid"); $pdo->exec("DELETE FROM meetings WHERE meeting_id=$mid"); }
     if (!empty($editorUid)) $pdo->exec("DELETE FROM users WHERE user_id=" . (int)$editorUid);
-    if ($emp) { $pdo->exec("DELETE FROM meeting_attendees WHERE employee_id=$emp"); $pdo->exec("DELETE FROM employees WHERE employee_id=$emp"); }
+    if ($attUser) { $pdo->exec("DELETE FROM meeting_attendees WHERE user_id=$attUser"); $pdo->exec("DELETE FROM users WHERE user_id=$attUser"); }
     $pdo->exec("DELETE FROM notification_dedupe WHERE dedupe_key LIKE 'meeting_%'");
     foreach ($origSettings as $k => $v) $pdo->prepare("UPDATE system_settings SET setting_value=? WHERE setting_key=?")->execute([$v, $k]);
     echo "  (fixtures + zoom settings restored)\n";
