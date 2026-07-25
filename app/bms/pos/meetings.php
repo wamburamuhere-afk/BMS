@@ -14,9 +14,10 @@ $can_edit   = canEdit('meetings');
 $can_delete = canDelete('meetings');
 $zoom_enabled = zoomConfigured();
 $zoom_hosts = $pdo->query("SELECT user_id, username, first_name, last_name FROM users WHERE is_active = 1 ORDER BY first_name, last_name")->fetchAll(PDO::FETCH_ASSOC);
-// Zoom host is never picked — it's always whoever is creating the meeting (see
-// api/manage_meeting.php, which derives host_user_id from the session, never
-// from client input). Only used to label the read-only "Host" line in the UI.
+// host_user_id is BMS-side organizer attribution only, never the Zoom host (see
+// zoomResolveHostEmail() in api/manage_meeting.php, which always uses the one
+// shared zoom_host_email setting). Never picked here -- server derives it from
+// the session. $zoom_hosts is only used to label the read-only "Organizer" line.
 $current_user_stmt = $pdo->prepare("SELECT first_name, last_name, username FROM users WHERE user_id = ?");
 $current_user_stmt->execute([$_SESSION['user_id']]);
 $current_user_row = $current_user_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -83,10 +84,10 @@ $current_user_name = trim(($current_user_row['first_name'] ?? '') . ' ' . ($curr
             <div class="d-none" id="mt_zoom_wrap">
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label class="form-label">Host</label>
+                        <label class="form-label">Organizer</label>
                         <div class="form-control-plaintext fw-bold py-1" id="mt_host_display"><i class="bi bi-person-check text-primary me-1"></i><?= safe_output($current_user_name) ?> (you)</div>
                         <input type="hidden" id="mt_host" value="<?= (int)($_SESSION['user_id'] ?? 0) ?>">
-                        <div class="form-text">The meeting host is always whoever creates it — it can't be reassigned here.</div>
+                        <div class="form-text">The BMS record shows whoever creates it as organizer. On Zoom, every meeting is hosted under the one shared company Zoom account (Settings -> Zoom Integration) — no personal Zoom login needed.</div>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Password <span class="text-muted small">(optional)</span></label>
@@ -182,10 +183,24 @@ function viewMeeting(id){
         MT_CUR=res.data;
         const m=res.data;
         const editable = MT_CAN_EDIT && m.status==='scheduled';
-        // Attendance is an employee/HR concept — only rows with an employee_id (in-person
-        // attendees) get a checkbox; a Zoom attendee (user_id only, no employee record)
-        // simply has nothing to track here, shown as "—" rather than a checkbox.
-        let prows = res.attendees.map(a=>`<tr><td>${safeOutput(a.first_name+' '+a.last_name)}</td><td>${!a.employee_id?'<span class="text-muted">—</span>':(editable?`<input type="checkbox" class="att-chk" data-eid="${a.employee_id}" ${Number(a.attended)===1?'checked':''}>`:(a.attended===null?'<span class="text-muted">—</span>':(Number(a.attended)?'<span class="badge bg-success">Present</span>':'<span class="badge bg-secondary">Absent</span>')))}</td></tr>`).join('');
+        // In-person attendees (employee_id) keep the existing manual Present/Absent
+        // checkbox. Zoom attendees (user_id only) get an automatic read-only "Joined"
+        // badge instead, sourced from joined_at -- stamped by api/join_meeting.php the
+        // moment they click Join (see mark_attendance vs. that endpoint: two separate,
+        // non-overlapping signals for the two attendee identity types).
+        let prows = res.attendees.map(a=>{
+            let statusCell;
+            if (a.employee_id) {
+                statusCell = editable
+                    ? `<input type="checkbox" class="att-chk" data-eid="${a.employee_id}" ${Number(a.attended)===1?'checked':''}>`
+                    : (a.attended===null ? '<span class="text-muted">—</span>' : (Number(a.attended)?'<span class="badge bg-success">Present</span>':'<span class="badge bg-secondary">Absent</span>'));
+            } else {
+                statusCell = a.joined_at
+                    ? `<span class="badge bg-success" title="Joined at ${safeOutput(a.joined_at)}">Joined</span>`
+                    : '<span class="badge bg-secondary">Not joined</span>';
+            }
+            return `<tr><td>${safeOutput(a.first_name+' '+a.last_name)}</td><td>${statusCell}</td></tr>`;
+        }).join('');
         if (!res.attendees.length) prows = '<tr><td colspan="2" class="text-muted text-center">No attendees.</td></tr>';
         let zoomBlock = '';
         if (m.meeting_type==='zoom'){
@@ -195,7 +210,7 @@ function viewMeeting(id){
             zoomBlock = `<div class="alert alert-light border mb-2">
                 <div><i class="bi bi-camera-video text-primary"></i> <strong>Zoom Meeting</strong></div>
                 ${m.zoom_sync_status==='failed' ? `<div class="text-danger small mt-1"><i class="bi bi-exclamation-triangle"></i> Zoom sync failed.${(MT_CAN_EDIT && m.status!=='completed') ? ` <button class="btn btn-sm btn-outline-danger ms-1 py-0" onclick="retryZoomSync(${m.meeting_id})"><i class="bi bi-arrow-clockwise"></i> Retry</button>` : ''}</div>` : ''}
-                ${m.zoom_join_url ? `<div class="mt-2"><a href="${m.zoom_join_url}" target="_blank" rel="noopener" class="btn btn-sm btn-primary"><i class="bi bi-box-arrow-up-right"></i> Join Meeting</a>${m.zoom_password ? ` <span class="small text-muted">Password: ${safeOutput(m.zoom_password)}</span>` : ''}</div>` : ''}
+                ${m.zoom_join_url ? `<div class="mt-2"><a href="<?= buildUrl('api/join_meeting.php') ?>?meeting_id=${m.meeting_id}" target="_blank" rel="noopener" class="btn btn-sm btn-primary"><i class="bi bi-box-arrow-up-right"></i> Join Meeting</a>${m.zoom_password ? ` <span class="small text-muted">Password: ${safeOutput(m.zoom_password)}</span>` : ''}</div>` : ''}
                 ${isHost && m.zoom_start_url ? `<div class="mt-2"><a href="${m.zoom_start_url}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary"><i class="bi bi-play-circle"></i> Start Meeting (Host)</a></div>` : ''}
             </div>`;
         }
@@ -241,6 +256,12 @@ $(function(){
     function mv(){ if (window.innerWidth<768){$('#mtTableView').addClass('d-none');$('#mtCardView').removeClass('d-none');}else{$('#mtTableView').removeClass('d-none');$('#mtCardView').addClass('d-none');} }
     mv(); $(window).on('resize', mv);
     loadMeetings();
+
+    // Deep link from a "Meeting scheduled/cancelled" notification's View Details
+    // (see notifyMeetingAttendees() in api/manage_meeting.php) -- lands the user on
+    // that specific meeting's Join button instead of just the general list.
+    const deepLinkId = parseInt(new URLSearchParams(location.search).get('meeting_id'), 10);
+    if (deepLinkId) viewMeeting(deepLinkId);
 });
 
 <?php if ($can_create): ?>
