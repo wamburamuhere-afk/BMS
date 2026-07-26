@@ -28,7 +28,7 @@ $date_to    = !empty($_GET['date_to'])    ? trim($_GET['date_to'])    : date('Y-
 $status     = !empty($_GET['status'])     ? trim($_GET['status'])     : '';
 
 try {
-    $where  = "WHERE e.project_id = ? AND a.attendance_date BETWEEN ? AND ?";
+    $where  = "WHERE e.project_id = ? AND e.status = 'active' AND a.attendance_date BETWEEN ? AND ?";
     $params = [$project_id, $date_from, $date_to];
 
     if ($status) {

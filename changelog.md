@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-07-25 (fix) — Project HR Attendance tab no longer lists inactive employees
+
+**File:** `api/operations/get_project_attendance.php`
+
+The Attendance tab under Project Details > HR was showing more employees than the
+Project Staff tab because its query joined `attendance` to `employees` filtered only
+by `project_id`, with no `status = 'active'` check — so employees who kept this
+project's `project_id` after being marked inactive/terminated still surfaced via
+their historical attendance rows. Added `AND e.status = 'active'` to the WHERE clause
+so the two tabs agree on which employees belong to the project.
+
 ## 2026-07-25 (feat) — Meetings: Zoom join-click attendance tracking, join-info visibility scoping, notification deep link
 
 **Files:** `migrations/2026_07_25_meeting_attendees_joined_at.php`, `api/join_meeting.php` (new),
