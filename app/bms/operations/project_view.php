@@ -5314,24 +5314,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
-<!-- ===== HR: View Attendance Modal ===== -->
-<div class="modal fade" id="viewAttendanceModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-bold text-primary"><i class="bi bi-calendar-check me-2"></i>Attendance Detail</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4" id="viewAttendanceBody">
-                <div class="text-center py-3"><div class="spinner-border text-primary"></div></div>
-            </div>
-            <div class="modal-footer bg-light p-3">
-                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- ===== HR: Apply / Edit Leave Modal ===== -->
 <div class="modal fade" id="applyLeaveModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -21167,17 +21149,15 @@ function renderProjectAttendance(data) {
         $('#hrAttendanceContent').html(`
             <div class="text-center py-5 text-muted border rounded" style="border-radius:12px;">
                 <i class="bi bi-calendar-check display-4 opacity-25"></i>
-                <p class="mt-2">No attendance records found for the selected period.</p>
+                <p class="mt-2">No staff assigned to this project, or no attendance records found for the selected period.</p>
                 <button class="btn btn-sm btn-primary" onclick="openMarkAttendanceModal()"><i class="bi bi-plus-lg me-1"></i> Mark Attendance</button>
             </div>`);
         return;
     }
 
-    const statusBadge = {
-        present: 'bg-success', absent: 'bg-danger', late: 'bg-warning text-dark',
-        half_day: 'bg-info', leave: 'bg-secondary', holiday: 'bg-primary'
-    };
-
+    // One row per employee (aggregated across the selected date range) — same
+    // shape as the standalone Attendance page's week/month view, so a staff
+    // member with several days of records doesn't repeat once per day.
     let html = `<div class="table-responsive">
         <table class="table table-hover align-middle border" style="border-radius:12px; overflow:hidden;">
             <thead class="table-light">
@@ -21185,22 +21165,19 @@ function renderProjectAttendance(data) {
                     <th class="text-center" width="50">S/NO</th>
                     <th>Staff Member</th>
                     <th>Department / Role</th>
-                    <th>Date</th>
-                    <th>Check-In</th>
-                    <th>Check-Out</th>
-                    <th>Hours</th>
-                    <th>Status</th>
+                    <th class="text-center">Total Hours</th>
+                    <th class="text-center">Present</th>
+                    <th class="text-center">Late</th>
+                    <th class="text-center">Half Day</th>
+                    <th class="text-center">Absent</th>
+                    <th class="text-center">On Leave</th>
                     <th class="text-end d-print-none">Actions</th>
                 </tr>
             </thead><tbody>`;
 
     data.forEach((r, i) => {
-        const name  = r.first_name + ' ' + r.last_name;
-        const badge = statusBadge[r.status] || 'bg-secondary';
-        const label = r.status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
-        const cin   = r.check_in_time  ? r.check_in_time.substring(0, 5)  : '';
-        const cout  = r.check_out_time ? r.check_out_time.substring(0, 5) : '';
-        html += `<tr data-emp-id="${r.employee_id}" data-att-date="${r.attendance_date}" data-att-status="${r.status}">
+        const name = r.first_name + ' ' + r.last_name;
+        html += `<tr>
             <td class="text-center text-muted small">${i + 1}</td>
             <td>
                 <div class="fw-bold text-dark">${name}</div>
@@ -21210,33 +21187,17 @@ function renderProjectAttendance(data) {
                 <div>${r.designation_name || 'Staff'}</div>
                 <small class="text-muted">${r.department_name || 'General'}</small>
             </td>
-            <td><small>${r.attendance_date}</small></td>
-            <td>
-                <input type="time" class="form-control form-control-sm proj-att-checkin d-print-none" style="min-width:90px;" value="${cin}" onchange="projectUpdateAttTime(this)">
-                <span class="d-none d-print-inline small">${r.check_in_time || '—'}</span>
-            </td>
-            <td>
-                <input type="time" class="form-control form-control-sm proj-att-checkout d-print-none" style="min-width:90px;" value="${cout}" onchange="projectUpdateAttTime(this)">
-                <span class="d-none d-print-inline small">${r.check_out_time || '—'}</span>
-            </td>
-            <td><small class="proj-att-hours">${r.total_hours ? parseFloat(r.total_hours).toFixed(1) + 'h' : '—'}</small></td>
-            <td>
-                <span class="badge ${badge} d-none d-print-inline">${label}</span>
-                <div class="btn-group btn-group-sm d-print-none" role="group">
-                    <button type="button" class="btn btn-${r.status === 'present'  ? 'success'        : 'outline-success'} status-btn" onclick="projectQuickMark(this,'present','09:00','17:00')"  title="Mark Present"><i class="bi bi-check-circle"></i> P</button>
-                    <button type="button" class="btn btn-${r.status === 'late'     ? 'warning'        : 'outline-warning'} status-btn" onclick="projectQuickMark(this,'late','10:00','17:00')"     title="Mark Late"><i class="bi bi-clock"></i> L</button>
-                    <button type="button" class="btn btn-${r.status === 'absent'   ? 'danger'         : 'outline-danger'}  status-btn" onclick="projectQuickMark(this,'absent','','')"              title="Mark Absent"><i class="bi bi-x-circle"></i> A</button>
-                    <button type="button" class="btn btn-${r.status === 'half_day' ? 'info text-dark' : 'outline-info'}    status-btn" onclick="projectQuickMark(this,'half_day','09:00','13:00')" title="Mark Half Day"><i class="bi bi-dash-circle"></i> H</button>
-                </div>
-            </td>
+            <td class="text-center fw-bold text-primary">${parseFloat(r.total_hours || 0).toFixed(1)}h</td>
+            <td class="text-center">${r.present_count || 0}</td>
+            <td class="text-center text-warning fw-bold">${r.late_count || 0}</td>
+            <td class="text-center text-info">${r.half_day_count || 0}</td>
+            <td class="text-center text-danger fw-bold">${r.absent_count || 0}</td>
+            <td class="text-center text-secondary">${r.leave_count || 0}</td>
             <td class="text-end d-print-none">
                 <div class="dropdown">
                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAttendanceRecord(${r.attendance_id})"><i class="bi bi-eye text-info me-2"></i>View</a></li>
-                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openEditAttendanceModal(${r.attendance_id})"><i class="bi bi-pencil text-warning me-2"></i>Edit</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteAttendanceRecord(${r.attendance_id}, '${name}')"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                        <li><a class="dropdown-item py-2" href="attendance?employee=${r.employee_id}"><i class="bi bi-clock-history me-2"></i>View History</a></li>
                     </ul>
                 </div>
             </td>
@@ -21246,47 +21207,6 @@ function renderProjectAttendance(data) {
     html += '</tbody></table></div>';
     $('#hrAttendanceContent').html(html);
     initHrDropdowns('#hrAttendanceContent');
-}
-
-function projectQuickMark(btn, status, defaultCheckIn, defaultCheckOut) {
-    const $row  = $(btn).closest('tr');
-    const empId = $row.data('emp-id');
-    const date  = $row.data('att-date');
-    const cin   = $row.find('.proj-att-checkin').val()  || defaultCheckIn;
-    const cout  = $row.find('.proj-att-checkout').val() || defaultCheckOut;
-
-    $.post(APP_URL + '/api/operations/save_project_attendance.php', {
-        project_id: projectId, employee_id: empId, attendance_date: date,
-        status: status, check_in_time: cin, check_out_time: cout
-    }, function(res) {
-        if (res.success) { loadProjectAttendance(); }
-        else { Swal.fire('Error', res.message, 'error'); }
-    }, 'json');
-}
-
-function projectUpdateAttTime(input) {
-    const $row   = $(input).closest('tr');
-    const empId  = $row.data('emp-id');
-    const date   = $row.data('att-date');
-    const status = $row.data('att-status');
-    const cin    = $row.find('.proj-att-checkin').val();
-    const cout   = $row.find('.proj-att-checkout').val();
-
-    $.post(APP_URL + '/api/operations/save_project_attendance.php', {
-        project_id: projectId, employee_id: empId, attendance_date: date,
-        status: status, check_in_time: cin, check_out_time: cout
-    }, function(res) {
-        if (res.success) {
-            if (cin && cout) {
-                const c1 = new Date('1970-01-01T' + cin);
-                const c2 = new Date('1970-01-01T' + cout);
-                const hrs = c2 > c1 ? ((c2 - c1) / 3600000).toFixed(1) + 'h' : '—';
-                $row.find('.proj-att-hours').text(hrs);
-            }
-        } else {
-            Swal.fire('Error', res.message, 'error');
-        }
-    }, 'json');
 }
 
 function openMarkAttendanceModal(record) {
@@ -21306,60 +21226,6 @@ function openMarkAttendanceModal(record) {
         $('#att_notes').val(record.notes || '');
     }
     $('#markAttendanceModal').modal('show');
-}
-
-function openEditAttendanceModal(id) {
-    $.getJSON(APP_URL + '/api/operations/get_project_attendance.php', {
-        project_id: projectId, date_from: '2000-01-01', date_to: '2099-12-31'
-    }, function(res) {
-        const rec = (res.data || []).find(r => r.attendance_id == id);
-        if (rec) openMarkAttendanceModal(rec);
-    });
-}
-
-function viewAttendanceRecord(id) {
-    $('#viewAttendanceModal').modal('show');
-    $('#viewAttendanceBody').html('<div class="text-center py-3"><div class="spinner-border text-primary"></div></div>');
-    $.getJSON(APP_URL + '/api/operations/get_project_attendance.php', {
-        project_id: projectId, date_from: '2000-01-01', date_to: '2099-12-31'
-    }, function(res) {
-        const r = (res.data || []).find(x => x.attendance_id == id);
-        if (!r) { $('#viewAttendanceBody').html('<p class="text-danger">Record not found.</p>'); return; }
-        const statusBadge = { present: 'bg-success', absent: 'bg-danger', late: 'bg-warning text-dark', half_day: 'bg-info', leave: 'bg-secondary', holiday: 'bg-primary' };
-        const badge = statusBadge[r.status] || 'bg-secondary';
-        const label = r.status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
-        $('#viewAttendanceBody').html(`
-            <div class="text-center mb-4">
-                <div class="bg-primary bg-opacity-10 text-primary rounded-circle mx-auto mb-3" style="width:64px;height:64px;display:flex;align-items:center;justify-content:center;"><i class="bi bi-calendar-check fs-2"></i></div>
-                <h5 class="fw-bold mb-1">${r.first_name} ${r.last_name}</h5>
-                <span class="badge ${badge}">${label}</span>
-            </div>
-            <div class="card bg-light border-0" style="border-radius:12px;">
-                <div class="card-body">
-                    <div class="row g-3">
-                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Date</small><strong>${r.attendance_date}</strong></div>
-                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Employee #</small><strong>${r.employee_number}</strong></div>
-                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Check-In</small><strong>${r.check_in_time || '—'}</strong></div>
-                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Check-Out</small><strong>${r.check_out_time || '—'}</strong></div>
-                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Total Hours</small><strong>${r.total_hours ? parseFloat(r.total_hours).toFixed(2) + 'h' : '—'}</strong></div>
-                        <div class="col-6"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Department</small><strong>${r.department_name || '—'}</strong></div>
-                        ${r.notes ? '<div class="col-12"><small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.7rem;">Notes</small><strong>' + r.notes + '</strong></div>' : ''}
-                    </div>
-                </div>
-            </div>`);
-    });
-}
-
-function deleteAttendanceRecord(id, name) {
-    Swal.fire({ title: 'Delete Record?', text: 'Delete attendance record for ' + name + '?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Delete' })
-    .then(r => {
-        if (r.isConfirmed) {
-            $.post(APP_URL + '/api/delete_attendance.php', { attendance_id: id }, function(res) {
-                if (res.success) { Swal.fire('Deleted!', res.message, 'success'); loadProjectAttendance(); }
-                else Swal.fire('Error', res.message, 'error');
-            }, 'json');
-        }
-    });
 }
 
 $('#markAttendanceForm').on('submit', function(e) {

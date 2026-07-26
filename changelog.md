@@ -1,5 +1,41 @@
 # BMS Changelog
 
+## 2026-07-26 (fix) — Project HR Attendance: one row per employee + real "View History" + Back to Project
+
+**Files:** `api/operations/get_project_attendance.php`, `app/bms/operations/project_view.php`,
+`app/bms/pos/attendance.php`
+
+Project Details > HR > Attendance was listing one row per attendance record (i.e. per
+employee per day), so any staff member with several days of history in the selected
+range appeared to "repeat many times." Rebuilt it to match the standalone Attendance
+page's aggregated week/month view instead:
+
+1. **`get_project_attendance.php`** now returns one row per active project employee,
+   with attendance counts (present/late/half_day/absent/leave) and total hours
+   aggregated across the selected date range, instead of one row per daily record.
+2. **Project's Attendance table** (`project_view.php`) redesigned to match: aggregate
+   columns (Total Hours, Present, Late, Half Day, Absent, On Leave) and a single
+   "View History" action per employee — same action the standalone Attendance page
+   uses — instead of per-day check-in/check-out editors and quick-mark buttons that
+   don't make sense on a multi-day aggregate row. Removed the now-dead per-record
+   functions (`projectQuickMark`, `projectUpdateAttTime`, `openEditAttendanceModal`,
+   `viewAttendanceRecord`, `deleteAttendanceRecord`) and their now-unused view modal.
+3. **"View History" now lands on the real, full `attendance.php`** page
+   (`attendance?employee=<id>`) — the exact same page used company-wide, with its
+   native Daily/Weekly/Monthly views, filters, print, and Excel export — not a
+   stripped-down in-project view.
+4. **Added "Back to Project" on `attendance.php`**, same convention as
+   `invoice_view.php` etc: when the employee being viewed belongs to a project, a
+   button links back to that project's page, regardless of how the visitor arrived.
+
+Note: while testing, found that an employee can have `employees.status = 'active'`
+(what this project list and the Project Staff tab check) while
+`employees.employment_status = 'terminated'` (what `attendance.php`'s own roster
+query checks) — such an employee shows in the project's attendance summary but
+"View History" lands on an empty roster there. Pre-existing data-model inconsistency
+between the two status fields, not introduced by this change and left alone pending
+a decision on which field should be authoritative.
+
 ## 2026-07-26 (feat) — Sitewide loading UX: top progress bar + shared skeleton engine
 
 **Files:** `assets/css/loading.css` (new), `assets/js/loading.js` (new), `header.php`,
