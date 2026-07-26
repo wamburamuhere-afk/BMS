@@ -5,6 +5,7 @@
 // designation changes never rewrite this appraisal. Saves as draft or submitted.
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../core/employee_status.php';
 
 header('Content-Type: application/json');
 
@@ -50,6 +51,9 @@ try {
     if (!$employee) throw new Exception('Employee not found');
     $emp_name = trim($employee['first_name'] . ' ' . $employee['last_name']);
     $designation_id = $employee['designation_id'] !== null ? (int)$employee['designation_id'] : null;
+
+    // No new appraisal cycle to rate someone against once they're no longer employed.
+    assertEmployeeActive($pdo, $employee_id, 'Employee');
 
     // Not a duplicate for this cycle (uniq_cycle_emp, excluding soft-deleted)
     $dup = $pdo->prepare("SELECT appraisal_id FROM employee_appraisals WHERE cycle_id = ? AND employee_id = ? AND status != 'deleted'");

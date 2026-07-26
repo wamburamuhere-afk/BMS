@@ -33,7 +33,9 @@ try {
                 $eid = (int)$eid;
                 if (!$eid) continue;
                 if (function_exists('assertScopeForEmployee')) assertScopeForEmployee($eid);
-                $chk = $pdo->prepare("SELECT employee_id FROM employees WHERE employee_id=? AND (status IS NULL OR status!='deleted')");
+                // Skip (not abort the whole batch) an inactive employee — no new
+                // training to enroll someone no longer employed in.
+                $chk = $pdo->prepare("SELECT employee_id FROM employees WHERE employee_id=? AND status = 'active'");
                 $chk->execute([$eid]);
                 if (!$chk->fetch()) continue;
                 $ins->execute([$training_id, $eid]);
