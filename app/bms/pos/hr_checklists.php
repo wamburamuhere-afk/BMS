@@ -146,7 +146,10 @@ window.openSpawnModal=function(){
     new bootstrap.Modal(document.getElementById('spawnModal')).show();
 };
 $('#spawnModal').on('shown.bs.modal', function(){
-    if (!$('#sp_employee').hasClass('select2-hidden-accessible')) $('#sp_employee').select2({ theme:'bootstrap-5',dropdownParent:$('#spawnModal'),placeholder:'Select employee…',width:'100%',minimumInputLength:1,ajax:{url:'<?= buildUrl('api/account/search_employees.php') ?>',dataType:'json',delay:300,data:p=>({q:p.term}),processResults:d=>({results:d.results}),cache:true} });
+    // Includes inactive employees — offboarding checklists legitimately target
+    // someone already deactivated; spawn_checklist.php enforces server-side that
+    // an onboarding template still requires an active employee.
+    if (!$('#sp_employee').hasClass('select2-hidden-accessible')) $('#sp_employee').select2({ theme:'bootstrap-5',dropdownParent:$('#spawnModal'),placeholder:'Select employee…',width:'100%',minimumInputLength:1,ajax:{url:'<?= buildUrl('api/account/search_employees.php') ?>',dataType:'json',delay:300,data:p=>({q:p.term,include_inactive:'1'}),processResults:d=>({results:d.results}),cache:true} });
 });
 $('#spawnForm').on('submit', function(e){
     e.preventDefault();
