@@ -7849,6 +7849,7 @@ $(document).ready(function() {
 
     logReportAction('Viewed Project Details', 'User viewed full details for project ID: ' + projectId);
     if (projectId > 0) {
+        if (window.BMSSkeleton) BMSSkeleton.render('#loading', { cards: 4, rows: 6 });
         loadProjectDetails();
         loadExpenseSchema();
     } else {
