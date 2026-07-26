@@ -23,7 +23,7 @@ try {
 
     $stmt = $pdo->prepare("
         SELECT vp.id, vp.amount, vp.payment_date, vp.payment_method,
-               vp.reference_number, vp.created_at,
+               vp.reference_number, vp.created_at, vp.reversed_at,
                a.account_name AS bank_name, a.account_code AS bank_code,
                u.username AS paid_by
         FROM voucher_payments vp
@@ -35,7 +35,8 @@ try {
     $stmt->execute([$voucher_id]);
     $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $total_paid = array_sum(array_column($payments, 'amount'));
+    // Total reflects what actually still stands — reversed payments no longer count.
+    $total_paid = array_sum(array_map(fn($p) => $p['reversed_at'] ? 0.0 : (float)$p['amount'], $payments));
 
     echo json_encode(['success' => true, 'payments' => $payments, 'total_paid' => $total_paid]);
 
