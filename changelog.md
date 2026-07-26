@@ -1,5 +1,69 @@
 # BMS Changelog
 
+## 2026-07-26 (feat) — Proper reversal mechanism for credit note / debit note / statutory remittance payments
+
+**Files:** `core/payment_source.php`, `api/sales/reverse_credit_note_payment.php` (new),
+`api/purchase/reverse_debit_note_payment.php` (new), `api/reverse_statutory_remittance.php` (new),
+`app/bms/sales/credit_notes/credit_note_view.php`, `app/bms/purchase/debit_notes/debit_note_view.php`,
+`app/bms/pos/statutory_remittances.php`
+
+Audited every source type that posts through the `postOutflow`/`postInflow` mirror
+pattern to check whether a mistaken "Pay"/"Remit" click could be undone. Five of
+eight already had a proper reversal (expenses, trips, supplier payments, bank
+transfers, revenue). Three did not: **credit note refunds**, **debit note
+settlements**, and **statutory remittances (PAYE/NSSF/SDL)** — their own delete
+endpoints even said *"reverse the payment first,"* an instruction pointing at a
+mechanism that didn't exist. The only way to undo a mistake for these three was
+the risky generic Journal Entries void/delete screen (see the entry below).
+
+Built the missing mechanism using the **contra-entry** pattern (Style B) rather
+than the delete-and-restore pattern (`reverseOutflow`/`reverseInflow`) already
+used by the other five — matching this codebase's own documented principle in
+`core/ledger_post.php` (`assertJournalNotPosted`'s docblock: *"posted journal
+entries are immutable... to reverse one you post a contra-entry, you don't edit
+the original"*) and standard double-entry practice: never delete/edit a posted
+entry, always correct it with a balancing entry so the full history stays
+visible in the ledger itself.
+
+1. **New shared engine** — `reverseMirroredEntry()` in `core/payment_source.php`
+   (plus thin `reverseOutflowContra()`/`reverseInflowContra()` wrappers): finds
+   the posted mirror entry (`entity_type='books_transaction'`), posts its exact
+   contra tagged `entity_type='books_transaction_void'`, leaves the original at
+   `status='posted'` untouched, and restores account balances only on the leg
+   the original posting actually moved (mirrors `postOutflow`/`postInflow`'s own
+   "only touch the cash leg" rule — correctly handles the WHT 3-leg case too).
+   Idempotent — a second call detects the existing contra and no-ops.
+2. **Three new endpoints**, one per gap, each gated by the same permission as
+   its "Pay" counterpart, period-lock protected
+   (`assertNotInFinalizedReconPeriod`), and restoring the source document to its
+   pre-payment status (`approved`/`pending`) with `transaction_id` and payment
+   fields cleared so it can be re-paid. The credit note path also reverses the
+   inventory/COGS restock leg via the already-existing `reverseCreditNoteRestock()`.
+3. **"Reverse Payment"/"Reverse" buttons** added to the credit note view, debit
+   note view, and statutory remittances list — reachable only from each
+   document's own page, never from the generic Journal Entries screen.
+
+**Testing:** 27 assertions in a `BEGIN`/`ROLLBACK`-isolated live-DB script
+(matching this codebase's own test-suite convention) covering plain outflow,
+WHT-split outflow, plain inflow, the restock leg, and graceful no-op/failure
+handling for missing or already-reversed transactions — all passed. Also ran a
+genuine end-to-end HTTP round trip (create → remit → reverse → verify → clean
+up) against a throwaway statutory remittance, confirming the real endpoint
+correctly restores status, clears fields, and leaves the original entry
+untouched while posting a balanced contra. Re-ran all 6 existing test suites
+touching this code (`test_credit_notes_cli`, `test_credit_note_restock_cli`,
+`test_credit_note_vat_reversal_cli`, `test_debit_notes_cli`,
+`test_payment_source_cli`, `test_supplier_payment_source_cli`) — 215/215 still
+pass, no regressions.
+
+**Found, not fixed (separate, pre-existing issue):** while sourcing real "paid"
+records to test against, every currently-paid credit note, debit note, and
+statutory remittance in this database has a `transaction_id` pointing at a row
+that doesn't exist in the `transactions` table at all — likely stale/synthetic
+seed data rather than something the application itself produced. Reversal
+correctly refuses these with a clear error (verified) rather than crashing, but
+none of them can be reversed until that underlying data is repaired separately.
+
 ## 2026-07-26 (fix) — Inactive employees: lock down forward-looking HR actions, fix offboarding gap
 
 **Files:** `app/bms/pos/employee_details.php`, `api/add_lifecycle_event.php`,
