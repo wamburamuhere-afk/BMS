@@ -2463,12 +2463,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-3 d-print-none gap-3">
                             <div class="text-center text-lg-start">
                                 <h5 class="fw-bold mb-0 text-primary"><i class="bi bi-calendar-check me-2"></i>Project Attendance</h5>
-                                <p class="text-muted small mb-0 mt-1">Track daily attendance for all staff assigned to this project.</p>
-                            </div>
-                            <div class="d-flex flex-wrap gap-2 justify-content-center justify-content-lg-end w-100 w-lg-auto">
-                                <button class="btn btn-outline-primary btn-sm px-3 shadow-sm" onclick="loadProjectAttendance()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
-                                <button class="btn btn-outline-secondary btn-sm px-3 shadow-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print</button>
-                                <button class="btn btn-primary btn-sm px-3 shadow-sm" onclick="openMarkAttendanceModal()"><i class="bi bi-plus-lg me-1"></i> Mark Attendance</button>
+                                <p class="text-muted small mb-0 mt-1">Mark today's attendance directly below, or pick a date range to review history.</p>
                             </div>
                         </div>
                         <!-- Stat Cards -->
@@ -5257,62 +5252,6 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
-
-<!-- ===== HR: Mark / Edit Attendance Modal ===== -->
-<div class="modal fade" id="markAttendanceModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-primary text-white py-3">
-                <h5 class="modal-title fw-bold" id="markAttModalTitle"><i class="bi bi-calendar-check me-2"></i>Mark Attendance</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form id="markAttendanceForm">
-                <input type="hidden" id="att_attendance_id" name="attendance_id" value="">
-                <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Staff Member <span class="text-danger">*</span></label>
-                        <select class="form-select" id="att_employee_id" name="employee_id" required>
-                            <option value="">Select Staff</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Date <span class="text-danger">*</span></label>
-                        <input type="date" class="form-control" id="att_date" name="attendance_date" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Status <span class="text-danger">*</span></label>
-                        <select class="form-select" id="att_status" name="status" required>
-                            <option value="present">Present</option>
-                            <option value="absent">Absent</option>
-                            <option value="late">Late</option>
-                            <option value="half_day">Half Day</option>
-                            <option value="leave">On Leave</option>
-                            <option value="holiday">Holiday</option>
-                        </select>
-                    </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-6">
-                            <label class="form-label fw-bold">Check-In Time</label>
-                            <input type="time" class="form-control" id="att_check_in" name="check_in_time">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label fw-bold">Check-Out Time</label>
-                            <input type="time" class="form-control" id="att_check_out" name="check_out_time">
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Notes</label>
-                        <textarea class="form-control" id="att_notes" name="notes" rows="2" placeholder="Optional notes..."></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer bg-light p-3">
-                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary px-4" id="btnSaveAttendance"><i class="bi bi-check-circle me-1"></i> Save</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 
 <!-- ===== HR: Apply / Edit Leave Modal ===== -->
 <div class="modal fade" id="applyLeaveModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
@@ -21085,10 +21024,12 @@ function deleteExpenseCategory(id) {
 // ============================================================
 $(document).ready(function() {
 
-    // Set default dates for attendance filters
+    // Set default dates for attendance filters — both default to today, so
+    // opening the tab lands directly on today's markable roster (same as the
+    // standalone Attendance page's Daily view). Widening the range switches
+    // to a read-only aggregated summary instead (see renderProjectAttendance).
     const today = new Date().toISOString().split('T')[0];
-    const firstOfMonth = today.substring(0, 8) + '01';
-    $('#attDateFrom').val(firstOfMonth);
+    $('#attDateFrom').val(today);
     $('#attDateTo').val(today);
 
     // Set default dates for leave filters
@@ -21116,8 +21057,10 @@ $(document).ready(function() {
 // ============================================================
 // HR: ATTENDANCE
 // ============================================================
+let projectAttViewMode = 'day';
+
 function loadProjectAttendance() {
-    const from   = $('#attDateFrom').val() || new Date().toISOString().split('T')[0].substring(0, 8) + '01';
+    const from   = $('#attDateFrom').val() || new Date().toISOString().split('T')[0];
     const to     = $('#attDateTo').val()   || new Date().toISOString().split('T')[0];
     const status = $('#attStatusFilter').val();
 
@@ -21135,7 +21078,8 @@ function loadProjectAttendance() {
             $('#attStatHalfDay').text(s.half_day || 0);
             $('#attStatOnLeave').text(s.leave || 0);
             $('#attStatHours').text(parseFloat(s.total_hours || 0).toFixed(1));
-            renderProjectAttendance(res.data);
+            projectAttViewMode = res.view_mode || 'day';
+            renderProjectAttendance(res.data, projectAttViewMode);
         } else {
             $('#hrAttendanceContent').html('<div class="alert alert-danger">' + res.message + '</div>');
         }
@@ -21144,20 +21088,100 @@ function loadProjectAttendance() {
     });
 }
 
-function renderProjectAttendance(data) {
+function renderProjectAttendance(data, viewMode) {
     if (!data || data.length === 0) {
         $('#hrAttendanceContent').html(`
             <div class="text-center py-5 text-muted border rounded" style="border-radius:12px;">
                 <i class="bi bi-calendar-check display-4 opacity-25"></i>
-                <p class="mt-2">No staff assigned to this project, or no attendance records found for the selected period.</p>
-                <button class="btn btn-sm btn-primary" onclick="openMarkAttendanceModal()"><i class="bi bi-plus-lg me-1"></i> Mark Attendance</button>
+                <p class="mt-2">No staff assigned to this project.</p>
             </div>`);
         return;
     }
 
-    // One row per employee (aggregated across the selected date range) — same
-    // shape as the standalone Attendance page's week/month view, so a staff
-    // member with several days of records doesn't repeat once per day.
+    if (viewMode === 'range') {
+        renderProjectAttendanceRange(data);
+    } else {
+        renderProjectAttendanceDay(data);
+    }
+}
+
+// Single date selected (default) — one row per employee, directly markable
+// in place, same behaviour as the standalone Attendance page's Daily view.
+function renderProjectAttendanceDay(data) {
+    const statusBadge = {
+        present: 'bg-success', absent: 'bg-danger', late: 'bg-warning text-dark',
+        half_day: 'bg-info', leave: 'bg-secondary', weekend: 'bg-dark'
+    };
+
+    let html = `<div class="table-responsive">
+        <table class="table table-hover align-middle border" style="border-radius:12px; overflow:hidden;">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-center" width="50">S/NO</th>
+                    <th>Staff Member</th>
+                    <th>Department / Role</th>
+                    <th>Check-In</th>
+                    <th>Check-Out</th>
+                    <th>Hours</th>
+                    <th>Status</th>
+                    <th class="text-end d-print-none">Actions</th>
+                </tr>
+            </thead><tbody>`;
+
+    data.forEach((r, i) => {
+        const name  = r.first_name + ' ' + r.last_name;
+        const badge = statusBadge[r.status] || 'bg-secondary';
+        const label = r.status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const cin   = r.check_in_time  ? r.check_in_time.substring(0, 5)  : '';
+        const cout  = r.check_out_time ? r.check_out_time.substring(0, 5) : '';
+        html += `<tr data-emp-id="${r.employee_id}" data-att-date="${r.attendance_date}" data-att-status="${r.status}">
+            <td class="text-center text-muted small">${i + 1}</td>
+            <td>
+                <div class="fw-bold text-dark">${name}</div>
+                <small class="badge bg-light text-primary border border-primary-subtle" style="font-size:0.65rem;">${r.employee_number}</small>
+            </td>
+            <td>
+                <div>${r.designation_name || 'Staff'}</div>
+                <small class="text-muted">${r.department_name || 'General'}</small>
+            </td>
+            <td>
+                <input type="time" class="form-control form-control-sm proj-att-checkin d-print-none" style="min-width:90px;" value="${cin}" onchange="projectUpdateAttTime(this)">
+                <span class="d-none d-print-inline small">${r.check_in_time || '—'}</span>
+            </td>
+            <td>
+                <input type="time" class="form-control form-control-sm proj-att-checkout d-print-none" style="min-width:90px;" value="${cout}" onchange="projectUpdateAttTime(this)">
+                <span class="d-none d-print-inline small">${r.check_out_time || '—'}</span>
+            </td>
+            <td><small class="proj-att-hours">${r.total_hours ? parseFloat(r.total_hours).toFixed(1) + 'h' : '—'}</small></td>
+            <td>
+                <span class="badge ${badge} d-none d-print-inline">${label}</span>
+                <div class="btn-group btn-group-sm d-print-none" role="group">
+                    <button type="button" class="btn btn-${r.status === 'present'  ? 'success'        : 'outline-success'} status-btn" onclick="projectQuickMark(this,'present','09:00','17:00')"  title="Mark Present"><i class="bi bi-check-circle"></i> P</button>
+                    <button type="button" class="btn btn-${r.status === 'late'     ? 'warning'        : 'outline-warning'} status-btn" onclick="projectQuickMark(this,'late','10:00','17:00')"     title="Mark Late"><i class="bi bi-clock"></i> L</button>
+                    <button type="button" class="btn btn-${r.status === 'absent'   ? 'danger'         : 'outline-danger'}  status-btn" onclick="projectQuickMark(this,'absent','','')"              title="Mark Absent"><i class="bi bi-x-circle"></i> A</button>
+                    <button type="button" class="btn btn-${r.status === 'half_day' ? 'info text-dark' : 'outline-info'}    status-btn" onclick="projectQuickMark(this,'half_day','09:00','13:00')" title="Mark Half Day"><i class="bi bi-dash-circle"></i> H</button>
+                </div>
+            </td>
+            <td class="text-end d-print-none">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item py-2" href="attendance?employee=${r.employee_id}"><i class="bi bi-clock-history me-2"></i>View History</a></li>
+                        ${r.existing_record ? `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteProjectAttendance(${r.employee_id}, '${r.attendance_date}', '${name}')"><i class="bi bi-trash me-2"></i>Delete</a></li>` : ''}
+                    </ul>
+                </div>
+            </td>
+        </tr>`;
+    });
+
+    html += '</tbody></table></div>';
+    $('#hrAttendanceContent').html(html);
+    initHrDropdowns('#hrAttendanceContent');
+}
+
+// A wider date range was picked — read-only aggregate, one row per employee
+// (same shape as the standalone Attendance page's week/month view).
+function renderProjectAttendanceRange(data) {
     let html = `<div class="table-responsive">
         <table class="table table-hover align-middle border" style="border-radius:12px; overflow:hidden;">
             <thead class="table-light">
@@ -21209,44 +21233,50 @@ function renderProjectAttendance(data) {
     initHrDropdowns('#hrAttendanceContent');
 }
 
-function openMarkAttendanceModal(record) {
-    $('#markAttModalTitle').html('<i class="bi bi-calendar-check me-2"></i>Mark Attendance');
-    $('#markAttendanceForm')[0].reset();
-    $('#att_attendance_id').val('');
-    $('#att_date').val(new Date().toISOString().split('T')[0]);
-    loadProjectStaffDropdown('#att_employee_id');
-    if (record) {
-        $('#markAttModalTitle').html('<i class="bi bi-pencil me-2"></i>Edit Attendance');
-        $('#att_attendance_id').val(record.attendance_id);
-        $('#att_employee_id').val(record.employee_id);
-        $('#att_date').val(record.attendance_date);
-        $('#att_status').val(record.status);
-        $('#att_check_in').val(record.check_in_time || '');
-        $('#att_check_out').val(record.check_out_time || '');
-        $('#att_notes').val(record.notes || '');
-    }
-    $('#markAttendanceModal').modal('show');
+function projectQuickMark(btn, status, defaultCheckIn, defaultCheckOut) {
+    const $row  = $(btn).closest('tr');
+    const empId = $row.data('emp-id');
+    const date  = $row.data('att-date');
+    const cin   = $row.find('.proj-att-checkin').val()  || defaultCheckIn;
+    const cout  = $row.find('.proj-att-checkout').val() || defaultCheckOut;
+
+    $.post(APP_URL + '/api/operations/save_project_attendance.php', {
+        project_id: projectId, employee_id: empId, attendance_date: date,
+        status: status, check_in_time: cin, check_out_time: cout
+    }, function(res) {
+        if (res.success) { loadProjectAttendance(); }
+        else { Swal.fire('Error', res.message, 'error'); }
+    }, 'json');
 }
 
-$('#markAttendanceForm').on('submit', function(e) {
-    e.preventDefault();
-    const btn = $('#btnSaveAttendance');
-    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
-    const data = $(this).serialize() + '&project_id=' + projectId;
-    $.post(APP_URL + '/api/operations/save_project_attendance.php', data, function(res) {
-        btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save');
-        if (res.success) {
-            $('#markAttendanceModal').modal('hide');
-            Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 1500, showConfirmButton: false });
-            loadProjectAttendance();
-        } else {
-            Swal.fire('Error', res.message, 'error');
+function projectUpdateAttTime(input) {
+    const $row   = $(input).closest('tr');
+    const empId  = $row.data('emp-id');
+    const date   = $row.data('att-date');
+    const status = $row.data('att-status');
+    const cin    = $row.find('.proj-att-checkin').val();
+    const cout   = $row.find('.proj-att-checkout').val();
+
+    $.post(APP_URL + '/api/operations/save_project_attendance.php', {
+        project_id: projectId, employee_id: empId, attendance_date: date,
+        status: status, check_in_time: cin, check_out_time: cout
+    }, function(res) {
+        if (res.success) { loadProjectAttendance(); }
+        else { Swal.fire('Error', res.message, 'error'); }
+    }, 'json');
+}
+
+function deleteProjectAttendance(employeeId, date, name) {
+    Swal.fire({ title: 'Delete Record?', text: 'Delete attendance record for ' + name + '?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Delete' })
+    .then(r => {
+        if (r.isConfirmed) {
+            $.post(APP_URL + '/api/delete_attendance.php', { employee_id: employeeId, attendance_date: date }, function(res) {
+                if (res.success) { Swal.fire({icon:'success', title:'Deleted!', text: res.message, timer:1500, showConfirmButton:false}); loadProjectAttendance(); }
+                else Swal.fire('Error', res.message, 'error');
+            }, 'json');
         }
-    }, 'json').fail(function() {
-        btn.prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Save');
-        Swal.fire('Error', 'Request failed.', 'error');
     });
-});
+}
 
 // ============================================================
 // HR: LEAVES

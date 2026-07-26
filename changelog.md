@@ -1,30 +1,42 @@
 # BMS Changelog
 
-## 2026-07-26 (fix) — Project HR Attendance: one row per employee + real "View History" + Back to Project
+## 2026-07-26 (fix) — Project HR Attendance: day-mode marking like the standalone page, no more repeated rows
 
 **Files:** `api/operations/get_project_attendance.php`, `app/bms/operations/project_view.php`,
 `app/bms/pos/attendance.php`
 
 Project Details > HR > Attendance was listing one row per attendance record (i.e. per
 employee per day), so any staff member with several days of history in the selected
-range appeared to "repeat many times." Rebuilt it to match the standalone Attendance
-page's aggregated week/month view instead:
+range appeared to "repeat many times," and marking attendance required a separate
+modal instead of the standalone Attendance page's direct inline marking. Rebuilt to
+mirror `attendance.php`'s own dual view design exactly:
 
-1. **`get_project_attendance.php`** now returns one row per active project employee,
-   with attendance counts (present/late/half_day/absent/leave) and total hours
-   aggregated across the selected date range, instead of one row per daily record.
-2. **Project's Attendance table** (`project_view.php`) redesigned to match: aggregate
-   columns (Total Hours, Present, Late, Half Day, Absent, On Leave) and a single
-   "View History" action per employee — same action the standalone Attendance page
-   uses — instead of per-day check-in/check-out editors and quick-mark buttons that
-   don't make sense on a multi-day aggregate row. Removed the now-dead per-record
-   functions (`projectQuickMark`, `projectUpdateAttTime`, `openEditAttendanceModal`,
-   `viewAttendanceRecord`, `deleteAttendanceRecord`) and their now-unused view modal.
-3. **"View History" now lands on the real, full `attendance.php`** page
+1. **`get_project_attendance.php`** now branches on the date range, same as the
+   standalone Attendance page's Daily vs Week/Month views:
+   - **Single date selected (the default — today):** one row per active project
+     employee for that exact day — real record if one exists, otherwise defaulted
+     to `weekend` / `leave` / `absent` the same way `attendance.php` does.
+   - **A wider date range:** one row per employee, aggregated (present/late/
+     half_day/absent/leave counts + total hours) — read-only history, not a
+     per-day list, so a multi-day range never repeats an employee.
+2. **Project's Attendance table** (`project_view.php`) now renders whichever shape
+   the API returns. Day mode is directly markable in place — check-in/check-out
+   inputs and P/L/A/H quick-mark buttons — the exact same interaction as the
+   standalone page, restoring `projectQuickMark`/`projectUpdateAttTime` (removed
+   in an earlier pass of this fix) plus a new `deleteProjectAttendance` wired to
+   the real `api/delete_attendance.php` contract (`employee_id` + `attendance_date`,
+   not `attendance_id` — the old project code called it with the wrong shape and
+   would have silently failed). Range mode stays read-only with a "View History"
+   action per employee, same as before.
+3. **Toolbar simplified**: removed "Mark Attendance" (the modal-based flow no
+   longer matches how marking actually works now — it's inline), "Print" (the
+   project-level Print button already prints the whole page), and "Refresh" (not
+   needed). Removed the now-fully-unused Mark/Edit Attendance modal and its form
+   handler.
+4. **"View History" (both modes) lands on the real, full `attendance.php`** page
    (`attendance?employee=<id>`) — the exact same page used company-wide, with its
-   native Daily/Weekly/Monthly views, filters, print, and Excel export — not a
-   stripped-down in-project view.
-4. **Added "Back to Project" on `attendance.php`**, same convention as
+   native Daily/Weekly/Monthly views, filters, print, and Excel export.
+5. **Added "Back to Project" on `attendance.php`**, same convention as
    `invoice_view.php` etc: when the employee being viewed belongs to a project, a
    button links back to that project's page, regardless of how the visitor arrived.
 
