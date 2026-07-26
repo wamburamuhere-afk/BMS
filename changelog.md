@@ -1,5 +1,54 @@
 # BMS Changelog
 
+## 2026-07-26 (fix) — Inactive employees: lock down forward-looking HR actions, fix offboarding gap
+
+**Files:** `app/bms/pos/employee_details.php`, `api/add_lifecycle_event.php`,
+`api/pos/assign_salary_component.php`, `api/add_contract.php`, `api/add_appraisal.php`,
+`api/add_goal.php`, `api/manage_training_participants.php`, `api/account/search_employees.php`,
+`app/bms/pos/hr_checklists.php`, `api/spawn_checklist.php`, `api/get_payroll_details.php`,
+`app/bms/pos/payroll_details.php`
+
+Audited every "create a new record" action reachable from an employee's profile,
+live against a real terminated employee, to check whether inactive employees
+were correctly locked out of actions that only make sense for someone still
+employed. They mostly weren't — every button was gated by role permission only,
+never by the employee's own status. Fixed in four phases:
+
+1. **Backend hardening** — added `assertEmployeeActive()` (already used by
+   Attendance/Leave) to every previously-unprotected create endpoint:
+   `add_lifecycle_event.php` (Promote/Transfer/Award/Warn/Complaint/Resignation/
+   **Termination** — confirmed live you could re-terminate an already-terminated
+   employee), `assign_salary_component.php`, `add_contract.php`, `add_appraisal.php`,
+   `add_goal.php`, and `manage_training_participants.php` (skips an inactive
+   employee within a batch enrollment rather than aborting the whole batch).
+2. **UI lockdown** — `employee_details.php` gets one computed
+   `$is_active_employee` flag; the "HR Action" dropdown, Salary Structure "Add
+   Component", Attendance "Check In Now/Check Out Now/Mark Attendance", and
+   Leave "Apply for Leave" are hidden when the employee is inactive. Documents
+   upload and Edit Profile stay available — HR still legitimately needs those
+   after termination (final paperwork, bank-detail corrections for last pay).
+3. **Fixed the one gap in the opposite direction** — the shared employee picker
+   (`search_employees.php`) already excludes inactive employees everywhere,
+   which correctly blocks new Contracts/Appraisals/Goals/Training enrollment,
+   but also wrongly made it impossible to spawn an **offboarding** checklist for
+   someone already deactivated. Added an opt-in `include_inactive=1` param
+   (every other caller is untouched — verified `?q=...` without the flag still
+   returns zero results for an inactive employee) and wired it into
+   `hr_checklists.php`'s employee picker; `spawn_checklist.php` now enforces
+   server-side that an *onboarding* template still requires an active employee
+   while *offboarding* accepts either — verified live: onboarding rejected,
+   offboarding succeeded, for the same inactive employee.
+4. **Labeled the legitimate exception** — Payroll's Approve/Mark-as-Paid on an
+   *existing* unpaid record for an inactive employee is correct behavior (final
+   settlement for pre-termination wages), not a bug. Added an `employee_status`
+   field to `get_payroll_details.php` and a "Final Settlement" badge on
+   `payroll_details.php` so it reads as intentional rather than a leftover
+   general-purpose button. Verified live against a real employee with two
+   pre-existing unpaid payroll rows from before their termination.
+
+Verified no regression: re-checked an active employee's page shows every
+button as before.
+
 ## 2026-07-26 (fix) — Attendance quick-mark buttons no longer overwrite a custom check-in/out time
 
 **Files:** `app/bms/pos/attendance.php`, `api/quick_mark_attendance.php`

@@ -323,7 +323,13 @@ function loadPayrollDetails() {
 
         const p = res.data.payroll;
         $('#payroll_number_display').text(p.payroll_number);
-        $('#employee_name').text(`${p.first_name} ${p.last_name}`);
+        // Flag records for an employee who is no longer active — this is a
+        // legitimate final settlement (wages earned before termination), not a
+        // stray general-purpose "pay" action left visible by mistake.
+        const nameHtml = `${p.first_name} ${p.last_name}` + (p.employee_status !== 'active'
+            ? ' <span class="badge bg-dark ms-1" title="Employee is inactive — this is a final settlement for a pre-termination period">Final Settlement</span>'
+            : '');
+        $('#employee_name').html(nameHtml);
         $('#designation_dept').text(`${p.designation_name} | ${p.department_name}`);
         $('#employee_avatar').text(`${p.first_name.charAt(0)}${p.last_name.charAt(0)}`);
         $('#payroll_period').text(p.payroll_period);
