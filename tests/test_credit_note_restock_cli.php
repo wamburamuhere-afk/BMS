@@ -49,9 +49,11 @@ $sra  ? pass("salesReturnsAccountId → #$sra")        : fail('salesReturnsAccou
 // ─────────────────────────────────────────────────────────────────────────
 section('2. postCreditNoteRestock posts a balanced Dr Inventory / Cr COGS (rolled back)');
 
-// A real stocked product with a sane cost (cost ≤ selling, mirroring the COGS guard).
+// A real stocked product with a sane cost (cost ≤ selling, mirroring the COGS
+// guard) — is_service=0, since a service never restocks Inventory (post_principle.md).
 $prod = $pdo->query("SELECT product_id, cost_price, selling_price FROM products
                       WHERE cost_price > 0 AND (selling_price = 0 OR selling_price >= cost_price)
+                        AND is_service = 0
                    ORDER BY product_id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 $cust = (int)($pdo->query("SELECT customer_id FROM customers ORDER BY customer_id LIMIT 1")->fetchColumn() ?: 0);
 $uid  = (int)($pdo->query("SELECT user_id FROM users ORDER BY user_id LIMIT 1")->fetchColumn() ?: 1);

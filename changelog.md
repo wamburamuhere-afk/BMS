@@ -1,5 +1,45 @@
 # BMS Changelog
 
+## 2026-07-26 (fix) — Correct pre-existing is_service COGS/Inventory overstatements
+
+**Files:** `migrations/2026_07_26_correct_is_service_cogs_entries.php` (new),
+`tests/test_credit_note_restock_cli.php`, `tests/test_invoice_cogs_cli.php`
+
+The `is_service` COGS fix (this same day, `core/sales_posting.php` etc.) stops
+the bug going forward, but doesn't retroactively touch anything already posted.
+The pre-push hook's own test suite caught the gap directly: `test_invoice_cogs_cli`
+and `test_credit_note_restock_cli` started failing after the fix, because their
+fixture-selection queries didn't filter `is_service` either and picked up **real,
+already-corrupted, live GL entries** as their "expected" baseline.
+
+Scanned every posted `invoice_cogs`/`pos_cogs`/`credit_note_cogs`/`purchase_return`
+entry against the now-corrected functions and found 2 genuinely wrong entries:
+
+- **Entry #75002** (Invoice #23) — posted Dr COGS / Cr Inventory **3,504,500,000.00**
+  for an invoice whose every line item is a service (`is_service=1`) with a large
+  `cost_price` on file. Correct value: **0**.
+- **Entry #24908** (POS sale #371) — posted 16,012,000.00; one service line was
+  wrongly included. Correct value: 16,000,000.00 (overstated by 12,000.00).
+
+**Fix — new migration**, criteria-based (re-derives every corrupted entry from
+the ledger + the fixed calculator functions, no entry ids hard-coded, so it
+self-heals whatever exists in each environment). Never edits or deletes the
+original posted entry — posts a Style B contra-entry for exactly the overstated
+excess (`Dr <original credit account> / Cr <original debit account>`, read from
+the entry itself so it works for both COGS-shaped and purchase-return-shaped
+entries), tagged `entity_type='<original>_isservice_correction'`. Idempotent —
+re-running skips anything already corrected.
+
+Verified with a rolled-back dry run before applying for real: net COGS/Inventory
+impact of Invoice #23's entries is now exactly 0.00, POS sale #371's net COGS is
+exactly 16,000,000.00, and the whole ledger stays balanced (Σ Dr = Σ Cr) through
+the correction. Applied for real, then confirmed idempotent on a second run.
+
+Also fixed the two test files' own fixture-selection queries to filter
+`is_service = 0` — they were the root cause of the confusion (an under-specified
+"expected" baseline that could legitimately include a service), not a code bug.
+Both pass cleanly now against a genuine physical-goods fixture.
+
 ## 2026-07-26 (feat) — Payment Voucher: reverse a mistakenly-recorded payment
 
 **Files:** `core/expense_posting.php`, `api/account/reverse_voucher_payment.php` (new),
