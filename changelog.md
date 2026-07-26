@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-07-26 (feat) — Sitewide loading UX: top progress bar + shared skeleton engine
+
+**Files:** `assets/css/loading.css` (new), `assets/js/loading.js` (new), `header.php`,
+`footer.php`, `app/bms/operations/project_view.php`
+
+Added a global, professional loading experience so pages don't feel like they're
+frozen while data loads, without needing every page to be touched individually:
+
+1. **Top progress bar** — a slim bar (amber/orange gradient, chosen for contrast
+   against the app's blue header, which the default blue completely disappeared
+   into during testing) that automatically shows on every `$.ajax` call and on
+   internal link clicks, sitewide, via `header.php`/`footer.php` (included on
+   every page already). Zero per-page changes needed — verified live on both
+   Project Details and Dashboard.
+2. **Shared skeleton-screen helper** (`window.BMSSkeleton.render(selector, opts)`) —
+   shimmering placeholder cards/lines instead of a blank spinner, opt-in per page
+   since real layouts differ too much to safely auto-detect (a blind global
+   auto-replace risked breaking table-cell loaders and empty-state messages that
+   share the same `spinner-border`/`text-center py-5` markup elsewhere in the
+   codebase — verified this would be unsafe before ruling it out).
+3. Applied the skeleton opt-in to **Project Details** (`#loading`) as the first
+   page, since that's the page identified as slow (see the fix below this entry).
+   Other heavy pages can adopt it with one line using the same shared engine.
+
 ## 2026-07-25 (fix) — Project HR Attendance tab no longer lists inactive employees
 
 **File:** `api/operations/get_project_attendance.php`
