@@ -1,5 +1,49 @@
 # BMS Changelog
 
+## 2026-07-26 (feat) — Payment Voucher: reverse a mistakenly-recorded payment
+
+**Files:** `core/expense_posting.php`, `api/account/reverse_voucher_payment.php` (new),
+`api/account/record_voucher_payment.php`, `api/account/delete_voucher.php`,
+`api/account/get_voucher_payments.php`, `app/constant/accounts/payment_vouchers.php`,
+`migrations/2026_07_26_voucher_payment_reversal_columns.php` (new)
+
+Audited Payment Voucher against `post_principle.md`'s 6 questions. Found one gap:
+once a voucher has a recorded payment, `delete_voucher.php` locks it with "Reverse
+the payment(s) first" — but no reversal endpoint existed anywhere. A mistaken
+payment (wrong amount/account, duplicate click) had no way to be undone short of
+the risky generic Journal Entries screen — the same class of gap already fixed
+this session for credit notes, debit notes, and statutory remittances.
+
+1. **`reverseVoucherPayment()`** (`core/expense_posting.php`) — Style B
+   contra-entry via the existing `reverseOutflowContra()`, operating on ONE
+   `voucher_payments` row (a voucher can carry several partial payments), not the
+   whole voucher. Removes that payment's own bank-register row by its captured
+   id, marks it `reversed_at`/`reversed_by`, and recomputes the voucher's status
+   from its remaining non-reversed payments. Idempotent.
+2. **New endpoint** `api/account/reverse_voucher_payment.php`, gated by
+   `canApprove('payment_vouchers')` (undoing money movement, same tier as
+   approving it) — verified against live role data that every role with edit
+   access to this module already carries `can_approve` too, so nobody is
+   inadvertently locked out.
+3. **Bug found and fixed while making the reversal precise**:
+   `recordBankTransaction()` dedupes on `(bank_account_id, reference_number,
+   type)`, and every partial payment on a voucher reused the same reference (the
+   voucher number) — so a second partial payment to the same account was
+   **silently never recorded on the Bank Statement at all**. Fixed in
+   `record_voucher_payment.php` by suffixing the reference for the 2nd+ payment
+   and capturing the real `bank_transaction_id` on each `voucher_payments` row,
+   so reversal always targets one exact row instead of an ambiguous reference
+   match. First-payment behaviour is unchanged (still the plain voucher number).
+4. `delete_voucher.php`'s payment-lock check and `get_voucher_payments.php`'s
+   totals now exclude reversed payments. Added a "Reverse" button + confirmation
+   to the voucher payment-history view.
+
+Verified live end-to-end (BEGIN/ROLLBACK isolation): single full payment →
+reverse restores the bank balance and voucher status exactly; two partial
+payments to the same account now correctly produce two distinct bank-register
+rows (proving the dedup-collision fix), and reversing only the first leaves the
+second's GL entry, bank row, and paid amount completely untouched.
+
 ## 2026-07-26 (fix) — Services (`is_service=1`) no longer post spurious COGS/Inventory movement
 
 **Files:** `core/sales_posting.php`, `core/revenue_posting.php`, `core/purchase_posting.php`,

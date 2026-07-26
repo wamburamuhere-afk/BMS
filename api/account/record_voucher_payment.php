@@ -53,8 +53,9 @@ try {
         throw new Exception("Payments can only be recorded on approved or partially paid vouchers.");
     }
 
-    // Calculate already paid and balance
-    $paid_stmt = $pdo->prepare("SELECT COALESCE(SUM(amount),0) FROM voucher_payments WHERE voucher_id = ?");
+    // Calculate already paid and balance — excludes reversed payments, which no
+    // longer count toward what was actually paid.
+    $paid_stmt = $pdo->prepare("SELECT COALESCE(SUM(amount),0) FROM voucher_payments WHERE voucher_id = ? AND reversed_at IS NULL");
     $paid_stmt->execute([$voucher_id]);
     $already_paid = round((float)$paid_stmt->fetchColumn(), 2);
     $balance_due  = round((float)$voucher['amount'] - $already_paid, 2);
@@ -104,20 +105,28 @@ try {
         "Voucher {$voucher['voucher_number']} — {$voucher['payee_name']}", $v_proj
     );
 
-    // Record bank transaction
-    recordBankTransaction($pdo, $paid_from_account_id, $payment_amount, 'withdrawal',
-        $payment_date, $voucher['voucher_number'],
+    // Record bank transaction. recordBankTransaction() dedupes on
+    // (bank_account_id, reference_number, type) — a second partial payment on the
+    // SAME voucher to the SAME account would otherwise collide with the first
+    // payment's reference and silently record nothing. Suffix the reference for
+    // the 2nd+ payment so each gets its own row (the first payment's reference is
+    // left exactly as the voucher number — no behaviour change for the common
+    // single-payment case).
+    $paidCountBefore = (int)$pdo->query("SELECT COUNT(*) FROM voucher_payments WHERE voucher_id = " . (int)$voucher_id . " AND reversed_at IS NULL")->fetchColumn();
+    $bank_ref = $paidCountBefore > 0 ? $voucher['voucher_number'] . '-P' . ($paidCountBefore + 1) : $voucher['voucher_number'];
+    $bank_txn_id = recordBankTransaction($pdo, $paid_from_account_id, $payment_amount, 'withdrawal',
+        $payment_date, $bank_ref,
         "Voucher {$voucher['voucher_number']} — {$voucher['payee_name']}", (int)$_SESSION['user_id']);
 
     // Insert into voucher_payments
     $pdo->prepare("
         INSERT INTO voucher_payments
             (voucher_id, amount, paid_from_account_id, payment_date, payment_method,
-             reference_number, gl_transaction_id, attachment, created_by, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+             reference_number, gl_transaction_id, bank_transaction_id, attachment, created_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     ")->execute([
         $voucher_id, $payment_amount, $paid_from_account_id, $payment_date,
-        $payment_method, $reference_number, $gl_txn_id, $attachment_path, $_SESSION['user_id']
+        $payment_method, $reference_number, $gl_txn_id, $bank_txn_id, $attachment_path, $_SESSION['user_id']
     ]);
 
     // Determine new voucher status
