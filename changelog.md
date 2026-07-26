@@ -1,5 +1,40 @@
 # BMS Changelog
 
+## 2026-07-26 (fix) — Attendance quick-mark buttons no longer overwrite a custom check-in/out time
+
+**Files:** `app/bms/pos/attendance.php`, `api/quick_mark_attendance.php`
+
+The P/L/A/H quick-status buttons (and the gear-menu "Mark Present"/"Mark Late")
+each had a fixed check-in/check-out time hardcoded into their `onclick`
+(`quickMarkAttendance(id, 'present', '09:00', '17:00')`, etc.), which then hit
+`api/quick_mark_attendance.php`'s unconditional `UPDATE ... SET check_in_time = ?,
+check_out_time = ?`. So typing a custom time (e.g. 07:30) into a row and then
+clicking that row's status button — a natural next step, not a misuse — silently
+overwrote it with the button's fixed default and reloaded the page, which is
+what was being seen as "check-in time changes to another time on its own."
+
+Fixed by having each of these read the row's current Check-In/Check-Out input
+values first and only fall back to the button's hardcoded default when that
+field is still empty — the same "existing value wins, default only fills gaps"
+rule already used by the project-attendance quick-mark buttons. Marking someone
+Absent still forces both times blank, since presence and absence are exclusive.
+Verified live: typed 07:30 → clicked Present → check-in stayed 07:30, check-out
+defaulted to 17:00 (was empty); then clicked Absent → both correctly cleared.
+
+Also hardened `api/quick_mark_attendance.php` itself with the same fallback,
+server-side — mirroring the pattern `api/mark_attendance.php` (Employee Details
+> Attendance tab) already used. The JS fix above protects today's buttons; this
+protects the endpoint itself against any other/future caller that omits a
+field, so the guarantee doesn't depend on every caller remembering to read the
+row first. Verified directly against the endpoint: a call that omitted
+`check_out_time` entirely preserved the previously-saved value instead of
+nulling it, and a `status=absent` call still correctly cleared both times.
+
+Audited all three places attendance can be marked (Project Attendance,
+standalone Attendance page, Employee Details > Attendance tab) — this was the
+only one with the bug; the other two already had the correct "preserve unless
+absent" behavior from how they were originally written.
+
 ## 2026-07-26 (fix) — Project HR Attendance: day-mode marking like the standalone page, no more repeated rows
 
 **Files:** `api/operations/get_project_attendance.php`, `app/bms/operations/project_view.php`,
