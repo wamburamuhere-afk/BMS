@@ -283,6 +283,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     
     <link rel="stylesheet" href="<?= getUrl('style.css') ?>">
     <link rel="stylesheet" href="<?= getUrl('assets/css/responsive.css') ?>">
+    <link rel="stylesheet" href="<?= getUrl('assets/css/loading.css') ?>">
 
     <style>
         /* ── Two-bar fixed header ── */
