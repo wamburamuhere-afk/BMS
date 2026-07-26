@@ -41,10 +41,14 @@ $cat = $pdo->query("SELECT at.category FROM accounts a JOIN account_types at ON 
 ($cat === 'cogs') ? pass("COGS account is classified 'cogs' (will show in the COGS section)") : fail("COGS account category='$cat' (not cogs — won't show in COGS section)");
 
 section('2. postInvoiceCOGS posts Dr COGS / Cr Inventory = Σ qty×cost (rolled back)');
+// is_service=0 only — a service line never contributes to COGS (post_principle.md);
+// including it here would compute an $expected the fixed invoiceCogsValue() can
+// never match, since it correctly excludes services.
 $row = $pdo->query("
     SELECT i.invoice_id, i.invoice_number, COALESCE(SUM(ii.quantity*COALESCE(p.cost_price,0)),0) cogs
       FROM invoices i JOIN invoice_items ii ON ii.invoice_id=i.invoice_id JOIN products p ON p.product_id=ii.product_id
      WHERE i.status NOT IN ('cancelled','rejected','deleted','draft') AND ii.product_id IS NOT NULL
+       AND p.is_service = 0
        AND NOT EXISTS (SELECT 1 FROM pos_sales ps WHERE ps.invoice_id=i.invoice_id)
   GROUP BY i.invoice_id HAVING cogs>0 ORDER BY cogs DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 if (!$row) { fail('no product invoice with COGS found — cannot run'); return; }
