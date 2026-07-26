@@ -1537,12 +1537,23 @@ function updateAttendanceNotes(employeeId, notes) {
     });
 }
 
-// Quick mark attendance with button click (auto-fills times)
+// Quick mark attendance with button click. checkInTime/checkOutTime are only
+// DEFAULTS, used when that field is still empty — a time the user already
+// typed into the row (e.g. a custom 07:30 check-in) is preserved rather than
+// silently overwritten by the button's fixed default. Marking someone Absent
+// still forces both times blank, since presence and absence are exclusive.
 function quickMarkAttendance(employeeId, status, checkInTime, checkOutTime) {
+    if (status !== 'absent') {
+        const $checkIn  = $(`.check-in-time[data-employee-id="${employeeId}"]`);
+        const $checkOut = $(`.check-out-time[data-employee-id="${employeeId}"]`);
+        if ($checkIn.length && $checkIn.val())   checkInTime  = $checkIn.val();
+        if ($checkOut.length && $checkOut.val()) checkOutTime = $checkOut.val();
+    }
+
     // Visual feedback - disable button temporarily
     const buttons = document.querySelectorAll(`button[data-employee-id="${employeeId}"]`);
     buttons.forEach(btn => btn.disabled = true);
-    
+
     $.ajax({
         url: APP_URL + '/api/quick_mark_attendance',
         type: 'POST',
@@ -1589,15 +1600,21 @@ function quickMarkPresent(employeeId) {
         cancelButtonColor: '#6c757d'
     }).then((result) => {
         if (result.isConfirmed) {
+            // Preserve a time already entered for this row; only default to
+            // 09:00-17:00 when the field is still empty.
+            const $checkIn  = $(`.check-in-time[data-employee-id="${employeeId}"]`);
+            const $checkOut = $(`.check-out-time[data-employee-id="${employeeId}"]`);
+            const checkInTime  = ($checkIn.length && $checkIn.val())   ? $checkIn.val()  : '09:00';
+            const checkOutTime = ($checkOut.length && $checkOut.val()) ? $checkOut.val() : '17:00';
             $.ajax({
                 url: APP_URL + '/api/quick_mark_attendance',
                 type: 'POST',
-                data: { 
+                data: {
                     employee_id: employeeId,
                     attendance_date: '<?= $selected_date ?>',
                     status: 'present',
-                    check_in_time: '09:00',
-                    check_out_time: '17:00'
+                    check_in_time: checkInTime,
+                    check_out_time: checkOutTime
                 },
                 dataType: 'json',
                 success: function(response) {
@@ -1695,15 +1712,21 @@ function quickMarkLate(employeeId) {
         cancelButtonColor: '#6c757d'
     }).then((result) => {
         if (result.isConfirmed) {
+            // Preserve a time already entered for this row; only default to
+            // 10:00-18:00 when the field is still empty.
+            const $checkIn  = $(`.check-in-time[data-employee-id="${employeeId}"]`);
+            const $checkOut = $(`.check-out-time[data-employee-id="${employeeId}"]`);
+            const checkInTime  = ($checkIn.length && $checkIn.val())   ? $checkIn.val()  : '10:00';
+            const checkOutTime = ($checkOut.length && $checkOut.val()) ? $checkOut.val() : '18:00';
             $.ajax({
                 url: APP_URL + '/api/quick_mark_attendance',
                 type: 'POST',
-                data: { 
+                data: {
                     employee_id: employeeId,
                     attendance_date: '<?= $selected_date ?>',
                     status: 'late',
-                    check_in_time: '10:00',
-                    check_out_time: '18:00'
+                    check_in_time: checkInTime,
+                    check_out_time: checkOutTime
                 },
                 dataType: 'json',
                 success: function(response) {
