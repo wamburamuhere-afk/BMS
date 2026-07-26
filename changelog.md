@@ -1,5 +1,57 @@
 # BMS Changelog
 
+## 2026-07-26 (fix) — Services (`is_service=1`) no longer post spurious COGS/Inventory movement
+
+**Files:** `core/sales_posting.php`, `core/revenue_posting.php`, `core/purchase_posting.php`,
+`app/bms/purchase/rfq_create.php`, `app/bms/purchase/purchase_returns.php`
+
+Audited every `Σ(quantity × cost_price)` calculator against `post_principle.md`
+and found none of them excluded `is_service=1` products, even though a service
+never enters Inventory via GRN (confirmed: GRN/PO/Stock Transfers/Stock
+Adjustments already gate on `is_service=0`). Proved live (rolled-back test) that
+selling a service with a `cost_price` set — a required field on every product,
+so this triggers on normal data entry, not misuse — wrongly posted Dr COGS /
+Cr Inventory. The resulting entry is internally Dr=Cr balanced, so
+`assertLedgerBalanced()` can never catch this class of bug; only an
+account-level audit does.
+
+1. **`posSaleCogs()`** (POS sale COGS) — added `AND p.is_service = 0`.
+2. **`invoiceCogsValue()`** (Invoice COGS) — added `AND p.is_service = 0`
+   (previously had no cost-sanity guard at all, unlike the POS twin).
+3. **`creditNoteRestockCost()`** (customer-return restock) — same gap, same fix;
+   its own docblock's claim that "service lines naturally contribute 0" was
+   false (it only excluded NULL/unmatched `product_id`, not a real service row).
+4. **`purchaseReturnValue()`** (supplier-return AP/Inventory contra) — added an
+   `is_service` guard via `LEFT JOIN products` (kept `LEFT` so a free-text line
+   with no `product_id` still counts, since its cost lives in the return item's
+   own `unit_price`, not `products.cost_price`).
+5. **Two procurement product-picker leaks found and closed**: `rfq_create.php`
+   fetched the product list with no `is_service`/`warehouse_id` filter at all
+   (previously relying solely on a client-side JS filter); `purchase_returns.php`
+   fetched with **no filtering whatsoever**, letting a user attach a service line
+   directly to a Purchase Return, which would have fed the bug in (4). Both now
+   send `is_service=0`, matching the convention GRN/PO already use.
+
+Traced the full chain for the one case a service legitimately carries a real
+cost — NIP (Non-Inventory Product) materials/BOM, which computes a service's
+`cost_price` from attached component materials — and confirmed neither
+`process_sale.php` nor `save_invoice.php` ever reads
+`product_assembly_components`, so no physical stock is actually consumed at
+sale time. The fix is correct as-is; there is no requisition/goods-issue
+mechanism anywhere in the codebase to post real BOM consumption, which is a
+separate, pre-existing feature gap, not something this fix should attempt.
+
+Verified live end-to-end (BEGIN/ROLLBACK isolation) for all four functions:
+service-only lines now post/compute zero, mixed service+goods lines correctly
+count only the goods portion, and free-text purchase-return lines are
+unaffected (no regression).
+
+**Not in scope:** `postGrnReceipt`, `postSubcontractorAccrual`,
+`postGoodsInvoiceAccrual` were audited and found already correct —
+subcontractor costs post `Dr COGS / Cr AP` with no Inventory leg at all, and
+GRN has a server-side `is_service` guard in `create_grn.php` independent of
+the client-side picker.
+
 ## 2026-07-26 (feat) — Proper reversal mechanism for credit note / debit note / statutory remittance payments
 
 **Files:** `core/payment_source.php`, `api/sales/reverse_credit_note_payment.php` (new),

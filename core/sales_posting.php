@@ -75,6 +75,9 @@ if (!function_exists('posSaleCogs')) {
      * inject a bogus COGS into the ledger, so it contributes 0 here (and the backfill
      * reports it). Once the cost_price is corrected the line is counted normally, so
      * a re-run is self-healing. Criteria-based — no product ids hard-coded.
+     *
+     * Services (is_service=1) never enter Inventory via GRN, so they must never
+     * leave it via COGS either — excluded regardless of any cost_price on file.
      */
     function posSaleCogs(PDO $pdo, int $saleId): float
     {
@@ -82,6 +85,7 @@ if (!function_exists('posSaleCogs')) {
                             FROM pos_sale_items si
                             JOIN products p ON si.product_id = p.product_id
                            WHERE si.sale_id = " . (int)$saleId . "
+                             AND p.is_service = 0
                              AND NOT (p.cost_price > p.selling_price AND p.selling_price > 0)")->fetchColumn();
         return round((float)$v, 2);
     }
@@ -237,9 +241,11 @@ if (!function_exists('creditNoteRestockCost')) {
     /**
      * Σ(quantity × products.cost_price) for a credit note's line items — the cost of
      * stocked goods coming back from a customer return. Mirrors posSaleCogs():
-     *   - JOINs products, so free-text / service / price-adjustment lines (NULL or
-     *     unmatched product_id) naturally contribute 0 — only real stocked goods
-     *     reverse COGS, which is exactly the desired behaviour.
+     *   - JOINs products, so free-text / price-adjustment lines (NULL or unmatched
+     *     product_id) naturally contribute 0 — only real stocked goods reverse COGS,
+     *     which is exactly the desired behaviour.
+     *   - Excludes is_service=1 products: a service was never received into
+     *     Inventory via GRN, so a return of it must never "restock" Inventory either.
      *   - Skips a line whose cost_price exceeds its selling_price (selling_price > 0):
      *     a clear data-entry error that would inject a bogus COGS. Self-healing once
      *     the cost is corrected. Criteria-based — no product ids hard-coded.
@@ -250,6 +256,7 @@ if (!function_exists('creditNoteRestockCost')) {
                             FROM credit_note_items ci
                             JOIN products p ON ci.product_id = p.product_id
                            WHERE ci.credit_note_id = " . (int)$creditNoteId . "
+                             AND p.is_service = 0
                              AND NOT (p.cost_price > p.selling_price AND p.selling_price > 0)")->fetchColumn();
         return round((float)$v, 2);
     }

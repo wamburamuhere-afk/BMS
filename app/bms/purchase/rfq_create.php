@@ -363,7 +363,7 @@ let rfqCurrentRowId = null;
 
 async function rfqFetchProducts() {
     try {
-        const r = await fetch('<?= getUrl('api/account/get_products.php') ?>?limit=1000');
+        const r = await fetch('<?= getUrl('api/account/get_products.php') ?>?limit=1000&is_service=0');
         const d = await r.json();
         if (d.success) rfqProductsList = d.data;
     } catch(e) { console.error('Failed to fetch products:', e); }
