@@ -53,6 +53,31 @@ $selected_department = isset($_GET['department']) ? (int)$_GET['department'] : n
 $selected_status = isset($_GET['status']) ? $_GET['status'] : '';
 $selected_employee = isset($_GET['employee']) ? (int)$_GET['employee'] : null;
 
+// Back-to-project link — same convention as invoice_view.php etc: if the
+// employee being viewed belongs to a project, offer a way back to it,
+// regardless of whether the visitor arrived here from that project or not.
+$back_to_project_id = null;
+$back_to_project_name = null;
+$enable_projects = 0;
+try {
+    $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'enable_projects'");
+    $stmt->execute();
+    $enable_projects = $stmt->fetchColumn() ?: 0;
+} catch (Exception $e) {}
+if ($enable_projects && $selected_employee) {
+    $stmt = $pdo->prepare("
+        SELECT p.project_id, p.project_name
+        FROM employees e
+        JOIN projects p ON p.project_id = e.project_id
+        WHERE e.employee_id = ?
+    ");
+    $stmt->execute([$selected_employee]);
+    if ($proj = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $back_to_project_id = $proj['project_id'];
+        $back_to_project_name = $proj['project_name'];
+    }
+}
+
 // Get departments for filtering
 $departments = $pdo->query("SELECT * FROM departments WHERE status = 'active' ORDER BY department_name")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -355,6 +380,17 @@ if ($employees) {
 ?>
 
 <div class="container-fluid mt-4">
+    <?php if ($back_to_project_id): ?>
+    <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
+        <div>
+            <h5 class="fw-bold mb-0"><i class="bi bi-clock-history me-2"></i>Attendance History</h5>
+            <p class="text-muted small mb-0">Viewing history for this staff member, from project "<?= safe_output($back_to_project_name) ?>"</p>
+        </div>
+        <a href="<?= getUrl('project_view') ?>?id=<?= $back_to_project_id ?>" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-kanban"></i> Back to Project
+        </a>
+    </div>
+    <?php endif; ?>
     <!-- Professional Print Header -->
     <div class="print-header d-none d-print-block text-center mb-4" style="visibility: visible !important;">
         <?php if(!empty($c_logo)): ?>
