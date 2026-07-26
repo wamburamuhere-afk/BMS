@@ -29,7 +29,7 @@ try {
     $status = trim($_POST['status']);
     $check_in_time = !empty($_POST['check_in_time']) ? trim($_POST['check_in_time']) : null;
     $check_out_time = !empty($_POST['check_out_time']) ? trim($_POST['check_out_time']) : null;
-    
+
     if (!$employee_id || !$attendance_date || !$status) {
         throw new Exception('Missing required fields');
     }
@@ -40,6 +40,25 @@ try {
     }
     assertEmployeeActive($pdo, $employee_id);
 
+    // Check if attendance record already exists
+    $check_stmt = $pdo->prepare("
+        SELECT * FROM attendance
+        WHERE employee_id = ? AND attendance_date = ?
+    ");
+    $check_stmt->execute([$employee_id, $attendance_date]);
+    $existing = $check_stmt->fetch(PDO::FETCH_ASSOC);
+
+    // Server-side backstop (mirrors api/mark_attendance.php): a caller that didn't
+    // supply a time falls back to whatever is already saved, rather than clearing
+    // it — protects against any future/other caller of this endpoint doing what the
+    // quick-mark buttons used to do (silently overwrite a time someone already
+    // entered). 'absent' is the one status that should always clear both times,
+    // since presence and absence are mutually exclusive.
+    if ($status !== 'absent' && $existing) {
+        if ($check_in_time === null)  $check_in_time  = $existing['check_in_time'];
+        if ($check_out_time === null) $check_out_time = $existing['check_out_time'];
+    }
+
     // Calculate total hours if times provided
     $total_hours = 0;
     if ($check_in_time && $check_out_time) {
@@ -47,14 +66,6 @@ try {
         $check_out = strtotime($check_out_time);
         $total_hours = ($check_out - $check_in) / 3600;
     }
-    
-    // Check if attendance record already exists
-    $check_stmt = $pdo->prepare("
-        SELECT attendance_id FROM attendance 
-        WHERE employee_id = ? AND attendance_date = ?
-    ");
-    $check_stmt->execute([$employee_id, $attendance_date]);
-    $existing = $check_stmt->fetch();
     
     if ($existing) {
         // Update existing record
