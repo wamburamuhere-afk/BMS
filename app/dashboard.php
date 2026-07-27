@@ -275,10 +275,28 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
     if (canView('products') || canView('inventory_report')) {
         $prodScope = scopeFilterSqlNullable('project', 'p');
         $whScope   = scopeFilterSqlNullable('warehouse', 'product_stocks');
+
+        // A warehouse-restricted non-admin must only count products actually
+        // carried in THEIR warehouse(s) -- both for the headline count and for
+        // "low stock". Without this, a product simply never stocked in this
+        // user's warehouse (but stocked fine elsewhere) has no row in the `s`
+        // subquery at all, COALESCE(...,0) makes it look like zero available
+        // stock, and it gets wrongly flagged as "low stock" purely because it
+        // isn't carried here -- inflating the count well past what an
+        // unrestricted admin sees for the exact same data (backwards: a scoped
+        // subset can never legitimately show MORE low-stock items than the
+        // company-wide total). `s.product_id IS NOT NULL` requires a real stock
+        // row in the visible warehouse(s) before a product counts at all.
+        // Admins (and any non-admin with grant-all warehouse access) get
+        // $whScope === '', so this clause is skipped and the full catalog count
+        // is preserved exactly as before.
+        $stockedOnlyInScope = ($whScope !== '') ? ' AND s.product_id IS NOT NULL ' : '';
+
         $stmt = $pdo->prepare("
             SELECT COUNT(p.product_id) as total_products,
                    SUM(COALESCE(s.total_stock, 0) * p.cost_price) as inventory_value,
-                   SUM(CASE WHEN COALESCE(s.available_stock, 0) <= p.min_stock_level
+                   SUM(CASE WHEN s.product_id IS NOT NULL
+                                 AND s.available_stock <= p.min_stock_level
                                  AND p.min_stock_level > 0 THEN 1 ELSE 0 END) as low_stock_items
             FROM products p
             LEFT JOIN (
@@ -291,7 +309,7 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
             ) s ON p.product_id = s.product_id
             WHERE p.status = 'active'
               AND p.is_service = 0
-              {$prodScope}
+              {$prodScope}{$stockedOnlyInScope}
         ");
         $stmt->execute();
         $stats['inventory'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $stats['inventory'];
@@ -465,6 +483,15 @@ function get_system_alerts($pdo, $user_id) {
         $prodScope = scopeFilterSqlNullable('project', 'p');
         $whScope   = scopeFilterSqlNullable('warehouse', 'product_stocks');
 
+        // Same false-positive as the Inventory Status stat card (see that comment):
+        // a product simply never stocked in a warehouse-restricted user's own
+        // warehouse(s) -- but perfectly well-stocked elsewhere -- would otherwise
+        // COALESCE to 0 and get listed as "Out of stock", flooding this alert list
+        // with products that aren't actually low/out, just not carried here.
+        // Admins (and grant-all-warehouse users) get $whScope === '', so a product
+        // with truly zero stock ANYWHERE still correctly alerts for them.
+        $stockedOnlyInScope = ($whScope !== '') ? ' AND s.product_id IS NOT NULL ' : '';
+
         $stmt = $pdo->prepare("
             SELECT 'low_stock' as type,
                    p.product_id as id,
@@ -483,7 +510,7 @@ function get_system_alerts($pdo, $user_id) {
               AND p.is_service = 0
               AND ((COALESCE(s.available_stock, 0) <= p.min_stock_level AND p.min_stock_level > 0)
                 OR (COALESCE(s.available_stock, 0) <= 0))
-              {$prodScope}
+              {$prodScope}{$stockedOnlyInScope}
             ORDER BY COALESCE(s.available_stock, 0) ASC
         ");
         $stmt->execute();
