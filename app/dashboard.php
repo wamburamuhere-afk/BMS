@@ -1,5 +1,7 @@
 <?php
-// scope-audit: skip — dashboard aggregates cross-system KPIs for summary display; per-module scope filtering deferred to Phase G-2
+// Project/warehouse/customer scope filtering (core/project_scope.php) is applied
+// per-widget throughout this file via scopeFilterSqlNullable()/scopeFilterSql() —
+// not deferred. See changelog.md 2026-07-27 for the audit that closed the last gaps.
 // File: dashboard.php
 require_once __DIR__ . '/../roots.php';
 require_once ROOT_DIR . '/core/financial_reports.php';   // glProfitLoss() — ledger revenue
@@ -146,10 +148,13 @@ $group_sources = [
     // Page-level only (no per-record filtered list): cash_bank, hr_payroll.
 ];
 
-// Get warehouses for quick stock adjustment
+// Get warehouses for quick stock adjustment — scoped, so a warehouse-restricted
+// user can't even pick a warehouse outside their assignment (api/create_stock_adjustment.php
+// enforces the same restriction server-side, see the userCan('warehouse', ...) gate there).
 $warehouses = [];
 try {
-    $stmt = $pdo->query("SELECT warehouse_id, warehouse_name FROM warehouses WHERE status = 'active' ORDER BY warehouse_name");
+    $whDropdownScope = scopeFilterSql('warehouse', 'w');
+    $stmt = $pdo->query("SELECT w.warehouse_id, w.warehouse_name FROM warehouses w WHERE w.status = 'active' {$whDropdownScope} ORDER BY w.warehouse_name");
     $warehouses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     // Fail silently
@@ -327,12 +332,13 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
     // Gate: pos module; scope: pos_sales.warehouse_id (Phase 6 — pos_upgrade_plan.md)
     if (canView('pos')) {
         $posScope = scopeFilterSqlNullable('warehouse', 'pos_sales');
+        $posProjScope = scopeFilterSqlNullable('project', 'pos_sales');
         $stmt = $pdo->prepare("
             SELECT COUNT(*) as pos_sales_today, SUM(grand_total) as pos_revenue_today
             FROM pos_sales
             WHERE DATE(sale_date) = CURDATE()
               AND sale_status = 'completed'
-              {$posScope}
+              {$posScope}{$posProjScope}
         ");
         $stmt->execute();
         $stats['pos_today'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $stats['pos_today'];
@@ -558,6 +564,7 @@ function get_system_alerts($pdo, $user_id) {
     $doc_alerts = [];
     if (canView('document_library') || isAdmin()) {
         try {
+            $docScope = scopeFilterSqlNullable('project', 'd');
             $stmt = $pdo->query("
                 SELECT 'doc_expiring' as type,
                        d.id as id,
@@ -569,6 +576,7 @@ function get_system_alerts($pdo, $user_id) {
                 WHERE d.expire_date IS NOT NULL
                   AND d.expire_date >= CURDATE()
                   AND d.expire_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+                  {$docScope}
                 ORDER BY d.expire_date ASC
             ");
             $doc_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -677,6 +685,7 @@ function get_system_alerts($pdo, $user_id) {
     $quote_alerts = [];
     if (canView('quotations')) {
         $quoteScope = scopeFilterSqlNullable('project', 'q');
+        $quoteWhScope = scopeFilterSqlNullable('warehouse', 'q');
         try {
             $stmt = $pdo->prepare("
                 SELECT 'quote_expiring' as type,
@@ -690,7 +699,7 @@ function get_system_alerts($pdo, $user_id) {
                 WHERE q.quote_valid_until IS NOT NULL
                   AND q.quote_valid_until BETWEEN CURDATE() AND CURDATE() + INTERVAL 5 DAY
                   AND q.status IN ('pending','sent','draft')
-                  {$quoteScope}
+                  {$quoteScope}{$quoteWhScope}
                 ORDER BY q.quote_valid_until ASC
                 LIMIT 5
             ");
@@ -761,6 +770,11 @@ function get_system_alerts($pdo, $user_id) {
     $credit_over_alerts = [];
     if (canView('invoices') || canView('customers')) {
         $custScope = scopeFilterSqlNullable('customer', 'c');
+        // The customer itself can be in-scope while carrying invoices tied to a
+        // DIFFERENT, out-of-scope project — without this, `outstanding`/`excess`
+        // (and the alert firing at all) could be driven entirely by invoices the
+        // user shouldn't see.
+        $invProjScope = scopeFilterSqlNullable('project', 'i');
         try {
             $stmt = $pdo->prepare("
                 SELECT 'credit_over' as type,
@@ -775,7 +789,7 @@ function get_system_alerts($pdo, $user_id) {
                 WHERE c.status = 'active'
                   AND c.credit_limit > 0
                   AND i.status NOT IN ('paid','cancelled','draft')
-                  {$custScope}
+                  {$custScope}{$invProjScope}
                 GROUP BY c.customer_id, c.customer_name, c.credit_limit
                 HAVING outstanding > c.credit_limit
                 ORDER BY excess DESC
