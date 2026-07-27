@@ -1,5 +1,59 @@
 # BMS Changelog
 
+## 2026-07-27 (fix) — Dashboard Inventory Status: warehouse-scoped non-admin saw MORE low-stock items than admin
+
+**Files:** `app/dashboard.php`
+
+Follow-up to the scope-gap fixes above: user reported that on the "Inventory Status"
+card, a warehouse-restricted non-admin's Low Stock count (e.g. 14) was HIGHER than
+what an unrestricted admin saw (e.g. 3-4) for the exact same data — backwards, since
+a scoped subset can never legitimately exceed the company-wide total. Also, Total
+Products showed the same number (the full catalog count) for both admin and
+non-admin, when a warehouse-restricted user should only see products actually
+carried in their own warehouse(s).
+
+Root cause: both the Inventory Status stat card (§3) and the Low Stock/Out of Stock
+alert list (`get_system_alerts()` §1) join `products` to a warehouse-scoped
+`product_stocks` subquery via `LEFT JOIN ... COALESCE(s.available_stock, 0)`. For a
+product simply never stocked in the warehouse-restricted user's own warehouse(s) —
+but perfectly well-stocked in a DIFFERENT warehouse they can't see — the subquery
+produces no row at all, `COALESCE(...)` silently defaults to 0, and `0 <=
+min_stock_level` (almost always true) or `0 <= 0` wrongly flags it as
+"low stock"/"out of stock". Since a warehouse-restricted user is, definitionally,
+excluded from more warehouses than an admin, they hit this false positive on far
+more products than the honest low-stock count — inflating their number past the
+company-wide admin total instead of narrowing below it.
+
+Fix: added `s.product_id IS NOT NULL` — a real stock row in the visible
+warehouse(s) — as a precondition before a product counts as low/out of stock at
+all, in both queries. For Total Products specifically, this exclusion is applied
+to the whole row (not just the low-stock CASE), conditionally only when
+`scopeFilterSqlNullable('warehouse', ...)` is actually restrictive
+(`$whScope !== ''`) — admins and grant-all-warehouse users are completely
+unaffected (their catalog count and low-stock figures stay exactly as before,
+including a product with genuinely zero stock ANYWHERE still correctly alerting
+for them).
+
+Verified live against real data (15 active products):
+```
+                          admin   user-12 (1 warehouse)   user-14 (multi-warehouse via projects)
+Total Products (before)    15            15                          15
+Total Products (after)     15             1  <- only what's actually  4
+                                             stocked in their warehouse(s)
+Low Stock (before)          4             6  <- was HIGHER than admin  4
+Low Stock (after)           1             0  <- corrected              1
+Out-of-Stock alert list    11            14 -> 0
+```
+Admin's own Low Stock figure also became more accurate as a side effect (4→1) —
+3 of those 4 were products with literally zero stock rows in ANY warehouse
+(never received), which is a different, arguably-separate signal from "running
+low"; excluding them from this count was the same fix applied uniformly.
+
+**Related, not fixed here:** `products.php`'s own `low_stock`/`?attention=1` filter
+uses the same `COALESCE(..., 0)` pattern without the `s.product_id IS NOT NULL`
+guard, so a warehouse-scoped non-admin using that filter would hit the same
+false-positive class. Flagged for a follow-up, not bundled into this fix.
+
 ## 2026-07-27 (fix) — Dashboard: closed 5 remaining project/warehouse scope gaps
 
 **Files:** `app/dashboard.php`, `api/create_stock_adjustment.php`
