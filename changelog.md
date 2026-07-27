@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-07-27 (fix) — api_perms_no_gate false positive for the external-signature endpoint
+
+**Files:** `scratch/api_permission_audit.php`
+
+`test_security_coverage_cli.php`'s `api_perms_no_gate` ceiling (locked at 0) was
+regressed by `api/document/submit_external_signature.php`, blocking every push
+regardless of what a PR actually changed. Not a real gap: that endpoint is
+deliberately token-authenticated instead of session-authenticated (the external
+signer — a client/supplier — has no BMS login; the single-use, hashed, expiring
+token in `document_signature_tokens` is the credential, per the file's own
+docblock). The audit script only pattern-matches for `canX()`/`isAuthenticated()`
+calls, so it can't recognise token-based auth as an equivalent gate.
+
+Added the file to `$ignore_substrings` (the audit's existing allowlist mechanism,
+already used for debug/test/migration scripts) with a comment explaining why,
+rather than raising `$CEILINGS['api_perms_no_gate']` from 0 to 1 — bumping the
+ceiling would silently permit one real future gap to slip through undetected;
+naming this specific known exception keeps the ceiling's strict "zero unknown
+gaps" meaning intact. Verified: `scratch/api_permission_audit.php` now reports
+0 gaps and `test_security_coverage_cli.php` passes clean.
+
 ## 2026-07-27 (feat) — Category "Other (specify)" + Tax Rate restricted to No Tax/VAT 18% on Add New Inventory Product
 
 **Files:** `app/bms/product/products.php`, `api/create_product.php`
