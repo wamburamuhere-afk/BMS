@@ -275,6 +275,21 @@ $categories = $pdo->query("SELECT category_id, category_name FROM categories WHE
 $suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
 $brands = $pdo->query("SELECT brand_id, brand_name FROM brands WHERE status = 'active' ORDER BY brand_name")->fetchAll(PDO::FETCH_ASSOC);
 $tax_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage FROM tax_rates WHERE status = 'active' ORDER BY rate_name")->fetchAll(PDO::FETCH_ASSOC);
+
+// Self-growing "Other (specify)" dropdown for Brand (same pattern as Category
+// on the Add Customer form): pick from the list, or type a new one that gets
+// created on the fly and persists for next time.
+require_once __DIR__ . '/../../../core/form_lookups.php';
+$lk_brands = array_map(fn($b) => ['value' => (string)$b['brand_id'], 'label' => $b['brand_name']], $brands);
+$lk_product_categories = build_category_lk_list($categories);
+
+// Tax Rate (Pricing tab, Add Product modal only): restrict to "No Tax" + "VAT 18%".
+// Looked up by percentage (never hard-code a rate_id — it can differ across
+// environments), not filtered elsewhere in this file.
+$vat18_rate = null;
+foreach ($tax_rates as $tax) {
+    if (round((float)$tax['rate_percentage'], 2) === 18.00) { $vat18_rate = $tax; break; }
+}
 // Shared helper — also respects the user's direct warehouse grant (Phase 6,
 // pos_upgrade_plan.md), not just project membership.
 require_once ROOT_DIR . '/core/warehouse_scope.php';
@@ -1120,6 +1135,46 @@ $(document).ready(function() {
         $(this).select2({ theme: 'bootstrap-5', placeholder: 'Select...', allowClear: true, width: '100%' });
     });
 
+    // "Other" dropdowns (renderOtherSelect): searchable Select2; choosing "Other"
+    // swaps the dropdown for a text input. Typed value is saved server-side and
+    // appears next time. Generic — every .other-trigger in the given scope.
+    function initOtherSelects(scopeSelector, $parent) {
+        $(scopeSelector).find('.other-trigger').each(function() {
+            const $el = $(this);
+            if ($el.hasClass('select2-hidden-accessible')) return;
+            $el.select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $parent,
+                width: '100%',
+                allowClear: true,
+                placeholder: $el.data('placeholder') || 'Select…'
+            });
+        });
+    }
+    $(document).off('change.otherSel').on('change.otherSel', 'select.other-trigger', function() {
+        const $sel = $(this), $wrap = $sel.closest('.other-field-wrap'), $box = $wrap.find('.other-input-box');
+        if ($sel.val() === 'other') {
+            $sel.addClass('d-none').next('.select2-container').addClass('d-none');
+            $box.removeClass('d-none').find('.other-input').val('').trigger('focus');
+        } else { $box.addClass('d-none'); }
+    });
+    $(document).off('click.otherBack').on('click.otherBack', '.other-back', function() {
+        const $wrap = $(this).closest('.other-field-wrap'), $sel = $wrap.find('select.other-trigger');
+        $wrap.find('.other-input-box').addClass('d-none').find('.other-input').val('');
+        $sel.removeClass('d-none').next('.select2-container').removeClass('d-none');
+        $sel.val('').trigger('change.select2');
+    });
+    // Reset the Other-widgets when a modal closes.
+    function resetOtherFields(scope) {
+        $(scope).find('.other-field-wrap').each(function() {
+            const $wrap = $(this);
+            $wrap.find('.other-input-box').addClass('d-none').find('.other-input').val('');
+            const $sel = $wrap.find('select.other-trigger');
+            $sel.removeClass('d-none');
+            $sel.next('.select2-container').removeClass('d-none');
+        });
+    }
+
     // Select2 — modal selects (init on open, destroy on close)
     $('#addProductModal').on('shown.bs.modal', function() {
         $('#addProductModal .select2-static').each(function() {
@@ -1127,10 +1182,12 @@ $(document).ready(function() {
                 $(this).select2({ theme: 'bootstrap-5', dropdownParent: $('#addProductModal'), placeholder: 'Select...', allowClear: true, width: '100%' });
             }
         });
+        initOtherSelects('#addProductModal', $('#addProductModal'));
     }).on('hidden.bs.modal', function() {
         $('#addProductModal .select2-static').each(function() {
             if ($(this).hasClass('select2-hidden-accessible')) { $(this).select2('destroy'); }
         });
+        resetOtherFields('#addProductModal');
     });
 
     // Initialize DataTable
@@ -1641,17 +1698,20 @@ function get_pagination_url($page) {
     return 'products.php?' . http_build_query($params);
 }
 
-function build_category_tree_modal($categories, $parent_id = 0, $depth = 0) {
-    $html = '';
+// Flat, indented [value,label] list of the category tree — feeds renderOtherSelect()
+// for the Add Product modal's Category field (was build_category_tree_modal(), which
+// built raw <option> HTML directly; renderOtherSelect needs plain value/label pairs
+// so it can append its own "Other (specify)" option).
+function build_category_lk_list($categories, $parent_id = 0, $depth = 0) {
+    $out = [];
     foreach ($categories as $category) {
         if (($category['parent_id'] ?? 0) == $parent_id) {
-            $indent = str_repeat('&nbsp;&nbsp;&nbsp;', $depth);
-            $html .= '<option value="' . $category['category_id'] . '">' 
-                   . $indent . htmlspecialchars($category['category_name']) . '</option>';
-            $html .= build_category_tree_modal($categories, $category['category_id'], $depth + 1);
+            $indent = str_repeat("\u{00A0}\u{00A0}\u{00A0}", $depth);
+            $out[] = ['value' => (string)$category['category_id'], 'label' => $indent . $category['category_name']];
+            $out = array_merge($out, build_category_lk_list($categories, $category['category_id'], $depth + 1));
         }
     }
-    return $html;
+    return $out;
 }
 
 function generate_sku_local() { return 'PROD' . time() . rand(100, 999); }
@@ -1735,10 +1795,7 @@ function generate_barcode_local() {
                                         </div>
                                         <div class="col-md-12 mb-3">
                                             <label class="form-label fw-bold">Category</label>
-                                            <select class="form-select select2-static" name="category_id" id="modal_category_id">
-                                                <option value="">Select Category</option>
-                                                <?= build_category_tree_modal($categories) ?>
-                                            </select>
+                                            <?= renderOtherSelect('modal_category_id', 'category_id', $lk_product_categories, '', 'category_other', 'Select Category') ?>
                                         </div>
                                         <div class="col-md-12 mb-3">
                                             <label class="form-label fw-bold">Description</label>
@@ -1827,9 +1884,9 @@ function generate_barcode_local() {
                                     <label class="form-label fw-bold">Tax Rate</label>
                                     <select class="form-select select2-static" name="tax_id" id="modal_tax_id">
                                         <option value="">No Tax</option>
-                                        <?php foreach ($tax_rates as $tax): ?>
-                                            <option value="<?= $tax['rate_id'] ?>"><?= safe_output($tax['rate_name']) ?> (<?= $tax['rate_percentage'] ?>%)</option>
-                                        <?php endforeach; ?>
+                                        <?php if ($vat18_rate): ?>
+                                            <option value="<?= $vat18_rate['rate_id'] ?>"><?= safe_output($vat18_rate['rate_name']) ?> (<?= $vat18_rate['rate_percentage'] ?>%)</option>
+                                        <?php endif; ?>
                                     </select>
                                     <div class="form-check mt-2">
                                         <input class="form-check-input" type="checkbox" name="is_taxable" value="1" checked id="modal_taxable">
@@ -1927,12 +1984,7 @@ function generate_barcode_local() {
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold">Brand</label>
-                                    <select class="form-select select2-static" name="brand_id" id="modal_brand_id">
-                                        <option value="">Select Brand</option>
-                                        <?php foreach ($brands as $brand): ?>
-                                            <option value="<?= $brand['brand_id'] ?>"><?= safe_output($brand['brand_name']) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                    <?= renderOtherSelect('modal_brand_id', 'brand_id', $lk_brands, '', 'brand_other', 'Select Brand') ?>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold">Preferred Supplier</label>

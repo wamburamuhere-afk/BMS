@@ -642,7 +642,7 @@ if (isAdmin()) {
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="addSupplierForm" method="POST" enctype="multipart/form-data">
+            <form id="addSupplierForm" method="POST" enctype="multipart/form-data" novalidate>
                 <div class="modal-body">
                     <div id="add-supplier-message" class="mb-3"></div>
                     <?php if ($proj_ctx_id > 0): ?>
@@ -941,7 +941,7 @@ if (isAdmin()) {
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="editSupplierForm" method="POST" enctype="multipart/form-data">
+            <form id="editSupplierForm" method="POST" enctype="multipart/form-data" novalidate>
                 <div class="modal-body">
                     <div id="edit-supplier-message" class="mb-3"></div>
                     <?php if ($proj_ctx_id > 0): ?>
@@ -1435,10 +1435,21 @@ $(document).ready(function() {
     // Add supplier form submission
     $('#addSupplierForm').on('submit', function(e) {
         e.preventDefault();
-        
+
+        const $invalid = $(this).find(':invalid').first();
+        if ($invalid.length) {
+            const paneId = $invalid.closest('.tab-pane').attr('id');
+            $('#addSupplierTabs button[data-bs-target="#' + paneId + '"]').tab('show');
+            $invalid.trigger('focus');
+            const fieldLabel = $('label[for="' + $invalid.attr('id') + '"]').text().replace('*', '').trim() || 'This field';
+            setTimeout(() => $invalid[0].reportValidity(), 150);
+            Swal.fire('Missing or invalid information', fieldLabel + ' is required or not in the correct format.', 'warning');
+            return;
+        }
+
         const formData = new FormData(this);
         const submitBtn = $(this).find('[type="submit"]');
-        
+
         submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...');
 
         $.ajax({
@@ -1519,10 +1530,21 @@ $(document).ready(function() {
     // Edit supplier form submission
     $('#editSupplierForm').on('submit', function(e) {
         e.preventDefault();
-        
+
+        const $invalid = $(this).find(':invalid').first();
+        if ($invalid.length) {
+            const paneId = $invalid.closest('.tab-pane').attr('id');
+            $('#editSupplierTabs button[data-bs-target="#' + paneId + '"]').tab('show');
+            $invalid.trigger('focus');
+            const fieldLabel = $('label[for="' + $invalid.attr('id') + '"]').text().replace('*', '').trim() || 'This field';
+            setTimeout(() => $invalid[0].reportValidity(), 150);
+            Swal.fire('Missing or invalid information', fieldLabel + ' is required or not in the correct format.', 'warning');
+            return;
+        }
+
         const formData = new FormData(this);
         const submitBtn = $(this).find('[type="submit"]');
-        
+
         submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating...');
 
         $.ajax({
