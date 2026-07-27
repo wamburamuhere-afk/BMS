@@ -25,11 +25,12 @@ try {
     }
 
     $stmt = $pdo->prepare("
-        SELECT 
+        SELECT
             p.*,
             e.first_name,
             e.last_name,
             e.employee_number,
+            e.status AS employee_status,
             e.designation_id,
             e.department_id,
             d.department_name,

@@ -595,6 +595,103 @@ if (!function_exists('reverseOutflow')) {
     }
 }
 
+if (!function_exists('reverseMirroredEntry')) {
+    /**
+     * Style-B reversal of a books_transaction-mirrored journal entry: posts the
+     * exact contra (Dr/Cr flipped) via postLedgerEntry — tagged
+     * entity_type='books_transaction_void', entity_id=$transactionId — and
+     * leaves the ORIGINAL entry untouched at status='posted'. This mirrors
+     * reverseAccrualEntry()'s philosophy in core/expense_posting.php (never
+     * delete/edit a posted entry; the net of the two posted entries settles to
+     * zero) instead of reverseOutflow()/reverseInflow()'s delete-based undo —
+     * used where a full audit trail in journal_entries itself matters (credit
+     * note refunds, debit note settlements, statutory remittances), reachable
+     * only from each document's own "Reverse Payment" action, never generically
+     * from the Journal Entries page.
+     *
+     * $restoreLegType is the leg type postOutflow/postInflow actually moved the
+     * balance on for the ORIGINAL entry ('credit' for an outflow — postOutflow
+     * only moves the paid-from + WHT legs; 'debit' for an inflow — postInflow
+     * only moves the received-into leg). Only that leg's balance is restored,
+     * exactly mirroring postOutflow/postInflow's own "leave the contra account's
+     * stored balance alone" rule.
+     *
+     * Idempotent: a second call finds the existing void entry and returns it
+     * rather than double-posting. Never throws; returns
+     * ['reversed'=>bool, 'reason'=>string, 'entry_id'?=>int].
+     */
+    function reverseMirroredEntry(PDO $pdo, ?int $transactionId, int $userId, string $restoreLegType): array
+    {
+        $out = ['reversed' => false, 'reason' => ''];
+        if (!$transactionId) { $out['reason'] = 'no_transaction'; return $out; }
+
+        $chkVoid = $pdo->prepare("SELECT entry_id FROM journal_entries WHERE entity_type = 'books_transaction_void' AND entity_id = ? AND status = 'posted' LIMIT 1");
+        $chkVoid->execute([$transactionId]);
+        if ($existingVoid = $chkVoid->fetchColumn()) {
+            $out['reversed'] = true; $out['reason'] = 'already_reversed'; $out['entry_id'] = (int)$existingVoid;
+            return $out;
+        }
+
+        $mirror = $pdo->prepare("SELECT entry_id, project_id FROM journal_entries WHERE entity_type = 'books_transaction' AND entity_id = ? AND status = 'posted' LIMIT 1");
+        $mirror->execute([$transactionId]);
+        $mirrorRow = $mirror->fetch(PDO::FETCH_ASSOC);
+        if (!$mirrorRow) { $out['reason'] = 'no_mirror_entry'; return $out; }
+
+        $lineStmt = $pdo->prepare("SELECT account_id, type, amount FROM journal_entry_items WHERE entry_id = ?");
+        $lineStmt->execute([(int)$mirrorRow['entry_id']]);
+        $lines = $lineStmt->fetchAll(PDO::FETCH_ASSOC);
+        if (!$lines) { $out['reason'] = 'no_lines'; return $out; }
+
+        $contra = [];
+        foreach ($lines as $l) {
+            $contra[] = [
+                'account_id'  => (int)$l['account_id'],
+                'type'        => $l['type'] === 'debit' ? 'credit' : 'debit',
+                'amount'      => (float)$l['amount'],
+                'description' => 'Reversal',
+            ];
+        }
+
+        $pid = ($mirrorRow['project_id'] !== null) ? (int)$mirrorRow['project_id'] : null;
+        try {
+            require_once __DIR__ . '/ledger_post.php';
+            $entryId = postLedgerEntry($pdo, "Reversal of transaction #$transactionId", $contra,
+                $pid, $transactionId, 'books_transaction_void', date('Y-m-d'), $userId);
+        } catch (Throwable $e) {
+            error_log("reverseMirroredEntry txn $transactionId: " . $e->getMessage());
+            $out['reason'] = 'post_error';
+            return $out;
+        }
+
+        // Restore the balance only on the leg the original post actually moved.
+        foreach ($lines as $l) {
+            if ($l['type'] === $restoreLegType) {
+                $opp = $restoreLegType === 'credit' ? 'debit' : 'credit';
+                applyAccountBalanceDelta($pdo, (int)$l['account_id'], $opp, (float)$l['amount']);
+            }
+        }
+
+        $out['reversed'] = true; $out['reason'] = 'reversed'; $out['entry_id'] = $entryId;
+        return $out;
+    }
+}
+
+if (!function_exists('reverseOutflowContra')) {
+    /** Style-B reversal of a postOutflow()-posted transaction (see reverseMirroredEntry). */
+    function reverseOutflowContra(PDO $pdo, ?int $transactionId, int $userId): array
+    {
+        return reverseMirroredEntry($pdo, $transactionId, $userId, 'credit');
+    }
+}
+
+if (!function_exists('reverseInflowContra')) {
+    /** Style-B reversal of a postInflow()-posted transaction (see reverseMirroredEntry). */
+    function reverseInflowContra(PDO $pdo, ?int $transactionId, int $userId): array
+    {
+        return reverseMirroredEntry($pdo, $transactionId, $userId, 'debit');
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Canonical account-slice helpers (Chart of Accounts upgrade, Phase 4).
 //

@@ -198,6 +198,10 @@ $labels = ['paye' => 'PAYE (income tax)', 'nssf' => 'NSSF (pension)', 'sdl' => '
                                             <button class="btn btn-sm btn-primary" onclick="remit(<?= (int)$r['remittance_id'] ?>, '<?= safe_output($labels[$r['tax_type']] ?? $r['tax_type']) ?>', <?= $amount ?>)">
                                                 <i class="bi bi-cash-coin me-1"></i> Remit
                                             </button>
+                                        <?php elseif ($isPaid && $can_edit): ?>
+                                            <button class="btn btn-sm btn-outline-danger" onclick="reverseRemittance(<?= (int)$r['remittance_id'] ?>, '<?= safe_output($labels[$r['tax_type']] ?? $r['tax_type']) ?>')">
+                                                <i class="bi bi-arrow-counterclockwise me-1"></i> Reverse
+                                            </button>
                                         <?php else: ?>
                                             <span class="text-muted small"><?= $isPaid ? 'Done' : ($amount <= 0 ? 'Nil' : '—') ?></span>
                                         <?php endif; ?>
@@ -279,6 +283,27 @@ function remit(id, label, amount) {
         $.post(APP_URL + '/api/remit_statutory', { remittance_id: id, paid_from_account_id: r.value }, res => {
             if (res.success) {
                 Swal.fire({ icon: 'success', title: 'Done!', text: res.message, showConfirmButton: true })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }
+        }, 'json').fail(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error.' }));
+    });
+}
+
+function reverseRemittance(id, label) {
+    Swal.fire({
+        title: 'Reverse ' + label + ' remittance?',
+        text: 'Posts a reversing ledger entry and returns this obligation to Pending so it can be re-remitted.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, reverse',
+        confirmButtonColor: '#dc3545'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post(APP_URL + '/api/reverse_statutory_remittance', { remittance_id: id }, res => {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Reversed!', text: res.message, showConfirmButton: true })
                     .then(() => location.reload());
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: res.message });

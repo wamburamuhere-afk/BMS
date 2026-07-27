@@ -59,6 +59,14 @@ if (!$employee) {
     exit();
 }
 
+// Whether this employee still has an ongoing employment relationship — gates
+// every "create new forward-looking record" action on this page (HR actions,
+// salary components, marking attendance, applying for leave). An inactive
+// employee's page is history from here on; Documents and Edit Profile stay
+// available since HR legitimately still needs those after termination
+// (attaching final paperwork, correcting bank details for last pay, etc).
+$is_active_employee = ($employee['status'] === 'active');
+
 // Phase D — project-scope gate
 $emp_project_id = $employee['project_id'] ?? null;
 if (!empty($emp_project_id) && function_exists('userCan') && !userCan('project', (int)$emp_project_id)) {
@@ -404,7 +412,7 @@ $sr_status_badge = [
                 <i class="bi bi-arrow-left"></i> Back to Employees
             </a>
             <div class="d-flex gap-2 d-print-none">
-                <?php if ($can_create_lifecycle): ?>
+                <?php if ($can_create_lifecycle && $is_active_employee): ?>
                 <div class="dropdown">
                     <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="bi bi-person-lines-fill me-1"></i> HR Action
@@ -877,7 +885,7 @@ $sr_status_badge = [
             <div class="card shadow-sm mb-4" id="salaryStructureCard">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <h5 class="mb-0"><i class="bi bi-sliders text-primary me-1"></i> Salary Structure</h5>
-                    <?php if ($can_edit_salary): ?>
+                    <?php if ($can_edit_salary && $is_active_employee): ?>
                     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#assignCompModal"><i class="bi bi-plus-circle me-1"></i> Add Component</button>
                     <?php endif; ?>
                 </div>
@@ -923,7 +931,7 @@ $sr_status_badge = [
                 </div>
             </div>
 
-            <?php if ($can_edit_salary): ?>
+            <?php if ($can_edit_salary && $is_active_employee): ?>
             <!-- Assign component modal (§UI-1 blue header) -->
             <div class="modal fade" id="assignCompModal" tabindex="-1" aria-hidden="true" data-bs-focus="false">
                 <div class="modal-dialog">
@@ -1476,7 +1484,7 @@ $sr_status_badge = [
                         <span class="small text-muted me-1">
                             <?= $attTotal ?> record(s) total<?= $attTotal > $attLimit ? " · showing most recent $attLimit" : '' ?>
                         </span>
-                        <?php if ($can_mark_attendance): ?>
+                        <?php if ($can_mark_attendance && $is_active_employee): ?>
                         <button type="button" class="btn btn-sm btn-outline-success d-print-none" id="btnCheckInNow" onclick="checkInNow()" <?= $hasCheckedInToday ? 'disabled' : '' ?>>
                             <i class="bi bi-box-arrow-in-right me-1"></i> <?= $hasCheckedInToday ? 'Checked In' : 'Check In Now' ?>
                         </button>
@@ -1525,7 +1533,7 @@ $sr_status_badge = [
                 </div>
             </div>
 
-            <?php if ($can_mark_attendance): ?>
+            <?php if ($can_mark_attendance && $is_active_employee): ?>
             <!-- Mark Attendance Modal — locked to this employee (no employee picker),
                  so this can never accidentally record another employee's attendance.
                  Posts to the existing api/mark_attendance.php, which already upserts
@@ -1695,7 +1703,7 @@ $sr_status_badge = [
                     <h5 class="mb-0"><i class="bi bi-calendar-week text-primary me-2"></i>Leave History</h5>
                     <div class="d-flex align-items-center gap-3">
                         <span class="small text-muted"><?= count($all_leaves) ?> record(s) total</span>
-                        <?php if ($can_apply_leave): ?>
+                        <?php if ($can_apply_leave && $is_active_employee): ?>
                         <button type="button" class="btn btn-sm btn-primary d-print-none" data-bs-toggle="modal" data-bs-target="#applyEmpLeaveModal">
                             <i class="bi bi-plus-circle me-1"></i> Apply for Leave
                         </button>
@@ -1751,7 +1759,7 @@ $sr_status_badge = [
                 </div>
             </div>
 
-            <?php if ($can_apply_leave): ?>
+            <?php if ($can_apply_leave && $is_active_employee): ?>
             <!-- Apply for Leave Modal — locked to this employee (a single hidden employee_id
                  field, no picker at all), so this can never file a leave application for
                  anyone else. Posts to the existing api/apply_leave.php; approve/reject/delete

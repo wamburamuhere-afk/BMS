@@ -1,0 +1,58 @@
+/* Sitewide loading UX: top progress bar + skeleton placeholders.
+   Included once in header.php / footer.php so every page gets it for free. */
+
+#bms-topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    width: 0%;
+    background: linear-gradient(90deg, #ffc107, #fd7e14);
+    box-shadow: 0 0 8px rgba(253, 126, 20, 0.6);
+    z-index: 20000;
+    opacity: 0;
+    transition: width 0.3s ease, opacity 0.2s ease;
+}
+#bms-topbar.bms-topbar-active {
+    opacity: 1;
+}
+
+.bms-skeleton-wrap {
+    padding: 0.5rem 0;
+}
+.skel-line, .skel-block, .skel-circle {
+    position: relative;
+    overflow: hidden;
+    background: #e9ecef;
+    border-radius: 6px;
+}
+.skel-line::after, .skel-block::after, .skel-circle::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+    animation: bms-shimmer 1.4s infinite;
+}
+.skel-line {
+    height: 12px;
+    margin: 0 auto 10px;
+}
+.skel-circle {
+    border-radius: 50%;
+}
+.skel-card {
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+@keyframes bms-shimmer {
+    100% { transform: translateX(100%); }
+}
+
+@media (prefers-color-scheme: dark) {
+    .skel-line, .skel-block, .skel-circle { background: #3a3f44; }
+    .skel-card { background: #2b2f33; border-color: #3a3f44; }
+}
