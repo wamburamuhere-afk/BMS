@@ -3,6 +3,7 @@
 // (employee_salary_components). Additive; affects only future payroll runs.
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/project_scope.php';
+require_once __DIR__ . '/../../core/employee_status.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -28,6 +29,9 @@ try {
     $emp = $pdo->prepare("SELECT employee_id FROM employees WHERE employee_id = ?");
     $emp->execute([$employee_id]);
     if (!$emp->fetchColumn()) throw new Exception('Employee not found.');
+
+    // No future pay structure to configure for someone no longer employed.
+    assertEmployeeActive($pdo, $employee_id, 'Employee');
 
     // Component must be a real, active component; a % cannot exceed 100.
     $comp = $pdo->prepare("SELECT calculation_type FROM salary_components WHERE component_id = ? AND status = 'active'");

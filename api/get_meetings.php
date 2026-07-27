@@ -17,9 +17,47 @@ try {
         $stmt->execute([$meeting_id]);
         $m = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$m) { echo json_encode(['success' => false, 'message' => 'Meeting not found']); exit; }
-        $at = $pdo->prepare("SELECT ma.employee_id, ma.attended, e.first_name, e.last_name FROM meeting_attendees ma JOIN employees e ON e.employee_id = ma.employee_id WHERE ma.meeting_id = ? ORDER BY e.first_name, e.last_name");
+        // Covers both attendee identity types (migration 2026_07_25_meeting_attendees_user_id):
+        // in-person attendees carry employee_id (attendance-markable), Zoom attendees
+        // carry user_id. linked_user_id resolves either identity to a BMS user_id so
+        // both attendance display and the join-info visibility check below can work
+        // uniformly regardless of which identity a given meeting's attendees use.
+        $at = $pdo->prepare("
+            SELECT ma.employee_id, ma.user_id, ma.attended, ma.joined_at,
+                   COALESCE(e.first_name, u.first_name) AS first_name,
+                   COALESCE(e.last_name, u.last_name) AS last_name,
+                   COALESCE(ma.user_id, ue.user_id) AS linked_user_id
+            FROM meeting_attendees ma
+            LEFT JOIN employees e ON e.employee_id = ma.employee_id
+            LEFT JOIN users u ON u.user_id = ma.user_id
+            LEFT JOIN users ue ON ue.employee_id = ma.employee_id
+            WHERE ma.meeting_id = ?
+            ORDER BY first_name, last_name
+        ");
         $at->execute([$meeting_id]);
-        echo json_encode(['success' => true, 'data' => $m, 'attendees' => $at->fetchAll(PDO::FETCH_ASSOC)]);
+        $attendees = $at->fetchAll(PDO::FETCH_ASSOC);
+
+        // Join info (link/password/start URL) is only ever meaningful to the host, an
+        // invited attendee, or someone who can already fully edit this meeting (this
+        // same endpoint feeds the Edit form's password pre-fill at meetings.php -- an
+        // editor who can already reschedule/cancel/regenerate this meeting gains
+        // nothing from having the current password hidden, it just breaks their Edit
+        // form). Everyone else with plain Meetings view access gets it nulled out
+        // server-side (not just hidden in the UI, which a network tab would still
+        // leak). Mirrors the isHost gating already applied client-side to the Start
+        // URL, but enforced where it actually matters. Admins bypass this too, same
+        // as the canView() check just above.
+        $viewerUid = (int)($_SESSION['user_id'] ?? 0);
+        $isHost = ((int)$m['host_user_id'] === $viewerUid) || ((int)$m['created_by'] === $viewerUid);
+        $isAttendee = false;
+        foreach ($attendees as $a) { if ((int)($a['linked_user_id'] ?? 0) === $viewerUid) { $isAttendee = true; break; } }
+        if (!$isHost && !$isAttendee && !isAdmin() && !canEdit('meetings')) {
+            $m['zoom_join_url'] = null;
+            $m['zoom_password'] = null;
+            $m['zoom_start_url'] = null;
+        }
+
+        echo json_encode(['success' => true, 'data' => $m, 'attendees' => $attendees]);
         exit;
     }
 
@@ -29,6 +67,7 @@ try {
 
     $stmt = $pdo->prepare("
         SELECT m.meeting_id, m.title, m.meeting_date, m.start_time, m.end_time, m.venue, m.status,
+               m.meeting_type, m.zoom_sync_status,
                (SELECT COUNT(*) FROM meeting_attendees ma WHERE ma.meeting_id = m.meeting_id) AS attendee_count
         FROM meetings m
         WHERE " . implode(' AND ', $where) . "

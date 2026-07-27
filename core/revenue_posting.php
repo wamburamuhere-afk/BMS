@@ -111,13 +111,20 @@ if (!function_exists('postInvoiceRevenue')) {
 /* ── Invoice COGS (IS Phase 2 — matching principle) ─────────────────────────── */
 
 if (!function_exists('invoiceCogsValue')) {
-    /** Σ(invoice_items.quantity × products.cost_price) for the invoice's PRODUCT lines. */
+    /**
+     * Σ(invoice_items.quantity × products.cost_price) for the invoice's PRODUCT lines.
+     *
+     * Services (is_service=1) never enter Inventory via GRN, so they must never
+     * leave it via COGS either — excluded regardless of any cost_price on file.
+     */
     function invoiceCogsValue(PDO $pdo, int $invoiceId): float
     {
         $v = $pdo->query("SELECT COALESCE(SUM(ii.quantity * COALESCE(p.cost_price, 0)), 0)
                             FROM invoice_items ii
                             JOIN products p ON p.product_id = ii.product_id
-                           WHERE ii.invoice_id = " . (int)$invoiceId . " AND ii.product_id IS NOT NULL")->fetchColumn();
+                           WHERE ii.invoice_id = " . (int)$invoiceId . "
+                             AND ii.product_id IS NOT NULL
+                             AND p.is_service = 0")->fetchColumn();
         return round((float)$v, 2);
     }
 }

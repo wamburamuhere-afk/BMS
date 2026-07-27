@@ -22,8 +22,9 @@
  * accounts.current_balance.
  */
 
-require_once __DIR__ . '/ledger_post.php';   // postLedgerEntry
-require_once __DIR__ . '/gl_accounts.php';   // accruedExpensesAccountId
+require_once __DIR__ . '/ledger_post.php';    // postLedgerEntry
+require_once __DIR__ . '/gl_accounts.php';    // accruedExpensesAccountId
+require_once __DIR__ . '/payment_source.php'; // reverseOutflowContra (voucher payment reversal)
 
 /* ── Generic accrual engine (parameterised by entity base) ──────────────────── */
 
@@ -161,6 +162,72 @@ if (!function_exists('postVoucherAccrual')) {
 }
 if (!function_exists('reverseVoucherAccrual')) {
     function reverseVoucherAccrual(PDO $pdo, int $voucherId, int $userId): array { return reverseAccrualEntry($pdo, 'voucher_accrual', $voucherId, $userId); }
+}
+
+if (!function_exists('reverseVoucherPayment')) {
+    /**
+     * Reverse ONE recorded voucher payment (Style B contra-entry) — for when a
+     * payment was recorded by mistake (wrong amount/account, duplicate click). A
+     * voucher can carry several partial payments, so this targets one specific
+     * voucher_payments row, never the whole voucher.
+     *
+     * Undoes the GL leg via reverseOutflowContra() (leaves the original posted
+     * entry untouched forever, matches assertJournalNotPosted's documented
+     * principle), removes that payment's OWN bank-register row by its captured
+     * id — never by reference match, since two partial payments on the same
+     * voucher can share a reference — and recomputes the voucher's status from
+     * its remaining non-reversed payments. Idempotent.
+     *
+     * @return array ['reversed'=>bool, 'reason'=>string, 'voucher_new_status'?=>string]
+     */
+    function reverseVoucherPayment(PDO $pdo, int $voucherPaymentId, int $userId): array
+    {
+        $out = ['reversed' => false, 'reason' => ''];
+        if ($voucherPaymentId <= 0) { $out['reason'] = 'invalid_payment'; return $out; }
+
+        $s = $pdo->prepare("SELECT * FROM voucher_payments WHERE id = ?");
+        $s->execute([$voucherPaymentId]);
+        $vp = $s->fetch(PDO::FETCH_ASSOC);
+        if (!$vp) { $out['reason'] = 'not_found'; return $out; }
+
+        if (!empty($vp['reversed_at'])) {
+            $out['reversed'] = true; $out['reason'] = 'already_reversed'; return $out;
+        }
+
+        // 1. Reverse the GL leg (Dr Bank / Cr Accrued Expenses — the contra of the
+        //    original Dr Accrued Expenses / Cr Bank settlement).
+        $rev = ['reversed' => false, 'reason' => 'no_gl_transaction'];
+        if (!empty($vp['gl_transaction_id'])) {
+            $rev = reverseOutflowContra($pdo, (int)$vp['gl_transaction_id'], $userId);
+        }
+        if (empty($rev['reversed']) && ($rev['reason'] ?? '') !== 'already_reversed') {
+            $out['reason'] = 'gl_reverse_failed:' . ($rev['reason'] ?? 'unknown');
+            return $out;
+        }
+
+        // 2. Remove this payment's own bank-register row (precise id captured at
+        //    record time — never a reference-based match).
+        if (!empty($vp['bank_transaction_id'])) {
+            $pdo->prepare("DELETE FROM bank_transactions WHERE transaction_id = ?")
+                ->execute([(int)$vp['bank_transaction_id']]);
+        }
+
+        // 3. Mark this payment reversed — excluded from all future "already paid"
+        //    sums (record_voucher_payment.php, delete_voucher.php's lock check).
+        $pdo->prepare("UPDATE voucher_payments SET reversed_at = NOW(), reversed_by = ? WHERE id = ?")
+            ->execute([$userId, $voucherPaymentId]);
+
+        // 4. Recompute the voucher's status from its remaining non-reversed payments.
+        $voucherId = (int)$vp['voucher_id'];
+        $remaining = round((float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM voucher_payments
+                                                 WHERE voucher_id = $voucherId AND reversed_at IS NULL")->fetchColumn(), 2);
+        $total = round((float)$pdo->query("SELECT amount FROM payment_vouchers WHERE id = $voucherId")->fetchColumn(), 2);
+        $newStatus = $remaining <= 0.005 ? 'approved' : ($remaining >= $total - 0.005 ? 'paid' : 'partially_paid');
+        $pdo->prepare("UPDATE payment_vouchers SET status = ? WHERE id = ?")->execute([$newStatus, $voucherId]);
+
+        $out['reversed'] = true; $out['reason'] = 'reversed'; $out['voucher_new_status'] = $newStatus;
+        return $out;
+    }
 }
 
 /* ── Employee Trip wrappers ──────────────────────────────────────────────────

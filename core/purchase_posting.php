@@ -403,11 +403,22 @@ if (!function_exists('supplierInvoiceHasPayments')) {
 }
 
 if (!function_exists('purchaseReturnValue')) {
-    /** Goods value of a purchase return = Σ(quantity × unit_price), net of tax. */
+    /**
+     * Goods value of a purchase return = Σ(quantity × unit_price), net of tax.
+     *
+     * LEFT JOINs products so a manually-typed line with no product_id still counts
+     * (its cost lives in the return item's own unit_price, not products.cost_price).
+     * Excludes only lines linked to an is_service=1 product: a service was never
+     * received into Inventory via GRN, so crediting Inventory for a "return" of it
+     * would corrupt the account exactly like a service posting bogus COGS on sale.
+     */
     function purchaseReturnValue(PDO $pdo, int $returnId): float
     {
-        $v = $pdo->query("SELECT COALESCE(SUM(quantity * unit_price), 0)
-                            FROM purchase_return_items WHERE purchase_return_id = " . (int)$returnId)->fetchColumn();
+        $v = $pdo->query("SELECT COALESCE(SUM(pri.quantity * pri.unit_price), 0)
+                            FROM purchase_return_items pri
+                            LEFT JOIN products p ON p.product_id = pri.product_id
+                           WHERE pri.purchase_return_id = " . (int)$returnId . "
+                             AND (p.product_id IS NULL OR p.is_service = 0)")->fetchColumn();
         return round((float)$v, 2);
     }
 }

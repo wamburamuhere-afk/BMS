@@ -5,6 +5,7 @@
 // where the D12 dual-write to contract_end_date/probation_end_date happens.
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../core/employee_status.php';
 
 header('Content-Type: application/json');
 
@@ -65,6 +66,10 @@ try {
     $employee = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$employee) throw new Exception('Employee not found');
     $emp_name = trim($employee['first_name'] . ' ' . $employee['last_name']);
+
+    // No new contract to issue for someone no longer employed. The employee
+    // picker already excludes inactive employees; this is the backend backstop.
+    assertEmployeeActive($pdo, $employee_id, 'Employee');
 
     // Optional signed-copy upload — §19 5-step
     if (!empty($_FILES['attachment']) && $_FILES['attachment']['error'] !== UPLOAD_ERR_NO_FILE) {
