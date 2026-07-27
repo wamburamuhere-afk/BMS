@@ -1,5 +1,282 @@
 # BMS Changelog
 
+## 2026-07-27 (fix) — Add/Edit Sub-contractor form no longer fails silently on invalid input
+
+**Files:** `app/bms/operations/sub_contractors.php`
+
+Same fix as Customers/Suppliers, applied to `#addSubContractorForm`/`#editSCForm`:
+added `novalidate` to both forms; both submit handlers now find the first `:invalid`
+field, switch to its owning tab (`#addSubContractorTabs` / `#editSubContractorTabs`),
+focus it, call `reportValidity()`, and show a SweetAlert naming the field before
+falling through to the existing AJAX save. This closes out the pattern across all
+three actor forms (Customers, Suppliers, Sub-contractors) that share the
+`renderOtherSelect(..., true)` required-year-on-a-tab layout.
+
+## 2026-07-27 (fix) — Add/Edit Supplier form no longer fails silently on invalid input
+
+**Files:** `app/bms/Suppliers/suppliers.php`
+
+Same fix as the Customer form below, applied to `#addSupplierForm`/`#editSupplierForm`:
+`supplier_name` (required) and `year` (required, via `renderOtherSelect`) sit on the
+tabbed Basic Info / Contact / Address / Financial layout, so an empty/invalid field
+on a non-active tab silently blocked submission with no feedback. Added `novalidate`
+to both forms; both submit handlers now find the first `:invalid` field, switch to
+its owning tab (`#addSupplierTabs` / `#editSupplierTabs`), focus it, call
+`reportValidity()`, and show a SweetAlert naming the field before falling through to
+the existing AJAX save. `app/bms/operations/sub_contractors.php` has the identical
+pattern and is still unfixed.
+
+## 2026-07-27 (fix) — Add/Edit Customer form no longer fails silently on invalid input
+
+**Files:** `app/bms/customer/customers.php`
+
+Root cause: `customer_name` and `year` (required) and `email`/`company_email`/`website`
+(format-constrained) sit across 4 Bootstrap tabs (Basic Info / Contact / Address /
+Financial). When an invalid field was on a tab other than the one currently visible,
+native HTML5 validation silently cancelled the submit — browsers cannot render a
+validation bubble on an element inside a `display:none` tab-pane — so the Save button
+did nothing with no alert, no spinner, no network call.
+
+Fix: added `novalidate` to `#addCustomerForm` and `#editCustomerForm` and replaced
+implicit browser blocking with an explicit check in each submit handler — finds the
+first `:invalid` field, switches to its owning tab via the Bootstrap Tab API, focuses
+it, calls `reportValidity()`, and fires a SweetAlert naming the field (a guaranteed
+fallback since Select2-wrapped selects like `year` can render the native bubble
+inconsistently). Scoped to Customers only per user request; the identical pattern
+also exists in `app/bms/Suppliers/suppliers.php` and
+`app/bms/operations/sub_contractors.php` and is not yet fixed there.
+
+## 2026-07-26 (feat) — Proper reversal mechanism for credit note / debit note / statutory remittance payments
+
+**Files:** `core/payment_source.php`, `api/sales/reverse_credit_note_payment.php` (new),
+`api/purchase/reverse_debit_note_payment.php` (new), `api/reverse_statutory_remittance.php` (new),
+`app/bms/sales/credit_notes/credit_note_view.php`, `app/bms/purchase/debit_notes/debit_note_view.php`,
+`app/bms/pos/statutory_remittances.php`
+
+Audited every source type that posts through the `postOutflow`/`postInflow` mirror
+pattern to check whether a mistaken "Pay"/"Remit" click could be undone. Five of
+eight already had a proper reversal (expenses, trips, supplier payments, bank
+transfers, revenue). Three did not: **credit note refunds**, **debit note
+settlements**, and **statutory remittances (PAYE/NSSF/SDL)** — their own delete
+endpoints even said *"reverse the payment first,"* an instruction pointing at a
+mechanism that didn't exist. The only way to undo a mistake for these three was
+the risky generic Journal Entries void/delete screen (see the entry below).
+
+Built the missing mechanism using the **contra-entry** pattern (Style B) rather
+than the delete-and-restore pattern (`reverseOutflow`/`reverseInflow`) already
+used by the other five — matching this codebase's own documented principle in
+`core/ledger_post.php` (`assertJournalNotPosted`'s docblock: *"posted journal
+entries are immutable... to reverse one you post a contra-entry, you don't edit
+the original"*) and standard double-entry practice: never delete/edit a posted
+entry, always correct it with a balancing entry so the full history stays
+visible in the ledger itself.
+
+1. **New shared engine** — `reverseMirroredEntry()` in `core/payment_source.php`
+   (plus thin `reverseOutflowContra()`/`reverseInflowContra()` wrappers): finds
+   the posted mirror entry (`entity_type='books_transaction'`), posts its exact
+   contra tagged `entity_type='books_transaction_void'`, leaves the original at
+   `status='posted'` untouched, and restores account balances only on the leg
+   the original posting actually moved (mirrors `postOutflow`/`postInflow`'s own
+   "only touch the cash leg" rule — correctly handles the WHT 3-leg case too).
+   Idempotent — a second call detects the existing contra and no-ops.
+2. **Three new endpoints**, one per gap, each gated by the same permission as
+   its "Pay" counterpart, period-lock protected
+   (`assertNotInFinalizedReconPeriod`), and restoring the source document to its
+   pre-payment status (`approved`/`pending`) with `transaction_id` and payment
+   fields cleared so it can be re-paid. The credit note path also reverses the
+   inventory/COGS restock leg via the already-existing `reverseCreditNoteRestock()`.
+3. **"Reverse Payment"/"Reverse" buttons** added to the credit note view, debit
+   note view, and statutory remittances list — reachable only from each
+   document's own page, never from the generic Journal Entries screen.
+
+**Testing:** 27 assertions in a `BEGIN`/`ROLLBACK`-isolated live-DB script
+(matching this codebase's own test-suite convention) covering plain outflow,
+WHT-split outflow, plain inflow, the restock leg, and graceful no-op/failure
+handling for missing or already-reversed transactions — all passed. Also ran a
+genuine end-to-end HTTP round trip (create → remit → reverse → verify → clean
+up) against a throwaway statutory remittance, confirming the real endpoint
+correctly restores status, clears fields, and leaves the original entry
+untouched while posting a balanced contra. Re-ran all 6 existing test suites
+touching this code (`test_credit_notes_cli`, `test_credit_note_restock_cli`,
+`test_credit_note_vat_reversal_cli`, `test_debit_notes_cli`,
+`test_payment_source_cli`, `test_supplier_payment_source_cli`) — 215/215 still
+pass, no regressions.
+
+**Found, not fixed (separate, pre-existing issue):** while sourcing real "paid"
+records to test against, every currently-paid credit note, debit note, and
+statutory remittance in this database has a `transaction_id` pointing at a row
+that doesn't exist in the `transactions` table at all — likely stale/synthetic
+seed data rather than something the application itself produced. Reversal
+correctly refuses these with a clear error (verified) rather than crashing, but
+none of them can be reversed until that underlying data is repaired separately.
+
+## 2026-07-26 (fix) — Inactive employees: lock down forward-looking HR actions, fix offboarding gap
+
+**Files:** `app/bms/pos/employee_details.php`, `api/add_lifecycle_event.php`,
+`api/pos/assign_salary_component.php`, `api/add_contract.php`, `api/add_appraisal.php`,
+`api/add_goal.php`, `api/manage_training_participants.php`, `api/account/search_employees.php`,
+`app/bms/pos/hr_checklists.php`, `api/spawn_checklist.php`, `api/get_payroll_details.php`,
+`app/bms/pos/payroll_details.php`
+
+Audited every "create a new record" action reachable from an employee's profile,
+live against a real terminated employee, to check whether inactive employees
+were correctly locked out of actions that only make sense for someone still
+employed. They mostly weren't — every button was gated by role permission only,
+never by the employee's own status. Fixed in four phases:
+
+1. **Backend hardening** — added `assertEmployeeActive()` (already used by
+   Attendance/Leave) to every previously-unprotected create endpoint:
+   `add_lifecycle_event.php` (Promote/Transfer/Award/Warn/Complaint/Resignation/
+   **Termination** — confirmed live you could re-terminate an already-terminated
+   employee), `assign_salary_component.php`, `add_contract.php`, `add_appraisal.php`,
+   `add_goal.php`, and `manage_training_participants.php` (skips an inactive
+   employee within a batch enrollment rather than aborting the whole batch).
+2. **UI lockdown** — `employee_details.php` gets one computed
+   `$is_active_employee` flag; the "HR Action" dropdown, Salary Structure "Add
+   Component", Attendance "Check In Now/Check Out Now/Mark Attendance", and
+   Leave "Apply for Leave" are hidden when the employee is inactive. Documents
+   upload and Edit Profile stay available — HR still legitimately needs those
+   after termination (final paperwork, bank-detail corrections for last pay).
+3. **Fixed the one gap in the opposite direction** — the shared employee picker
+   (`search_employees.php`) already excludes inactive employees everywhere,
+   which correctly blocks new Contracts/Appraisals/Goals/Training enrollment,
+   but also wrongly made it impossible to spawn an **offboarding** checklist for
+   someone already deactivated. Added an opt-in `include_inactive=1` param
+   (every other caller is untouched — verified `?q=...` without the flag still
+   returns zero results for an inactive employee) and wired it into
+   `hr_checklists.php`'s employee picker; `spawn_checklist.php` now enforces
+   server-side that an *onboarding* template still requires an active employee
+   while *offboarding* accepts either — verified live: onboarding rejected,
+   offboarding succeeded, for the same inactive employee.
+4. **Labeled the legitimate exception** — Payroll's Approve/Mark-as-Paid on an
+   *existing* unpaid record for an inactive employee is correct behavior (final
+   settlement for pre-termination wages), not a bug. Added an `employee_status`
+   field to `get_payroll_details.php` and a "Final Settlement" badge on
+   `payroll_details.php` so it reads as intentional rather than a leftover
+   general-purpose button. Verified live against a real employee with two
+   pre-existing unpaid payroll rows from before their termination.
+
+Verified no regression: re-checked an active employee's page shows every
+button as before.
+
+## 2026-07-26 (fix) — Attendance quick-mark buttons no longer overwrite a custom check-in/out time
+
+**File:** `app/bms/pos/attendance.php`
+
+The P/L/A/H quick-status buttons (and the gear-menu "Mark Present"/"Mark Late")
+each had a fixed check-in/check-out time hardcoded into their `onclick`
+(`quickMarkAttendance(id, 'present', '09:00', '17:00')`, etc.), which then hit
+`api/quick_mark_attendance.php`'s unconditional `UPDATE ... SET check_in_time = ?,
+check_out_time = ?`. So typing a custom time (e.g. 07:30) into a row and then
+clicking that row's status button — a natural next step, not a misuse — silently
+overwrote it with the button's fixed default and reloaded the page, which is
+what was being seen as "check-in time changes to another time on its own."
+
+Fixed by having each of these read the row's current Check-In/Check-Out input
+values first and only fall back to the button's hardcoded default when that
+field is still empty — the same "existing value wins, default only fills gaps"
+rule already used by the project-attendance quick-mark buttons. Marking someone
+Absent still forces both times blank, since presence and absence are exclusive.
+Verified live: typed 07:30 → clicked Present → check-in stayed 07:30, check-out
+defaulted to 17:00 (was empty); then clicked Absent → both correctly cleared.
+
+Also hardened `api/quick_mark_attendance.php` itself with the same fallback,
+server-side — mirroring the pattern `api/mark_attendance.php` (Employee Details
+> Attendance tab) already used. The JS fix above protects today's buttons; this
+protects the endpoint itself against any other/future caller that omits a
+field, so the guarantee doesn't depend on every caller remembering to read the
+row first. Verified directly against the endpoint: a call that omitted
+`check_out_time` entirely preserved the previously-saved value instead of
+nulling it, and a `status=absent` call still correctly cleared both times.
+
+Audited all three places attendance can be marked (Project Attendance,
+standalone Attendance page, Employee Details > Attendance tab) — this was the
+only one with the bug; the other two already had the correct "preserve unless
+absent" behavior from how they were originally written.
+
+## 2026-07-26 (fix) — Project HR Attendance: day-mode marking like the standalone page, no more repeated rows
+
+**Files:** `api/operations/get_project_attendance.php`, `app/bms/operations/project_view.php`,
+`app/bms/pos/attendance.php`
+
+Project Details > HR > Attendance was listing one row per attendance record (i.e. per
+employee per day), so any staff member with several days of history in the selected
+range appeared to "repeat many times," and marking attendance required a separate
+modal instead of the standalone Attendance page's direct inline marking. Rebuilt to
+mirror `attendance.php`'s own dual view design exactly:
+
+1. **`get_project_attendance.php`** now branches on the date range, same as the
+   standalone Attendance page's Daily vs Week/Month views:
+   - **Single date selected (the default — today):** one row per active project
+     employee for that exact day — real record if one exists, otherwise defaulted
+     to `weekend` / `leave` / `absent` the same way `attendance.php` does.
+   - **A wider date range:** one row per employee, aggregated (present/late/
+     half_day/absent/leave counts + total hours) — read-only history, not a
+     per-day list, so a multi-day range never repeats an employee.
+2. **Project's Attendance table** (`project_view.php`) now renders whichever shape
+   the API returns. Day mode is directly markable in place — check-in/check-out
+   inputs and P/L/A/H quick-mark buttons — the exact same interaction as the
+   standalone page, restoring `projectQuickMark`/`projectUpdateAttTime` (removed
+   in an earlier pass of this fix) plus a new `deleteProjectAttendance` wired to
+   the real `api/delete_attendance.php` contract (`employee_id` + `attendance_date`,
+   not `attendance_id` — the old project code called it with the wrong shape and
+   would have silently failed). Range mode stays read-only with a "View History"
+   action per employee, same as before.
+3. **Toolbar simplified**: removed "Mark Attendance" (the modal-based flow no
+   longer matches how marking actually works now — it's inline), "Print" (the
+   project-level Print button already prints the whole page), and "Refresh" (not
+   needed). Removed the now-fully-unused Mark/Edit Attendance modal and its form
+   handler.
+4. **"View History" (both modes) lands on the real, full `attendance.php`** page
+   (`attendance?employee=<id>`) — the exact same page used company-wide, with its
+   native Daily/Weekly/Monthly views, filters, print, and Excel export.
+5. **Added "Back to Project" on `attendance.php`**, same convention as
+   `invoice_view.php` etc: when the employee being viewed belongs to a project, a
+   button links back to that project's page, regardless of how the visitor arrived.
+
+Note: while testing, found that an employee can have `employees.status = 'active'`
+(what this project list and the Project Staff tab check) while
+`employees.employment_status = 'terminated'` (what `attendance.php`'s own roster
+query checks) — such an employee shows in the project's attendance summary but
+"View History" lands on an empty roster there. Pre-existing data-model inconsistency
+between the two status fields, not introduced by this change and left alone pending
+a decision on which field should be authoritative.
+
+## 2026-07-26 (feat) — Sitewide loading UX: top progress bar + shared skeleton engine
+
+**Files:** `assets/css/loading.css` (new), `assets/js/loading.js` (new), `header.php`,
+`footer.php`, `app/bms/operations/project_view.php`
+
+Added a global, professional loading experience so pages don't feel like they're
+frozen while data loads, without needing every page to be touched individually:
+
+1. **Top progress bar** — a slim bar (amber/orange gradient, chosen for contrast
+   against the app's blue header, which the default blue completely disappeared
+   into during testing) that automatically shows on every `$.ajax` call and on
+   internal link clicks, sitewide, via `header.php`/`footer.php` (included on
+   every page already). Zero per-page changes needed — verified live on both
+   Project Details and Dashboard.
+2. **Shared skeleton-screen helper** (`window.BMSSkeleton.render(selector, opts)`) —
+   shimmering placeholder cards/lines instead of a blank spinner, opt-in per page
+   since real layouts differ too much to safely auto-detect (a blind global
+   auto-replace risked breaking table-cell loaders and empty-state messages that
+   share the same `spinner-border`/`text-center py-5` markup elsewhere in the
+   codebase — verified this would be unsafe before ruling it out).
+3. Applied the skeleton opt-in to **Project Details** (`#loading`) as the first
+   page, since that's the page identified as slow (see the fix below this entry).
+   Other heavy pages can adopt it with one line using the same shared engine.
+
+## 2026-07-25 (fix) — Project HR Attendance tab no longer lists inactive employees
+
+**File:** `api/operations/get_project_attendance.php`
+
+The Attendance tab under Project Details > HR was showing more employees than the
+Project Staff tab because its query joined `attendance` to `employees` filtered only
+by `project_id`, with no `status = 'active'` check — so employees who kept this
+project's `project_id` after being marked inactive/terminated still surfaced via
+their historical attendance rows. Added `AND e.status = 'active'` to the WHERE clause
+so the two tabs agree on which employees belong to the project.
+
 ## 2026-07-24 (fix) — Dashboard: 3 purchase-order widgets now narrow by assigned warehouse
 
 **Files:** `app/dashboard.php`, `tests/test_warehouse_scope_cli.php`

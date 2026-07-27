@@ -428,7 +428,7 @@ if (isAdmin()) {
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="addCustomerForm" autocomplete="off">
+            <form id="addCustomerForm" autocomplete="off" novalidate>
                 <div class="modal-body">
                     <div id="add-customer-message" class="mb-3"></div>
                     
@@ -710,7 +710,7 @@ if (isAdmin()) {
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form id="editCustomerForm" autocomplete="off">
+                <form id="editCustomerForm" autocomplete="off" novalidate>
                     <div class="modal-body">
                         <div id="edit-customer-message" class="mb-3"></div>
                         <input type="hidden" id="edit_customer_id" name="customer_id">
@@ -1260,6 +1260,16 @@ $(document).ready(function() {
     // Form Submissions
     $('#addCustomerForm').on('submit', function(e) {
         e.preventDefault();
+        const $invalid = $(this).find(':invalid').first();
+        if ($invalid.length) {
+            const paneId = $invalid.closest('.tab-pane').attr('id');
+            $('#customerTabs button[data-bs-target="#' + paneId + '"]').tab('show');
+            $invalid.trigger('focus');
+            const fieldLabel = $('label[for="' + $invalid.attr('id') + '"]').text().replace('*', '').trim() || 'This field';
+            setTimeout(() => $invalid[0].reportValidity(), 150);
+            Swal.fire('Missing or invalid information', fieldLabel + ' is required or not in the correct format.', 'warning');
+            return;
+        }
         const btn = $(this).find('[type="submit"]');
         const originalHtml = btn.html();
         btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Saving...');
@@ -1334,6 +1344,16 @@ $(document).ready(function() {
 
     $('#editCustomerForm').on('submit', function(e) {
         e.preventDefault();
+        const $invalid = $(this).find(':invalid').first();
+        if ($invalid.length) {
+            const paneId = $invalid.closest('.tab-pane').attr('id');
+            $('#editCustomerTabs button[data-bs-target="#' + paneId + '"]').tab('show');
+            $invalid.trigger('focus');
+            const fieldLabel = $('label[for="' + $invalid.attr('id') + '"]').text().replace('*', '').trim() || 'This field';
+            setTimeout(() => $invalid[0].reportValidity(), 150);
+            Swal.fire('Missing or invalid information', fieldLabel + ' is required or not in the correct format.', 'warning');
+            return;
+        }
         const btn = $(this).find('[type="submit"]');
         const originalHtml = btn.html();
         btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Updating...');
