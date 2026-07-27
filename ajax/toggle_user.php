@@ -3,10 +3,9 @@ require_once '../roots.php';
 require_once '../includes/config.php';
 require_once '../helpers.php';
 
-session_start();
 header('Content-Type: application/json');
 
-// Check if user is logged in
+// Check if user is logged in (session already started by roots.php)
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);

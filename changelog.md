@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-07-27 (fix) — "Error communicating with server: OK" on Assign Role / Activate-Deactivate User
+
+**Files:** `ajax/assign_role.php`, `ajax/toggle_user.php`
+
+Both endpoints called `session_start()` a second time after `require_once roots.php`,
+which already starts the session itself (guarded with
+`if (session_status() === PHP_SESSION_NONE)`). The redundant, unguarded second call
+triggered a PHP notice (`session_start(): Ignoring session_start() because a session
+is already active`) — and since `roots.php` forces `display_errors = 1` on every
+request, that notice text got printed straight into the response body, ahead of the
+real `{"success":true,...}` JSON.
+
+The HTTP status stayed `200 OK` (a notice doesn't change it), so the failure was
+invisible on the network tab — but `dataType: 'json'` failed to parse the now-corrupted
+body, firing jQuery's `error:` callback instead of `success:`. That handler
+(`users.php:322`) displays `'Error communicating with server: ' + xhr.statusText`,
+and `xhr.statusText` for any 2xx response is literally `"OK"` — hence the confusing
+**"Error communicating with server: OK"**, which looked like a connectivity issue but
+was actually a corrupted-but-successful response. The underlying role
+assignment/activation likely still wrote to the database despite the scary error.
+
+Fix: removed the redundant `session_start()` call from both files (`roots.php`
+already provides it). Verified live with a PHP CLI reproduction: simulating the
+double call produces exactly this corrupted, non-JSON output
+(`json_decode() === null`); removing it produces clean, valid JSON. Searched the
+rest of `api/`/`app/` for the same pattern — 3 other `session_start()` calls found,
+none sharing the defect (two never load `roots.php` at all; one calls
+`session_start()` *before* `roots.php`, so `roots.php`'s own guard correctly no-ops).
+
 ## 2026-07-27 (feat) — Category "Other (specify)" + Tax Rate restricted to No Tax/VAT 18% on Add New Inventory Product
 
 **Files:** `app/bms/product/products.php`, `api/create_product.php`
