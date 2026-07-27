@@ -44,9 +44,19 @@ if ($attention) {
 // Calculate offset
 $offset = ($page - 1) * $per_page;
 
+// Warehouse-scope the STOCK NUMBER itself, not just which products are visible.
+// product_stocks.warehouse_id is NOT NULL (every stock row belongs to exactly one
+// warehouse), so the strict variant is correct here -- there is no "global" stock
+// row to preserve for a non-admin the way scopeFilterSqlNullable preserves
+// untagged products. Applied in the JOIN's ON clause (not WHERE) so a product
+// with zero stock in the user's assigned warehouse(s) still appears in the list
+// with total_stock = 0, rather than being dropped by the LEFT JOIN turning strict.
+// Admins get '' (unrestricted, same total as before).
+$stock_wh_scope = scopeFilterSql('warehouse', 'ps');
+
 // Build query with filters
 $query = "
-    SELECT 
+    SELECT
         p.*,
         c.category_name,
         b.brand_name,
@@ -111,7 +121,7 @@ $query = "
     LEFT JOIN brands b ON p.brand_id = b.brand_id
     LEFT JOIN suppliers s ON p.supplier_id = s.supplier_id
     LEFT JOIN tax_rates t ON p.tax_id = t.rate_id
-    LEFT JOIN product_stocks ps ON p.product_id = ps.product_id
+    LEFT JOIN product_stocks ps ON p.product_id = ps.product_id{$stock_wh_scope}
     LEFT JOIN warehouses w ON ps.warehouse_id = w.warehouse_id
     LEFT JOIN locations loc ON ps.location_id = loc.location_id
     WHERE 1=1
@@ -301,6 +311,12 @@ if (empty($units)) {
     $units = [['unit_code' => 'pcs', 'unit_name' => 'Pieces']];
 }
 
+// Same warehouse scoping as the main list's stock sum, applied to this
+// subquery's own alias (ps2) so the stat cards (Total Value, Out of Stock,
+// Low Stock counts) agree with the STOCK column above rather than counting
+// company-wide totals for a warehouse-scoped non-admin.
+$stock_wh_scope_ps2 = scopeFilterSql('warehouse', 'ps2');
+
 // Calculate global statistics for filtered results
 $stats_query = "
     SELECT 
@@ -326,6 +342,7 @@ $stats_query = "
             SUM(ps2.stock_quantity) as total_stock,
             SUM(ps2.stock_quantity - ps2.reserved_quantity) as available_stock
         FROM product_stocks ps2
+        WHERE 1=1{$stock_wh_scope_ps2}
         GROUP BY ps2.product_id
     ) as stock_summary ON p.product_id = stock_summary.agg_pid
 ";

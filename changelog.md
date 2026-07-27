@@ -1,5 +1,40 @@
 # BMS Changelog
 
+## 2026-07-27 (fix) — Products list: Stock column now respects warehouse scope for non-admins
+
+**Files:** `app/bms/product/products.php`
+
+`products.php` already scoped *which product rows* are visible by warehouse
+(via `products.warehouse_id`), but the STOCK NUMBER shown for a visible product
+summed `product_stocks.stock_quantity` across every warehouse in the company,
+regardless of the viewer's own warehouse assignment — a warehouse-restricted
+non-admin saw the full company-wide total, not just what's actually in their
+warehouse(s). Same gap in the stat cards above the table (Total Value, Out of
+Stock count, Low Stock count), which used a separate un-scoped subquery
+(`ps2`/`stock_summary`).
+
+Fix: applied `scopeFilterSql('warehouse', ...)` — the strict variant, since
+`product_stocks.warehouse_id` is `NOT NULL` (every stock row belongs to exactly
+one warehouse; there's no "global" stock row to preserve visibility for, unlike
+the nullable variant used elsewhere for optional `project_id`s) — to both the
+main list's `product_stocks ps` JOIN (in the `ON` clause, not `WHERE`, so a
+product with zero stock in the user's warehouse(s) still appears with
+`total_stock = 0` rather than being dropped by the LEFT JOIN turning strict)
+and the stats subquery's own `ps2` alias. A user's assigned warehouse(s) come
+from the existing scope engine (`core/project_scope.php`'s `loadUserScope()`,
+already wired to `user_projects` + `user_scope_overrides` and the admin bypass)
+— no new mechanism, just applying the one already used for `warehousesForSelect()`
+and the dashboard's PO widgets to this page's stock aggregation too. Admins
+(`scopeFilterSql` → `''`) are unaffected — same company-wide total as before.
+
+Verified live against real data: "Bread Loaf" (product_id 7) has 870 units in
+Main Warehouse (id 5) and 117 in POLES (id 14), totaling 987. A real non-admin
+user (id 12) with an explicit `user_scope_overrides` grant for warehouse 5 only
+now correctly sees `total_stock = 870`, not 987; simulating the same product as
+an admin still returns 987 (unchanged); a user with zero warehouse/project
+assignment correctly sees 0 (default-deny, matching `scopeFilterSql`'s
+documented behavior elsewhere).
+
 ## 2026-07-27 (fix) — "Error communicating with server: OK" on Assign Role / Activate-Deactivate User
 
 **Files:** `ajax/assign_role.php`, `ajax/toggle_user.php`
