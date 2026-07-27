@@ -482,7 +482,7 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="addSubContractorForm" method="POST" enctype="multipart/form-data">
+            <form id="addSubContractorForm" method="POST" enctype="multipart/form-data" novalidate>
                 <div class="modal-body">
                     <div id="add-sc-message" class="mb-3"></div>
                     <?php if ($proj_ctx_id > 0): ?>
@@ -717,7 +717,7 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="editSCForm" method="POST" enctype="multipart/form-data">
+            <form id="editSCForm" method="POST" enctype="multipart/form-data" novalidate>
                 <input type="hidden" name="supplier_id" id="edit_sc_id">
                 <div class="modal-body">
                     <div id="edit-sc-message" class="mb-3"></div>
@@ -1120,6 +1120,16 @@ $(document).ready(function() {
     // Add Form Submit
     $('#addSubContractorForm').on('submit', function(e) {
         e.preventDefault();
+        const $invalid = $(this).find(':invalid').first();
+        if ($invalid.length) {
+            const paneId = $invalid.closest('.tab-pane').attr('id');
+            $('#addSubContractorTabs button[data-bs-target="#' + paneId + '"]').tab('show');
+            $invalid.trigger('focus');
+            const fieldLabel = $('label[for="' + $invalid.attr('id') + '"]').text().replace('*', '').trim() || 'This field';
+            setTimeout(() => $invalid[0].reportValidity(), 150);
+            Swal.fire('Missing or invalid information', fieldLabel + ' is required or not in the correct format.', 'warning');
+            return;
+        }
         const formData = new FormData(this);
         $.ajax({
             url: 'api/add_sub_contractor.php',
@@ -1141,6 +1151,16 @@ $(document).ready(function() {
     // Edit Form Submit
     $('#editSCForm').on('submit', function(e) {
         e.preventDefault();
+        const $invalid = $(this).find(':invalid').first();
+        if ($invalid.length) {
+            const paneId = $invalid.closest('.tab-pane').attr('id');
+            $('#editSubContractorTabs button[data-bs-target="#' + paneId + '"]').tab('show');
+            $invalid.trigger('focus');
+            const fieldLabel = $('label[for="' + $invalid.attr('id') + '"]').text().replace('*', '').trim() || 'This field';
+            setTimeout(() => $invalid[0].reportValidity(), 150);
+            Swal.fire('Missing or invalid information', fieldLabel + ' is required or not in the correct format.', 'warning');
+            return;
+        }
         const formData = new FormData(this);
         $.ajax({
             url: 'api/update_sub_contractor.php',

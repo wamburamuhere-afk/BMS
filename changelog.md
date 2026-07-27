@@ -1,5 +1,112 @@
 # BMS Changelog
 
+## 2026-07-27 (fix) — api_perms_no_gate false positive for the external-signature endpoint
+
+**Files:** `scratch/api_permission_audit.php`
+
+`test_security_coverage_cli.php`'s `api_perms_no_gate` ceiling (locked at 0) was
+regressed by `api/document/submit_external_signature.php`, blocking every push
+regardless of what a PR actually changed. Not a real gap: that endpoint is
+deliberately token-authenticated instead of session-authenticated (the external
+signer — a client/supplier — has no BMS login; the single-use, hashed, expiring
+token in `document_signature_tokens` is the credential, per the file's own
+docblock). The audit script only pattern-matches for `canX()`/`isAuthenticated()`
+calls, so it can't recognise token-based auth as an equivalent gate.
+
+Added the file to `$ignore_substrings` (the audit's existing allowlist mechanism,
+already used for debug/test/migration scripts) with a comment explaining why,
+rather than raising `$CEILINGS['api_perms_no_gate']` from 0 to 1 — bumping the
+ceiling would silently permit one real future gap to slip through undetected;
+naming this specific known exception keeps the ceiling's strict "zero unknown
+gaps" meaning intact. Verified: `scratch/api_permission_audit.php` now reports
+0 gaps and `test_security_coverage_cli.php` passes clean.
+
+## 2026-07-27 (feat) — Category "Other (specify)" + Tax Rate restricted to No Tax/VAT 18% on Add New Inventory Product
+
+**Files:** `app/bms/product/products.php`, `api/create_product.php`
+
+Scoped strictly to the Add Product modal (Basic Info → Category, Pricing → Tax Rate):
+
+1. **Category** now uses the same `renderOtherSelect()` "Other (specify)" pattern
+   as Brand (see entry below) and Category on Add Customer. The category tree's
+   parent/child indentation is preserved — replaced `build_category_tree_modal()`
+   (which built raw `<option>` HTML) with `build_category_lk_list()`, returning
+   flat `[value,label]` pairs (indent via literal `\u{00A0}` since `renderOtherSelect`
+   HTML-escapes labels, so `&nbsp;` would show as literal text). `create_product.php`
+   resolves `category_id === 'other'` the same way as Brand: case-insensitive
+   match against an existing active product category, or a new row created on
+   the fly (`type='product'`).
+2. **Tax Rate** dropdown, in this modal only, now lists just "No Tax" and
+   "VAT 18%" — dropped Reduced Rate 5% and both Withholding Tax entries that the
+   old `foreach ($tax_rates as $tax)` loop pulled in. The VAT 18% option's
+   `rate_id` is looked up dynamically by `rate_percentage = 18.00` (never
+   hard-coded — an id can differ across environments), not filtered anywhere
+   else `$tax_rates` is used on this page.
+
+## 2026-07-27 (feat) — "Other (specify)" for Brand on Add New Inventory Product
+
+**Files:** `app/bms/product/products.php`, `api/create_product.php`
+
+Applied the same self-growing-dropdown pattern already used for Category on the
+Add Customer form (`core/form_lookups.php`'s `renderOtherSelect()`) to the Brand
+field on the Add Product modal's Details tab. Picking "➕ Other (type new)…" swaps
+the dropdown for a text input; the typed name is resolved server-side in
+`create_product.php` — case-insensitive match against an existing active brand,
+or a new row created on the fly in `brands` — mirroring exactly how
+`api/add_customer.php` resolves `category_id === 'other'` into a real
+`customer_categories` row. Added the shared `initOtherSelects()` /
+`.other-trigger` change handler / `.other-back` handler / `resetOtherFields()`
+JS (copied from customers.php, none of it existed on this page before) and wired
+it into `#addProductModal`'s `shown.bs.modal`/`hidden.bs.modal` handlers alongside
+the existing Select2 init. Scoped to Add Product only — there is no separate Edit
+Product modal on this page.
+
+## 2026-07-27 (fix) — Add/Edit Sub-contractor form no longer fails silently on invalid input
+
+**Files:** `app/bms/operations/sub_contractors.php`
+
+Same fix as Customers/Suppliers, applied to `#addSubContractorForm`/`#editSCForm`:
+added `novalidate` to both forms; both submit handlers now find the first `:invalid`
+field, switch to its owning tab (`#addSubContractorTabs` / `#editSubContractorTabs`),
+focus it, call `reportValidity()`, and show a SweetAlert naming the field before
+falling through to the existing AJAX save. This closes out the pattern across all
+three actor forms (Customers, Suppliers, Sub-contractors) that share the
+`renderOtherSelect(..., true)` required-year-on-a-tab layout.
+
+## 2026-07-27 (fix) — Add/Edit Supplier form no longer fails silently on invalid input
+
+**Files:** `app/bms/Suppliers/suppliers.php`
+
+Same fix as the Customer form below, applied to `#addSupplierForm`/`#editSupplierForm`:
+`supplier_name` (required) and `year` (required, via `renderOtherSelect`) sit on the
+tabbed Basic Info / Contact / Address / Financial layout, so an empty/invalid field
+on a non-active tab silently blocked submission with no feedback. Added `novalidate`
+to both forms; both submit handlers now find the first `:invalid` field, switch to
+its owning tab (`#addSupplierTabs` / `#editSupplierTabs`), focus it, call
+`reportValidity()`, and show a SweetAlert naming the field before falling through to
+the existing AJAX save. `app/bms/operations/sub_contractors.php` has the identical
+pattern and is still unfixed.
+
+## 2026-07-27 (fix) — Add/Edit Customer form no longer fails silently on invalid input
+
+**Files:** `app/bms/customer/customers.php`
+
+Root cause: `customer_name` and `year` (required) and `email`/`company_email`/`website`
+(format-constrained) sit across 4 Bootstrap tabs (Basic Info / Contact / Address /
+Financial). When an invalid field was on a tab other than the one currently visible,
+native HTML5 validation silently cancelled the submit — browsers cannot render a
+validation bubble on an element inside a `display:none` tab-pane — so the Save button
+did nothing with no alert, no spinner, no network call.
+
+Fix: added `novalidate` to `#addCustomerForm` and `#editCustomerForm` and replaced
+implicit browser blocking with an explicit check in each submit handler — finds the
+first `:invalid` field, switches to its owning tab via the Bootstrap Tab API, focuses
+it, calls `reportValidity()`, and fires a SweetAlert naming the field (a guaranteed
+fallback since Select2-wrapped selects like `year` can render the native bubble
+inconsistently). Scoped to Customers only per user request; the identical pattern
+also exists in `app/bms/Suppliers/suppliers.php` and
+`app/bms/operations/sub_contractors.php` and is not yet fixed there.
+
 ## 2026-07-26 (fix) — Correct pre-existing is_service COGS/Inventory overstatements
 
 **Files:** `migrations/2026_07_26_correct_is_service_cogs_entries.php` (new),

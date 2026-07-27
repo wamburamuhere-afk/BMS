@@ -45,6 +45,12 @@ $ignore_substrings = [
     '/api/dn_attachment_helper',
     '/api/helpers/',
     '/api/pos/scratch/',
+    // Token-authenticated, not session-authenticated, by design: the external
+    // signer has no BMS login. The single-use, hashed, expiring token in
+    // document_signature_tokens IS the credential here (see the file's own
+    // docblock) -- an equivalent gate to canX(), just not one this scanner's
+    // regex can recognise.
+    '/api/document/submit_external_signature.php',
 ];
 
 function shouldSkip(string $path): bool {
