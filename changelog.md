@@ -1,5 +1,45 @@
 # BMS Changelog
 
+## 2026-07-27 (feat) — Category "Other (specify)" + Tax Rate restricted to No Tax/VAT 18% on Add New Inventory Product
+
+**Files:** `app/bms/product/products.php`, `api/create_product.php`
+
+Scoped strictly to the Add Product modal (Basic Info → Category, Pricing → Tax Rate):
+
+1. **Category** now uses the same `renderOtherSelect()` "Other (specify)" pattern
+   as Brand (see entry below) and Category on Add Customer. The category tree's
+   parent/child indentation is preserved — replaced `build_category_tree_modal()`
+   (which built raw `<option>` HTML) with `build_category_lk_list()`, returning
+   flat `[value,label]` pairs (indent via literal `\u{00A0}` since `renderOtherSelect`
+   HTML-escapes labels, so `&nbsp;` would show as literal text). `create_product.php`
+   resolves `category_id === 'other'` the same way as Brand: case-insensitive
+   match against an existing active product category, or a new row created on
+   the fly (`type='product'`).
+2. **Tax Rate** dropdown, in this modal only, now lists just "No Tax" and
+   "VAT 18%" — dropped Reduced Rate 5% and both Withholding Tax entries that the
+   old `foreach ($tax_rates as $tax)` loop pulled in. The VAT 18% option's
+   `rate_id` is looked up dynamically by `rate_percentage = 18.00` (never
+   hard-coded — an id can differ across environments), not filtered anywhere
+   else `$tax_rates` is used on this page.
+
+## 2026-07-27 (feat) — "Other (specify)" for Brand on Add New Inventory Product
+
+**Files:** `app/bms/product/products.php`, `api/create_product.php`
+
+Applied the same self-growing-dropdown pattern already used for Category on the
+Add Customer form (`core/form_lookups.php`'s `renderOtherSelect()`) to the Brand
+field on the Add Product modal's Details tab. Picking "➕ Other (type new)…" swaps
+the dropdown for a text input; the typed name is resolved server-side in
+`create_product.php` — case-insensitive match against an existing active brand,
+or a new row created on the fly in `brands` — mirroring exactly how
+`api/add_customer.php` resolves `category_id === 'other'` into a real
+`customer_categories` row. Added the shared `initOtherSelects()` /
+`.other-trigger` change handler / `.other-back` handler / `resetOtherFields()`
+JS (copied from customers.php, none of it existed on this page before) and wired
+it into `#addProductModal`'s `shown.bs.modal`/`hidden.bs.modal` handlers alongside
+the existing Select2 init. Scoped to Add Product only — there is no separate Edit
+Product modal on this page.
+
 ## 2026-07-27 (fix) — Add/Edit Sub-contractor form no longer fails silently on invalid input
 
 **Files:** `app/bms/operations/sub_contractors.php`
