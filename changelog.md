@@ -1,5 +1,66 @@
 # BMS Changelog
 
+## 2026-07-27 (fix) — Dashboard: closed 5 remaining project/warehouse scope gaps
+
+**Files:** `app/dashboard.php`, `api/create_stock_adjustment.php`
+
+Follow-up to the Products list fix (below): audited the rest of `app/dashboard.php`
+(2392 lines, every stat card/widget/alert) for the same class of bug — a widget
+whose underlying table carries `project_id`/`warehouse_id` but whose query never
+applies `scopeFilterSqlNullable()`/`scopeFilterSql()`, so a project- or
+warehouse-restricted non-admin sees company-wide data. Most of the file was
+already correctly scoped (Total Purchases, Pending PO Approvals, GRN Pending,
+Inventory Value/Low Stock, invoice/expense/leave widgets, etc. — several from
+an earlier pass, commit `6ce69a8`). Five gaps remained:
+
+1. **Quick Add Stock warehouse dropdown** — listed every active warehouse
+   company-wide. Now filtered by `scopeFilterSql('warehouse', 'w')` (strict —
+   `warehouses.warehouse_id` is the table's own PK, never NULL). Also hardened
+   `api/create_stock_adjustment.php` itself with a server-side
+   `userCan('warehouse', $_POST['warehouse_id'])` gate — the dropdown narrowing
+   was cosmetic only; a hand-crafted request could previously submit a stock
+   adjustment for any warehouse regardless of scope, even though the *product*
+   scope gate (`assertScopeForRecord('products', ...)`) was already in place.
+2. **POS Sales Today stat card** — had warehouse scope but not project scope,
+   even though `pos_sales.project_id` exists. Added
+   `scopeFilterSqlNullable('project', 'pos_sales')` alongside the existing
+   warehouse filter.
+3. **Document expiry alert** — no scope filter at all, despite `documents.project_id`
+   existing. Added `scopeFilterSqlNullable('project', 'd')`.
+4. **Quotations expiring alert** — had project scope but not warehouse scope,
+   even though `quotations.warehouse_id` exists (same unified quotes/sales-orders
+   table already known to carry it). Added `scopeFilterSqlNullable('warehouse', 'q')`.
+5. **Customers-over-credit-limit alert** — scoped the `customers` row via the
+   `customer` resource list, but the `INNER JOIN invoices` was never scoped by
+   project: an in-scope customer with invoices on a project outside the user's
+   scope could have `outstanding`/`excess` computed from — and the alert fired
+   entirely by — invoices they shouldn't see. Added
+   `scopeFilterSqlNullable('project', 'i')` on the joined invoices.
+
+Also updated a stale file-level comment (`// scope-audit: skip ... deferred to
+Phase G-2`) that no longer matched reality — the file has extensive scope
+filtering throughout; confirmed via `scratch/project_scope_audit.php`'s own
+guard logic (looks for any real `scopeFilterSql*()`/`userCan()` call in the
+file, not just the marker) that removing the stale claim doesn't newly flag
+the file.
+
+Verified live: ran all 5 fixed queries as admin vs. a real non-admin user
+(id 12, explicit warehouse-5-only scope, no project assignments) — every
+non-admin count came back narrower than the admin count with no SQL errors
+(warehouse dropdown 9→1, POS sales 38→32, documents 8→6, quotations 6→1,
+customer-invoice pairs 7→0), confirming the filters are active rather than
+silently no-op.
+
+Widgets audited and confirmed already correct or genuinely company-wide (no
+project/warehouse column to scope by): Recent Activities, Cash Register
+Shifts, Bank Reconciliation, Tender Deadlines, Payroll-not-processed flag,
+and the Smart Notification engine (pre-filtered at notification-creation time
+per `notification_engine_plan.md` Phase 3). Personal Sales/Cashier metrics
+(`get_user_metrics()`) are hard-restricted to the logged-in user's own
+`created_by`/`user_id` already — flagged as a separate policy question (should
+personal KPIs also narrow by current project/warehouse scope?) rather than
+bundled in as a security fix.
+
 ## 2026-07-27 (fix) — Products list: Stock column now respects warehouse scope for non-admins
 
 **Files:** `app/bms/product/products.php`

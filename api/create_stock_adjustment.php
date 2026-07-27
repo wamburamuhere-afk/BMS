@@ -38,6 +38,15 @@ if (function_exists('assertScopeForRecord')) {
     assertScopeForRecord('products', 'product_id', (int)$_POST['product_id']);
 }
 
+// Warehouse-scope gate — a product can be in-scope (global/company-wide) while
+// the warehouse a caller names is not; the dashboard's dropdown already only
+// lists in-scope warehouses, but this endpoint must not trust that client-side
+// narrowing against a hand-crafted request.
+if (function_exists('userCan') && !userCan('warehouse', (int)$_POST['warehouse_id'])) {
+    echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+    exit();
+}
+
 try {
     $pdo->beginTransaction();
 
