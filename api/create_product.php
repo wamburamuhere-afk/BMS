@@ -71,6 +71,50 @@ try {
     // Use calculated value, or manual override if provided
     $min_selling_price = !empty($_POST['min_selling_price']) ? floatval($_POST['min_selling_price']) : $calculated_min_price;
     
+    // Brand "Other (specify)" — resolve 'other' + brand_other into a real brands
+    // row, creating it on the fly if it doesn't exist yet (same pattern as the
+    // Category "Other" field on the Add Customer form).
+    $brand_id = !empty($_POST['brand_id']) ? trim($_POST['brand_id']) : null;
+    if ($brand_id === 'other') {
+        $brand_other = trim($_POST['brand_other'] ?? '');
+        if ($brand_other !== '') {
+            $bb = $pdo->prepare("SELECT brand_id FROM brands WHERE LOWER(brand_name) = LOWER(?) AND status = 'active'");
+            $bb->execute([$brand_other]);
+            $bid = $bb->fetchColumn();
+            if ($bid) {
+                $brand_id = $bid;
+            } else {
+                $pdo->prepare("INSERT INTO brands (brand_name, website, description, status) VALUES (?, '', '', 'active')")->execute([$brand_other]);
+                $brand_id = $pdo->lastInsertId();
+            }
+        } else {
+            $brand_id = null;
+        }
+    } else {
+        $brand_id = !empty($brand_id) ? intval($brand_id) : null;
+    }
+
+    // Category "Other (specify)" — same on-the-fly creation pattern as Brand above.
+    $category_id = !empty($_POST['category_id']) ? trim($_POST['category_id']) : null;
+    if ($category_id === 'other') {
+        $category_other = trim($_POST['category_other'] ?? '');
+        if ($category_other !== '') {
+            $cc = $pdo->prepare("SELECT category_id FROM categories WHERE LOWER(category_name) = LOWER(?) AND status = 'active' AND type = 'product'");
+            $cc->execute([$category_other]);
+            $cid = $cc->fetchColumn();
+            if ($cid) {
+                $category_id = $cid;
+            } else {
+                $pdo->prepare("INSERT INTO categories (category_name, type, status) VALUES (?, 'product', 'active')")->execute([$category_other]);
+                $category_id = $pdo->lastInsertId();
+            }
+        } else {
+            $category_id = null;
+        }
+    } else {
+        $category_id = !empty($category_id) ? intval($category_id) : null;
+    }
+
     // Combine dimensions
     $dimensions = null;
     if (!empty($_POST['dim_length']) || !empty($_POST['dim_width']) || !empty($_POST['dim_height'])) {
@@ -87,8 +131,8 @@ try {
         'product_code' => !empty($_POST['sku']) ? trim($_POST['sku']) : null,
         'barcode' => !empty($_POST['barcode']) ? trim($_POST['barcode']) : null,
         'description' => !empty($_POST['description']) ? trim($_POST['description']) : null,
-        'category_id' => !empty($_POST['category_id']) ? intval($_POST['category_id']) : null,
-        'brand_id' => !empty($_POST['brand_id']) ? intval($_POST['brand_id']) : null,
+        'category_id' => $category_id,
+        'brand_id' => $brand_id,
         'supplier_id' => !empty($_POST['supplier_id']) ? intval($_POST['supplier_id']) : null,
         'unit' => $_POST['unit'],
         'weight' => !empty($_POST['weight']) ? floatval($_POST['weight']) : 0.000,
