@@ -2,6 +2,7 @@
 // Meetings — Tier 4, Phase 4.3 (D29). page_key: meetings.
 // Minimal: schedule + attendees + minutes + status. No rooms/recurrence/video.
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/zoom_service.php';
 
 autoEnforcePermission('meetings');
 includeHeader();
@@ -11,6 +12,16 @@ logActivity($pdo, $_SESSION['user_id'], 'View meetings', 'User viewed the Meetin
 $can_create = canCreate('meetings');
 $can_edit   = canEdit('meetings');
 $can_delete = canDelete('meetings');
+$zoom_enabled = zoomConfigured();
+$zoom_hosts = $pdo->query("SELECT user_id, username, first_name, last_name FROM users WHERE is_active = 1 ORDER BY first_name, last_name")->fetchAll(PDO::FETCH_ASSOC);
+// host_user_id is BMS-side organizer attribution only, never the Zoom host (see
+// zoomResolveHostEmail() in api/manage_meeting.php, which always uses the one
+// shared zoom_host_email setting). Never picked here -- server derives it from
+// the session. $zoom_hosts is only used to label the read-only "Organizer" line.
+$current_user_stmt = $pdo->prepare("SELECT first_name, last_name, username FROM users WHERE user_id = ?");
+$current_user_stmt->execute([$_SESSION['user_id']]);
+$current_user_row = $current_user_stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+$current_user_name = trim(($current_user_row['first_name'] ?? '') . ' ' . ($current_user_row['last_name'] ?? '')) ?: ($current_user_row['username'] ?? 'You');
 ?>
 
 <div class="container-fluid mt-4">
@@ -33,7 +44,7 @@ $can_delete = canDelete('meetings');
 
     <div id="mtTableView" class="card border-0 shadow-sm"><div class="card-body">
         <table id="meetingsTable" class="table table-hover align-middle w-100">
-            <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"><tr><th class="text-center">S/NO</th><th>Title</th><th>Date</th><th>Time</th><th>Venue</th><th>Attendees</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+            <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"><tr><th class="text-center">S/NO</th><th>Title</th><th>Date</th><th>Time</th><th>Location</th><th>Attendees</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
             <tbody></tbody>
         </table>
     </div></div>
@@ -54,13 +65,61 @@ $can_delete = canDelete('meetings');
             <input type="hidden" name="meeting_id" id="mt_id">
             <div class="mb-3"><label class="form-label">Title <span class="text-danger">*</span></label><input class="form-control" name="title" id="mt_title" required maxlength="255"></div>
             <div class="mb-3"><label class="form-label">Agenda</label><textarea class="form-control" name="agenda" id="mt_agenda" rows="2"></textarea></div>
+            <div class="mb-3">
+                <label class="form-label d-block">Meeting Type</label>
+                <div class="btn-group" role="group">
+                    <input type="radio" class="btn-check" name="meeting_type" id="mt_type_person" value="in_person" checked>
+                    <label class="btn btn-outline-primary btn-sm" for="mt_type_person"><i class="bi bi-geo-alt me-1"></i>In-Person</label>
+                    <input type="radio" class="btn-check" name="meeting_type" id="mt_type_zoom" value="zoom" <?= $zoom_enabled ? '' : 'disabled' ?>>
+                    <label class="btn btn-outline-primary btn-sm" for="mt_type_zoom" <?= $zoom_enabled ? '' : 'title="Ask an administrator to enable Zoom in Settings → Zoom Integration"' ?>><i class="bi bi-camera-video me-1"></i>Zoom</label>
+                </div>
+                <?php if (!$zoom_enabled): ?><div class="form-text text-warning"><i class="bi bi-info-circle"></i> Zoom is not enabled — ask an administrator to configure it in Settings → Zoom Integration.</div><?php endif; ?>
+            </div>
             <div class="row">
                 <div class="col-md-4 mb-3"><label class="form-label">Date <span class="text-danger">*</span></label><input type="date" class="form-control" name="meeting_date" id="mt_date" value="<?= date('Y-m-d') ?>" required></div>
                 <div class="col-md-3 mb-3"><label class="form-label">Start</label><input type="time" class="form-control" name="start_time" id="mt_start"></div>
                 <div class="col-md-3 mb-3"><label class="form-label">End</label><input type="time" class="form-control" name="end_time" id="mt_end"></div>
-                <div class="col-md-2 mb-3"><label class="form-label">Venue</label><input class="form-control" name="venue" id="mt_venue"></div>
+                <div class="col-md-2 mb-3" id="mt_venue_wrap"><label class="form-label">Venue</label><input class="form-control" name="venue" id="mt_venue"></div>
             </div>
-            <div class="mb-3"><label class="form-label">Attendees</label><select class="form-select" name="attendees[]" id="mt_attendees" multiple style="width:100%"></select></div>
+            <div class="d-none" id="mt_zoom_wrap">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Organizer</label>
+                        <div class="form-control-plaintext fw-bold py-1" id="mt_host_display"><i class="bi bi-person-check text-primary me-1"></i><?= safe_output($current_user_name) ?> (you)</div>
+                        <input type="hidden" id="mt_host" value="<?= (int)($_SESSION['user_id'] ?? 0) ?>">
+                        <div class="form-text">The BMS record shows whoever creates it as organizer. On Zoom, every meeting is hosted under the one shared company Zoom account (Settings -> Zoom Integration) — no personal Zoom login needed.</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Password <span class="text-muted small">(optional)</span></label>
+                        <input class="form-control" name="zoom_password" id="mt_zoom_password" maxlength="10" placeholder="Leave blank to auto-generate">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-6 col-md-3 mb-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="zoom_host_video" id="mt_zoom_host_video" value="1" checked><label class="form-check-label" for="mt_zoom_host_video">Host video on</label></div></div>
+                    <div class="col-6 col-md-3 mb-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="zoom_participant_video" id="mt_zoom_participant_video" value="1"><label class="form-check-label" for="mt_zoom_participant_video">Participant video on</label></div></div>
+                    <div class="col-6 col-md-3 mb-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="zoom_waiting_room" id="mt_zoom_waiting_room" value="1" checked><label class="form-check-label" for="mt_zoom_waiting_room">Waiting room</label></div></div>
+                    <div class="col-6 col-md-3 mb-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="zoom_auto_recording" id="mt_zoom_auto_recording" value="1"><label class="form-check-label" for="mt_zoom_auto_recording">Auto-record (cloud)</label></div></div>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Attendees</label>
+                <select class="form-select" name="attendees[]" id="mt_attendees" multiple style="width:100%"></select>
+                <div class="d-none border rounded p-2 mt-2 bg-light" id="mt_role_picker_wrap">
+                    <label class="form-label small fw-bold mb-1">Add attendees by role</label>
+                    <select class="form-select form-select-sm" id="mt_role_select" style="max-width:280px">
+                        <option value="">Choose a role…</option>
+                    </select>
+                    <div class="d-none mt-2" id="mt_role_users_wrap">
+                        <div class="form-check mb-1">
+                            <input class="form-check-input" type="checkbox" id="mt_role_select_all">
+                            <label class="form-check-label small fw-bold" for="mt_role_select_all">Select all in this role</label>
+                        </div>
+                        <div id="mt_role_users_list" class="mb-2" style="max-height:150px;overflow-y:auto;"></div>
+                        <button type="button" class="btn btn-sm btn-primary" id="mt_role_add_btn"><i class="bi bi-plus-lg"></i> Add selected</button>
+                    </div>
+                    <div class="d-none small text-muted mt-1" id="mt_role_none_msg">No roles are currently set up with both Meetings access and a linked-employee login — see Users / User Roles &amp; Permissions.</div>
+                </div>
+            </div>
         </div>
         <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
     </form>
@@ -72,15 +131,29 @@ $can_delete = canDelete('meetings');
 function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 const MT_CSRF = <?= json_encode(csrf_token()) ?>;
 const MT_CAN_EDIT=<?= json_encode($can_edit) ?>, MT_CAN_DELETE=<?= json_encode($can_delete) ?>;
+const MT_USER_ID = <?= json_encode((int)$_SESSION['user_id']) ?>;
+const MT_CURRENT_USER_NAME = <?= json_encode($current_user_name) ?>;
+const MT_ZOOM_HOSTS = <?= json_encode(array_map(fn($h) => ['user_id'=>(int)$h['user_id'],'name'=>trim($h['first_name'].' '.$h['last_name']) ?: $h['username']], $zoom_hosts)) ?>;
 let mtTable=null, MT_ROWS=[], MT_CUR=null;
 
 function mtBadge(s){ const m={scheduled:['#0d6efd','#fff'],completed:['#198754','#fff'],cancelled:['#6c757d','#fff']}; const [bg,fg]=m[s]||['#e9ecef','#495057']; return `<span class="badge" style="background:${bg};color:${fg}">${s.charAt(0).toUpperCase()+s.slice(1)}</span>`; }
+function mtLocationCell(r){
+    if (r.meeting_type==='zoom'){
+        let b = '<span class="badge bg-primary-subtle text-primary border"><i class="bi bi-camera-video"></i> Zoom</span>';
+        if (r.zoom_sync_status==='failed') b += ' <span class="badge bg-danger-subtle text-danger border">Sync failed</span>';
+        return b;
+    }
+    return safeOutput(r.venue||'—');
+}
 function mtActions(r){
     let items = `<li><button class="dropdown-item py-2" onclick="viewMeeting(${r.meeting_id})"><i class="bi bi-eye text-primary me-2"></i>View / Attendance</button></li>`;
     if (MT_CAN_EDIT && r.status==='scheduled'){
         items += `<li><button class="dropdown-item py-2" onclick="editMeeting(${r.meeting_id})"><i class="bi bi-pencil text-primary me-2"></i>Edit</button></li>`;
         items += `<li><button class="dropdown-item py-2" onclick="completeMeeting(${r.meeting_id})"><i class="bi bi-check2-all text-success me-2"></i>Complete</button></li>`;
         items += `<li><button class="dropdown-item py-2 text-danger" onclick="meetingAction(${r.meeting_id},'cancel')"><i class="bi bi-x-circle text-danger me-2"></i>Cancel</button></li>`;
+    }
+    if (MT_CAN_EDIT && r.zoom_sync_status==='failed'){
+        items += `<li><button class="dropdown-item py-2 text-danger" onclick="retryZoomSync(${r.meeting_id})"><i class="bi bi-arrow-clockwise text-danger me-2"></i>Retry Zoom Sync</button></li>`;
     }
     if (MT_CAN_DELETE) items += `<li><hr class="dropdown-divider"></li><li><button class="dropdown-item py-2 text-danger" onclick="meetingAction(${r.meeting_id},'delete')"><i class="bi bi-trash text-danger me-2"></i>Delete</button></li>`;
     return `<div class="dropdown d-flex justify-content-end"><button class="btn btn-sm btn-outline-primary dropdown-toggle px-2" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button><ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${items}</ul></div>`;
@@ -93,7 +166,7 @@ function loadMeetings(){
         mtTable.clear().rows.add(res.data.map(r=>[
             '', safeOutput(r.title), safeOutput(r.meeting_date),
             (r.start_time?safeOutput(r.start_time.substring(0,5)):'—')+(r.end_time?'–'+safeOutput(r.end_time.substring(0,5)):''),
-            safeOutput(r.venue||'—'), r.attendee_count, mtBadge(r.status), mtActions(r)
+            mtLocationCell(r), r.attendee_count, mtBadge(r.status), mtActions(r)
         ])).draw();
     });
 }
@@ -101,7 +174,7 @@ function mtCards(rows){
     if (!rows.length){ $('#mtCardView').html('<div class="col-12 text-center py-5 text-muted">No meetings yet.</div>'); return; }
     $('#mtCardView').html(rows.map(r=>`<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
         <div class="d-flex justify-content-between"><div class="fw-bold">${safeOutput(r.title)}</div>${mtBadge(r.status)}</div>
-        <div class="small text-muted mt-1">${safeOutput(r.meeting_date)} · ${r.attendee_count} attendee(s)</div>
+        <div class="small text-muted mt-1">${safeOutput(r.meeting_date)} · ${mtLocationCell(r)} · ${r.attendee_count} attendee(s)</div>
         <button class="btn btn-sm btn-outline-primary mt-2" onclick="viewMeeting(${r.meeting_id})"><i class="bi bi-eye"></i> View</button></div></div></div>`).join(''));
 }
 function viewMeeting(id){
@@ -110,18 +183,54 @@ function viewMeeting(id){
         MT_CUR=res.data;
         const m=res.data;
         const editable = MT_CAN_EDIT && m.status==='scheduled';
-        let prows = res.attendees.map(a=>`<tr><td>${safeOutput(a.first_name+' '+a.last_name)}</td><td>${editable?`<input type="checkbox" class="att-chk" data-eid="${a.employee_id}" ${Number(a.attended)===1?'checked':''}>`:(a.attended===null?'<span class="text-muted">—</span>':(Number(a.attended)?'<span class="badge bg-success">Present</span>':'<span class="badge bg-secondary">Absent</span>'))}</td></tr>`).join('');
+        // In-person attendees (employee_id) keep the existing manual Present/Absent
+        // checkbox. Zoom attendees (user_id only) get an automatic read-only "Joined"
+        // badge instead, sourced from joined_at -- stamped by api/join_meeting.php the
+        // moment they click Join (see mark_attendance vs. that endpoint: two separate,
+        // non-overlapping signals for the two attendee identity types).
+        let prows = res.attendees.map(a=>{
+            let statusCell;
+            if (a.employee_id) {
+                statusCell = editable
+                    ? `<input type="checkbox" class="att-chk" data-eid="${a.employee_id}" ${Number(a.attended)===1?'checked':''}>`
+                    : (a.attended===null ? '<span class="text-muted">—</span>' : (Number(a.attended)?'<span class="badge bg-success">Present</span>':'<span class="badge bg-secondary">Absent</span>'));
+            } else {
+                statusCell = a.joined_at
+                    ? `<span class="badge bg-success" title="Joined at ${safeOutput(a.joined_at)}">Joined</span>`
+                    : '<span class="badge bg-secondary">Not joined</span>';
+            }
+            return `<tr><td>${safeOutput(a.first_name+' '+a.last_name)}</td><td>${statusCell}</td></tr>`;
+        }).join('');
         if (!res.attendees.length) prows = '<tr><td colspan="2" class="text-muted text-center">No attendees.</td></tr>';
+        let zoomBlock = '';
+        if (m.meeting_type==='zoom'){
+            // Start URL carries Zoom host privileges — shown only to the designated
+            // host or the meeting's creator, never to attendees (Zoom's own convention).
+            const isHost = MT_USER_ID===Number(m.host_user_id) || MT_USER_ID===Number(m.created_by);
+            zoomBlock = `<div class="alert alert-light border mb-2">
+                <div><i class="bi bi-camera-video text-primary"></i> <strong>Zoom Meeting</strong></div>
+                ${m.zoom_sync_status==='failed' ? `<div class="text-danger small mt-1"><i class="bi bi-exclamation-triangle"></i> Zoom sync failed.${(MT_CAN_EDIT && m.status!=='completed') ? ` <button class="btn btn-sm btn-outline-danger ms-1 py-0" onclick="retryZoomSync(${m.meeting_id})"><i class="bi bi-arrow-clockwise"></i> Retry</button>` : ''}</div>` : ''}
+                ${m.zoom_join_url ? `<div class="mt-2"><a href="<?= buildUrl('api/join_meeting.php') ?>?meeting_id=${m.meeting_id}" target="_blank" rel="noopener" class="btn btn-sm btn-primary"><i class="bi bi-box-arrow-up-right"></i> Join Meeting</a>${m.zoom_password ? ` <span class="small text-muted">Password: ${safeOutput(m.zoom_password)}</span>` : ''}</div>` : ''}
+                ${isHost && m.zoom_start_url ? `<div class="mt-2"><a href="${m.zoom_start_url}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary"><i class="bi bi-play-circle"></i> Start Meeting (Host)</a></div>` : ''}
+            </div>`;
+        }
         $('#meetingViewBody').html(`
             <div class="fs-5 fw-bold">${safeOutput(m.title)}</div>
-            <div class="small text-muted mb-2">${safeOutput(m.meeting_date)} ${m.start_time?safeOutput(m.start_time.substring(0,5)):''} · ${safeOutput(m.venue||'—')} · ${mtBadge(m.status)}</div>
+            <div class="small text-muted mb-2">${safeOutput(m.meeting_date)} ${m.start_time?safeOutput(m.start_time.substring(0,5)):''} · ${m.meeting_type==='zoom'?'Zoom':safeOutput(m.venue||'—')} · ${mtBadge(m.status)}</div>
+            ${zoomBlock}
             ${m.agenda?`<div class="mb-2"><strong>Agenda:</strong> ${safeOutput(m.agenda)}</div>`:''}
             ${m.minutes?`<div class="mb-2"><strong>Minutes:</strong><div style="white-space:pre-wrap">${safeOutput(m.minutes)}</div></div>`:''}
             <table class="table table-sm"><thead><tr><th>Attendee</th><th>Attended</th></tr></thead><tbody>${prows}</tbody></table>
-            ${editable && res.attendees.length ? `<button class="btn btn-sm btn-primary" onclick="saveAttendance(${m.meeting_id})"><i class="bi bi-save me-1"></i>Save Attendance</button>` : ''}`);
+            ${editable && res.attendees.some(a=>a.employee_id) ? `<button class="btn btn-sm btn-primary" onclick="saveAttendance(${m.meeting_id})"><i class="bi bi-save me-1"></i>Save Attendance</button>` : ''}`);
         new bootstrap.Modal(document.getElementById('meetingViewModal')).show();
     });
 }
+window.retryZoomSync=function(id){
+    $.post('<?= buildUrl('api/manage_meeting.php') ?>', { action:'retry_zoom', meeting_id:id, _csrf:MT_CSRF }, function(r){
+        if (r.success){ Swal.fire({icon:'success',title:'Synced!',text:r.message,timer:1600,showConfirmButton:false}); loadMeetings(); }
+        else Swal.fire({icon:'error',title:'Retry failed',text:r.message});
+    }, 'json').fail(()=>Swal.fire({icon:'error',title:'Error',text:'Server error.'}));
+};
 window.saveAttendance=function(id){
     const present={}; $('.att-chk:checked').each(function(){ present[$(this).data('eid')]=1; });
     $.post('<?= buildUrl('api/manage_meeting.php') ?>', { action:'mark_attendance', meeting_id:id, present, _csrf:MT_CSRF }, function(r){
@@ -147,22 +256,131 @@ $(function(){
     function mv(){ if (window.innerWidth<768){$('#mtTableView').addClass('d-none');$('#mtCardView').removeClass('d-none');}else{$('#mtTableView').removeClass('d-none');$('#mtCardView').addClass('d-none');} }
     mv(); $(window).on('resize', mv);
     loadMeetings();
+
+    // Deep link from a "Meeting scheduled/cancelled" notification's View Details
+    // (see notifyMeetingAttendees() in api/manage_meeting.php) -- lands the user on
+    // that specific meeting's Join button instead of just the general list.
+    const deepLinkId = parseInt(new URLSearchParams(location.search).get('meeting_id'), 10);
+    if (deepLinkId) viewMeeting(deepLinkId);
 });
 
 <?php if ($can_create): ?>
-function attendeeSelect2(){ if (!$('#mt_attendees').hasClass('select2-hidden-accessible')) $('#mt_attendees').select2({ theme:'bootstrap-5',dropdownParent:$('#meetingModal'),placeholder:'Search employees…',width:'100%',minimumInputLength:1,ajax:{url:'<?= buildUrl('api/account/search_employees.php') ?>',dataType:'json',delay:300,data:p=>({q:p.term}),processResults:d=>({results:d.results}),cache:true} }); }
-window.openMeetingModal=function(){ $('#meetingForm')[0].reset(); $('#mt_id').val(''); $('#mt_attendees').empty().val(null).trigger('change'); $('#meetingModalTitle').text('New Meeting'); new bootstrap.Modal(document.getElementById('meetingModal')).show(); };
+// Zoom attendees must be logged-in BMS users (see the Role picker below) — the
+// free-text employee search is for in-person meetings only. Re-configures
+// (destroy + reinit) whenever the meeting type toggles, so switching between
+// In-Person and Zoom mid-edit never leaves the wrong search behavior active.
+// Already-added chips are untouched either way — this only changes whether
+// NEW people can be found by typing a name.
+function attendeeSelect2(){
+    const isZoom = $('#mt_type_zoom').is(':checked');
+    if ($('#mt_attendees').hasClass('select2-hidden-accessible')) $('#mt_attendees').select2('destroy');
+    if (isZoom) {
+        $('#mt_attendees').select2({ theme:'bootstrap-5', dropdownParent:$('#meetingModal'), width:'100%', minimumResultsForSearch: Infinity, placeholder:'Use "Add attendees by role" below' });
+    } else {
+        $('#mt_attendees').select2({ theme:'bootstrap-5',dropdownParent:$('#meetingModal'),placeholder:'Search employees…',width:'100%',minimumInputLength:1,ajax:{url:'<?= buildUrl('api/account/search_employees.php') ?>',dataType:'json',delay:300,data:p=>({q:p.term}),processResults:d=>({results:d.results}),cache:true} });
+    }
+}
+// Host is never picked — it's whoever creates the meeting, always. This just
+// updates the read-only display: "you" for a new meeting, or the original
+// host's name when editing an existing Zoom meeting (which may not be you).
+function mtSetHostDisplay(hostUserId){
+    const isMe = !hostUserId || Number(hostUserId) === MT_USER_ID;
+    const host = MT_ZOOM_HOSTS.find(h => h.user_id === Number(hostUserId));
+    const label = isMe ? `${safeOutput(MT_CURRENT_USER_NAME)} (you)` : safeOutput(host ? host.name : 'Unknown user');
+    $('#mt_host_display').html(`<i class="bi bi-person-check text-primary me-1"></i>${label}`);
+    $('#mt_host').val(hostUserId || MT_USER_ID);
+}
+
+// Zoom-only Attendees picker: Role -> linked-user checklist (in-person meetings
+// keep the free-text employee search above, untouched). Loaded once per page
+// load and cached — the eligible-roles list changes rarely (role permission /
+// user-link admin actions), not per meeting.
+let MT_ROLE_DATA = null;
+function mtLoadRoleData(cb){
+    if (MT_ROLE_DATA !== null) { cb(); return; }
+    $.getJSON('<?= buildUrl('api/zoom/get_attendee_roles.php') ?>', function(res){
+        MT_ROLE_DATA = (res.success ? res.roles : []);
+        cb();
+    }).fail(function(){ MT_ROLE_DATA = []; cb(); });
+}
+function mtRenderRoleSelect(){
+    const $sel = $('#mt_role_select');
+    $sel.find('option:not(:first)').remove();
+    MT_ROLE_DATA.forEach(r => $sel.append(`<option value="${r.role_id}">${safeOutput(r.role_name)} (${r.users.length})</option>`));
+    $('#mt_role_none_msg').toggleClass('d-none', MT_ROLE_DATA.length > 0);
+    $sel.toggleClass('d-none', MT_ROLE_DATA.length === 0);
+}
+function mtResetRolePicker(){
+    $('#mt_role_select').val('');
+    $('#mt_role_users_wrap').addClass('d-none');
+    $('#mt_role_select_all').prop('checked', false);
+    $('#mt_role_users_list').empty();
+}
+$(document).on('change', '#mt_role_select', function(){
+    const roleId = $(this).val();
+    if (!roleId) { $('#mt_role_users_wrap').addClass('d-none'); return; }
+    const role = MT_ROLE_DATA.find(r => String(r.role_id) === String(roleId));
+    const existing = new Set(($('#mt_attendees').val() || []).map(String));
+    const users = (role ? role.users : []).filter(u => !existing.has(String(u.user_id)));
+    $('#mt_role_select_all').prop('checked', false);
+    if (!users.length) {
+        $('#mt_role_users_list').html('<div class="text-muted small">Everyone in this role is already added.</div>');
+    } else {
+        $('#mt_role_users_list').html(users.map(u => `
+            <div class="form-check"><input class="form-check-input mt-role-user-chk" type="checkbox" value="${u.user_id}" data-name="${safeOutput(u.name)}" id="mt_ru_${u.user_id}">
+            <label class="form-check-label small" for="mt_ru_${u.user_id}">${safeOutput(u.name)}</label></div>`).join(''));
+    }
+    $('#mt_role_users_wrap').removeClass('d-none');
+});
+$(document).on('change', '#mt_role_select_all', function(){
+    $('.mt-role-user-chk').prop('checked', $(this).is(':checked'));
+});
+$(document).on('click', '#mt_role_add_btn', function(){
+    // Attendee ids are user_id here (Zoom picker) — a different id space from the
+    // employee_id used by the in-person search, but #mt_attendees is a shared,
+    // opaque multi-select: whichever meeting_type is active decides how
+    // manage_meeting.php interprets every submitted value, so mixing never happens.
+    $('.mt-role-user-chk:checked').each(function(){
+        const uid = $(this).val(), name = $(this).data('name');
+        if (!$(`#mt_attendees option[value="${uid}"]`).length) $('#mt_attendees').append(new Option(name, uid, true, true));
+    });
+    $('#mt_attendees').trigger('change');
+    mtResetRolePicker();
+});
+function mtToggleType(){
+    const isZoom = $('#mt_type_zoom').is(':checked');
+    $('#mt_venue_wrap').toggleClass('d-none', isZoom);
+    $('#mt_zoom_wrap').toggleClass('d-none', !isZoom);
+    $('#mt_role_picker_wrap').toggleClass('d-none', !isZoom);
+    attendeeSelect2();
+    if (isZoom) mtLoadRoleData(mtRenderRoleSelect);
+}
+$(document).on('change', 'input[name="meeting_type"]', mtToggleType);
+window.openMeetingModal=function(){
+    $('#meetingForm')[0].reset(); $('#mt_id').val(''); $('#mt_attendees').empty().val(null).trigger('change');
+    $('#mt_type_person').prop('checked', true); mtToggleType(); mtResetRolePicker(); mtSetHostDisplay(MT_USER_ID);
+    $('#meetingModalTitle').text('New Meeting'); new bootstrap.Modal(document.getElementById('meetingModal')).show();
+};
 window.editMeeting=function(id){
     $.getJSON('<?= buildUrl('api/get_meetings.php') ?>', { meeting_id:id }, function(res){
         if (!res.success) return;
         const m=res.data;
         $('#meetingModalTitle').text('Edit Meeting'); $('#mt_id').val(id); $('#mt_title').val(m.title); $('#mt_agenda').val(m.agenda||'');
         $('#mt_date').val(m.meeting_date); $('#mt_start').val(m.start_time?m.start_time.substring(0,5):''); $('#mt_end').val(m.end_time?m.end_time.substring(0,5):''); $('#mt_venue').val(m.venue||'');
+        $('#mt_type_' + (m.meeting_type==='zoom' ? 'zoom' : 'person')).prop('checked', true);
+        $('#mt_zoom_password').val(m.zoom_password||'');
+        $('#mt_zoom_host_video').prop('checked', Number(m.zoom_host_video)===1);
+        $('#mt_zoom_participant_video').prop('checked', Number(m.zoom_participant_video)===1);
+        $('#mt_zoom_waiting_room').prop('checked', Number(m.zoom_waiting_room)===1);
+        $('#mt_zoom_auto_recording').prop('checked', Number(m.zoom_auto_recording)===1);
+        mtToggleType(); mtResetRolePicker(); mtSetHostDisplay(m.host_user_id);
         new bootstrap.Modal(document.getElementById('meetingModal')).show();
-        setTimeout(function(){ attendeeSelect2(); $('#mt_attendees').empty(); res.attendees.forEach(a=>{ $('#mt_attendees').append(new Option(a.first_name+' '+a.last_name, a.employee_id, true, true)); }); $('#mt_attendees').trigger('change'); }, 300);
+        setTimeout(function(){
+            attendeeSelect2(); $('#mt_attendees').empty(); res.attendees.forEach(a=>{ $('#mt_attendees').append(new Option(a.first_name+' '+a.last_name, a.employee_id || a.user_id, true, true)); }); $('#mt_attendees').trigger('change');
+        }, 300);
     });
 };
-$('#meetingModal').on('shown.bs.modal', attendeeSelect2);
+$('#meetingModal').on('shown.bs.modal', function(){ attendeeSelect2(); });
 $('#meetingForm').on('submit', function(e){
     e.preventDefault();
     const btn=$(this).find('[type="submit"]'); btn.prop('disabled',true);

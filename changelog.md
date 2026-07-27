@@ -107,6 +107,142 @@ inconsistently). Scoped to Customers only per user request; the identical patter
 also exists in `app/bms/Suppliers/suppliers.php` and
 `app/bms/operations/sub_contractors.php` and is not yet fixed there.
 
+## 2026-07-26 (fix) — Correct pre-existing is_service COGS/Inventory overstatements
+
+**Files:** `migrations/2026_07_26_correct_is_service_cogs_entries.php` (new),
+`tests/test_credit_note_restock_cli.php`, `tests/test_invoice_cogs_cli.php`
+
+The `is_service` COGS fix (this same day, `core/sales_posting.php` etc.) stops
+the bug going forward, but doesn't retroactively touch anything already posted.
+The pre-push hook's own test suite caught the gap directly: `test_invoice_cogs_cli`
+and `test_credit_note_restock_cli` started failing after the fix, because their
+fixture-selection queries didn't filter `is_service` either and picked up **real,
+already-corrupted, live GL entries** as their "expected" baseline.
+
+Scanned every posted `invoice_cogs`/`pos_cogs`/`credit_note_cogs`/`purchase_return`
+entry against the now-corrected functions and found 2 genuinely wrong entries:
+
+- **Entry #75002** (Invoice #23) — posted Dr COGS / Cr Inventory **3,504,500,000.00**
+  for an invoice whose every line item is a service (`is_service=1`) with a large
+  `cost_price` on file. Correct value: **0**.
+- **Entry #24908** (POS sale #371) — posted 16,012,000.00; one service line was
+  wrongly included. Correct value: 16,000,000.00 (overstated by 12,000.00).
+
+**Fix — new migration**, criteria-based (re-derives every corrupted entry from
+the ledger + the fixed calculator functions, no entry ids hard-coded, so it
+self-heals whatever exists in each environment). Never edits or deletes the
+original posted entry — posts a Style B contra-entry for exactly the overstated
+excess (`Dr <original credit account> / Cr <original debit account>`, read from
+the entry itself so it works for both COGS-shaped and purchase-return-shaped
+entries), tagged `entity_type='<original>_isservice_correction'`. Idempotent —
+re-running skips anything already corrected.
+
+Verified with a rolled-back dry run before applying for real: net COGS/Inventory
+impact of Invoice #23's entries is now exactly 0.00, POS sale #371's net COGS is
+exactly 16,000,000.00, and the whole ledger stays balanced (Σ Dr = Σ Cr) through
+the correction. Applied for real, then confirmed idempotent on a second run.
+
+Also fixed the two test files' own fixture-selection queries to filter
+`is_service = 0` — they were the root cause of the confusion (an under-specified
+"expected" baseline that could legitimately include a service), not a code bug.
+Both pass cleanly now against a genuine physical-goods fixture.
+
+## 2026-07-26 (feat) — Payment Voucher: reverse a mistakenly-recorded payment
+
+**Files:** `core/expense_posting.php`, `api/account/reverse_voucher_payment.php` (new),
+`api/account/record_voucher_payment.php`, `api/account/delete_voucher.php`,
+`api/account/get_voucher_payments.php`, `app/constant/accounts/payment_vouchers.php`,
+`migrations/2026_07_26_voucher_payment_reversal_columns.php` (new)
+
+Audited Payment Voucher against `post_principle.md`'s 6 questions. Found one gap:
+once a voucher has a recorded payment, `delete_voucher.php` locks it with "Reverse
+the payment(s) first" — but no reversal endpoint existed anywhere. A mistaken
+payment (wrong amount/account, duplicate click) had no way to be undone short of
+the risky generic Journal Entries screen — the same class of gap already fixed
+this session for credit notes, debit notes, and statutory remittances.
+
+1. **`reverseVoucherPayment()`** (`core/expense_posting.php`) — Style B
+   contra-entry via the existing `reverseOutflowContra()`, operating on ONE
+   `voucher_payments` row (a voucher can carry several partial payments), not the
+   whole voucher. Removes that payment's own bank-register row by its captured
+   id, marks it `reversed_at`/`reversed_by`, and recomputes the voucher's status
+   from its remaining non-reversed payments. Idempotent.
+2. **New endpoint** `api/account/reverse_voucher_payment.php`, gated by
+   `canApprove('payment_vouchers')` (undoing money movement, same tier as
+   approving it) — verified against live role data that every role with edit
+   access to this module already carries `can_approve` too, so nobody is
+   inadvertently locked out.
+3. **Bug found and fixed while making the reversal precise**:
+   `recordBankTransaction()` dedupes on `(bank_account_id, reference_number,
+   type)`, and every partial payment on a voucher reused the same reference (the
+   voucher number) — so a second partial payment to the same account was
+   **silently never recorded on the Bank Statement at all**. Fixed in
+   `record_voucher_payment.php` by suffixing the reference for the 2nd+ payment
+   and capturing the real `bank_transaction_id` on each `voucher_payments` row,
+   so reversal always targets one exact row instead of an ambiguous reference
+   match. First-payment behaviour is unchanged (still the plain voucher number).
+4. `delete_voucher.php`'s payment-lock check and `get_voucher_payments.php`'s
+   totals now exclude reversed payments. Added a "Reverse" button + confirmation
+   to the voucher payment-history view.
+
+Verified live end-to-end (BEGIN/ROLLBACK isolation): single full payment →
+reverse restores the bank balance and voucher status exactly; two partial
+payments to the same account now correctly produce two distinct bank-register
+rows (proving the dedup-collision fix), and reversing only the first leaves the
+second's GL entry, bank row, and paid amount completely untouched.
+
+## 2026-07-26 (fix) — Services (`is_service=1`) no longer post spurious COGS/Inventory movement
+
+**Files:** `core/sales_posting.php`, `core/revenue_posting.php`, `core/purchase_posting.php`,
+`app/bms/purchase/rfq_create.php`, `app/bms/purchase/purchase_returns.php`
+
+Audited every `Σ(quantity × cost_price)` calculator against `post_principle.md`
+and found none of them excluded `is_service=1` products, even though a service
+never enters Inventory via GRN (confirmed: GRN/PO/Stock Transfers/Stock
+Adjustments already gate on `is_service=0`). Proved live (rolled-back test) that
+selling a service with a `cost_price` set — a required field on every product,
+so this triggers on normal data entry, not misuse — wrongly posted Dr COGS /
+Cr Inventory. The resulting entry is internally Dr=Cr balanced, so
+`assertLedgerBalanced()` can never catch this class of bug; only an
+account-level audit does.
+
+1. **`posSaleCogs()`** (POS sale COGS) — added `AND p.is_service = 0`.
+2. **`invoiceCogsValue()`** (Invoice COGS) — added `AND p.is_service = 0`
+   (previously had no cost-sanity guard at all, unlike the POS twin).
+3. **`creditNoteRestockCost()`** (customer-return restock) — same gap, same fix;
+   its own docblock's claim that "service lines naturally contribute 0" was
+   false (it only excluded NULL/unmatched `product_id`, not a real service row).
+4. **`purchaseReturnValue()`** (supplier-return AP/Inventory contra) — added an
+   `is_service` guard via `LEFT JOIN products` (kept `LEFT` so a free-text line
+   with no `product_id` still counts, since its cost lives in the return item's
+   own `unit_price`, not `products.cost_price`).
+5. **Two procurement product-picker leaks found and closed**: `rfq_create.php`
+   fetched the product list with no `is_service`/`warehouse_id` filter at all
+   (previously relying solely on a client-side JS filter); `purchase_returns.php`
+   fetched with **no filtering whatsoever**, letting a user attach a service line
+   directly to a Purchase Return, which would have fed the bug in (4). Both now
+   send `is_service=0`, matching the convention GRN/PO already use.
+
+Traced the full chain for the one case a service legitimately carries a real
+cost — NIP (Non-Inventory Product) materials/BOM, which computes a service's
+`cost_price` from attached component materials — and confirmed neither
+`process_sale.php` nor `save_invoice.php` ever reads
+`product_assembly_components`, so no physical stock is actually consumed at
+sale time. The fix is correct as-is; there is no requisition/goods-issue
+mechanism anywhere in the codebase to post real BOM consumption, which is a
+separate, pre-existing feature gap, not something this fix should attempt.
+
+Verified live end-to-end (BEGIN/ROLLBACK isolation) for all four functions:
+service-only lines now post/compute zero, mixed service+goods lines correctly
+count only the goods portion, and free-text purchase-return lines are
+unaffected (no regression).
+
+**Not in scope:** `postGrnReceipt`, `postSubcontractorAccrual`,
+`postGoodsInvoiceAccrual` were audited and found already correct —
+subcontractor costs post `Dr COGS / Cr AP` with no Inventory leg at all, and
+GRN has a server-side `is_service` guard in `create_grn.php` independent of
+the client-side picker.
+
 ## 2026-07-26 (feat) — Proper reversal mechanism for credit note / debit note / statutory remittance payments
 
 **Files:** `core/payment_source.php`, `api/sales/reverse_credit_note_payment.php` (new),
@@ -222,7 +358,7 @@ button as before.
 
 ## 2026-07-26 (fix) — Attendance quick-mark buttons no longer overwrite a custom check-in/out time
 
-**File:** `app/bms/pos/attendance.php`
+**Files:** `app/bms/pos/attendance.php`, `api/quick_mark_attendance.php`
 
 The P/L/A/H quick-status buttons (and the gear-menu "Mark Present"/"Mark Late")
 each had a fixed check-in/check-out time hardcoded into their `onclick`
@@ -337,6 +473,234 @@ by `project_id`, with no `status = 'active'` check — so employees who kept thi
 project's `project_id` after being marked inactive/terminated still surfaced via
 their historical attendance rows. Added `AND e.status = 'active'` to the WHERE clause
 so the two tabs agree on which employees belong to the project.
+
+## 2026-07-25 (feat) — Meetings: Zoom join-click attendance tracking, join-info visibility scoping, notification deep link
+
+**Files:** `migrations/2026_07_25_meeting_attendees_joined_at.php`, `api/join_meeting.php` (new),
+`api/get_meetings.php`, `api/manage_meeting.php`, `app/bms/pos/meetings.php`,
+`tests/test_join_meeting_cli.php` (new)
+
+Three gaps found while verifying the shared-host-email fix below, before push:
+
+1. **Attendance tracking.** Zoom attendees had no attendance signal at all — the manual
+   Present/Absent checkbox only ever worked for in-person (employee_id) attendees. New
+   `api/join_meeting.php` is a click-through redirect: an invited attendee's "Join Meeting"
+   link now routes through it, stamps `meeting_attendees.attended=1`/`joined_at=NOW()`, then
+   302s to the real Zoom URL. The View/Attendance modal shows a "Joined" badge for Zoom
+   attendees instead of "—". Approximate signal (proves they clicked, not that they stayed) —
+   an accurate Zoom Participant Report sync was scoped out for now, tracked as a possible v2.
+
+2. **Join-info exposure.** `zoom_join_url` / `zoom_password` / `zoom_start_url` were returned
+   by `get_meetings.php` to *any* user with generic Meetings view access, not just people
+   actually invited — the password was shown inline to non-attendees too. Now nulled out
+   server-side unless the viewer is the host, an invited attendee, an admin, or has edit
+   rights on Meetings (the last is needed because this same endpoint feeds the Edit form's
+   password pre-fill — an editor who can already reschedule/cancel the meeting gains nothing
+   from a blanked-out password field).
+
+3. **Notification deep link.** A "Meeting scheduled/cancelled" notification's "View Details"
+   always landed on the general Meetings list. `notifyMeetingAttendees()`'s `action_url` now
+   carries `?meeting_id=`, and `meetings.php` auto-opens that specific meeting on load.
+
+New `tests/test_join_meeting_cli.php` (22 assertions) covers invited-attendee/host/outsider/
+admin/editor authorization paths for the redirect, the attendance stamp, and the
+`get_meetings.php` visibility nulling. Verified against a real MySQL run, not just lint —
+caught and fixed 2 bugs in the test harness itself along the way (see PR).
+
+## 2026-07-25 (fix) — Zoom meetings now sync under one shared host email, not the creator's own
+
+**Files:** `migrations/2026_07_25_zoom_host_email_setting.php`, `core/zoom_service.php`,
+`api/manage_meeting.php`, `api/zoom/save_zoom_settings.php`, `app/constant/settings/zoom_settings.php`,
+`tests/test_zoom_foundation_cli.php`, `tests/test_zoom_meeting_sync_cli.php`,
+`tests/test_zoom_notifications_cli.php`, `tests/test_zoom_service_cli.php`
+
+Every Zoom meeting was being created under the individual BMS user's own email as Zoom host
+(`zoomResolveHostEmail()` looked up `users.email` for whoever was set as host). Zoom's API only
+accepts a host that's an actual member of the connected Zoom account, so any staff member
+without their own Zoom seat got a live "User does not exist" error on sync — this is what
+surfaced the bug. This also contradicted the plan's own stated intent
+(`core/zoom_service.php`'s header comment: "one company, one Zoom account... no per-user Zoom
+login needed").
+
+Added a single `zoom_host_email` setting (Settings → Zoom Integration, new required field) that
+every meeting now syncs under regardless of who created it in BMS — no other staff need a Zoom
+seat of their own. `zoomConfigured()` now also requires this field to be set; existing Account
+ID / Client ID / Client Secret are untouched. The "Host" field in the meeting form stays exactly
+as it already was (BMS-side organizer attribution, auto-filled to the creator) — it never
+reaches the Zoom API.
+
+## 2026-07-25 (feat) — Tenders Registry: converted to a client-side DataTable + customers.php-style toolbar
+
+**Files:** `api/get_tenders.php`, `app/bms/tenders/tenders.php`, `tests/test_tenders_datatable_cli.php`,
+`tests/test_ui_constants_group_a_cli.php`
+
+`tenders.php` previously used hand-rolled AJAX pagination (`loadTenders()`/`renderPagination()`,
+one page fetched per request). Converted to a client-side DataTable — one call fetches every
+tender matching the current filters, then DataTables handles Show/paging/sort in the browser
+(same pattern as `meetings.php`). Server-side search/status/category/date filters are
+unchanged and still trigger a re-fetch (they reach joined fields like customer name a
+client-only search wouldn't); the "Show" dropdown now only changes the client page length,
+no server round-trip. `api/get_tenders.php` gained a `limit=-1` mode ("fetch everything" —
+the same convention customers.php's Show dropdown already uses) with its default
+paginated behavior otherwise untouched; confirmed nothing else in the codebase calls this
+endpoint.
+
+Action toolbar restyled to match `customers.php`'s segmented Copy/CSV/Print layout —
+deliberately *not* copied wholesale (no Import button; tenders has no bulk-import feature).
+The existing formatted PDF export (jsPDF) and print stylesheet were kept as-is, since they
+were already purpose-built for this page and still work unchanged (they read whatever rows
+are currently in the DOM, same as before — actually more capable now, since selecting
+"Show: All" renders every row at once for a full export).
+
+Updated the pre-existing `test_ui_constants_group_a_cli.php` guard, which had asserted
+tenders.php must stay AJAX-paginated with no DataTable (an earlier, now-superseded decision)
+— its spec for tenders.php now reflects the new intentional state. New
+`test_tenders_datatable_cli.php` (20 assertions) covers the `limit=-1` contract, the
+unchanged default-pagination path, and that every pre-existing workflow feature (staff
+assignment, PDF export, status-action generator) survived the conversion.
+
+## 2026-07-25 (feat) — Zoom Attendees: dropped the linked-employee requirement entirely
+
+**Files:** `migrations/2026_07_25_meeting_attendees_user_id.php`, `api/zoom/get_attendee_roles.php`,
+`api/manage_meeting.php`, `api/get_meetings.php`, `app/bms/pos/meetings.php`,
+`tests/test_zoom_attendee_roles_cli.php`, `tests/test_zoom_meeting_sync_cli.php`,
+`tests/test_zoom_notifications_cli.php`
+
+Explicit decision: a Zoom attendee only needs a BMS login — HR employee-record linkage,
+which the picker required as of the last two fixes, is no longer a condition at all.
+`meeting_attendees.employee_id` (NOT NULL, part of the primary key) couldn't hold a Zoom
+attendee with no employee record, so this required a real schema change: a new nullable
+`user_id` column, a surrogate `attendee_id` primary key (the old composite PK can't allow
+NULLs), and its own FK + unique constraint. A meeting's attendees are always ONE identity
+type — in-person keeps storing `employee_id` exactly as before (zero behavior change,
+zero risk to that path); Zoom meetings now store `user_id` directly. The role picker's
+only two conditions are now: the role has `meetings` access, and it has ≥1 active user —
+full stop, no employee link needed.
+
+Downstream effects handled: `notifyMeetingAttendees()` now UNIONs both identity types so
+notifications reach either kind of attendee row; the View modal's attendance table only
+shows a checkbox for employee-based (in-person) rows — a Zoom-only attendee has nothing to
+mark, shown as "—" rather than an error, since attendance tracking is an HR concept that
+simply doesn't apply to a login-only invitee.
+
+104 Zoom assertions across 5 suites, all updated/passing; in-person meeting flow
+(`meeting scheduled with an attendee`, `attendance marked present`) untouched and
+confirmed via the existing regression suite.
+
+## 2026-07-25 (fix) — Zoom Attendees: removed the free-text employee search entirely
+
+**Files:** `app/bms/pos/meetings.php`
+
+Feedback from live testing: the old "Search employees…" AJAX box was still active for
+Zoom meetings alongside the new Role → User picker, which is exactly backwards — Zoom
+attendees must be logged-in BMS users found through the role picker, not arbitrary
+employees who may have no login at all. `attendeeSelect2()` now reconfigures itself
+whenever the meeting type toggles (destroy + reinit): in-person keeps the original
+AJAX employee search unchanged, Zoom mode disables new searches entirely
+(`minimumResultsForSearch: Infinity`, no ajax source) while existing chips stay visible
+and removable — "Add attendees by role" becomes the only way to add someone. This also
+resolves a reported "search box opens then closes" glitch, which no longer has anything
+to interact with in Zoom mode.
+
+## 2026-07-25 (fix) — Zoom Attendees role picker: full-access roles (is_admin=1) were wrongly excluded
+
+**Files:** `api/zoom/get_attendee_roles.php`, `tests/test_zoom_attendee_roles_cli.php`
+
+Found live on the demo site: roles marked "Full system access" (`roles.is_admin=1` —
+e.g. Director, Managing Director) never appeared in the Zoom Attendees role picker, even
+with linked users, because the query only checked for an explicit `role_permissions` row.
+That's not how access actually works elsewhere in the app — `canView()`/`isAdmin()` treat
+`roles.is_admin=1` as an automatic bypass with no permissions-matrix row required at all
+(that's why those roles show "Full system access" with nothing configurable on the Roles
+page). The query now mirrors that exact bypass: a role qualifies if EITHER
+`roles.is_admin=1` OR it has an explicit `can_view=1` row for `meetings`. Ticking the
+"Zoom Integration" permission (a different, unrelated page — the admin settings screen)
+does nothing for this picker; the permission that matters is `meetings`.
+
+New regression test creates a fixture role flagged `is_admin=1` with zero rows in
+`role_permissions` at all, confirms it's still returned. 9/9 on this suite (up from 8);
+all other Zoom suites unaffected (103 total Zoom assertions across 5 suites).
+
+## 2026-07-24 (feat) — Zoom Host: auto-filled to the meeting creator, no longer selectable
+
+**Files:** `app/bms/pos/meetings.php`, `api/manage_meeting.php`, `tests/test_zoom_meeting_sync_cli.php`
+
+The Host field for Zoom meetings is now a read-only display ("You" on create, or the
+original host's name when editing someone else's meeting) instead of a dropdown. The
+backend never trusts a client-submitted `host_user_id` — it's always derived server-side:
+the session user for a brand-new Zoom meeting (or one just switched to Zoom), and the
+**preserved original host** on every re-save of a meeting that was already Zoom, so editing
+or rescheduling never silently hands the Zoom-side meeting (and its Start URL) to whoever
+happens to be doing the edit. `test_zoom_meeting_sync_cli.php` grew from 26 to 31
+assertions (replaced the now-obsolete "no host selected" guardrail with auto-fill,
+spoofed-input, and host-lock-on-edit checks); all other Zoom suites re-run clean
+(102 total Zoom assertions across 5 suites now).
+
+## 2026-07-24 (feat) — Zoom Attendees: Role → linked-user picker (replaces employee search for Zoom meetings)
+
+**Files:** `api/zoom/get_attendee_roles.php`, `app/bms/pos/meetings.php`, `tests/test_zoom_attendee_roles_cli.php`
+
+Follow-up to the Zoom integration above. Root cause found in production data: several
+leadership logins (Director, 2× Managing Director, Credit Manager, Secretary) were created
+directly as `users` rows with no matching `employees` record at all — so the Attendees
+field's employee search could never surface them, and even if it had, the notification
+system (keyed off `employee_id`) would have had nothing to notify.
+
+For **Zoom meetings only** (in-person attendee picker is untouched), the Attendees field
+now offers a "Add attendees by role" picker: pick a role, then pick specific people or
+"Select all in this role", added as removable chips alongside the existing field — you can
+add from multiple roles before saving. A role appears **only if both** are true: it has
+`can_view=1` on `meetings`, and at least one of its active users has a linked employee
+record — so a role is never shown if picking it would produce an empty, dead-end list.
+Selections still resolve to `employee_id` under the hood — no schema change, and
+attendance-marking/notifications are unaffected.
+
+8 new CLI assertions in `test_zoom_attendee_roles_cli.php` (role filtering both directions,
+employee_id correctness, no dead-end roles, permission gating). Built on a fresh branch off
+`develop` since the original Zoom integration PR (#1536) had already been merged.
+
+## 2026-07-24 (feat) — Zoom video-conferencing integration for Meetings (Phases 1–6)
+
+**Files:** `migrations/2026_07_24_zoom_integration_settings.php`, `migrations/2026_07_24_zoom_meeting_columns.php`,
+`migrations/2026_07_24_zoom_meeting_notification_event.php`, `core/zoom_service.php`,
+`app/constant/settings/zoom_settings.php`, `api/zoom/save_zoom_settings.php`, `api/zoom/test_zoom_config.php`,
+`api/manage_meeting.php`, `api/get_meetings.php`, `app/bms/pos/meetings.php`, `header.php`, `roots.php`,
+`tests/test_zoom_foundation_cli.php`, `tests/test_zoom_service_cli.php`, `tests/test_zoom_meeting_sync_cli.php`,
+`tests/test_zoom_notifications_cli.php`
+
+Added real Zoom meeting capability inside the existing Meetings module, using Zoom's
+Server-to-Server OAuth (the mechanism Zoom recommends for a single-company internal
+system — no per-user Zoom login). Plan in `zoom.md`; Phase 7 (live verification against a
+real Zoom account) and Phase 8 (PR/merge) intentionally left for after this review, per plan.
+
+1. **Settings** — new admin-only "Zoom Integration" panel (mirrors AI Assistant settings
+   exactly): Account ID / Client ID / encrypted Client Secret / enable toggle / Test
+   Connection. New `zoom_*` `system_settings` rows + `zoom_settings` permission, ships OFF.
+2. **Service layer** (`core/zoom_service.php`) — `zoomGetAccessToken()` (cached, auto-refresh),
+   `zoomCreateMeeting/zoomUpdateMeeting/zoomDeleteMeeting`, uniform
+   `{success,message,data}` shape; a Zoom failure is data, never an uncaught exception.
+3. **Schema** — additive `meetings` columns: `meeting_type`, `host_user_id`,
+   `zoom_meeting_id/join_url/start_url/password`, video/waiting-room/recording toggles,
+   `zoom_sync_status`.
+4. **Backend** (`api/manage_meeting.php`) — add/update sync to Zoom after the local save
+   commits; cancel deletes the Zoom-side meeting first; a Zoom failure never blocks the
+   local save (`zoom_sync_status='failed'` + new `retry_zoom` action); switching a meeting
+   from Zoom back to in-person removes the now-orphaned Zoom meeting so it never drifts.
+5. **UI** (`meetings.php`) — In-Person/Zoom type switch (disabled with a tooltip when the
+   integration isn't enabled), host/password/video settings replace Venue in Zoom mode,
+   Join URL shown to all attendees, Start URL shown only to the host/creator, a visible
+   "Zoom sync failed — Retry" state in both the list and the view modal.
+6. **Notifications** — attendees' existing meeting notification now includes the Zoom join
+   link; registered the (previously unregistered) `hr_meeting` event into
+   `notification_events` so per-user mute preferences are honoured. Kept the existing
+   attendee-targeted delivery rather than switching to `dispatchEvent()` as originally
+   planned — that engine resolves recipients as "everyone who can view Meetings," which
+   would have broadcast the Zoom join link past the actual invitees.
+
+89 new CLI assertions across 4 new suites (foundation, service-layer with a mocked HTTP
+seam, manage_meeting.php orchestration, notifications), all against real mocked Zoom
+responses — no live Zoom account needed for Phases 1–6. Existing meetings/trips regression
+suite (23 assertions) and HR talent foundation suite (83 assertions) both still pass.
 
 ## 2026-07-24 (fix) — Dashboard: 3 purchase-order widgets now narrow by assigned warehouse
 

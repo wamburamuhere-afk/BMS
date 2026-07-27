@@ -7,6 +7,7 @@
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../core/lifecycle_effects.php';
+require_once __DIR__ . '/../core/employee_status.php';
 
 header('Content-Type: application/json');
 
@@ -64,6 +65,12 @@ try {
     $stmt->execute([$employee_id]);
     $employee = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$employee) throw new Exception('Employee not found');
+
+    // An inactive employee has no ongoing employment relationship left to
+    // promote, transfer, award, warn, or terminate again — this is history
+    // from here on, recorded elsewhere (Service Record view), not a place to
+    // record new HR actions against.
+    assertEmployeeActive($pdo, $employee_id, 'Employee');
 
     // ── Per-type required fields + typed values ────────────────────────────
     $new_designation_id = ($_POST['new_designation_id'] ?? '') !== '' ? intval($_POST['new_designation_id']) : null;
