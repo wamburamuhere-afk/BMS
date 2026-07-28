@@ -1,5 +1,48 @@
 # BMS Changelog
 
+## 2026-07-27 (feat) — Products list: warehouse-scoped non-admin no longer sees products absent from their own warehouse(s)
+
+**Files:** `app/bms/product/products.php`
+
+Follow-up to the earlier Stock-column fix: that fix correctly narrowed the
+STOCK NUMBER shown for a visible product to the user's own warehouse(s), but
+every active product still appeared as a ROW in the list (just showing 0
+stock) even when it had never been stocked in any warehouse the user can see.
+User asked for the row itself to be excluded in that case, not just show a
+zero — non-admins should see only products actually available in their
+assigned warehouse(s).
+
+Applied the same "must have a real `product_stocks` row in the visible
+warehouse(s)" requirement — already used for the dashboard's Inventory Status
+fix — to all three places this page counts/lists products, so they all agree:
+
+1. **Main list query** — added `COUNT(ps.stock_id) > 0` to a new `HAVING`
+   clause (combined with the existing `$attention`-mode HAVING via `AND` when
+   both apply), conditionally only when `scopeFilterSql('warehouse', 'ps')`
+   is actually restrictive. HAVING (not WHERE) since it depends on the
+   JOIN/aggregate result after `GROUP BY p.product_id`.
+2. **Pagination count query** — same requirement expressed as
+   `EXISTS (SELECT 1 FROM product_stocks ps WHERE ps.product_id = p.product_id
+   {scope})`, since this query has no `GROUP BY` of its own; keeps the
+   "Showing X of Y" total consistent with what the list actually displays.
+3. **Stat cards query** (Total Products/Value/Low Stock/Out of Stock) — added
+   `stock_summary.agg_pid IS NOT NULL` to its plain `WHERE` clause (this query
+   collapses everything into one summary row, so `WHERE` — not `HAVING` — is
+   the correct place to exclude a product before it contributes to any total).
+
+Admins (and any non-admin with grant-all-warehouse access) get `''` from
+`scopeFilterSql('warehouse', ...)` in all three, so none of this applies to
+them — same full catalog as before.
+
+Verified live: a real non-admin user (id 12) scoped to warehouse 5 only now
+sees exactly 1 product in the list (the only one actually stocked in
+warehouse 5), matching the pagination count (1) and the Total Products stat
+card (1) — all three previously would have shown 15 (the full company
+catalog) for this user, with 14 of those rows showing a misleading "0 stock"
+instead of not appearing at all. Admin is unaffected: still 15 across all
+three. Also verified the combined `$attention`-mode HAVING (stocked-only AND
+low/out-of-stock/expiring) executes without SQL errors.
+
 ## 2026-07-27 (fix) — Sub-Contractor View Details: print used a completely separate, non-shared header/footer, only ever printed one section
 
 **Files:** `app/bms/operations/sub_contractor_details.php`
