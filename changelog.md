@@ -1,5 +1,50 @@
 # BMS Changelog
 
+## 2026-07-27 (fix) — Delivery Notes list print: columns cut off in portrait, duplicate footer, blank landscape pages
+
+**Files:** `app/bms/grn/delivery_notes.php`
+
+User asked for this page's print to be "as smart as" the recently-fixed Customer
+print — three distinct issues, all traced to the same root cause: this page had
+its own bespoke print-repagination scaffold that duplicated (and conflicted
+with) the already-working shared global print mechanism.
+
+**Root cause:** the entire page was wrapped in a `<table class="print-layout-table">`
+with a `<tfoot>` reserving a 60px "footer spacer" — a manual attempt at a
+repeating page footer. But the shared global print footer (`.bms-print-footer`,
+in `responsive.css`, already included via `includeFooter()`) already handles
+this correctly and automatically on every page via `position: fixed; bottom: 0`
+— no page-specific scaffolding needed at all, as already proven on
+Customer/Supplier/Sub-Contractor View Details. The two mechanisms fighting
+each other is what produced:
+
+1. **Two footers.** The page's own `print-footer-spacer` reservation and the
+   shared global fixed-position footer both tried to manage the same space.
+2. **Blank pages at the top in landscape.** Wrapping the *entire* page's
+   content in one giant `<table>` is unusual, and interacted badly with the
+   page's own already-documented `page-break-inside` handling for
+   `#dnTableCard` (there's a code comment from a prior fix explaining a related
+   "blank pages" bug caused by an overly broad `page-break-inside: avoid`
+   rule) — landscape's shorter page height made it worse.
+3. **Columns cut off on the right in portrait**, separately: DataTables sets
+   explicit inline pixel widths on `th`/`td`, calculated for the wide on-screen
+   container. Those don't shrink for a narrower printed page, so the
+   right-hand columns overflowed off the page edge.
+
+**Fix:**
+1. Removed the entire `print-layout-table`/`tbody`/`tr`/`td`/`tfoot`/
+   `print-footer-spacer` scaffold — the shared header (already present via
+   the existing `d-none d-print-block` block) and shared footer now work the
+   same proven way as the other three pages, nothing page-specific needed.
+2. Added `#dnTable th, #dnTable td { width: auto !important; }` inside the
+   existing `@media print` block, letting the already-present
+   `table-layout: fixed` distribute the visible columns across the real
+   print width instead of keeping DataTables' oversized on-screen pixel widths.
+
+Left the rest of the print CSS (existing `#dnTableCard` page-break-inside
+override, Actions-column hiding, print header/summary cards) untouched —
+those were already correct and unrelated to the three reported issues.
+
 ## 2026-07-27 (feat) — Products list: warehouse-scoped non-admin no longer sees products absent from their own warehouse(s)
 
 **Files:** `app/bms/product/products.php`
