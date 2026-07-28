@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-07-27 (fix) — Customer View Details print: landscape started on page 2, tab buttons appeared in printout
+
+**Files:** `app/bms/customer/customer_details.php`
+
+Two issues with Customer View Details → Print:
+
+1. **Landscape started content on page 2 instead of page 1** (portrait was fine).
+   A print rule — `body.print-landscape .financial-details-card { page-break-before:
+   always; }` — forced a page break at the "Financial & Banking Details" card in
+   landscape mode only. Since that card sits early in the page (right after the
+   customer's basic info), the break pushed nearly everything from that point
+   onward to page 2, leaving page 1 mostly blank; portrait had no such rule, so
+   it flowed naturally from page 1. Removed the landscape-only forced break —
+   both orientations now flow the same way.
+2. **The section-tab buttons (Sales Orders / Invoices / LPOs / System Info)
+   appeared in the printout.** The tab bar was marked with a `no-print` class,
+   but no such class exists anywhere in the stylesheet — a naming mismatch, not
+   a missing rule. Every other non-printable element on this page correctly uses
+   Bootstrap's `d-print-none` (which the file's own print CSS already keys off
+   in several places). Changed the tab bar to `d-print-none` to match.
+
 ## 2026-07-27 (fix) — Dashboard Inventory Status: warehouse-scoped non-admin saw MORE low-stock items than admin
 
 **Files:** `app/dashboard.php`
