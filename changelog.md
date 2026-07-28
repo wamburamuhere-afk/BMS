@@ -1,5 +1,53 @@
 # BMS Changelog
 
+## 2026-07-27 (fix) — Sub-Contractor View Details: print used a completely separate, non-shared header/footer, only ever printed one section
+
+**Files:** `app/bms/operations/sub_contractor_details.php`
+
+User asked for this page's print to match the same structure as Supplier View
+Details. Investigation found a materially different (and more broken)
+situation than the Customer/Supplier fixes: this page's `printScDetails()`
+didn't print the current page at all — it opened a brand-new blank browser
+window and wrote an entirely separate, self-contained HTML document into it
+via `window.open()` + `document.write()`, with its own hand-rolled `.prt-header`
+title block and `.prt-footer` "Printed by…/Powered by…" text. That's the
+concrete meaning of "no header as other areas is" / "footer is not shared" —
+the print output used custom lookalike markup, never the shared
+`d-none d-print-block` report-header pattern or the shared global
+`.bms-print-footer` (from `footer.php`, already included on the real page via
+`includeFooter()`, but never reached by the popup). It also only ever
+included the Projects Involved table — Bills and Payments were completely
+absent from every printout, unlike the real on-screen page which has all
+three sections.
+
+Fix: replaced the entire popup-generation function with `window.print()`,
+matching Customer/Supplier's approach exactly — print the real page in place:
+
+1. Added the shared "Print-only Header" block
+   (`<div class="d-none d-print-block">…SUB-CONTRACTOR INFORMATION
+   REPORT…</div>`), identical pattern to `supplier_details.php`.
+2. The shared global print footer now appears automatically — no page-specific
+   footer markup needed, since `includeFooter()` was already correctly called
+   at the end of this page; it just never got used because printing bypassed
+   the page entirely.
+3. This page toggles its three sections (Projects Involved / Bills / Recent
+   Payments) via a custom `.sc-tab-pane`/`.d-none` scheme, not Bootstrap's
+   `.tab-pane` — so unlike the Customer/Supplier fix, forcing all sections to
+   print needed a page-specific override: `.sc-tab-pane.d-none { display:
+   block !important; }`. This is also the prerequisite for point 4 (an empty
+   section can only be hidden from print if it was a printing candidate in the
+   first place — previously Bills/Payments never printed at all, empty or not).
+4. Each of the three section cards now gets `d-print-none` conditionally —
+   `empty($sc_projects)` / `empty($received_invoices_count)` /
+   `empty($payments)` — hidden from print only when there's nothing to show.
+5. Hid the section-tab button row itself from print (`d-print-none`) — it had
+   no print-hiding class at all before.
+
+Scoped narrowly to what was asked: didn't rebuild the full custom print-CSS
+column/font reflow that Customer/Supplier have (this page's `.card` never set
+`page-break-inside: avoid`, so it isn't exposed to that specific landscape bug
+either — nothing to fix there).
+
 ## 2026-07-27 (fix) — Supplier View Details print: same class of issues as Customer print, plus one more (only the active tab was printing at all)
 
 **Files:** `app/bms/Suppliers/supplier_details.php`
