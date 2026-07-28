@@ -202,14 +202,30 @@ $query .= $scope_sql;
 // Group by product
 $query .= " GROUP BY p.product_id";
 
-// Attention filter (aggregate → must be HAVING). Mirrors dashboard alert logic:
-// low/out stock, negative stock, or expiring within 30 days.
+// Warehouse-restricted non-admin: the product ROW itself must not appear at
+// all if it has no stock record in their own warehouse(s) -- not merely show
+// 0 (already handled by the product_stocks JOIN scoping above). Checked via
+// HAVING (not WHERE) since it depends on the JOIN/aggregate result after
+// GROUP BY; product_stocks' own PK (stock_id) makes COUNT() correctly read 0
+// when the scoped LEFT JOIN matched nothing. Admins (and grant-all-warehouse
+// users) get $stock_wh_scope === '', so this never applies to them.
+$havingParts = [];
+if ($stock_wh_scope !== '') {
+    $havingParts[] = 'COUNT(ps.stock_id) > 0';
+}
+
+// Attention filter. Mirrors dashboard alert logic: low/out stock, negative
+// stock, or expiring within 30 days.
 if ($attention) {
-    $query .= " HAVING (
+    $havingParts[] = "(
         (COALESCE(SUM(ps.stock_quantity - ps.reserved_quantity), 0) <= p.min_stock_level AND p.min_stock_level > 0)
         OR COALESCE(SUM(ps.stock_quantity - ps.reserved_quantity), 0) <= 0
         OR (p.expiry_date IS NOT NULL AND p.expiry_date > CURDATE() AND DATEDIFF(p.expiry_date, CURDATE()) <= 30)
     )";
+}
+
+if (!empty($havingParts)) {
+    $query .= " HAVING " . implode(" AND ", $havingParts);
 }
 
 // Apply sorting
@@ -242,6 +258,13 @@ if (!empty($conditions)) {
     $count_query .= " AND " . implode(" AND ", $conditions);
 }
 $count_query .= $scope_sql;
+
+// Same warehouse-stock requirement as the main list's HAVING clause, expressed
+// as EXISTS since this query has no GROUP BY/JOIN of its own -- keeps the
+// pagination total consistent with what the list actually shows.
+if ($stock_wh_scope !== '') {
+    $count_query .= " AND EXISTS (SELECT 1 FROM product_stocks ps WHERE ps.product_id = p.product_id{$stock_wh_scope})";
+}
 
 // Execute count query
 $count_stmt = $pdo->prepare($count_query);
@@ -352,6 +375,15 @@ if (!empty($conditions)) {
     $stats_query .= " AND " . implode(" AND ", $conditions);
 }
 $stats_query .= $scope_sql;
+
+// Same warehouse-stock requirement as the main list -- this query has no
+// per-product GROUP BY (it collapses everything into one summary row), so a
+// plain WHERE here correctly excludes a product BEFORE it contributes to
+// total_products/total_value/low_stock_count/etc., keeping the stat cards
+// consistent with what the list actually shows.
+if ($stock_wh_scope_ps2 !== '') {
+    $stats_query .= " AND stock_summary.agg_pid IS NOT NULL";
+}
 
 // Reuse the $params from before
 $stats_stmt = $pdo->prepare($stats_query);
