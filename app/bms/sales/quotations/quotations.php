@@ -110,6 +110,12 @@ $can_approve = canApprove('sales_orders');
 .status-info { color: #055160 !important; background-color: #cff4fc !important; }
 
     @media print {
+        /* Extra bottom clearance (16mm vs the global 15mm) so the last table
+           row never sits under the shared fixed-position print footer --
+           same margin already proven correct on Customer/Supplier/
+           Sub-Contractor/Delivery-Notes print. */
+        @page { margin: 10mm 8mm 16mm 8mm; size: auto; }
+
         body { background: white !important; }
         .quotations-dashboard { background: white !important; padding: 0 !important; }
         .d-print-none { display: none !important; }
@@ -117,10 +123,35 @@ $can_approve = canApprove('sales_orders');
         table { width: 100% !important; border-collapse: collapse !important; }
         th, td { border: 1px solid #dee2e6 !important; padding: 8px !important; }
         th { background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; }
-        
+
         .flex-nowrap-print { display: flex !important; flex-wrap: nowrap !important; }
         .col-3-print { width: 25% !important; flex: 0 0 25% !important; max-width: 25% !important; }
         .custom-stat-card { border: 1px solid #badbcc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+        /* Root cause of "columns not fully seen at the right hand side":
+           DataTables sets explicit inline pixel widths on th/td, sized for the
+           wide on-screen container -- those don't shrink for a narrower
+           printed page, so the rightmost column(s) overflow off the page.
+           Stripping them lets table-layout:fixed distribute the actually-
+           visible columns evenly across the real print width, in both
+           orientations. */
+        table.dataTable { table-layout: fixed !important; }
+        #quotationsTable th, #quotationsTable td { width: auto !important; font-size: 8pt !important; padding: 5px !important; }
+
+        /* Root cause of "print not starting on the first page": the global
+           responsive.css rule `p, .card, section { page-break-inside: avoid }`
+           applies to the Quotations Table Card, which is many times taller
+           than one printed page. An unbreakable "avoid" block that can never
+           fit anywhere gets pushed entirely onto a later page, leaving page 1
+           blank. A more specific id-selector override beats the class rule
+           and lets the table flow and break normally across pages. */
+        #quotationsTableCard {
+            page-break-inside: auto !important;
+            break-inside: auto !important;
+            overflow: visible !important;
+        }
+        #quotationsTable tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+        #quotationsTable thead { display: table-header-group; }
     }
 </style>
 
@@ -193,8 +224,41 @@ $can_approve = canApprove('sales_orders');
         <a href="<?= getUrl('quotations') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> Show all quotations</a>
     </div>
     <?php endif; ?>
+    <!-- Print Summary Cards — lean, fixed-font stand-in for the Statistics
+         Cards below so large values (e.g. Total Quote Value) can never
+         overflow their card on the printed page; matches the pattern already
+         proven on Delivery Notes print. -->
+    <div class="d-none d-print-block mb-4">
+        <div class="row g-2" style="display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important;">
+            <div class="col-3" style="flex: 1 1 0px !important;">
+                <div style="border: 1px solid #badbcc; padding: 8px; text-align: center; height: 100%;">
+                    <p style="color: #0f5132; font-size: 7pt; text-transform: uppercase; margin-bottom: 4px; font-weight: 700;">Total Quotes</p>
+                    <h3 style="color: #0f5132; font-weight: 800; margin: 0; font-size: 13pt;"><?= $stats['total_quotes'] ?></h3>
+                </div>
+            </div>
+            <div class="col-3" style="flex: 1 1 0px !important;">
+                <div style="border: 1px solid #badbcc; padding: 8px; text-align: center; height: 100%;">
+                    <p style="color: #0f5132; font-size: 7pt; text-transform: uppercase; margin-bottom: 4px; font-weight: 700;">Pending</p>
+                    <h3 style="color: #0f5132; font-weight: 800; margin: 0; font-size: 13pt;"><?= $stats['pending'] ?></h3>
+                </div>
+            </div>
+            <div class="col-3" style="flex: 1 1 0px !important;">
+                <div style="border: 1px solid #badbcc; padding: 8px; text-align: center; height: 100%;">
+                    <p style="color: #0f5132; font-size: 7pt; text-transform: uppercase; margin-bottom: 4px; font-weight: 700;">Win Rate</p>
+                    <h3 style="color: #0f5132; font-weight: 800; margin: 0; font-size: 13pt;"><?= $stats['win_rate'] !== null ? $stats['win_rate'] . '%' : 'N/A' ?></h3>
+                </div>
+            </div>
+            <div class="col-3" style="flex: 1 1 0px !important;">
+                <div style="border: 1px solid #badbcc; padding: 8px; text-align: center; height: 100%;">
+                    <p style="color: #0f5132; font-size: 7pt; text-transform: uppercase; margin-bottom: 4px; font-weight: 700;">Total Quote Value</p>
+                    <h3 style="color: #0f5132; font-weight: 800; margin: 0; font-size: 11pt; word-break: break-word;"><?= number_format($stats['total_value'], 2) ?></h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Statistics Cards -->
-    <div class="row g-4 mb-5 flex-nowrap-print">
+    <div class="row g-4 mb-5 flex-nowrap-print d-print-none">
         <div class="col-md-3 col-3-print">
             <div class="card custom-stat-card h-100 shadow-sm p-3">
                 <div class="card-body p-0 d-flex align-items-center">
@@ -326,7 +390,7 @@ $can_approve = canApprove('sales_orders');
     </div>
 
     <!-- Quotations Table Card -->
-    <div class="card shadow-sm border-0">
+    <div class="card shadow-sm border-0" id="quotationsTableCard">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0" id="quotationsTable" style="width:100%">
                 <thead class="bg-light text-uppercase small fw-bold">
