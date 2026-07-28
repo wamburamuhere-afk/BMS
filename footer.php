@@ -107,3 +107,7 @@ $(document).ajaxSuccess(function(event, xhr, settings, data) {
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+
+<!-- Sitewide loading UX: top progress bar (automatic on every $.ajax call
+     and internal link click) + shared BMSSkeleton helper for pages to opt in. -->
+<script src="<?= getUrl('assets/js/loading.js') ?>"></script>

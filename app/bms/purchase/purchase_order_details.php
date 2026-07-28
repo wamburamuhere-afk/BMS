@@ -125,6 +125,13 @@ if ($order_id) {
         <div style="border-bottom: 3px solid #0d6efd; margin-top: 10px; margin-bottom: 20px;"></div>
     </div>
 
+    <div id="loading" class="text-center py-5 d-print-none">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 text-muted">Loading order details...</p>
+    </div>
+
     <div id="content" style="display: none;">
         <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 gap-2">
             <div>
@@ -507,24 +514,25 @@ $(document).ready(function() {
 });
 
 function loadOrderDetails() {
-    $.ajax({
-        url: '<?= buildUrl("api/account/get_purchase_order_details.php") ?>',
-        data: { id: orderId },
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                renderOrder(response.data);
-                logReportAction('Viewed Purchase Order Details', 'User viewed details for PO #' + response.data.order.order_number);
-                $('#loading').hide();
-                $('#content').fadeIn();
-            } else {
+    BMSSkeleton.load({
+        loading: '#loading',
+        content: '#content',
+        skeleton: { cards: 3, rows: 5 },
+        ajax: {
+            url: '<?= buildUrl("api/account/get_purchase_order_details.php") ?>',
+            data: { id: orderId },
+            dataType: 'json'
+        },
+        onData: function(response) {
+            if (!response.success) {
+                // Not found / access denied — redirect rather than offer a retry.
                 Swal.fire('Error', response.message, 'error').then(() => {
                     window.location.href = '<?= getUrl("purchase_orders") ?>';
                 });
+                return;
             }
-        },
-        error: function() {
-            Swal.fire('Error', 'Failed to load order details.', 'error');
+            renderOrder(response.data);
+            logReportAction('Viewed Purchase Order Details', 'User viewed details for PO #' + response.data.order.order_number);
         }
     });
 }

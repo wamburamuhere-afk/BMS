@@ -241,24 +241,25 @@ $(document).ready(function() {
 });
 
 function loadReturnDetails() {
-    $.ajax({
-        url: '<?= buildUrl("api/get_purchase_return.php") ?>',
-        data: { id: returnId },
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                renderReturn(response.data);
-                logReportAction('Viewed Purchase Return Details', 'User viewed details for Purchase Return #' + response.data.return_number);
-                $('#loading').hide();
-                $('#content').fadeIn();
-            } else {
+    BMSSkeleton.load({
+        loading: '#loading',
+        content: '#content',
+        skeleton: { cards: 3, rows: 5 },
+        ajax: {
+            url: '<?= buildUrl("api/get_purchase_return.php") ?>',
+            data: { id: returnId },
+            dataType: 'json'
+        },
+        onData: function(response) {
+            if (!response.success) {
+                // Not found / access denied — redirect rather than offer a retry.
                 Swal.fire('Error', response.message, 'error').then(() => {
                     window.location.href = '<?= getUrl("purchase_returns") ?>';
                 });
+                return;
             }
-        },
-        error: function() {
-            Swal.fire('Error', 'Failed to load return details. Please check your connection.', 'error');
+            renderReturn(response.data);
+            logReportAction('Viewed Purchase Return Details', 'User viewed details for Purchase Return #' + response.data.return_number);
         }
     });
 }
