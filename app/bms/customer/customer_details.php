@@ -845,7 +845,7 @@ global $company_name, $company_logo;
             <?php endif; ?>
 
             <!-- Section Tabs -->
-            <ul class="nav nav-pills flex-nowrap overflow-auto gap-1 mb-3 pb-1 no-print" id="customerDetailTabs" role="tablist">
+            <ul class="nav nav-pills flex-nowrap overflow-auto gap-1 mb-3 pb-1 d-print-none" id="customerDetailTabs" role="tablist">
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-orders" type="button" role="tab"><i class="bi bi-cart-check me-1"></i> Sales Orders</button>
                 </li>
@@ -1450,12 +1450,6 @@ global $company_name, $company_logo;
 
     /* ===== PAGE BREAKS ===== */
     .print-page-break {
-        page-break-before: always !important;
-        margin-top: 10mm !important;
-    }
-
-    /* Move Financial Details to next page ONLY in landscape */
-    body.print-landscape .financial-details-card {
         page-break-before: always !important;
         margin-top: 10mm !important;
     }
