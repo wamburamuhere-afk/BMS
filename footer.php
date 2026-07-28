@@ -109,5 +109,8 @@ $(document).ajaxSuccess(function(event, xhr, settings, data) {
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
 
 <!-- Sitewide loading UX: top progress bar (automatic on every $.ajax call
-     and internal link click) + shared BMSSkeleton helper for pages to opt in. -->
-<script src="<?= getUrl('assets/js/loading.js') ?>"></script>
+     and internal link click) + shared BMSSkeleton helper for pages to opt in.
+     Cache-busted with the file's mtime so an edit here is never served stale
+     from a browser's heuristic cache (Apache sends no Cache-Control on static
+     assets, so browsers may otherwise reuse an old copy for a while). -->
+<script src="<?= getUrl('assets/js/loading.js') ?>?v=<?= @filemtime(__DIR__ . '/assets/js/loading.js') ?>"></script>
