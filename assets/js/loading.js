@@ -93,11 +93,62 @@
         return html;
     }
 
+    // ---- Guaranteed-resolve section loader (opt-in) ----
+    // Usage:
+    //   BMSSkeleton.load({
+    //       loading:  '#loading',             // container to show the skeleton in
+    //       content:  '#content',             // optional — container to reveal on success
+    //       skeleton: { cards: 4, rows: 6 },   // passed straight to BMSSkeleton.render
+    //       ajax:     { url: '...', data: {...}, dataType: 'json' },
+    //       onData:   function (res) { ... }   // render the real content
+    //   })
+    // Always resolves: on success `content` fades in; on failure (network error,
+    // or a throw inside onData) the loading container is replaced with an inline
+    // error + Retry button instead of spinning forever. onData always receives
+    // the raw response — including a `success: false` payload — so pages that
+    // need custom handling (e.g. redirect away on "not found") can do so inline;
+    // pages happy with the generic retry state can just `throw` on that branch.
+    function loadSection(opts) {
+        var $loading = opts.loading ? $(opts.loading) : null;
+        var $content = opts.content ? $(opts.content) : null;
+
+        if ($loading && $loading.length) {
+            $loading.show().html(buildSkeleton(opts.skeleton));
+        }
+        if ($content && $content.length) $content.hide();
+
+        function showError(message) {
+            if (!$loading || !$loading.length) return;
+            $loading.html(
+                '<div class="text-center py-4 text-muted">' +
+                '<i class="bi bi-exclamation-triangle text-warning" style="font-size:1.5rem;"></i>' +
+                '<p class="mt-2 mb-2">' + (message || 'Failed to load this section.') + '</p>' +
+                '<button type="button" class="btn btn-sm btn-outline-primary bms-retry-btn">' +
+                '<i class="bi bi-arrow-clockwise"></i> Retry</button></div>'
+            );
+            $loading.find('.bms-retry-btn').on('click', function () { loadSection(opts); });
+        }
+
+        $.ajax(opts.ajax).done(function (res) {
+            try {
+                if (typeof opts.onData === 'function') opts.onData(res);
+                if ($loading && $loading.length) $loading.hide();
+                if ($content && $content.length) $content.fadeIn();
+            } catch (e) {
+                console.error('BMSSkeleton.load onData error:', e);
+                showError((e && e.message) || 'Something went wrong while displaying this section.');
+            }
+        }).fail(function () {
+            showError('Network error. Please try again.');
+        });
+    }
+
     window.BMSSkeleton = {
         render: function (selector, opts) {
             var el = document.querySelector(selector);
             if (el) el.innerHTML = buildSkeleton(opts);
         },
-        html: buildSkeleton
+        html: buildSkeleton,
+        load: loadSection
     };
 })();

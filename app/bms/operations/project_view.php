@@ -2003,7 +2003,7 @@ $ipc_customers = $ipc_cust_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
                             <h5 class="fw-bold mb-0"><i class="bi bi-box-seam me-2 text-primary"></i>Project Materials & Stock</h5>
                             <div>
-                                <button class="btn btn-outline-primary btn-sm me-2" onclick="loadProjectDetails()">
+                                <button class="btn btn-outline-primary btn-sm me-2" onclick="loadProjectInventory(true)">
                                     <i class="bi bi-arrow-clockwise"></i> Refresh Data
                                 </button>
                                 <a href="<?= getUrl('stock_adjustments') ?>?project_id=<?= $project_id ?>" class="btn btn-primary btn-sm">
@@ -7773,6 +7773,9 @@ $(document).ready(function() {
         if (window.BMSSkeleton) BMSSkeleton.render('#loading', { cards: 4, rows: 6 });
         loadProjectDetails();
         loadExpenseSchema();
+        $('button[data-bs-target="#inventory"]').off('shown.bs.tab.load').on('shown.bs.tab.load', function () {
+            loadProjectInventory();
+        });
     } else {
         Swal.fire({
             icon: 'error',
@@ -8095,27 +8098,41 @@ function deleteProjectDocument(id, origin) {
 }
 
 function loadProjectDetails() {
-    $.ajax({
-        url: '/api/operations/get_project.php',
-        data: { id: projectId },
-        dataType: 'json',
-        success: function(res) {
-            if (res.success) {
-                try {
-                    projectData = res;
-                    renderProject(res.data, res.financial_summary, res.progress_analysis);
-                    renderTables(res);
-                } catch (e) {
-                    console.error("Rendering Error:", e);
-                }
-                $('#loading').hide();
-                $('#content').fadeIn();
-            } else {
-                Swal.fire({ icon: 'error', title: 'Error', text: res.message, confirmButtonColor: '#28a745', confirmButtonText: 'OK' });
-            }
+    BMSSkeleton.load({
+        loading: '#loading',
+        content: '#content',
+        skeleton: { cards: 4, rows: 6 },
+        ajax: {
+            url: '/api/operations/get_project.php',
+            data: { id: projectId },
+            dataType: 'json'
         },
-        error: function() {
-            Swal.fire('Error', 'Failed to load project data.', 'error');
+        onData: function (res) {
+            if (!res.success) throw new Error(res.message || 'Failed to load project data.');
+            projectData = res;
+            renderProject(res.data, res.financial_summary, res.progress_analysis);
+            renderTables(res);
+        }
+    });
+}
+
+// Inventory tab: the expensive stock_movements aggregation lives in its own
+// endpoint (get_project_inventory.php) and loads only when the tab is opened,
+// not as part of the initial project view.
+function loadProjectInventory(force) {
+    if (_cachedInventory && !force) return;
+    BMSSkeleton.load({
+        loading: '#projectWarehousesSummaryTable',
+        skeleton: { rows: 5 },
+        ajax: {
+            url: '<?= buildUrl('api/operations/get_project_inventory.php') ?>',
+            data: { id: projectId },
+            dataType: 'json'
+        },
+        onData: function (res) {
+            if (!res.success) throw new Error(res.message || 'Failed to load inventory data.');
+            if (projectData) projectData.inventory = res.inventory;
+            renderInventory(res.inventory);
         }
     });
 }
@@ -8718,8 +8735,9 @@ function renderTables(data) {
     // Render Tab Data (Full Tables & Expenses/Budgets)
     renderExpenses(data.expenses);
     loadProjectBudgetsAjax(1);
-    renderInventory(data.inventory);
-    
+    // Inventory is no longer in this response — it loads independently via
+    // loadProjectInventory() when the Inventory tab is opened (see doc-ready).
+
     // Render Documents and update tab count
     const totalDocs = renderDocs(data);
     $('#docs-tab span.badge').remove();
