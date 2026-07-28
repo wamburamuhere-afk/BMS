@@ -230,25 +230,15 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
         </div>
     </div>
 
-    <!-- Print Header — company letterhead (logo + name only, per request — no
-         web/email/TIN/VRN lines). $company_name/$company_logo were previously
-         undefined here — header.php sets them via `global`, but this file is
-         require_once'd from inside handleRoute(), so that global binding never
-         reaches this scope. Fetched locally, same pattern project_view.php uses. -->
-    <?php
-        $company_name = getSetting('company_name', 'BMS');
-        $company_logo = getSetting('company_logo', '');
-    ?>
+    <!-- Print Header — report title only. The company letterhead (logo + name)
+         is already rendered once, globally, by header.php's renderPrintHeader()
+         on every page; this block used to redundantly re-render it a second
+         time, which is what produced the duplicate logo/company-name seen in
+         print. Only the report-specific title/date belongs here, matching the
+         pattern already used by Customer/Supplier/Sub-Contractor print. -->
     <div class="d-none d-print-block text-center mb-4 mt-2">
-        <?php if (!empty($company_logo)): ?>
-            <div class="mb-2"><img src="<?= getUrl($company_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;"></div>
-        <?php endif; ?>
-        <h2 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0;"><?= htmlspecialchars($company_name) ?></h2>
-
-        <div class="mt-3 text-center">
-            <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">Delivery Notes Report</h2>
-            <p style="color: #6c757d; margin: 0; font-size: 10pt;">Generated officially on <?= date('d M Y, H:i') ?></p>
-        </div>
+        <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">Delivery Notes Report</h2>
+        <p style="color: #6c757d; margin: 0; font-size: 10pt;">Generated officially on <?= date('d M Y, H:i') ?></p>
         <div style="border-bottom: 3px solid #0d6efd; margin-top: 10px; margin-bottom: 20px;"></div>
     </div>
 
@@ -854,7 +844,12 @@ function changeStatus(id, newStatus) {
 
     /* Print Preview Consistency */
     @media print {
-        @page { margin: 10mm; size: auto; }
+        /* Extra bottom clearance (16mm vs 10mm elsewhere) so the last row of
+           content never sits under the shared fixed-position print footer --
+           same margin already proven correct on Customer/Supplier/
+           Sub-Contractor print. The previous uniform 10mm didn't leave enough
+           room, so the footer overlapped/hid the bottom-most table row. */
+        @page { margin: 10mm 8mm 16mm 8mm; size: auto; }
         .d-print-none, .btn, .dataTables_filter, .dataTables_length, .dataTables_paginate, .dataTables_info { display: none !important; }
         table.dataTable { table-layout: fixed !important; }
 

@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-07-27 (fix) — Delivery Notes list print: duplicate header, footer overlapping the last row
+
+**Files:** `app/bms/grn/delivery_notes.php`
+
+Follow-up to the previous print fix (below) — 2 remaining issues:
+
+1. **Company logo/name appeared twice.** `header.php`'s `renderPrintHeader()`
+   already renders the company letterhead (logo + name) once, globally, on
+   every page's printout. This page's own print-header block redundantly
+   re-rendered the exact same logo + name a second time, before its
+   "Delivery Notes Report" title. Removed the duplicated portion — kept only
+   the report-specific title/generated-date/divider, matching the pattern
+   Customer/Supplier/Sub-Contractor print already use correctly (they only
+   add their own report title, never re-render the letterhead).
+2. **The footer overlapped/hid the bottom-most table row.** The shared global
+   print footer is `position: fixed; bottom: 0`, so content needs enough
+   reserved bottom page margin to never reach that fixed zone. This page's
+   own `@page` rule set a uniform `10mm` margin, overriding the shared
+   stylesheet's asymmetric margin (which reserves extra room at the bottom
+   specifically for the footer) with too little bottom clearance. Changed to
+   `10mm 8mm 16mm 8mm` — the exact margin already proven correct on
+   Customer/Supplier/Sub-Contractor print.
+
 ## 2026-07-27 (fix) — Delivery Notes list print: columns cut off in portrait, duplicate footer, blank landscape pages
 
 **Files:** `app/bms/grn/delivery_notes.php`
