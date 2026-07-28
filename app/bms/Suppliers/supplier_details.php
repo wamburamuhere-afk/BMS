@@ -1206,6 +1206,15 @@ window.addEventListener('resize', resizeTextToFit);
         width: 100% !important;
         max-width: 100% !important;
         padding: 0 !important;
+        /* Clear the fixed .bms-print-footer (position:fixed; bottom:0 — sits
+           relative to the page's content box, not the physical page edge, so
+           the @page bottom margin alone doesn't reliably keep it clear of the
+           last row). Scoped to this page only: a site-wide version of this
+           same reservation existed before and was deliberately removed
+           (responsive.css) because it caused blank trailing pages on other
+           pages — this stays local so it can't repeat that regression
+           elsewhere. */
+        padding-bottom: 14mm !important;
         margin: 0 !important;
     }
 
