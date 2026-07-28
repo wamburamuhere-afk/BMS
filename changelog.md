@@ -1,5 +1,42 @@
 # BMS Changelog
 
+## 2026-07-28 (fix) — Quotations list print: content pushed to page 2, columns cut off, stat cards overflowing
+
+**Files:** `app/bms/sales/quotations/quotations.php`
+
+User asked for the same class of print fixes already proven on Delivery Notes /
+Customer / Supplier / Sub-Contractor, plus a new issue: large numbers (e.g.
+Total Quote Value) overflowing their stat card. Four distinct root causes:
+
+1. **Print didn't start on the first page.** The global `responsive.css` rule
+   `p, .card, section { page-break-inside: avoid !important }` applies to the
+   Quotations Table Card, which is many times taller than one printed page. An
+   unbreakable "avoid" block that can never fit anywhere gets pushed entirely
+   onto a later page, leaving page 1 blank. Added an id (`#quotationsTableCard`)
+   to the table's wrapping card and overrode with
+   `page-break-inside: auto !important` (the id selector beats the class
+   rule), same fix already proven on Delivery Notes (`#dnTableCard`).
+2. **Columns cut off on the right.** DataTables sets explicit inline pixel
+   widths on `th`/`td`, sized for the wide on-screen container — they don't
+   shrink for a narrower printed page. Added
+   `table.dataTable { table-layout: fixed !important; }` plus
+   `#quotationsTable th, #quotationsTable td { width: auto !important; }` so
+   the actually-visible columns are distributed evenly across the real print
+   width, in both orientations.
+3. **Large digits overflowing their stat card.** The on-screen Statistics
+   Cards render full-size (`h4`) numbers with no print-specific sizing/wrap —
+   a value like `168,924,066.00` broke out of its 25%-width card. Hid the
+   on-screen stat row on print (`d-print-none`) and added a lean, small-font
+   print-only summary row instead (same pattern already proven on Delivery
+   Notes' "Print Summary Cards").
+4. **Footer risk of hiding the last row.** Added the same asymmetric
+   `@page { margin: 10mm 8mm 16mm 8mm; }` override already proven correct on
+   Customer/Supplier/Sub-Contractor/Delivery-Notes print, for consistent extra
+   bottom clearance under the shared fixed-position footer.
+
+Verified: `php -l` clean; `<div>` open/close tag count balanced (65/65) after
+the edit.
+
 ## 2026-07-27 (fix) — Delivery Notes list print: duplicate header, footer overlapping the last row
 
 **Files:** `app/bms/grn/delivery_notes.php`
