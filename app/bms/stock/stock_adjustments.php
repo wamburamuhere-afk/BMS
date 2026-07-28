@@ -111,7 +111,7 @@ try { $users      = $pdo->query("SELECT user_id, username FROM users WHERE statu
 $enable_projects = getSetting('enable_projects', 0);
 $projects = [];
 if ($enable_projects) {
-    try { $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status!='cancelled' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC); } catch(Exception $e){ $projects=[]; }
+    try { $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status!='cancelled' " . scopeFilterSql('project', 'projects') . " ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC); } catch(Exception $e){ $projects=[]; }
 }
 
 $c_name     = getSetting('company_name', 'BMS');
