@@ -70,6 +70,13 @@ if ($lpo_id) {
         </ol>
     </nav>
 
+    <div id="loading" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 text-muted">Loading LPO details...</p>
+    </div>
+
     <div id="content" style="display: none;">
         <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center mb-4 gap-2">
             <div>
@@ -266,20 +273,24 @@ const LPO_CAN_CREATE_DN = <?= json_encode(canCreate('dn')) ?>;
 $(document).ready(function() { loadLpoDetails(); });
 
 function loadLpoDetails() {
-    $.ajax({
-        url: '<?= buildUrl("api/customer/get_lpo.php") ?>',
-        data: { lpo_id: lpoId },
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                renderLpo(response.data);
-                logReportAction('Viewed LPO Details', 'User viewed details for LPO ' + response.data.lpo_number);
-                $('#content').fadeIn();
-            } else {
-                Swal.fire('Error', response.message, 'error').then(() => { window.location.href = '<?= getUrl("lpos") ?>'; });
-            }
+    BMSSkeleton.load({
+        loading: '#loading',
+        content: '#content',
+        skeleton: { cards: 3, rows: 5 },
+        ajax: {
+            url: '<?= buildUrl("api/customer/get_lpo.php") ?>',
+            data: { lpo_id: lpoId },
+            dataType: 'json'
         },
-        error: function() { Swal.fire('Error', 'Failed to load LPO details.', 'error'); }
+        onData: function(response) {
+            if (!response.success) {
+                // Not found / access denied — redirect rather than offer a retry.
+                Swal.fire('Error', response.message, 'error').then(() => { window.location.href = '<?= getUrl("lpos") ?>'; });
+                return;
+            }
+            renderLpo(response.data);
+            logReportAction('Viewed LPO Details', 'User viewed details for LPO ' + response.data.lpo_number);
+        }
     });
 }
 
