@@ -77,11 +77,6 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 <script src="/assets/js/select2.min.js"></script>
 
 <div class="container-fluid mt-4">
-    <!-- Master Table for Print Space Management -->
-    <table class="print-layout-table" style="width: 100%; border: none; border-collapse: collapse; background: transparent;">
-        <tbody>
-            <tr>
-                <td style="border: none; padding: 0;">
     <!-- Breadcrumbs -->
     <nav aria-label="breadcrumb" class="mb-3 d-print-none dn-list-sticky-nav">
         <ol class="breadcrumb">
@@ -382,21 +377,6 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
         </div>
     </div>
     </div>
-
-                </td>
-            </tr>
-        </tbody>
-        <tfoot class="d-none d-print-table-footer-group">
-            <tr>
-                <td style="border: none; padding: 0;">
-                    <div class="print-footer-spacer" style="height: 60px;"></div>
-                </td>
-            </tr>
-        </tfoot>
-    </table>
-
-
-   
 </div>
 
 <script>
@@ -877,6 +857,14 @@ function changeStatus(id, newStatus) {
         @page { margin: 10mm; size: auto; }
         .d-print-none, .btn, .dataTables_filter, .dataTables_length, .dataTables_paginate, .dataTables_info { display: none !important; }
         table.dataTable { table-layout: fixed !important; }
+
+        /* Root cause of "columns half appear, cut off on the right in portrait":
+           DataTables sets explicit inline pixel widths on th/td, calculated for
+           the wide on-screen container -- those don't shrink for a narrower
+           printed page, so the rightmost column(s) overflow off the page.
+           Stripping them lets table-layout:fixed distribute the actually-visible
+           columns evenly across the real print width, in both orientations. */
+        #dnTable th, #dnTable td { width: auto !important; }
 
         /* Root cause of "a lot of blank pages": the global responsive.css rule
            `p, .card, section { page-break-inside: avoid !important }` applies to
