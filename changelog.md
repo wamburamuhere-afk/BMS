@@ -1,5 +1,118 @@
 # BMS Changelog
 
+## 2026-07-27 (fix) — Sub-Contractor View Details: print used a completely separate, non-shared header/footer, only ever printed one section
+
+**Files:** `app/bms/operations/sub_contractor_details.php`
+
+User asked for this page's print to match the same structure as Supplier View
+Details. Investigation found a materially different (and more broken)
+situation than the Customer/Supplier fixes: this page's `printScDetails()`
+didn't print the current page at all — it opened a brand-new blank browser
+window and wrote an entirely separate, self-contained HTML document into it
+via `window.open()` + `document.write()`, with its own hand-rolled `.prt-header`
+title block and `.prt-footer` "Printed by…/Powered by…" text. That's the
+concrete meaning of "no header as other areas is" / "footer is not shared" —
+the print output used custom lookalike markup, never the shared
+`d-none d-print-block` report-header pattern or the shared global
+`.bms-print-footer` (from `footer.php`, already included on the real page via
+`includeFooter()`, but never reached by the popup). It also only ever
+included the Projects Involved table — Bills and Payments were completely
+absent from every printout, unlike the real on-screen page which has all
+three sections.
+
+Fix: replaced the entire popup-generation function with `window.print()`,
+matching Customer/Supplier's approach exactly — print the real page in place:
+
+1. Added the shared "Print-only Header" block
+   (`<div class="d-none d-print-block">…SUB-CONTRACTOR INFORMATION
+   REPORT…</div>`), identical pattern to `supplier_details.php`.
+2. The shared global print footer now appears automatically — no page-specific
+   footer markup needed, since `includeFooter()` was already correctly called
+   at the end of this page; it just never got used because printing bypassed
+   the page entirely.
+3. This page toggles its three sections (Projects Involved / Bills / Recent
+   Payments) via a custom `.sc-tab-pane`/`.d-none` scheme, not Bootstrap's
+   `.tab-pane` — so unlike the Customer/Supplier fix, forcing all sections to
+   print needed a page-specific override: `.sc-tab-pane.d-none { display:
+   block !important; }`. This is also the prerequisite for point 4 (an empty
+   section can only be hidden from print if it was a printing candidate in the
+   first place — previously Bills/Payments never printed at all, empty or not).
+4. Each of the three section cards now gets `d-print-none` conditionally —
+   `empty($sc_projects)` / `empty($received_invoices_count)` /
+   `empty($payments)` — hidden from print only when there's nothing to show.
+5. Hid the section-tab button row itself from print (`d-print-none`) — it had
+   no print-hiding class at all before.
+
+Scoped narrowly to what was asked: didn't rebuild the full custom print-CSS
+column/font reflow that Customer/Supplier have (this page's `.card` never set
+`page-break-inside: avoid`, so it isn't exposed to that specific landscape bug
+either — nothing to fix there).
+
+## 2026-07-27 (fix) — Supplier View Details print: same class of issues as Customer print, plus one more (only the active tab was printing at all)
+
+**Files:** `app/bms/Suppliers/supplier_details.php`
+
+Same user-reported symptoms as the Customer View Details print fixes above
+(landscape not starting on page 1, section-tab buttons appearing in the
+printout, empty tables printing anyway) — but this page's print CSS is a
+different, independently-written stylesheet from `customer_details.php`'s, so
+each root cause needed tracing separately rather than assumed identical:
+
+1. **Tab buttons (Recent Payments/Bills/Recent Purchase Orders/Projects
+   Involved) appeared in print.** Unlike `customer_details.php` (which had a
+   `no-print` typo), this page's tab bar `<ul>` carried **no print-hiding class
+   at all**. Added `d-print-none`.
+2. **Only the currently-active tab printed at all — the other three sections
+   never appeared in the printout, regardless of data.** This page was missing
+   the `.tab-content > .tab-pane { display: block !important; ... }` rule that
+   `customer_details.php` already has, so Bootstrap's normal "only the active
+   `.tab-pane.show` is visible" behavior carried straight through to print.
+   Added the same rule, so all four sections are now considered for printing —
+   which is also the prerequisite for point 3 below (an empty section can only
+   be hidden from print if it's a candidate to print in the first place).
+3. **Empty sections should not appear in print.** Added `d-print-none`
+   conditionally to each of the four section cards, based on the real PHP data
+   already available: `empty($supplier_projects)`, `empty($received_invoices_count)`
+   (the Bills table body is populated via AJAX, but its count is already
+   server-computed), `empty($purchase_orders)`, `empty($payments)`.
+4. **Landscape didn't start content on page 1.** Different mechanism from the
+   Customer page's forced page-break: here `.card { page-break-inside: avoid; }`
+   applied to every card. When an early card doesn't fit the remaining space on
+   the current page, `avoid` relocates the *entire* card to the next page
+   rather than letting it split — far more likely to trigger on landscape's
+   shorter page height than portrait's taller one, explaining why portrait
+   looked fine. Changed to `page-break-inside: auto` (matching
+   `customer_details.php`'s already-fixed `.card` rule), letting a card split
+   across pages naturally instead of jumping wholesale to the next one.
+
+## 2026-07-27 (fix) — Customer View Details print: empty history tables no longer print, removed the forced-page-break gap
+
+**Files:** `app/bms/customer/customer_details.php`
+
+Follow-up to the previous print fix (below). Two more issues on the same printout:
+
+1. **Sales Order History / Invoice & Payment History / LPOs cards printed even
+   when they had zero records**, each showing a bare table with just a
+   DataTables "No … found for this customer." empty-state row — noise on the
+   printout for a customer with no activity in that category. Each of the
+   three card containers now carries `d-print-none` conditionally
+   (`empty($customer_orders)` / `empty($customer_invoices)` /
+   `empty($customer_lpos)`) — hidden from print only when there's nothing to
+   show; still fully visible on-screen either way (including the "Add"
+   buttons), and the LPOs pane can still render on-screen for a
+   zero-LPO customer when the viewer has create permission, exactly as before.
+2. **Large blank gap between a field like "Registered" and the next visible
+   section**, in both portrait and landscape. Root cause: the Sales Order
+   History card carried a `print-page-break` class forcing
+   `page-break-before: always` unconditionally — a forced break to a new page
+   fills the rest of the current page with blank space before the break takes
+   effect, which is exactly the gap being reported. Removed the class from the
+   card and deleted the now-fully-unused `.print-page-break` CSS rule
+   (confirmed zero remaining references first). Content now flows naturally
+   in both orientations, matching the fix already applied to the
+   `.financial-details-card` landscape-only break above — same root cause,
+   same fix, applied everywhere it still existed.
+
 ## 2026-07-27 (fix) — Customer View Details print: landscape started on page 2, tab buttons appeared in printout
 
 **Files:** `app/bms/customer/customer_details.php`

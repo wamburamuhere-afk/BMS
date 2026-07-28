@@ -865,7 +865,7 @@ global $company_name, $company_logo;
 
             <div class="tab-pane fade show active" id="pane-orders" role="tabpanel">
             <!-- Sales Order History -->
-            <div class="card border-0 shadow-sm mb-4 print-page-break">
+            <div class="card border-0 shadow-sm mb-4<?= empty($customer_orders) ? ' d-print-none' : '' ?>">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                     <h6 class="mb-0 fw-bold text-primary">
                         <i class="bi bi-cart-check me-2"></i> Sales Order History
@@ -925,7 +925,7 @@ global $company_name, $company_logo;
 
             <div class="tab-pane fade" id="pane-invoices" role="tabpanel">
             <!-- Invoice & Payment History -->
-            <div class="card border-0 shadow-sm mb-4">
+            <div class="card border-0 shadow-sm mb-4<?= empty($customer_invoices) ? ' d-print-none' : '' ?>">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                     <h6 class="mb-0 fw-bold text-primary">
                         <i class="bi bi-file-earmark-text me-2"></i> Invoice & Payment History
@@ -1004,7 +1004,7 @@ global $company_name, $company_logo;
             <?php if (!empty($customer_lpos) || $can_create_lpos): ?>
             <div class="tab-pane fade" id="pane-lpos" role="tabpanel">
             <!-- Customer Purchase Orders (LPO) -->
-            <div class="card mb-3">
+            <div class="card mb-3<?= empty($customer_lpos) ? ' d-print-none' : '' ?>">
                 <div class="card-header bg-light border-bottom d-flex justify-content-between align-items-center">
                     <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-file-earmark-text"></i> Purchase Orders (LPO)</h6>
                     <?php if ($can_create_lpos): ?>
@@ -1446,12 +1446,6 @@ global $company_name, $company_logo;
         border: 0.5pt solid #ccc !important;
         padding: 4pt !important;
         margin-bottom: 4pt !important;
-    }
-
-    /* ===== PAGE BREAKS ===== */
-    .print-page-break {
-        page-break-before: always !important;
-        margin-top: 10mm !important;
     }
 
     /* ===== HIDE NON-PRINTABLE ELEMENTS (FINAL OVERRIDE) ===== */

@@ -619,7 +619,7 @@ global $company_name, $company_logo;
     <!-- Section Tab Navigation -->
     <div class="row mb-3">
         <div class="col-12">
-            <ul class="nav nav-pills flex-wrap gap-2" id="supplierSectionTabs" role="tablist">
+            <ul class="nav nav-pills flex-wrap gap-2 d-print-none" id="supplierSectionTabs" role="tablist">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-payments" type="button" role="tab">
                         <i class="bi bi-cash-coin me-1"></i> Recent Payments
@@ -650,7 +650,7 @@ global $company_name, $company_logo;
         <div class="tab-pane fade" id="pane-projects" role="tabpanel">
             <div class="row mt-2 mb-4">
                 <div class="col-12">
-                    <div class="card border-0 shadow-sm">
+                    <div class="card border-0 shadow-sm<?= empty($supplier_projects) ? ' d-print-none' : '' ?>">
                         <div class="card-header bg-white py-3 d-flex align-items-center">
                             <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-diagram-3 text-primary me-2"></i> Projects Involved <span class="badge bg-primary ms-1"><?= $total_supplier_projects ?></span></h6>
                             <?php if ($can_edit): ?>
@@ -731,7 +731,7 @@ global $company_name, $company_logo;
         <div class="tab-pane fade" id="pane-invoices" role="tabpanel">
             <div class="row mb-4">
                 <div class="col-12">
-                    <div class="card border-0 shadow-sm">
+                    <div class="card border-0 shadow-sm<?= empty($received_invoices_count) ? ' d-print-none' : '' ?>">
                         <div class="card-header bg-white py-3 d-flex align-items-center">
                             <h6 class="mb-0 fw-bold text-dark">
                                 <i class="bi bi-inbox text-success me-2"></i>
@@ -772,7 +772,7 @@ global $company_name, $company_logo;
         <div class="tab-pane fade" id="pane-pos" role="tabpanel">
             <div class="row mb-4">
                 <div class="col-12">
-                    <div class="card">
+                    <div class="card<?= empty($purchase_orders) ? ' d-print-none' : '' ?>">
                         <div class="card-header bg-light border-bottom">
                             <div class="d-flex justify-content-between align-items-center gap-2">
                                 <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cart"></i> Recent Purchase Orders</h6>
@@ -860,7 +860,7 @@ global $company_name, $company_logo;
         <div class="tab-pane fade show active" id="pane-payments" role="tabpanel">
             <div class="row mb-4">
                 <div class="col-12">
-                    <div class="card">
+                    <div class="card<?= empty($payments) ? ' d-print-none' : '' ?>">
                         <div class="card-header bg-light border-bottom">
                             <div class="d-flex justify-content-between align-items-center gap-2">
                                 <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cash"></i> Recent Payments</h6>
@@ -1273,7 +1273,13 @@ window.addEventListener('resize', resizeTextToFit);
         border-radius: 0 !important;
         overflow: visible !important;
         width: 100% !important;
-        page-break-inside: avoid;
+        /* allow a card to split across pages instead of relocating whole to
+           the next page when it doesn't fit the remaining space -- with
+           "avoid", a tall card near the top that doesn't fit landscape's
+           shorter page height got pushed entirely to page 2, leaving page 1
+           mostly blank; portrait's taller page rarely triggered it. */
+        page-break-inside: auto !important;
+        break-inside: auto !important;
     }
 
     /* ===== STAT CARDS ===== */
@@ -1357,6 +1363,14 @@ window.addEventListener('resize', resizeTextToFit);
     /* ===== PRINT HEADER ===== */
     .d-none.d-print-block {
         display: block !important;
+    }
+
+    /* ===== TAB CONTENT: force every section to print, not just the one
+       currently active on screen ===== */
+    .tab-content > .tab-pane {
+        display: block !important;
+        opacity: 1 !important;
+        visibility: visible !important;
     }
 }
 #supplierSectionTabs .nav-link {
