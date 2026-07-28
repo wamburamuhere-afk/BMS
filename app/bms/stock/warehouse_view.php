@@ -514,45 +514,57 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
         flex: 0 0 100% !important; 
         max-width: 100% !important; 
     }
-    .card { 
-        box-shadow: none !important; 
-        border: 1px solid #dee2e6 !important; 
+    .card {
+        box-shadow: none !important;
+        border: 1px solid #dee2e6 !important;
     }
     body { background: white !important; }
-    
-    /* Stats cards as a 2x2 grid for print — a single 4-across row leaves too
-       little width for the currency value in "Stock Value (Cost)", which wraps
-       onto two cramped lines in portrait. 2 columns gives every card, including
-       the long formatted currency figure, room to stay on one line. */
+
+    /* The site-wide print rule (assets/css/responsive.css) marks every .card
+       as break-inside:avoid, so the whole inventory card — including its full
+       table — was treated as one unsplittable block: if it didn't entirely
+       fit in whatever space remained on page 1 after the header/stat cards,
+       the browser deferred the ENTIRE card to page 2, leaving page 1 mostly
+       blank. Overriding it here lets the table start filling page 1
+       immediately and continue naturally onto page 2+; individual rows stay
+       intact via responsive.css's `tr { page-break-inside: avoid }`. */
+    .col-lg-8 .card {
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+    }
+
+    /* Stats cards — 4 across in one row regardless of portrait/landscape.
+       Font sizes are tightened (and the icon dropped) so even the longest
+       currency value on this page fits on a single line at quarter-width. */
     .row.mb-5.g-4 {
         display: flex !important;
         flex-direction: row !important;
-        flex-wrap: wrap !important;
-        gap: 10px !important;
+        flex-wrap: nowrap !important;
+        gap: 8px !important;
     }
     .row.mb-5.g-4 .col-md-3 {
-        width: calc(50% - 5px) !important;
-        flex: 0 0 calc(50% - 5px) !important;
-        max-width: calc(50% - 5px) !important;
+        width: calc(25% - 6px) !important;
+        flex: 0 0 calc(25% - 6px) !important;
+        max-width: calc(25% - 6px) !important;
         margin-bottom: 10px !important;
     }
     .custom-stat-card {
-        padding: 8px !important;
+        padding: 6px 8px !important;
         background-color: #d1e7dd !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
-        min-height: 70px !important;
+        min-height: 60px !important;
     }
-    .stats-icon {
-        font-size: 1.1rem !important;
-        margin-right: 0.6rem !important;
+    .custom-stat-card .stats-icon {
+        display: none !important;
     }
     .custom-stat-card h4 {
-        font-size: 1.15rem !important;
+        font-size: 0.82rem !important;
         white-space: nowrap !important;
     }
     .custom-stat-card small {
-        font-size: 0.68rem !important;
+        font-size: 0.56rem !important;
+        white-space: nowrap !important;
     }
 }
 </style>
