@@ -1,5 +1,40 @@
 # BMS Changelog
 
+## 2026-07-28 (fix) — Quotations list print: duplicate/mismatched table header (DataTables scrollX clone)
+
+**Files:** `app/bms/sales/quotations/quotations.php`
+
+Follow-up to the previous Quotations print fix (below) — user reported one
+column heading rendering differently from the rest, and another heading not
+appearing at all.
+
+**Root cause:** the Quotations table uses DataTables' `scrollX: true`, which
+splits the header into two separate DOM elements:
+- `.dataTables_scrollHead` — a **cloned header table with no id**, used only
+  to visually sync with horizontal scrolling.
+- The real `#quotationsTable` `<thead>`, which lives inside
+  `.dataTables_scrollBody`.
+
+The previous fix's `#quotationsTable th, #quotationsTable td { width: auto; font-size: 8pt; ... }`
+override only ever matched the real thead (by id) — the id-less clone in
+`.dataTables_scrollHead` was left completely unstyled and, since the global
+print stylesheet forces `.dataTables_wrapper`/`.table-responsive` to
+`display: block !important; overflow: visible !important`, both header rows
+rendered in print at once: one restyled to the compact print font, one still
+at full on-screen size — exactly the "heading appeared different / other
+heading not appeared" symptom reported.
+
+**Fix:** hide `.dataTables_scrollHead` in print and let `.dataTables_scrollBody`
+flow naturally at full width (`overflow: visible; height: auto; width: 100%`),
+so only the real, correctly-styled thead renders. Verified directly against
+the DOM (not just visually) on the local dev instance:
+`.dataTables_scrollHead` computed `display: none`; the real thead sits
+immediately before the first body row (single header row, not two); all 9
+header labels present and correctly hidden/shown (`Actions` th computed
+`display: none` per its existing `d-print-none`); all 4 print-summary stat
+cards' value widths measured smaller than their container (no overflow),
+including the "Total Quote Value" figure.
+
 ## 2026-07-28 (fix) — Quotations list print: content pushed to page 2, columns cut off, stat cards overflowing
 
 **Files:** `app/bms/sales/quotations/quotations.php`

@@ -152,6 +152,25 @@ $can_approve = canApprove('sales_orders');
         }
         #quotationsTable tr { page-break-inside: avoid !important; break-inside: avoid !important; }
         #quotationsTable thead { display: table-header-group; }
+
+        /* Root cause of "heading appeared different from its column, other
+           heading not appeared": this table uses DataTables' scrollX:true,
+           which clones the header row into a separate, id-less table inside
+           .dataTables_scrollHead (for horizontal-scroll syncing) while the
+           REAL #quotationsTable thead lives inside .dataTables_scrollBody.
+           My th/td print overrides above only ever matched the real thead
+           (by id) -- the unstyled clone stayed visible too, so print showed
+           two overlapping header rows: one restyled to the compact print
+           font, one still at the original on-screen size. Hiding the clone
+           and letting the scroll body flow at full width leaves exactly one,
+           correctly-styled header row. */
+        .dataTables_scrollHead { display: none !important; }
+        .dataTables_scrollBody {
+            overflow: visible !important;
+            height: auto !important;
+            width: 100% !important;
+        }
+        .dataTables_scrollBody table { width: 100% !important; }
     }
 </style>
 
