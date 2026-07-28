@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-07-27 (fix) — Customer View Details print: empty history tables no longer print, removed the forced-page-break gap
+
+**Files:** `app/bms/customer/customer_details.php`
+
+Follow-up to the previous print fix (below). Two more issues on the same printout:
+
+1. **Sales Order History / Invoice & Payment History / LPOs cards printed even
+   when they had zero records**, each showing a bare table with just a
+   DataTables "No … found for this customer." empty-state row — noise on the
+   printout for a customer with no activity in that category. Each of the
+   three card containers now carries `d-print-none` conditionally
+   (`empty($customer_orders)` / `empty($customer_invoices)` /
+   `empty($customer_lpos)`) — hidden from print only when there's nothing to
+   show; still fully visible on-screen either way (including the "Add"
+   buttons), and the LPOs pane can still render on-screen for a
+   zero-LPO customer when the viewer has create permission, exactly as before.
+2. **Large blank gap between a field like "Registered" and the next visible
+   section**, in both portrait and landscape. Root cause: the Sales Order
+   History card carried a `print-page-break` class forcing
+   `page-break-before: always` unconditionally — a forced break to a new page
+   fills the rest of the current page with blank space before the break takes
+   effect, which is exactly the gap being reported. Removed the class from the
+   card and deleted the now-fully-unused `.print-page-break` CSS rule
+   (confirmed zero remaining references first). Content now flows naturally
+   in both orientations, matching the fix already applied to the
+   `.financial-details-card` landscape-only break above — same root cause,
+   same fix, applied everywhere it still existed.
+
 ## 2026-07-27 (fix) — Customer View Details print: landscape started on page 2, tab buttons appeared in printout
 
 **Files:** `app/bms/customer/customer_details.php`
