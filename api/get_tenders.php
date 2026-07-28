@@ -11,8 +11,12 @@ if (!isAuthenticated()) {
 global $pdo;
 
 // Pagination & Filtering
+// limit=-1 (DataTables' own "All" convention, e.g. customers.php's Show dropdown)
+// returns every matching row in one call — the tenders DataTable is client-side,
+// so it fetches the full filtered set once and handles paging/sort/search itself.
 $params = [];
 $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
+$fetchAll = ($limit === -1);
 $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
 $offset = ($page - 1) * $limit;
 
@@ -62,12 +66,12 @@ $stmt_count->execute($params);
 $total_records = $stmt_count->fetchColumn();
 
 // Fetch data
-$query = "SELECT t.*, c.customer_name as entity_name 
-          FROM tenders t 
-          LEFT JOIN customers c ON t.customer_id = c.customer_id 
-          $where 
-          ORDER BY t.created_at DESC 
-          LIMIT $limit OFFSET $offset";
+$query = "SELECT t.*, c.customer_name as entity_name
+          FROM tenders t
+          LEFT JOIN customers c ON t.customer_id = c.customer_id
+          $where
+          ORDER BY t.created_at DESC"
+          . ($fetchAll ? '' : " LIMIT $limit OFFSET $offset");
 
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
@@ -80,6 +84,6 @@ echo json_encode([
         'total' => $total_records,
         'limit' => $limit,
         'page' => $page,
-        'pages' => ceil($total_records / $limit)
+        'pages' => $fetchAll ? 1 : ceil($total_records / $limit)
     ]
 ]);

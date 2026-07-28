@@ -106,6 +106,9 @@ $badge = [
             <?php if ($status === 'approved' && $can_approve): ?>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#payModal"><i class="bi bi-cash-coin me-1"></i> Record Refund</button>
             <?php endif; ?>
+            <?php if ($status === 'paid' && $can_approve): ?>
+                <button class="btn btn-outline-danger" onclick="dnReversePayment()"><i class="bi bi-arrow-counterclockwise me-1"></i> Reverse Payment</button>
+            <?php endif; ?>
             <?php if ($status === 'pending' && $can_edit): ?>
                 <a class="btn btn-outline-primary" href="<?= getUrl('debit_note_edit') ?>?id=<?= $id ?><?= $proj_qs ?>"><i class="bi bi-pencil me-1"></i> Edit</a>
             <?php endif; ?>
@@ -284,6 +287,16 @@ function dnPost(url, okTitle){
 }
 function dnReview(){ Swal.fire({title:'Send for Review?',text:'Marks the note reviewed and captures your e-signature.',icon:'question',showCancelButton:true,confirmButtonColor:'#0d6efd',confirmButtonText:'Yes, send'}).then(r=>{ if(r.isConfirmed) dnPost('<?= buildUrl('api/purchase/review_debit_note.php') ?>','Reviewed'); }); }
 function dnApprove(){ Swal.fire({title:'Approve Debit Note?',text:'Captures your e-signature as approver.',icon:'question',showCancelButton:true,confirmButtonColor:'#0d6efd',confirmButtonText:'Yes, approve'}).then(r=>{ if(r.isConfirmed) dnPost('<?= buildUrl('api/purchase/approve_debit_note.php') ?>','Approved'); }); }
+function dnReversePayment(){
+    Swal.fire({title:'Reverse this settlement?',text:'Posts a reversing ledger entry and returns the note to Approved so it can be re-settled.',icon:'warning',showCancelButton:true,confirmButtonColor:'#dc3545',confirmButtonText:'Yes, reverse'})
+        .then(r=>{
+            if(!r.isConfirmed) return;
+            $.post('<?= buildUrl('api/purchase/reverse_debit_note_payment.php') ?>', { debit_note_id: <?= (int)$id ?>, _csrf: CSRF_TOKEN }, function(res){
+                if(res.success){ Swal.fire({icon:'success',title:'Reversed!',text:res.message}).then(()=>location.reload()); }
+                else { Swal.fire({icon:'error',title:'Error',text:res.message}); }
+            }, 'json').fail(function(){ Swal.fire({icon:'error',title:'Error',text:'Server error.'}); });
+        });
+}
 
 $(document).ready(function(){
     $('#payModal').on('shown.bs.modal', function(){

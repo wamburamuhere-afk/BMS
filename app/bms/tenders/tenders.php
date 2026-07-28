@@ -252,22 +252,31 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
     <div class="d-print-none mb-3">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div class="d-flex align-items-center gap-2">
-                <div class="btn-group shadow-sm bg-white" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
-                    <button type="button" class="btn btn-sm btn-white fw-medium px-3 border-0 py-2" onclick="window.print()" style="background: #fff; color: #444;">
+                <div class="d-flex flex-wrap shadow-sm bg-white" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
+                    <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="copyTendersTable()" style="background: #fff; height: 38px;">
+                        <i class="bi bi-clipboard text-info me-1"></i> <span class="d-none d-sm-inline">Copy</span>
+                    </button>
+                    <div class="bg-light d-none d-sm-block" style="width: 1px; height: 38px;"></div>
+                    <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="exportTendersCSV()" style="background: #fff; height: 38px;">
+                        <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> <span class="d-none d-sm-inline">CSV</span>
+                    </button>
+                    <div class="bg-light d-none d-sm-block" style="width: 1px; height: 38px;"></div>
+                    <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="window.print()" style="background: #fff; height: 38px;">
                         <i class="bi bi-printer text-primary me-1"></i> <span class="d-none d-sm-inline">Print</span>
                     </button>
-                    <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
-                    <button type="button" class="btn btn-sm btn-white fw-medium px-3 border-0 py-2" onclick="exportPDF()" style="background: #fff; color: #444;">
+                    <div class="bg-light d-none d-sm-block" style="width: 1px; height: 38px;"></div>
+                    <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="exportPDF()" style="background: #fff; height: 38px;">
                         <i class="bi bi-file-pdf text-danger me-1"></i> <span class="d-none d-sm-inline">PDF</span>
                     </button>
                 </div>
-                <div class="d-flex align-items-center bg-white shadow-sm px-2 py-1" style="border: 1px solid #dee2e6; border-radius: 8px; height: 36px;">
-                    <span class="small text-muted me-1 d-none d-md-inline"><i class="bi bi-list-ol"></i></span>
-                    <select id="pageLimit" class="form-select form-select-sm border-0 fw-bold p-0" style="width: 50px; box-shadow: none; background: transparent;">
+                <div class="d-flex align-items-center bg-white shadow-sm px-2 py-1" style="border: 1px solid #dee2e6; border-radius: 8px; height: 38px;">
+                    <span class="small text-muted me-2 text-nowrap">Show:</span>
+                    <select id="pageLimit" class="form-select form-select-sm border-0 fw-bold p-0" style="width: 50px; background: transparent;">
                         <option value="10">10</option>
-                        <option value="25">25</option>
+                        <option value="25" selected>25</option>
                         <option value="50">50</option>
                         <option value="100">100</option>
+                        <option value="-1">All</option>
                     </select>
                 </div>
             </div>
@@ -295,14 +304,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                             <th class="text-center" style="font-size:0.82rem;">Action</th>
                         </tr>
                     </thead>
-                    <tbody id="tenderTableBody">
-                        <tr>
-                            <td colspan="8" class="text-center py-5">
-                                <div class="spinner-border text-primary" role="status"></div>
-                                <div class="mt-2 text-muted">Loading Tenders Registry...</div>
-                            </td>
-                        </tr>
-                    </tbody>
+                    <tbody id="tenderTableBody"></tbody>
                     <tfoot class="d-none d-print-table-footer">
                         <!-- Slim 'Bodyguard' Row for safety -->
                         <tr style="height: 30px !important; border: 1px solid #dee2e6 !important; background: #fff !important;">
@@ -310,14 +312,6 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                         </tr>
                     </tfoot>
                 </table>
-            </div>
-            
-            <!-- Pagination Controls -->
-            <div class="d-flex justify-content-between align-items-center p-3 bg-light border-top d-print-none">
-                <div id="paginationInfo" class="text-muted small"></div>
-                <nav>
-                    <ul class="pagination pagination-sm mb-0" id="paginationControls"></ul>
-                </nav>
             </div>
         </div>
     </div>
@@ -994,83 +988,103 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
  </div>
 
  <script>
- let currentPage = 1;
- 
- function loadTenders(page = 1) {
-    currentPage = page;
-    const body = $('#tenderTableBody');
-    const params = {
-        action: 'get_tenders',
-        search: $('#searchInput').val(),
-        status: $('#statusFilter').val(),
-        category: $('#categoryFilter').val(),
-        date_from: $('#dateFrom').val(),
-        date_to: $('#dateTo').val(),
-        limit: $('#pageLimit').val(),
-        page: page,
-        attention: <?= $attention ? 1 : 0 ?>
-    };
-    
-    if (page === 1) {
-        let filterDesc = [];
-        if (params.search) filterDesc.push(`search: "${params.search}"`);
-        if (params.status) filterDesc.push(`status: "${params.status}"`);
-        if (params.category) filterDesc.push(`category: "${params.category}"`);
-        if (params.date_from || params.date_to) filterDesc.push(`date range: ${params.date_from || 'any'} to ${params.date_to || 'any'}`);
-        
-        let actionMsg = filterDesc.length > 0 ? 'Filtered registry by ' + filterDesc.join(', ') : 'Loaded registry';
-        logActivityAction('FILTER', 'Tender Registry Filter', actionMsg);
-    }
-    
-    $.ajax({
-        url: '<?= buildUrl("api/get_tenders") ?>',
-        method: 'GET',
-        data: params,
-        success: function(res) {
-            if (!res.success) {
-                body.html(`<tr><td colspan="7" class="text-center text-danger py-4">${res.message}</td></tr>`);
-                return;
-            }
+ // HTML-escape helper (page-local per app convention)
+ function safeOutput(s) { return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 
-            if (res.data.length === 0) {
-                body.html('<tr><td colspan="7" class="text-center py-5 text-muted">No matching tenders found.</td></tr>');
-            } else {
-                let html = '';
-                let sn = (page - 1) * params.limit + 1;
-                res.data.forEach(t => {
-                    const statusBadge = getStatusBadgeClass(t.status);
-                    const deadline = t.submission_deadline ? new Date(t.submission_deadline).toLocaleDateString() : '-';
-                    
-                    html += `
-                        <tr>
-                            <td class="text-center text-muted fw-bold" style="font-size:0.78rem;">${sn++}</td>
-                            <td><strong class="tender-no-text">${t.tender_no}</strong></td>
-                            <td><span class="entity-text" title="${t.entity_name || t.procuring_entity_name}">${t.entity_name || t.procuring_entity_name}</span></td>
-                            <td class="d-none d-md-table-cell"><span class="badge bg-light text-dark border fw-bold">${t.acronym || '-'}</span></td>
-                            <td class="d-none d-md-table-cell" style="font-size:0.82rem;">${t.tender_category}</td>
-                            <td class="deadline-cell" style="font-size:0.82rem; white-space:nowrap;">${deadline}</td>
-                            <td><span class="badge bg-${statusBadge} status-badge">${t.status.toUpperCase()}</span></td>
-                            <td class="text-center">
-                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-1 py-1" type="button" data-bs-toggle="dropdown" style="font-size:0.78rem;">
-                                    <i class="bi bi-gear"></i>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end shadow">
-                                    <li><a class="dropdown-item" href="<?= getUrl('tender_view') ?>?id=${t.tender_id}"><i class="bi bi-eye"></i> View</a></li>
-                                    <li><a class="dropdown-item" href="<?= getUrl('tender_edit') ?>?id=${t.tender_id}"><i class="bi bi-pencil"></i> Edit</a></li>
-                                    ${generateActions(t)}
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteTender(${t.tender_id})"><i class="bi bi-trash"></i> Delete</a></li>
-                                </ul>
-                            </td>
-                        </tr>
-                    `;
-                });
-                body.html(html);
+ // Tenders DataTable: client-side (fetches every matching row in one call, then
+ // DataTables itself handles paging/length/sort in the browser — same pattern as
+ // meetings.php). api/get_tenders.php's search/status/category/date filters still
+ // run server-side (they cover joined fields like customer_name that a purely
+ // client-side search wouldn't reach), so filter changes trigger a re-fetch via
+ // reloadTenders(); the "Show" dropdown only changes the client page length.
+ let tendersTable = null;
+
+ function tendersAjaxParams(d) {
+    d.action = 'get_tenders';
+    d.search = $('#searchInput').val();
+    d.status = $('#statusFilter').val();
+    d.category = $('#categoryFilter').val();
+    d.date_from = $('#dateFrom').val();
+    d.date_to = $('#dateTo').val();
+    d.limit = -1; // always fetch the full filtered set — DataTables paginates client-side
+    d.attention = <?= $attention ? 1 : 0 ?>;
+ }
+
+ function initTendersTable() {
+    tendersTable = $('#tenderTable').DataTable({
+        processing: true,
+        ajax: {
+            url: '<?= buildUrl("api/get_tenders") ?>',
+            data: tendersAjaxParams,
+            dataSrc: 'data'
+        },
+        columns: [
+            {
+                data: null, orderable: false, searchable: false,
+                className: 'text-center text-muted fw-bold', style: 'font-size:0.78rem;',
+                render: (d, t, row, meta) => meta.row + meta.settings._iDisplayStart + 1
+            },
+            { data: 'tender_no', render: d => `<strong class="tender-no-text">${safeOutput(d)}</strong>` },
+            {
+                data: null,
+                render: (d, t, row) => `<span class="entity-text" title="${safeOutput(row.entity_name || row.procuring_entity_name)}">${safeOutput(row.entity_name || row.procuring_entity_name)}</span>`
+            },
+            {
+                data: 'acronym', className: 'd-none d-md-table-cell',
+                render: d => `<span class="badge bg-light text-dark border fw-bold">${safeOutput(d || '-')}</span>`
+            },
+            { data: 'tender_category', className: 'd-none d-md-table-cell' },
+            {
+                data: 'submission_deadline', className: 'deadline-cell',
+                render: d => d ? new Date(d).toLocaleDateString() : '-'
+            },
+            {
+                data: 'status',
+                render: d => `<span class="badge bg-${getStatusBadgeClass(d)} status-badge">${safeOutput(String(d).toUpperCase())}</span>`
+            },
+            {
+                data: null, orderable: false, className: 'text-center',
+                render: (d, t, row) => `
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-1 py-1" type="button" data-bs-toggle="dropdown" style="font-size:0.78rem;">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow">
+                        <li><a class="dropdown-item" href="<?= getUrl('tender_view') ?>?id=${row.tender_id}"><i class="bi bi-eye"></i> View</a></li>
+                        <li><a class="dropdown-item" href="<?= getUrl('tender_edit') ?>?id=${row.tender_id}"><i class="bi bi-pencil"></i> Edit</a></li>
+                        ${generateActions(row)}
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="#" onclick="deleteTender(${row.tender_id})"><i class="bi bi-trash"></i> Delete</a></li>
+                    </ul>`
             }
-            renderPagination(res.pagination);
+        ],
+        order: [],
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
+        dom: 'rtipB',
+        buttons: [
+            { extend: 'copyHtml5', className: 'd-none', exportOptions: { columns: ':not(:last-child)' } },
+            { extend: 'csvHtml5', className: 'd-none', exportOptions: { columns: ':not(:last-child)' } }
+        ],
+        language: { emptyTable: 'No matching tenders found.', zeroRecords: 'No matching tenders found.' },
+        drawCallback: function() {
             if (window.bmsMobileCards) window.bmsMobileCards.renderForTable('tenderTable');
         }
     });
+ }
+
+ function reloadTenders() {
+    if (tendersTable) tendersTable.ajax.reload(null, false);
+ }
+
+ function copyTendersTable() {
+    logActivityAction('EXPORT', 'Tender Registry Copy', 'Copied tender records to clipboard');
+    tendersTable.button('.buttons-copy').trigger();
+    Swal.fire({ icon: 'success', title: 'Copied!', text: 'Table data copied to clipboard', timer: 1500, showConfirmButton: false, position: 'center' });
+ }
+
+ function exportTendersCSV() {
+    logActivityAction('EXPORT', 'Tender Registry CSV Export', 'Exported tenders registry list as CSV');
+    tendersTable.button('.buttons-csv').trigger();
  }
 
  function getStatusBadgeClass(status) {
@@ -1100,29 +1114,6 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
     // AWARDED status no longer needs manual project migration
 
     return actionHtml ? `<li><hr class="dropdown-divider"></li>${actionHtml}` : '';
- }
-
- function renderPagination(p) {
-    const start = (p.page - 1) * p.limit + 1;
-    const end = Math.min(start + p.limit - 1, p.total);
-    $('#paginationInfo').text(`Showing ${p.total > 0 ? start : 0} to ${end} of ${p.total} entries`);
-
-    let html = '';
-    // Previous
-    html += `<li class="page-item ${p.page <= 1 ? 'disabled' : ''}"><a class="page-link" href="#" onclick="loadTenders(${p.page - 1})">Previous</a></li>`;
-    
-    // Page numbers
-    for (let i = 1; i <= p.pages; i++) {
-        if (i === 1 || i === p.pages || (i >= p.page - 1 && i <= p.page + 1)) {
-            html += `<li class="page-item ${i === p.page ? 'active' : ''}"><a class="page-link" href="#" onclick="loadTenders(${i})">${i}</a></li>`;
-        } else if (i === p.page - 2 || i === p.page + 2) {
-            html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-        }
-    }
-
-    // Next
-    html += `<li class="page-item ${p.page >= p.pages ? 'disabled' : ''}"><a class="page-link" href="#" onclick="loadTenders(${p.page + 1})">Next</a></li>`;
-    $('#paginationControls').html(html);
  }
 
   // PDF Export Logic using html2pdf.js  // Professional PDF Export using jsPDF & autoTable (The Projects Strategy)
@@ -1278,12 +1269,10 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
 
 
  $(document).ready(function() {
-    loadTenders();
+    initTendersTable();
 
     // §UI-3 — searchable Select2 on the DB-backed dropdowns inside the
     // Quick-Add-Employee modal (employment type / department / designation).
-    // No client DataTable on the tender list: it is AJAX-paginated (loadTenders),
-    // which a DataTable would conflict with.
     $('#quickAddEmployeeModal').on('shown.bs.modal', function () {
         const modal = $(this);
         modal.find('.tender-emp-s2').each(function () {
@@ -1294,7 +1283,17 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
     });
 
     // Trigger filter with Apply button
-    $('#applyBtn').on('click', () => loadTenders(1));
+    $('#applyBtn').on('click', function() {
+        let filterDesc = [];
+        const search = $('#searchInput').val(), status = $('#statusFilter').val(), category = $('#categoryFilter').val();
+        const dateFrom = $('#dateFrom').val(), dateTo = $('#dateTo').val();
+        if (search) filterDesc.push(`search: "${search}"`);
+        if (status) filterDesc.push(`status: "${status}"`);
+        if (category) filterDesc.push(`category: "${category}"`);
+        if (dateFrom || dateTo) filterDesc.push(`date range: ${dateFrom || 'any'} to ${dateTo || 'any'}`);
+        logActivityAction('FILTER', 'Tender Registry Filter', filterDesc.length ? 'Filtered registry by ' + filterDesc.join(', ') : 'Loaded registry');
+        reloadTenders();
+    });
 
     // Clear filters
     $('#clearBtn').on('click', function() {
@@ -1304,16 +1303,18 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
         $('#categoryFilter').val('');
         $('#dateFrom').val('');
         $('#dateTo').val('');
-        loadTenders(1);
+        reloadTenders();
     });
 
-    // Also allow auto-filter for better UX, or keep it purely manual with Apply button
-    // Let's keep it manual as implied by adding an Apply button
     $('#searchInput').on('keypress', function(e) {
-        if(e.which == 13) loadTenders(1);
+        if (e.which == 13) reloadTenders();
     });
 
-    $('#pageLimit').on('change', () => loadTenders(1));
+    // "Show" only changes the client-side page length — the full filtered set is
+    // already loaded, so this never needs a server round-trip.
+    $('#pageLimit').on('change', function() {
+        tendersTable.page.len(parseInt(this.value)).draw();
+    });
 
     // Decision Modal logic
     $('#decisionStatus').on('change', function() {
@@ -1347,7 +1348,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                 success: function(res) {
                     if (res.success) {
                         logActivityAction('DELETE', 'Tender Deletion', 'Confirmed deletion of tender ID: ' + id, 'tender', id);
-                        Swal.fire('Deleted!', res.message, 'success').then(() => loadTenders(currentPage));
+                        Swal.fire('Deleted!', res.message, 'success').then(() => reloadTenders());
                     } else {
                         Swal.fire('Error', res.message, 'error');
                     }
@@ -1639,7 +1640,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                 data: { tender_id: id, status: status, action: 'UPDATE_STATUS' },
                 success: function(res) {
                     if (res.success) {
-                        Swal.fire('Success', res.message, 'success').then(() => loadTenders(currentPage));
+                        Swal.fire('Success', res.message, 'success').then(() => reloadTenders());
                     } else {
                         Swal.fire('Error', res.message, 'error');
                     }
@@ -1667,7 +1668,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
         success: function(res) {
             if (res.success) {
                 $(modalId).modal('hide');
-                Swal.fire('Success', res.message, 'success').then(() => loadTenders(currentPage));
+                Swal.fire('Success', res.message, 'success').then(() => reloadTenders());
             } else {
                 Swal.fire('Error', res.message, 'error');
                 $btn.prop('disabled', false).text('Try Again');
