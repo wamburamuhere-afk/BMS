@@ -329,9 +329,6 @@ if (!isset($_SESSION['csrf_token'])) {
 // Get filter parameters
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $status_filter = isset($_GET['status']) ? $_GET['status'] : 'all';
-$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-$limit = 20;
-$offset = ($page - 1) * $limit;
 
 // Calculate Next Warehouse Code
 $stmt_max = $pdo->query("SELECT MAX(warehouse_id) FROM warehouses");
@@ -389,9 +386,8 @@ $count_query = "SELECT COUNT(*) as total FROM warehouses $where_clause";
 $count_stmt = $pdo->prepare($count_query);
 $count_stmt->execute($params);
 $total_count = $count_stmt->fetch(PDO::FETCH_ASSOC)['total'];
-$total_pages = ceil($total_count / $limit);
 
-// Get warehouses with pagination
+// Get warehouses — full filtered result set; DataTable handles pagination client-side
 $query = "
     SELECT 
         w.*,
@@ -441,7 +437,6 @@ $query = "
     LEFT JOIN users u2 ON w.updated_by = u2.user_id
     $where_clause
     ORDER BY w.is_primary DESC, w.warehouse_name
-    LIMIT $limit OFFSET $offset
 ";
 
 $stmt = $pdo->prepare($query);
@@ -914,7 +909,7 @@ function get_primary_badge($is_primary) {
                             <tbody>
                                 <?php foreach ($warehouses as $index => $warehouse): ?>
                                 <tr>
-                                    <td><?= $offset + $index + 1 ?></td>
+                                    <td><?= $index + 1 ?></td>
                                     <td>
                                         <code class="custom-code"><?= htmlspecialchars($warehouse['warehouse_code'] ?? '') ?></code>
                                         <?php if ($warehouse['is_primary']): ?>
