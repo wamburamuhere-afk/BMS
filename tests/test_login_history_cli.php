@@ -193,7 +193,11 @@ ok(str_contains($apiContent, "'us.login_at'"), "API orders by login_at column");
 echo "\n[7] Page — login_history.php content checks\n";
 
 $pageContent = file_get_contents($loginHistoryFile);
-ok(str_contains($pageContent, 'isAdmin()'),          "Page enforces admin-only access");
+// The page used to redirect non-admins unconditionally even after the real,
+// grantable autoEnforcePermission('login_history') gate passed — removed, so
+// a role granted this permission via Roles & Permissions actually works now.
+ok(str_contains($pageContent, "autoEnforcePermission('login_history')"), "Page enforces the grantable login_history permission");
+ok(!str_contains($pageContent, 'if (!isAdmin())'),   "Page no longer redirects non-admins unconditionally");
 ok(str_contains($pageContent, 'function safeOutput'), "Page defines safeOutput() JS helper");
 ok(str_contains($pageContent, 'Login History'),       "Page title is 'Login History'");
 ok(str_contains($pageContent, 'get_login_history'),   "Page references the correct API endpoint");

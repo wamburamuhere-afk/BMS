@@ -244,17 +244,23 @@ section('8. Single backup directory — all components agree on backups/');
 // Bug class this guards against: the page listed files from one folder while
 // the API created/restored/deleted in a different folder, so every Delete
 // and Restore action returned "File not found" even though the file existed
-// somewhere else on disk. Fixed by routing all four files at ROOT_DIR/backups/.
+// somewhere else on disk. Fixed by routing all components at ROOT_DIR/backups/.
+//
+// api/download_backup.php (a duplicate, unauthenticated-on-create/list/
+// delete backup implementation embedded as a tab in system_settings.php) was
+// removed entirely — the real Backup page/menu item always used
+// app/constant/settings/download_backup.php, which is the only download path
+// left and is checked below.
 
-$dlApi  = $root . '/api/download_backup.php';
 $dlPage = $root . '/app/constant/settings/download_backup.php';
 
-foreach ([$dlApi, $dlPage] as $f) {
-    $rel = str_replace($root . DIRECTORY_SEPARATOR, '', $f);
-    check(is_file($f), "$rel exists", "$rel is missing");
-}
+check(is_file($dlPage), 'app/constant/settings/download_backup.php exists', 'app/constant/settings/download_backup.php is missing');
+check(!is_file($root . '/api/create_backup.php'), 'api/create_backup.php (unauthenticated duplicate) has been removed', 'api/create_backup.php still exists — the unauthenticated duplicate backup creator is back');
+check(!is_file($root . '/api/get_backup_list.php'), 'api/get_backup_list.php (unauthenticated duplicate) has been removed', 'api/get_backup_list.php still exists — the unauthenticated duplicate backup lister is back');
+check(!is_file($root . '/api/download_backup.php'), 'api/download_backup.php (duplicate) has been removed', 'api/download_backup.php still exists — the duplicate download path is back');
+check(!is_file($root . '/api/delete_backup.php'), 'api/delete_backup.php (unauthenticated duplicate) has been removed', 'api/delete_backup.php still exists — the unauthenticated duplicate backup deleter is back');
+check(!is_file($root . '/api/save_backup_settings.php'), 'api/save_backup_settings.php (duplicate) has been removed', 'api/save_backup_settings.php still exists — the duplicate settings saver is back');
 
-$dlApiSrc  = is_file($dlApi)  ? file_get_contents($dlApi)  : '';
 $dlPageSrc = is_file($dlPage) ? file_get_contents($dlPage) : '';
 
 // Canonical path = ROOT_DIR . '/backups/' (top-level backups folder).
@@ -276,12 +282,6 @@ check(
     (bool) preg_match("#\\\$backupsDir\\s*=\\s*__DIR__\\s*\\.\\s*['\"]/\\.\\./\\.\\./\\.\\./backups/['\"]#", $ui),
     'Page uses __DIR__ . \'/../../../backups/\' (resolves to ROOT_DIR/backups/)',
     'Page no longer uses the canonical backups/ path'
-);
-
-check(
-    (bool) preg_match("#ROOT_DIR\\s*\\.\\s*['\"]/backups/['\"]#", $dlApiSrc),
-    'api/download_backup.php uses ROOT_DIR . \'/backups/\'',
-    'api/download_backup.php no longer matches the canonical path'
 );
 
 check(
@@ -322,6 +322,74 @@ check(
     '.htaccess also has the defence-in-depth PHP-execution block',
     '.htaccess is missing the PHP-execution defence-in-depth block'
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+section('10. The duplicate, unauthenticated "Backup" tab inside Settings is gone');
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// system_settings.php used to embed a second, entirely separate Backup
+// feature (its own tab, its own 5 API files) alongside the real Backup page.
+// That duplicate had NO auth check at all on create/list/delete (the
+// permission check was commented out), hardcoded a Windows-only mysqldump
+// path that would fail on the Linux production server, and could never
+// download its own .zip output (download only accepted .sql). Removed
+// entirely rather than fixed, since the real Backup page already covers
+// everything it did.
+
+$settingsFile = $root . '/app/constant/settings/system_settings.php';
+check(is_file($settingsFile), 'system_settings.php exists', 'system_settings.php is missing');
+$settingsSrc = is_file($settingsFile) ? file_get_contents($settingsFile) : '';
+
+foreach ([
+    'id="backup-tab"'        => 'the Backup tab nav button',
+    'id="backup"'            => 'the Backup tab-pane content',
+    "id=\"createBackup\""    => 'the Create Backup button/handler',
+    'saveBackupSettings'     => 'the Save Backup Settings handler',
+    'loadBackupList'         => 'the backup-list loader',
+    'backup_frequency'       => 'the backup frequency scheduler field',
+    'backup_retention'       => 'the backup retention scheduler field',
+] as $needle => $label) {
+    check(
+        !str_contains($settingsSrc, $needle),
+        "system_settings.php no longer contains $label",
+        "system_settings.php still contains $label — the duplicate Backup tab was not fully removed"
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+section('11. Backup entry point moved into Settings > Admin, not touching the real page');
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Per request: "Backup" moved from being its own standalone item in the top
+// Settings dropdown to living inside Settings > Admin (system_settings.php),
+// at the end of its tab list — but as a PLAIN LINK to the existing,
+// unmodified backup_restore.php page, not a re-implementation. header.php's
+// old standalone dropdown item is removed; backup_restore.php itself must
+// stay byte-for-byte untouched.
+
+check(
+    !preg_match("#<li><a class=\"dropdown-item\" href=\"<\\?= getUrl\\('backup_restore'\\) \\?>\"><i class=\"bi bi-database\"></i> Backup</a></li>#", $hdr),
+    'header.php no longer has a standalone "Backup" item in the Settings dropdown',
+    'header.php still has the old standalone Backup dropdown item — should have moved into Settings > Admin'
+);
+
+check(
+    (bool) preg_match('/href="<\?= getUrl\(\'backup_restore\'\) \?>"/', $settingsSrc),
+    'system_settings.php now links to backup_restore.php from within Settings > Admin',
+    'system_settings.php has no link to backup_restore.php — the Backup entry point is missing entirely'
+);
+
+// The link must be a genuine navigation (no data-bs-toggle="tab"), so it
+// opens the real page rather than trying to render a local tab-pane.
+if (preg_match('/<a class="list-group-item[^"]*"\s+href="<\?= getUrl\(\'backup_restore\'\) \?>">/s', $settingsSrc)) {
+    pass('the Backup link is a plain navigation (no data-bs-toggle="tab") — opens the real page, not a local pane');
+} else {
+    fail('the Backup link is not structured as a plain nav link — check it isn\'t wired as a Bootstrap tab pointing at a (now-deleted) local pane');
+}
+
+// backup_restore.php itself must keep working exactly as before this move —
+// already thoroughly verified by sections 1-9 above (CSRF, permission gate,
+// all 4 actions wired, directory paths); nothing here re-touches that file.
 
 // ─────────────────────────────────────────────────────────────────────────────
 echo "\n\033[1m═════════════════════════════════════════════\033[0m\n";

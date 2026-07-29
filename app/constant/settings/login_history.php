@@ -2,18 +2,15 @@
 /**
  * app/constant/settings/login_history.php
  * User Login History — who logged in, from where, on what device.
- * Admin-only. Data fed by user_sessions table enriched with GeoIP + UA parsing.
+ * Grantable via Roles & Permissions (page_key 'login_history') — admin can
+ * delegate this to other roles; canView() itself always passes for admins.
+ * Data fed by user_sessions table enriched with GeoIP + UA parsing.
  */
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
 require_once __DIR__ . '/../../../core/session_tracker.php';
 
 autoEnforcePermission('login_history');
-
-if (!isAdmin()) {
-    header('Location: ' . getUrl('unauthorized'));
-    exit;
-}
 
 $page_title = 'Login History';
 includeHeader();

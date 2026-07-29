@@ -10,7 +10,7 @@ if (!isAuthenticated()) {
     echo json_encode(['draw' => 1, 'recordsTotal' => 0, 'recordsFiltered' => 0, 'data' => []]);
     exit;
 }
-if (!isAdmin()) {
+if (!canView('login_history')) {
     echo json_encode(['draw' => 1, 'recordsTotal' => 0, 'recordsFiltered' => 0, 'data' => []]);
     exit;
 }
