@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-07-29 (chore) — Dashboard Quick Actions: remove "View Reports"
+
+**Files:** `app/dashboard.php`
+
+Per request: removed the "View Reports" item (and its own divider) from the Dashboard's Quick Actions dropdown — reports should only be reached via the top-nav Reports mega-menu. Analysed first: `hasReportsAccess()` (the gate this item used) is not dead code — it's still actively used in `header.php` (gates the real Reports mega-dropdown), `api/get_performance_data.php`, and 3 other dashboard widgets (invoice/sales stats query, Monthly Revenue card, Performance Overview chart) — none of that was touched, only the 4-line Quick Actions block.
+
 ## 2026-07-29 (chore) — Top nav: swap "Admin" / "Settings" labels
 
 **Files:** `header.php`
