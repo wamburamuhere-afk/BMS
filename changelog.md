@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-07-29 (fix) — Sales Orders list print: column bleeding, header clipping, hidden columns
+
+**Files:** `app/bms/sales/sales_orders.php`, `tests/test_sales_orders_print_layout_cli.php`
+
+Follow-up to the previous Sales Orders print fix (page-1-blank issue, below). Two rounds of further feedback:
+
+**Round 1 — column values bleeding into the next column.** The prior fix used `table-layout: auto` (matching `print-customers.php`), which fixed the bleeding but caused a *new* bug: with 12 richly-styled columns and long unbreakable strings (currency figures, "PARTIALLY DELIVERED" badges), auto layout let the table's intrinsic width exceed the physical page. Landscape had spare width to absorb it; portrait didn't, so the rightmost columns ran off the page, and `word-break: break-word` squeezed some narrow columns to one letter per line. Fixed with `table-layout: fixed` (guarantees the table never exceeds page width) plus explicit, content-proportional percentage widths on every column (summing to 100%, not an equal split — equal split is what caused the original bleeding) — separate sets for `enable_projects` on/off. Also removed the "Prepared By / Management Review / Authorised Signature" print-only footer block per request.
+
+**Round 2 — header text clipped, and remove Items/Payment/Delivery from print.** A general, always-on rule (`#salesOrdersTable thead th { white-space: nowrap }`) forces header labels onto one line; the round-1 fix only reset `white-space` on cell *children*, never the `<th>` itself, so headers (direct text nodes) stayed nowrap and got clipped by the `overflow: hidden` backstop — fixed with a print-only override directly on `thead th`. Also removed Items, Payment, and Delivery from print entirely (both header and DataTables column config now carry `d-print-none`, the same mechanism already used for Actions) — their freed width was redistributed across the remaining 9/8 visible columns, still summing to exactly 100%.
+
+Verified with the existing regression suite, expanded to 27 checks (page-break specificity, proportional non-equal widths summing to 100% in both branches, hidden-column width rules absent, header/cell wrap fixes, footer removal) — all pass, plus `php -l` and div-tag balance clean.
+
 ## 2026-07-29 (chore) — Dashboard Quick Actions: remove "View Reports"
 
 **Files:** `app/dashboard.php`
