@@ -2,6 +2,7 @@
 // API: Add an employee goal (Tier 3, Phase 3.4).
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../core/employee_status.php';
 
 header('Content-Type: application/json');
 
@@ -39,6 +40,9 @@ try {
     $er = $emp->fetch(PDO::FETCH_ASSOC);
     if (!$er) throw new Exception('Employee not found');
     $emp_name = trim($er['first_name'] . ' ' . $er['last_name']);
+
+    // No future goal to track for someone no longer employed.
+    assertEmployeeActive($pdo, $employee_id, 'Employee');
 
     $pdo->prepare("
         INSERT INTO employee_goals (employee_id, goal_type_id, subject, description, start_date, end_date, progress, status, created_by)

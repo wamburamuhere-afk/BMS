@@ -1069,7 +1069,7 @@ function renderStats(data) {
 }
 
 function loadProductsCache() {
-    $.getJSON('<?= getUrl('api/account/get_products.php') ?>', { active_only: true }, function(response) {
+    $.getJSON('<?= getUrl('api/account/get_products.php') ?>', { active_only: true, is_service: 0 }, function(response) {
         if (response.success) {
             productsCache = response.data;
         }

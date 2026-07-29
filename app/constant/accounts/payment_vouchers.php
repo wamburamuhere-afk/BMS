@@ -743,11 +743,14 @@ function viewVoucherDetails(data) {
                 let rows = res.payments.map((p, i) => `
                     <div class="d-flex justify-content-between align-items-start py-2 ${i > 0 ? 'border-top' : ''}">
                         <div>
-                            <div class="fw-bold small">${esc(p.payment_date)}</div>
+                            <div class="fw-bold small">${esc(p.payment_date)} ${p.reversed_at ? '<span class="badge bg-secondary ms-1">Reversed</span>' : ''}</div>
                             <div class="text-muted" style="font-size:.75rem;">${esc((p.payment_method||'').replace(/_/g,' '))} ${p.reference_number ? '· ' + esc(p.reference_number) : ''}</div>
                             <div class="text-muted" style="font-size:.75rem;">${esc(p.bank_code ? p.bank_code + ' — ' : '')}${esc(p.bank_name || '—')}</div>
                         </div>
-                        <strong class="text-primary">${money(p.amount)}</strong>
+                        <div class="text-end">
+                            <strong class="${p.reversed_at ? 'text-muted text-decoration-line-through' : 'text-primary'}">${money(p.amount)}</strong>
+                            ${p.reversed_at ? '' : `<div><button type="button" class="btn btn-sm btn-outline-danger mt-1 py-0 px-2" style="font-size:.68rem;" onclick="reverseVoucherPayment(${p.id}, ${data.id})"><i class="bi bi-arrow-counterclockwise"></i> Reverse</button></div>`}
+                        </div>
                     </div>`).join('');
                 rows += `<div class="d-flex justify-content-between border-top pt-2 mt-1">
                             <strong class="small text-muted">Total Paid</strong>
@@ -764,6 +767,28 @@ function viewVoucherDetails(data) {
 
 function printVoucher(id) {
     window.open(`<?= getUrl('payment_voucher_print') ?>?id=${id}`, '_blank').focus();
+}
+
+// §UI-4 — undo a mistakenly-recorded voucher payment (contra-entry reversal)
+function reverseVoucherPayment(voucherPaymentId, voucherId) {
+    Swal.fire({
+        title: 'Reverse this payment?',
+        text: 'This will undo the ledger entry and bank record for this payment. The voucher balance will be restored. This cannot be undone.',
+        icon: 'warning', showCancelButton: true,
+        confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, reverse it', cancelButtonText: 'Back'
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        $.post('<?= buildUrl('api/account/reverse_voucher_payment.php') ?>',
+            { voucher_payment_id: voucherPaymentId, _csrf: CSRF_TOKEN },
+            function (data) {
+                if (data.success) {
+                    Swal.fire({ icon: 'success', title: 'Reversed!', text: data.message, showConfirmButton: true })
+                        .then(() => { bootstrap.Modal.getInstance(document.getElementById('detailsModal'))?.hide(); loadVouchers(); });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+                }
+            }, 'json');
+    });
 }
 
 function submitVoucherStatus(id, status) {

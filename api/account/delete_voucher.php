@@ -32,7 +32,7 @@ try {
     // posted payment entries (Dr Accrued/Expense / Cr Bank), the bank-register rows,
     // and the moved bank balance — leaving money off-book. Reverse the payment(s)
     // first. (Mirrors the paid-expense delete lock.)
-    $pc = $pdo->prepare("SELECT COUNT(*) FROM voucher_payments WHERE voucher_id = ?");
+    $pc = $pdo->prepare("SELECT COUNT(*) FROM voucher_payments WHERE voucher_id = ? AND reversed_at IS NULL");
     $pc->execute([$id]);
     $paidCount = (int)$pc->fetchColumn();
     if (in_array($status, ['paid', 'partially_paid'], true) || $paidCount > 0) {

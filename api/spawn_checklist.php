@@ -18,10 +18,20 @@ try {
     if (!$template_id) throw new Exception('Template is required');
     if (function_exists('assertScopeForEmployee')) assertScopeForEmployee($employee_id);
 
-    $emp = $pdo->prepare("SELECT first_name, last_name FROM employees WHERE employee_id=? AND (status IS NULL OR status!='deleted')");
+    $emp = $pdo->prepare("SELECT first_name, last_name, status FROM employees WHERE employee_id=? AND (status IS NULL OR status!='deleted')");
     $emp->execute([$employee_id]);
     $er = $emp->fetch(PDO::FETCH_ASSOC);
     if (!$er) throw new Exception('Employee not found');
+
+    // Onboarding only makes sense for someone still employed; offboarding is the
+    // one checklist type that legitimately targets an employee who has already
+    // been deactivated (the employee picker allows both for this reason).
+    $tplType = $pdo->prepare("SELECT template_type FROM checklist_templates WHERE template_id = ? AND status = 'active'");
+    $tplType->execute([$template_id]);
+    $templateType = $tplType->fetchColumn();
+    if ($templateType === 'onboarding' && $er['status'] !== 'active') {
+        throw new Exception('Cannot start an onboarding checklist for an inactive employee.');
+    }
 
     $pdo->beginTransaction();
     $cid = spawnChecklistFromTemplate($pdo, $employee_id, $template_id, (int)$_SESSION['user_id']);

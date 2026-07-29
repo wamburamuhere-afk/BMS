@@ -53,6 +53,31 @@ $selected_department = isset($_GET['department']) ? (int)$_GET['department'] : n
 $selected_status = isset($_GET['status']) ? $_GET['status'] : '';
 $selected_employee = isset($_GET['employee']) ? (int)$_GET['employee'] : null;
 
+// Back-to-project link — same convention as invoice_view.php etc: if the
+// employee being viewed belongs to a project, offer a way back to it,
+// regardless of whether the visitor arrived here from that project or not.
+$back_to_project_id = null;
+$back_to_project_name = null;
+$enable_projects = 0;
+try {
+    $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'enable_projects'");
+    $stmt->execute();
+    $enable_projects = $stmt->fetchColumn() ?: 0;
+} catch (Exception $e) {}
+if ($enable_projects && $selected_employee) {
+    $stmt = $pdo->prepare("
+        SELECT p.project_id, p.project_name
+        FROM employees e
+        JOIN projects p ON p.project_id = e.project_id
+        WHERE e.employee_id = ?
+    ");
+    $stmt->execute([$selected_employee]);
+    if ($proj = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $back_to_project_id = $proj['project_id'];
+        $back_to_project_name = $proj['project_name'];
+    }
+}
+
 // Get departments for filtering
 $departments = $pdo->query("SELECT * FROM departments WHERE status = 'active' ORDER BY department_name")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -355,6 +380,17 @@ if ($employees) {
 ?>
 
 <div class="container-fluid mt-4">
+    <?php if ($back_to_project_id): ?>
+    <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
+        <div>
+            <h5 class="fw-bold mb-0"><i class="bi bi-clock-history me-2"></i>Attendance History</h5>
+            <p class="text-muted small mb-0">Viewing history for this staff member, from project "<?= safe_output($back_to_project_name) ?>"</p>
+        </div>
+        <a href="<?= getUrl('project_view') ?>?id=<?= $back_to_project_id ?>" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-kanban"></i> Back to Project
+        </a>
+    </div>
+    <?php endif; ?>
     <!-- Professional Print Header -->
     <div class="print-header d-none d-print-block text-center mb-4" style="visibility: visible !important;">
         <?php if(!empty($c_logo)): ?>
@@ -1501,12 +1537,23 @@ function updateAttendanceNotes(employeeId, notes) {
     });
 }
 
-// Quick mark attendance with button click (auto-fills times)
+// Quick mark attendance with button click. checkInTime/checkOutTime are only
+// DEFAULTS, used when that field is still empty — a time the user already
+// typed into the row (e.g. a custom 07:30 check-in) is preserved rather than
+// silently overwritten by the button's fixed default. Marking someone Absent
+// still forces both times blank, since presence and absence are exclusive.
 function quickMarkAttendance(employeeId, status, checkInTime, checkOutTime) {
+    if (status !== 'absent') {
+        const $checkIn  = $(`.check-in-time[data-employee-id="${employeeId}"]`);
+        const $checkOut = $(`.check-out-time[data-employee-id="${employeeId}"]`);
+        if ($checkIn.length && $checkIn.val())   checkInTime  = $checkIn.val();
+        if ($checkOut.length && $checkOut.val()) checkOutTime = $checkOut.val();
+    }
+
     // Visual feedback - disable button temporarily
     const buttons = document.querySelectorAll(`button[data-employee-id="${employeeId}"]`);
     buttons.forEach(btn => btn.disabled = true);
-    
+
     $.ajax({
         url: APP_URL + '/api/quick_mark_attendance',
         type: 'POST',
@@ -1553,15 +1600,21 @@ function quickMarkPresent(employeeId) {
         cancelButtonColor: '#6c757d'
     }).then((result) => {
         if (result.isConfirmed) {
+            // Preserve a time already entered for this row; only default to
+            // 09:00-17:00 when the field is still empty.
+            const $checkIn  = $(`.check-in-time[data-employee-id="${employeeId}"]`);
+            const $checkOut = $(`.check-out-time[data-employee-id="${employeeId}"]`);
+            const checkInTime  = ($checkIn.length && $checkIn.val())   ? $checkIn.val()  : '09:00';
+            const checkOutTime = ($checkOut.length && $checkOut.val()) ? $checkOut.val() : '17:00';
             $.ajax({
                 url: APP_URL + '/api/quick_mark_attendance',
                 type: 'POST',
-                data: { 
+                data: {
                     employee_id: employeeId,
                     attendance_date: '<?= $selected_date ?>',
                     status: 'present',
-                    check_in_time: '09:00',
-                    check_out_time: '17:00'
+                    check_in_time: checkInTime,
+                    check_out_time: checkOutTime
                 },
                 dataType: 'json',
                 success: function(response) {
@@ -1659,15 +1712,21 @@ function quickMarkLate(employeeId) {
         cancelButtonColor: '#6c757d'
     }).then((result) => {
         if (result.isConfirmed) {
+            // Preserve a time already entered for this row; only default to
+            // 10:00-18:00 when the field is still empty.
+            const $checkIn  = $(`.check-in-time[data-employee-id="${employeeId}"]`);
+            const $checkOut = $(`.check-out-time[data-employee-id="${employeeId}"]`);
+            const checkInTime  = ($checkIn.length && $checkIn.val())   ? $checkIn.val()  : '10:00';
+            const checkOutTime = ($checkOut.length && $checkOut.val()) ? $checkOut.val() : '18:00';
             $.ajax({
                 url: APP_URL + '/api/quick_mark_attendance',
                 type: 'POST',
-                data: { 
+                data: {
                     employee_id: employeeId,
                     attendance_date: '<?= $selected_date ?>',
                     status: 'late',
-                    check_in_time: '10:00',
-                    check_out_time: '18:00'
+                    check_in_time: checkInTime,
+                    check_out_time: checkOutTime
                 },
                 dataType: 'json',
                 success: function(response) {

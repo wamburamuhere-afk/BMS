@@ -102,6 +102,9 @@ $badge = [
             <?php if ($status === 'approved' && $can_approve): ?>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#payModal"><i class="bi bi-cash-coin me-1"></i> Record Payment</button>
             <?php endif; ?>
+            <?php if ($status === 'paid' && $can_approve): ?>
+                <button class="btn btn-outline-danger" onclick="cnReversePayment()"><i class="bi bi-arrow-counterclockwise me-1"></i> Reverse Payment</button>
+            <?php endif; ?>
             <?php if ($status === 'pending' && $can_edit): ?>
                 <a class="btn btn-outline-primary" href="<?= getUrl('credit_note_edit') ?>?id=<?= $id ?>"><i class="bi bi-pencil me-1"></i> Edit</a>
             <?php endif; ?>
@@ -305,6 +308,16 @@ function cnReview(){
 function cnApprove(){
     Swal.fire({title:'Approve Credit Note?',text:'Captures your e-signature as approver.',icon:'question',showCancelButton:true,confirmButtonColor:'#0d6efd',confirmButtonText:'Yes, approve'})
         .then(r=>{ if(r.isConfirmed) cnPost('<?= buildUrl('api/sales/approve_credit_note.php') ?>','Approved'); });
+}
+function cnReversePayment(){
+    Swal.fire({title:'Reverse this refund?',text:'Posts a reversing ledger entry and returns the note to Approved so it can be re-refunded.',icon:'warning',showCancelButton:true,confirmButtonColor:'#dc3545',confirmButtonText:'Yes, reverse'})
+        .then(r=>{
+            if(!r.isConfirmed) return;
+            $.post('<?= buildUrl('api/sales/reverse_credit_note_payment.php') ?>', { credit_note_id: <?= (int)$id ?>, _csrf: CSRF_TOKEN }, function(res){
+                if(res.success){ Swal.fire({icon:'success',title:'Reversed!',text:res.message}).then(()=>location.reload()); }
+                else { Swal.fire({icon:'error',title:'Error',text:res.message}); }
+            }, 'json').fail(function(){ Swal.fire({icon:'error',title:'Error',text:'Server error.'}); });
+        });
 }
 
 $(document).ready(function(){
