@@ -1026,11 +1026,6 @@ function get_progress_color($percentage) {
                             <?php if(canCreate('suppliers')): ?>
                             <li><a class="dropdown-item" href="<?= getUrl('suppliers') ?>?action=add"><i class="bi bi-truck"></i> Add Supplier</a></li>
                             <?php endif; ?>
-                            
-                            <?php if(hasReportsAccess()): ?>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="reports"><i class="bi bi-graph-up"></i> View Reports</a></li>
-                            <?php endif; ?>
 
                             <?php if (get_setting('enable_projects') == '1' && canView('projects')): ?>
                             <li><hr class="dropdown-divider"></li>
