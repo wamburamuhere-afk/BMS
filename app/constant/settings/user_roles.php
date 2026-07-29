@@ -3,8 +3,13 @@ $page_title = "User Roles & Permissions";
 require_once __DIR__ . '/../../../roots.php';
 require_once 'core/permissions.php';
 
-// Only admins can manage roles
-if (!canView('user_roles')) {
+// Role/permission management is strictly admin-only by design — it is NOT
+// delegable via itself no matter what is granted (the 'user_roles'
+// permission row is hidden from this very UI entirely; see
+// migrations/2026_07_29_lock_sensitive_settings.php). This is the page that
+// defines what every role can do — a non-admin with edit access here could
+// grant their own role admin-equivalent power, a direct escalation path.
+if (!canView('user_roles') || !isAdmin()) {
     header("Location: unauthorized.php");
     exit();
 }

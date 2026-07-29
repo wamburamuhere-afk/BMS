@@ -66,7 +66,16 @@ try {
     $test=src($root,'api/zoom/test_zoom_config.php');
     ok(strpos($test,'isAdmin()')!==false && strpos($test,'zoomGetAccessToken(')!==false, 'test endpoint admin-gated + calls zoomGetAccessToken');
     $page=src($root,'app/constant/settings/zoom_settings.php');
-    ok(strpos($page,'isAdmin()')!==false, 'settings page admin-gated');
+    // The page itself is now delegable via Roles & Permissions (page_key
+    // 'zoom_settings') — the redundant isAdmin() redirect that used to sit
+    // here (silently defeating any such grant) was removed. Saving/testing
+    // the actual credentials remains isAdmin()-only by design (checked
+    // above on save_zoom_settings.php / test_zoom_config.php). Checking for
+    // the functional redirect block specifically, not just the string
+    // "isAdmin()" anywhere (which would false-positive on this file's own
+    // explanatory comment about the split).
+    ok(strpos($page,"autoEnforcePermission('zoom_settings')")!==false, 'settings page gated via the grantable zoom_settings permission');
+    ok(!preg_match('/if\s*\(\s*!\s*isAdmin\(\)\s*\)\s*\{\s*header/', $page), 'settings page no longer redirects non-admins unconditionally');
     ok(strpos($page,'Swal.fire')!==false && strpos($page,'alert(')===false, 'uses SweetAlert2, not alert() (§UI-4)');
 
     section('4. Live save round-trip (rolled back)');

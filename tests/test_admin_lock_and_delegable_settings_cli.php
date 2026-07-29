@@ -1,0 +1,192 @@
+<?php
+/**
+ * Settings menu — 5 pages locked strictly admin-only, the rest genuinely
+ * delegable via Roles & Permissions.
+ *
+ * User-reported/requested: "Settings > Admin" (system_settings.php) and
+ * everything sensitive within reach of it should only ever be usable by a
+ * literal admin — never delegable via user_roles.php, no matter what a
+ * future admin grants. Everything else in the Settings menu should be
+ * genuinely delegable: hidden from a role until that role is granted the
+ * specific permission, then visible and usable.
+ *
+ * Locked (isAdmin() hard check, permission row hidden from user_roles.php
+ * entirely so it can't even be offered as a checkbox):
+ *   - system_settings.php  ("Admin" in the menu)
+ *   - users.php
+ *   - user_roles.php       (editing this IS the escalation vector — a
+ *                           non-admin with edit access here could grant
+ *                           their own role admin-equivalent power)
+ *   - backup_restore.php   (full restore/download risk)
+ *   - payment_settings.php (bank/gateway fraud risk)
+ *
+ * Delegable (canView('page_key') only, no isAdmin() block — admins still
+ * always pass canView(), so nothing is lost for them):
+ *   - user_projects.php, login_history.php, ai_settings.php (view only —
+ *     the save/test API endpoints for the actual secrets stay isAdmin()-only),
+ *     zoom_settings.php (same), company_profile.php, pos_config_settings.php,
+ *     color_settings.php, tax_settings.php, notification_settings.php,
+ *     notification_rules.php
+ *
+ * header.php's Settings dropdown mirrors this exactly: the 5 locked items
+ * show only for isAdmin(); everything else shows via canView('page_key').
+ *
+ * Run: php tests/test_admin_lock_and_delegable_settings_cli.php
+ *   Exit 0 = all pass · Exit 1 = a regression slipped in.
+ */
+error_reporting(E_ALL & ~E_DEPRECATED);
+
+$root   = dirname(__DIR__);
+$isLive = is_file("$root/includes/config.php");
+
+if ($isLive) {
+    require_once "$root/roots.php";
+    require_once "$root/core/project_scope.php";
+}
+
+$failures = 0;
+$passes   = 0;
+
+function pass(string $m): void { global $passes;   $passes++;   echo "  \033[32m✅\033[0m $m\n"; }
+function fail(string $m): void { global $failures; $failures++; echo "  \033[31m❌ $m\033[0m\n"; }
+function section(string $t): void { echo "\n\033[1m── $t ──\033[0m\n"; }
+function check(bool $cond, string $ok, string $ko): void { $cond ? pass($ok) : fail($ko); }
+function readSrc($root, $rel) { $p = "$root/$rel"; return file_exists($p) ? file_get_contents($p) : ''; }
+
+echo "\n\033[1m═══ Settings menu — admin-only lock + genuine delegation ═══\033[0m\n";
+
+$LOCKED = [
+    'app/constant/settings/system_settings.php'  => 'system_settings',
+    'app/constant/settings/users.php'            => 'users',
+    'app/constant/settings/user_roles.php'       => 'user_roles',
+    'app/constant/settings/backup_restore.php'   => 'backup_restore',
+    'app/constant/settings/payment_settings.php' => 'payment_settings',
+];
+$DELEGABLE = [
+    'app/constant/settings/user_projects.php'         => 'user_projects',
+    'app/constant/settings/login_history.php'         => 'login_history',
+    'app/constant/settings/ai_settings.php'            => 'ai_assistant',
+    'app/constant/settings/zoom_settings.php'          => 'zoom_settings',
+    'app/constant/settings/company_profile.php'        => 'company_profile',
+    'app/constant/settings/pos_config_settings.php'    => 'pos_config_settings',
+    'app/constant/settings/color_settings.php'          => 'color_settings',
+    'app/constant/settings/tax_settings.php'            => 'tax_settings',
+    'app/constant/settings/notification_settings.php'  => 'notification_settings',
+    'app/constant/settings/notification_rules.php'      => 'notification_rules',
+];
+
+section('1. php -l — every touched file');
+foreach (array_merge(array_keys($LOCKED), array_keys($DELEGABLE), ['header.php', 'migrations/2026_07_29_lock_sensitive_settings.php']) as $f) {
+    $out = []; $rc = 0;
+    exec('php -l ' . escapeshellarg("$root/$f") . ' 2>&1', $out, $rc);
+    check($rc === 0, "$f — no syntax errors", "$f — php -l failed: " . implode(' ', $out));
+}
+
+section('2. Locked pages have a hard isAdmin() gate');
+foreach ($LOCKED as $file => $key) {
+    $s = readSrc($root, $file);
+    check((bool)preg_match('/if\s*\(\s*!\s*(isAdmin\(\)|canView\([\'"]user_roles[\'"]\)\s*\|\|\s*!\s*isAdmin\(\))\s*\)/', $s),
+        "$file has a hard isAdmin() gate",
+        "$file is missing its hard isAdmin() gate — would become delegable again");
+}
+
+section('3. Delegable pages have NO redundant isAdmin() block (autoEnforcePermission alone gates them)');
+foreach ($DELEGABLE as $file => $key) {
+    $s = readSrc($root, $file);
+    check(str_contains($s, "autoEnforcePermission('$key')"), "$file still calls autoEnforcePermission('$key')", "$file is missing its autoEnforcePermission('$key') call");
+    check(!preg_match('/if\s*\(\s*!\s*isAdmin\(\)\s*\)/', $s), "$file has no redundant isAdmin() block", "$file still hard-blocks non-admins, defeating delegation");
+}
+
+section('4. AI/Zoom credential-writing endpoints remain isAdmin()-only (view is delegable, write is not)');
+foreach ([
+    'api/ai/save_ai_settings.php'   => 'AI API key save',
+    'api/ai/test_ai_config.php'     => 'AI connection test',
+    'api/zoom/save_zoom_settings.php' => 'Zoom secret save',
+    'api/zoom/test_zoom_config.php' => 'Zoom connection test',
+] as $file => $label) {
+    $s = readSrc($root, $file);
+    check(str_contains($s, 'isAdmin()'), "$label ($file) is still isAdmin()-gated", "$label ($file) lost its isAdmin() gate — credential writes should stay admin-only");
+}
+
+section('5. header.php mirrors the same split');
+$hdr = readSrc($root, 'header.php');
+foreach (['users', 'user_roles', 'system_settings', 'payment_settings'] as $key) {
+    $pos = strpos($hdr, "getUrl('$key')");
+    check($pos !== false, "header.php still links to $key", "header.php is missing its link to $key");
+}
+// Each of the 4 locked LINKS (not backup_restore — that link now lives
+// inside system_settings.php itself) must fall inside SOME isAdmin-only
+// nav-toggle block (there are 3 separate such blocks: users+user_roles
+// together, Admin alone, Payments alone), not just gated by a bare
+// canView() somewhere.
+preg_match_all('/if \(isAdmin\(\)\):\s*' . preg_quote('?>', '/') . '(.*?)' . preg_quote('<?php', '/') . ' endif; ' . preg_quote('?>', '/') . '/s', $hdr, $adminBlocks);
+$adminBlockText = implode("\n", $adminBlocks[1] ?? []);
+foreach (['users', 'user_roles', 'system_settings', 'payment_settings'] as $key) {
+    check(
+        str_contains($adminBlockText, "getUrl('$key')"),
+        "header.php's $key link falls inside an isAdmin()-only block",
+        "header.php's $key link is not gated by isAdmin() — could show to a delegated non-admin"
+    );
+}
+foreach ($DELEGABLE as $file => $key) {
+    check(str_contains($hdr, "canView('$key')"), "header.php gates $key via canView()", "header.php is missing a canView('$key') gate for its menu item");
+}
+
+section('6. The 5 locked permissions are hidden from the Roles & Permissions management UI');
+$rolesSrc = readSrc($root, 'app/constant/settings/user_roles.php');
+check(str_contains($rolesSrc, 'COALESCE(is_hidden, 0) = 0'), 'user_roles.php filters out is_hidden=1 permissions from its management list', 'user_roles.php no longer filters by is_hidden — hidden permissions would leak back into the UI');
+
+if (!$isLive) {
+    echo "\n  \033[33m⊘\033[0m  Skipping live section (no includes/config.php — not a live install)\n";
+} else {
+    section('7. Live — the 5 permission rows are actually hidden in the DB');
+    global $pdo;
+    try {
+        foreach (array_values($LOCKED) as $key) {
+            $hidden = (int)$pdo->query("SELECT COALESCE(is_hidden,0) FROM permissions WHERE page_key = " . $pdo->quote($key))->fetchColumn();
+            check($hidden === 1, "permission '$key' has is_hidden=1", "permission '$key' is NOT hidden (is_hidden=$hidden) — run migrations/2026_07_29_lock_sensitive_settings.php");
+        }
+
+        section('8. Live — canView() proves the split: locked pages deny a granted-but-non-admin user; delegable pages allow one');
+        // Simulate a non-admin explicitly granted EVERY one of these 15 page_keys
+        // (the most generous possible grant) and confirm the 5 locked ones are
+        // still denied by the isAdmin()-based menu/page logic, while every
+        // delegable one is allowed.
+        $_SESSION['user_id']  = 999051;
+        $_SESSION['role_id']  = 999051; // never role_id 1
+        $_SESSION['is_admin'] = false;
+        $allKeys = array_merge(array_values($LOCKED), array_values($DELEGABLE));
+        $_SESSION['permissions'] = [];
+        foreach ($allKeys as $k) {
+            $_SESSION['permissions'][$k] = ['view' => true, 'create' => true, 'edit' => true, 'delete' => true, 'review' => true, 'approve' => true];
+        }
+
+        foreach ($LOCKED as $file => $key) {
+            // The page's own gate additionally requires isAdmin() — canView()
+            // alone (even fully granted) must not be sufficient.
+            check(canView($key) === true && isAdmin() === false,
+                "'$key' — canView() passes (fully granted) but isAdmin() correctly still false for this non-admin",
+                "'$key' — sanity check failed: isAdmin() unexpectedly true for a non-admin session");
+        }
+        check(!isAdmin(), 'confirmed: this simulated session is NOT an admin (the locked pages\' isAdmin() gate would correctly reject it)', 'session unexpectedly resolved as admin — test setup invalid');
+
+        foreach ($DELEGABLE as $file => $key) {
+            check(canView($key) === true, "'$key' — a non-admin granted this permission passes canView() (delegation works)", "'$key' — STILL BROKEN: granted permission does not pass canView()");
+        }
+
+        // And the reverse: with NOTHING granted, every one of these must deny.
+        $_SESSION['permissions'] = [];
+        foreach ($allKeys as $k) {
+            check(canView($k) === false, "'$k' — with nothing granted, canView() correctly denies", "'$k' — LEAK: canView() passed with zero permissions granted");
+        }
+
+        unset($_SESSION['user_id'], $_SESSION['role_id'], $_SESSION['is_admin'], $_SESSION['permissions']);
+        pass('test session state cleaned up');
+    } catch (Throwable $e) {
+        fail('Live section threw: ' . $e->getMessage());
+    }
+}
+
+echo "\nPasses:   \033[32m$passes\033[0m\n";
+echo "Failures: " . ($failures > 0 ? "\033[31m$failures\033[0m" : "\033[32m0\033[0m") . "\n";
+exit($failures > 0 ? 1 : 0);

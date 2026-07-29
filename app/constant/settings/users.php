@@ -10,6 +10,17 @@ autoEnforcePermission('users');
 
 require_once HEADER_FILE;
 
+// User management (account creation + role assignment) is strictly
+// admin-only by design — it is NOT delegable via Roles & Permissions no
+// matter what is granted (the 'users' permission row is hidden from that
+// UI entirely; see migrations/2026_07_29_lock_sensitive_settings.php).
+// Granting this to a non-admin would let them create an account and hand
+// it any role, including admin — a direct privilege-escalation path.
+if (!isAdmin()) {
+    header('Location: ' . getUrl('unauthorized'));
+    exit;
+}
+
 
 
 

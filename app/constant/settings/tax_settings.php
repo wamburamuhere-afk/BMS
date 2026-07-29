@@ -10,12 +10,6 @@ autoEnforcePermission('tax_settings');
 
 require_once __DIR__ . '/../../../header.php';
 
-// Check admin permissions
-if (!isAdmin()) {
-    header("Location: unauthorized.php");
-    exit();
-}
-
 $success_msg = '';
 $error_msg = '';
 

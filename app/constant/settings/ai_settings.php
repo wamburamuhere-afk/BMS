@@ -1,9 +1,13 @@
 <?php
 /**
  * app/constant/settings/ai_settings.php
- * Admin configuration for the AI Assistant (plan: ai_assistant.md, Phase 1).
- * Admin-only. The API key is stored ENCRYPTED — this page never shows it back,
- * only whether one is set, with a "Replace key" action.
+ * Configuration for the AI Assistant (plan: ai_assistant.md, Phase 1).
+ * Grantable via Roles & Permissions (page_key 'ai_assistant') — admin can
+ * delegate VIEWING this page to other roles; canView() itself always passes
+ * for admins. Actually saving/testing the API key remains isAdmin()-only,
+ * enforced separately in api/ai/save_ai_settings.php and test_ai_config.php.
+ * The key is stored ENCRYPTED — this page never shows it back, only whether
+ * one is set, with a "Replace key" action.
  */
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
@@ -11,7 +15,6 @@ require_once __DIR__ . '/../../../core/permissions.php';
 require_once __DIR__ . '/../../../core/ai_service.php';
 
 autoEnforcePermission('ai_assistant');
-if (!isAdmin()) { header('Location: ' . getUrl('unauthorized')); exit; }
 
 logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Viewed AI Settings');
 require_once __DIR__ . '/../../../header.php';
