@@ -1109,18 +1109,18 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         </li>
                         <?php endif; ?>
                         
-                        <!-- Settings — each item gated individually. Users, Roles & Permissions,
-                             the Admin page (system_settings.php), Backup, and Payments are
-                             STRICTLY admin-only (isAdmin()) and are never delegable, no matter
-                             what is granted via Roles & Permissions — their permission rows are
-                             hidden from that UI entirely (see
-                             migrations/2026_07_29_lock_sensitive_settings.php). Everything else
-                             is gated by canView('page_key'), which admins always pass too, so a
-                             non-admin granted that specific permission sees and can reach it. -->
+                        <!-- Settings — each item gated individually. Everything strictly
+                             admin-only (Users, Roles & Permissions, Payments, Backup) now
+                             lives ONLY inside the "Admin" page (system_settings.php) itself —
+                             not as separate top-nav items — so a non-admin never even sees
+                             them as menu entries; the Admin link below is the single entry
+                             point, itself isAdmin()-gated. Everything else here is gated by
+                             canView('page_key'), which admins always pass too, so a non-admin
+                             granted that specific permission sees and can reach it. -->
                         <?php
-                        $_set_um_visible  = isAdmin() || canView('user_projects') || canView('login_history');
+                        $_set_um_visible  = canView('user_projects') || canView('login_history');
                         $_set_sys_visible = isAdmin() || canView('ai_assistant') || canView('zoom_settings') || canView('company_profile') || canView('pos_config_settings') || canView('color_settings');
-                        $_set_biz_visible = canView('tax_settings') || isAdmin() || canView('notification_settings') || canView('notification_rules');
+                        $_set_biz_visible = canView('tax_settings') || canView('notification_settings') || canView('notification_rules');
                         ?>
                         <?php if ($_set_um_visible || $_set_sys_visible || $_set_biz_visible): ?>
                         <li class="nav-item dropdown">
@@ -1130,10 +1130,6 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                             <ul class="dropdown-menu" aria-labelledby="adminDropdown">
                                 <?php if ($_set_um_visible): ?>
                                 <li><h6 class="dropdown-header">User Management</h6></li>
-                                <?php if (isAdmin()): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('users') ?>"><i class="bi bi-people"></i> Users</a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('user_roles') ?>"><i class="bi bi-shield-check"></i> Roles & Permissions</a></li>
-                                <?php endif; ?>
                                 <?php if (canView('user_projects')): ?><li><a class="dropdown-item" href="<?= getUrl('user_projects') ?>"><i class="bi bi-diagram-3"></i> Project Assignments</a></li><?php endif; ?>
                                 <?php if (canView('login_history')): ?><li><a class="dropdown-item" href="<?= getUrl('login_history') ?>"><i class="bi bi-clock-history"></i> Login History</a></li><?php endif; ?>
                                 <?php endif; ?>
@@ -1151,9 +1147,6 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if ($_set_biz_visible): ?>
                                 <li><h6 class="dropdown-header">Business Settings</h6></li>
                                 <?php if (canView('tax_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('tax_settings') ?>"><i class="bi bi-percent"></i> Tax</a></li><?php endif; ?>
-                                <?php if (isAdmin()): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('payment_settings') ?>"><i class="bi bi-credit-card"></i> Payments</a></li>
-                                <?php endif; ?>
                                 <?php if (canView('notification_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('notification_settings') ?>"><i class="bi bi-bell"></i> Notifications</a></li><?php endif; ?>
                                 <?php if (canView('notification_rules')): ?><li><a class="dropdown-item" href="<?= getUrl('notification_rules') ?>"><i class="bi bi-bell-fill"></i> Notification Rules</a></li><?php endif; ?>
                                 <?php endif; ?>
