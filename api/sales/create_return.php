@@ -35,6 +35,12 @@ if ($order_id <= 0 || empty($items)) {
     exit;
 }
 
+// Scope gate — the order picker (api/sales/search_orders.php) already only
+// lists in-scope orders, but a hand-crafted request could still name one
+// outside the caller's scope.
+require_once __DIR__ . '/../../core/project_scope.php';
+assertScopeForRecord('sales_orders', 'sales_order_id', $order_id);
+
 try {
     $pdo->beginTransaction();
 
