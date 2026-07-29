@@ -1,5 +1,5 @@
 <?php
-// scope-audit: skip — sales returns paged list; scoped via sales_orders which is already gated at SO level; deferred to Phase G-2
+// scope-audit: skip — filters via scopeFilterSqlNullable('warehouse', 'w') below (see $scope_join/$scope_filter)
 // File: api/sales/get_returns_paged.php
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
@@ -22,6 +22,19 @@ $date_from = isset($_GET['date_from']) ? $_GET['date_from'] : '';
 $date_to = isset($_GET['date_to']) ? $_GET['date_to'] : '';
 
 $offset = ($page - 1) * $limit;
+
+// Phase 6 (pos_upgrade_plan.md) parity with sales_return_view.php: a sales
+// return carries no project/warehouse_id of its own, so its warehouse is
+// resolved through the source invoice (or, if not yet invoiced, the sales
+// order) — the same COALESCE used in sales_return_view.php's single-record
+// gate. Joined here so the list, stats and count all agree with what a
+// non-admin is actually allowed to open.
+$scope_join = "
+    LEFT JOIN sales_orders so_scope ON sr.sales_order_id = so_scope.sales_order_id
+    LEFT JOIN invoices inv_scope ON sr.invoice_id = inv_scope.invoice_id
+    LEFT JOIN warehouses w_scope ON w_scope.warehouse_id = COALESCE(inv_scope.warehouse_id, so_scope.warehouse_id)
+";
+$scope_filter = scopeFilterSqlNullable('warehouse', 'w_scope');
 
 // Base Query
 $where_clauses = ["1=1"];
@@ -47,7 +60,7 @@ if (!empty($date_to)) {
     $params[] = $date_to;
 }
 
-$where_sql = implode(' AND ', $where_clauses);
+$where_sql = implode(' AND ', $where_clauses) . $scope_filter;
 
 // Stats — same filters minus the status filter so cards always show the full breakdown
 $stats_where  = ["1=1"];
@@ -55,7 +68,7 @@ $stats_params = [];
 if ($customer_id > 0)   { $stats_where[] = "sr.customer_id = ?";  $stats_params[] = $customer_id; }
 if (!empty($date_from)) { $stats_where[] = "sr.return_date >= ?"; $stats_params[] = $date_from; }
 if (!empty($date_to))   { $stats_where[] = "sr.return_date <= ?"; $stats_params[] = $date_to; }
-$stats_where_sql = implode(' AND ', $stats_where);
+$stats_where_sql = implode(' AND ', $stats_where) . $scope_filter;
 $stats_data = ['total' => 0, 'pending' => 0, 'approved' => 0, 'rejected' => 0, 'refunded' => 0, 'refunded_amount' => 0];
 try {
     $statsStmt = $pdo->prepare("
@@ -67,6 +80,7 @@ try {
             SUM(sr.status = 'refunded') AS refunded,
             SUM(CASE WHEN sr.status = 'refunded' THEN sr.total_amount ELSE 0 END) AS refunded_amount
         FROM sales_returns sr
+        $scope_join
         WHERE $stats_where_sql
     ");
     $statsStmt->execute($stats_params);
@@ -74,7 +88,7 @@ try {
 } catch (Exception $e) { /* non-fatal */ }
 
 // Count Query
-$count_query = "SELECT COUNT(*) FROM sales_returns sr WHERE $where_sql";
+$count_query = "SELECT COUNT(*) FROM sales_returns sr $scope_join WHERE $where_sql";
 $stmt = $pdo->prepare($count_query);
 $stmt->execute($params);
 $total_records = $stmt->fetchColumn();
@@ -98,6 +112,7 @@ $query = "
     LEFT JOIN customers c ON sr.customer_id = c.customer_id
     LEFT JOIN sales_orders so ON sr.sales_order_id = so.sales_order_id
     LEFT JOIN users u ON sr.created_by = u.user_id
+    $scope_join
     WHERE $where_sql
     ORDER BY sr.return_date DESC, sr.created_at DESC
     LIMIT $limit OFFSET $offset

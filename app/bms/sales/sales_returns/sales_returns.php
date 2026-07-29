@@ -36,8 +36,12 @@ if (isset($table_exists) && $table_exists === false) {
     // Table missing, show empty
 } else {
     // Build query for returns
+    // Phase 6 (pos_upgrade_plan.md) parity with sales_return_view.php / the
+    // AJAX-backed api/sales/get_returns_paged.php: a sales return carries no
+    // warehouse_id of its own, so its warehouse is resolved through the
+    // source invoice (or, if not yet invoiced, the sales order).
     $query = "
-        SELECT 
+        SELECT
             sr.sales_return_id as return_id,
             sr.return_number,
             sr.sales_order_id,
@@ -53,10 +57,13 @@ if (isset($table_exists) && $table_exists === false) {
         FROM sales_returns sr
         LEFT JOIN customers c ON sr.customer_id = c.customer_id
         LEFT JOIN sales_orders so ON sr.sales_order_id = so.sales_order_id
+        LEFT JOIN invoices inv_scope ON sr.invoice_id = inv_scope.invoice_id
+        LEFT JOIN warehouses w_scope ON w_scope.warehouse_id = COALESCE(inv_scope.warehouse_id, so.warehouse_id)
         LEFT JOIN users u ON sr.created_by = u.user_id
         WHERE 1=1
     ";
     $query .= scopeFilterSqlNullable('project', 'so');
+    $query .= scopeFilterSqlNullable('warehouse', 'w_scope');
 
     $params = [];
 
