@@ -1113,7 +1113,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php if (isset($role_id) && ($role_id == 1 || strtolower($user_role) == 'admin')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-sliders"></i> Admin
+                                <i class="bi bi-sliders"></i> Settings
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="adminDropdown">
                                 <li><h6 class="dropdown-header">User Management</h6></li>
@@ -1122,7 +1122,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('user_projects') ?>"><i class="bi bi-diagram-3"></i> Project Assignments</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('login_history') ?>"><i class="bi bi-clock-history"></i> Login History</a></li>
                                 <li><h6 class="dropdown-header">System Configuration</h6></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i> Settings</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i> Admin</a></li>
                                 <?php if (isAdmin()): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('ai_settings') ?>"><i class="bi bi-stars"></i> AI Assistant</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('zoom_settings') ?>"><i class="bi bi-camera-video"></i> Zoom Integration</a></li>

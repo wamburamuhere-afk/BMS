@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-07-29 (chore) — Top nav: swap "Admin" / "Settings" labels
+
+**Files:** `header.php`
+
+Per request: the top-level nav dropdown (all 13 User Management/System Configuration/Business Settings items) is now labeled "Settings" instead of "Admin". The item inside it that used to be labeled "Settings" (links to `system_settings.php`) is now labeled "Admin". Pure label swap — no links, icons, permission gates, or menu structure changed. First step toward a planned split of the 13 items into a hardcoded admin-only tier (Users, Roles & Permissions, Backup, the renamed Admin/system_settings item) and a delegable-via-permission tier for the rest — that split is scoped but not yet implemented.
+
 ## 2026-07-29 (fix) — Sales Orders list print: content pushed to page 2, misaligned columns, footer risk
 
 **Files:** `app/bms/sales/sales_orders.php`, `tests/test_sales_orders_print_layout_cli.php`
