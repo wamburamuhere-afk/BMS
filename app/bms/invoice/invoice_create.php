@@ -187,6 +187,20 @@ if ($order && !empty($order['warehouse_id'])) {
     $prefill_warehouse_id = (int)$delivery['warehouse_id'];
 }
 
+// The source document's warehouse can fall outside this user's explicit
+// warehouse grant (Phase 6 scope) even though its project is in scope —
+// warehousesForSelect() would then omit it, no <option> ends up "selected",
+// and the browser silently falls back to the blank placeholder: the invoice
+// saves with no warehouse at all even though one was already committed to.
+// Make sure the source warehouse is always offered/selected here.
+if ($prefill_warehouse_id > 0 && !in_array($prefill_warehouse_id, array_column($warehouses, 'warehouse_id'))) {
+    $stmt = $pdo->prepare("SELECT warehouse_id, warehouse_name, location, IFNULL(project_id, 0) AS project_id FROM warehouses WHERE warehouse_id = ?");
+    $stmt->execute([$prefill_warehouse_id]);
+    if ($sourceWarehouse = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $warehouses[] = $sourceWarehouse;
+    }
+}
+
 // Get projects if enabled
 $enable_projects = 0;
 try {

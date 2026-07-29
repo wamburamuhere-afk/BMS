@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-07-28 (fix) — Sales Return warehouse-scope leak + Invoice warehouse/edit-button gaps
+
+**Files:** `api/sales/get_returns_paged.php`, `app/bms/sales/sales_returns/sales_returns.php`, `app/bms/sales/sales_returns/sales_return_view.php`, `app/bms/invoice/invoice_view.php`, `app/bms/invoice/invoice_create.php`, `tests/test_sales_return_invoice_scope_fixes_cli.php`
+
+Four related fixes, user-reported:
+
+1. **Sales Returns list had no warehouse-scope filter at all.** `api/sales/get_returns_paged.php` (the real AJAX data source behind the list) claimed via a stale comment to be "gated at SO level" but had no scope filter whatsoever — a non-admin could see every sales return, including ones drawn from a warehouse outside their assignment. Added a `scopeFilterSqlNullable('warehouse', 'w_scope')` filter (joined through the source invoice/sales order → warehouse, mirroring `sales_return_view.php`'s own per-record gate) to the data, stats, and count queries. Mirrored the same fix into `sales_returns.php`'s initial (pre-AJAX) query for consistency.
+2. **`sales_return_view.php` threw a "headers already sent" PHP warning** ahead of its own access-denied message, because `http_response_code(403)` was called after `includeHeader()` had already flushed output. Guarded the call with `if (!headers_sent())`, matching the pattern already used elsewhere (e.g. `warehouse_view.php`).
+3. **Invoice "Edit" button stayed visible after a payment was recorded.** `invoice_view.php`'s `$inv_can_edit_now` only checked approval status/admin role, never whether the invoice already had payments against it. Added `&& floatval($invoice['paid_amount']) <= 0` — editing is now blocked (even for admins) the moment any payment, partial or full, is recorded, since the payment/ledger history already references the invoice's current totals.
+4. **A newly created invoice could silently save with no warehouse.** `invoice_create.php` prefills the warehouse from a linked Sales Order/Delivery Note, but only ever offered options from `warehousesForSelect()` — scoped to the creator's explicit warehouse grant. If the source document's warehouse fell outside that grant, no `<option>` ended up `selected`, the browser silently defaulted to the blank placeholder, and the invoice saved with `warehouse_id = NULL` even though one had already been committed upstream. Fixed by force-including the source warehouse as an option (and therefore selected) whenever it's missing from the scoped list.
+
+Verified with a new regression suite (`tests/test_sales_return_invoice_scope_fixes_cli.php`, 25 checks) that reproduces each bug live against the DB pre-fix, confirms the fix, and cleans up after itself. Re-ran every existing related suite (`test_sales_return_order_scope_cli.php`, `test_invoice_create_scope_cli.php`, `test_lpo_invoice_warehouse_cli.php`, `test_warehouse_scope_cli.php`, `test_warehouse_project_filter_cli.php`) — all pass, no regressions.
+
 ## 2026-07-28 (fix) — Quotations list print: duplicate/mismatched table header (DataTables scrollX clone)
 
 **Files:** `app/bms/sales/quotations/quotations.php`

@@ -68,8 +68,11 @@ if (!empty($invoice['warehouse_id']) && !userCan('warehouse', (int)$invoice['war
     die('Access denied: this warehouse is not in your assigned scope.');
 }
 
-// Edit/Delete gating per three_approval.md: once approved, only admin can edit
-$inv_can_edit_now   = canEdit('invoices')   && canEditDocument($invoice['status'], $inv_is_admin);
+// Edit/Delete gating per three_approval.md: once approved, only admin can edit.
+// A partially or fully paid invoice is never editable (even for admins) — the
+// recorded payments already reference these totals/line items, so changing
+// them would desync the invoice from its payment/ledger history.
+$inv_can_edit_now   = canEdit('invoices')   && canEditDocument($invoice['status'], $inv_is_admin) && floatval($invoice['paid_amount']) <= 0;
 $inv_can_delete_now = canDelete('invoices') && ($invoice['status'] === 'pending' || $inv_is_admin);
 
 // Audit-panel data
