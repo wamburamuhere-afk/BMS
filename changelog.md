@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-07-29 (fix) — Sales Orders list print: content pushed to page 2, misaligned columns, footer risk
+
+**Files:** `app/bms/sales/sales_orders.php`, `tests/test_sales_orders_print_layout_cli.php`
+
+User-reported: printing the Sales Orders list left the first page almost entirely blank, with the whole table pushed to page 2. Same root cause already fixed on Quotations/Delivery Notes/Warehouse Inventory/Supplier print: the global `responsive.css` rule `p, .card, section { page-break-inside: avoid }` treats the Sales Orders Table Card as one unsplittable block — since it's many times taller than a printed page, the whole card gets deferred to the next page instead of flowing from page 1. Also asked to match `print-customers.php`'s column alignment and keep the shared fixed-position footer from overlapping the last row.
+
+Fix:
+1. Added `id="salesOrdersTableCard"` to the table's wrapping card and overrode `page-break-inside`/`break-inside` back to `auto` for just that id — beats the class-level rule, table now starts filling page 1 immediately.
+2. DataTables was setting fixed pixel column widths (`40px`/`110px`/`100px`) sized for the wide on-screen container — added `table.dataTable { table-layout: fixed }` plus `#salesOrdersTable th/td { width: auto }` so columns distribute evenly across the real print width in both orientations, matching `print-customers.php`.
+3. Added `@page { margin: 10mm 8mm 16mm 8mm }` — the same asymmetric bottom clearance already proven correct on Customer/Supplier/Sub-Contractor/Delivery-Notes/Quotations print — keeps the last row clear of the shared fixed-position footer.
+
+Verified with a new regression suite (`tests/test_sales_orders_print_layout_cli.php`, 11 checks): `php -l`, the id wraps the correct element with no duplicates, the page-break override has the specificity to beat the global rule, the column-width strip and `@page` margin are exactly in place, and a live sanity call to the table's AJAX data source (`api/account/get_sales_orders.php`) confirming the CSS-only change didn't disturb the page pipeline.
+
 ## 2026-07-28 (fix) — Sales Return warehouse-scope leak + Invoice warehouse/edit-button gaps
 
 **Files:** `api/sales/get_returns_paged.php`, `app/bms/sales/sales_returns/sales_returns.php`, `app/bms/sales/sales_returns/sales_return_view.php`, `app/bms/invoice/invoice_view.php`, `app/bms/invoice/invoice_create.php`, `tests/test_sales_return_invoice_scope_fixes_cli.php`
