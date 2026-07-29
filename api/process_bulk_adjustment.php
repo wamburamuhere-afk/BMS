@@ -6,6 +6,7 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/stock_posting.php';
 require_once __DIR__ . '/../core/warehouse_scope.php';
 
 // Suppress errors to ensure only clean JSON is returned
@@ -141,6 +142,13 @@ try {
                 $reference_number, $warehouse_id, $current_stock, $new_stock,
                 $reason, $notes, $user_id
             ]);
+            $movement_id = (int)$pdo->lastInsertId();
+
+            // GL posting — same call already proven correct in
+            // api/create_stock_adjustment.php; this path was silently
+            // skipping it entirely (post_principle.md audit).
+            postStockAdjustmentGl($pdo, $movement_id, $adj_quantity, $movement_type,
+                (float)$unit_cost, null, $user_id, date('Y-m-d'), $reference_number);
 
             // Update product_stocks
             $stmt = $pdo->prepare("
