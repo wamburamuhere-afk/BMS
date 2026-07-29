@@ -285,12 +285,83 @@ foreach ($orders as $order) {
     /* Root cause of "columns not fully aligned / cut off": DataTables sets
        explicit inline pixel widths on th/td (width: '40px'/'110px'/'100px'
        in the columns config below), sized for the wide on-screen container.
-       Those don't shrink for a narrower printed page. Stripping them lets
-       table-layout:fixed distribute the actually-visible columns evenly
-       across the real print width, matching print-customers.php's aligned
-       columns in both orientations. */
-    table.dataTable { table-layout: fixed !important; }
+       Those don't shrink for a narrower printed page. Stripped here first,
+       then given real proportional widths below. */
     #salesOrdersTable th, #salesOrdersTable td { width: auto !important; font-size: 8pt !important; padding: 5px !important; }
+
+    /* table-layout: auto (the browser default, and what print-customers.php's
+       plain table relies on) was tried first and reverted: with 12
+       richly-styled columns and long unbreakable strings (e.g. currency
+       figures, "PARTIALLY DELIVERED" status badges), auto layout let the
+       table's own intrinsic content width exceed the physical page width.
+       Landscape had enough spare width to absorb that; portrait didn't, so
+       the rightmost columns ran off the page edge. table-layout: fixed
+       guarantees the table can never exceed the page's printable width in
+       either orientation -- but with no explicit per-column widths it just
+       splits that width evenly, which is what caused values to bleed into
+       the next column. Explicit, content-proportional percentage widths on
+       every column (summing to 100%) fix both problems together: the table
+       is always exactly page-width, and each column gets enough room for
+       its actual content to wrap onto 2-3 lines instead of being squeezed
+       down to one letter per line. */
+    table.dataTable { table-layout: fixed !important; }
+    /* Items, Payment and Delivery are dropped from print entirely (their
+       th/td already carry .d-print-none) -- one less thing to squeeze onto
+       the page, and their share of the page width is redistributed below
+       to the columns that remain, rather than left as unused blank space
+       (their nth-child position gets no width rule at all: a display:none
+       cell consumes zero layout width, so it needs none). */
+    <?php if ($enable_projects): ?>
+    /* 9 visible columns with Project enabled (Items/Payment/Delivery/Actions
+       are d-print-none; their nth-child positions 8, 10, 11, 13 are skipped) */
+    #salesOrdersTable th:nth-child(1), #salesOrdersTable td:nth-child(1)  { width: 4%  !important; } /* S/NO */
+    #salesOrdersTable th:nth-child(2), #salesOrdersTable td:nth-child(2)  { width: 12% !important; } /* Order # */
+    #salesOrdersTable th:nth-child(3), #salesOrdersTable td:nth-child(3)  { width: 11% !important; } /* Date */
+    #salesOrdersTable th:nth-child(4), #salesOrdersTable td:nth-child(4)  { width: 18% !important; } /* Customer */
+    #salesOrdersTable th:nth-child(5), #salesOrdersTable td:nth-child(5)  { width: 10% !important; } /* Project */
+    #salesOrdersTable th:nth-child(6), #salesOrdersTable td:nth-child(6)  { width: 10% !important; } /* Warehouse */
+    #salesOrdersTable th:nth-child(7), #salesOrdersTable td:nth-child(7)  { width: 8%  !important; } /* Type */
+    #salesOrdersTable th:nth-child(9), #salesOrdersTable td:nth-child(9)  { width: 14% !important; } /* Total Amount */
+    #salesOrdersTable th:nth-child(12), #salesOrdersTable td:nth-child(12) { width: 13% !important; } /* Status */
+    <?php else: ?>
+    /* 8 visible columns with Project disabled (Items/Payment/Delivery/Actions
+       are d-print-none; their nth-child positions 7, 9, 10, 12 are skipped) */
+    #salesOrdersTable th:nth-child(1), #salesOrdersTable td:nth-child(1)  { width: 4%  !important; } /* S/NO */
+    #salesOrdersTable th:nth-child(2), #salesOrdersTable td:nth-child(2)  { width: 13% !important; } /* Order # */
+    #salesOrdersTable th:nth-child(3), #salesOrdersTable td:nth-child(3)  { width: 12% !important; } /* Date */
+    #salesOrdersTable th:nth-child(4), #salesOrdersTable td:nth-child(4)  { width: 21% !important; } /* Customer */
+    #salesOrdersTable th:nth-child(5), #salesOrdersTable td:nth-child(5)  { width: 11% !important; } /* Warehouse */
+    #salesOrdersTable th:nth-child(6), #salesOrdersTable td:nth-child(6)  { width: 9%  !important; } /* Type */
+    #salesOrdersTable th:nth-child(8), #salesOrdersTable td:nth-child(8)  { width: 16% !important; } /* Total Amount */
+    #salesOrdersTable th:nth-child(11), #salesOrdersTable td:nth-child(11) { width: 14% !important; } /* Status */
+    <?php endif; ?>
+
+    /* Root cause of "header text truncated" (e.g. WAREHOUSE -> WAREHO,
+       TOTAL AMOUNT -> TOTAL AMO): a general, always-on rule further down
+       this stylesheet (#salesOrdersTable thead th) forces header labels to
+       a single line with white-space: nowrap. Combined with the
+       overflow: hidden backstop below, any header wider than its column
+       just got clipped instead of wrapping. Overridden for print only. */
+    #salesOrdersTable thead th { white-space: normal !important; }
+
+    /* Root cause of "column values bleeding into the next column": several
+       cells render rich, JS-built HTML with on-screen sizing baked in as
+       inline styles -- e.g. the customer name's `max-width:150px`, and
+       Bootstrap's .text-truncate forcing `white-space: nowrap` -- so that
+       content kept trying to render at its on-screen width/single line
+       even once the column above got a narrower printed width. Reset every
+       inline max-width to 100% of its own column and force wrapping instead
+       of nowrap truncation, with overflow/word-break as a hard backstop so
+       nothing can ever escape its own cell. */
+    #salesOrdersTable td, #salesOrdersTable th {
+        overflow: hidden !important;
+        word-wrap: break-word !important;
+        word-break: normal !important;
+    }
+    #salesOrdersTable td *, #salesOrdersTable th * {
+        max-width: 100% !important;
+        white-space: normal !important;
+    }
 }
 
 #salesOrdersTable {
@@ -612,10 +683,10 @@ foreach ($orders as $order) {
                         <?php if ($enable_projects): ?><th>Project</th><?php endif; ?>
                         <th>Warehouse</th>
                         <th class="text-center">Type</th>
-                        <th class="text-center">Items</th>
+                        <th class="text-center d-print-none">Items</th>
                         <th class="text-end">Total Amount</th>
-                        <th class="text-center">Payment</th>
-                        <th class="text-center">Delivery</th>
+                        <th class="text-center d-print-none">Payment</th>
+                        <th class="text-center d-print-none">Delivery</th>
                         <th class="text-center">Status</th>
                         <th class="text-end pe-4 d-print-none">Actions</th>
                     </tr>
@@ -624,20 +695,6 @@ foreach ($orders as $order) {
                     <!-- Data loaded via AJAX -->
                 </tbody>
             </table>
-        </div>
-    </div>
-    <!-- Report Footer Footer -->
-    <div class="d-none d-print-block mt-5 pt-4 border-top">
-        <div class="row">
-            <div class="col-4 text-center">
-                <div class="border-top mx-4 mt-4 pt-2 small text-muted">Prepared By</div>
-            </div>
-            <div class="col-4 text-center">
-                <div class="border-top mx-4 mt-4 pt-2 small text-muted">Management Review</div>
-            </div>
-            <div class="col-4 text-center">
-                <div class="border-top mx-4 mt-4 pt-2 small text-muted">Authorised Signature</div>
-            </div>
         </div>
     </div>
 </div> <!-- dashboard end -->
@@ -809,7 +866,7 @@ function initTable() {
             },
             {
                 data: 'total_items',
-                className: 'text-center',
+                className: 'text-center d-print-none',
                 width: '60px',
                 render: function(data) {
                     return `<span class="badge bg-secondary rounded-pill small">${data}</span>`;
@@ -825,7 +882,7 @@ function initTable() {
             },
             {
                 data: null,
-                className: 'text-center',
+                className: 'text-center d-print-none',
                 orderable: false,
                 width: '85px',
                 render: function(data, type, row) {
@@ -843,7 +900,7 @@ function initTable() {
             },
             {
                 data: null,
-                className: 'text-center',
+                className: 'text-center d-print-none',
                 orderable: false,
                 width: '100px',
                 render: function(data, type, row) {
