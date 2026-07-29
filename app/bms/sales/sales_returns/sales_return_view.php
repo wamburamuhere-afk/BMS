@@ -59,7 +59,7 @@ if (!$return) {
 // source invoice/sales order's warehouse) — sales returns carry no
 // project_id of their own, so this is the only scope check available here.
 if (!empty($return['resolved_warehouse_id']) && !userCan('warehouse', (int)$return['resolved_warehouse_id'])) {
-    http_response_code(403);
+    if (!headers_sent()) http_response_code(403);
     echo '<div class="container-fluid mt-4"><div class="alert alert-danger">Access denied: this warehouse is not in your assigned scope.</div></div>';
     includeFooter();
     exit;
