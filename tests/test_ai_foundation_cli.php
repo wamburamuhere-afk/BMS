@@ -72,7 +72,14 @@ try {
     $test=src($root,'api/ai/test_ai_config.php');
     ok(strpos($test,'isAdmin()')!==false && strpos($test,'aiComplete(')!==false, 'test endpoint admin-gated + calls aiComplete');
     $page=src($root,'app/constant/settings/ai_settings.php');
-    ok(strpos($page,'isAdmin()')!==false, 'settings page admin-gated');
+    // The page itself is now delegable via Roles & Permissions (page_key
+    // 'ai_assistant') — the redundant isAdmin() redirect that used to sit
+    // here was removed. Saving/testing the actual API key remains
+    // isAdmin()-only by design (checked above). Checking for the functional
+    // redirect block specifically, not just the string "isAdmin()" anywhere
+    // (which would false-positive on this file's own explanatory comment).
+    ok(strpos($page,"autoEnforcePermission('ai_assistant')")!==false, 'settings page gated via the grantable ai_assistant permission');
+    ok(!preg_match('/if\s*\(\s*!\s*isAdmin\(\)\s*\)\s*\{\s*header/', $page), 'settings page no longer redirects non-admins unconditionally');
     ok(strpos($page,'select2-static')!==false, 'provider dropdown uses Select2 (ui-constants §UI-3)');
     ok(strpos($page,'Swal.fire')!==false && strpos($page,'alert(')===false, 'uses SweetAlert2, not alert() (§UI-4)');
 

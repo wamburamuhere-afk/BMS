@@ -10,12 +10,6 @@ autoEnforcePermission('company_profile');
 
 require_once __DIR__ . '/../../../header.php';
 
-// Check admin permissions
-if (!isAdmin()) {
-    header("Location: unauthorized.php");
-    exit();
-}
-
 // Initialize variables
 $success_msg = $_SESSION['success_msg'] ?? '';
 $error_msg = $_SESSION['error_msg'] ?? '';

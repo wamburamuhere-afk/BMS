@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-07-29 (security) — Settings menu: admin-only lock + genuine delegation, Backup relocated, POS/Color split out
+
+**Files:** `header.php`, `roots.php`, `app/constant/settings/{system_settings,users,user_roles,backup_restore,payment_settings,login_history,ai_settings,zoom_settings,company_profile,tax_settings}.php`, new `app/constant/settings/{pos_config_settings,color_settings}.php`, `api/get_login_history.php`, deleted `api/{create_backup,get_backup_list,download_backup,delete_backup,save_backup_settings}.php`, new `migrations/2026_07_29_{lock_sensitive_settings,pos_color_settings_split}.php`, new `tests/{test_admin_lock_and_delegable_settings_cli,test_pos_color_settings_split_cli}.php`
+
+Three related pieces of work on the Settings menu, in order:
+
+1. **Removed a duplicate, unauthenticated "Backup" tab** that lived inside `system_settings.php` alongside the real, working Backup page. That duplicate had its permission check literally commented out on Create/List/Delete, hardcoded a Windows-only `mysqldump.exe` path (would fail entirely on the Linux production server), and passed the DB password unescaped into a shell command. Removed entirely — 5 orphaned API files deleted, tab/JS removed from `system_settings.php`. The real "Backup" menu item was then relocated from a standalone top-nav link into a plain navigation entry inside `system_settings.php`'s own tab list (at the end, matching where the old tab used to sit) — `backup_restore.php` itself untouched throughout, confirmed via live end-to-end round-trip testing (a real backup create/list/delete cycle).
+
+2. **Split "POS Settings" and "Color Setting"** out of `system_settings.php`'s shared tab list into their own standalone pages (`pos_config_settings.php`, `color_settings.php`), each with its own grantable permission — previously they were only reachable via the single `system_settings` permission, with no way to delegate one without the other. Verified live that an actual color value saved through the new page round-trips through `system_settings` and is picked up by the real print templates (`--accent` CSS variable), not just stored inertly.
+
+3. **Locked 5 pages to strictly admin-only** (hard `isAdmin()` check, never delegable no matter what's granted): `system_settings.php` (the "Admin" menu item — General/Email/SMS/Collections/**Security policy**), `users.php` and `user_roles.php` (the escalation-risk pair — a non-admin editor on `user_roles.php` could grant their own role admin-equivalent power), `backup_restore.php`, and `payment_settings.php` (bank/gateway fraud risk). Their permission rows are also hidden from the Roles & Permissions management screen entirely (`is_hidden=1`), so they can't even be offered as grantable checkboxes. Removed the redundant admin-only blocks from the remaining pages (`login_history.php`, `ai_settings.php`/`zoom_settings.php` — view only, their credential-writing API endpoints stay admin-only — `company_profile.php`, `tax_settings.php`) so they're genuinely delegable via `autoEnforcePermission()` alone. `header.php`'s Settings dropdown rebuilt to mirror this exactly: the 5 locked items show only for `isAdmin()`, everything else via `canView('page_key')`.
+
+Verified with two new regression suites (`test_pos_color_settings_split_cli.php`, 34 checks; `test_admin_lock_and_delegable_settings_cli.php`, 102 checks — including a live simulation granting a non-admin every one of the 15 relevant permissions and confirming the 5 locked pages still deny via `isAdmin()` while all 10 delegable ones allow access) plus re-running every adjacent existing suite (Backup CSRF, AI/Zoom foundation, Login History, admin-breakglass) — all pass.
+
 ## 2026-07-29 (fix) — Sales Orders list print: column bleeding, header clipping, hidden columns
 
 **Files:** `app/bms/sales/sales_orders.php`, `tests/test_sales_orders_print_layout_cli.php`

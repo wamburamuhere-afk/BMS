@@ -1109,31 +1109,54 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         </li>
                         <?php endif; ?>
                         
-                        <!-- Admin -->
-                        <?php if (isset($role_id) && ($role_id == 1 || strtolower($user_role) == 'admin')): ?>
+                        <!-- Settings — each item gated individually. Users, Roles & Permissions,
+                             the Admin page (system_settings.php), Backup, and Payments are
+                             STRICTLY admin-only (isAdmin()) and are never delegable, no matter
+                             what is granted via Roles & Permissions — their permission rows are
+                             hidden from that UI entirely (see
+                             migrations/2026_07_29_lock_sensitive_settings.php). Everything else
+                             is gated by canView('page_key'), which admins always pass too, so a
+                             non-admin granted that specific permission sees and can reach it. -->
+                        <?php
+                        $_set_um_visible  = isAdmin() || canView('user_projects') || canView('login_history');
+                        $_set_sys_visible = isAdmin() || canView('ai_assistant') || canView('zoom_settings') || canView('company_profile') || canView('pos_config_settings') || canView('color_settings');
+                        $_set_biz_visible = canView('tax_settings') || isAdmin() || canView('notification_settings') || canView('notification_rules');
+                        ?>
+                        <?php if ($_set_um_visible || $_set_sys_visible || $_set_biz_visible): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-sliders"></i> Settings
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="adminDropdown">
+                                <?php if ($_set_um_visible): ?>
                                 <li><h6 class="dropdown-header">User Management</h6></li>
+                                <?php if (isAdmin()): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('users') ?>"><i class="bi bi-people"></i> Users</a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('user_roles') ?>"><i class="bi bi-shield-check"></i> Roles & Permissions</a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('user_projects') ?>"><i class="bi bi-diagram-3"></i> Project Assignments</a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('login_history') ?>"><i class="bi bi-clock-history"></i> Login History</a></li>
-                                <li><h6 class="dropdown-header">System Configuration</h6></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i> Admin</a></li>
-                                <?php if (isAdmin()): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('ai_settings') ?>"><i class="bi bi-stars"></i> AI Assistant</a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('zoom_settings') ?>"><i class="bi bi-camera-video"></i> Zoom Integration</a></li>
                                 <?php endif; ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('company_profile') ?>"><i class="bi bi-building"></i> Company Profile</a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('backup_restore') ?>"><i class="bi bi-database"></i> Backup</a></li>
+                                <?php if (canView('user_projects')): ?><li><a class="dropdown-item" href="<?= getUrl('user_projects') ?>"><i class="bi bi-diagram-3"></i> Project Assignments</a></li><?php endif; ?>
+                                <?php if (canView('login_history')): ?><li><a class="dropdown-item" href="<?= getUrl('login_history') ?>"><i class="bi bi-clock-history"></i> Login History</a></li><?php endif; ?>
+                                <?php endif; ?>
+                                <?php if ($_set_sys_visible): ?>
+                                <li><h6 class="dropdown-header">System Configuration</h6></li>
+                                <?php if (isAdmin()): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i> Admin</a></li>
+                                <?php endif; ?>
+                                <?php if (canView('ai_assistant')): ?><li><a class="dropdown-item" href="<?= getUrl('ai_settings') ?>"><i class="bi bi-stars"></i> AI Assistant</a></li><?php endif; ?>
+                                <?php if (canView('zoom_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('zoom_settings') ?>"><i class="bi bi-camera-video"></i> Zoom Integration</a></li><?php endif; ?>
+                                <?php if (canView('company_profile')): ?><li><a class="dropdown-item" href="<?= getUrl('company_profile') ?>"><i class="bi bi-building"></i> Company Profile</a></li><?php endif; ?>
+                                <?php if (canView('pos_config_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('pos_config_settings') ?>"><i class="bi bi-cart"></i> POS Settings</a></li><?php endif; ?>
+                                <?php if (canView('color_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('color_settings') ?>"><i class="bi bi-palette"></i> Color Setting</a></li><?php endif; ?>
+                                <?php endif; ?>
+                                <?php if ($_set_biz_visible): ?>
                                 <li><h6 class="dropdown-header">Business Settings</h6></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('tax_settings') ?>"><i class="bi bi-percent"></i> Tax</a></li>
+                                <?php if (canView('tax_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('tax_settings') ?>"><i class="bi bi-percent"></i> Tax</a></li><?php endif; ?>
+                                <?php if (isAdmin()): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('payment_settings') ?>"><i class="bi bi-credit-card"></i> Payments</a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('notification_settings') ?>"><i class="bi bi-bell"></i> Notifications</a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('notification_rules') ?>"><i class="bi bi-bell-fill"></i> Notification Rules</a></li>
+                                <?php endif; ?>
+                                <?php if (canView('notification_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('notification_settings') ?>"><i class="bi bi-bell"></i> Notifications</a></li><?php endif; ?>
+                                <?php if (canView('notification_rules')): ?><li><a class="dropdown-item" href="<?= getUrl('notification_rules') ?>"><i class="bi bi-bell-fill"></i> Notification Rules</a></li><?php endif; ?>
+                                <?php endif; ?>
                             </ul>
                         </li>
                         <?php endif; ?>
