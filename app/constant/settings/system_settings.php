@@ -276,10 +276,48 @@ if ($_POST) {
                                 </div>
                             </div>
                         </a>
-                        <!-- Backup lives on its own page (app/constant/settings/backup_restore.php) —
-                             this is a plain navigation link (no data-bs-toggle="tab"), not a local
-                             tab-pane, so it always opens the real, fully-working Backup & Restore
-                             page unchanged. -->
+                        <!-- The rest of this list are plain navigation links (no data-bs-toggle="tab"),
+                             not local tab-panes — each opens its own real, unmodified page. They're
+                             gathered here rather than as separate top-nav Settings items because all
+                             four are strictly admin-only: reaching THIS page already required
+                             isAdmin(), so grouping them here means a non-admin never even sees them
+                             as menu entries anywhere, on top of each page's own isAdmin() gate. -->
+                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
+                           href="<?= getUrl('users') ?>">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-box me-3 bg-primary-soft text-primary">
+                                    <i class="bi bi-people"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold">Users</h6>
+                                    <small class="text-muted">Accounts & roles</small>
+                                </div>
+                            </div>
+                        </a>
+                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
+                           href="<?= getUrl('user_roles') ?>">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-box me-3 bg-primary-soft text-primary">
+                                    <i class="bi bi-shield-check"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold">Roles & Permissions</h6>
+                                    <small class="text-muted">What each role can do</small>
+                                </div>
+                            </div>
+                        </a>
+                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
+                           href="<?= getUrl('payment_settings') ?>">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-box me-3 bg-success-soft text-success">
+                                    <i class="bi bi-credit-card"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold">Payments</h6>
+                                    <small class="text-muted">Bank & gateway details</small>
+                                </div>
+                            </div>
+                        </a>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            href="<?= getUrl('backup_restore') ?>">
                             <div class="d-flex align-items-center">

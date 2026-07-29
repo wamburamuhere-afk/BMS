@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-07-29 (security) — Consolidate all admin-only Settings items behind one "Admin" entry point
+
+**Files:** `header.php`, `app/constant/settings/system_settings.php`, `tests/test_admin_lock_and_delegable_settings_cli.php`
+
+Per request: Users, Roles & Permissions, and Payments no longer appear as their own separate top-nav Settings items — they're strictly admin-only anyway, so having them scattered as standalone menu entries added clutter without adding capability for anyone but an admin. Moved them into `system_settings.php`'s own nav list as plain page links (same treatment already given to Backup) — each still opens its real, unmodified standalone page; since reaching `system_settings.php` at all already requires `isAdmin()`, everything nested inside it is implicitly admin-only too, on top of each page's own existing `isAdmin()` gate. `header.php`'s Settings dropdown now only exposes a single "Admin" entry point for all of this, plus the genuinely delegable items (Project Assignments, Login History, AI Assistant, Zoom Integration, Company Profile, POS Settings, Color Setting, Tax, Notifications, Notification Rules) which are untouched.
+
+Verified: expanded `test_admin_lock_and_delegable_settings_cli.php` to 109 checks (up from 102) — confirms `header.php` no longer links to any of the 4 consolidated pages directly, and `system_settings.php` links to all 4 as genuine page links (not fake local tabs). Re-ran every adjacent suite (Backup CSRF, AI/Zoom foundation, Login History, admin-breakglass, POS/Color split) — all pass.
+
 ## 2026-07-29 (security) — Settings menu: admin-only lock + genuine delegation, Backup relocated, POS/Color split out
 
 **Files:** `header.php`, `roots.php`, `app/constant/settings/{system_settings,users,user_roles,backup_restore,payment_settings,login_history,ai_settings,zoom_settings,company_profile,tax_settings}.php`, new `app/constant/settings/{pos_config_settings,color_settings}.php`, `api/get_login_history.php`, deleted `api/{create_backup,get_backup_list,download_backup,delete_backup,save_backup_settings}.php`, new `migrations/2026_07_29_{lock_sensitive_settings,pos_color_settings_split}.php`, new `tests/{test_admin_lock_and_delegable_settings_cli,test_pos_color_settings_split_cli}.php`

@@ -108,28 +108,36 @@ foreach ([
     check(str_contains($s, 'isAdmin()'), "$label ($file) is still isAdmin()-gated", "$label ($file) lost its isAdmin() gate — credential writes should stay admin-only");
 }
 
-section('5. header.php mirrors the same split');
+section('5. header.php consolidates admin-only items behind one "Admin" entry point');
 $hdr = readSrc($root, 'header.php');
-foreach (['users', 'user_roles', 'system_settings', 'payment_settings'] as $key) {
-    $pos = strpos($hdr, "getUrl('$key')");
-    check($pos !== false, "header.php still links to $key", "header.php is missing its link to $key");
+// Per request: Users/Roles & Permissions/Payments/Backup should NOT appear
+// as their own separate top-nav Settings items at all — only reachable via
+// the single "Admin" (system_settings.php) link, itself isAdmin()-gated.
+// header.php should therefore link to system_settings, but NOT directly to
+// users/user_roles/payment_settings/backup_restore.
+check(str_contains($hdr, "getUrl('system_settings')"), "header.php still links to the Admin entry point (system_settings)", "header.php is missing its link to system_settings");
+foreach (['users', 'user_roles', 'payment_settings', 'backup_restore'] as $key) {
+    check(!str_contains($hdr, "getUrl('$key')"), "header.php no longer links to '$key' directly (consolidated into Admin)", "header.php still has a direct top-nav link to '$key' — should only be reachable via the Admin page");
 }
-// Each of the 4 locked LINKS (not backup_restore — that link now lives
-// inside system_settings.php itself) must fall inside SOME isAdmin-only
-// nav-toggle block (there are 3 separate such blocks: users+user_roles
-// together, Admin alone, Payments alone), not just gated by a bare
-// canView() somewhere.
-preg_match_all('/if \(isAdmin\(\)\):\s*' . preg_quote('?>', '/') . '(.*?)' . preg_quote('<?php', '/') . ' endif; ' . preg_quote('?>', '/') . '/s', $hdr, $adminBlocks);
-$adminBlockText = implode("\n", $adminBlocks[1] ?? []);
-foreach (['users', 'user_roles', 'system_settings', 'payment_settings'] as $key) {
-    check(
-        str_contains($adminBlockText, "getUrl('$key')"),
-        "header.php's $key link falls inside an isAdmin()-only block",
-        "header.php's $key link is not gated by isAdmin() — could show to a delegated non-admin"
-    );
-}
+// The Admin link itself must still be isAdmin()-gated.
+check(
+    (bool)preg_match('/if \(isAdmin\(\)\):\s*' . preg_quote('?>', '/') . '(.*?)' . preg_quote('<?php', '/') . ' endif; ' . preg_quote('?>', '/') . '/s', $hdr, $m) && str_contains($m[1] ?? '', "getUrl('system_settings')"),
+    "header.php's Admin link falls inside an isAdmin()-only block",
+    "header.php's Admin link is not gated by isAdmin()"
+);
 foreach ($DELEGABLE as $file => $key) {
     check(str_contains($hdr, "canView('$key')"), "header.php gates $key via canView()", "header.php is missing a canView('$key') gate for its menu item");
+}
+
+section('5b. system_settings.php now hosts plain nav links to Users/Roles & Permissions/Payments/Backup');
+$settingsPageSrc = readSrc($root, 'app/constant/settings/system_settings.php');
+foreach (['users', 'user_roles', 'payment_settings', 'backup_restore'] as $key) {
+    check(str_contains($settingsPageSrc, "getUrl('$key')"), "system_settings.php links to '$key'", "system_settings.php is missing a link to '$key' — it should be reachable from inside the Admin page");
+}
+// These must be plain navigation links, not local tab-panes (no matching
+// data-bs-toggle="tab" id for any of these four).
+foreach (['users-tab', 'roles-tab', 'user_roles-tab', 'payment-tab', 'payment_settings-tab'] as $badId) {
+    check(!str_contains($settingsPageSrc, "id=\"$badId\""), "system_settings.php has no local tab-pane id=\"$badId\" (must be a real page link, not a fake local tab)", "system_settings.php defines a local tab-pane id=\"$badId\" — should link to the real standalone page instead");
 }
 
 section('6. The 5 locked permissions are hidden from the Roles & Permissions management UI');
