@@ -236,15 +236,21 @@ foreach ($orders as $order) {
 .status-secondary { color: #41464b !important; background-color: #e2e3e5 !important; }
 
 @media print {
+    /* Extra bottom clearance (16mm vs the global 15mm) so the last table row
+       never sits under the shared fixed-position print footer -- same margin
+       already proven correct on Customer/Supplier/Sub-Contractor/Delivery-
+       Notes/Quotations print. */
+    @page { margin: 10mm 8mm 16mm 8mm; size: auto; }
+
     body { background: white !important; padding: 0 !important; padding-top: 0 !important; margin: 0 !important; }
     .sales-orders-dashboard { background: white !important; padding: 20px !important; }
-    
+
     /* Force Stats Cards to stay on one row in print */
     .row { display: flex !important; flex-wrap: nowrap !important; gap: 10px !important; }
     .col-md-3 { flex: 1 !important; width: 25% !important; margin-bottom: 0 !important; }
-    .custom-stat-card { 
+    .custom-stat-card {
         padding: 10px !important;
-        box-shadow: none !important; 
+        box-shadow: none !important;
         border: 1px solid #d1e7dd !important;
         background-color: #f8fafc !important;
         -webkit-print-color-adjust: exact;
@@ -260,6 +266,31 @@ foreach ($orders as $order) {
     th { background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; font-size: 8px !important; }
     .d-print-none { display: none !important; }
     .dataTables_length, .dataTables_info, .dataTables_paginate, .dataTables_filter { display: none !important; }
+
+    /* Root cause of "first page stays blank, everything pushed to page 2":
+       the global responsive.css rule `p, .card, section { page-break-inside:
+       avoid }` applies to the Sales Orders Table Card, which is many times
+       taller than one printed page. An unbreakable "avoid" block that can
+       never fit anywhere gets pushed entirely onto a later page. An
+       id-selector override beats the class rule and lets the table flow and
+       break normally across pages, in both orientations. */
+    #salesOrdersTableCard {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+        overflow: visible !important;
+    }
+    #salesOrdersTable tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+    #salesOrdersTable thead { display: table-header-group; }
+
+    /* Root cause of "columns not fully aligned / cut off": DataTables sets
+       explicit inline pixel widths on th/td (width: '40px'/'110px'/'100px'
+       in the columns config below), sized for the wide on-screen container.
+       Those don't shrink for a narrower printed page. Stripping them lets
+       table-layout:fixed distribute the actually-visible columns evenly
+       across the real print width, matching print-customers.php's aligned
+       columns in both orientations. */
+    table.dataTable { table-layout: fixed !important; }
+    #salesOrdersTable th, #salesOrdersTable td { width: auto !important; font-size: 8pt !important; padding: 5px !important; }
 }
 
 #salesOrdersTable {
@@ -569,7 +600,7 @@ foreach ($orders as $order) {
     </div>
 
     <!-- Sales Orders Table Card -->
-    <div class="card shadow-sm border-0">
+    <div class="card shadow-sm border-0" id="salesOrdersTableCard">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0" id="salesOrdersTable" style="width:100%">
                 <thead class="bg-light text-uppercase small fw-bold">
