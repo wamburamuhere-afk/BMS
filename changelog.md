@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-07-30 (security) — Lock Project Assignments and AI Assistant to admin-only
+
+**Files:** `app/constant/settings/{user_projects,ai_settings,system_settings}.php`, `header.php`, new `migrations/2026_07_30_lock_project_assignments.php`, `tests/test_admin_lock_and_delegable_settings_cli.php`
+
+Continuation of the Settings > Admin consolidation. Project Assignments and AI Assistant (the AI provider/API-key config page) are now also strictly `isAdmin()`-only, reached only via Settings > Admin, no longer top-nav items. The now-empty "User Management" section (Project Assignments was its only item) was removed from `header.php`'s Settings dropdown entirely.
+
+One deliberate asymmetry: the `ai_assistant` permission key is shared with a separate, unrelated feature — the "Ask BMS AI" chat link elsewhere in the top-nav (`app/constant/communication/ai_assistant.php`). Hiding that permission row from Roles & Permissions would also have blocked granting the chat feature to non-admins, which wasn't requested. So `ai_settings.php` (the config page) got the same hard `isAdmin()` gate as everything else, but its permission row was deliberately left visible/grantable — only `user_projects`'s permission row is hidden by the new migration.
+
+`tests/test_admin_lock_and_delegable_settings_cli.php` expanded to 126 assertions (was 120), including a check that the unrelated "Ask BMS AI" chat link is still intact. All pass live. Verified in a real browser session that both pages render with their data intact and now appear inside Admin's nav list.
+
 ## 2026-07-30 (security) — Lock Notification Rules to admin-only
 
 **Files:** `app/constant/settings/{notification_rules,system_settings}.php`, `header.php`, new `migrations/2026_07_30_lock_notification_rules.php`, `tests/test_admin_lock_and_delegable_settings_cli.php`
