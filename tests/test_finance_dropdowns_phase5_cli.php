@@ -9,7 +9,6 @@
  * account_type string / type_name LIKE subquery:
  *   - revenue.php        → incomeAccounts()
  *   - bank_transfers.php → expenseAccounts()
- *   - recurring.php      → expenseAccounts()
  *   - expenses.php       → expenseAccounts()
  * and that each still requires core/payment_source.php and lints clean.
  *
@@ -33,7 +32,6 @@ register_shutdown_function(function () {
 $specs = [
     'app/constant/accounts/revenue.php'        => ['incomeAccounts($pdo)',  "account_type = 'income'"],
     'app/constant/accounts/bank_transfers.php' => ['expenseAccounts($pdo)', "account_type = 'expense'"],
-    'app/constant/accounts/recurring.php'      => ['expenseAccounts($pdo)', "account_type='expense'"],
     'app/constant/accounts/expenses.php'       => ['expenseAccounts($pdo)', "type_name LIKE '%expense%'"],
 ];
 
