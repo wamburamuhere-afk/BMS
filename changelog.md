@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-07-30 (chore) — Remove recurring-billing feature
+
+**Files:** deleted `app/constant/accounts/recurring.php`, `core/recurring.php`, `api/account/{save_recurring_profile,update_recurring_status,run_recurring_now}.php`, `cron/run_recurring.php`, `tests/test_recurring_cli.php`; edited `roots.php`, `header.php`, `app/constant/accounts/expenses.php`, `api/account/get_expenses.php`, `tests/{test_money_out_flows_cli,test_finance_dropdowns_phase5_cli}.php`; new `migrations/2026_07_30_remove_recurring_billing.php`
+
+Removed per request: the feature only ever generated recurring **expenses** (never invoices, despite being labelled "recurring billing"), it silently ran itself once a day via a hidden include in `header.php` rather than an explicit action, and it was functionally redundant — expenses are easily re-entered manually each period, and payroll already has its own built-in periodicity. Three sources of confusion for a feature with only 2 profiles ever created, both already ended.
+
+Mapped the full footprint before touching anything: the generator (`core/recurring.php`), its page, 3 API endpoints, the daily cron trigger (silently included from `header.php` on every page load, throttled via a `recurring_last_run` setting), the route registrations, a cosmetic "Recurring" badge + filter on the Expenses page (confirmed zero GL/posting dependency — `expenses.recurring_profile_id`'s own migration docblock says outright "metadata only, never read by any GL posting function"), and two test files with static source-checks that referenced `recurring.php` and would have failed once it was deleted.
+
+New migration drops `recurring_profiles`, `recurring_runs`, and `expenses.recurring_profile_id` (idempotent, checked twice locally). The two original creation migrations (`2026_06_10_recurring.php`, `2026_06_25_expenses_recurring_profile_id.php`) are left untouched — deployed migration history is a one-way log; this migration is the record of the reversal, not a rewrite of the past.
+
+Verified: full-repo case-insensitive grep for "recurring" before and after — before, 16 files (7 to delete, 4 to edit, 2 old migrations to keep, 2 pre-existing false-positive comments); after, exactly the 2 kept migrations + the new one + the same false-positive comment, nothing else. `php -l` clean on every touched file. `test_money_out_flows_cli` (15/15), `test_finance_dropdowns_phase5_cli` (12/12), and `test_expense_posting_cli` (35/35) all still pass. Migration run twice locally to confirm idempotency.
+
 ## 2026-07-30 (feature) — Bank Reconciliation Phase 5: real statement import + two-sided matching
 
 **Files:** new `core/bank_recon_matching.php`, new `api/account/import_bank_statement.php`, new `api/account/suggest_reconciliation_matches.php`, `api/account/{toggle_reconciliation_match,get_reconciliation_lines,create_entry_from_statement_line}.php`, `app/constant/accounts/{bank_reconciliation,reconciliation_details}.php`, new `migrations/2026_07_30_bank_transactions_matched_pair.php`, new `tests/test_bank_recon_phase5_import_matching_cli.php`
