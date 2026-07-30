@@ -310,12 +310,19 @@ try {
     ]);
 
     // Record the initial payment (deposit/full) against the sale, if any was collected.
+    // Guarded: the pos_sale_payments table ships with migration 2026_06_08; on a server
+    // where that migration has not run yet, skip the payment-ledger row rather than fail
+    // the whole sale (mirrors the table-existence guard in api/pos/get_sales.php).
     if ($amount_paid_now > 0.01) {
-        $pmRow = in_array($payment_method, ['cash','card','mobile_money','bank_transfer','voucher','loyalty_points'], true) ? $payment_method : 'cash';
-        $pdo->prepare("
-            INSERT INTO pos_sale_payments (sale_id, amount, payment_method, reference, notes, received_by, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, NOW())
-        ")->execute([$sale_id, $amount_paid_now, $pmRow, $receipt_number, ($is_credit ? 'Deposit at sale' : 'Paid at sale'), $user_id]);
+        $hasPayTable = false;
+        try { $hasPayTable = (bool)$pdo->query("SHOW TABLES LIKE 'pos_sale_payments'")->fetch(); } catch (Throwable $e) {}
+        if ($hasPayTable) {
+            $pmRow = in_array($payment_method, ['cash','card','mobile_money','bank_transfer','voucher','loyalty_points'], true) ? $payment_method : 'cash';
+            $pdo->prepare("
+                INSERT INTO pos_sale_payments (sale_id, amount, payment_method, reference, notes, received_by, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
+            ")->execute([$sale_id, $amount_paid_now, $pmRow, $receipt_number, ($is_credit ? 'Deposit at sale' : 'Paid at sale'), $user_id]);
+        }
     }
 
     // Record cash transaction if shift exists — only the CASH actually received.
