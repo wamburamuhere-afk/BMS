@@ -55,15 +55,21 @@ try {
 
     $bankId = (int)$rec['bank_account_id'];
 
-    // Load the bank_transactions line — must belong to this bank account
+    // Load the bank_transactions line — must belong to this bank account.
+    // Phase 5: MUST be a statement-side (imported_from IS NOT NULL) line.
+    // Book-side rows (imported_from IS NULL) are auto-written for something
+    // that has ALREADY been posted to the GL by the original event (expense
+    // payment, revenue, etc.) — posting an entry "from" one of those would
+    // double-book money that is already correctly recorded.
     $line = $pdo->prepare(
         "SELECT * FROM bank_transactions
           WHERE transaction_id = ? AND bank_account_id = ?
+            AND imported_from IS NOT NULL
             AND COALESCE(matching_status,'unmatched') NOT IN ('matched','manual','reconciled')"
     );
     $line->execute([$txnId, $bankId]);
     $line = $line->fetch(PDO::FETCH_ASSOC);
-    if (!$line) throw new Exception('Line not found, does not belong to this account, or already matched');
+    if (!$line) throw new Exception('Line not found, is not a statement-side line, or already matched');
 
     $amount  = (float)$line['amount'];
     $date    = $line['transaction_date'];

@@ -359,7 +359,7 @@ if ($bank_account_id) {
                     <div class="alert alert-info">
                         <h6><i class="bi bi-info-circle"></i> Import Instructions:</h6>
                         <ul class="mb-0">
-                            <li>Supported formats: CSV, Excel (.xlsx)</li>
+                            <li>Supported formats: CSV only</li>
                             <li>Date format: YYYY-MM-DD</li>
                             <li>Amount format: 1234.56 (no currency symbols)</li>
                             <li>Transaction types: deposit, withdrawal</li>
@@ -376,7 +376,7 @@ if ($bank_account_id) {
                         </div>
                         <div class="col-md-12 mb-3">
                             <label for="statement_file" class="form-label">Statement File <span class="text-danger">*</span></label>
-                            <input type="file" class="form-control" id="statement_file" name="statement_file" accept=".csv,.xlsx,.xls" required>
+                            <input type="file" class="form-control" id="statement_file" name="statement_file" accept=".csv" required>
                         </div>
                         <div class="col-md-12 mb-3">
                             <label for="import_action" class="form-label">Import Action</label>
@@ -645,7 +645,7 @@ $(document).ready(function() {
         submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Importing...');
 
         $.ajax({
-            url: '/api/account/import_bank_statement.php',
+            url: '<?= buildUrl('api/account/import_bank_statement.php') ?>',
             type: 'POST',
             data: formData,
             processData: false,
