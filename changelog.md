@@ -8,6 +8,14 @@ Follow-up to the admin-only consolidation below: Login History (privacy-sensitiv
 
 Verified: `test_admin_lock_and_delegable_settings_cli.php` (114 assertions), `test_login_history_cli.php` (92), `test_zoom_foundation_cli.php` (25) — all pass including live DB checks. PR: #1633 into `develop`.
 
+## 2026-07-29 (fix/security) — Project-scope leaks in project/order pickers + missing GL posting on stock adjustments
+
+**Files:** `api/{search_projects,create_stock_adjustment,update_adjustment,process_bulk_adjustment,update_product,pos/process_sale}.php`, `api/sales/{search_orders,create_return}.php`, `app/bms/Suppliers/supplier_details.php`, `app/bms/stock/{stock_adjustments,warehouse_view,warehouses}.php`, new `tests/{test_search_projects_scope_cli,test_sales_return_order_scope_cli,test_stock_adjustment_project_scope_cli,test_stock_adjustment_gl_gaps_cli}.php`
+
+`api/search_projects.php` and `api/sales/search_orders.php` each carried a `scope-audit: skip` marker claiming scope was enforced by a different page's filter — but both are independent queries that filter never reached, so a non-admin could search/select any project or sales order in the system. Both now genuinely scope-filter. Added server-side scope gates on submitted `project_id`/`warehouse_id` in `create_return.php`, `create_stock_adjustment.php`, and `update_adjustment.php` as defense in depth. Separately, `update_product.php` and `process_bulk_adjustment.php` were silently skipping GL posting on stock movements entirely (found via a real historical unposted movement) — both now post through `postStockAdjustmentGl()`, matching the already-correct `create_stock_adjustment.php` path. Bundled from the same audit pass: a table-existence guard on `pos_sale_payments` in `process_sale.php`, print layout fixes in `warehouse_view.php`/`supplier_details.php`, and dropped server-side pagination in `warehouses.php` (superseded by client-side DataTables).
+
+Verified: 3 of 4 new suites pass clean live. `test_stock_adjustment_gl_gaps_cli.php` fails 4 assertions on the dev machine used to write this only — no Inventory account (code `1-1300`) configured in that local DB's chart of accounts, so `postStockAdjustmentGl()` correctly no-ops per its documented behavior; needs re-verification on an environment with a full chart of accounts. PR: #1632 into `develop`.
+
 ## 2026-07-29 (security) — Consolidate all admin-only Settings items behind one "Admin" entry point
 
 **Files:** `header.php`, `app/constant/settings/system_settings.php`, `tests/test_admin_lock_and_delegable_settings_cli.php`
