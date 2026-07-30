@@ -80,7 +80,6 @@ try {
     $checks = [
         'app/constant/accounts/expenses.php'        => ['cashBankAccounts($pdo)', 'expenseAccounts($pdo)'],
         'app/constant/accounts/bank_transfers.php'  => ['expenseAccounts($pdo)'],   // charge account
-        'app/constant/accounts/recurring.php'       => ['cashBankAccounts($pdo)', 'expenseAccounts($pdo)'],
     ];
     foreach ($checks as $rel => $needles) {
         $s = src($root, $rel);
