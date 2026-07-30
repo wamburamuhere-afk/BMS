@@ -193,11 +193,11 @@ ok(str_contains($apiContent, "'us.login_at'"), "API orders by login_at column");
 echo "\n[7] Page — login_history.php content checks\n";
 
 $pageContent = file_get_contents($loginHistoryFile);
-// The page used to redirect non-admins unconditionally even after the real,
-// grantable autoEnforcePermission('login_history') gate passed — removed, so
-// a role granted this permission via Roles & Permissions actually works now.
-ok(str_contains($pageContent, "autoEnforcePermission('login_history')"), "Page enforces the grantable login_history permission");
-ok(!str_contains($pageContent, 'if (!isAdmin())'),   "Page no longer redirects non-admins unconditionally");
+// Login History is strictly admin-only by request (privacy-sensitive audit
+// trail) — consolidated inside Settings > Admin, not delegable via Roles &
+// Permissions no matter what's granted (permission row hidden from that UI).
+ok(str_contains($pageContent, "autoEnforcePermission('login_history')"), "Page still calls autoEnforcePermission('login_history')");
+ok(str_contains($pageContent, 'if (!isAdmin())'),   "Page hard-redirects non-admins (strictly admin-only)");
 ok(str_contains($pageContent, 'function safeOutput'), "Page defines safeOutput() JS helper");
 ok(str_contains($pageContent, 'Login History'),       "Page title is 'Login History'");
 ok(str_contains($pageContent, 'get_login_history'),   "Page references the correct API endpoint");
@@ -206,10 +206,13 @@ ok(str_contains($pageContent, 'ISP'),                 "Page shows ISP column");
 ok(str_contains($pageContent, 'device_type'),         "Page uses device_type from API");
 ok(str_contains($pageContent, 'today_logins'),        "Page has Today stat card");
 
-// Check nav link added to header
+// Login History is consolidated inside Settings > Admin (system_settings.php),
+// not a standalone top-nav item — header.php should NOT link to it directly.
 $headerContent = file_get_contents($root . '/header.php');
-ok(str_contains($headerContent, "getUrl('login_history')"), "header.php contains login_history nav link");
-ok(str_contains($headerContent, 'bi-clock-history'),        "header.php uses clock-history icon");
+ok(!str_contains($headerContent, "getUrl('login_history')"), "header.php no longer links to login_history directly (moved into Settings > Admin)");
+$settingsPageContent = file_get_contents($root . '/app/constant/settings/system_settings.php');
+ok(str_contains($settingsPageContent, "getUrl('login_history')"), "system_settings.php links to login_history");
+ok(str_contains($settingsPageContent, 'bi-clock-history'),        "system_settings.php uses clock-history icon");
 
 // ── Summary ──────────────────────────────────────────────────────────────────
 echo "\n";

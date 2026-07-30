@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-07-29 (security) — Lock Login History + Zoom Integration to admin-only
+
+**Files:** `api/get_login_history.php`, `app/constant/settings/{login_history,zoom_settings,system_settings}.php`, `header.php`, new `migrations/2026_07_29_lock_login_history_and_zoom.php`, `tests/{test_admin_lock_and_delegable_settings_cli,test_login_history_cli,test_zoom_foundation_cli}.php`
+
+Follow-up to the admin-only consolidation below: Login History (privacy-sensitive login IP/device/location audit trail) and Zoom Integration are now also strictly `isAdmin()`-only and consolidated inside Settings > Admin, no longer delegable via Roles & Permissions or reachable as standalone top-nav items. New migration hides both permission rows from the Roles & Permissions UI (idempotent, additive only).
+
+Verified: `test_admin_lock_and_delegable_settings_cli.php` (114 assertions), `test_login_history_cli.php` (92), `test_zoom_foundation_cli.php` (25) — all pass including live DB checks. PR: #1633 into `develop`.
+
 ## 2026-07-29 (fix/security) — Project-scope leaks in project/order pickers + missing GL posting on stock adjustments
 
 **Files:** `api/{search_projects,create_stock_adjustment,update_adjustment,process_bulk_adjustment,update_product,pos/process_sale}.php`, `api/sales/{search_orders,create_return}.php`, `app/bms/Suppliers/supplier_details.php`, `app/bms/stock/{stock_adjustments,warehouse_view,warehouses}.php`, new `tests/{test_search_projects_scope_cli,test_sales_return_order_scope_cli,test_stock_adjustment_project_scope_cli,test_stock_adjustment_gl_gaps_cli}.php`
