@@ -57,12 +57,6 @@ try {
 }
 
 try {
-    $suppliers = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status = 'active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $suppliers = [];
-}
-
-try {
     $tax_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage FROM tax_rates WHERE status = 'active' ORDER BY rate_name")->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     $tax_rates = [];
@@ -636,18 +630,6 @@ $(document).ready(function() {
                                                 <i class="bi bi-plus-lg"></i>
                                             </button>
                                         </div>
-                                    </div>
-
-                                    <div class="mb-4">
-                                        <label for="supplier_id" class="form-label fw-bold small">Preferred Supplier</label>
-                                        <select class="form-select border-0 py-2 shadow-sm select2-static" id="supplier_id" name="supplier_id">
-                                            <option value="">Select Supplier</option>
-                                            <?php foreach ($suppliers as $supplier): ?>
-                                                <option value="<?= $supplier['supplier_id'] ?>" <?= $product['supplier_id'] == $supplier['supplier_id'] ? 'selected' : '' ?>>
-                                                    <?= htmlspecialchars($supplier['supplier_name']) ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
                                     </div>
 
                                     <div class="mb-3">

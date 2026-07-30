@@ -2035,15 +2035,6 @@ function generate_barcode_local() {
                                     <label class="form-label fw-bold">Brand</label>
                                     <?= renderOtherSelect('modal_brand_id', 'brand_id', $lk_brands, '', 'brand_other', 'Select Brand') ?>
                                 </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">Preferred Supplier</label>
-                                    <select class="form-select select2-static" name="supplier_id" id="modal_supplier_id">
-                                        <option value="">Select Supplier</option>
-                                        <?php foreach ($suppliers as $supplier): ?>
-                                            <option value="<?= $supplier['supplier_id'] ?>"><?= safe_output($supplier['supplier_name']) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
                                 <div class="col-md-4 mb-3 modal-inventory-only">
                                     <label class="form-label fw-bold">Weight (kg)</label>
                                     <input type="number" step="0.001" class="form-control" name="weight" placeholder="0.000">
