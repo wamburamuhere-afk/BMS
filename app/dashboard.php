@@ -26,10 +26,67 @@ $user_permissions = [
 // Determine if user can see ANY approvals
 $user_permissions['can_approve'] = $user_permissions['can_approve_expenses'] || $user_permissions['can_approve_purchases'];
 
-// Set time range for dashboard data (default: current month)
-$start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
-$end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
-$time_range = isset($_GET['time_range']) ? $_GET['time_range'] : 'monthly';
+// Set time range for dashboard data (default: current month).
+// Precedence: explicit start_date/end_date (the Custom Range form) always
+// win, exactly as before. Otherwise, the quick-select time_range preset
+// (Today/Yesterday/This Week/This Quarter/This Year — sent as ?time_range=X
+// with no dates) now actually computes real bounds instead of being ignored
+// and silently falling through to the current-month default.
+if (isset($_GET['start_date']) || isset($_GET['end_date'])) {
+    $start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
+    $end_date   = isset($_GET['end_date'])   ? $_GET['end_date']   : date('Y-m-t');
+    $time_range = 'custom';
+} else {
+    $time_range = isset($_GET['time_range']) ? $_GET['time_range'] : 'month';
+    switch ($time_range) {
+        case 'today':
+            $start_date = date('Y-m-d');
+            $end_date   = date('Y-m-d');
+            break;
+        case 'yesterday':
+            $start_date = date('Y-m-d', strtotime('-1 day'));
+            $end_date   = date('Y-m-d', strtotime('-1 day'));
+            break;
+        case 'week':
+            $start_date = date('Y-m-d', strtotime('monday this week'));
+            $end_date   = date('Y-m-d', strtotime('sunday this week'));
+            break;
+        case 'quarter':
+            $quarterStartMonth = (((int)date('n') - 1) - ((int)date('n') - 1) % 3) + 1;
+            $start_date = date('Y') . '-' . str_pad((string)$quarterStartMonth, 2, '0', STR_PAD_LEFT) . '-01';
+            $end_date   = date('Y-m-t', strtotime($start_date . ' +2 months'));
+            break;
+        case 'year':
+            $start_date = date('Y-01-01');
+            $end_date   = date('Y-12-31');
+            break;
+        case 'month':
+        default:
+            $start_date = date('Y-m-01');
+            $end_date   = date('Y-m-t');
+            $time_range = 'month';
+            break;
+    }
+}
+
+// Human-readable label for the "Monthly Revenue" card so it matches
+// whichever range is actually active, instead of always claiming "Monthly"
+// even when Today/This Week/etc. is selected.
+$revenue_period_labels = [
+    'today'     => ['title' => "Today's Revenue",       'caption' => 'Sales today'],
+    'yesterday' => ['title' => "Yesterday's Revenue",   'caption' => 'Sales yesterday'],
+    'week'      => ['title' => "This Week's Revenue",   'caption' => 'Sales this week'],
+    'month'     => ['title' => 'Monthly Revenue',       'caption' => 'Sales this month'],
+    'quarter'   => ['title' => "This Quarter's Revenue", 'caption' => 'Sales this quarter'],
+    'year'      => ['title' => "This Year's Revenue",   'caption' => 'Sales this year'],
+];
+if (isset($revenue_period_labels[$time_range])) {
+    $revenue_card_title   = $revenue_period_labels[$time_range]['title'];
+    $revenue_card_caption = $revenue_period_labels[$time_range]['caption'];
+} else {
+    $revenue_card_title   = 'Revenue (' . date('M d', strtotime($start_date)) . ' - ' . date('M d', strtotime($end_date)) . ')';
+    $revenue_card_caption = 'Sales in range';
+}
 
 // Get dashboard statistics — always use business stats for the main cards
 $dashboard_stats = get_business_stats($pdo, $start_date, $end_date, $user_id, $user_permissions);
@@ -1371,7 +1428,7 @@ function get_progress_color($percentage) {
                     <div class="d-flex justify-content-between">
                         <div>
                             <h4 class="mb-0"><?= format_currency($dashboard_stats['sales']['total_revenue'] ?? 0) ?></h4>
-                            <p class="mb-0">Monthly Revenue</p>
+                            <p class="mb-0"><?= htmlspecialchars($revenue_card_title) ?></p>
                         </div>
                         <div class="align-self-center">
                             <i class="bi bi-graph-up" style="font-size: 2rem;"></i>
@@ -1380,7 +1437,7 @@ function get_progress_color($percentage) {
                     <div class="mt-3">
                         <small>
                             <i class="bi bi-receipt"></i>
-                            <?= $dashboard_stats['sales']['total_sales'] ?? 0 ?> Sales this month
+                            <?= $dashboard_stats['sales']['total_sales'] ?? 0 ?> <?= htmlspecialchars($revenue_card_caption) ?>
                         </small>
                     </div>
                 </div>
