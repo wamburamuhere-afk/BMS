@@ -21,6 +21,17 @@
 $page_title = "Project Assignments";
 require_once __DIR__ . '/../../../roots.php';
 autoEnforcePermission('user_projects');
+
+// Strictly admin-only by request (2026-07-30) — consolidated inside
+// Settings > Admin alongside Users/Roles & Permissions/Payments/Backup/
+// Login History/Zoom Integration/Company Profile/Notification Rules, no
+// longer delegable via Roles & Permissions no matter what is granted
+// (permission row hidden from that UI). Reached only via Settings > Admin.
+if (!isAdmin()) {
+    header('Location: ' . getUrl('unauthorized'));
+    exit;
+}
+
 global $pdo;
 
 // ── AJAX: return user's current assignments as JSON ───────────────────────

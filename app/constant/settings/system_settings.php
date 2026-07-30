@@ -279,7 +279,7 @@ if ($_POST) {
                         <!-- The rest of this list are plain navigation links (no data-bs-toggle="tab"),
                              not local tab-panes — each opens its own real, unmodified page. They're
                              gathered here rather than as separate top-nav Settings items because all
-                             eight are strictly admin-only: reaching THIS page already required
+                             ten are strictly admin-only: reaching THIS page already required
                              isAdmin(), so grouping them here means a non-admin never even sees them
                              as menu entries anywhere, on top of each page's own isAdmin() gate. -->
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
@@ -375,6 +375,30 @@ if ($_POST) {
                                 <div>
                                     <h6 class="mb-0 fw-bold">Notification Rules</h6>
                                     <small class="text-muted">Who's notified, per event</small>
+                                </div>
+                            </div>
+                        </a>
+                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
+                           href="<?= getUrl('user_projects') ?>">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-box me-3 bg-primary-soft text-primary">
+                                    <i class="bi bi-diagram-3"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold">Project Assignments</h6>
+                                    <small class="text-muted">Who's assigned to which project</small>
+                                </div>
+                            </div>
+                        </a>
+                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
+                           href="<?= getUrl('ai_settings') ?>">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-box me-3 bg-info-soft text-info">
+                                    <i class="bi bi-stars"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold">AI Assistant</h6>
+                                    <small class="text-muted">AI configuration &amp; API key</small>
                                 </div>
                             </div>
                         </a>
