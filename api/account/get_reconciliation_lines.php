@@ -56,7 +56,7 @@ try {
         SELECT transaction_id, transaction_date, value_date, description, reference_number,
                transaction_type, amount, balance_after,
                COALESCE(matching_status, 'unmatched') AS matching_status,
-               reconciliation_id
+               reconciliation_id, imported_from, matched_transaction_id
           FROM bank_transactions
          WHERE bank_account_id = ?
            AND (
@@ -94,16 +94,25 @@ try {
             $uncleared += $signed; $unclearedCount++;
         }
 
+        // Phase 5: which side of the ledger this row came from, and — when
+        // it isn't confirmed yet — the pending suggested-pair partner (if
+        // any) so the worksheet can show "suggested match" affordances.
+        $source = ($r['imported_from'] !== null) ? 'statement' : 'book';
+        $suggestedPartnerId = (!$isMatched && !$isIgnored && !empty($r['matched_transaction_id']))
+            ? (int)$r['matched_transaction_id'] : null;
+
         $lines[] = [
-            'transaction_id'   => (int)$r['transaction_id'],
-            'transaction_date' => $r['transaction_date'],
-            'description'      => $r['description'],
-            'reference_number' => $r['reference_number'],
-            'transaction_type' => $r['transaction_type'],
-            'amount'           => (float)$r['amount'],
-            'signed_amount'    => $signed,
-            'matched'          => $isMatched,
-            'ignored'          => $isIgnored,
+            'transaction_id'        => (int)$r['transaction_id'],
+            'transaction_date'      => $r['transaction_date'],
+            'description'           => $r['description'],
+            'reference_number'      => $r['reference_number'],
+            'transaction_type'      => $r['transaction_type'],
+            'amount'                => (float)$r['amount'],
+            'signed_amount'         => $signed,
+            'matched'               => $isMatched,
+            'ignored'               => $isIgnored,
+            'source'                => $source,
+            'suggested_partner_id'  => $suggestedPartnerId,
         ];
     }
 

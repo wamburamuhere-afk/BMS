@@ -16,6 +16,7 @@
  * the reconciliation's own status — it never moves money or touches the ledger.
  */
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/bank_recon_matching.php';
 global $pdo;
 
 header('Content-Type: application/json');
@@ -51,6 +52,7 @@ if (!in_array($action, ['match', 'unmatch', 'ignore', 'unignore', 'finalize'], t
 }
 
 /** Recompute the live reconciliation maths from the register, same model as the read API. */
+if (!function_exists('recon_compute')) {
 function recon_compute(PDO $pdo, array $rec): array {
     $bank = (int)$rec['bank_account_id'];
     $stmt = $pdo->prepare("
@@ -81,6 +83,7 @@ function recon_compute(PDO $pdo, array $rec): array {
         'balanced'           => abs($difference) < 0.01,
     ];
 }
+}
 
 try {
     $pdo->beginTransaction();
@@ -101,18 +104,32 @@ try {
         if ($txn_id <= 0) throw new Exception('Missing transaction line');
 
         // The line must belong to THIS reconciliation's bank account (scope guard).
-        $lstmt = $pdo->prepare("SELECT transaction_id FROM bank_transactions
+        $lstmt = $pdo->prepare("SELECT transaction_id, matched_transaction_id FROM bank_transactions
                                  WHERE transaction_id = ? AND bank_account_id = ?");
         $lstmt->execute([$txn_id, (int)$rec['bank_account_id']]);
-        if (!$lstmt->fetchColumn()) throw new Exception('That line does not belong to this reconciliation.');
+        $line = $lstmt->fetch(PDO::FETCH_ASSOC);
+        if (!$line) throw new Exception('That line does not belong to this reconciliation.');
 
         if ($action === 'match') {
-            $pdo->prepare("UPDATE bank_transactions SET matching_status = 'matched', reconciliation_id = ?, status = 'cleared', updated_at = NOW()
-                            WHERE transaction_id = ?")->execute([$rec_id, $txn_id]);
+            // Phase 5: if this line has a suggested/confirmed statement<->book
+            // pairing (matched_transaction_id), matching it must match its
+            // counterpart too — otherwise the same real movement would be
+            // half-matched, half-unmatched and get double-counted in the
+            // worksheet's uncleared total. Lines with no pairing (the vast
+            // majority today, and every account that has never imported a
+            // statement) behave exactly as before.
+            if (!empty($line['matched_transaction_id'])) {
+                confirmBankRecMatchPair($pdo, $txn_id, (int)$line['matched_transaction_id'], $rec_id);
+            } else {
+                $pdo->prepare("UPDATE bank_transactions SET matching_status = 'matched', reconciliation_id = ?, status = 'cleared', updated_at = NOW()
+                                WHERE transaction_id = ?")->execute([$rec_id, $txn_id]);
+            }
         } elseif ($action === 'unmatch') {
-            $pdo->prepare("UPDATE bank_transactions SET matching_status = 'unmatched', reconciliation_id = NULL, status = 'pending', updated_at = NOW()
-                            WHERE transaction_id = ?")->execute([$txn_id]);
+            releaseBankRecMatchPair($pdo, $txn_id);
         } elseif ($action === 'ignore') {
+            // Break any pairing first — an ignored line must never be
+            // revivable by clicking "match" on its (former) counterpart.
+            breakBankRecMatchPair($pdo, $txn_id);
             $pdo->prepare("UPDATE bank_transactions SET matching_status = 'ignored', updated_at = NOW()
                             WHERE transaction_id = ?")->execute([$txn_id]);
         } elseif ($action === 'unignore') {
