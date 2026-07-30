@@ -109,7 +109,10 @@ try {
         'description' => !empty($_POST['description']) ? trim($_POST['description']) : null,
         'category_id' => !empty($_POST['category_id']) ? intval($_POST['category_id']) : null,
         'brand_id' => !empty($_POST['brand_id']) ? intval($_POST['brand_id']) : null,
-        'supplier_id' => !empty($_POST['supplier_id']) ? intval($_POST['supplier_id']) : null,
+        // supplier_id intentionally NOT in this update set — the "Preferred
+        // Supplier" field was removed from the edit form (2026-07-30); any
+        // value already stored on existing products is left untouched
+        // rather than being silently wiped to NULL on every save.
         'unit' => $_POST['unit'],
         'weight' => !empty($_POST['weight']) ? floatval($_POST['weight']) : 0.000,
         'dimensions' => $dimensions,
