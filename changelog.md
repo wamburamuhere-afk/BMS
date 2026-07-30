@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-07-30 (chore) — Remove "Preferred Supplier" field from product Create/Edit forms
+
+**Files:** `app/bms/product/{product_create,product_edit,products}.php`, `api/update_product.php`, new `tests/test_product_preferred_supplier_removed_cli.php`
+
+Investigated the "Preferred Supplier" field on request: it's real (stored in `products.supplier_id`, settable on create/edit, shown on product view, and usable as a Products-list filter), but purely cosmetic beyond that — never consulted anywhere in the actual purchasing/payment workflow. Purchase Order creation has its own separate, required supplier field; nothing pre-fills, defaults, or cross-checks against a product's "preferred" one, and no reorder/restock logic reads it either. Removed from the Add Product and Edit Product forms per request, and from the Products-list quick-add modal (confirmed that modal only ever submits to `create_product.php`, so no existing-data risk there). The list-page's own Supplier filter dropdown — a separate, still-legitimate use of the same column — was left untouched.
+
+One real risk caught before shipping: `api/update_product.php` builds its `UPDATE` query dynamically from every key in its data array, including `supplier_id` — with the field gone from the form, every future edit-save would have silently reset `supplier_id` to `NULL` on save, wiping any value already stored on existing products. Fixed by removing `supplier_id` from that array entirely so the column is never touched by an update, preserving whatever value already exists.
+
+Verified with a new 14-assertion suite: source checks (field gone from both forms and the modal, list filter untouched, the data-loss key removed from the update array) plus a live end-to-end test — sets a real product's `supplier_id`, runs an actual save through `update_product.php` exactly as the edit form now does (no `supplier_id` in the POST), and confirms the value survives the save unchanged before restoring it.
+
 ## 2026-07-30 (security) — Lock Project Assignments and AI Assistant to admin-only
 
 **Files:** `app/constant/settings/{user_projects,ai_settings,system_settings}.php`, `header.php`, new `migrations/2026_07_30_lock_project_assignments.php`, `tests/test_admin_lock_and_delegable_settings_cli.php`
