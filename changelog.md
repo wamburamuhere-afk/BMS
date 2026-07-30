@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-07-30 (fix) — Dashboard date-range quick-select (Today/Yesterday/This Week/Quarter/Year) now actually filters
+
+**Files:** `app/dashboard.php`, new `tests/test_dashboard_time_range_cli.php`
+
+`$_GET['time_range']` was read but never converted into actual `$start_date`/`$end_date` bounds, so the quick-select links in the dashboard's date-range dropdown (Today, Yesterday, This Week, This Quarter, This Year) silently did nothing — they only changed the URL, while the page kept using the current-month default for every stat that's date-filtered. Only the Custom Range form (which sends `start_date`/`end_date` directly) ever worked. Fixed by mapping each `time_range` value to real date bounds, with explicit `start_date`/`end_date` still taking precedence exactly as before. Audited every section first: the only visible thing driven by this range is the "Monthly Revenue" card (`total_revenue` + sales count) — its title/caption are now dynamic too ("Today's Revenue", "This Week's Revenue", etc.) so a correct number doesn't sit under a now-wrong "Monthly" label. Everything else (Today's POS Sales, Overdue Invoices, Inventory Value, Recent Activities, Pending Approvals, and the independent Performance Overview chart with its own Weekly/Monthly/Quarterly/Yearly selector) is unaffected by design and was left untouched.
+
+Verified live in a real browser session (`dev.bms.local/dashboard`) for every `time_range` value plus a custom range — date-picker label, revenue number, and dynamic title/caption all correct in each case; unaffected cards confirmed unchanged across all of them. `tests/test_dashboard_time_range_cli.php` (16 assertions) added as a regression guard.
+
 ## 2026-07-29 (security) — Lock Login History + Zoom Integration to admin-only
 
 **Files:** `api/get_login_history.php`, `app/constant/settings/{login_history,zoom_settings,system_settings}.php`, `header.php`, new `migrations/2026_07_29_lock_login_history_and_zoom.php`, `tests/{test_admin_lock_and_delegable_settings_cli,test_login_history_cli,test_zoom_foundation_cli}.php`
