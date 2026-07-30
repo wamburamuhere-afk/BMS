@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-07-30 (security) — Lock Notification Rules to admin-only
+
+**Files:** `app/constant/settings/{notification_rules,system_settings}.php`, `header.php`, new `migrations/2026_07_30_lock_notification_rules.php`, `tests/test_admin_lock_and_delegable_settings_cli.php`
+
+Continuation of the Settings > Admin consolidation (Users/Roles & Permissions/Payments/Backup/Login History/Zoom Integration/Company Profile): Notification Rules is now also strictly `isAdmin()`-only and reached only via Settings > Admin, no longer delegable via Roles & Permissions or a standalone top-nav item. Same file, same fields, same functionality — only the permission gate and entry point moved; nothing to re-enter. New migration hides its permission row from Roles & Permissions (idempotent, additive only).
+
+Verified: `tests/test_admin_lock_and_delegable_settings_cli.php` expanded to 120 assertions (was 117), all pass live. Confirmed in a real browser session that the page still renders with all its data (per-module notification rules, master switch, channel toggles) and now appears inside Admin's nav list.
+
 ## 2026-07-30 (security) — Lock Company Profile to admin-only; resolves duplicate address fields with Admin > General
 
 **Files:** `app/constant/settings/{company_profile,system_settings}.php`, `header.php`, new `migrations/2026_07_30_lock_company_profile.php`, `tests/test_admin_lock_and_delegable_settings_cli.php`
