@@ -2,18 +2,18 @@
 /**
  * app/constant/settings/zoom_settings.php
  * Configuration for the Zoom integration (plan: zoom.md, Phase 1).
- * Grantable via Roles & Permissions (page_key 'zoom_settings') — admin can
- * delegate VIEWING this page to other roles; canView() itself always passes
- * for admins. Actually saving/testing the Client Secret remains isAdmin()-only,
- * enforced separately in api/zoom/save_zoom_settings.php and test_zoom_config.php.
- * The secret is stored ENCRYPTED — this page never shows it back, only
- * whether one is set, with a "leave blank to keep" pattern.
+ * Strictly admin-only by design — not delegable via Roles & Permissions no
+ * matter what is granted (the 'zoom_settings' permission row is hidden from
+ * that UI entirely). Reached only via Settings > Admin. The Client Secret
+ * is stored ENCRYPTED — this page never shows it back, only whether one is
+ * set, with a "leave blank to keep" pattern.
  */
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/permissions.php';
 
 autoEnforcePermission('zoom_settings');
+if (!isAdmin()) { header('Location: ' . getUrl('unauthorized')); exit; }
 
 logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Viewed Zoom Settings');
 require_once __DIR__ . '/../../../header.php';
