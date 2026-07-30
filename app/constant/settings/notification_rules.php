@@ -7,6 +7,16 @@ require_once __DIR__ . '/../../../core/permissions.php';
 // Admin / explicitly-granted only.
 autoEnforcePermission('notification_rules');
 
+// Strictly admin-only by request (2026-07-30) — consolidated inside
+// Settings > Admin alongside Users/Roles & Permissions/Payments/Backup/
+// Login History/Zoom Integration/Company Profile, no longer delegable via
+// Roles & Permissions no matter what is granted (permission row hidden
+// from that UI). Reached only via Settings > Admin.
+if (!isAdmin()) {
+    header('Location: ' . getUrl('unauthorized'));
+    exit;
+}
+
 $page_title = 'Notification Rules';
 require_once __DIR__ . '/../../../header.php';
 ?>

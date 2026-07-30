@@ -1111,17 +1111,17 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         
                         <!-- Settings — each item gated individually. Everything strictly
                              admin-only (Users, Roles & Permissions, Payments, Backup, Login
-                             History, Zoom Integration, Company Profile) now lives ONLY inside
-                             the "Admin" page (system_settings.php) itself — not as separate
-                             top-nav items — so a non-admin never even sees them as menu entries;
-                             the Admin link below is the single entry point, itself
+                             History, Zoom Integration, Company Profile, Notification Rules) now
+                             lives ONLY inside the "Admin" page (system_settings.php) itself — not
+                             as separate top-nav items — so a non-admin never even sees them as
+                             menu entries; the Admin link below is the single entry point, itself
                              isAdmin()-gated. Everything else here is gated by
                              canView('page_key'), which admins always pass too, so a non-admin
                              granted that specific permission sees and can reach it. -->
                         <?php
                         $_set_um_visible  = canView('user_projects');
                         $_set_sys_visible = isAdmin() || canView('ai_assistant') || canView('pos_config_settings') || canView('color_settings');
-                        $_set_biz_visible = canView('tax_settings') || canView('notification_settings') || canView('notification_rules');
+                        $_set_biz_visible = canView('tax_settings') || canView('notification_settings');
                         ?>
                         <?php if ($_set_um_visible || $_set_sys_visible || $_set_biz_visible): ?>
                         <li class="nav-item dropdown">
@@ -1146,7 +1146,6 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><h6 class="dropdown-header">Business Settings</h6></li>
                                 <?php if (canView('tax_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('tax_settings') ?>"><i class="bi bi-percent"></i> Tax</a></li><?php endif; ?>
                                 <?php if (canView('notification_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('notification_settings') ?>"><i class="bi bi-bell"></i> Notifications</a></li><?php endif; ?>
-                                <?php if (canView('notification_rules')): ?><li><a class="dropdown-item" href="<?= getUrl('notification_rules') ?>"><i class="bi bi-bell-fill"></i> Notification Rules</a></li><?php endif; ?>
                                 <?php endif; ?>
                             </ul>
                         </li>
