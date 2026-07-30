@@ -3,6 +3,8 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/stock_ledger.php';
+require_once __DIR__ . '/../core/stock_posting.php';
+require_once __DIR__ . '/../core/code_generator.php';
 global $pdo;
 
 // Check if user is logged in and has permission
@@ -202,20 +204,28 @@ try {
             ")->execute([$product_id, $warehouse_id, $new_quantity]);
 
             // Record stock movement
-            recordStockMovement($pdo, [
-                'product_id'     => $product_id,
-                'movement_type'  => $movement_type,
-                'quantity'       => abs($diff),
-                'unit'           => $product_data['unit'],
-                'reference_type' => 'manual',
-                'reference_id'   => $product_id,
-                'warehouse_id'   => $warehouse_id,
-                'stock_before'   => $current_qty,
-                'stock_after'    => $new_quantity,
-                'reason'         => 'Stock adjustment via product edit',
-                'notes'          => 'Manual stock edit',
-                'created_by'     => $user_id,
+            $reference_number = nextCode($pdo, 'ADJ');
+            $movement_id = recordStockMovement($pdo, [
+                'product_id'       => $product_id,
+                'movement_type'    => $movement_type,
+                'quantity'         => abs($diff),
+                'unit'             => $product_data['unit'],
+                'reference_type'   => 'manual',
+                'reference_id'     => $product_id,
+                'reference_number' => $reference_number,
+                'warehouse_id'     => $warehouse_id,
+                'stock_before'     => $current_qty,
+                'stock_after'      => $new_quantity,
+                'reason'           => 'Stock adjustment via product edit',
+                'notes'            => 'Manual stock edit',
+                'created_by'       => $user_id,
             ]);
+
+            // GL posting — same call already proven correct in
+            // api/create_stock_adjustment.php; this path was silently
+            // skipping it (post_principle.md audit).
+            postStockAdjustmentGl($pdo, $movement_id, $diff, $movement_type,
+                (float)$product_data['cost_price'], null, $user_id, date('Y-m-d'), $reference_number);
         }
     }
 

@@ -47,6 +47,15 @@ if (function_exists('userCan') && !userCan('warehouse', (int)$_POST['warehouse_i
     exit();
 }
 
+// Project-scope gate — same reasoning as the warehouse check above: the
+// dropdown already only lists in-scope projects, but a hand-crafted request
+// could still name one outside the caller's scope. Only when a project was
+// actually chosen (project_id is optional on this form).
+if (!empty($_POST['project_id']) && function_exists('userCan') && !userCan('project', (int)$_POST['project_id'])) {
+    echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your assigned scope.']);
+    exit();
+}
+
 try {
     $pdo->beginTransaction();
 

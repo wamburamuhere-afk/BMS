@@ -42,6 +42,18 @@ if (function_exists('assertScopeForRecord')) {
     assertScopeForRecord('products', 'product_id', $product_id);
 }
 
+// Warehouse/project-scope gates — mirrors api/create_stock_adjustment.php:
+// the dropdown already only lists in-scope warehouses/projects, but a
+// hand-crafted request could still name one outside the caller's scope.
+if (function_exists('userCan') && !userCan('warehouse', $warehouse_id)) {
+    echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+    exit;
+}
+if ($project_id && function_exists('userCan') && !userCan('project', $project_id)) {
+    echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your assigned scope.']);
+    exit;
+}
+
 try {
     $pdo->beginTransaction();
 
