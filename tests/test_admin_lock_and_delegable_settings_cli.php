@@ -1,6 +1,6 @@
 <?php
 /**
- * Settings menu — 7 pages locked strictly admin-only (all consolidated
+ * Settings menu — 8 pages locked strictly admin-only (all consolidated
  * inside Settings > Admin), the rest genuinely delegable via Roles &
  * Permissions.
  *
@@ -13,7 +13,12 @@
  * (plain page links, not local tabs) rather than as separate top-nav
  * Settings items — since reaching that page already requires isAdmin(),
  * nesting them there means a non-admin never even sees them as menu
- * entries anywhere. Everything else in the Settings menu stays genuinely
+ * entries anywhere. Company Profile was added to this locked set later
+ * still (2026-07-30): it had grown into the single source of truth for
+ * company identity data actually consumed elsewhere (header logo,
+ * TIN/VRN on tax documents, addresses) and was consolidated the same way
+ * — same page, same fields, same stored settings, just reached only via
+ * Admin now. Everything else in the Settings menu stays genuinely
  * delegable: hidden from a role until granted the specific permission,
  * then visible and usable.
  *
@@ -33,11 +38,13 @@
  *   - zoom_settings.php    (view was briefly delegable, now locked too;
  *                           its credential-writing API endpoints were
  *                           always isAdmin()-only regardless)
+ *   - company_profile.php  (logo/TIN/VRN/addresses — feeds tax-compliant
+ *                           documents and the site-wide header)
  *
  * Delegable (canView('page_key') only, no isAdmin() block — admins still
  * always pass canView(), so nothing is lost for them):
  *   - user_projects.php, ai_settings.php (view only — the save/test API
- *     endpoints for the actual API key stay isAdmin()-only), company_profile.php,
+ *     endpoints for the actual API key stay isAdmin()-only),
  *     pos_config_settings.php, color_settings.php, tax_settings.php,
  *     notification_settings.php, notification_rules.php
  *
@@ -73,11 +80,11 @@ $LOCKED = [
     'app/constant/settings/payment_settings.php' => 'payment_settings',
     'app/constant/settings/login_history.php'    => 'login_history',
     'app/constant/settings/zoom_settings.php'    => 'zoom_settings',
+    'app/constant/settings/company_profile.php'  => 'company_profile',
 ];
 $DELEGABLE = [
     'app/constant/settings/user_projects.php'         => 'user_projects',
     'app/constant/settings/ai_settings.php'            => 'ai_assistant',
-    'app/constant/settings/company_profile.php'        => 'company_profile',
     'app/constant/settings/pos_config_settings.php'    => 'pos_config_settings',
     'app/constant/settings/color_settings.php'          => 'color_settings',
     'app/constant/settings/tax_settings.php'            => 'tax_settings',
@@ -86,7 +93,7 @@ $DELEGABLE = [
 ];
 
 section('1. php -l — every touched file');
-foreach (array_merge(array_keys($LOCKED), array_keys($DELEGABLE), ['header.php', 'migrations/2026_07_29_lock_sensitive_settings.php']) as $f) {
+foreach (array_merge(array_keys($LOCKED), array_keys($DELEGABLE), ['header.php', 'migrations/2026_07_29_lock_sensitive_settings.php', 'migrations/2026_07_30_lock_company_profile.php']) as $f) {
     $out = []; $rc = 0;
     exec('php -l ' . escapeshellarg("$root/$f") . ' 2>&1', $out, $rc);
     check($rc === 0, "$f — no syntax errors", "$f — php -l failed: " . implode(' ', $out));
@@ -124,9 +131,9 @@ $hdr = readSrc($root, 'header.php');
 // Integration should NOT appear as their own separate top-nav Settings
 // items at all — only reachable via the single "Admin" (system_settings.php)
 // link, itself isAdmin()-gated. header.php should therefore link to
-// system_settings, but NOT directly to any of the other 6 locked pages.
+// system_settings, but NOT directly to any of the other 7 locked pages.
 check(str_contains($hdr, "getUrl('system_settings')"), "header.php still links to the Admin entry point (system_settings)", "header.php is missing its link to system_settings");
-foreach (['users', 'user_roles', 'payment_settings', 'backup_restore', 'login_history', 'zoom_settings'] as $key) {
+foreach (['users', 'user_roles', 'payment_settings', 'backup_restore', 'login_history', 'zoom_settings', 'company_profile'] as $key) {
     check(!str_contains($hdr, "getUrl('$key')"), "header.php no longer links to '$key' directly (consolidated into Admin)", "header.php still has a direct top-nav link to '$key' — should only be reachable via the Admin page");
 }
 // The Admin link itself must still be isAdmin()-gated.
@@ -141,33 +148,33 @@ foreach ($DELEGABLE as $file => $key) {
 
 section('5b. system_settings.php now hosts plain nav links to every other locked page');
 $settingsPageSrc = readSrc($root, 'app/constant/settings/system_settings.php');
-foreach (['users', 'user_roles', 'payment_settings', 'backup_restore', 'login_history', 'zoom_settings'] as $key) {
+foreach (['users', 'user_roles', 'payment_settings', 'backup_restore', 'login_history', 'zoom_settings', 'company_profile'] as $key) {
     check(str_contains($settingsPageSrc, "getUrl('$key')"), "system_settings.php links to '$key'", "system_settings.php is missing a link to '$key' — it should be reachable from inside the Admin page");
 }
 // These must be plain navigation links, not local tab-panes (no matching
 // data-bs-toggle="tab" id for any of these).
-foreach (['users-tab', 'roles-tab', 'user_roles-tab', 'payment-tab', 'payment_settings-tab', 'login_history-tab', 'zoom-tab', 'zoom_settings-tab'] as $badId) {
+foreach (['users-tab', 'roles-tab', 'user_roles-tab', 'payment-tab', 'payment_settings-tab', 'login_history-tab', 'zoom-tab', 'zoom_settings-tab', 'company_profile-tab'] as $badId) {
     check(!str_contains($settingsPageSrc, "id=\"$badId\""), "system_settings.php has no local tab-pane id=\"$badId\" (must be a real page link, not a fake local tab)", "system_settings.php defines a local tab-pane id=\"$badId\" — should link to the real standalone page instead");
 }
 
-section('6. The 7 locked permissions are hidden from the Roles & Permissions management UI');
+section('6. The 8 locked permissions are hidden from the Roles & Permissions management UI');
 $rolesSrc = readSrc($root, 'app/constant/settings/user_roles.php');
 check(str_contains($rolesSrc, 'COALESCE(is_hidden, 0) = 0'), 'user_roles.php filters out is_hidden=1 permissions from its management list', 'user_roles.php no longer filters by is_hidden — hidden permissions would leak back into the UI');
 
 if (!$isLive) {
     echo "\n  \033[33m⊘\033[0m  Skipping live section (no includes/config.php — not a live install)\n";
 } else {
-    section('7. Live — the 7 permission rows are actually hidden in the DB');
+    section('7. Live — the 8 permission rows are actually hidden in the DB');
     global $pdo;
     try {
         foreach (array_values($LOCKED) as $key) {
             $hidden = (int)$pdo->query("SELECT COALESCE(is_hidden,0) FROM permissions WHERE page_key = " . $pdo->quote($key))->fetchColumn();
-            check($hidden === 1, "permission '$key' has is_hidden=1", "permission '$key' is NOT hidden (is_hidden=$hidden) — run migrations/2026_07_29_lock_sensitive_settings.php");
+            check($hidden === 1, "permission '$key' has is_hidden=1", "permission '$key' is NOT hidden (is_hidden=$hidden) — run migrations/2026_07_29_lock_sensitive_settings.php, migrations/2026_07_29_lock_login_history_and_zoom.php or migrations/2026_07_30_lock_company_profile.php");
         }
 
         section('8. Live — canView() proves the split: locked pages deny a granted-but-non-admin user; delegable pages allow one');
-        // Simulate a non-admin explicitly granted EVERY one of these 15 page_keys
-        // (the most generous possible grant) and confirm the 5 locked ones are
+        // Simulate a non-admin explicitly granted EVERY one of these page_keys
+        // (the most generous possible grant) and confirm the locked ones are
         // still denied by the isAdmin()-based menu/page logic, while every
         // delegable one is allowed.
         $_SESSION['user_id']  = 999051;

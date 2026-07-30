@@ -8,6 +8,16 @@ require_once __DIR__ . '/../../../core/permissions.php';
 // can now grant 'company_profile' to other roles via /user_roles.php.
 autoEnforcePermission('company_profile');
 
+// Strictly admin-only by request (2026-07-30) — consolidated inside
+// Settings > Admin alongside Users/Roles & Permissions/Payments/Backup/
+// Login History/Zoom Integration, no longer delegable via Roles &
+// Permissions no matter what is granted (permission row hidden from that
+// UI). Reached only via Settings > Admin.
+if (!isAdmin()) {
+    header('Location: ' . getUrl('unauthorized'));
+    exit;
+}
+
 require_once __DIR__ . '/../../../header.php';
 
 // Initialize variables
