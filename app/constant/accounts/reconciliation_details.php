@@ -332,9 +332,14 @@ $diffClass = $diff == 0 ? 'success' : 'danger';
 
                     <?php if ($reconciliation['status'] === 'pending'): ?>
                     <div class="d-flex justify-content-between align-items-center mt-3">
-                        <button class="btn btn-outline-primary btn-sm" onclick="openAddAdjustment()">
-                            <i class="bi bi-plus-circle me-1"></i> Add Adjustment
-                        </button>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-primary btn-sm" onclick="openAddAdjustment()">
+                                <i class="bi bi-plus-circle me-1"></i> Add Adjustment
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="suggestMatches()">
+                                <i class="bi bi-magic me-1"></i> Suggest Matches
+                            </button>
+                        </div>
                         <button class="btn btn-primary" id="btnFinalizeMatch" onclick="finalizeMatching()" disabled>
                             <i class="bi bi-lock-fill me-1"></i> Finalize Reconciliation
                         </button>
@@ -459,6 +464,7 @@ const REC_ID    = <?= (int)$reconciliation_id ?>;
 const REC_STATUS = '<?= addslashes($reconciliation['status']) ?>';
 const LINES_URL = '<?= buildUrl('api/account/get_reconciliation_lines.php') ?>';
 const MATCH_URL = '<?= buildUrl('api/account/toggle_reconciliation_match.php') ?>';
+const SUGGEST_URL = '<?= buildUrl('api/account/suggest_reconciliation_matches.php') ?>';
 const CSRF      = '<?= csrf_token() ?>';
 const fmtN = n => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const escH = s => $('<div>').text(s == null ? '' : s).html();
@@ -499,15 +505,24 @@ function loadMatchLines() {
                     ? '<span class="badge bg-secondary">Ignored</span>'
                     : (l.matched ? '<span class="badge" style="background:#052c65;">Cleared</span>'
                                  : '<span class="badge bg-light text-dark border">Uncleared</span>');
-                const createBtn = (!locked && !l.matched && !l.ignored)
+                const sourceBadge = l.source === 'statement'
+                    ? '<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle" title="From an imported bank statement"><i class="bi bi-bank2"></i> Statement</span>'
+                    : '<span class="badge bg-light text-secondary border" title="Auto-recorded when BMS posted this transaction"><i class="bi bi-journal-check"></i> Book</span>';
+                const suggestedBadge = (l.suggested_partner_id && !l.matched && !l.ignored)
+                    ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1" title="Suggested match with line #${l.suggested_partner_id} — tick to confirm both"><i class="bi bi-magic"></i> Suggested</span>`
+                    : '';
+                // "Create GL entry" only ever makes sense for a statement-side
+                // line with no book counterpart — a book-side line is already
+                // posted; creating "from" it would double-book the money.
+                const createBtn = (!locked && !l.matched && !l.ignored && l.source === 'statement' && !l.suggested_partner_id)
                     ? `<button class="btn btn-xs btn-outline-warning py-0 px-1 create-from-line" title="Create GL entry for this line"
                           data-id="${l.transaction_id}" data-amt="${l.amount}" data-type="${l.transaction_type}" data-date="${l.transaction_date}" data-desc="${escH(l.description)}" style="font-size:0.68rem;">
                           <i class="bi bi-journal-plus"></i></button>`
                     : '';
-                html += `<tr class="${l.ignored ? 'opacity-50' : ''}">
+                html += `<tr class="${l.ignored ? 'opacity-50' : ''}${l.suggested_partner_id && !l.matched ? ' table-warning' : ''}">
                     <td class="text-center"><input type="checkbox" class="form-check-input match-chk" data-id="${l.transaction_id}" ${checked} ${dis}></td>
                     <td>${escH(l.transaction_date)}</td>
-                    <td class="small">${escH(l.description)}</td>
+                    <td class="small">${escH(l.description)} ${sourceBadge} ${suggestedBadge}</td>
                     <td><small class="text-muted">${escH(l.reference_number || '')}</small></td>
                     <td class="text-end text-success">${isIn ? fmtN(l.amount) : ''}</td>
                     <td class="text-end text-danger">${!isIn ? fmtN(l.amount) : ''}</td>
@@ -535,6 +550,22 @@ function loadMatchLines() {
         })
         .fail(function () {
             $('#matchTable tbody').html('<tr><td colspan="8" class="text-center text-danger py-4">Server error loading lines.</td></tr>');
+        });
+}
+
+function suggestMatches() {
+    $.getJSON(SUGGEST_URL, { reconciliation_id: REC_ID })
+        .done(function (res) {
+            if (!res || !res.success) {
+                Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not compute suggestions.' });
+                return;
+            }
+            const n = (res.suggested || []).length;
+            Swal.fire({ icon: n ? 'success' : 'info', title: n ? 'Suggestions found' : 'Nothing new', text: res.message, timer: 2200, showConfirmButton: false })
+                .then(() => loadMatchLines());
+        })
+        .fail(function () {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Server error computing suggestions.' });
         });
 }
 
