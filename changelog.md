@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-07-30 (security) — Lock Company Profile to admin-only; resolves duplicate address fields with Admin > General
+
+**Files:** `app/constant/settings/{company_profile,system_settings}.php`, `header.php`, new `migrations/2026_07_30_lock_company_profile.php`, `tests/test_admin_lock_and_delegable_settings_cli.php`
+
+Investigated a user question about whether "Settings > Company Profile" and "Settings > Admin > Company Profile" were both real and which was authoritative. Finding: there was only ever one Company Profile page, but it overlapped with Admin > General's own company fields (Name/Phone/Email/Website/Address) — both write to the same `system_settings` table and mostly the same keys, EXCEPT Address: General has one `company_address` field while Company Profile splits it into `company_postal_address`/`company_physical_address`. Different consumers read different keys (header.php reads `company_physical_address`; document/letter templates, supplier-payment prints, and the activity log read `company_address`), so filling in only one page left the other's consumers blank. Company Profile is also the *only* place to set Logo, TIN, VRN, Currency Code, Code Prefix, and Share Capital — all consumed elsewhere (header logo, tax-compliant invoices/receipts/purchase orders/reports) — making it the more complete, load-bearing page of the two.
+
+Per request: consolidated to one page, reached only via Settings > Admin (like Login History/Zoom/Backup/Users/Roles/Payments before it), with a hard `isAdmin()` gate added. Admin > General's own fields are untouched — same fields, same behavior, nothing removed or reset. Company Profile's own fields/table/keys are untouched too — only its permission gate and entry point moved, so all existing data (logo, TIN, VRN, addresses, etc.) is preserved exactly as-is with nothing to re-enter. The underlying address-key mismatch across consumers (`company_address` vs `company_physical_address`) is a separate, still-open issue — noted for a future fix, not addressed in this change.
+
+Verified: `tests/test_admin_lock_and_delegable_settings_cli.php` expanded to 117 assertions (was 116), all pass live. Confirmed in a real browser session that Company Profile's data renders unchanged, the old top-nav link is gone, and it now appears inside Admin's nav list.
+
 ## 2026-07-30 (fix) — Dashboard date-range quick-select (Today/Yesterday/This Week/Quarter/Year) now actually filters
 
 **Files:** `app/dashboard.php`, new `tests/test_dashboard_time_range_cli.php`
