@@ -1,6 +1,6 @@
 <?php
 /**
- * Settings menu — 9 pages locked strictly admin-only (all consolidated
+ * Settings menu — 11 pages locked strictly admin-only (all consolidated
  * inside Settings > Admin), the rest genuinely delegable via Roles &
  * Permissions.
  *
@@ -13,16 +13,15 @@
  * (plain page links, not local tabs) rather than as separate top-nav
  * Settings items — since reaching that page already requires isAdmin(),
  * nesting them there means a non-admin never even sees them as menu
- * entries anywhere. Company Profile (2026-07-30) and Notification Rules
- * (2026-07-30) were added to this locked set later still, each the same
- * way — same page, same fields, same stored settings, just reached only
- * via Admin now. Everything else in the Settings menu stays genuinely
- * delegable: hidden from a role until granted the specific permission,
- * then visible and usable.
+ * entries anywhere. Company Profile, Notification Rules, Project
+ * Assignments, and AI Assistant were added to this locked set later still
+ * (all 2026-07-30), each the same way — same page, same fields, same
+ * stored settings, just reached only via Admin now. Everything else in the
+ * Settings menu stays genuinely delegable: hidden from a role until
+ * granted the specific permission, then visible and usable.
  *
- * Locked (isAdmin() hard check, permission row hidden from user_roles.php
- * entirely so it can't even be offered as a checkbox; link lives only
- * inside system_settings.php, not header.php's top-nav dropdown):
+ * Locked (isAdmin() hard check; link lives only inside system_settings.php,
+ * not header.php's top-nav dropdown):
  *   - system_settings.php     ("Admin" in the menu — the one exception
  *                              that DOES still have its own top-nav link,
  *                              since it's the entry point to all the others)
@@ -39,12 +38,22 @@
  *   - company_profile.php     (logo/TIN/VRN/addresses — feeds tax-compliant
  *                              documents and the site-wide header)
  *   - notification_rules.php  (who's notified, per event, across every module)
+ *   - user_projects.php       (project/warehouse scope assignment UI)
+ *   - ai_settings.php         (AI provider/API-key configuration — NOT the
+ *                              same as the separate "Ask BMS AI" chat
+ *                              feature, app/constant/communication/ai_assistant.php,
+ *                              which stays independently delegable)
+ *
+ * All of the above have their permission row hidden from user_roles.php
+ * entirely so it can't even be offered as a checkbox — EXCEPT
+ * 'ai_assistant': that page_key is shared with the "Ask BMS AI" chat
+ * feature, which must stay grantable to non-admins, so hiding it here
+ * would have removed the ability to delegate chat access too. The config
+ * page itself is still fully admin-only via its own isAdmin() gate either way.
  *
  * Delegable (canView('page_key') only, no isAdmin() block — admins still
  * always pass canView(), so nothing is lost for them):
- *   - user_projects.php, ai_settings.php (view only — the save/test API
- *     endpoints for the actual API key stay isAdmin()-only),
- *     pos_config_settings.php, color_settings.php, tax_settings.php,
+ *   - pos_config_settings.php, color_settings.php, tax_settings.php,
  *     notification_settings.php
  *
  * Run: php tests/test_admin_lock_and_delegable_settings_cli.php
@@ -81,10 +90,13 @@ $LOCKED = [
     'app/constant/settings/zoom_settings.php'    => 'zoom_settings',
     'app/constant/settings/company_profile.php'  => 'company_profile',
     'app/constant/settings/notification_rules.php' => 'notification_rules',
+    'app/constant/settings/user_projects.php'    => 'user_projects',
+    'app/constant/settings/ai_settings.php'      => 'ai_assistant',
 ];
+// Locked pages whose permission row is deliberately left visible (not
+// hidden) in Roles & Permissions — see the file-header note on 'ai_assistant'.
+$LOCKED_PERMISSION_STAYS_VISIBLE = ['ai_assistant'];
 $DELEGABLE = [
-    'app/constant/settings/user_projects.php'         => 'user_projects',
-    'app/constant/settings/ai_settings.php'            => 'ai_assistant',
     'app/constant/settings/pos_config_settings.php'    => 'pos_config_settings',
     'app/constant/settings/color_settings.php'          => 'color_settings',
     'app/constant/settings/tax_settings.php'            => 'tax_settings',
@@ -92,7 +104,7 @@ $DELEGABLE = [
 ];
 
 section('1. php -l — every touched file');
-foreach (array_merge(array_keys($LOCKED), array_keys($DELEGABLE), ['header.php', 'migrations/2026_07_29_lock_sensitive_settings.php', 'migrations/2026_07_30_lock_company_profile.php', 'migrations/2026_07_30_lock_notification_rules.php']) as $f) {
+foreach (array_merge(array_keys($LOCKED), array_keys($DELEGABLE), ['header.php', 'migrations/2026_07_29_lock_sensitive_settings.php', 'migrations/2026_07_30_lock_company_profile.php', 'migrations/2026_07_30_lock_notification_rules.php', 'migrations/2026_07_30_lock_project_assignments.php']) as $f) {
     $out = []; $rc = 0;
     exec('php -l ' . escapeshellarg("$root/$f") . ' 2>&1', $out, $rc);
     check($rc === 0, "$f — no syntax errors", "$f — php -l failed: " . implode(' ', $out));
@@ -130,11 +142,17 @@ $hdr = readSrc($root, 'header.php');
 // Integration should NOT appear as their own separate top-nav Settings
 // items at all — only reachable via the single "Admin" (system_settings.php)
 // link, itself isAdmin()-gated. header.php should therefore link to
-// system_settings, but NOT directly to any of the other 8 locked pages.
+// system_settings, but NOT directly to any of the other 10 locked pages.
+// (ai_settings is checked by its own route key here, NOT 'ai_assistant' —
+// header.php legitimately still links to getUrl('ai_assistant') for the
+// unrelated "Ask BMS AI" chat feature, checked separately below.)
 check(str_contains($hdr, "getUrl('system_settings')"), "header.php still links to the Admin entry point (system_settings)", "header.php is missing its link to system_settings");
-foreach (['users', 'user_roles', 'payment_settings', 'backup_restore', 'login_history', 'zoom_settings', 'company_profile', 'notification_rules'] as $key) {
+foreach (['users', 'user_roles', 'payment_settings', 'backup_restore', 'login_history', 'zoom_settings', 'company_profile', 'notification_rules', 'user_projects', 'ai_settings'] as $key) {
     check(!str_contains($hdr, "getUrl('$key')"), "header.php no longer links to '$key' directly (consolidated into Admin)", "header.php still has a direct top-nav link to '$key' — should only be reachable via the Admin page");
 }
+check(str_contains($hdr, "getUrl('ai_assistant')") && str_contains($hdr, "Ask BMS"),
+    "header.php still links to the separate 'Ask BMS AI' chat feature (unaffected by locking the AI config page)",
+    "header.php lost its 'Ask BMS AI' chat link — locking the AI config page should not have touched this");
 // The Admin link itself must still be isAdmin()-gated.
 check(
     (bool)preg_match('/if \(isAdmin\(\)\):\s*' . preg_quote('?>', '/') . '(.*?)' . preg_quote('<?php', '/') . ' endif; ' . preg_quote('?>', '/') . '/s', $hdr, $m) && str_contains($m[1] ?? '', "getUrl('system_settings')"),
@@ -147,28 +165,33 @@ foreach ($DELEGABLE as $file => $key) {
 
 section('5b. system_settings.php now hosts plain nav links to every other locked page');
 $settingsPageSrc = readSrc($root, 'app/constant/settings/system_settings.php');
-foreach (['users', 'user_roles', 'payment_settings', 'backup_restore', 'login_history', 'zoom_settings', 'company_profile', 'notification_rules'] as $key) {
+foreach (['users', 'user_roles', 'payment_settings', 'backup_restore', 'login_history', 'zoom_settings', 'company_profile', 'notification_rules', 'user_projects', 'ai_settings'] as $key) {
     check(str_contains($settingsPageSrc, "getUrl('$key')"), "system_settings.php links to '$key'", "system_settings.php is missing a link to '$key' — it should be reachable from inside the Admin page");
 }
 // These must be plain navigation links, not local tab-panes (no matching
 // data-bs-toggle="tab" id for any of these).
-foreach (['users-tab', 'roles-tab', 'user_roles-tab', 'payment-tab', 'payment_settings-tab', 'login_history-tab', 'zoom-tab', 'zoom_settings-tab', 'company_profile-tab', 'notification_rules-tab'] as $badId) {
+foreach (['users-tab', 'roles-tab', 'user_roles-tab', 'payment-tab', 'payment_settings-tab', 'login_history-tab', 'zoom-tab', 'zoom_settings-tab', 'company_profile-tab', 'notification_rules-tab', 'user_projects-tab', 'ai_settings-tab'] as $badId) {
     check(!str_contains($settingsPageSrc, "id=\"$badId\""), "system_settings.php has no local tab-pane id=\"$badId\" (must be a real page link, not a fake local tab)", "system_settings.php defines a local tab-pane id=\"$badId\" — should link to the real standalone page instead");
 }
 
-section('6. The 9 locked permissions are hidden from the Roles & Permissions management UI');
+section('6. The 10 of 11 locked permissions expected to be hidden are hidden from the Roles & Permissions management UI');
 $rolesSrc = readSrc($root, 'app/constant/settings/user_roles.php');
 check(str_contains($rolesSrc, 'COALESCE(is_hidden, 0) = 0'), 'user_roles.php filters out is_hidden=1 permissions from its management list', 'user_roles.php no longer filters by is_hidden — hidden permissions would leak back into the UI');
 
 if (!$isLive) {
     echo "\n  \033[33m⊘\033[0m  Skipping live section (no includes/config.php — not a live install)\n";
 } else {
-    section('7. Live — the 9 permission rows are actually hidden in the DB');
+    section('7. Live — the hidden permission rows are actually hidden in the DB (ai_assistant deliberately excluded)');
     global $pdo;
     try {
         foreach (array_values($LOCKED) as $key) {
+            if (in_array($key, $LOCKED_PERMISSION_STAYS_VISIBLE, true)) continue;
             $hidden = (int)$pdo->query("SELECT COALESCE(is_hidden,0) FROM permissions WHERE page_key = " . $pdo->quote($key))->fetchColumn();
-            check($hidden === 1, "permission '$key' has is_hidden=1", "permission '$key' is NOT hidden (is_hidden=$hidden) — run migrations/2026_07_29_lock_sensitive_settings.php, migrations/2026_07_29_lock_login_history_and_zoom.php, migrations/2026_07_30_lock_company_profile.php or migrations/2026_07_30_lock_notification_rules.php");
+            check($hidden === 1, "permission '$key' has is_hidden=1", "permission '$key' is NOT hidden (is_hidden=$hidden) — run migrations/2026_07_29_lock_sensitive_settings.php, migrations/2026_07_29_lock_login_history_and_zoom.php, migrations/2026_07_30_lock_company_profile.php, migrations/2026_07_30_lock_notification_rules.php or migrations/2026_07_30_lock_project_assignments.php");
+        }
+        foreach ($LOCKED_PERMISSION_STAYS_VISIBLE as $key) {
+            $hidden = (int)$pdo->query("SELECT COALESCE(is_hidden,0) FROM permissions WHERE page_key = " . $pdo->quote($key))->fetchColumn();
+            check($hidden === 0, "permission '$key' is deliberately still visible (is_hidden=0) — shared with the delegable 'Ask BMS AI' chat feature", "permission '$key' is unexpectedly hidden — this would also block granting the 'Ask BMS AI' chat feature to non-admins");
         }
 
         section('8. Live — canView() proves the split: locked pages deny a granted-but-non-admin user; delegable pages allow one');
