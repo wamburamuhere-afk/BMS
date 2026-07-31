@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-07-31 (feat) — Income Statement: drill-down "View" is now a real DataTable
+
+**Files:** `app/bms/invoice/income_statement.php`, new `tests/test_income_statement_drill_datatable_cli.php`
+
+User-reported: clicking a P&L line's "View" drill-down icon opened a modal whose table body was built as one raw HTML string and injected via jQuery `.html()` — every contributing record for the period landed in the DOM at once, no pagination, search, or sort. For an account with hundreds/thousands of transactions in the period, that's slow to render and slow to interact with (violates ui-constants.md §UI-2: every DB-backed `<table>` must be a DataTable).
+
+`#drillTable` is now a real client-side DataTable, lazily initialised once (`ensureDrillTable()`) and reloaded on every drill-down via the standard `table.clear().rows.add(rowsData).draw()` pattern — never raw HTML, never `location.reload()`. The grouped invoices display (collected / recognized / pipeline) is preserved as a per-row "Group" label instead of the old `colspan="8"` divider rows, since DataTables paginates real per-row data and a divider row would break across pages; pipeline rows keep their dimmed styling via `createdRow()`. Column `render()` callbacks are type-aware (`type === 'display'`) — DataTables calls `render()` separately for display, sort, filter, and type-detection on every row, so building full badge HTML / formatting dates for all four (not just display) was quietly quadrupling the cost on every reload; only display now does the expensive work, sort/filter/type get a cheap raw value.
+
+Verified with new `tests/test_income_statement_drill_datatable_cli.php` (15 checks) plus live browser verification on dev.bms.local: opened real drill-downs (flat `journal` source + synthetic grouped `invoices` source), confirmed search/sort/pagination all work, confirmed switching between two different accounts' drill-downs correctly clears and reloads, and benchmarked a synthetic 2000-row account — the DOM held only 15 `<tr>` elements (one page) throughout, versus all 2000 before this fix (render time dropped from 5.4s to 2.6s after making the column renderers type-aware; a realistic 300-row worst case renders in ~425ms). Zero regression in adjacent suites (`test_income_statement_drilldown_cli` 6/6, `test_income_statement_phase1_cli` 4/4, `test_income_statement_phase2_cli` 5/5, `test_income_statement_sources_cli` 12/12; pre-existing, unrelated dev-DB data-state failures in `test_income_statement_cli`, `test_income_statement_other_income_cli`, and `test_income_statement_revenue_truth_cli` confirmed identical with and without this change).
+
 ## 2026-07-31 (fix) — E-Signatures: Draw Signature canvas "Clear" not fully wiping strokes
 
 **Files:** `app/constant/document/e_signatures.php`, new `tests/test_esignature_canvas_clear_transform_cli.php`
