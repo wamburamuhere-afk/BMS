@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-07-31 (fix) — GRN list print, round 2: landscape footer cut-off + inconsistent column font sizes
+
+**Files:** `app/bms/grn/grn.php`, `tests/test_grn_print_layout_cli.php`
+
+Follow-up to the same-day GRN print fix below, driven by a real print/PDF screenshot the user supplied showing landscape still cutting content under the footer, plus a font-size inconsistency across columns.
+
+1. **Landscape footer cut-off persisted after round 1's 16mm bottom `@page` margin.** Landscape's page is physically shorter than portrait's (width/height swap), so the same absolute bottom margin leaves proportionally less room before the shared fixed-position footer. Bumped the base margin to 20mm and added a landscape-specific `@media print and (orientation: landscape)` override bumping it further to 24mm.
+2. **Column values rendered at inconsistent font sizes.** Most cells wrap their value in Bootstrap's `.small`/`<small>` (sized ~87.5% of its parent), while the Date column's plain `<span>` has no such wrapper and printed at the full size — plus the Status badge carried its own inline `style="font-size:0.7rem"` from the on-screen view. Added `#grnTable td *, #grnTable th * { font-size: 8pt !important; }` to force every cell's value and everything nested inside it (badges, `<strong>`, `<code>`, `<small>`, `<div>`) to the exact same size, matching Date — an `!important` author rule beats a plain inline style with no `!important` of its own. Column headers are set to 9pt (Date's 8pt + 1) and bold via a specificity-boosted `#grnTable thead tr th` selector, needed to beat an unrelated, equally-specific `#grnTable thead th` rule declared later in the same file for the on-screen view.
+
+Verified live in a real browser session (dev.bms.local): injected the page's own `@media print` rules as active on-screen styles and confirmed every column's leaf element (`CODE`, `SPAN`, `DIV`, `STRONG` — GRN#, Date, Supplier, Total Value, etc.) computes to the exact same `10.6667px` (8pt), with every header cell at `12px` (9pt) bold. `tests/test_grn_print_layout_cli.php` expanded to 22 checks (was 18). Zero regression in adjacent suites (`test_grn_posting_cli` 17/17, `test_grn_three_approval_cli` 68/68, `test_phase4_grn_approved_cli` 16/16, `test_print_css_standard_cli` 109/109).
+
 ## 2026-07-31 (fix) — Compliance Documents: Delete/Edit actions failing silently
 
 **Files:** `app/constant/document/compliance_documents.php`, `api/delete_compliance.php`, new `tests/test_compliance_delete_silent_fail_cli.php`
