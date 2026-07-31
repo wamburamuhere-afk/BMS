@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-07-31 (fix) — GRN list print: hidden column values, footer overlap, oval status badges
+
+**Files:** `app/bms/grn/grn.php`, new `tests/test_grn_print_layout_cli.php`
+
+User-reported: printing `grn.php` in portrait hid some column values, the shared fixed-position print footer overlapped content at the bottom, and the Status column's rounded "oval" badge shape was unwanted in print.
+
+Root causes, matching the same class of bug already fixed on Sales Orders/Quotations/Supplier/Warehouse Inventory print: (1) every column — including the hidden Actions column — was forced to an identical `8.33%` width regardless of content, so a long Supplier/GRN-number cell got squeezed to the same width as a short Items/S-NO cell with nowhere for its content to go but clip; (2) no extra bottom `@page` clearance for the shared `.bms-print-footer` (fixed, `bottom:0` on every printed page); (3) the site-wide `p, .card, section { page-break-inside: avoid }` rule treats the whole GRN table card as one unsplittable block, risking a blank first page on a long list; (4) Status rendered as a Bootstrap `.badge` pill even in print.
+
+Fixed with the same proven pattern: explicit content-proportional percentage widths (summing to 100%) for every visible column in both the with/without-Project branches, Actions dropped from print via `.d-print-none` (freeing its width rather than leaving it reserved), `@page` bottom margin matching the already-proven 16mm value, an `#grnTableCard` `page-break-inside: auto` override, and an ID-qualified `#grnTable .grn-status-badge` print rule that strips background/border/border-radius/padding so Status prints as plain bold text instead of a pill.
+
+Verified with new `tests/test_grn_print_layout_cli.php` (18 checks, including an automated check that each branch's column-width percentages actually sum to 100%) plus live browser verification on dev.bms.local: injected the page's own `@media print` rules as active on-screen styles (a native print dialog can't be screenshotted), confirmed no column value clips, and confirmed via computed style that the Status badge renders with `color: rgb(0,0,0)`, `background: transparent`, `border: none`, `border-radius: 0` — no oval shape. Zero regression in adjacent suites (`test_grn_posting_cli` 17/17, `test_grn_three_approval_cli` 68/68, `test_phase4_grn_approved_cli` 16/16, `test_print_css_standard_cli` 109/109).
+
 ## 2026-07-31 (feat) — Income Statement: drill-down "View" is now a real DataTable
 
 **Files:** `app/bms/invoice/income_statement.php`, new `tests/test_income_statement_drill_datatable_cli.php`
