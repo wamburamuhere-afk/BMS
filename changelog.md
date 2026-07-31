@@ -10,6 +10,16 @@ Fixed by adding `data-no-autoclose="true"` to `#processPayrollModal`, the same o
 
 Verified with new `tests/test_payroll_process_modal_autoclose_cli.php` (10 checks): the opt-out attribute is present, `footer.php`'s handler still honours it, `preview_payroll.php`'s response shape confirms the trigger condition, and the existing `ai_generate.php` opt-out is untouched. Zero regression in adjacent suites (`test_attendance_payroll_cli` 26/26, `test_payroll_bulk_null_id_cli` 10/10, `test_phase4_payroll_paid_cli` 52/52).
 
+## 2026-07-31 (fix) — Assets: Run Depreciation proposal modal auto-closing on preview
+
+**Files:** `app/bms/operations/assets.php`, new `tests/test_asset_depreciation_modal_autoclose_cli.php`
+
+User-reported: on Assets > Run Depreciation, the Preview closed the form on its own, and Post Depreciation appeared "not functioning." Same root cause as the Payroll "Process Payroll" modal fixed the same day (PR #1653): `footer.php`'s sitewide `$(document).ajaxSuccess` handler closes whatever modal is open the moment any non-GET AJAX call returns `{success: true}`, unless that modal carries `data-no-autoclose="true"`. `#depProposalModal` didn't have that attribute. Clicking Preview calls `loadDepPreview()`, which POSTs to `api/assets/run_depreciation.php` with `mode: 'preview'` — that endpoint returns `{success: true, mode: 'preview', proposal: ...}` on a normal preview, so the global handler closed the modal the instant the preview table rendered, before the user could ever reach the now-enabled Post Depreciation button. Both reported symptoms were one bug, not two.
+
+Fixed by adding `data-no-autoclose="true"` to `#depProposalModal`, the same opt-out already used by `#processPayrollModal` and `app/includes/ai_generate.php`'s `#aiGenModal`.
+
+Verified with new `tests/test_asset_depreciation_modal_autoclose_cli.php` (13 checks): the opt-out attribute is present, `footer.php`'s handler still honours it, `run_depreciation.php`'s preview response shape confirms the trigger condition, Preview/Post wiring and the Post button's disabled-by-default safety behaviour are unchanged, and the existing `ai_generate.php` opt-out is untouched. Zero regression in adjacent suites (`test_asset_depreciation_phase1_cli` 47/47, `test_asset_depreciation_phase4_cli` 21/21, `test_asset_depreciation_preview_cli` 16/16).
+
 ## 2026-07-30 (fix) — Maintenance: real GL posting, closes the post_principle.md gap
 
 **Files:** `core/expense_posting.php` (new Maintenance wrappers), `api/operations/{save_maintenance_log,delete_maintenance_log,get_maintenance_log,get_maintenance_logs,export_maintenance,print_maintenance}.php`, `app/bms/operations/{maintenance,asset_view,asset_dashboard}.php`, new `migrations/2026_07_30_{maintenance_logs_payment,remove_asset_maintenance}.php`, new `tests/test_maintenance_gl_posting_cli.php`, `tests/{test_asset_intelligence_phase8,test_asset_disposal_phase6}_cli.php` (fixture updates); deleted `api/operations/save_maintenance.php`
