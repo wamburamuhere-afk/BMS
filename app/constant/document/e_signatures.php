@@ -789,9 +789,14 @@ function initSignaturePad() {
     
     // Scale context to match device pixel ratio
     ctx.scale(dpr, dpr);
-    
+
     // Clear canvas with transparent background (NO WHITE FILL for transparency)
+    // Reset to identity first so the clear covers physical pixels correctly
+    // regardless of the scale transform just applied above.
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
     
     // Configure drawing style
     ctx.strokeStyle = '#000000';
@@ -884,8 +889,15 @@ function handleTouchMove(e) {
 
 function clearSignature() {
     if (!canvas || !ctx) return;
-    // Clear with transparency instead of white fill
+    // Reset to the identity transform first: ctx carries a scale(dpr, dpr) from
+    // initSignaturePad(), so clearing with canvas.width/height (physical pixels)
+    // while that transform is still active operates in the wrong coordinate
+    // space. Resetting to identity makes the clear correct regardless of DPI,
+    // browser zoom, or rendering pipeline.
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
     $('#saveSignatureBtn').prop('disabled', true);
 }
 
