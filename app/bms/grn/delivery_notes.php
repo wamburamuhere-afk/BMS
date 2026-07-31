@@ -344,7 +344,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                         <tr>
                             <th style="width:50px;" class="ps-3">S/NO</th>
                             <th>DN Number</th>
-                            <th style="width:90px;">Type</th>
+                            <th style="width:90px;" class="d-print-none">Type</th>
                             <th>Date</th>
                             <th id="dnPartyColHeading"><?= $is_outbound_view ? 'Customer' : 'Supplier / Sub-Contractor' ?></th>
                             <?php if ($enable_projects): ?><th>Project</th><?php endif; ?>
@@ -546,7 +546,7 @@ $(document).ready(function() {
             },
             {
                 data: 'dn_type',
-                className: 'text-center',
+                className: 'text-center d-print-none',
                 render: function(data) { return dnTypeBadge(data); }
             },
             {
@@ -564,8 +564,8 @@ $(document).ready(function() {
             <?php if ($enable_projects): ?>
             {
                 data: 'project_name',
-                render: function(data) { 
-                    return data ? `<span class="badge bg-info-soft text-info border border-info small p-1 text-wrap w-100" style="white-space: normal; word-break: break-word;">${safe_output(data)}</span>` : '<span class="text-muted small">N/A</span>'; 
+                render: function(data) {
+                    return data ? `<span class="badge bg-info-soft text-info border border-info small p-1 text-wrap w-100 dn-project-badge" style="white-space: normal; word-break: break-word;">${safe_output(data)}</span>` : '<span class="text-muted small">N/A</span>';
                 }
             },
             <?php endif; ?>
@@ -878,11 +878,47 @@ function changeStatus(id, newStatus) {
         #dnTable thead { display: table-header-group; }
 
         #dnTable th, #dnTable td {
-            font-size: 8pt !important;
             padding: 5px !important;
             border: 1px solid #000 !important;
         }
         #dnTable th:last-child, #dnTable td:last-child { display: none !important; } /* Hide Actions */
+
+        /* Font sizing mirrors ledger_report.php's #ledgerTable / grn.php's
+           #grnTable exactly: header smaller than body (plain <th> is bold by
+           default, already distinct from values without inflating its size). */
+        #dnTable thead tr th {
+            font-size: 7pt !important;
+            line-height: 1.15 !important;
+        }
+        /* Base body size on the cell itself (covers a cell with no nested
+           wrapper element, e.g. Warehouse), matching #ledgerTable/#grnTable's
+           tbody td rule exactly. */
+        #dnTable tbody td {
+            font-size: 7.5pt !important;
+        }
+        /* Most cells wrap their value in Bootstrap's .small/<small>/badges
+           (sized relative to their parent, or carrying their own inline
+           font-size from the on-screen view) -- force every cell's nested
+           content to the same 7.5pt too, so no column reads a different size
+           from another (same fix already applied to grn.php). */
+        #dnTable td *, #dnTable th * {
+            max-width: 100% !important;
+            white-space: normal !important;
+            font-size: 7.5pt !important;
+        }
+
+        /* Project "badge" printed as plain bold text -- no pill/oval shape.
+           #dnTable-qualified so this always wins over any generic .badge
+           print rule elsewhere regardless of source order. */
+        #dnTable .dn-project-badge {
+            background: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            color: #000 !important;
+            font-weight: 700 !important;
+            font-size: 7.5pt !important;
+        }
     }
 
     .hover-shadow:hover {
