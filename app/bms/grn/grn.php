@@ -198,18 +198,24 @@ function generate_grn_number() {
 
     /* Print Logic: Force Table View, Hide Card View */
     @media print {
+        /* Extra bottom clearance (16mm vs the global 15mm) so the last table
+           row never sits under the shared fixed-position print footer --
+           same margin already proven correct on Customer/Supplier/
+           Sub-Contractor/Delivery-Notes/Quotations/Sales-Orders print. */
+        @page { margin: 10mm 8mm 16mm 8mm; size: auto; }
+
         #card-view-container {
             display: none !important;
         }
         #table-view-container {
             display: block !important;
         }
-        
+
         /* Repeat Table Headers on each page */
         thead {
             display: table-header-group !important;
         }
-        
+
         tr {
             page-break-inside: avoid !important;
         }
@@ -225,6 +231,18 @@ function generate_grn_number() {
             background: none !important;
             border: none !important;
         }
+
+        /* The global responsive.css rule `p, .card, section { page-break-inside:
+           avoid }` treats the whole GRN table card as one unsplittable block --
+           for a list many times taller than one printed page, that pushes it
+           entirely onto a later page and leaves page 1 blank. An id-selector
+           override beats the class rule and lets the table flow/break
+           normally across pages (same fix as Sales Orders/Quotations). */
+        #grnTableCard {
+            page-break-inside: auto !important;
+            break-inside: auto !important;
+            overflow: visible !important;
+        }
     }
 
     /* Fix for Table Alignment and Margins */
@@ -233,7 +251,7 @@ function generate_grn_number() {
         background: #fff;
         border-radius: 8px;
     }
-    
+
     /* Screen View Table Styling */
     table.dataTable {
         width: 100% !important;
@@ -241,7 +259,7 @@ function generate_grn_number() {
         border-collapse: collapse !important;
         table-layout: fixed !important; /* Force fit to screen width */
     }
-    
+
     #grnTable th, #grnTable td {
         text-align: center !important;
         vertical-align: middle !important;
@@ -249,7 +267,7 @@ function generate_grn_number() {
         border: 1px solid #dee2e6 !important;
         overflow-wrap: break-word !important;
         word-break: break-word !important;
-        white-space: normal !important; 
+        white-space: normal !important;
         /* Removed min-width to prevent horizontal scrolling */
     }
 
@@ -258,14 +276,80 @@ function generate_grn_number() {
         table.dataTable {
             table-layout: fixed !important;
         }
+
+        /* Root cause of "column values hidden/cut off": every column (including
+           the Actions column, which is dropped from print entirely via
+           .d-print-none) was forced to the SAME 8.33% width regardless of its
+           actual content -- a long Supplier/GRN-number cell got squeezed down
+           to the same width as a short Items/S-NO cell, so its content had
+           nowhere to go but overflow/clip. Strip the old inline JS pixel
+           widths first, then give each VISIBLE column an explicit,
+           content-proportional percentage width (summing to 100%) instead. */
         #grnTable th, #grnTable td {
-            width: 8.33% !important;
-            min-width: 0 !important; /* Allow shrinking to fit page */
+            width: auto !important;
+            min-width: 0 !important;
             font-size: 8pt !important;
             padding: 5px 2px !important;
         }
-        #grnTable th:first-child, #grnTable td:first-child {
-            width: 35px !important;
+
+        <?php if ($enable_projects): ?>
+        /* 11 visible columns with Project enabled (Actions is .d-print-none) */
+        #grnTable th:nth-child(1),  #grnTable td:nth-child(1)  { width: 4%  !important; } /* S/NO */
+        #grnTable th:nth-child(2),  #grnTable td:nth-child(2)  { width: 11% !important; } /* GRN # */
+        #grnTable th:nth-child(3),  #grnTable td:nth-child(3)  { width: 8%  !important; } /* Date */
+        #grnTable th:nth-child(4),  #grnTable td:nth-child(4)  { width: 14% !important; } /* Supplier */
+        #grnTable th:nth-child(5),  #grnTable td:nth-child(5)  { width: 9%  !important; } /* PO # */
+        #grnTable th:nth-child(6),  #grnTable td:nth-child(6)  { width: 9%  !important; } /* Project */
+        #grnTable th:nth-child(7),  #grnTable td:nth-child(7)  { width: 9%  !important; } /* Warehouse */
+        #grnTable th:nth-child(8),  #grnTable td:nth-child(8)  { width: 6%  !important; } /* Items */
+        #grnTable th:nth-child(9),  #grnTable td:nth-child(9)  { width: 11% !important; } /* Total Value */
+        #grnTable th:nth-child(10), #grnTable td:nth-child(10) { width: 9%  !important; } /* Received By */
+        #grnTable th:nth-child(11), #grnTable td:nth-child(11) { width: 10% !important; } /* Status */
+        <?php else: ?>
+        /* 10 visible columns with Project disabled (Actions is .d-print-none) */
+        #grnTable th:nth-child(1),  #grnTable td:nth-child(1)  { width: 4%  !important; } /* S/NO */
+        #grnTable th:nth-child(2),  #grnTable td:nth-child(2)  { width: 12% !important; } /* GRN # */
+        #grnTable th:nth-child(3),  #grnTable td:nth-child(3)  { width: 9%  !important; } /* Date */
+        #grnTable th:nth-child(4),  #grnTable td:nth-child(4)  { width: 16% !important; } /* Supplier */
+        #grnTable th:nth-child(5),  #grnTable td:nth-child(5)  { width: 10% !important; } /* PO # */
+        #grnTable th:nth-child(6),  #grnTable td:nth-child(6)  { width: 10% !important; } /* Warehouse */
+        #grnTable th:nth-child(7),  #grnTable td:nth-child(7)  { width: 7%  !important; } /* Items */
+        #grnTable th:nth-child(8),  #grnTable td:nth-child(8)  { width: 12% !important; } /* Total Value */
+        #grnTable th:nth-child(9),  #grnTable td:nth-child(9)  { width: 10% !important; } /* Received By */
+        #grnTable th:nth-child(10), #grnTable td:nth-child(10) { width: 10% !important; } /* Status */
+        <?php endif; ?>
+
+        /* Header labels must wrap, not clip, once their column has a real
+           (narrower) printed width. */
+        #grnTable thead th {
+            white-space: normal !important;
+        }
+
+        /* Backstop so no cell's content can bleed into its neighbour: several
+           cells render JS-built HTML with on-screen sizing baked in as inline
+           styles (e.g. max-width:100px/80px truncation on Warehouse/Received
+           By). Reset every inline max-width to the column's own width and
+           force wrapping instead of nowrap/ellipsis truncation. */
+        #grnTable td, #grnTable th {
+            overflow: hidden !important;
+            word-wrap: break-word !important;
+            word-break: normal !important;
+        }
+        #grnTable td *, #grnTable th * {
+            max-width: 100% !important;
+            white-space: normal !important;
+        }
+
+        /* Status "badge" printed as plain bold text -- no pill/oval shape.
+           #grnTable-qualified so this always wins over the generic .badge
+           print rule further down this stylesheet regardless of source order. */
+        #grnTable .grn-status-badge {
+            background: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            color: #000 !important;
+            font-weight: 700 !important;
         }
     }
 
@@ -566,7 +650,7 @@ function generate_grn_number() {
     </div>
 
     <!-- Table -->
-    <div class="card border-0 shadow-sm">
+    <div class="card border-0 shadow-sm" id="grnTableCard">
         <div class="card-header bg-white py-3 border-bottom d-print-none">
             <h5 class="mb-0 fw-bold">Goods Received Notes List</h5>
         </div>
@@ -588,7 +672,7 @@ function generate_grn_number() {
                                 <th class="text-center">Total Value</th>
                                 <th class="text-center">Received By</th>
                                 <th class="text-center">Status</th>
-                                <th class="text-center">Actions</th>
+                                <th class="text-center d-print-none">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -940,18 +1024,19 @@ function initTable() {
                 width: '100px',
                 render: function(data) { return `<div class="text-truncate small" style="max-width: 80px;" title="${safeOutput(data)}">${safeOutput(data)}</div>`; }
             },
-            { 
+            {
                 data: 'status',
                 className: 'text-center',
                 width: '90px',
                 render: function(data) {
                     const badgeClass = getStatusBadge(data);
-                    return `<span class="badge bg-${badgeClass} small" style="font-size: 0.7rem; padding: 4px 8px;">${data.toUpperCase()}</span>`;
+                    return `<span class="badge bg-${badgeClass} small grn-status-badge" style="font-size: 0.7rem; padding: 4px 8px;">${data.toUpperCase()}</span>`;
                 }
             },
             {
                 data: null,
                 orderable: false,
+                className: 'd-print-none',
                 render: function(data, type, row) {
                     let actions = `
                         <div class="dropdown">
