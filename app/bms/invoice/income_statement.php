@@ -243,8 +243,9 @@ $is_admin_user = isAdmin();
             </div>
             <div class="modal-body p-0">
                 <div class="px-3 pt-2"><small class="text-muted" id="drillCount"></small></div>
+                <div class="text-center py-4 d-none" id="drillLoading"><div class="spinner-border spinner-border-sm text-primary"></div> Loading…</div>
                 <div class="table-responsive" id="drillTableWrap">
-                    <table class="table table-hover table-sm align-middle mb-0">
+                    <table class="table table-hover table-sm align-middle mb-0" id="drillTable" style="width:100%;">
                         <thead class="table-light">
                             <tr>
                                 <th class="ps-3">S/NO</th>
@@ -257,7 +258,7 @@ $is_admin_user = isAdmin();
                                 <th class="text-end pe-3">Amount</th>
                             </tr>
                         </thead>
-                        <tbody id="drillBody"></tbody>
+                        <tbody></tbody>
                         <tfoot>
                             <tr class="fw-bold border-top">
                                 <td colspan="7" class="text-end">GL Total (recognised)</td>
@@ -580,6 +581,77 @@ function drillStatus(s) {
     else if (['rejected','cancelled','void'].includes(v))   style = 'background:#dc3545;color:#fff;';
     return `<span class="badge" style="${style}padding:4px 9px;border-radius:20px;font-size:0.72rem;">${drillEsc(s || '—')}</span>`;
 }
+// GL-posted badge for a drill-down row.
+function drillGlBadge(posted) {
+    return posted
+        ? `<span class="badge" style="background:#d1e7dd;color:#0a3622;font-size:0.68rem;padding:3px 6px;border-radius:20px;" title="Journal entry posted">✓ Posted</span>`
+        : `<span class="badge" style="background:#fff3cd;color:#664d03;font-size:0.68rem;padding:3px 6px;border-radius:20px;" title="No journal entry yet — not recognised on P&L">⏳ Pending</span>`;
+}
+// Group label appended to the Type badge (invoices source only: collected/recognized/pipeline).
+function drillGroupLabel(group) {
+    if (group === 'collected')  return '<br><small class="text-success" style="font-size:0.68rem;"><i class="bi bi-check-circle-fill me-1"></i>Collected</small>';
+    if (group === 'recognized') return '<br><small class="text-warning-emphasis" style="font-size:0.68rem;"><i class="bi bi-hourglass-split me-1"></i>Recognized</small>';
+    if (group === 'pipeline')   return '<br><small class="text-muted fst-italic" style="font-size:0.68rem;"><i class="bi bi-clock me-1"></i>Pipeline</small>';
+    return '';
+}
+
+// Drill-down DataTable — lazily initialised once, then reloaded via clear()+rows.add()+draw()
+// per ui-constants.md §UI-2 (never rebuild raw HTML for a DB-backed table; keeps it fast even
+// when an account has hundreds/thousands of contributing records).
+let drillTable = null;
+function ensureDrillTable() {
+    if (drillTable) return drillTable;
+    drillTable = $('#drillTable').DataTable({
+        responsive: false,
+        scrollX: true,
+        pageLength: 15,
+        order: [],
+        dom: 'frtip',
+        language: {
+            emptyTable: 'No contributing records found for this period.',
+            zeroRecords: 'No matching records.'
+        },
+        // Every render() below is type-aware: DataTables calls render() separately for
+        // 'display' (what's shown), 'sort', 'filter' (search index), and 'type' (auto
+        // column-type detection) — for EVERY row, not just the visible page. Building
+        // full HTML badges / formatting dates for all four on every one of thousands of
+        // rows is what made this slow before; only 'display' needs the expensive work,
+        // the rest just need a cheap, sortable/searchable primitive.
+        columns: [
+            { data: 'no', className: 'ps-3' },
+            { data: 'gl_posted', className: 'text-center',
+              render: (v, type) => type === 'display' ? drillGlBadge(v !== false) : (v !== false ? 1 : 0) },
+            { data: 'type',
+              render: (v, type, row) => type === 'display'
+                  ? `<span class="badge bg-light text-secondary border" style="font-size:0.7rem;font-weight:600;">${drillEsc(v || '—')}</span>${drillGroupLabel(row.group)}`
+                  : (v || '') },
+            { data: 'ref', className: 'font-monospace fw-semibold', width: '1%' /* keep intrinsic width, no wrap forced */,
+              render: (v, type) => type === 'display' ? drillEsc(v || '—') : (v || '') },
+            { data: 'date',
+              render: (v, type) => type === 'display' ? drillDate(v) : (v || '') },
+            { data: 'party',
+              render: (v, type) => type === 'display' ? drillEsc(v) : (v || '') },
+            { data: 'status', className: 'text-center',
+              render: (v, type) => type === 'display' ? drillStatus(v) : (v || '') },
+            { data: 'amount', className: 'text-end pe-3 font-monospace',
+              render: (v, type) => type === 'display' ? formatMoney(v) : v }
+        ],
+        createdRow: function (row, data) {
+            if (data.group === 'pipeline') $(row).css('opacity', '0.55');
+        }
+    });
+    return drillTable;
+}
+// Flatten the API's grouped (invoices source) or flat (every other source) shape into one
+// array in the SAME order the report already reasons about it (collected → recognized →
+// pipeline, or date order for flat sources), tagging a sequential S/NO along the way.
+function buildDrillRows(res) {
+    const hasGroups = res.collected && (res.collected.length + (res.recognized ? res.recognized.length : 0)) > 0;
+    const combined = hasGroups
+        ? [].concat(res.collected || [], res.recognized || [], res.pipeline || [])
+        : (res.rows || []).slice();
+    return combined.map((r, i) => Object.assign({}, r, { no: i + 1 }));
+}
 function openDrill(drill, name) {
     const params = Object.assign({
         start_date: $('#start_date').val(),
@@ -587,80 +659,37 @@ function openDrill(drill, name) {
         project_id: $('#project_id').val() || ''
     }, drill);
 
+    const table = ensureDrillTable();
+
     $('#drillTitle').text(name);
     $('#drillCount').text('');
     $('#drillTotal').text('0.00');
-    $('#drillBody').html('<tr><td colspan="8" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> Loading…</td></tr>');
+    table.clear().draw();
+    $('#drillTableWrap').addClass('d-none');
+    $('#drillLoading').removeClass('d-none');
     new bootstrap.Modal(document.getElementById('drillModal')).show();
 
     $.getJSON('<?= buildUrl('api/account/get_income_statement_detail.php') ?>', params, function (res) {
+        $('#drillLoading').addClass('d-none');
+        $('#drillTableWrap').removeClass('d-none');
         if (!res.success) {
-            $('#drillBody').html(`<tr><td colspan="8" class="text-danger text-center py-3">${drillEsc(res.message || 'Failed to load')}</td></tr>`);
+            Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Failed to load contributing records.' });
             return;
         }
         if (res.title) $('#drillTitle').text(res.title);
-        if (!res.rows || !res.rows.length) {
-            $('#drillBody').html('<tr><td colspan="8" class="text-muted text-center py-3">No contributing records found for this period.</td></tr>');
-            $('#drillTotal').text(formatMoney(res.total || 0));
-            return;
-        }
 
-        // GL badge helper
-        function glBadge(posted) {
-            return posted
-                ? `<span class="badge" style="background:#d1e7dd;color:#0a3622;font-size:0.68rem;padding:3px 6px;border-radius:20px;" title="Journal entry posted">✓ Posted</span>`
-                : `<span class="badge" style="background:#fff3cd;color:#664d03;font-size:0.68rem;padding:3px 6px;border-radius:20px;" title="No journal entry yet — not recognised on P&L">⏳ Pending</span>`;
-        }
+        const rowsData = buildDrillRows(res);
+        table.clear().rows.add(rowsData).draw();
+        table.columns.adjust();
 
-        // Build a single row (shared helper). dimmed = true for pipeline rows.
-        function drillRow(r, i, dimmed) {
-            const style = dimmed ? 'opacity:0.55;' : '';
-            return `<tr style="${style}">
-                <td class="ps-3 text-muted">${i}</td>
-                <td class="text-center">${glBadge(r.gl_posted !== false)}</td>
-                <td><span class="badge bg-light text-secondary border" style="font-size:0.7rem;font-weight:600;">${drillEsc(r.type || '—')}</span></td>
-                <td class="font-monospace fw-semibold" style="font-size:0.82rem;">${drillEsc(r.ref || '—')}</td>
-                <td style="white-space:nowrap;">${drillDate(r.date)}</td>
-                <td>${drillEsc(r.party)}</td>
-                <td class="text-center">${drillStatus(r.status)}</td>
-                <td class="text-end pe-3 font-monospace">${formatMoney(r.amount)}</td>
-            </tr>`;
-        }
-
-        let html = '', i = 1;
-
-        // Grouped display (invoices source: collected / recognized / pipeline).
-        const hasGroups = res.collected && res.collected.length + (res.recognized ? res.recognized.length : 0) > 0;
-        if (hasGroups) {
-            if (res.collected && res.collected.length) {
-                html += `<tr class="table-success"><td colspan="8" class="fw-bold py-1 ps-3" style="font-size:0.8rem;">
-                    <i class="bi bi-check-circle-fill me-1"></i> COLLECTED — cash already received
-                </td></tr>`;
-                res.collected.forEach(r => { html += drillRow(r, i++, false); });
-            }
-            if (res.recognized && res.recognized.length) {
-                html += `<tr class="table-warning"><td colspan="8" class="fw-bold py-1 ps-3" style="font-size:0.8rem;">
-                    <i class="bi bi-hourglass-split me-1"></i> RECOGNIZED — pending collection (Accounts Receivable)
-                </td></tr>`;
-                res.recognized.forEach(r => { html += drillRow(r, i++, false); });
-            }
-            if (res.pipeline && res.pipeline.length) {
-                html += `<tr style="background:#f8f9fa;"><td colspan="8" class="fw-bold py-1 ps-3 text-muted" style="font-size:0.8rem;border-top:2px dashed #dee2e6;">
-                    <i class="bi bi-clock me-1"></i> PIPELINE — not yet recognised on P&L (${res.pipeline.length} invoice${res.pipeline.length > 1 ? 's' : ''}, ${formatMoney(res.pipeline_total || 0)})
-                </td></tr>`;
-                res.pipeline.forEach(r => { html += drillRow(r, i++, true); });
-            }
-        } else {
-            // Flat list — all other sources.
-            res.rows.forEach(r => { html += drillRow(r, i++, false); });
-        }
-
-        $('#drillBody').html(html);
         const pipelineNote = (res.pipeline_total > 0) ? ` — pipeline: ${formatMoney(res.pipeline_total)} not included` : '';
-        $('#drillCount').text(res.count + ' recognised record(s)' + pipelineNote);
-        $('#drillTotal').text(formatMoney(res.total));
+        $('#drillCount').text((res.count || 0) + ' recognised record(s)' + pipelineNote);
+        $('#drillTotal').text(formatMoney(res.total || 0));
     }).fail(function () {
-        $('#drillBody').html('<tr><td colspan="8" class="text-danger text-center py-3">Server error.</td></tr>');
+        $('#drillLoading').addClass('d-none');
+        $('#drillTableWrap').removeClass('d-none');
+        table.clear().draw();
+        Swal.fire({ icon: 'error', title: 'Error', text: 'Server error while loading contributing records.' });
     });
 }
 
