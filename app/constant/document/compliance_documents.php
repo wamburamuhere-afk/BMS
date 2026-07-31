@@ -13,6 +13,9 @@ if (function_exists('autoEnforcePermission')) {
     autoEnforcePermission('compliance');
 }
 
+$can_edit   = canEdit('compliance');
+$can_delete = canDelete('compliance');
+
 // Categories for Compliance
 $compliance_categories = [
     'KYC' => 'Know Your Customer documents (IDs, Photos)',
@@ -283,6 +286,9 @@ $compliance_categories = [
 </style>
 
 <script>
+const CAN_EDIT_COMPLIANCE   = <?= json_encode($can_edit) ?>;
+const CAN_DELETE_COMPLIANCE = <?= json_encode($can_delete) ?>;
+
 $(document).ready(function() {
     // Audit Log for Page View
     logReportAction('Viewed Compliance Management', 'User viewed the compliance documents dashboard');
@@ -357,6 +363,14 @@ $(document).ready(function() {
                     } else {
                         viewItem = `<li><span class="dropdown-item text-muted" style="cursor:default"><i class="bi bi-eye-slash me-2"></i> No file attached</span></li>`;
                     }
+                    let actionItems = '';
+                    if (CAN_EDIT_COMPLIANCE) {
+                        actionItems += `<li><a class="dropdown-item" href="javascript:void(0)" onclick="editCompliance(${row.id})"><i class="bi bi-pencil me-2"></i> Edit Record</a></li>`;
+                    }
+                    if (CAN_DELETE_COMPLIANCE) {
+                        if (CAN_EDIT_COMPLIANCE) actionItems += `<li><hr class="dropdown-divider"></li>`;
+                        actionItems += `<li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteCompliance(${row.id})"><i class="bi bi-trash me-2"></i> Remove</a></li>`;
+                    }
                     return `
                     <div class="dropdown">
                         <button class="btn btn-sm btn-light border dropdown-toggle" type="button" data-bs-toggle="dropdown">
@@ -364,9 +378,7 @@ $(document).ready(function() {
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                             ${viewItem}
-                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="editCompliance(${row.id})"><i class="bi bi-pencil me-2"></i> Edit Record</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="deleteCompliance(${row.id})"><i class="bi bi-trash me-2"></i> Remove</a></li>
+                            ${actionItems}
                         </ul>
                     </div>`;
                 }
@@ -400,10 +412,15 @@ function editCompliance(id) {
             $('[name="ref_no"]').val(r.ref_no);
             $('[name="expiry_date"]').val(r.expiry_date);
             $('[name="notes"]').val(r.notes);
-            
+
             $('#uploadComplianceModal .modal-title').html('<i class="bi bi-pencil"></i> Edit Compliance Record');
             $('#uploadComplianceModal').modal('show');
+        } else {
+            Swal.fire('Error!', res.message || 'Could not load this record.', 'error');
         }
+    }).fail(function(xhr) {
+        const msg = xhr.status === 403 ? 'You do not have permission to edit compliance records.' : 'Server error while loading this record.';
+        Swal.fire('Error!', msg, 'error');
     });
 }
 
@@ -418,7 +435,7 @@ function deleteCompliance(id) {
         confirmButtonText: 'Yes, delete it!'
     }).then((result) => {
         if (result.isConfirmed) {
-            $.post(`${APP_URL}/api/delete_compliance.php`, { id: id }, function(res) {
+            $.post(`${APP_URL}/api/delete_compliance.php`, { id: id, _csrf: CSRF_TOKEN }, function(res) {
                 if (res.success) {
                     logReportAction('Deleted Compliance Record', 'User successfully deleted compliance record ID: ' + id);
                     Swal.fire('Deleted!', 'Record has been removed.', 'success');
@@ -426,7 +443,12 @@ function deleteCompliance(id) {
                 } else {
                     Swal.fire('Error!', res.message, 'error');
                 }
-            }, 'json');
+            }, 'json').fail(function(xhr) {
+                let msg = 'Server error while deleting this record.';
+                if (xhr.status === 403) msg = 'You do not have permission to delete compliance records.';
+                else if (xhr.status === 419) msg = 'Your session has expired. Please refresh the page and try again.';
+                Swal.fire('Error!', msg, 'error');
+            });
         }
     });
 }

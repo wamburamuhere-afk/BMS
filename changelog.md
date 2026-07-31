@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-07-31 (fix) — Compliance Documents: Delete/Edit actions failing silently
+
+**Files:** `app/constant/document/compliance_documents.php`, `api/delete_compliance.php`, new `tests/test_compliance_delete_silent_fail_cli.php`
+
+User-reported: on `compliance_documents.php`, clicking an Actions dropdown item (Delete in particular) "is not properly functioning" — nothing visibly happens. Live-tested on dev.bms.local: delete itself works correctly for Admin end-to-end, but found two real defects that reproduce the symptom for anyone else.
+
+`deleteCompliance()`'s `$.post()` call had no `.fail()`/error handler. `api/delete_compliance.php` calls `http_response_code(403)` when `canDelete('compliance')` is false; jQuery treats any non-2xx response as an error and never runs the success callback for it — with no `.fail()` wired up, a permission-denied delete produced **zero visible feedback**. Confirmed live: forced a mocked 403 and verified the old code showed nothing, the new code shows `Swal.fire('Error!', 'You do not have permission to delete compliance records.', 'error')`. Separately, the "Edit Record"/"Remove" dropdown items were rendered unconditionally for every viewer — unlike the Upload button, which already correctly checks `canCreate('compliance')`. Checked the live `role_permissions` table: only Admin, Managing Director, and Secretary (PS) have any `compliance` grant at all, so this gap is narrow today but would bite any other role that gains view access to this page. `api/delete_compliance.php` also had no `csrf_check()` at all, despite being a state-changing POST endpoint (security.md §21 requires one on every such endpoint).
+
+Fixed: added `.fail()` handlers to both `deleteCompliance()` and `editCompliance()` that surface a clear SweetAlert2 error (with specific messages for 403/419), gated the Edit/Remove dropdown items behind new `$can_edit`/`$can_delete` PHP flags exposed as `CAN_EDIT_COMPLIANCE`/`CAN_DELETE_COMPLIANCE` JS constants (the same "pass the permission flag from PHP" pattern used elsewhere), and added the missing `csrf_check()` to `delete_compliance.php`.
+
+Verified with new `tests/test_compliance_delete_silent_fail_cli.php` (15 checks) plus live browser verification: confirmed a real delete still succeeds end-to-end for Admin (record count dropped, item removed from the list), confirmed the dropdown gating logic correctly handles all 4 true/false permission combinations, and confirmed a mocked 403 now surfaces a clear error instead of doing nothing.
+
 ## 2026-07-31 (fix) — GRN list print: hidden column values, footer overlap, oval status badges
 
 **Files:** `app/bms/grn/grn.php`, new `tests/test_grn_print_layout_cli.php`
