@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-07-31 (fix) — Delivery Notes list print: drop Type column, remove Project oval, ledger_report.php fonts
+
+**Files:** `app/bms/grn/delivery_notes.php`, new `tests/test_dn_print_layout_cli.php`
+
+Follow-up request (with a real print/PDF screenshot of `delivery_notes.php`): apply the same font-size fix already done for `grn.php` (mirroring `ledger_report.php`'s `#ledgerTable` scheme), drop the "Type" (INBOUND/OUTBOUND) column from print entirely, and remove the oval around the Project column's value.
+
+The Type column's `<th>` and its DataTable column definition are now marked `.d-print-none`, matching the existing convention already used for the Actions column on this same page. The Project badge span gets a dedicated `dn-project-badge` class with a print-only rule stripping background/border/border-radius/padding, so it prints as plain bold text instead of a pill — the same treatment already applied to Status/Project on `grn.php`. Font sizing now mirrors `ledger_report.php`'s `#ledgerTable` / `grn.php`'s `#grnTable` exactly: header 7pt, body 7.5pt forced onto the cell itself and everything nested inside it, replacing the old flat 8pt rule that let Bootstrap's `.small`/badges compound to a different visual size per column.
+
+Verified live on dev.bms.local: injected the page's own `@media print` rules as active on-screen styles and confirmed the Type column's header computes to `display:none`, confirmed all 10 remaining visible columns compute to the exact same `10px` (7.5pt) with the header row at `9.33333px` (7pt), and confirmed via computed style that the Project badge renders with `background: transparent`, `border: none`, `border-radius: 0` — no oval shape. New `tests/test_dn_print_layout_cli.php` (11 checks). Zero regression in adjacent suites (`test_dn_cli` 80/80, `test_dn_three_approval_cli` 73/73).
+
 ## 2026-07-31 (fix) — GRN list print, round 3: canonical shared footer + ledger_report.php font scheme
 
 **Files:** `app/bms/grn/grn.php`, `tests/test_grn_print_layout_cli.php`
