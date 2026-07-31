@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-07-31 (fix) — Invoices list print: canonical shared footer, ledger_report.php font scheme
+
+**Files:** `app/bms/invoice/invoices.php`, new `tests/test_invoices_print_layout_cli.php`
+
+User request (with a real print/PDF screenshot showing a row's content overlapped by the shared print footer in landscape): use the same font size as `ledger_report.php`, and stop the footer hiding rows the same way it was fixed on `ledger_report.php`.
+
+Root cause: `invoices.php` had **no `@page` bottom margin at all** beyond the browser default (`@page { size: auto; }` only) — the shared, fixed-position `.bms-print-footer` had no reserved band to sit in, so it overlapped whatever content happened to land at the very bottom of a page. Same class of bug already fixed on `grn.php`/`delivery_notes.php`/`rfq.php`: switched to the canonical `includes/print_footer_css.php` + `print_footer_html.php` pair (i_e_print.md §1-3: `@page` bottom margin 16mm, the correctly-sized dedicated footer), hiding the generic `.bms-print-footer` so there's no duplicate.
+
+Font sizing previously used an ad-hoc 8pt table base plus a separate 6.5pt override just for badges/progress bars — two different sizes on the same row depending on which column you looked at. Now mirrors `ledger_report.php`'s `#ledgerTable` / `grn.php`'s `#grnTable` exactly: header 7pt, body 7.5pt forced onto the cell itself and everything nested inside it (Type/Status badges, progress bars), so every column reads the same size. The existing content-proportional column-width scheme (already correct on this page) was left untouched.
+
+Verified live on dev.bms.local: injected the page's own `@media print` rules as active on-screen styles and confirmed `.bms-print-footer` computes to `display:none` while the canonical `.print-footer` computes to `display:flex`; confirmed every one of the 10 visible columns' leaf elements (`A`, `SPAN`, `STRONG`, `DIV` — Invoice#, Type/Status badges, Customer, progress bar) computes to the exact same `10px` (7.5pt), with the header row at `9.33333px` (7pt). New `tests/test_invoices_print_layout_cli.php` (12 checks). Zero regression in adjacent suites (`test_csrf_token_redeclaration_cli` 10/10, `test_warehouse_scope_cli` 147/147; `test_invoice_three_approval_cli`'s one pre-existing failure — about `save_invoice.php`, unrelated to this page — confirmed present with and without this change via `git stash`).
+
 ## 2026-07-31 (fix) — RFQ list print: canonical shared footer, blank first page, ledger_report.php fonts
 
 **Files:** `app/bms/purchase/rfq.php`, new `tests/test_rfq_print_layout_cli.php`
