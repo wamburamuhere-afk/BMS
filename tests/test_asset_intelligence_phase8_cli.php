@@ -49,15 +49,15 @@ try {
     $warn = $pdo->query("SELECT COUNT(*) FROM assets WHERE asset_id=$aid AND warranty_expiry IS NOT NULL AND warranty_expiry <= DATE_ADD(CURDATE(), INTERVAL 60 DAY)")->fetchColumn();
     ($warn == 1) ? pass("warranty-expiring detectable") : fail("warranty alert not detectable");
 
-    // §8.2 — maintenance overdue detectable.
-    $pdo->prepare("INSERT INTO asset_maintenance (asset_id,maintenance_date,description,cost,next_due_date,created_by) VALUES (?,?,?,?,?,?)")
-        ->execute([$aid, date('Y-m-d', strtotime('-90 days')), 'Service', 10000, date('Y-m-d', strtotime('-10 days')), 4]);
-    $over = $pdo->query("SELECT COUNT(*) FROM (SELECT asset_id, MAX(next_due_date) nd FROM asset_maintenance WHERE asset_id=$aid GROUP BY asset_id) t WHERE nd < CURDATE()")->fetchColumn();
+    // §8.2 — maintenance overdue detectable (maintenance_logs — asset_maintenance retired).
+    $pdo->prepare("INSERT INTO maintenance_logs (asset_id,maintenance_date,description,cost,next_due_date,status) VALUES (?,?,?,?,?,?)")
+        ->execute([$aid, date('Y-m-d', strtotime('-90 days')), 'Service', 10000, date('Y-m-d', strtotime('-10 days')), 'pending']);
+    $over = $pdo->query("SELECT COUNT(*) FROM (SELECT asset_id, MAX(next_due_date) nd FROM maintenance_logs WHERE asset_id=$aid AND status != 'deleted' GROUP BY asset_id) t WHERE nd < CURDATE()")->fetchColumn();
     ($over == 1) ? pass("maintenance-overdue detectable") : fail("overdue maintenance not detectable");
 
     foreach ($created as $id) {
         $pdo->exec("DELETE FROM depreciation_entries WHERE asset_id=$id");
-        $pdo->exec("DELETE FROM asset_maintenance WHERE asset_id=$id");
+        $pdo->exec("DELETE FROM maintenance_logs WHERE asset_id=$id");
         $pdo->exec("DELETE FROM asset_depreciation_areas WHERE asset_id=$id");
         $pdo->exec("DELETE FROM asset_audit_log WHERE asset_id=$id");
         $pdo->exec("DELETE FROM assets WHERE asset_id=$id");

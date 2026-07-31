@@ -59,10 +59,10 @@ try {
     $maxPeriod = $pdo->query("SELECT MAX(period_end) FROM depreciation_entries WHERE asset_id=$aid AND area='book'")->fetchColumn();
     ($maxPeriod !== null && substr($maxPeriod,0,4) <= '2028') ? pass("engine stopped at disposal (last book period $maxPeriod)") : fail("engine ran past disposal (last $maxPeriod)");
 
-    // Maintenance row.
-    $pdo->prepare("INSERT INTO asset_maintenance (asset_id,maintenance_date,description,cost,performed_by,next_due_date,created_by) VALUES (?,?,?,?,?,?,?)")
-        ->execute([$aid,'2026-06-01','Oil change',50000,'Vendor X','2026-12-01',4]);
-    $mc = $pdo->query("SELECT COUNT(*) FROM asset_maintenance WHERE asset_id=$aid")->fetchColumn();
+    // Maintenance row (maintenance_logs — asset_maintenance has been retired).
+    $pdo->prepare("INSERT INTO maintenance_logs (asset_id,maintenance_date,description,cost,performed_by,next_due_date,status) VALUES (?,?,?,?,?,?,?)")
+        ->execute([$aid,'2026-06-01','Oil change',50000,'Vendor X','2026-12-01','pending']);
+    $mc = $pdo->query("SELECT COUNT(*) FROM maintenance_logs WHERE asset_id=$aid")->fetchColumn();
     ($mc==1) ? pass("maintenance row written") : fail("$mc maintenance rows");
 
     // Audit log has a dispose entry.
@@ -72,7 +72,7 @@ try {
     // Cleanup.
     $pdo->exec("DELETE FROM depreciation_entries WHERE asset_id=$aid");
     $pdo->exec("DELETE FROM asset_disposals WHERE asset_id=$aid");
-    $pdo->exec("DELETE FROM asset_maintenance WHERE asset_id=$aid");
+    $pdo->exec("DELETE FROM maintenance_logs WHERE asset_id=$aid");
     $pdo->exec("DELETE FROM asset_depreciation_areas WHERE asset_id=$aid");
     $pdo->exec("DELETE FROM asset_audit_log WHERE asset_id=$aid");
     $pdo->exec("DELETE FROM assets WHERE asset_id=$aid");

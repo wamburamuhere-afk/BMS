@@ -13,7 +13,7 @@ try {
     $status = $_GET['status'] ?? '';
     $search_term = $_GET['search_term'] ?? '';
     
-    $where = ["1=1"];
+    $where = ["m.status != 'deleted'"];
     $params = [];
     
     if ($status) {
@@ -29,7 +29,7 @@ try {
     
     $where_clause = implode(" AND ", $where);
     
-    $total_stmt = $pdo->query("SELECT COUNT(*) FROM maintenance_logs");
+    $total_stmt = $pdo->query("SELECT COUNT(*) FROM maintenance_logs WHERE status != 'deleted'");
     $total_records = $total_stmt->fetchColumn();
     
     $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM maintenance_logs m JOIN assets a ON m.asset_id = a.asset_id WHERE $where_clause");
@@ -46,11 +46,12 @@ try {
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Stats Summary
-    $stats_stmt = $pdo->query("SELECT 
+    $stats_stmt = $pdo->query("SELECT
         COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
         COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as progress,
         COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
-        SUM(cost) as total_cost
+        COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid,
+        SUM(CASE WHEN status != 'deleted' THEN cost ELSE 0 END) as total_cost
         FROM maintenance_logs");
     $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
     

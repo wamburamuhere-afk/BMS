@@ -7,10 +7,10 @@ global $pdo;
 $id = $_GET['id'] ?? null;
 
 try {
-    $stmt = $pdo->prepare("SELECT m.*, a.asset_name, a.asset_code 
-                           FROM maintenance_logs m 
-                           JOIN assets a ON m.asset_id = a.asset_id 
-                           WHERE m.log_id = ?");
+    $stmt = $pdo->prepare("SELECT m.*, a.asset_name, a.asset_code
+                           FROM maintenance_logs m
+                           JOIN assets a ON m.asset_id = a.asset_id
+                           WHERE m.log_id = ? AND m.status != 'deleted'");
     $stmt->execute([$id]);
     $data = $stmt->fetch(PDO::FETCH_ASSOC);
     echo json_encode(["success" => !!$data, "data" => $data]);

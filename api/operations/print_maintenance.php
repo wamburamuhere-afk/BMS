@@ -17,9 +17,9 @@ $status = $_GET['s'] ?? '';
 $search = $_GET['q'] ?? '';
 
 try {
-    $where = ["1=1"];
+    $where = ["m.status != 'deleted'"];
     $params = [];
-    
+
     if ($status) {
         $where[] = "m.status = ?";
         $params[] = $status;

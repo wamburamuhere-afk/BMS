@@ -83,6 +83,21 @@ includeHeader();
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
+                            <h4 class="mb-0" id="stat-paid">0</h4>
+                            <p class="small mb-0">Paid</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-cash-coin" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card custom-stat-card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
                             <h4 class="mb-0" id="stat-total-cost">0</h4>
                             <p class="small mb-0">Total Costs</p>
                         </div>
@@ -106,6 +121,7 @@ includeHeader();
                         <option value="pending">Pending</option>
                         <option value="in_progress">In Progress</option>
                         <option value="completed">Completed</option>
+                        <option value="paid">Paid</option>
                         <option value="cancelled">Cancelled</option>
                     </select>
                 </div>
@@ -226,7 +242,7 @@ includeHeader();
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Expense Account <span class="text-danger gl-account-required d-none">*</span></label>
                             <select class="form-select select2-static" name="expense_account_id" id="expenseAccountSelect">
-                                <option value="">— Select account (required when Completed) —</option>
+                                <option value="">— Select account (required when Completed/Paid) —</option>
                                 <?php
                                 require_once __DIR__ . '/../../../core/payment_source.php';
                                 foreach (expenseAccounts($pdo) as $acc):
@@ -241,12 +257,26 @@ includeHeader();
                                 <option value="pending">Pending</option>
                                 <option value="in_progress">In Progress</option>
                                 <option value="completed">Completed</option>
+                                <option value="paid">Paid</option>
                                 <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 d-none" id="paidFromBlock">
+                            <label class="form-label fw-semibold">Paid From Account <span class="text-danger">*</span></label>
+                            <select class="form-select select2-static" name="paid_from_account_id" id="paidFromAccountSelect">
+                                <option value="">— Select the account money left from —</option>
+                                <?php foreach (cashBankAccounts($pdo) as $acc): ?>
+                                <option value="<?= $acc['account_id'] ?>"><?= safe_output($acc['account_code']) ?> — <?= safe_output($acc['account_name']) ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Completion Date</label>
                             <input type="date" class="form-control" name="completion_date">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Next Due Date</label>
+                            <input type="date" class="form-control" name="next_due_date">
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-semibold">Maintenance Description <span class="text-danger">*</span></label>
@@ -408,6 +438,7 @@ $(document).ready(function() {
                 $('#stat-pending').text(json.stats.pending || 0);
                 $('#stat-progress').text(json.stats.progress || 0);
                 $('#stat-completed').text(json.stats.completed || 0);
+                $('#stat-paid').text(json.stats.paid || 0);
                 $('#stat-total-cost').text(parseFloat(json.stats.total_cost || 0).toLocaleString() + ' TZS');
                 return json.data;
             }
@@ -452,6 +483,7 @@ $(document).ready(function() {
                 render: function(data) {
                     let cls = 'secondary';
                     if (data === 'completed') cls = 'success';
+                    if (data === 'paid') cls = 'dark';
                     if (data === 'in_progress') cls = 'primary';
                     if (data === 'pending') cls = 'warning text-dark';
                     if (data === 'cancelled') cls = 'danger';
@@ -493,10 +525,11 @@ $(document).ready(function() {
         }
     });
 
-    // Show/hide expense account required marker based on status
+    // Show/hide expense account required marker + Paid-From account based on status
     $(document).on('change', '#maintenanceStatus', function() {
-        const isCompleted = $(this).val() === 'completed';
-        $('.gl-account-required').toggleClass('d-none', !isCompleted);
+        const val = $(this).val();
+        $('.gl-account-required').toggleClass('d-none', val !== 'completed' && val !== 'paid');
+        $('#paidFromBlock').toggleClass('d-none', val !== 'paid');
     });
 
     $('#maintenanceForm').on('submit', function(e) {
@@ -534,9 +567,14 @@ function viewDetails(id) {
                 'pending': { cls: 'warning text-dark', label: 'PENDING' },
                 'in_progress': { cls: 'primary', label: 'IN PROGRESS' },
                 'completed': { cls: 'success', label: 'COMPLETED' },
+                'paid': { cls: 'dark', label: 'PAID' },
                 'cancelled': { cls: 'danger', label: 'CANCELLED' }
             };
             const s = statusMap[d.status] || { cls: 'secondary', label: d.status.toUpperCase() };
+            const paymentBlock = d.status === 'paid'
+                ? `<div class="col-6"><small class="text-muted d-block">Payment Date</small><strong>${d.payment_date || 'N/A'}</strong></div>
+                   <div class="col-6"><small class="text-muted d-block">Paid Amount</small><strong class="text-success">${parseFloat(d.paid_amount || d.cost).toLocaleString()} TZS</strong></div>`
+                : '';
 
             const html = `
                 <div class="mb-4 text-center">
@@ -549,7 +587,9 @@ function viewDetails(id) {
                     <div class="col-6"><small class="text-muted d-block">Cost</small><strong class="text-danger">${parseFloat(d.cost).toLocaleString()} TZS</strong></div>
                     <div class="col-6"><small class="text-muted d-block">Performed By</small><strong>${d.performed_by || 'N/A'}</strong></div>
                     <div class="col-6"><small class="text-muted d-block">Completion Date</small><strong>${d.completion_date || 'N/A'}</strong></div>
+                    <div class="col-6"><small class="text-muted d-block">Next Due Date</small><strong>${d.next_due_date || 'N/A'}</strong></div>
                     <div class="col-6"><small class="text-muted d-block">Date Logged</small><strong>${d.created_at || 'N/A'}</strong></div>
+                    ${paymentBlock}
                     <div class="col-12"><small class="text-muted d-block font-weight-bold">Description</small><div class="bg-light p-3 rounded border mt-1">${d.description}</div></div>
                     <div class="col-12"><small class="text-muted d-block font-weight-bold">Additional Notes</small><div class="bg-light p-3 rounded border mt-1 small text-muted">${d.notes || 'No extra notes provided.'}</div></div>
                 </div>
@@ -590,9 +630,11 @@ function editLog(id) {
             $('input[name="cost"]').val(d.cost);
             $('select[name="status"]').val(d.status).trigger('change');
             $('input[name="completion_date"]').val(d.completion_date);
+            $('input[name="next_due_date"]').val(d.next_due_date);
             $('textarea[name="description"]').val(d.description);
             $('textarea[name="notes"]').val(d.notes);
             if (d.expense_account_id) $('select[name="expense_account_id"]').val(d.expense_account_id).trigger('change');
+            if (d.paid_from_account_id) $('select[name="paid_from_account_id"]').val(d.paid_from_account_id).trigger('change');
             $('#maintenanceModalLabel').text('Edit Maintenance Task');
             $('#maintenanceModal').modal('show');
         }

@@ -67,8 +67,9 @@ $entStmt->execute([$asset_id]);
 $entries = ['book' => [], 'tax' => []];
 foreach ($entStmt->fetchAll(PDO::FETCH_ASSOC) as $e) { $entries[$e['area']][] = $e; }
 
-// Maintenance history.
-$mStmt = $pdo->prepare("SELECT * FROM asset_maintenance WHERE asset_id = ? ORDER BY maintenance_date DESC");
+// Maintenance history (maintenance_logs — the one GL-posting maintenance
+// system; the old zero-posting asset_maintenance table has been retired).
+$mStmt = $pdo->prepare("SELECT * FROM maintenance_logs WHERE asset_id = ? AND status != 'deleted' ORDER BY maintenance_date DESC");
 $mStmt->execute([$asset_id]);
 $maintenance = $mStmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -254,14 +255,19 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
                     <?php else: ?>
                     <div class="table-responsive">
                         <table class="table table-sm mb-0">
-                            <thead class="table-light"><tr><th class="ps-3">Date</th><th>Description</th><th class="text-end">Cost</th><th>By</th><th>Next Due</th></tr></thead>
+                            <thead class="table-light"><tr><th class="ps-3">Date</th><th>Description</th><th class="text-end">Cost</th><th>By</th><th>Status</th><th>Next Due</th></tr></thead>
                             <tbody>
-                            <?php foreach ($maintenance as $m): ?>
+                            <?php
+                            $mStatusCls = ['completed' => 'success', 'paid' => 'dark', 'in_progress' => 'primary', 'pending' => 'warning text-dark', 'cancelled' => 'danger'];
+                            foreach ($maintenance as $m):
+                                $mCls = $mStatusCls[$m['status']] ?? 'secondary';
+                            ?>
                                 <tr>
                                     <td class="ps-3"><?= safe_output($m['maintenance_date']) ?></td>
                                     <td><?= safe_output($m['description'], '—') ?></td>
                                     <td class="text-end"><?= tzs($m['cost']) ?></td>
                                     <td><?= safe_output($m['performed_by'], '—') ?></td>
+                                    <td><span class="badge bg-<?= $mCls ?>"><?= safe_output(str_replace('_', ' ', $m['status'])) ?></span></td>
                                     <td><?= safe_output($m['next_due_date'], '—') ?></td>
                                 </tr>
                             <?php endforeach; ?>
@@ -312,12 +318,31 @@ function tzs($v) { return number_format((float)$v, 2) . ' TZS'; }
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="asset_id" value="<?= (int)$asset_id ?>">
+                    <!-- Quick log = already happened, already decided — same one-step
+                         pattern as Budget's Quick Expense: posts the accrual immediately
+                         (Dr Expense / Cr Accrued Expenses) rather than sitting as a
+                         separate pending task. Use the full Maintenance page for the
+                         pending/in-progress workflow, or to later mark this Paid. -->
+                    <input type="hidden" name="status" value="completed">
                     <div class="row g-3">
                         <div class="col-md-6"><label class="form-label fw-semibold">Date <span class="text-danger">*</span></label><input type="date" name="maintenance_date" class="form-control" value="<?= date('Y-m-d') ?>" required></div>
-                        <div class="col-md-6"><label class="form-label fw-semibold">Cost (TZS)</label><input type="number" name="cost" class="form-control" step="0.01" min="0" value="0"></div>
-                        <div class="col-12"><label class="form-label fw-semibold">Description</label><textarea name="description" class="form-control" rows="2" placeholder="What was done"></textarea></div>
+                        <div class="col-md-6"><label class="form-label fw-semibold">Cost (TZS)</label><input type="number" name="cost" id="qmCost" class="form-control" step="0.01" min="0" value="0"></div>
+                        <div class="col-12"><label class="form-label fw-semibold">Description <span class="text-danger">*</span></label><textarea name="description" class="form-control" rows="2" placeholder="What was done" required></textarea></div>
                         <div class="col-md-6"><label class="form-label fw-semibold">Performed By</label><input type="text" name="performed_by" class="form-control" placeholder="Vendor / technician"></div>
                         <div class="col-md-6"><label class="form-label fw-semibold">Next Due Date</label><input type="date" name="next_due_date" class="form-control"></div>
+                        <div class="col-12" id="qmExpenseAccountBlock">
+                            <label class="form-label fw-semibold">Expense Account <span class="text-danger">*</span></label>
+                            <select class="form-select select2-static" name="expense_account_id" id="qmExpenseAccountSelect">
+                                <option value="">— Select account (required when there's a cost) —</option>
+                                <?php
+                                require_once __DIR__ . '/../../../core/payment_source.php';
+                                foreach (expenseAccounts($pdo) as $acc):
+                                ?>
+                                <option value="<?= $acc['account_id'] ?>"><?= safe_output($acc['account_code']) ?> — <?= safe_output($acc['account_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text small text-muted">Posts Dr Expense / Cr Accrued Expenses immediately. Mark it Paid later from the main Maintenance page.</div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-warning"><i class="bi bi-check-lg me-1"></i> Save</button></div>
@@ -390,7 +415,7 @@ $(document).ready(function() {
             });
         });
     }
-    submitAsset('#maintenanceForm', '<?= buildUrl('api/operations/save_maintenance.php') ?>', 'Saving…');
+    submitAsset('#maintenanceForm', '<?= buildUrl('api/operations/save_maintenance_log.php') ?>', 'Saving…');
     submitAsset('#disposeForm', '<?= buildUrl('api/operations/dispose_asset.php') ?>', 'Disposing…');
 });
 </script>
