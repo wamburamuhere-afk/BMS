@@ -53,10 +53,6 @@ $c_email = getSetting('company_email', '');
 $c_tin   = getSetting('company_tin', '');
 $c_vrn   = getSetting('company_vrn', '');
 
-// Print user info
-$print_user = ucwords(trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')));
-$print_role = ucwords($_SESSION['user_role'] ?? 'Staff');
-$print_date = date('d M, Y \a\t h:i A');
 ?>
 
 <div class="rfq-page p-2 p-md-3" style="background:#fff;min-height:100vh;">
@@ -88,18 +84,6 @@ $print_date = date('d M, Y \a\t h:i A');
             </div>
             <?php endforeach; ?>
         </div>
-    </div>
-
-    <!-- ===== PRINT FOOTER (fixed, matches tenders) ===== -->
-    <div class="print-footer d-none d-print-block">
-        <p class="mb-1 text-muted" style="font-size:8pt;">
-            This document was Printed by
-            <span class="fw-bold text-dark"><?= safe_output($print_user) ?> - <?= safe_output($print_role) ?></span>
-            on <span class="fw-bold text-dark"><?= $print_date ?></span>
-        </p>
-        <p class="mb-0 fw-bold text-primary" style="font-size:10pt;letter-spacing:0.5px;">
-            Powered By BJP Technologies &copy; 2026
-        </p>
     </div>
 
     <!-- ===== BREADCRUMB ===== -->
@@ -277,32 +261,67 @@ $print_date = date('d M, Y \a\t h:i A');
     body{padding:0!important;margin:0!important;background:#fff!important;}
    .container-fluid,.rfq-page{width:100%!important;max-width:none!important;padding:0!important;padding-bottom:0!important;}
 
-    @page{size:auto;margin:0.5in 0.5in 0.5in 0.5in!important;}
+    /* Canonical I/E Print margin — see i_e_print.md §1 (same value as
+       ledger_report.php, grn.php, delivery_notes.php). The previous
+       0.5in-all-round margin was a local, one-off value that didn't reserve
+       enough bottom room for the shared footer once the local duplicate
+       footer below is replaced with the canonical one. */
+    @page { margin: 10mm 8mm 16mm 8mm; }
+
+    /* Root cause of "page 1 is blank, the table starts on page 2": the
+       global responsive.css rule `p, .card, section { page-break-inside:
+       avoid }` treats #rfqReportContainer (the table's wrapping .card) as
+       one unsplittable block — for a list many rows tall, that pushes the
+       whole thing to a later page. Same fix as grn.php/delivery_notes.php. */
+    #rfqReportContainer {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+        overflow: visible !important;
+    }
 
     #rfqTable{table-layout:auto!important;width:100%!important;border-collapse:collapse!important;}
+    /* Font sizing mirrors ledger_report.php's #ledgerTable / grn.php's
+       #grnTable exactly: header 7pt, body 7.5pt (forced onto the cell
+       itself and everything nested inside it, so the Project badge/any
+       Bootstrap .small text can't render at a different size). */
     #rfqTable th{white-space:nowrap!important;font-weight:bold!important;background:#f8f9fa!important;
         text-align:center!important;vertical-align:middle!important;
-        -webkit-print-color-adjust:exact;border:1px solid #000!important;padding:8px 4px!important;font-size:8.5pt!important;}
-    #rfqTable td{border:1px solid #ddd!important;padding:8px 4px!important;font-size:8.5pt!important;vertical-align:middle!important;}
+        -webkit-print-color-adjust:exact;border:1px solid #000!important;padding:8px 4px!important;font-size:7pt!important;}
+    #rfqTable td{border:1px solid #ddd!important;padding:8px 4px!important;font-size:7.5pt!important;vertical-align:middle!important;}
+    #rfqTable td *, #rfqTable th * { font-size: 7.5pt !important; max-width: 100% !important; white-space: normal !important; }
     #rfqTable tr{page-break-inside:avoid!important;}
     #rfqTable th:last-child,#rfqTable td:last-child{display:none!important;}
+
+    /* Project "badge" printed as plain bold text — no pill/oval shape, same
+       treatment already applied on grn.php/delivery_notes.php. */
+    #rfqTable .rfq-project-badge {
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        color: #000 !important;
+        font-weight: 700 !important;
+        font-size: 7.5pt !important;
+    }
 
     .dataTables_length,.dataTables_info,.dataTables_paginate,.dataTables_filter{display:none!important;}
     .d-print-table-header{display:table-header-group!important;}
     .d-print-table-footer{display:table-footer-group!important;}
 
-    /* Fixed footer - matches tenders exactly */
-    .print-footer{
-        position:fixed!important;bottom:0!important;left:0;right:0;
-        height:1.5cm;display:flex;flex-direction:column;justify-content:center;
-        text-align:center;background:#fff!important;padding:0;
-        border-top:1px solid #ddd!important;font-size:10px;
-        z-index:999999!important;-webkit-print-color-adjust:exact;pointer-events:none;
-    }
+    /* The shared report footer (.print-footer, includes/print_footer_html.php)
+       keeps its default fixed position from print_footer_css.php, so it
+       repeats at the bottom of every printed page — same as every other
+       report page. Keep ONE footer only: hide the global footer.php print
+       footer (.bms-print-footer) that would otherwise render a duplicate
+       here, and the page's own local one has been removed entirely. */
+    .bms-print-footer { display: none !important; }
+
     .custom-stat-card{box-shadow:none!important;border:1px solid #d1e7dd!important;}
     .custom-stat-card h4,.custom-stat-card small{color:#000!important;}
 }
 </style>
+
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 
 <script>
 $(document).ready(function(){
@@ -321,7 +340,7 @@ $(document).ready(function(){
             render:d=>d?`<span style="white-space:normal;word-break:break-word;">${d}</span>`:'<span class="text-muted">—</span>'},
     ];
     if(projEnabled) cols.push({data:'project_name',defaultContent:'—',responsivePriority:6,
-        render:d=>d?`<span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25" style="white-space:normal;">${d}</span>`:'—'});
+        render:d=>d?`<span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 rfq-project-badge" style="white-space:normal;">${d}</span>`:'—'});
     cols.push(
         {data:'warehouse_name',responsivePriority:4,
             render:d=>d?`<span style="white-space:normal;word-break:break-word;">${d}</span>`:'<span class="text-muted">—</span>'},
@@ -497,5 +516,9 @@ function approveRFQ(id,number){
 }
 
 </script>
+
+<div class="d-none d-print-block">
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
+</div>
 
 <?php includeFooter(); ?>
