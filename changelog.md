@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-07-31 (fix) — Payroll: Process Payroll modal auto-closing on preview refresh
+
+**Files:** `app/bms/pos/payroll.php`, new `tests/test_payroll_process_modal_autoclose_cli.php`
+
+User-reported: the Payroll module's "Process Payroll" form closed on its own with no visible action from the user. Root cause: `footer.php`'s sitewide `$(document).ajaxSuccess` handler closes whatever modal is currently open the moment *any* non-GET AJAX call on the page returns `{success: true}`, unless that modal carries `data-no-autoclose="true"`. `#processPayrollModal` didn't have that attribute, but its own Payroll Period / Department / Employment Status fields fire a POST to `api/preview_payroll.php` on change (just to refresh the preview table) which also returns `{success: true}` — the global handler read that as "a save just happened" and closed the modal, even though nothing had actually been submitted.
+
+Fixed by adding `data-no-autoclose="true"` to `#processPayrollModal`, the same opt-out already used by `app/includes/ai_generate.php`'s `#aiGenModal` for the identical class of problem. No behaviour change to the preview itself — only the premature close is suppressed.
+
+Verified with new `tests/test_payroll_process_modal_autoclose_cli.php` (10 checks): the opt-out attribute is present, `footer.php`'s handler still honours it, `preview_payroll.php`'s response shape confirms the trigger condition, and the existing `ai_generate.php` opt-out is untouched. Zero regression in adjacent suites (`test_attendance_payroll_cli` 26/26, `test_payroll_bulk_null_id_cli` 10/10, `test_phase4_payroll_paid_cli` 52/52).
+
 ## 2026-07-30 (fix) — Maintenance: real GL posting, closes the post_principle.md gap
 
 **Files:** `core/expense_posting.php` (new Maintenance wrappers), `api/operations/{save_maintenance_log,delete_maintenance_log,get_maintenance_log,get_maintenance_logs,export_maintenance,print_maintenance}.php`, `app/bms/operations/{maintenance,asset_view,asset_dashboard}.php`, new `migrations/2026_07_30_{maintenance_logs_payment,remove_asset_maintenance}.php`, new `tests/test_maintenance_gl_posting_cli.php`, `tests/{test_asset_intelligence_phase8,test_asset_disposal_phase6}_cli.php` (fixture updates); deleted `api/operations/save_maintenance.php`
