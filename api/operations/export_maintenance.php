@@ -8,9 +8,9 @@ $status = $_GET['status'] ?? '';
 $search = $_GET['search_term'] ?? '';
 
 try {
-    $where = ["1=1"];
+    $where = ["m.status != 'deleted'"];
     $params = [];
-    
+
     if ($status) {
         $where[] = "m.status = ?";
         $params[] = $status;

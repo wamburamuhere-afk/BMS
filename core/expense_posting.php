@@ -25,6 +25,7 @@
 require_once __DIR__ . '/ledger_post.php';    // postLedgerEntry
 require_once __DIR__ . '/gl_accounts.php';    // accruedExpensesAccountId
 require_once __DIR__ . '/payment_source.php'; // reverseOutflowContra (voucher payment reversal)
+require_once __DIR__ . '/bank_register.php';  // reverseBankTransaction (Maintenance wrappers below)
 
 /* ── Generic accrual engine (parameterised by entity base) ──────────────────── */
 
@@ -252,4 +253,37 @@ if (!function_exists('postTripAccrual')) {
 }
 if (!function_exists('reverseTripAccrual')) {
     function reverseTripAccrual(PDO $pdo, int $tripId, int $userId): array { return reverseAccrualEntry($pdo, 'trip_accrual', $tripId, $userId); }
+}
+
+/* ── Maintenance Log wrappers ──────────────────────────────────────────────
+ * post_principle.md gap fix (2026-07-30): maintenance_logs previously posted
+ * the accrual (Dr Expense / Cr Accrued Expenses at status=completed) but had
+ * no payment/settlement step anywhere in the module — the liability it
+ * raised could never be system-settled. Same accrual-then-settle lifecycle
+ * as Trips, off the same generic engine:
+ *   Completed → Dr Expense (maintenance_logs.expense_account_id) / Cr Accrued Expenses
+ *   Paid      → Dr Accrued Expenses / Cr Bank (settlement; see postOutflow in
+ *               api/operations/save_maintenance_log.php's 'paid' status)
+ *   Cancelled/deleted → reverse whatever was posted (settlement first, then
+ *   the accrual) — shared by save_maintenance_log.php's 'cancelled' status
+ *   and delete_maintenance_log.php's soft-delete, so a deleted log never
+ *   leaves an orphaned journal entry behind (post_principle.md Q6). */
+
+if (!function_exists('maintenanceLogIsAccrued')) {
+    function maintenanceLogIsAccrued(PDO $pdo, int $logId): bool { return isDocAccrued($pdo, 'maintenance_log', $logId); }
+}
+if (!function_exists('reverseMaintenanceLedger')) {
+    function reverseMaintenanceLedger(PDO $pdo, array $log, int $userId): void
+    {
+        $logId = (int)$log['log_id'];
+        if (!empty($log['transaction_id'])) {
+            reverseOutflow($pdo, (int)$log['transaction_id']);
+            if (!empty($log['paid_from_account_id'])) {
+                reverseBankTransaction($pdo, (int)$log['paid_from_account_id'], 'ML-' . $logId, 'withdrawal');
+            }
+        }
+        if (accrualEntryId($pdo, 'maintenance_log', $logId) !== null && !accrualVoided($pdo, 'maintenance_log', $logId)) {
+            reverseAccrualEntry($pdo, 'maintenance_log', $logId, $userId);
+        }
+    }
 }
