@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-07-31 (fix) — E-Signatures: Draw Signature canvas "Clear" not fully wiping strokes
+
+**Files:** `app/constant/document/e_signatures.php`, new `tests/test_esignature_canvas_clear_transform_cli.php`
+
+User-reported: on the Draw Signature modal, clicking "Clear" only wiped the top of the canvas — strokes drawn lower down remained visible, forcing a Cancel + reopen to get a clean canvas.
+
+Root cause: `initSignaturePad()` applies `ctx.scale(dpr, dpr)` once for crisp high-DPI drawing, but `clearSignature()` then called `ctx.clearRect(0, 0, canvas.width, canvas.height)` using the *physical* bitmap dimensions while that scale transform was still active — the wrong coordinate space for a transformed context. Live pixel-level testing on `dev.bms.local` (drawing a full-width, full-height signature and scanning every pixel before/after Clear at both normal and simulated 2x DPI) showed this happens to still fully clear in the current Chromium build, which clips an oversized clear-rectangle to the canvas bounds — but that's an accident of one engine's clipping behaviour, not correct by construction, and is exactly the class of bug that produces partial/stale visual clears on other rendering pipelines (remote desktop sessions, older browser engines, unusual zoom/DPI combinations). Reopening the modal always worked because `openDrawSignatureModal()` clones the canvas into a brand-new DOM node — a hard reset unrelated to `clearSignature()`'s own correctness.
+
+Fixed both `clearSignature()` and `initSignaturePad()`'s own initial clear to reset the context transform to identity (`ctx.setTransform(1,0,0,1,0,0)`, wrapped in `save()`/`restore()` to preserve `strokeStyle`/`lineWidth`/`lineCap`) before calling `clearRect` — the universally-correct way to clear a canvas regardless of any active transform, DPI, or browser zoom.
+
+Verified with new `tests/test_esignature_canvas_clear_transform_cli.php` (9 checks) plus live browser verification: drew a realistic full-canvas signature at devicePixelRatio 1 and 2, confirmed zero ink pixels remained anywhere in the bitmap after Clear in both cases, and confirmed drawing style and the ability to draw again survive the clear unchanged. Zero regression in adjacent suites (`test_esignatures_cli` 56/56, `test_esignatures_wizard_cli` 145/145, `test_esignature_integrity_cli` 26/26).
+
 ## 2026-07-31 (fix) — Payroll: Process Payroll modal auto-closing on preview refresh
 
 **Files:** `app/bms/pos/payroll.php`, new `tests/test_payroll_process_modal_autoclose_cli.php`
