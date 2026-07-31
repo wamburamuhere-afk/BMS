@@ -198,11 +198,16 @@ function generate_grn_number() {
 
     /* Print Logic: Force Table View, Hide Card View */
     @media print {
-        /* Extra bottom clearance so the last table row never sits under the
-           shared fixed-position print footer (landscape gets an even larger
-           bump just below -- its page is physically shorter than portrait's,
-           so the same absolute margin leaves proportionally less room). */
-        @page { margin: 10mm 8mm 20mm 8mm; size: auto; }
+        /* The shared report footer (.print-footer, includes/print_footer_html.php)
+           is FIXED-position and repeats at the bottom of every printed page --
+           same mechanism as every report page (ledger_report.php, income_statement.php,
+           trial_balance.php...). The canonical @page bottom margin (16mm, see
+           i_e_print.md §1) reserves the band it sits in, in BOTH orientations --
+           no per-orientation override needed once the correct, purpose-built
+           footer is used instead of the generic site-wide one. Keep ONE footer
+           only: hide the global footer.php print footer (.bms-print-footer)
+           that would otherwise render a duplicate here. */
+        .bms-print-footer { display: none !important; }
 
         #card-view-container {
             display: none !important;
@@ -244,15 +249,9 @@ function generate_grn_number() {
             overflow: visible !important;
         }
     }
-
-    /* Landscape's page is physically shorter than portrait's (width/height
-       swap), so the same absolute bottom @page margin leaves proportionally
-       less clearance before the shared fixed-position footer -- a real
-       cut-off was reported specifically in landscape even after the base
-       20mm fix above. Give landscape extra room on top of it. */
-    @media print and (orientation: landscape) {
-        @page { margin: 10mm 8mm 24mm 8mm; size: auto; }
-    }
+    /* Canonical I/E Print margin — see i_e_print.md §1 (same value as
+       ledger_report.php, income_statement.php, and every other report). */
+    @page { margin: 10mm 8mm 16mm 8mm; }
 
     /* Fix for Table Alignment and Margins */
     .table-responsive {
@@ -297,7 +296,6 @@ function generate_grn_number() {
         #grnTable th, #grnTable td {
             width: auto !important;
             min-width: 0 !important;
-            font-size: 8pt !important;
             padding: 5px 2px !important;
         }
 
@@ -328,17 +326,27 @@ function generate_grn_number() {
         #grnTable th:nth-child(10), #grnTable td:nth-child(10) { width: 10% !important; } /* Status */
         <?php endif; ?>
 
-        /* Header labels must wrap, not clip, once their column has a real
-           (narrower) printed width. One size point above the body text below
-           (8pt), and bold, so headers read as clearly distinct from values --
-           `thead tr th` (not just `thead th`) is needed to out-specificity the
-           unrelated #grnTable thead th{font-size:0.75rem} rule declared later
-           in this same file for the on-screen view, which would otherwise win
-           the cascade tie at print time regardless of source order. */
+        /* Font sizing mirrors ledger_report.php's #ledgerTable exactly (the
+           proven scheme for a dense, many-column print report): header
+           smaller than body, plain <th> bold already covers "distinct from
+           values" without inflating its size. `thead tr th` (not just
+           `thead th`) is needed to out-specificity the unrelated
+           #grnTable thead th{font-size:0.75rem} rule declared later in this
+           same file for the on-screen view, which would otherwise win the
+           cascade tie at print time regardless of source order. */
         #grnTable thead tr th {
             white-space: normal !important;
-            font-size: 9pt !important;
-            font-weight: 700 !important;
+            font-size: 7pt !important;
+            line-height: 1.15 !important;
+        }
+
+        /* Base body size on the cell itself too, not just its descendants:
+           the S/NO column's DataTables className puts Bootstrap's .small
+           directly on the <td> (no nested wrapper element), so a
+           descendant-only rule never reached it. Matches
+           ledger_report.php's #ledgerTable tbody td rule exactly. */
+        #grnTable tbody td {
+            font-size: 7.5pt !important;
         }
 
         /* Backstop so no cell's content can bleed into its neighbour: several
@@ -354,32 +362,54 @@ function generate_grn_number() {
 
         /* Root cause of "some columns have a bigger/smaller font than others":
            most cells wrap their value in Bootstrap's .small/<small> (which
-           sets a size RELATIVE to its parent, ~87.5% of the 8pt td above --
-           e.g. Supplier/PO#/Warehouse/Received By/Total Value), while the
-           Date column's plain <span> has no such wrapper and prints at the
-           full 8pt -- so Date reads larger than almost everything else. The
-           Status badge additionally carries its own inline
-           style="font-size:0.7rem" from the on-screen view. Force every cell
-           AND everything nested inside it to the exact same 8pt regardless of
-           Bootstrap classes or inline styles (an !important author rule beats
-           a plain inline style with no !important of its own). */
+           sets a size RELATIVE to its parent, ~87.5% of whatever it inherits
+           -- e.g. Supplier/PO#/Warehouse/Received By/Total Value), while the
+           Date column's plain <span> has no such wrapper -- so Date reads a
+           different size than almost everything else. The Status/Project
+           badges additionally carry their own font-size from the on-screen
+           view. Force every cell AND everything nested inside it to the same
+           7.5pt (matching ledger_report.php's tbody/tfoot body-text size)
+           regardless of Bootstrap classes or inline styles (an !important
+           author rule beats a plain inline style with no !important of its
+           own). */
         #grnTable td *, #grnTable th * {
             max-width: 100% !important;
             white-space: normal !important;
-            font-size: 8pt !important;
+            font-size: 7.5pt !important;
         }
 
-        /* Status "badge" printed as plain bold text -- no pill/oval shape.
-           #grnTable-qualified so this always wins over the generic .badge
-           print rule further down this stylesheet regardless of source order. */
-        #grnTable .grn-status-badge {
+        /* Money column must never wrap onto a second line -- same treatment
+           ledger_report.php gives its Debit/Credit/Balance columns -- so a
+           large TZS total (millions/billions) always fits inside its column
+           instead of overflowing into the next one. Smallest print font of
+           all, same as ledger's money columns. Total Value is column 9 with
+           Project enabled, column 8 without (Actions is already .d-print-none
+           and excluded from this count). */
+        <?php if ($enable_projects): ?>
+        #grnTable td:nth-child(9), #grnTable td:nth-child(9) * {
+            white-space: nowrap !important;
+            font-size: 7pt !important;
+        }
+        <?php else: ?>
+        #grnTable td:nth-child(8), #grnTable td:nth-child(8) * {
+            white-space: nowrap !important;
+            font-size: 7pt !important;
+        }
+        <?php endif; ?>
+
+        /* Status/Project "badges" printed as plain bold text -- no pill/oval
+           shape. #grnTable-qualified so this always wins over the generic
+           .badge print rule further down this stylesheet regardless of
+           source order. */
+        #grnTable .grn-status-badge,
+        #grnTable .grn-project-badge {
             background: transparent !important;
             border: none !important;
             border-radius: 0 !important;
             padding: 0 !important;
             color: #000 !important;
             font-weight: 700 !important;
-            font-size: 8pt !important;
+            font-size: 7.5pt !important;
         }
     }
 
@@ -1026,8 +1056,8 @@ function initTable() {
             <?php if ($enable_projects): ?>
             {
                 data: 'project_name',
-                render: function(data) { 
-                    return data ? `<div class="text-wrap-cell"><span class="badge bg-info-soft text-info border border-info small p-1 text-wrap w-100" style="white-space: normal; word-break: break-word;">${safeOutput(data)}</span></div>` : '<span class="text-muted small">N/A</span>'; 
+                render: function(data) {
+                    return data ? `<div class="text-wrap-cell"><span class="badge bg-info-soft text-info border border-info small p-1 text-wrap w-100 grn-project-badge" style="white-space: normal; word-break: break-word;">${safeOutput(data)}</span></div>` : '<span class="text-muted small">N/A</span>';
                 }
             },
             <?php endif; ?>
@@ -1479,6 +1509,11 @@ function exportGRNs() {
     }
 }
 </style>
+
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
+<div class="d-none d-print-block">
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
+</div>
 
 <?php
 // Include the footer
