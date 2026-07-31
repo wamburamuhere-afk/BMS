@@ -470,7 +470,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View assets', 'User viewed the assets m
 </div>
 
 <!-- Depreciation Proposal Modal (Preview -> Post) -->
-<div class="modal fade" id="depProposalModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="depProposalModal" tabindex="-1" aria-hidden="true" data-no-autoclose="true">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-primary text-white">
