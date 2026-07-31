@@ -878,8 +878,20 @@ function exportExcel() {
 
 @media print {
     /* size:auto keeps the user's Portrait/Landscape choice; everything below
-       adapts via percentage widths so neither orientation clips or squeezes. */
-    @page { size: auto; }
+       adapts via percentage widths so neither orientation clips or squeezes.
+       Canonical I/E Print margin (i_e_print.md §1, same value as
+       ledger_report.php/grn.php/delivery_notes.php/rfq.php) -- there was
+       previously NO bottom clearance at all beyond the browser default,
+       which is what let the shared print footer overlap/hide the last
+       table row on a page. */
+    @page { size: auto; margin: 10mm 8mm 16mm 8mm; }
+
+    /* The shared report footer (.print-footer, includes/print_footer_html.php)
+       is fixed-position and repeats at the bottom of every printed page --
+       same mechanism as every other report page. Keep ONE footer only: hide
+       the generic footer.php print footer (.bms-print-footer) that would
+       otherwise render a duplicate here. */
+    .bms-print-footer { display: none !important; }
 
     body { background: white !important; padding: 0 !important; }
     .invoice-dashboard { background: white !important; padding: 0 !important; }
@@ -928,7 +940,6 @@ function exportExcel() {
         width: 100% !important;
         table-layout: fixed !important;
         border-collapse: collapse !important;
-        font-size: 8pt !important;
     }
     #invoicesTable th, #invoicesTable td {
         border: 1px solid #dee2e6 !important;
@@ -939,7 +950,24 @@ function exportExcel() {
         vertical-align: middle !important;
     }
     #invoicesTable th { background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; }
-    #invoicesTable td .badge, #invoicesTable td .progress { font-size: 6.5pt !important; }
+
+    /* Font sizing mirrors ledger_report.php's #ledgerTable / grn.php's
+       #grnTable / delivery_notes.php's #dnTable / rfq.php's #rfqTable
+       exactly: header 7pt, body 7.5pt -- forced onto the cell itself AND
+       everything nested inside it (Type/Status badges, progress bars),
+       replacing the old ad-hoc 8pt base + 6.5pt badge-only override that
+       made columns read at inconsistent sizes relative to each other. */
+    #invoicesTable th {
+        font-size: 7pt !important;
+    }
+    #invoicesTable td {
+        font-size: 7.5pt !important;
+    }
+    #invoicesTable td *, #invoicesTable th * {
+        font-size: 7.5pt !important;
+        max-width: 100% !important;
+        white-space: normal !important;
+    }
 
     <?php
     // Printed columns: S/NO, Invoice#, Date, Customer, [Project], Type, Amount, Balance, Status
@@ -979,5 +1007,10 @@ function exportExcel() {
     }
 }
 </style>
+
+<?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
+<div class="d-none d-print-block">
+    <?php require_once ROOT_DIR . '/includes/print_footer_html.php'; ?>
+</div>
 
 <?php includeFooter(); ?>
