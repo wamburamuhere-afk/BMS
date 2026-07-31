@@ -198,11 +198,11 @@ function generate_grn_number() {
 
     /* Print Logic: Force Table View, Hide Card View */
     @media print {
-        /* Extra bottom clearance (16mm vs the global 15mm) so the last table
-           row never sits under the shared fixed-position print footer --
-           same margin already proven correct on Customer/Supplier/
-           Sub-Contractor/Delivery-Notes/Quotations/Sales-Orders print. */
-        @page { margin: 10mm 8mm 16mm 8mm; size: auto; }
+        /* Extra bottom clearance so the last table row never sits under the
+           shared fixed-position print footer (landscape gets an even larger
+           bump just below -- its page is physically shorter than portrait's,
+           so the same absolute margin leaves proportionally less room). */
+        @page { margin: 10mm 8mm 20mm 8mm; size: auto; }
 
         #card-view-container {
             display: none !important;
@@ -243,6 +243,15 @@ function generate_grn_number() {
             break-inside: auto !important;
             overflow: visible !important;
         }
+    }
+
+    /* Landscape's page is physically shorter than portrait's (width/height
+       swap), so the same absolute bottom @page margin leaves proportionally
+       less clearance before the shared fixed-position footer -- a real
+       cut-off was reported specifically in landscape even after the base
+       20mm fix above. Give landscape extra room on top of it. */
+    @media print and (orientation: landscape) {
+        @page { margin: 10mm 8mm 24mm 8mm; size: auto; }
     }
 
     /* Fix for Table Alignment and Margins */
@@ -320,9 +329,16 @@ function generate_grn_number() {
         <?php endif; ?>
 
         /* Header labels must wrap, not clip, once their column has a real
-           (narrower) printed width. */
-        #grnTable thead th {
+           (narrower) printed width. One size point above the body text below
+           (8pt), and bold, so headers read as clearly distinct from values --
+           `thead tr th` (not just `thead th`) is needed to out-specificity the
+           unrelated #grnTable thead th{font-size:0.75rem} rule declared later
+           in this same file for the on-screen view, which would otherwise win
+           the cascade tie at print time regardless of source order. */
+        #grnTable thead tr th {
             white-space: normal !important;
+            font-size: 9pt !important;
+            font-weight: 700 !important;
         }
 
         /* Backstop so no cell's content can bleed into its neighbour: several
@@ -335,9 +351,22 @@ function generate_grn_number() {
             word-wrap: break-word !important;
             word-break: normal !important;
         }
+
+        /* Root cause of "some columns have a bigger/smaller font than others":
+           most cells wrap their value in Bootstrap's .small/<small> (which
+           sets a size RELATIVE to its parent, ~87.5% of the 8pt td above --
+           e.g. Supplier/PO#/Warehouse/Received By/Total Value), while the
+           Date column's plain <span> has no such wrapper and prints at the
+           full 8pt -- so Date reads larger than almost everything else. The
+           Status badge additionally carries its own inline
+           style="font-size:0.7rem" from the on-screen view. Force every cell
+           AND everything nested inside it to the exact same 8pt regardless of
+           Bootstrap classes or inline styles (an !important author rule beats
+           a plain inline style with no !important of its own). */
         #grnTable td *, #grnTable th * {
             max-width: 100% !important;
             white-space: normal !important;
+            font-size: 8pt !important;
         }
 
         /* Status "badge" printed as plain bold text -- no pill/oval shape.
@@ -350,6 +379,7 @@ function generate_grn_number() {
             padding: 0 !important;
             color: #000 !important;
             font-weight: 700 !important;
+            font-size: 8pt !important;
         }
     }
 
