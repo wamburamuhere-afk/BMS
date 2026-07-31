@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-07-31 (fix) — GRN list print, round 3: canonical shared footer + ledger_report.php font scheme
+
+**Files:** `app/bms/grn/grn.php`, `tests/test_grn_print_layout_cli.php`
+
+User pointed at `app/constant/reports/ledger_report.php` as the reference to copy, since landscape print (shown in a real print/PDF screenshot) still cut a row off under the footer even after round 2's larger `@page` margins, and asked for the Project column's oval badge removed too, matching Status.
+
+Root cause of the persistent footer overlap: rounds 1-2 kept enlarging the `@page` bottom margin reserved for the **generic, site-wide** `.bms-print-footer` (from `footer.php`/`responsive.css`, rendered on every app page) — a losing game across orientations. Every other report page in this codebase (`ledger_report.php`, `income_statement.php`, `trial_balance.php`, ...) instead **hides that generic footer during print** and uses the dedicated, purpose-built `includes/print_footer_css.php` + `print_footer_html.php` pair (i_e_print.md §1-3: canonical `@page { margin: 10mm 8mm 16mm 8mm; }`, no per-orientation override needed once the correctly-sized footer is used). Switched `grn.php` to that same canonical mechanism, removing the per-orientation `@page` hack entirely.
+
+Font sizing now mirrors `ledger_report.php`'s `#ledgerTable` exactly: header 7pt, body 7.5pt (forced onto the cell itself **and** everything nested inside it, so Bootstrap's `.small`/`<small>`/inline font-size styles can no longer make one column look different from another), Total Value 7pt + `white-space: nowrap` — the same treatment `ledger_report.php` gives its Debit/Credit/Balance columns so a large TZS figure never wraps or overflows into the next column. The Project column's badge gets the same oval-removal treatment already applied to Status (`grn-project-badge`, background/border/border-radius/padding stripped in print).
+
+Verified live on dev.bms.local: injected the page's own `@media print` rules as active on-screen styles and confirmed `.bms-print-footer` computes to `display:none` while the canonical `.print-footer` computes to `display:flex`/`position:fixed` (no duplicate footer, no reliance on the unreliable one); confirmed every body column computes to `10px` (7.5pt) except Total Value at `9.33333px` (7pt, nowrap) and every header cell at `9.33333px` (7pt); confirmed via computed style that both Status and Project badges render with `background: transparent`, `border: none`, `border-radius: 0` — no oval on either. `tests/test_grn_print_layout_cli.php` rewritten to 28 checks (was 22). Zero regression in adjacent suites (`test_grn_posting_cli` 17/17, `test_grn_three_approval_cli` 68/68, `test_phase4_grn_approved_cli` 16/16, `test_print_css_standard_cli` 109/109).
+
 ## 2026-07-31 (fix) — GRN list print, round 2: landscape footer cut-off + inconsistent column font sizes
 
 **Files:** `app/bms/grn/grn.php`, `tests/test_grn_print_layout_cli.php`

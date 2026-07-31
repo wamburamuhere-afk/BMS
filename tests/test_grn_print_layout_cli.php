@@ -1,7 +1,7 @@
 <?php
 /**
- * GRN list print — hidden column values, footer overlap, oval status badges,
- * inconsistent column font sizes, landscape-specific footer cut-off
+ * GRN list print — hidden column values, footer overlap, oval badges,
+ * inconsistent column font sizes
  *   php tests/test_grn_print_layout_cli.php
  *
  * User-reported (round 1): printing app/bms/grn/grn.php in portrait cut
@@ -10,58 +10,54 @@
  * rounded "oval" badge shape was unwanted in print.
  *
  * User-reported (round 2, with a real print/PDF screenshot): landscape
- * print STILL cut content off under the footer even after round 1's fix,
+ * print STILL cut a row off under the footer even after round 1's fix (a
+ * larger @page bottom margin on the generic site-wide .bms-print-footer),
  * and column values rendered at visibly different font sizes from each
- * other (most columns wrap their value in Bootstrap's .small/<small>,
- * which sizes ~87.5% of its parent — while the Date column's plain <span>
- * has no such wrapper and printed at the full size — plus the Status badge
- * carried its own inline style="font-size:0.7rem" from the on-screen view).
+ * other.
  *
- * Root causes, matching the same class of bug already fixed on Sales
- * Orders/Quotations/Supplier/Warehouse Inventory print:
+ * User-reported (round 3, pointing at app/constant/reports/ledger_report.php
+ * as the reference to copy): use ledger_report.php's exact font-size scheme
+ * (header smaller than body, money column smallest + nowrap) and fix the
+ * footer overlap "how it was fixed in ledger_report.php" — i.e. switch to
+ * the canonical shared footer mechanism instead of further inflating the
+ * generic one — and remove the oval around the Project column's value too.
+ *
+ * Root cause of the persistent footer overlap: grn.php was reserving space
+ * for the generic, site-wide `.bms-print-footer` (from footer.php /
+ * responsive.css, rendered on every app page) via an ever-larger @page
+ * bottom margin — a losing game across orientations. Every other report
+ * page in this codebase (ledger_report.php, income_statement.php,
+ * trial_balance.php, ...) instead hides that generic footer during print
+ * and uses the dedicated, purpose-built includes/print_footer_css.php +
+ * print_footer_html.php pair (i_e_print.md §1-3: canonical
+ * `@page { margin: 10mm 8mm 16mm 8mm; }`, no per-orientation override
+ * needed once the correctly-sized footer is used).
+ *
+ * Font sizing now mirrors ledger_report.php's #ledgerTable exactly:
+ * header 7pt, body 7.5pt (cell itself AND everything nested inside it, so
+ * Bootstrap's .small/<small>/inline font-size styles can't produce a
+ * different-looking column), money column (Total Value) 7pt + nowrap so a
+ * large TZS figure never wraps or overflows into the next column.
+ *
+ * Root causes (round 1, unchanged from earlier rounds):
  * 1. Every column (including the hidden Actions column) was forced to an
- *    identical 8.33% width regardless of content — a long Supplier/GRN-number
- *    cell got squeezed to the same width as a short Items/S-NO cell, so
- *    content had nowhere to go but clip/overflow.
- * 2. No extra bottom @page clearance for the shared .bms-print-footer
- *    (fixed, bottom:0 on every printed page) — the standard fix already
- *    proven on Customer/Supplier/Sub-Contractor/Delivery-Notes/Quotations/
- *    Sales-Orders print is extra @page bottom margin (vs the global 15mm).
- *    Landscape's page is physically shorter than portrait's (width/height
- *    swap), so the same absolute margin leaves proportionally less room —
- *    landscape gets an additional bump on top of the base fix.
- * 3. The site-wide `p, .card, section { page-break-inside: avoid }` rule
+ *    identical 8.33% width regardless of content.
+ * 2. The site-wide `p, .card, section { page-break-inside: avoid }` rule
  *    treats the whole GRN table card as one unsplittable block, which for a
  *    list many rows tall pushes it entirely onto a later page (blank page 1).
- * 4. Status rendered as a Bootstrap `.badge` pill even in print.
- * 5. Most cell values were wrapped in Bootstrap's .small/<small>/inline
- *    font-size styles, rendering at inconsistent sizes relative to the
- *    unwrapped Date column.
- *
- * Fix: explicit content-proportional percentage widths (summing to 100%)
- * for every VISIBLE column, Actions dropped from print via .d-print-none
- * (freeing its width rather than leaving it reserved/blank), extra @page
- * bottom margin (larger again specifically for landscape orientation),
- * #grnTableCard page-break-inside override, an ID-qualified
- * `#grnTable .grn-status-badge` print rule that strips background/border/
- * border-radius/padding so Status prints as plain bold text instead of a
- * pill, and a `#grnTable td *, #grnTable th *` rule that forces every cell's
- * value AND everything nested inside it to the exact same font-size
- * (matching the Date column), with headers set one point size larger and
- * bold via a specificity-boosted `#grnTable thead tr th` selector (needed to
- * beat an unrelated, equally-specific #grnTable thead th rule declared later
- * in the file for the on-screen view).
  *
  * This is a source-pattern regression guard, not a live HTTP test — the
- * page requires an authenticated session to render. The fix was also
- * verified live in a real browser session (dev.bms.local): injected the
- * page's own @media print rules as active on-screen styles (since a native
- * print dialog can't be screenshotted) and confirmed no column value is
- * clipped; confirmed via computed style that the Status badge renders with
- * color:rgb(0,0,0), background:transparent, border:none, border-radius:0 —
- * no oval shape; and confirmed every column's leaf element (CODE, SPAN, DIV,
- * STRONG — GRN#, Date, Supplier, Total Value, etc.) computes to the exact
- * same 10.6667px (8pt), with every header cell at 12px (9pt) bold.
+ * page requires an authenticated session to render. The fix was verified
+ * live in a real browser session (dev.bms.local): injected the page's own
+ * @media print rules as active on-screen styles (a native print dialog
+ * can't be screenshotted), confirmed the generic .bms-print-footer computes
+ * to display:none while the canonical .print-footer computes to
+ * display:flex/position:fixed (no duplicate, no reliance on the unreliable
+ * one), confirmed every body column computes to 10px (7.5pt) except Total
+ * Value at 9.33333px (7pt, nowrap), every header cell at 9.33333px (7pt),
+ * and confirmed via computed style that both the Status and Project badges
+ * render with color:rgb(0,0,0), background:transparent, border:none,
+ * border-radius:0 — no oval shape on either.
  *
  * Exit 0 = all checks pass. Exit 1 = a regression slipped in.
  */
@@ -76,7 +72,7 @@ register_shutdown_function(function () {
     if ($failures > 0) exit(1);
 });
 
-echo "\n\033[1m═══ GRN list print — layout, footer clearance, and no oval status badge ═══\033[0m\n";
+echo "\n\033[1m═══ GRN list print — canonical footer, ledger-matched fonts, no oval badges ═══\033[0m\n";
 
 $root = dirname(__DIR__);
 $file = $root . '/app/bms/grn/grn.php';
@@ -89,13 +85,22 @@ $res = shell_exec(escapeshellarg(PHP_BINARY) . ' -l ' . escapeshellarg($file) . 
 
 $src = file_get_contents($file) ?: '';
 
-head('Footer clearance — extra bottom @page margin, larger again for landscape');
-str_contains($src, '@page { margin: 10mm 8mm 20mm 8mm; size: auto; }')
-    ? ok('GRN print carries the 20mm-bottom base @page margin')
-    : bad('extra bottom @page clearance missing — last row may sit under the fixed print footer again');
-(preg_match('/@media print and \(orientation:\s*landscape\)\s*\{\s*@page\s*\{\s*margin:\s*10mm 8mm 24mm 8mm;/s', $src) === 1)
-    ? ok('landscape gets an additional bottom-margin bump (24mm) on top of the base fix')
-    : bad('landscape-specific extra footer clearance is missing — a real cut-off was reported here');
+head('Footer clearance — canonical shared footer (same mechanism as ledger_report.php)');
+str_contains($src, '.bms-print-footer { display: none !important; }')
+    ? ok('the generic site-wide print footer is hidden during print (no duplicate)')
+    : bad('.bms-print-footer is not hidden — a duplicate/unreliable footer may render again');
+str_contains($src, "require_once ROOT_DIR . '/includes/print_footer_css.php';")
+    ? ok('the canonical print_footer_css.php is included')
+    : bad('print_footer_css.php is not included — footer positioning/sizing reverts to none');
+str_contains($src, "require_once ROOT_DIR . '/includes/print_footer_html.php';")
+    ? ok('the canonical print_footer_html.php is included')
+    : bad('print_footer_html.php is not included — no footer content will render at all');
+(preg_match('/@page\s*\{\s*margin:\s*10mm 8mm 16mm 8mm;\s*\}/', $src) === 1)
+    ? ok('GRN print carries the canonical 16mm-bottom @page margin (i_e_print.md §1, matches ledger_report.php exactly)')
+    : bad('the canonical @page margin is missing or does not match the standard');
+(!preg_match('/@media print and \(orientation:\s*landscape\)/', $src))
+    ? ok('no per-orientation @page hack remains — the canonical footer needs none, in either orientation')
+    : bad('a leftover per-orientation @page override was found — should no longer be necessary');
 
 head('Blank-first-page guard — table card opts out of the unsplittable .card rule');
 str_contains($src, 'id="grnTableCard"')
@@ -148,21 +153,30 @@ str_contains($src, '#grnTable td *, #grnTable th *')
     ? ok('inline max-width/white-space reset applied to nested cell content')
     : bad('nested-content bleed backstop missing');
 
-head('Status badge prints as plain text — no oval/pill shape');
+head('Status/Project badges print as plain text — no oval/pill shape on either');
 str_contains($src, 'grn-status-badge')
     ? ok('status render() tags the badge with a dedicated grn-status-badge class')
     : bad('grn-status-badge class missing from the status column render()');
-(preg_match('/#grnTable\s+\.grn-status-badge\s*\{[^}]*background:\s*transparent[^}]*border:\s*none[^}]*border-radius:\s*0[^}]*padding:\s*0/s', $src) === 1)
-    ? ok('#grnTable .grn-status-badge strips background/border/border-radius/padding in print')
-    : bad('grn-status-badge print override incomplete — the oval shape may still render');
+str_contains($src, 'grn-project-badge')
+    ? ok('project render() tags the badge with a dedicated grn-project-badge class')
+    : bad('grn-project-badge class missing from the project column render()');
+(preg_match('/#grnTable \.grn-status-badge,\s*#grnTable \.grn-project-badge\s*\{[^}]*background:\s*transparent[^}]*border:\s*none[^}]*border-radius:\s*0[^}]*padding:\s*0/s', $src) === 1)
+    ? ok('both #grnTable .grn-status-badge and .grn-project-badge strip background/border/border-radius/padding in print')
+    : bad('the combined status/project badge print override is missing or incomplete — an oval shape may still render on one or both');
 
-head('Every column\'s value renders at the same font-size (matching Date), headers +1pt bold');
-(preg_match('/#grnTable td \*, #grnTable th \*\s*\{[^}]*font-size:\s*8pt\s*!important/s', $src) === 1)
-    ? ok('every cell AND its nested content (badges/strong/code/small/div) is forced to 8pt in print')
-    : bad('nested-content font-size override missing — badges/.small text will render smaller/larger than Date again');
-(preg_match('/#grnTable thead tr th\s*\{[^}]*font-size:\s*9pt\s*!important[^}]*font-weight:\s*700\s*!important/s', $src) === 1)
-    ? ok('#grnTable thead tr th is 9pt (Date\'s 8pt + 1) and bold')
-    : bad('header font-size/weight override missing or not exactly 1pt above body text');
-(preg_match('/#grnTable \.grn-status-badge\s*\{[^}]*font-size:\s*8pt\s*!important/s', $src) === 1)
-    ? ok('#grnTable .grn-status-badge explicitly matches the 8pt body size (overrides its own inline font-size:0.7rem)')
-    : bad('grn-status-badge no longer explicitly matches the body font-size');
+head('Font sizing mirrors ledger_report.php\'s #ledgerTable exactly (header smaller than body, money column smallest)');
+(preg_match('/#grnTable thead tr th\s*\{[^}]*font-size:\s*7pt\s*!important/s', $src) === 1)
+    ? ok('#grnTable thead tr th is 7pt (matches #ledgerTable thead th exactly)')
+    : bad('header font-size no longer matches ledger_report.php\'s 7pt reference');
+(preg_match('/#grnTable tbody td\s*\{\s*font-size:\s*7\.5pt\s*!important;\s*\}/s', $src) === 1)
+    ? ok('#grnTable tbody td (the cell itself, not just nested content) is 7.5pt (matches #ledgerTable tbody/tfoot td exactly)')
+    : bad('base body cell font-size missing — a cell with no nested wrapper (e.g. S/NO) would fall back to some other ambient size');
+(preg_match('/#grnTable td \*, #grnTable th \*\s*\{[^}]*font-size:\s*7\.5pt\s*!important/s', $src) === 1)
+    ? ok('every cell\'s nested content (badges/strong/code/small/div/a) is also forced to 7.5pt')
+    : bad('nested-content font-size override missing or no longer 7.5pt — badges/.small text could render a different size again');
+(preg_match('/#grnTable td:nth-child\(9\), #grnTable td:nth-child\(9\) \*\s*\{\s*white-space:\s*nowrap\s*!important;\s*font-size:\s*7pt\s*!important;/s', $src) === 1)
+    ? ok('Total Value (Project-enabled, column 9) gets nowrap + 7pt, same treatment ledger_report.php gives its money columns')
+    : bad('Total Value column no longer gets the nowrap+7pt money-column treatment (Project-enabled branch)');
+(preg_match('/#grnTable td:nth-child\(8\), #grnTable td:nth-child\(8\) \*\s*\{\s*white-space:\s*nowrap\s*!important;\s*font-size:\s*7pt\s*!important;/s', $src) === 1)
+    ? ok('Total Value (Project-disabled, column 8) gets nowrap + 7pt, same treatment ledger_report.php gives its money columns')
+    : bad('Total Value column no longer gets the nowrap+7pt money-column treatment (Project-disabled branch)');
