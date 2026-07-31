@@ -10,6 +10,8 @@ try {
         throw new Exception('Access Denied: you do not have permission to delete compliance records');
     }
 
+    csrf_check();
+
     $id = $_POST['id'] ?? null;
     if (!$id) throw new Exception("ID required");
 
