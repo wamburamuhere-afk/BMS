@@ -294,7 +294,7 @@ $selected_status = $_GET['status'] ?? '';
     </div>
 
 <!-- Process Payroll Modal -->
-<div class="modal fade" id="processPayrollModal" tabindex="-1">
+<div class="modal fade" id="processPayrollModal" tabindex="-1" data-no-autoclose="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
             <div class="modal-header border-0 p-4 text-white" style="background: var(--primary-gradient);">
