@@ -95,10 +95,12 @@ $chargeStmt->execute([$fyStart, $fyEnd]);
 $currentFyCharge = (float)$chargeStmt->fetchColumn();
 
 // ── Maintenance overdue (latest next_due_date in the past) ───────────────────
+// maintenance_logs — the one GL-posting maintenance system; the old
+// zero-posting asset_maintenance table has been retired.
 $maintStmt = $pdo->query("
     SELECT a.asset_id, a.asset_code, a.asset_name, mx.next_due
       FROM assets a
-      JOIN (SELECT asset_id, MAX(next_due_date) next_due FROM asset_maintenance WHERE next_due_date IS NOT NULL GROUP BY asset_id) mx
+      JOIN (SELECT asset_id, MAX(next_due_date) next_due FROM maintenance_logs WHERE next_due_date IS NOT NULL AND status != 'deleted' GROUP BY asset_id) mx
         ON mx.asset_id = a.asset_id
      WHERE a.status NOT IN ('deleted','disposed','written_off')
        AND mx.next_due < CURDATE()

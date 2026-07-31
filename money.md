@@ -311,6 +311,26 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
 4. **Tanzania practice:** same statutory set as OUT-4 (PAYE/NSSF/SDL/WCF), per project.
 5. **Improve:** post like OUT-4 with `project_id` scope.
 
+### OUT-17 — Asset maintenance  ✅ FIXED 2026-07-30  ·  `api/operations/save_maintenance_log.php` (+ `delete_maintenance_log.php`)
+> **FIXED:** predates this document — found via a `post_principle.md` 6-question audit, not the
+> original money.md sweep. Two parallel systems existed for the same event: `asset_maintenance`
+> (zero GL posting despite a real `cost` field) and `maintenance_logs` (posted the accrual only —
+> no payment/settlement step existed anywhere, so the Accrued Expenses liability it raised could
+> never be system-settled). Consolidated to `maintenance_logs` alone (0 live rows in
+> `asset_maintenance` — nothing to migrate; table dropped). Added the missing payment leg mirroring
+> Trips' proven accrue→pay→reverse cycle (`core/expense_posting.php` Maintenance wrappers +
+> `reverseMaintenanceLedger()`), and fixed `delete_maintenance_log.php` from a hard DELETE with zero
+> reversal (violated both CLAUDE.md §12 and post_principle.md Q6 — orphaned journal entries) to a
+> soft-delete that reverses first. Verified `tests/test_maintenance_gl_posting_cli.php` 55/55.
+1. **Where:** chosen Expense account, Accrued Expenses (2-1500), Bank/Paid-From account.
+2. **Double entry:** Completed → `Dr Expense / Cr Accrued Expenses`; Paid → `Dr Accrued Expenses / Cr Bank`. *(Done.)*
+3. **Current situation:** **FIXED** — full accrue→pay→reverse cycle, idempotent, double-post guarded
+   (an already-paid log rejects a money-affecting re-save), soft-delete reverses first.
+4. **Tanzania practice:** vendor/technician maintenance needs an EFD receipt to claim input VAT;
+   paid via mobile money/bank/cash like any other expense.
+5. **Improve (remaining, optional):** WHT on maintenance paid to a registered service provider —
+   not yet modelled (mirrors the same gap noted generically at OUT-1).
+
 ---
 
 ## Fix order (recommended)
@@ -351,5 +371,6 @@ These authoritative facts feed the per-file Step 4. (Verify amounts each tax yea
 | OUT-14 | Asset disposal | ✅ FIXED — Cr Asset / Dr Accum Dep / Dr Clearing (proceeds) / Cr gain or Dr loss; postAssetDisposalGl now falls back to canonical accounts on the live chart | ☑ |
 | OUT-15 | Project IPC | ✅ FIXED — Dr AR / Cr Contract Revenue at Approved (postIpcRevenue, core/ipc_posting.php); IN-3 defers via recognised_via_ipc | ☑ |
 | OUT-16 | Project payroll | ✅ FIXED — auto-approved project payroll accrues via ensurePayrollAccrued (Dr Salaries Exp / Cr PAYE+NSSF+Salaries Payable) + period SDL/statutory sync | ☑ |
+| OUT-17 | Asset maintenance | ✅ FIXED (2026-07-30) — completed: Dr Expense / Cr Accrued Expenses; paid: Dr Accrued Expenses / Cr Bank (core/expense_posting.php Maintenance wrappers); asset_maintenance (zero-post duplicate) retired | ☑ |
 
 > **Excluded:** Loans (not a real money path in this system — treat as a bug; do not wire).
