@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-07-31 (refactor) — Notification Settings folded into Notification Rules as an admin-only collapsible panel
+
+**Files:** new `app/constant/settings/_notification_settings_panel.php`, `app/constant/settings/notification_settings.php`, `app/constant/settings/notification_rules.php`, `header.php`, new `migrations/2026_07_31_lock_notification_settings.php`, `tests/test_admin_lock_and_delegable_settings_cli.php`
+
+User request: `notification_settings.php` (channels, email/SMS templates, alert rules, test tab) should be reachable from inside `notification_rules.php` via a toggle, and should no longer be delegable via Roles & Permissions — admin-only, like the rest of Settings > Admin.
+
+Extracted the entire settings body (the `$_POST` save handlers + the tabbed UI + its script) out of `notification_settings.php` into a new shared partial, `_notification_settings_panel.php`, with its CSS scoped under `.notif-settings-panel` so it can't bleed into whichever page includes it. `notification_rules.php` now has a collapsible card ("⚙ Notification Settings — channels, email/SMS templates & alert rules", collapsed by default) that `require`s this partial — since that page is already hard `isAdmin()`-gated, the embedded panel inherits that automatically. `notification_settings.php` itself was given the same hard `isAdmin()` redirect `notification_rules.php` already has (its standalone URL still works, just admin-only now), and also `require`s the same partial instead of duplicating the markup. Removed the now-dead "Notifications" link from `header.php`'s Settings ▾ Business Settings dropdown (was gated by `canView('notification_settings')`). New migration hides the `notification_settings` permission row from Roles & Permissions (`is_hidden = 1`), same pattern as `2026_07_30_lock_notification_rules.php`.
+
+Updated `tests/test_admin_lock_and_delegable_settings_cli.php` to move `notification_settings` from the delegable set into the locked set (with a new `$LOCKED_NO_SIDEBAR_LINK` exception, since — unlike the other locked pages — it deliberately gets no `system_settings.php` sidebar link, only the embed inside Notification Rules), and added a new section asserting the panel is actually shared (not duplicated) between both callers. Ran migration locally (`php migrations/2026_07_31_lock_notification_settings.php`) and the full suite: 134/134 passing. Also ran `tests/test_notification_engine_cli.php` (76/77 — confirmed the one failure, `save_invoice.php` not emitting `invoice.needs_review`, pre-exists on `develop` via `git stash`, unrelated to this change). `php -l` clean on every touched/new file; both pages return HTTP 200 with no fatal error in the response body.
+
 ## 2026-07-31 (fix) — Invoices list print: canonical shared footer, ledger_report.php font scheme
 
 **Files:** `app/bms/invoice/invoices.php`, new `tests/test_invoices_print_layout_cli.php`
