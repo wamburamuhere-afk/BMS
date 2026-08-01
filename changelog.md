@@ -10,6 +10,18 @@ Extracted the entire settings body (the `$_POST` save handlers + the tabbed UI +
 
 Updated `tests/test_admin_lock_and_delegable_settings_cli.php` to move `notification_settings` from the delegable set into the locked set (with a new `$LOCKED_NO_SIDEBAR_LINK` exception, since — unlike the other locked pages — it deliberately gets no `system_settings.php` sidebar link, only the embed inside Notification Rules), and added a new section asserting the panel is actually shared (not duplicated) between both callers. Ran migration locally (`php migrations/2026_07_31_lock_notification_settings.php`) and the full suite: 134/134 passing. Also ran `tests/test_notification_engine_cli.php` (76/77 — confirmed the one failure, `save_invoice.php` not emitting `invoice.needs_review`, pre-exists on `develop` via `git stash`, unrelated to this change). `php -l` clean on every touched/new file; both pages return HTTP 200 with no fatal error in the response body.
 
+## 2026-07-31 (removal) — system_settings.php: dropped the dead Collections tab
+
+**Files:** `app/constant/settings/system_settings.php`
+
+User request: this system doesn't do anything with loan arrears/collections, so remove the "Collections" tab (Monthly Target, Grace Period, Overdue Threshold, Auto Reminders, Frequency, plus a static "Reminder Sequence Protocol" card) — but only after confirming it's safe.
+
+Audit before removal: grepped the whole codebase for all 5 keys it writes (`collection_target_monthly`, `grace_period_days`, `max_overdue_days`, `enable_auto_reminders`, `overdue_reminder_days`) — zero readers anywhere outside this page. The only other hit was `scripts/legacy/update_business_info.php`, a one-off manual seed script (not included/executed by the app, no cron) that writes a couple of these keys as demo data — doesn't read them, unaffected by removing the UI. No test references "Collections" or its keys, and nothing deep-links to the `#collection` tab anchor. The "Reminder Sequence Protocol" card was also static hardcoded text (3/7/14/30+ days), never reflecting the actual field values above it.
+
+Removed the sidebar nav item, the `save_collection` POST handler, and the entire tab-pane. Left the underlying `system_settings` DB rows in place (harmless orphaned data, not worth a migration). Updated the page's own top-of-file comment (dropped "Collections" from the "General/Email/SMS/Collections/Security" list) — left the historical `migrations/2026_07_29_lock_sensitive_settings.php` comment as-is since migrations are a historical record, not a live invariant.
+
+Verified: `php -l` clean, `grep collection` on the file returns nothing, `tests/test_admin_lock_and_delegable_settings_cli.php` 126/126 passing, confirmed live on dev.bms.local — sidebar now reads General → Email Config → SMS Gateway → Security with no fatal errors.
+
 ## 2026-07-31 (fix) — Invoices list print: canonical shared footer, ledger_report.php font scheme
 
 **Files:** `app/bms/invoice/invoices.php`, new `tests/test_invoices_print_layout_cli.php`
