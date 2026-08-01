@@ -22,6 +22,16 @@ Removed the sidebar nav item, the `save_collection` POST handler, and the entire
 
 Verified: `php -l` clean, `grep collection` on the file returns nothing, `tests/test_admin_lock_and_delegable_settings_cli.php` 126/126 passing, confirmed live on dev.bms.local — sidebar now reads General → Email Config → SMS Gateway → Security with no fatal errors.
 
+## 2026-07-31 (refactor) — system_settings.php sidebar: grouped into visual sections
+
+**Files:** `app/constant/settings/system_settings.php`
+
+User request (with a screenshot of the flat sidebar and a reference screenshot of the top-nav Settings ▾ dropdown's "System Configuration"/"Business Settings" header style): group the Admin page's sidebar the same way.
+
+Added five non-clickable section headers (`.sidebar-group-header`, `pointer-events: none` so hover/click has no effect) splitting the links into: **System Configuration** (General, Email Config, SMS Gateway, Security — the local tabs, unchanged; rebased on top of the separate Collections-tab removal, PR #1678), **Access & Security** (Users, Roles & Permissions, Login History, Backup), **Business & Finance** (Payments, Company Profile), **Communication & Integrations** (Notification Rules, Zoom Integration, AI Assistant), **Projects** (Project Assignments). Reordered the plain-link items to sit under their new group (same links, same `getUrl()` targets, same isAdmin() gate on each destination page — nothing added or removed beyond the grouping itself, purely a visual reorganization).
+
+Verified live on dev.bms.local as an authenticated admin: all 5 group headers render with the correct items underneath, scrolled through the full list to confirm nothing was dropped or duplicated. `php -l` clean. Re-ran `tests/test_admin_lock_and_delegable_settings_cli.php` (126/126 passing — its checks are order-independent substring/regex checks on the page source, unaffected by reordering).
+
 ## 2026-07-31 (fix) — Invoices list print: canonical shared footer, ledger_report.php font scheme
 
 **Files:** `app/bms/invoice/invoices.php`, new `tests/test_invoices_print_layout_cli.php`
