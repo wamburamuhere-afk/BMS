@@ -49,6 +49,22 @@ require_once __DIR__ . '/../../../header.php';
         </div>
     </div>
 
+    <!-- Notification Settings (channels, templates, alert rules) — collapsed by
+         default; embeds the same admin-only panel notification_settings.php uses. -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#notifSettingsCollapse" aria-expanded="false" aria-controls="notifSettingsCollapse">
+            <div class="d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-gear-fill text-primary me-2"></i><strong>Notification Settings</strong> <span class="text-muted small">— channels, email/SMS templates & alert rules</span></span>
+                <i class="bi bi-chevron-down"></i>
+            </div>
+        </div>
+        <div class="collapse" id="notifSettingsCollapse">
+            <div class="card-body">
+                <?php require __DIR__ . '/_notification_settings_panel.php'; ?>
+            </div>
+        </div>
+    </div>
+
     <div id="nrLoading" class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading events…</div>
     <div id="nrAccordion" class="accordion d-none"></div>
 </div>

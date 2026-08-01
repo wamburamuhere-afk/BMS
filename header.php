@@ -1114,7 +1114,10 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                              reach it. -->
                         <?php
                         $_set_sys_visible = isAdmin() || canView('pos_config_settings') || canView('color_settings');
-                        $_set_biz_visible = canView('tax_settings') || canView('notification_settings');
+                        // notification_settings dropped 2026-07-31: folded into notification_rules.php
+                        // (Settings > Admin > Notification Rules) as an admin-only collapsible panel,
+                        // no longer delegable via Roles & Permissions.
+                        $_set_biz_visible = canView('tax_settings');
                         ?>
                         <?php if ($_set_sys_visible || $_set_biz_visible): ?>
                         <li class="nav-item dropdown">
@@ -1133,7 +1136,6 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if ($_set_biz_visible): ?>
                                 <li><h6 class="dropdown-header">Business Settings</h6></li>
                                 <?php if (canView('tax_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('tax_settings') ?>"><i class="bi bi-percent"></i> Tax</a></li><?php endif; ?>
-                                <?php if (canView('notification_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('notification_settings') ?>"><i class="bi bi-bell"></i> Notifications</a></li><?php endif; ?>
                                 <?php endif; ?>
                             </ul>
                         </li>
