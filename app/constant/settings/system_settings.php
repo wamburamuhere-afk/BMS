@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../../../roots.php';
 
-// This page (General/Email/SMS/Collections/Security policy) is strictly
+// This page (General/Email/SMS/Security policy) is strictly
 // admin-only by design — it is NOT delegable via Roles & Permissions no
 // matter what is granted (the 'system_settings' permission row is hidden
 // from that UI entirely; see migrations/2026_07_29_lock_sensitive_settings.php).
@@ -134,27 +134,6 @@ if ($_POST) {
         }
     }
     
-    // Collection Settings
-    if (isset($_POST['save_collection'])) {
-        try {
-            $settings = [
-                'collection_target_monthly' => $_POST['collection_target_monthly'],
-                'overdue_reminder_days' => $_POST['overdue_reminder_days'],
-                'max_overdue_days' => $_POST['max_overdue_days'],
-                'enable_auto_reminders' => $_POST['enable_auto_reminders'] ?? 0,
-                'enable_sms_notifications' => $_POST['enable_sms_notifications'] ?? 0,
-                'grace_period_days' => $_POST['grace_period_days']
-            ];
-            
-            foreach ($settings as $key => $value) {
-                save_setting($key, $value);
-            }
-            $success_messages[] = "Collection settings updated successfully";
-        } catch (Exception $e) {
-            $error_messages[] = "Error updating collection settings: " . $e->getMessage();
-        }
-    }
-    
     // Security Settings
     if (isset($_POST['save_security'])) {
         try {
@@ -253,18 +232,6 @@ if ($_POST) {
                             </div>
                         </a>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           id="collection-tab" data-bs-toggle="tab" data-bs-target="#collection" type="button" role="tab" aria-selected="false">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-danger-soft text-danger">
-                                    <i class="bi bi-coin"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold">Collections</h6>
-                                    <small class="text-muted">Targets & reminders</small>
-                                </div>
-                            </div>
-                        </a>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent" 
                            id="security-tab" data-bs-toggle="tab" data-bs-target="#security" type="button" role="tab" aria-selected="false">
                             <div class="d-flex align-items-center">
                                 <div class="icon-box me-3 bg-dark-soft text-dark">
@@ -650,103 +617,6 @@ if ($_POST) {
                         <div class="mt-5 pt-3 border-top d-flex justify-content-end">
                             <button type="submit" name="save_email" class="btn btn-primary px-5">
                                 <i class="bi bi-save me-2"></i> Save Configuration
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- Collection Settings Tab -->
-                <div class="tab-pane fade" id="collection" role="tabpanel">
-                    <form method="POST">
-                        <div class="d-flex align-items-center mb-4">
-                            <h4 class="section-title mb-0">Collections & Recovery</h4>
-                            <span class="badge bg-danger-soft text-danger ms-3">Arrears Management</span>
-                        </div>
-
-                        <div class="row g-4">
-                            <div class="col-md-7">
-                                <div class="card info-card h-100">
-                                    <div class="card-body p-4">
-                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1">Targeting & Thresholds</h6>
-                                        <div class="mb-3">
-                                            <label for="collection_target_monthly" class="form-label">Monthly Target Amount</label>
-                                            <div class="input-group">
-                                                <span class="input-group-text"><?= get_setting('currency', 'TZS') ?></span>
-                                                <input type="number" step="0.01" class="form-control" id="collection_target_monthly" name="collection_target_monthly" value="<?= get_setting('collection_target_monthly', '50000.00') ?>">
-                                            </div>
-                                        </div>
-                                        <div class="row g-3">
-                                            <div class="col-md-6">
-                                                <label for="grace_period_days" class="form-label">Grace Period (Days)</label>
-                                                <input type="number" class="form-control" id="grace_period_days" name="grace_period_days" value="<?= get_setting('grace_period_days', '7') ?>">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="max_overdue_days" class="form-label">Default Threshold (Days)</label>
-                                                <input type="number" class="form-control" id="max_overdue_days" name="max_overdue_days" value="<?= get_setting('max_overdue_days', '90') ?>">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="col-md-5">
-                                <div class="card info-card h-100">
-                                    <div class="card-body p-4">
-                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1">Automation Switch</h6>
-                                        <div class="mb-4">
-                                            <div class="form-check form-switch p-0 ms-0">
-                                                <div class="d-flex justify-content-between align-items-center">
-                                                    <label class="form-check-label fw-bold" for="enable_auto_reminders">Auto Reminders</label>
-                                                    <input class="form-check-input" type="checkbox" id="enable_auto_reminders" name="enable_auto_reminders" value="1" <?= get_setting('enable_auto_reminders') ? 'checked' : '' ?>>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="mb-0">
-                                            <label for="overdue_reminder_days" class="form-label">Frequency (Every X Days)</label>
-                                            <input type="number" class="form-control" id="overdue_reminder_days" name="overdue_reminder_days" value="<?= get_setting('overdue_reminder_days', '3') ?>">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="col-12">
-                                <div class="card info-card bg-light border-0">
-                                    <div class="card-body p-4">
-                                        <h6 class="fw-bold mb-3">Reminder Sequence Protocol</h6>
-                                        <div class="row text-center g-2">
-                                            <div class="col-md-3">
-                                                <div class="p-3 bg-white rounded-3 shadow-sm">
-                                                    <div class="text-primary fw-bold mb-1">Friendly</div>
-                                                    <div class="small text-muted">3 Days Overdue</div>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <div class="p-3 bg-white rounded-3 shadow-sm">
-                                                    <div class="text-warning fw-bold mb-1">Final Notice</div>
-                                                    <div class="small text-muted">7 Days Overdue</div>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <div class="p-3 bg-white rounded-3 shadow-sm">
-                                                    <div class="text-danger fw-bold mb-1">Warning</div>
-                                                    <div class="small text-muted">14 Days Overdue</div>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <div class="p-3 bg-dark text-white rounded-3 shadow-sm">
-                                                    <div class="fw-bold mb-1">Default</div>
-                                                    <div class="small opacity-75">30+ Days Overdue</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mt-5 pt-3 border-top d-flex justify-content-end">
-                            <button type="submit" name="save_collection" class="btn btn-primary px-5">
-                                <i class="bi bi-save me-2"></i> Save Collection Strategy
                             </button>
                         </div>
                     </form>
