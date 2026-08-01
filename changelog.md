@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-08-01 (feat) — Customer LPOs list: Copy/CSV/Print toolbar + Show/Search, matching customers.php
+
+**Files:** `app/bms/sales/lpo/lpos.php`
+
+User request (with a screenshot of customers.php's toolbar): give lpos.php the same Copy/CSV/Print/Show/Search toolbar customers.php has. Import was explicitly scoped out — no `api/import_lpos.php` backend exists, and building one (template, parser, validation, customer matching) was confirmed out of scope for this request.
+
+Added the same "Action Buttons" toolbar block (Copy/CSV/Print, `d-print-none`) plus a "Show: X / Search" row, placed between the Filters card and the table, mirroring customers.php's layout exactly. Wired the DataTable's `dom` to `'rtipB'` with `copyHtml5`/`excelHtml5` buttons (`exportOptions: { columns: ':not(:last-child)' }` to exclude the Actions column, same as customers.php). Print uses `window.print()` (matching sales_orders.php's/purchase_orders.php's simpler pattern, not customers.php's dedicated `print-customers.php` list page — no `print-lpos` route exists, and the page already had `d-print-none` scaffolding on its breadcrumbs/header/stats/filters anticipating exactly this). New JS: `copyLposTable()`, `exportLpos()`, `printLposTable()`, `quickSearchLpos()` — each logs via the existing `logReportAction()` global helper, same as customers.php's equivalents.
+
+Verified live on dev.bms.local: Copy button shows the DataTables "Copy to clipboard" tooltip (confirmed via screenshot); CSV export, search (filtered 2 rows to 1 on "AMAN"), and `window.print()` invocation all confirmed via direct JS execution with no console errors. `php -l` clean. `tests/test_lpo_module_cli.php` 105/105 passing (no regression — this page's own tests don't touch the toolbar, but confirm the underlying LPO data/workflow logic is untouched).
+
 ## 2026-07-31 (refactor) — Notification Settings folded into Notification Rules as an admin-only collapsible panel
 
 **Files:** new `app/constant/settings/_notification_settings_panel.php`, `app/constant/settings/notification_settings.php`, `app/constant/settings/notification_rules.php`, `header.php`, new `migrations/2026_07_31_lock_notification_settings.php`, `tests/test_admin_lock_and_delegable_settings_cli.php`
