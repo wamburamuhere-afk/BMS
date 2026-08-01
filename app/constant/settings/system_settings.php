@@ -195,7 +195,8 @@ if ($_POST) {
             <div class="card border-0 shadow-sm sticky-top" style="top: 100px; z-index: 100;">
                 <div class="card-body p-0">
                     <div class="list-group list-group-flush settings-nav" id="settingsTabs" role="tablist">
-                        <a class="list-group-item list-group-item-action active py-3 px-4 border-0 border-start border-4 border-transparent" 
+                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header">System Configuration</div>
+                        <a class="list-group-item list-group-item-action active py-3 px-4 border-0 border-start border-4 border-transparent"
                            id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab" aria-selected="true">
                             <div class="d-flex align-items-center">
                                 <div class="icon-box me-3 bg-primary-soft text-primary">
@@ -219,7 +220,7 @@ if ($_POST) {
                                 </div>
                             </div>
                         </a>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent" 
+                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            id="sms-tab" data-bs-toggle="tab" data-bs-target="#sms" type="button" role="tab" aria-selected="false">
                             <div class="d-flex align-items-center">
                                 <div class="icon-box me-3 bg-warning-soft text-warning">
@@ -248,7 +249,11 @@ if ($_POST) {
                              gathered here rather than as separate top-nav Settings items because all
                              ten are strictly admin-only: reaching THIS page already required
                              isAdmin(), so grouping them here means a non-admin never even sees them
-                             as menu entries anywhere, on top of each page's own isAdmin() gate. -->
+                             as menu entries anywhere, on top of each page's own isAdmin() gate. Grouped
+                             under sub-headers (2026-07-31) purely for visual scanning — same links,
+                             same order-independent gates, just sectioned like the top-nav Settings
+                             dropdown's "System Configuration" / "Business Settings" headers. -->
+                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header">Access & Security</div>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            href="<?= getUrl('users') ?>">
                             <div class="d-flex align-items-center">
@@ -274,6 +279,31 @@ if ($_POST) {
                             </div>
                         </a>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
+                           href="<?= getUrl('login_history') ?>">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-box me-3 bg-dark-soft text-dark">
+                                    <i class="bi bi-clock-history"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold">Login History</h6>
+                                    <small class="text-muted">Who logged in, from where</small>
+                                </div>
+                            </div>
+                        </a>
+                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
+                           href="<?= getUrl('backup_restore') ?>">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-box me-3 bg-indigo-soft text-indigo">
+                                    <i class="bi bi-cloud-arrow-down"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold">Backup</h6>
+                                    <small class="text-muted">Database recovery</small>
+                                </div>
+                            </div>
+                        </a>
+                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header">Business & Finance</div>
+                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            href="<?= getUrl('payment_settings') ?>">
                             <div class="d-flex align-items-center">
                                 <div class="icon-box me-3 bg-success-soft text-success">
@@ -286,14 +316,27 @@ if ($_POST) {
                             </div>
                         </a>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('login_history') ?>">
+                           href="<?= getUrl('company_profile') ?>">
                             <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-dark-soft text-dark">
-                                    <i class="bi bi-clock-history"></i>
+                                <div class="icon-box me-3 bg-warning-soft text-warning">
+                                    <i class="bi bi-building"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold">Login History</h6>
-                                    <small class="text-muted">Who logged in, from where</small>
+                                    <h6 class="mb-0 fw-bold">Company Profile</h6>
+                                    <small class="text-muted">Logo, TIN/VRN, addresses</small>
+                                </div>
+                            </div>
+                        </a>
+                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header">Communication & Integrations</div>
+                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
+                           href="<?= getUrl('notification_rules') ?>">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-box me-3 bg-danger-soft text-danger">
+                                    <i class="bi bi-bell-fill"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold">Notification Rules</h6>
+                                    <small class="text-muted">Who's notified, per event</small>
                                 </div>
                             </div>
                         </a>
@@ -310,41 +353,18 @@ if ($_POST) {
                             </div>
                         </a>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('backup_restore') ?>">
+                           href="<?= getUrl('ai_settings') ?>">
                             <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-indigo-soft text-indigo">
-                                    <i class="bi bi-cloud-arrow-down"></i>
+                                <div class="icon-box me-3 bg-info-soft text-info">
+                                    <i class="bi bi-stars"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold">Backup</h6>
-                                    <small class="text-muted">Database recovery</small>
+                                    <h6 class="mb-0 fw-bold">AI Assistant</h6>
+                                    <small class="text-muted">AI configuration &amp; API key</small>
                                 </div>
                             </div>
                         </a>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('company_profile') ?>">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-warning-soft text-warning">
-                                    <i class="bi bi-building"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold">Company Profile</h6>
-                                    <small class="text-muted">Logo, TIN/VRN, addresses</small>
-                                </div>
-                            </div>
-                        </a>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('notification_rules') ?>">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-danger-soft text-danger">
-                                    <i class="bi bi-bell-fill"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold">Notification Rules</h6>
-                                    <small class="text-muted">Who's notified, per event</small>
-                                </div>
-                            </div>
-                        </a>
+                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header">Projects</div>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            href="<?= getUrl('user_projects') ?>">
                             <div class="d-flex align-items-center">
@@ -354,18 +374,6 @@ if ($_POST) {
                                 <div>
                                     <h6 class="mb-0 fw-bold">Project Assignments</h6>
                                     <small class="text-muted">Who's assigned to which project</small>
-                                </div>
-                            </div>
-                        </a>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('ai_settings') ?>">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-info-soft text-info">
-                                    <i class="bi bi-stars"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold">AI Assistant</h6>
-                                    <small class="text-muted">AI configuration &amp; API key</small>
                                 </div>
                             </div>
                         </a>
@@ -824,6 +832,19 @@ body {
     color: var(--bs-primary);
     border-left-color: var(--bs-primary) !important;
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.settings-nav .sidebar-group-header {
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    padding-top: 0.85rem !important;
+    padding-bottom: 0.35rem !important;
+    pointer-events: none;
+}
+
+.settings-nav .sidebar-group-header:hover {
+    background-color: #f8f9fa !important;
+    color: #6c757d !important;
 }
 
 .settings-content {
