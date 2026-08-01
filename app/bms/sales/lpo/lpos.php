@@ -164,6 +164,49 @@ if (isAdmin()) {
         </div>
     </div>
 
+    <!-- Actions Toolbar -->
+    <div class="row mb-4 d-print-none">
+        <div class="col-12">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="d-flex flex-wrap align-items-center gap-2 flex-grow-1">
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex flex-wrap shadow-sm bg-white" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
+                        <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="copyLposTable()" style="background: #fff; height: 38px;">
+                            <i class="bi bi-clipboard text-info me-1"></i> Copy
+                        </button>
+                        <div class="bg-light d-none d-sm-block" style="width: 1px; height: 38px;"></div>
+                        <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="exportLpos()" style="background: #fff; height: 38px;">
+                            <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> CSV
+                        </button>
+                        <div class="bg-light d-none d-sm-block" style="width: 1px; height: 38px;"></div>
+                        <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="printLposTable()" style="background: #fff; height: 38px;">
+                            <i class="bi bi-printer text-primary me-1"></i> Print
+                        </button>
+                    </div>
+
+                    <!-- Toolbar -->
+                    <div class="d-flex align-items-center gap-2 flex-grow-1">
+                        <div class="d-flex align-items-center bg-white shadow-sm px-2 py-1" style="border: 1px solid #dee2e6; border-radius: 8px; height: 38px;">
+                            <span class="small text-muted me-2 text-nowrap">Show:</span>
+                            <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 45px; background: transparent;" onchange="$('#lposTable').DataTable().page.len(this.value).draw();">
+                                <option value="10">10</option>
+                                <option value="25" selected>25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="-1">All</option>
+                            </select>
+                        </div>
+                        <div class="input-group input-group-sm shadow-sm flex-grow-1" style="border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6; height: 38px; min-width: 150px; max-width: 350px;">
+                            <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
+                            <input type="text" class="form-control border-0" id="searchLpos" placeholder="Search LPOs..." onkeyup="quickSearchLpos()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Views Container -->
     <div id="tableView" class="view-section">
         <div class="card border-0 shadow-sm">
@@ -216,7 +259,11 @@ $(document).ready(function() {
     logReportAction('Viewed Customer LPOs List', 'User viewed the customer LPO management list');
 
     const table = $('#lposTable').DataTable({
-        dom: 'rtip',
+        dom: 'rtipB',
+        buttons: [
+            { extend: 'copyHtml5', className: 'd-none', exportOptions: { columns: ':not(:last-child)' } },
+            { extend: 'excelHtml5', className: 'd-none', exportOptions: { columns: ':not(:last-child)' } }
+        ],
         serverSide: false,
         ajax: {
             url: '<?= getUrl('api/get_lpos_list') ?>',
@@ -368,6 +415,32 @@ function clearFilters() {
     $('#filterForm')[0].reset();
     $('.select2-static').val('').trigger('change');
     $('#lposTable').DataTable().ajax.reload();
+}
+
+function quickSearchLpos() {
+    $('#lposTable').DataTable().search($('#searchLpos').val()).draw();
+}
+
+function copyLposTable() {
+    logReportAction('Copied Customer LPOs list', 'Copied LPO records to clipboard');
+    $('#lposTable').DataTable().button('.buttons-copy').trigger();
+    Swal.fire({
+        icon: 'success',
+        title: 'Copied!',
+        text: 'Table data copied to clipboard',
+        timer: 1500,
+        showConfirmButton: false
+    });
+}
+
+function exportLpos() {
+    logReportAction('Exported Customer LPOs list', 'Exported LPO records to Excel/CSV file');
+    $('#lposTable').DataTable().button('.buttons-excel').trigger();
+}
+
+function printLposTable() {
+    logReportAction('Printed Customer LPOs list', 'Generated a printed report of the customer LPOs list');
+    window.print();
 }
 
 function reviewLpo(id, lpoNumber) {
