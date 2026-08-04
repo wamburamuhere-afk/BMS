@@ -217,7 +217,7 @@ try {
 
     // ── Warnings (GL-relevant) ───────────────────────────────────────────
     $unclassified = fc_unclassified_types($pdo);
-    $draftStmt = $pdo->prepare("SELECT COUNT(*) FROM journal_entries WHERE entry_date BETWEEN ? AND ? AND status != 'posted'");
+    $draftStmt = $pdo->prepare("SELECT COUNT(*) FROM journal_entries WHERE entry_date BETWEEN ? AND ? AND status = 'draft'");
     $draftStmt->execute([$start_date, $end_date]);
     $draft_count = (int) $draftStmt->fetchColumn();
 
