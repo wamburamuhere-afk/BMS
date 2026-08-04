@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-08-04 (fix) — Income Statement "drafts pending" warning no longer counts reversed/voided entries
+
+**Files:** `api/account/get_income_statement.php`
+
+The completeness notice ("N manual journal entries are still in draft for this period") queried `journal_entries WHERE status != 'posted'`, which also matched `reversed` and `void` entries — statuses that are already correctly closed out, not pending action. Voiding a payroll payment (or any posted entry) posts a `status='posted'` contra reversal and flips the original to `status='reversed'`, so every void was incorrectly inflating this counter and implying action was needed when none was. Narrowed the query to `status = 'draft'` only.
+
 ## 2026-08-01 (feat) — Customer LPOs list: Copy/CSV/Print toolbar + Show/Search, matching customers.php
 
 **Files:** `app/bms/sales/lpo/lpos.php`
