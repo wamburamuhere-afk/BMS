@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-08-04 (fix) — Project Duration "Time Status" badge now matches Overall Progress status
+
+**Files:** `app/bms/operations/project_view.php`
+
+On `project_view.php`, the "Overall Progress" panel correctly showed "Ahead of schedule" (sourced from the backend's `progress_analysis.status`, computed in `api/operations/get_project.php` by comparing performance % vs. timeline % elapsed), while the "Project Duration" panel's Time Status badge independently always said "Project On Track" whenever the deadline hadn't passed — it never checked `progress.status` at all, only `daysRemaining < 0`. Added `behind`/`ahead` branches to the Time Status logic so it reads the same `progress.status` value the Overall Progress panel already uses, instead of computing its own separate (and always-optimistic) assessment.
+
 ## 2026-08-04 (fix) — Income Statement "drafts pending" warning no longer counts reversed/voided entries
 
 **Files:** `api/account/get_income_statement.php`

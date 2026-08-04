@@ -8451,6 +8451,14 @@ function renderProject(d, fin, progress) {
             $('#daysRemainingFocus').text(Math.abs(daysRemaining) + ' Days Overdue');
             $('#timeDescriptor').html('<i class="bi bi-exclamation-triangle-fill me-1"></i>Schedule Delayed');
             countdownContainer.css('background', 'linear-gradient(135deg, #dc3545 0%, #fd7e14 100%)');
+        } else if (progress.status === 'behind') {
+            $('#daysRemainingFocus').text(daysRemaining + ' Days Left');
+            $('#timeDescriptor').html('<i class="bi bi-exclamation-circle me-1"></i>Project Behind Schedule');
+            countdownContainer.css('background', 'linear-gradient(135deg, #ffc107 0%, #fd7e14 100%)');
+        } else if (progress.status === 'ahead') {
+            $('#daysRemainingFocus').text(daysRemaining + ' Days Left');
+            $('#timeDescriptor').html('<i class="bi bi-rocket-takeoff-fill me-1"></i>Project Ahead of Schedule');
+            countdownContainer.css('background', 'linear-gradient(135deg, #198754 0%, #20c997 100%)');
         } else {
             $('#daysRemainingFocus').text(daysRemaining + ' Days Left');
             $('#timeDescriptor').html('<i class="bi bi-activity me-1"></i>Project On Track');
