@@ -8451,18 +8451,16 @@ function renderProject(d, fin, progress) {
             $('#daysRemainingFocus').text(Math.abs(daysRemaining) + ' Days Overdue');
             $('#timeDescriptor').html('<i class="bi bi-exclamation-triangle-fill me-1"></i>Schedule Delayed');
             countdownContainer.css('background', 'linear-gradient(135deg, #dc3545 0%, #fd7e14 100%)');
-        } else if (progress.status === 'behind') {
-            $('#daysRemainingFocus').text(daysRemaining + ' Days Left');
-            $('#timeDescriptor').html('<i class="bi bi-exclamation-circle me-1"></i>Project Behind Schedule');
-            countdownContainer.css('background', 'linear-gradient(135deg, #ffc107 0%, #fd7e14 100%)');
-        } else if (progress.status === 'ahead') {
-            $('#daysRemainingFocus').text(daysRemaining + ' Days Left');
-            $('#timeDescriptor').html('<i class="bi bi-rocket-takeoff-fill me-1"></i>Project Ahead of Schedule');
-            countdownContainer.css('background', 'linear-gradient(135deg, #198754 0%, #20c997 100%)');
         } else {
+            // Mirror Overall Progress exactly — reuse its already-computed status
+            // (progressStatusMsg/progressStatusCls) instead of re-deriving ahead/behind
+            // here, so the two panels can never disagree.
             $('#daysRemainingFocus').text(daysRemaining + ' Days Left');
-            $('#timeDescriptor').html('<i class="bi bi-activity me-1"></i>Project On Track');
-            countdownContainer.css('background', 'linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%)');
+            $('#timeDescriptor').html(progressStatusMsg);
+            countdownContainer.css('background',
+                progressStatusCls === 'text-danger'  ? 'linear-gradient(135deg, #dc3545 0%, #fd7e14 100%)' :
+                progressStatusCls === 'text-warning' ? 'linear-gradient(135deg, #ffc107 0%, #fd7e14 100%)' :
+                                                        'linear-gradient(135deg, #198754 0%, #20c997 100%)');
         }
     } else {
         $('#daysRemainingFocus').text('No Duration Set');
