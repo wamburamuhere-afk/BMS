@@ -77,6 +77,31 @@ try {
         mkdir($upload_dir, 0777, true);
     }
 
+    // Profile photo (optional) — hardened per security.md §19: extension +
+    // real MIME + size whitelist, non-guessable filename.
+    $photo_rel_path = null;
+    if (isset($_FILES['photo_file']) && $_FILES['photo_file']['error'] === UPLOAD_ERR_OK) {
+        $photo_ext = strtolower(pathinfo($_FILES['photo_file']['name'], PATHINFO_EXTENSION));
+        $allowed_photo_ext = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        if (!in_array($photo_ext, $allowed_photo_ext, true)) {
+            throw new Exception("Profile photo must be JPG, PNG, GIF or WEBP.");
+        }
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $photo_mime = $finfo->file($_FILES['photo_file']['tmp_name']);
+        $allowed_photo_mime = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!in_array($photo_mime, $allowed_photo_mime, true)) {
+            throw new Exception("That file is not a valid image (detected type: " . htmlspecialchars($photo_mime ?: 'unknown') . ").");
+        }
+        if ($_FILES['photo_file']['size'] > 2 * 1024 * 1024) {
+            throw new Exception("Profile photo must be under 2MB.");
+        }
+        $photo_filename = 'photo_' . bin2hex(random_bytes(8)) . '.' . $photo_ext;
+        if (!move_uploaded_file($_FILES['photo_file']['tmp_name'], $upload_dir . $photo_filename)) {
+            throw new Exception("Failed to upload profile photo.");
+        }
+        $photo_rel_path = 'uploads/hr/employees/' . $photo_filename;
+    }
+
     $documents = [];
     $docTypes = [
         'cv' => 'cv_file', 
@@ -168,7 +193,7 @@ try {
             tax_id, social_security_number, emergency_contact,
             emergency_contact_relationship, emergency_contact_phone, emergency_contact_postal_address,
             emergency_contact_physical_address, emergency_contact_email,
-            benefits, notes, documents, other_doc_name, project_id, created_by, created_at
+            benefits, notes, documents, other_doc_name, photo, project_id, created_by, created_at
         ) VALUES (
             ?, ?, ?, ?, ?,   -- row 1: 5
             ?, ?, ?, ?, ?,   -- row 2: 5
@@ -180,7 +205,7 @@ try {
             ?, ?, ?, ?,      -- row 8: 4
             ?, ?, ?,         -- row 9: 3
             ?, ?, ?, ?, ?,   -- row 10: 5
-            ?, ?, ?, ?, ?, ?, NOW() -- row 11: 6 + NOW()
+            ?, ?, ?, ?, ?, ?, ?, NOW() -- row 11: 7 + NOW()
         )
     ");
 
@@ -237,6 +262,7 @@ try {
         $_POST['notes'] ?? null, 
         $documents_json,
         $other_doc_name,
+        $photo_rel_path,
         !empty($_POST['project_id']) ? $_POST['project_id'] : null,
         $_SESSION['user_id']
     ]);

@@ -557,6 +557,15 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                         <!-- Personal Information Tab -->
                         <div class="wizard-step" id="step-0" style="display:block;">
                             <div class="row">
+                                <div class="col-12 mb-3 text-center">
+                                    <label class="form-label d-block">Profile Photo</label>
+                                    <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-2" style="width:110px;height:110px;overflow:hidden;">
+                                        <img id="photo_preview_img" src="" class="w-100 h-100 d-none" style="object-fit:cover;" alt="Profile photo preview">
+                                        <i id="photo_preview_icon" class="bi bi-person-fill" style="font-size:3.5rem;color:#adb5bd;"></i>
+                                    </div>
+                                    <input type="file" class="form-control form-control-sm mx-auto" style="max-width:280px;" id="photo_file" name="photo_file" accept=".jpg,.jpeg,.png,.gif,.webp">
+                                    <div class="form-text">JPG, PNG, GIF or WEBP — max 2MB</div>
+                                </div>
                                 <div class="col-md-4 mb-3">
                                     <label for="first_name" class="form-label">First Name <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control" id="first_name" name="first_name" required placeholder="Enter first name">
@@ -1167,6 +1176,23 @@ function initEmpSelect2(context, dropdownParent) {
         $el.select2($.extend({}, opts, { placeholder: placeholder }));
     });
 }
+
+// Live preview for the profile photo picked in the wizard's Personal Info step.
+function resetEmpPhotoPreview() {
+    $('#photo_file').val('');
+    $('#photo_preview_img').addClass('d-none').attr('src', '');
+    $('#photo_preview_icon').removeClass('d-none');
+}
+$(document).on('change', '#photo_file', function() {
+    const file = this.files && this.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        $('#photo_preview_img').attr('src', e.target.result).removeClass('d-none');
+        $('#photo_preview_icon').addClass('d-none');
+    };
+    reader.readAsDataURL(file);
+});
 
 // --- Department → Designation cascade + "Other (specify)" (Step 2) ---------
 // Master list of designations (id, name, department_id) so the Designation
@@ -1975,7 +2001,8 @@ $(document).ready(function() {
             $('#addEmployeeForm')[0].reset();
             $('#employee_id').val('');
             $('#addEmployeeModalLabel').html('<i class="bi bi-plus-circle"></i> Add New Employee');
-            
+            resetEmpPhotoPreview();
+
             // Reset Documents Wizards
             $('#intro_letter_upload_div, #app_letter_upload_div, #other_doc_upload_div').addClass('d-none');
             $('#cv_file, #id_file, #certificates_file, #intro_letter_file, #app_letter_file').val('').removeClass('is-invalid');
@@ -2129,6 +2156,11 @@ function editEmployee(employeeId) {
                 $('#addEmployeeModalLabel').html('<i class="bi bi-pencil"></i> Edit Employee');
                 
                 // Step 0: Personal Information
+                resetEmpPhotoPreview();
+                if (emp.photo) {
+                    $('#photo_preview_img').attr('src', APP_URL + '/' + emp.photo).removeClass('d-none');
+                    $('#photo_preview_icon').addClass('d-none');
+                }
                 $('#first_name').val(emp.first_name || '');
                 $('#middle_name').val(emp.middle_name || '');
                 $('#last_name').val(emp.last_name || '');
