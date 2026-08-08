@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-08-08 (fix) — Create Delivery Order warehouse dropdown empty on first load
+
+**Files:** `app/bms/operations/project_view.php`
+
+Reported: opening a project and going straight to Procurements → Delivery Orders → Create DO showed "No warehouses for this project" in the Warehouse dropdown even though the project has warehouses assigned, and the same happened for both admin and non-admin users — ruling out project-scope/permission filtering as the cause.
+
+Root cause: `projectData.inventory.warehouses` (the array `openCreateDOModal()` read to populate the dropdown) is only fetched when the Inventory tab is opened (`loadProjectInventory()`, lazy-loaded by design to avoid the expensive `stock_movements` aggregation on every page load). The Create DO button lives in the Delivery Orders section, not the Inventory tab, so a user who never visited Inventory in that page view hit `projectData.inventory === undefined` and fell through to the empty-state branch — a load-order bug, not a data or scope issue.
+
+Fix: added `populateCDOWarehouses()` — uses `projectData.inventory.warehouses` immediately if already cached, otherwise shows "Loading warehouses..." and calls `loadProjectInventory(false, callback)` (added an optional `onDone` callback param) to fetch it on demand before rendering the `<option>`s. `openCreateDOModal()` now calls this instead of reading `projectData.inventory` directly.
+
+Verified live on dev.bms.local: navigated directly to project 16 → Procurements → Delivery Order → Create DO (skipping Inventory tab entirely) — Warehouse dropdown now correctly populates with MSANGAI and POLES on first open, no console errors. `php -l` clean.
+
 ## 2026-08-04 (fix) — Project Duration "Time Status" badge now matches Overall Progress status
 
 **Files:** `app/bms/operations/project_view.php`

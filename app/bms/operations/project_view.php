@@ -8119,8 +8119,11 @@ function loadProjectDetails() {
 // Inventory tab: the expensive stock_movements aggregation lives in its own
 // endpoint (get_project_inventory.php) and loads only when the tab is opened,
 // not as part of the initial project view.
-function loadProjectInventory(force) {
-    if (_cachedInventory && !force) return;
+function loadProjectInventory(force, onDone) {
+    if (_cachedInventory && !force) {
+        if (onDone) onDone();
+        return;
+    }
     BMSSkeleton.load({
         loading: '#projectWarehousesSummaryTable',
         skeleton: { rows: 5 },
@@ -8130,9 +8133,13 @@ function loadProjectInventory(force) {
             dataType: 'json'
         },
         onData: function (res) {
-            if (!res.success) throw new Error(res.message || 'Failed to load inventory data.');
+            if (!res.success) {
+                if (onDone) onDone();
+                throw new Error(res.message || 'Failed to load inventory data.');
+            }
             if (projectData) projectData.inventory = res.inventory;
             renderInventory(res.inventory);
+            if (onDone) onDone();
         }
     });
 }
@@ -18077,6 +18084,33 @@ $(document).ready(function() {
 
 // ─── Delivery Order (DO) Functions ────────────────────────────────────────────
 
+// Renders warehouse <option>s from an already-fetched warehouses array.
+function renderCDOWarehouseOptions(warehouses) {
+    const $wSel = $('#cdo_warehouse_id');
+    $wSel.prop('disabled', false).html('<option value="">-- Select Warehouse --</option>');
+    if (warehouses && warehouses.length > 0) {
+        warehouses.forEach(function(w) {
+            $wSel.append(`<option value="${w.warehouse_id}">${w.warehouse_name}</option>`);
+        });
+    } else {
+        $wSel.append('<option value="" disabled>No warehouses for this project</option>');
+    }
+}
+
+// Populates the Create DO warehouse dropdown, fetching project inventory
+// first if the Inventory tab hasn't been opened yet this page view.
+function populateCDOWarehouses() {
+    if (projectData && projectData.inventory && projectData.inventory.warehouses) {
+        renderCDOWarehouseOptions(projectData.inventory.warehouses);
+        return;
+    }
+    $('#cdo_warehouse_id').prop('disabled', true).html('<option value="">Loading warehouses...</option>');
+    loadProjectInventory(false, function() {
+        const warehouses = (projectData && projectData.inventory && projectData.inventory.warehouses) ? projectData.inventory.warehouses : [];
+        renderCDOWarehouseOptions(warehouses);
+    });
+}
+
 function openCreateDOModal() {
     $('#createDOForm')[0].reset();
     $('#cdoAttachmentRows').empty();
@@ -18100,17 +18134,10 @@ function openCreateDOModal() {
         $sSel.append('<option value="" disabled>No suppliers linked to this project</option>');
     }
 
-    // Populate warehouses (project-specific)
-    const $wSel = $('#cdo_warehouse_id');
-    $wSel.html('<option value="">-- Select Warehouse --</option>');
-    const warehouses = (projectData && projectData.inventory && projectData.inventory.warehouses) ? projectData.inventory.warehouses : [];
-    if (warehouses.length > 0) {
-        warehouses.forEach(function(w) {
-            $wSel.append(`<option value="${w.warehouse_id}">${w.warehouse_name}</option>`);
-        });
-    } else {
-        $wSel.append('<option value="" disabled>No warehouses for this project</option>');
-    }
+    // Populate warehouses (project-specific). The Inventory tab is lazy-loaded
+    // and may not have been opened yet in this page view, so projectData.inventory
+    // can still be empty here — fetch it on demand rather than assuming it's ready.
+    populateCDOWarehouses();
 
     // Clear stock cache when warehouse changes so dropdown reloads
     $('#cdo_warehouse_id').off('change.dostock').on('change.dostock', function() {
