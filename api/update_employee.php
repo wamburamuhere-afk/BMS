@@ -91,7 +91,35 @@ try {
     if (!is_dir($upload_dir)) {
         mkdir($upload_dir, 0777, true);
     }
-    
+
+    // Profile photo (optional) — hardened per security.md §19: extension +
+    // real MIME + size whitelist, non-guessable filename. Only touched when a
+    // new file is actually chosen; no file means the existing photo stays put.
+    $photo_uploaded = false;
+    $photo_rel_path = null;
+    if (isset($_FILES['photo_file']) && $_FILES['photo_file']['error'] === UPLOAD_ERR_OK) {
+        $photo_ext = strtolower(pathinfo($_FILES['photo_file']['name'], PATHINFO_EXTENSION));
+        $allowed_photo_ext = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        if (!in_array($photo_ext, $allowed_photo_ext, true)) {
+            throw new Exception("Profile photo must be JPG, PNG, GIF or WEBP.");
+        }
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $photo_mime = $finfo->file($_FILES['photo_file']['tmp_name']);
+        $allowed_photo_mime = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!in_array($photo_mime, $allowed_photo_mime, true)) {
+            throw new Exception("That file is not a valid image (detected type: " . htmlspecialchars($photo_mime ?: 'unknown') . ").");
+        }
+        if ($_FILES['photo_file']['size'] > 2 * 1024 * 1024) {
+            throw new Exception("Profile photo must be under 2MB.");
+        }
+        $photo_filename = 'photo_' . bin2hex(random_bytes(8)) . '.' . $photo_ext;
+        if (!move_uploaded_file($_FILES['photo_file']['tmp_name'], $upload_dir . $photo_filename)) {
+            throw new Exception("Failed to upload profile photo.");
+        }
+        $photo_rel_path = 'uploads/hr/employees/' . $photo_filename;
+        $photo_uploaded = true;
+    }
+
     // Get existing docs
     $existing_docs = !empty($old_values['documents']) ? json_decode($old_values['documents'], true) : [];
     if (!is_array($existing_docs)) $existing_docs = [];
@@ -215,6 +243,13 @@ try {
             $update_fields[] = "$field = ?";
             $update_params[] = $_POST[$field];
         }
+    }
+
+    // photo only changes when a new file was actually uploaded this request —
+    // $_POST never carries it, so it can't go through the isset($_POST[...]) loop.
+    if ($photo_uploaded) {
+        $update_fields[] = "photo = ?";
+        $update_params[] = $photo_rel_path;
     }
 
     // reporting_to_id can legitimately be set to NULL (clear manager), which
