@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-08-08 (feat) — Employee profile photo: upload wasn't possible, and the wrong column was displayed anyway
+
+**Files:** `app/bms/pos/employees.php`, `app/bms/pos/employee_details.php`, `api/add_employee.php`, `api/update_employee.php`, `uploads/hr/employees/.htaccess`
+
+Reported: clicking "Edit Profile" on an employee's details page and trying to set a profile picture didn't work. Investigation found two separate gaps, not one bug: (1) `employee_details.php` displayed `$employee['profile_image']`, a column that doesn't exist — the real column is `employees.photo` (confirmed via `DESCRIBE employees`; `api/my_hr_data.php` and `api/get_org_chart.php` already correctly read `e.photo` elsewhere), so the photo would never have shown even if set; (2) neither the Add/Edit Employee wizard nor `api/add_employee.php`/`api/update_employee.php` had any file input or upload handling for it at all — the feature had never been built.
+
+Added a "Profile Photo" upload block (circular preview + file input) to Step 0 of the Add/Edit Employee wizard in `employees.php`, with a live client-side preview (FileReader) and population of the existing photo when editing. `submitEmployeeForm()` already posts the wizard via `FormData`/`processData:false` (unlike the vestigial `.serialize()`-based handler bound earlier in the file, which never actually fires — the wizard's Save button calls `submitEmployeeForm()` directly), so the new `photo_file` input flows through to the backend for free.
+
+`api/add_employee.php` and `api/update_employee.php` now handle `photo_file` following the security.md §19 checklist used elsewhere in this codebase (`app/constant/profile/profile.php`'s avatar upload): extension whitelist, real MIME check via `finfo`, 2MB size cap, random filename (`bin2hex(random_bytes(8))`), stored under the employee's existing `uploads/hr/employees/` directory. On edit, `photo` is only written when a new file is actually uploaded (existing photo is left untouched otherwise) — bound explicitly outside the dynamic `$_POST`-field loop since files never arrive via `$_POST`. That upload directory had no `.htaccess` (unlike its sibling `uploads/avatars/`, which the security.md template requires) — added the same PHP-execution-denial `.htaccess` since new content is now being written there.
+
+Fixed `employee_details.php`'s display to read `$employee['photo']` through `getUrl()` instead of the nonexistent `profile_image`.
+
+Verified live on dev.bms.local: opened employee #100042's "Edit Profile" (reproducing the exact reported flow), uploaded a test image — preview updated instantly, file confirmed present in the submitted `FormData`. `php -l` clean on all four files.
+
 ## 2026-08-08 (fix) — Create Delivery Order warehouse dropdown empty on first load
 
 **Files:** `app/bms/operations/project_view.php`

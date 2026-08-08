@@ -441,8 +441,8 @@ $sr_status_badge = [
         <div class="col-md-4 col-xl-3">
             <div class="card mb-4 shadow-sm">
                 <div class="card-body text-center">
-                    <?php if (!empty($employee['profile_image'])): ?>
-                        <img src="<?= safe_output($employee['profile_image']) ?>" class="rounded-circle img-fluid mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+                    <?php if (!empty($employee['photo'])): ?>
+                        <img src="<?= getUrl(htmlspecialchars($employee['photo'])) ?>" class="rounded-circle img-fluid mb-3" style="width: 150px; height: 150px; object-fit: cover;">
                     <?php else: ?>
                         <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 150px; height: 150px;">
                             <i class="bi bi-person-fill" style="font-size: 5rem; color: #adb5bd;"></i>
