@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-08-12 (fix) — Return Note supplier dropdown empty despite approved GRNs in the warehouse
+
+**Files:** `api/operations/get_return_suppliers.php`, `api/operations/get_return_grns.php`, `app/bms/operations/project_view.php`, `tests/test_return_note_supplier_list_cli.php`
+
+Reported: in Project Details → Procurements → Return Note, choosing a warehouse left the Supplier dropdown empty, even though approved GRNs existed for that warehouse under the same project.
+
+Root cause: `get_return_suppliers.php` filtered with `AND s.project_id = ?` — the **supplier's** legacy single "primary project" column — instead of the GRN's own project. A return is raised against a receipt, so the project must come from `purchase_receipts.project_id`. Suppliers whose real project link lives in the `supplier_projects` junction, who are untagged (`project_id IS NULL`), or who carry a different primary project were all excluded regardless of how many approved GRNs they had in the warehouse. Reproduced on local data: warehouse #14 (project 16) has 5 suppliers with non-cancelled GRNs, and the old query returned **0**. GRN status was never the issue — `pr.status != 'cancelled'` already admits `approved`.
+
+Same class of defect as the sub-contractor/project fix in the entry below: reading a party record's legacy `project_id` column where the real relationship lives elsewhere.
+
+Fix: the supplier query is now anchored on `purchase_receipts`, joined to `suppliers`, filtered by warehouse and by the receipt's project. Untagged receipts (`project_id IS NULL`) are included, matching the `scopeFilterSqlNullable` leniency that security.md §23 rule 3 prescribes — otherwise legacy GRNs recorded before project tagging could never be returned from a project screen. Deleted suppliers are excluded.
+
+`get_return_grns.php` now accepts and applies the same project rule (passed from `project_view.php`). Previously it filtered on warehouse + supplier only, so once the supplier list was corrected the two dropdowns would have disagreed — and a return raised for one project could have been booked against another project's GRN.
+
+Also on these two endpoints: `get_return_suppliers.php` had no server-side scope gate at all (`get_return_grns.php` already had the warehouse one, added 2026-07-18). Both now gate the chosen warehouse and project via `userCan()` per §23 rule 2 — the UI pre-scopes both, but nothing stopped a hand-crafted request reading another project's supplier list. Both files were also missing the `global $pdo;` declaration the rest of the API layer carries; added.
+
+UI: an empty supplier list rendered as a bare "Select Supplier" placeholder, which read as a broken control — that is exactly how it was reported. It now says "No supplier has a GRN in this warehouse", and a server-side refusal surfaces its own message instead of a generic one.
+
+`tests/test_return_note_supplier_list_cli.php` — 24 assertions. Picks a warehouse/project pair with real GRNs from the live DB, asserts the old supplier-project filter returns fewer rows than exist (reproducing the empty dropdown: 0 of 5), then drives both endpoints and asserts the supplier list is complete and that **every** supplier offered yields at least one selectable GRN, so the two dropdowns cannot disagree. Scope gates are asserted via `userCan()` directly plus a source check that each guard 403s and exits before querying (the endpoints `exit()` on refusal, which would tear down the test process). With the three files stashed the suite fails 10 assertions.
+
+Not addressed (pre-existing, separate): `save_goods_return.php` carries a "Phase 3c — goods returns affect stock + supplier balances" note but posts no stock movement or GL entry.
+
 ## 2026-08-12 (fix) — Sub-contractor created for a project didn't appear inside that project
 
 **Files:** `api/add_sub_contractor.php`, `api/update_sub_contractor.php`, `migrations/2026_08_12_backfill_sub_contractor_project_links.php`, `tests/test_sub_contractor_project_link_cli.php`
