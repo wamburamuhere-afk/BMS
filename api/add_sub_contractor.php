@@ -152,6 +152,15 @@ try {
 
     $supplier_id = $pdo->lastInsertId();
     ensureActorLedgerAccount($pdo, 'sub_contractor', (int) $supplier_id, $supplier_name);
+
+    // Mirror the primary project into the junction table. The project-side views
+    // (Project > Procurement > Sub-Contractors) read sub_contractor_projects only,
+    // so without this row the new sub-contractor is invisible inside its own project.
+    if (!empty($project_id)) {
+        $pdo->prepare("INSERT IGNORE INTO sub_contractor_projects (supplier_id, project_id, assigned_by) VALUES (?, ?, ?)")
+            ->execute([(int) $supplier_id, (int) $project_id, $_SESSION['user_id']]);
+    }
+
     $pdo->commit();
 
     // Handle Logo Upload

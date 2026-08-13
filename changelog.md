@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-08-12 (fix) — Sub-contractor created for a project didn't appear inside that project
+
+**Files:** `api/add_sub_contractor.php`, `api/update_sub_contractor.php`, `migrations/2026_08_12_backfill_sub_contractor_project_links.php`, `tests/test_sub_contractor_project_link_cli.php`
+
+Reported: creating a sub-contractor from Project Details → Procurements → Sub-Contractor left it missing from that project's list, while Core → Sub-Contractors showed it correctly against the same project.
+
+Root cause: a sub-contractor's project link lives in two places. `sub_contractors.project_id` holds the primary project chosen on the form; the `sub_contractor_projects` junction table (added by `migrations/2026_05_14_sub_contractor_projects.php`) holds the many-to-many assignments. Every project-side view reads the junction **only** — `api/get_project_sub_contractors.php` and `project_view.php:96` both `JOIN sub_contractor_projects` — but `api/add_sub_contractor.php` and `api/update_sub_contractor.php` wrote **only** `sub_contractors.project_id` and never inserted the junction row. `api/assign_sc_to_project.php` was the sole writer of that table.
+
+The "Add New" button inside the project's Sub-Contractor tab (`project_view.php:2086`) is a link out to the core Sub-Contractors page with the project pre-locked, so it saves through `add_sub_contractor.php` and lands in exactly that gap, then returns the user to the project tab where the record isn't listed. (`project_view.php` does contain a `projScAddModal` whose JS calls `assign_sc_to_project.php` after creating — the one path that would have worked — but nothing opens it; no button or `data-bs-target` references it. Left in place, now redundant.) `sub_contractor_details.php:103-127` had already been patched around the same split, `UNION`-ing the primary project back into "Projects Involved"; the project-side view never got equivalent treatment.
+
+Fix at the source: both write APIs now `INSERT IGNORE INTO sub_contractor_projects` whenever a `project_id` is present — in `add_sub_contractor.php` inside the existing create transaction, so the link cannot be orphaned by a mid-write failure. Edits are assign-only: choosing a different primary project adds that link and leaves existing ones alone, since those are managed deliberately via `assign_sc_to_project.php` and silently unassigning would discard real data.
+
+`migrations/2026_08_12_backfill_sub_contractor_project_links.php` repairs records created before the fix — criteria-based (no hard-coded ids), guarded on table/column existence, `INSERT IGNORE` + `NOT EXISTS` so re-runs are no-ops, joined to `projects` so a stale `project_id` can't produce a dangling row, skips `status='deleted'`, and names each repaired record in the deploy log.
+
+`tests/test_sub_contractor_project_link_cli.php` — 28 assertions. Beyond the source/migration guards it drives the real runtime path: creates a sub-contractor through `add_sub_contractor.php`, asserts the junction row exists and that the record comes back from `api/get_project_sub_contractors.php` for that project; edits the primary project and asserts the new link is written and the old one retained; and plants an unlinked fixture to prove the backfill repairs it and that a second run changes nothing. Confirmed the suite catches the original defect — with the two API changes stashed it fails 8 assertions, including "no junction row after create" and "still missing from the project-side API". Fixtures are cleaned up; local DB verified back to 6 sub-contractors / 9 junction rows.
+
 ## 2026-08-08 (feat) — Employee profile photo: upload wasn't possible, and the wrong column was displayed anyway
 
 **Files:** `app/bms/pos/employees.php`, `app/bms/pos/employee_details.php`, `api/add_employee.php`, `api/update_employee.php`, `uploads/hr/employees/.htaccess`

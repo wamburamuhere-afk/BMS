@@ -202,6 +202,16 @@ $params = array_merge($params, [
 try {
     $update_stmt->execute($params);
 
+    // Keep the junction table in step with the primary project. The project-side
+    // views read sub_contractor_projects only, so a project picked here must also
+    // land there or the sub-contractor stays invisible inside that project.
+    // Assign-only: existing links to other projects are left alone — they are
+    // managed deliberately via assign_sc_to_project.php.
+    if (!empty($project_id)) {
+        $pdo->prepare("INSERT IGNORE INTO sub_contractor_projects (supplier_id, project_id, assigned_by) VALUES (?, ?, ?)")
+            ->execute([(int) $supplier_id, (int) $project_id, $_SESSION['user_id']]);
+    }
+
     // Re-code on edit (sub-contractors are always editable): upgrade a legacy
     // "SBCxxxxYYMM" code to the company format. No-op if already converted/manual.
     $sccur = $pdo->prepare("SELECT supplier_code FROM sub_contractors WHERE supplier_id = ?");
