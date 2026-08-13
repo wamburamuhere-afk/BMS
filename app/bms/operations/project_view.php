@@ -10995,14 +10995,17 @@ function loadReturnSuppliers(warehouseId) {
     $sup.html('<option value="">Loading...</option>').prop('disabled', true);
     
     $.get('<?= getUrl('api/operations/get_return_suppliers') ?>', { warehouse_id: warehouseId, project_id: '<?= $project_id ?>' }, function(res) {
-        if (res.success) {
+        if (res.success && res.data.length > 0) {
             let html = '<option value="">Select Supplier</option>';
             res.data.forEach(s => {
                 html += `<option value="${s.supplier_id}">${s.supplier_name}</option>`;
             });
             $sup.html(html).prop('disabled', false);
+        } else if (res.success) {
+            // Empty list read as "the dropdown is broken" before — say why it's empty.
+            $sup.html('<option value="">No supplier has a GRN in this warehouse</option>');
         } else {
-            $sup.html('<option value="">No Suppliers found</option>');
+            $sup.html('<option value="">' + (res.message || 'No Suppliers found') + '</option>');
         }
     });
 }
@@ -11018,7 +11021,7 @@ function loadReturnGRNs(supplierId) {
 
     $grn.html('<option value="">Loading...</option>').prop('disabled', true);
     
-    $.get('<?= getUrl('api/operations/get_return_grns') ?>', { warehouse_id: warehouseId, supplier_id: supplierId }, function(res) {
+    $.get('<?= getUrl('api/operations/get_return_grns') ?>', { warehouse_id: warehouseId, supplier_id: supplierId, project_id: '<?= $project_id ?>' }, function(res) {
         if (res.success) {
             let html = '<option value="">Select GRN</option>';
             res.data.forEach(g => {
