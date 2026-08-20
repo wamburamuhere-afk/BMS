@@ -53,3 +53,20 @@ RewriteRule ^(.*)$ index.php [QSA,L]
 # the PHP layer above — if PHP limits are somehow bypassed, Apache still
 # refuses the request with 413 Request Entity Too Large.
 LimitRequestBody 104857600
+
+# ── Compression: shrink text responses (HTML/CSS/JS/JSON) so pages transfer
+# faster, especially the larger detail pages. AddOutputFilterByType needs
+# BOTH mod_deflate AND mod_filter loaded — nesting the guard means this is a
+# true no-op (silently ignored, no parse error) if either is missing on the
+# host, instead of a fatal "Invalid command" if only one is present. Only
+# text-based types are compressed — images/PDFs/fonts are already
+# compressed and gain nothing (occasionally a byte or two more) from gzip.
+<IfModule mod_filter.c>
+    <IfModule mod_deflate.c>
+        AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml
+        AddOutputFilterByType DEFLATE application/javascript application/x-javascript
+        AddOutputFilterByType DEFLATE application/json application/xml application/rss+xml
+        AddOutputFilterByType DEFLATE image/svg+xml
+    </IfModule>
+</IfModule>
+
