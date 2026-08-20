@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-08-20 (perf) — static asset cache headers (phase 2 of 4 performance items)
+
+**Files:** `.htaccess`
+
+Real static files (assets/css/*, assets/js/*, images, fonts) already carried `ETag` + `Last-Modified` from Apache's default static handler — a legitimate future change to any of these files is still detected and re-fetched correctly, that safety net is untouched. This only adds `Cache-Control`/`Expires` (via `mod_expires`) so a repeat request within the window skips the round-trip entirely instead of always asking the server "any changes?" — a real speed win, not a correctness change.
+
+Durations chosen conservatively, given this app is under active development: **1 hour** for CSS/JS (this app's own stylesheets/scripts are actively touched), **7 days** for images/fonts (logo, icons — essentially static). Both are short enough that any real deploy propagates to every user automatically within that window with zero extra engineering (no cache-busting/versioned-filename infrastructure needed).
+
+**Caught and fixed during rollout:** the first pass only listed `application/javascript` / `application/x-javascript` — this server actually serves `.js` as `text/javascript` (current Apache/mod_mime default per RFC 9239), so JS files were silently getting no cache header at all. Added `text/javascript` explicitly; verified with real requests before/after.
+
+**Verified:** `mod_expires` has no hidden second module dependency (checked explicitly this time, after the phase-1 `mod_deflate`/`mod_filter` incident) — enabled cleanly, no errors in the Apache log. Confirmed real `Cache-Control`/`Expires` headers on a CSS file, a JS file, a PNG, and a `.woff2` font. Full `project_view` render regression suite still 30/30 passing; decompressed+cached page output is still byte-identical to the pre-change baseline (only the expected CSRF-nonce/timestamp noise differs between any two requests).
+
+## 2026-08-20 (perf) — gzip/deflate compression for text responses (phase 1 of 4 performance items)
+
+**Files:** `.htaccess`
+
+Measured: `project_view.php` was 2–4x slower and shipped ~11.5x more bytes than a normal list page (1.32MB vs 115KB), and no gzip/deflate was applied anywhere on the site. Added `AddOutputFilterByType DEFLATE` for text-based response types (html, css, js, json, xml, svg) — binary types (images, PDFs, fonts) are left alone since they're already compressed and gain nothing. Pure transport-layer change: the browser decompresses back to the exact original bytes before rendering, so it cannot affect markup, logic, print layout, or mobile/desktop UI — verified this directly by diffing decompressed vs. uncompressed output (byte-for-byte identical) and re-running the full `project_view` regression suite (77/77 pass unchanged).
+
+**Incident during rollout (transparency):** `AddOutputFilterByType` requires both `mod_deflate` *and* `mod_filter` loaded. The local WAMP dev server only had `mod_deflate` enabled; the first attempt caused a brief site-wide 500 outage (every page, not just this one) until reverted. Root-caused via the Apache error log, reverted within ~1 minute (`.htaccess` is re-read per-request, so the revert took effect immediately with no restart needed), then re-applied correctly with `mod_filter` also enabled and the `.htaccess` guard nested on both modules (`<IfModule mod_filter.c><IfModule mod_deflate.c>...`) so it degrades to a true no-op instead of a fatal parse error if either is ever missing on a host. Most standard Apache installs (including typical production hosts) ship both modules enabled by default — this was a quirk of this specific local Windows/WAMP install, not something expected in production, but the nested guard makes the directive safe either way.
+
+**Result:** `project_view.php` response: 1,360,583 → 213,464 bytes (**84% smaller**) over the wire. Verified on `projects`, `dashboard`, and a static `.css` asset too, since this is a site-wide config change, not page-specific.
+
 ## 2026-08-20 (fix) — Project Details → Procurements → Inventory: warehouse list invisible
 
 **Files:** `includes/project_view/scripts/pv_js_01.php`, `tests/test_project_progressive_loading_cli.php`

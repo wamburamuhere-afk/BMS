@@ -53,3 +53,47 @@ RewriteRule ^(.*)$ index.php [QSA,L]
 # the PHP layer above — if PHP limits are somehow bypassed, Apache still
 # refuses the request with 413 Request Entity Too Large.
 LimitRequestBody 104857600
+
+# ── Compression: shrink text responses (HTML/CSS/JS/JSON) so pages transfer
+# faster, especially the larger detail pages. AddOutputFilterByType needs
+# BOTH mod_deflate AND mod_filter loaded — nesting the guard means this is a
+# true no-op (silently ignored, no parse error) if either is missing on the
+# host, instead of a fatal "Invalid command" if only one is present. Only
+# text-based types are compressed — images/PDFs/fonts are already
+# compressed and gain nothing (occasionally a byte or two more) from gzip.
+<IfModule mod_filter.c>
+    <IfModule mod_deflate.c>
+        AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml
+        AddOutputFilterByType DEFLATE application/javascript application/x-javascript
+        AddOutputFilterByType DEFLATE application/json application/xml application/rss+xml
+        AddOutputFilterByType DEFLATE image/svg+xml
+    </IfModule>
+</IfModule>
+
+# ── Static asset caching: today, real static files (assets/css/*, assets/js/*,
+# images, fonts) already carry ETag + Last-Modified from Apache's default
+# static handler, so the browser correctly re-fetches the instant a file
+# changes — nothing here weakens that. This only adds Cache-Control so a
+# repeat visit within the window skips the round-trip entirely instead of
+# always asking the server "any changes?". Durations are deliberately short
+# for CSS/JS (1 hour — this app's own stylesheets/scripts are actively
+# developed) and longer for images/fonts (7 days — vendor/logo assets that
+# essentially never change). No-op if mod_expires isn't loaded on the host.
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css                "access plus 1 hour"
+    ExpiresByType text/javascript          "access plus 1 hour"
+    ExpiresByType application/javascript   "access plus 1 hour"
+    ExpiresByType application/x-javascript "access plus 1 hour"
+    ExpiresByType image/png                "access plus 7 days"
+    ExpiresByType image/jpeg               "access plus 7 days"
+    ExpiresByType image/gif                "access plus 7 days"
+    ExpiresByType image/svg+xml            "access plus 7 days"
+    ExpiresByType image/webp               "access plus 7 days"
+    ExpiresByType image/x-icon             "access plus 7 days"
+    ExpiresByType font/woff2               "access plus 7 days"
+    ExpiresByType font/woff                "access plus 7 days"
+    ExpiresByType font/ttf                 "access plus 7 days"
+    ExpiresByType application/font-woff2   "access plus 7 days"
+</IfModule>
+
