@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-08-20 (fix) — Project Details → Procurements → Inventory: warehouse list invisible
+
+**Files:** `includes/project_view/scripts/pv_js_01.php`, `tests/test_project_progressive_loading_cli.php`
+
+Reported: opening a project's Inventory tab (Project Details → Procurements → Inventory) showed the tab header and buttons but no warehouse list, even for projects with warehouses linked and even as admin. Confirmed on project #16 "Upgrade of Transmission Line" (2 linked warehouses: POLES, MSANGAI) — the API (`get_project_inventory.php`) returned both correctly, `renderInventory()` built the real table into the DOM (verified via live browser DOM inspection: 2 rows, real content), but the wrapping `#projectWarehousesSummaryTable` div was left with inline `style="display:none"` — invisible with no console error.
+
+Root cause: `loadProjectInventory()`'s `BMSSkeleton.load()` call (added in `4b38f98`, 2026-07-28, "progressive skeleton loading") passes only `loading: '#projectWarehousesSummaryTable'` with no `content` target. The shared helper (`assets/js/loading.js`) is designed for two separate containers — it shows a skeleton in `loading`, then on success calls `$loading.hide()` and `$content.fadeIn()`. Here the real table is rendered directly into the same element used as `loading` (single-container usage), so the unconditional `.hide()` call hides the just-rendered content since no `content` was given to fade back in.
+
+Fix: added `content: '#projectWarehousesSummaryTable'` (same selector as `loading`) to that one `BMSSkeleton.load()` call — `.hide()` then `.fadeIn()` on the same element nets to visible. Matches the working two-key pattern already used by `loadProjectDetails()` on the same page.
+
+Verified live in-browser (not just CLI): clicked into the Inventory tab, inspected the DOM before/after — `display:none` gone, table height went from 0 to 321px, both warehouse rows visible with real data.
+
+Also fixed `tests/test_project_progressive_loading_cli.php`, whose source-location checks were pointing only at `project_view.php` and started failing after the 2026-08-20 JS-extraction refactor moved that code into `includes/project_view/scripts/pv_js_*.php` (functionality was unaffected — proven separately by that refactor's own byte-diff verification — but the test's grep target was stale). Updated it to check both locations, and added a regression assertion that this specific `loading`/`content` pairing stays in place.
+
 ## 2026-08-20 (refactor) — project_view.php size reduction, phase 1: JS extracted to includes
 
 **Files:** `app/bms/operations/project_view.php`, `includes/project_view/scripts/pv_js_01.php`–`pv_js_16.php` (new), `tests/test_project_view_render_cli.php` (new)

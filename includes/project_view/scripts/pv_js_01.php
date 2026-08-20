@@ -375,6 +375,7 @@ function loadProjectInventory(force, onDone) {
     }
     BMSSkeleton.load({
         loading: '#projectWarehousesSummaryTable',
+        content: '#projectWarehousesSummaryTable',
         skeleton: { rows: 5 },
         ajax: {
             url: '<?= buildUrl('api/operations/get_project_inventory.php') ?>',
