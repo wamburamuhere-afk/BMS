@@ -114,7 +114,13 @@ $nodeCheck = shell_exec('node --check ' . escapeshellarg(dirname(__DIR__) . '/as
     : bad('loading.js syntax error: ' . trim((string)$nodeCheck));
 
 head('Source — project_view.php wired to BMSSkeleton.load + lazy Inventory tab');
+// project_view.php's inline <script> body was split into includes/project_view/scripts/pv_js_*.php
+// (2026-08-20 size-reduction refactor) — the logic these checks look for now lives across both
+// the main file and those includes, reassembled in the browser exactly as before.
 $pv = @file_get_contents(dirname(__DIR__) . '/app/bms/operations/project_view.php') ?: '';
+foreach (glob(dirname(__DIR__) . '/includes/project_view/scripts/pv_js_*.php') as $jsPart) {
+    $pv .= "\n" . (@file_get_contents($jsPart) ?: '');
+}
 (preg_match('/function loadProjectDetails\(\)\s*\{\s*BMSSkeleton\.load/', $pv) === 1)
     ? ok('loadProjectDetails() uses BMSSkeleton.load')
     : bad('loadProjectDetails() does not use BMSSkeleton.load');
@@ -130,6 +136,13 @@ $pv = @file_get_contents(dirname(__DIR__) . '/app/bms/operations/project_view.ph
 (strpos($pv, 'get_project_inventory.php') !== false)
     ? ok('project_view.php calls the new get_project_inventory.php endpoint')
     : bad('project_view.php does not reference get_project_inventory.php');
+// Regression guard (2026-08-20 fix): BMSSkeleton.load() hides `loading` and fades in `content`
+// after onData() runs. loadProjectInventory() renders the real table INTO the `loading` element
+// itself (single-container usage), so without a matching `content` key the helper hides the table
+// right after rendering it — the warehouse list silently disappears with no console error.
+(preg_match("/loading:\s*'#projectWarehousesSummaryTable'[\s\S]{0,80}content:\s*'#projectWarehousesSummaryTable'/", $pv) === 1)
+    ? ok('loadProjectInventory() BMSSkeleton.load call has a matching content: key (warehouse list stays visible)')
+    : bad('loadProjectInventory() is missing content: — the warehouse list will render then be hidden');
 
 head('Source — the other 3 detail pages use BMSSkeleton.load');
 $others = [
