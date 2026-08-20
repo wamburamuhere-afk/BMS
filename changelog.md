@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-08-20 (fix) — Project Details → Procurements → Inventory: warehouse list invisible
+
+**Files:** `includes/project_view/scripts/pv_js_01.php`, `tests/test_project_progressive_loading_cli.php`
+
+Reported: opening a project's Inventory tab (Project Details → Procurements → Inventory) showed the tab header and buttons but no warehouse list, even for projects with warehouses linked and even as admin. Confirmed on project #16 "Upgrade of Transmission Line" (2 linked warehouses: POLES, MSANGAI) — the API (`get_project_inventory.php`) returned both correctly, `renderInventory()` built the real table into the DOM (verified via live browser DOM inspection: 2 rows, real content), but the wrapping `#projectWarehousesSummaryTable` div was left with inline `style="display:none"` — invisible with no console error.
+
+Root cause: `loadProjectInventory()`'s `BMSSkeleton.load()` call (added in `4b38f98`, 2026-07-28, "progressive skeleton loading") passes only `loading: '#projectWarehousesSummaryTable'` with no `content` target. The shared helper (`assets/js/loading.js`) is designed for two separate containers — it shows a skeleton in `loading`, then on success calls `$loading.hide()` and `$content.fadeIn()`. Here the real table is rendered directly into the same element used as `loading` (single-container usage), so the unconditional `.hide()` call hides the just-rendered content since no `content` was given to fade back in.
+
+Fix: added `content: '#projectWarehousesSummaryTable'` (same selector as `loading`) to that one `BMSSkeleton.load()` call — `.hide()` then `.fadeIn()` on the same element nets to visible. Matches the working two-key pattern already used by `loadProjectDetails()` on the same page.
+
+Verified live in-browser (not just CLI): clicked into the Inventory tab, inspected the DOM before/after — `display:none` gone, table height went from 0 to 321px, both warehouse rows visible with real data.
+
+Also fixed `tests/test_project_progressive_loading_cli.php`, whose source-location checks were pointing only at `project_view.php` and started failing after the 2026-08-20 JS-extraction refactor moved that code into `includes/project_view/scripts/pv_js_*.php` (functionality was unaffected — proven separately by that refactor's own byte-diff verification — but the test's grep target was stale). Updated it to check both locations, and added a regression assertion that this specific `loading`/`content` pairing stays in place.
+
+## 2026-08-20 (refactor) — project_view.php size reduction, phase 1: JS extracted to includes
+
+**Files:** `app/bms/operations/project_view.php`, `includes/project_view/scripts/pv_js_01.php`–`pv_js_16.php` (new), `tests/test_project_view_render_cli.php` (new)
+
+Purely mechanical refactor, zero behavior/UI change intended or verified. `project_view.php` had grown to 22,004 lines, with ~14,000 of those being one giant inline `<script>` block (382 JS functions across 4 `<script>` tags). Split the JS body into 16 include files under `includes/project_view/scripts/`, pulled back in via `<?php include ?>` at the exact original position inside the same `<script>` tags — output is a literal text reassembly, no code was rewritten. Cut points were chosen only at verified top-level JS statement boundaries (validated with `node --check` on every resulting chunk before touching the real file, so no cut lands mid-function/mid-statement).
+
+`project_view.php` is now 8,311 lines (was 22,004).
+
+Verified via `tests/test_project_view_render_cli.php`: lints the main file + all 16 includes, then renders the page for admin mode, sub-contractor-restricted mode, and supplier-restricted mode against real project data, asserting no fatal/parse/SQL/include error and key markers present. Before writing this test, captured raw HTML output for 4 real scenarios (2 projects × admin mode, 1 sub-contractor-mode, 1 supplier-mode) against the pre-refactor file and byte-diffed against the same renders post-refactor — identical once the two expected sources of per-request noise (CSRF nonce, wall-clock timestamps) are normalized out. No structural, markup, or logic differences found.
+
+HTML tab-pane markup (~6,000 lines across 40 tabs) and modal forms (~1,500 lines) were scoped as later phases of the same size-reduction effort but not touched in this pass — `sc-payments` tab alone is still 2,256 lines and will need its own sub-split.
+
 ## 2026-08-12 (fix) — Return Note supplier dropdown empty despite approved GRNs in the warehouse
 
 **Files:** `api/operations/get_return_suppliers.php`, `api/operations/get_return_grns.php`, `app/bms/operations/project_view.php`, `tests/test_return_note_supplier_list_cli.php`
