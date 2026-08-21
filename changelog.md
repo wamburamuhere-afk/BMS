@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-08-21 (tooling) — read-only DB performance audit script
+
+**Files:** `tools/db_perf_audit.php` (new)
+
+Diagnostic for prioritising the query-optimization work against **real** production data. The local dev database is not representative — `invoices` holds 12 rows there, `pos_sales` 37 — so index and query fixes cannot be ranked by impact from it. Two candidates were already ruled out locally on exactly this basis: `loan_repayment_schedule` (1,361 rows) has **zero** query sites in the codebase, and `notification_log` (7,950 rows) is INSERT-only and never read — indexing either would be pure write cost.
+
+Reports six things: largest tables by row count with data/index size, tables with no index beyond `PRIMARY` (the pattern behind the phase-1 dashboard fix), likely filter/join columns leading no index, redundant indexes (exact duplicates and prefix-redundant pairs), non-InnoDB tables, and the size of every table currently filtered with a non-sargable `DATE(col)=` / `MONTH(col)=` predicate.
+
+**Safety:** CLI-only (refuses over HTTP), issues `SELECT` exclusively — no writes, no DDL, no temp tables — and reads `information_schema` metadata plus row counts, never the contents of a business row, so no customer or financial data is printed. Exact `COUNT(*)` is issued only for tables the optimiser estimates under `--count-limit` (default 200,000); anything larger reports the approximation prefixed with `~`, so the script cannot trigger a slow full index scan on a large production table. `--count-limit=0` disables exact counts entirely.
+
+Usage: `php tools/db_perf_audit.php [--top=30] [--min-rows=500] [--count-limit=200000]`
+
 ## 2026-08-21 (perf) — query optimization phase 1: missing read-path indexes
 
 **Files:** `migrations/2026_08_21_query_perf_indexes.php` (new)
