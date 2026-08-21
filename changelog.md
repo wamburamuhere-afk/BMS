@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-08-20 — Customer Details: Quotations, Payments, Deliveries, Credit Notes & Advances tabs
+
+**Files:** `app/bms/customer/customer_details.php`
+
+Added four tabs to the Customer View page — **Quotations**, **Payments**, **Deliveries**, and **Credit Notes & Advances** — using the exact same `nav-pills` toggle markup/CSS already on this page (`#customerDetailTabs`, itself identical to `#employeeExtrasTabs` on Employee Details). Each reads live from its correct existing table: `quotations` (separate from `sales_orders` since the 2026-05-22 split), `payments` + `payment_allocations` (actual receipt transactions and what each settled — invoice or advance — not just the `paid_amount` rollup already shown per invoice), `deliveries` (outbound DNs, `customer_id`/`order_id`), and `credit_notes` + the existing `customerAdvanceGross/Applied/Available()` helpers from `core/customer_advance.php` for the deposit sub-ledger balance. Desktop table / mobile card split uses plain Bootstrap `d-none d-md-block` / `d-md-none` (no new JS). View links wired to the existing `quotation_view`, `dn_view`, `credit_note_view` routes.
+
+**Bug fixed in passing:** the Sales Orders tab's query had no `is_quote` filter, so any quote still sitting in the legacy `sales_orders` table (`is_quote=1`) was double-listed there under a stale status alongside its correct entry in the new Quotations tab. Added `AND so.is_quote = 0`, matching the filter already used on the main Sales Orders list page.
+
+**Verified live:** navigated to a real customer (Epsilon Gov, #14) with data in every new table and confirmed each tab renders correct rows, statuses, and totals; confirmed the empty state on Deliveries (customer has none); confirmed the Sales Orders/Quotations duplicate disappeared after the fix.
+
 ## 2026-08-20 (perf) — static asset cache headers (phase 2 of 4 performance items)
 
 **Files:** `.htaccess`
