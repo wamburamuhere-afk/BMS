@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-08-21 (perf) — query optimization phase 3: activity log duplicate COUNT
+
+**Files:** `app/activity_log.php`, `tests/test_activity_log_count_reuse_cli.php` (new)
+
+The Activity Log page fires **three** queries per DataTables request — `recordsTotal`, `recordsFiltered`, and the page rows — all over the same `LAG() OVER (PARTITION BY user_id ORDER BY created_at, id)` dedup subquery, which materialises the whole filtered table each time.
+
+When the search box is empty, `$whereDt` is assembled from exactly `$outerConds` and `$dtP` from exactly `$outerP` — so `recordsFiltered` is **character-for-character the same query** as `recordsTotal`, run a second time for a value already in hand. It is now skipped in that case and the computed value reused; a non-empty search term still executes the query normally.
+
+The `LAG` subquery itself was deliberately **left alone**. Rewriting the dedup was flagged as the risky part of this work and the semantics are subtle, so this phase only removes provably-redundant work.
+
+**Measured (period = all, no search, averaged over 5 runs):** 1,693 ms → 1,091 ms per request, **602 ms saved (36%)**. One of three full table materialisations eliminated. The remaining cost is the `LAG` subquery, which still shows `type=ALL rows=16382, Using temporary; Using filesort` — the window function needs every column, so the phase-1 indexes cannot help it. That is the next target if this page needs more.
+
+**Verified:** rebuilt both count branches exactly as the page builds them and compared across every realistic filter combination — no filters, date range, single day, user, user+date, an empty future window, and each of the four activity types. All identical (e.g. no filters 8,685 = 8,685; user filter 7,302 = 7,302; empty window 0 = 0). Confirmed a non-empty search still narrows correctly (`'Login'` → 25 of 8,685) and that an impossible search yields **0**, not the reused total — which is the failure mode this change could have introduced if the branch condition were wrong.
+
+**New test** `tests/test_activity_log_count_reuse_cli.php` (19 assertions, all passing) locks the invariant in: it asserts both that the generated SQL is identical and that the counts match for every filter combination, so if anyone later adds a condition to the filtered branch that is not also in the total branch, this fails loudly instead of silently reporting a wrong row count in the UI.
+
 ## 2026-08-21 (perf) — query optimization phase 2: payroll loop-invariant queries
 
 **Files:** `api/process_payroll.php`, `core/payroll_tax.php`, `tests/test_payroll_config_memo_cli.php` (new)
