@@ -180,6 +180,22 @@ try {
     $total_amount = 0;
     $errors = [];
 
+    // ── Loop-invariant lookups, resolved once for the whole run ──────────────
+    // None of these depend on the employee being processed, so re-reading them
+    // per iteration was firing the same queries N times per payroll run. Values
+    // are identical to what the in-loop calls returned; only the query count
+    // changes.
+    $att_mode = attendancePayrollMode($pdo);
+
+    // Standard working days per month — only consulted in attendance mode, but
+    // resolved unconditionally here so the value is a plain scalar in the loop.
+    $work_days_setting = (float)($pdo->query(
+        "SELECT setting_value FROM payroll_settings WHERE setting_key = 'working_days_per_month'"
+    )->fetchColumn() ?: 22);
+
+    // Employer NSSF rate — a company-level rate, the same for every employee.
+    $nssf_employer_rate = nssfEmployerRate($pdo);
+
     foreach ($employees as $employee) {
         try {
             $total_processed++;
@@ -204,7 +220,7 @@ try {
             
 
             // Plan H2 — attendance-driven mode (feature-flagged; default 'off' = legacy).
-            $att_mode = attendancePayrollMode($pdo);
+            // $att_mode is resolved once before the loop.
             $att_overtime = 0.0; $att_deduction = 0.0; $att_summary = null;
 
             // Consider attendance if enabled
@@ -214,7 +230,7 @@ try {
                     // Basic stays whole; the absent/half deduction is applied as a deduction
                     // line, and overtime is added to earnings, so the payslip is itemised.
                     $att_summary = payrollAttendanceSummary($pdo, (int)$employee['employee_id'], $payroll_period);
-                    $work_days = (float)($pdo->query("SELECT setting_value FROM payroll_settings WHERE setting_key = 'working_days_per_month'")->fetchColumn() ?: 22);
+                    $work_days = $work_days_setting;
                     if ($work_days <= 0) $work_days = 22;
                     $per_day = $basic_salary / $work_days;
                     $att_deduction = round($per_day * ($att_summary['absent_days'] + 0.5 * $att_summary['half_days']), 2);
@@ -296,7 +312,7 @@ try {
             $nssf_employee = $stat['nssf_employee'];
             $tax_amount    = $stat['paye'];
             // Employer NSSF — separate company cost, not deducted from staff net pay.
-            $nssf_employer = round($gross_salary * nssfEmployerRate($pdo) / 100, 2);
+            $nssf_employer = round($gross_salary * $nssf_employer_rate / 100, 2);
             if ($nssf_employee > 0) {
                 $payroll_items_breakdown[] = ['item_type' => 'deduction',     'item_name' => 'NSSF (employee)',  'amount' => $nssf_employee, 'tax_applicable' => 0];
             }
