@@ -209,10 +209,20 @@ $company_vrn = get_setting('company_vrn', '');
             $dtP[':dts'] = '%' . $searchVal . '%';
         }
         $whereDt = 'WHERE ' . implode(' AND ', $dtConds);
-        $rf = $pdo->prepare("SELECT COUNT(*) $dt_base $whereDt");
-        foreach ($dtP as $k => $v) $rf->bindValue($k, $v);
-        $rf->execute();
-        $recordsFiltered = (int) $rf->fetchColumn();
+
+        // With an empty search box, $whereDt is built from exactly $outerConds and
+        // $dtP from exactly $outerP — so this COUNT is character-for-character the
+        // query just run above, against the same LAG subquery over the whole table.
+        // Re-running it costs a second full materialisation for a value we already
+        // hold. Only issue it when the search term actually narrows the set.
+        if ($searchVal === '') {
+            $recordsFiltered = $recordsTotal;
+        } else {
+            $rf = $pdo->prepare("SELECT COUNT(*) $dt_base $whereDt");
+            foreach ($dtP as $k => $v) $rf->bindValue($k, $v);
+            $rf->execute();
+            $recordsFiltered = (int) $rf->fetchColumn();
+        }
 
         // Ordering — plain column names from the subquery (no table prefix).
         $dt_cols = [0 => 'id', 1 => 'created_at', 2 => 'action',

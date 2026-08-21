@@ -119,16 +119,35 @@ if (!function_exists('calcSdlAmount')) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 if (!function_exists('payrollSetting')) {
-    /** Read a payroll_settings value by key; $default when the row/table is absent. */
+    /**
+     * Read a payroll_settings value by key; $default when the row/table is absent.
+     *
+     * The DB lookup is memoised for the lifetime of the request. payroll_settings is
+     * configuration that is only ever written by api/payroll/update_settings.php — a
+     * separate request that performs no reads — so a value cannot change underneath a
+     * caller mid-request. This matters because a payroll run calls this once per
+     * employee via nssfEmployeeRate()/nssfEmployerRate(), re-reading the same row
+     * hundreds of times per run.
+     *
+     * Only the raw DB result is cached (with a sentinel for "absent"), never the
+     * resolved default — so two callers passing different $default values for the same
+     * missing key still each get their own default back, exactly as before.
+     */
     function payrollSetting(PDO $pdo, string $key, $default = null)
     {
-        try {
-            $s = $pdo->prepare("SELECT setting_value FROM payroll_settings WHERE setting_key = ? LIMIT 1");
-            $s->execute([$key]);
-            $v = $s->fetchColumn();
-            if ($v !== false && $v !== null && $v !== '') return $v;
-        } catch (Throwable $e) { /* table/row absent → default */ }
-        return $default;
+        static $memo = [];
+
+        if (!array_key_exists($key, $memo)) {
+            $memo[$key] = null;   // sentinel: looked up, nothing usable found
+            try {
+                $s = $pdo->prepare("SELECT setting_value FROM payroll_settings WHERE setting_key = ? LIMIT 1");
+                $s->execute([$key]);
+                $v = $s->fetchColumn();
+                if ($v !== false && $v !== null && $v !== '') $memo[$key] = $v;
+            } catch (Throwable $e) { /* table/row absent → default */ }
+        }
+
+        return $memo[$key] ?? $default;
     }
 }
 
@@ -177,6 +196,14 @@ if (!function_exists('activeTaxBrackets')) {
     function activeTaxBrackets(PDO $pdo, ?string $asOfDate = null): array
     {
         $asOf = ($asOfDate && preg_match('/^\d{4}-\d{2}-\d{2}$/', $asOfDate)) ? $asOfDate : date('Y-m-d');
+
+        // Memoised per as-of date for the lifetime of the request. A payroll run
+        // resolves brackets once per employee against the same period date, so this
+        // collapses N identical tax_brackets reads into one. tax_brackets is
+        // reference data, not written during a run.
+        static $memo = [];
+        if (isset($memo[$asOf])) return $memo[$asOf];
+
         try {
             $s = $pdo->prepare("
                 SELECT min_income, max_income, tax_rate, bracket_name
@@ -188,9 +215,9 @@ if (!function_exists('activeTaxBrackets')) {
             ");
             $s->execute([$asOf, $asOf]);
             $rows = $s->fetchAll(PDO::FETCH_ASSOC);
-            if ($rows) return $rows;
+            if ($rows) return $memo[$asOf] = $rows;
         } catch (Throwable $e) { /* fall through to defaults */ }
-        return defaultTanzaniaPayeBrackets();
+        return $memo[$asOf] = defaultTanzaniaPayeBrackets();
     }
 }
 

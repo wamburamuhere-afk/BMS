@@ -1,5 +1,41 @@
 # BMS Changelog
 
+## 2026-08-21 (perf) — query optimization phase 3: activity log duplicate COUNT
+
+**Files:** `app/activity_log.php`, `tests/test_activity_log_count_reuse_cli.php` (new)
+
+The Activity Log page fires **three** queries per DataTables request — `recordsTotal`, `recordsFiltered`, and the page rows — all over the same `LAG() OVER (PARTITION BY user_id ORDER BY created_at, id)` dedup subquery, which materialises the whole filtered table each time.
+
+When the search box is empty, `$whereDt` is assembled from exactly `$outerConds` and `$dtP` from exactly `$outerP` — so `recordsFiltered` is **character-for-character the same query** as `recordsTotal`, run a second time for a value already in hand. It is now skipped in that case and the computed value reused; a non-empty search term still executes the query normally.
+
+The `LAG` subquery itself was deliberately **left alone**. Rewriting the dedup was flagged as the risky part of this work and the semantics are subtle, so this phase only removes provably-redundant work.
+
+**Measured (period = all, no search, averaged over 5 runs):** 1,693 ms → 1,091 ms per request, **602 ms saved (36%)**. One of three full table materialisations eliminated. The remaining cost is the `LAG` subquery, which still shows `type=ALL rows=16382, Using temporary; Using filesort` — the window function needs every column, so the phase-1 indexes cannot help it. That is the next target if this page needs more.
+
+**Verified:** rebuilt both count branches exactly as the page builds them and compared across every realistic filter combination — no filters, date range, single day, user, user+date, an empty future window, and each of the four activity types. All identical (e.g. no filters 8,685 = 8,685; user filter 7,302 = 7,302; empty window 0 = 0). Confirmed a non-empty search still narrows correctly (`'Login'` → 25 of 8,685) and that an impossible search yields **0**, not the reused total — which is the failure mode this change could have introduced if the branch condition were wrong.
+
+**New test** `tests/test_activity_log_count_reuse_cli.php` (19 assertions, all passing) locks the invariant in: it asserts both that the generated SQL is identical and that the counts match for every filter combination, so if anyone later adds a condition to the filtered branch that is not also in the total branch, this fails loudly instead of silently reporting a wrong row count in the UI.
+
+## 2026-08-21 (perf) — query optimization phase 2: payroll loop-invariant queries
+
+**Files:** `api/process_payroll.php`, `core/payroll_tax.php`, `tests/test_payroll_config_memo_cli.php` (new)
+
+The per-employee loop in `process_payroll.php` was re-reading the same configuration rows on every iteration. None of these depend on the employee being processed, so a 100-employee payroll run fired ~500 queries that returned identical values every time.
+
+**Hoisted above the `foreach`** (values identical, only the query count changes): `attendancePayrollMode()`, the `working_days_per_month` setting (previously a raw `$pdo->query()` at line 217, inside the loop), and `nssfEmployerRate()` — a company-level rate that is the same for every employee.
+
+**Memoised for the request** in `core/payroll_tax.php`: `payrollSetting()` and `activeTaxBrackets()`. These two could not be hoisted because they are reached indirectly through `computeEmployeeStatutory($pdo, $gross, $asOf)`, which legitimately varies per employee via `$gross` — only its *config* lookups are invariant. Caching them there also benefits every other caller rather than just payroll.
+
+Safety of the memo was checked, not assumed: `payroll_settings` has exactly one writer in the codebase, `api/payroll/update_settings.php`, which performs **no** reads (verified — no `SELECT`, no helper calls in that file), so a value cannot change underneath a caller mid-request. The memo caches only the **raw DB result** with a sentinel for "absent", never the resolved default — so two callers passing different `$default` values for the same missing key still each get their own default back. `activeTaxBrackets` memoises **per as-of date**, so re-running an old month still resolves that month's bracket table.
+
+**Measured (cold cache, 100-employee run simulated):** 100 × (`nssfEmployeeRate` + `nssfEmployerRate` + `activeTaxBrackets`) issued **3** `Com_select` queries, against **300** for the same loop written the old uncached way. With the three hoisted calls included, roughly **500 → 5** queries per 100-employee run.
+
+**Verified:** helper values compared against direct uncached DB reads — all match (`nssf_rate` 10.00, `nssf_employer_rate` 10, `working_days_per_month` 26, `sdl_rate` 3.5, plus a 5-band tax table hash match). `computeEmployeeStatutory` swept across gross 0 → 9,999,999.99 with NSSF and taxable independently recomputed from raw config at every step — all OK. Payroll suites: `test_payroll_statutory_cli`, `test_payroll_statutory_master_cli`, `test_attendance_payroll_cli`, `test_payroll_items_employer_cost_cli`, `test_payroll_tx_atomicity_cli`, `test_payroll_bulk_null_id_cli`, `test_project_payroll_posting_cli`, `test_phase4_payroll_paid_cli`, `test_payroll_gl_orphan_heal_cli` all **PASS**.
+
+`test_salary_components_cli` shows 26 pass / 1 fail (`save gated by canEdit(payroll)`) — **proven pre-existing**: stashed the changes, re-ran, restored; byte-identical result (26/1, same assertion) with and without them. It asserts a permission gate, which this change does not touch.
+
+**New test** `tests/test_payroll_config_memo_cli.php` (20 assertions, all passing) locks in that the memo is a performance change only — values match uncached reads, each caller's `$default` is honoured for a missing key, repeated lookups issue zero further queries, and a *new* as-of date still hits the DB.
+
 ## 2026-08-21 (perf) — query optimization phase 1: missing read-path indexes
 
 **Files:** `migrations/2026_08_21_query_perf_indexes.php` (new)
