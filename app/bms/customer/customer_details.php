@@ -62,7 +62,7 @@ $so_stmt = $pdo->prepare("
                 ELSE 'draft'
             END as display_status
     FROM sales_orders so
-    WHERE so.customer_id = ?
+    WHERE so.customer_id = ? AND so.is_quote = 0
     ORDER BY so.order_date DESC, so.sales_order_id DESC
 ");
 $so_stmt->execute([$customer_id]);
@@ -174,6 +174,86 @@ try {
     }
 } catch (PDOException $e) {
     // table may not exist yet — migration pending
+}
+
+// Quotations — dedicated table (mirrors sales_orders shape; see
+// migrations/2026_05_22_create_quotations_tables.php).
+$customer_quotations = [];
+try {
+    $quo_stmt = $pdo->prepare("
+        SELECT * FROM quotations
+        WHERE customer_id = ?
+        ORDER BY order_date DESC, sales_order_id DESC
+    ");
+    $quo_stmt->execute([$customer_id]);
+    $customer_quotations = $quo_stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    // table may not exist yet
+}
+
+// Payments / Receipts — the actual payment transactions (distinct from the
+// paid_amount rollup already shown per invoice), with what each one settled.
+$customer_payments = [];
+try {
+    $pay_stmt = $pdo->prepare("
+        SELECT p.*, i2.invoice_number AS direct_invoice_number,
+            (SELECT GROUP_CONCAT(DISTINCT i.invoice_number SEPARATOR ', ')
+               FROM payment_allocations pa
+               JOIN invoices i ON i.invoice_id = pa.target_id AND pa.target_type = 'invoice'
+              WHERE pa.payment_id = p.payment_id) AS allocated_invoices,
+            (SELECT SUM(pa.allocated_amount) FROM payment_allocations pa
+              WHERE pa.payment_id = p.payment_id AND pa.target_type = 'advance') AS advance_amount
+        FROM payments p
+        LEFT JOIN invoices i2 ON i2.invoice_id = p.invoice_id
+        WHERE p.customer_id = ?
+        ORDER BY p.payment_date DESC, p.payment_id DESC
+    ");
+    $pay_stmt->execute([$customer_id]);
+    $customer_payments = $pay_stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    // table may not exist yet
+}
+
+// Deliveries — outbound delivery notes for this customer's orders.
+$customer_deliveries = [];
+try {
+    $dn_stmt = $pdo->prepare("
+        SELECT d.*, so.order_number
+        FROM deliveries d
+        LEFT JOIN sales_orders so ON so.sales_order_id = d.order_id
+        WHERE d.customer_id = ?
+        ORDER BY d.delivery_date DESC, d.delivery_id DESC
+    ");
+    $dn_stmt->execute([$customer_id]);
+    $customer_deliveries = $dn_stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    // table may not exist yet
+}
+
+// Credit Notes + Advances/Deposits — refunds owed and prepayments held on
+// account. Advance sub-ledger reuses the shared helpers so the figures match
+// Customer Deposits exactly (core/customer_advance.php).
+require_once __DIR__ . '/../../../core/customer_advance.php';
+$adv_gross = 0.0; $adv_applied = 0.0; $adv_available = 0.0;
+try {
+    $adv_gross     = customerAdvanceGross($pdo, $customer_id);
+    $adv_applied   = customerAdvanceApplied($pdo, $customer_id);
+    $adv_available = customerAdvanceAvailable($pdo, $customer_id);
+} catch (Throwable $e) {
+    // deposit tables may not exist yet
+}
+
+$customer_credit_notes = [];
+try {
+    $cn_stmt = $pdo->prepare("
+        SELECT * FROM credit_notes
+        WHERE customer_id = ? AND status != 'deleted'
+        ORDER BY credit_date DESC, credit_note_id DESC
+    ");
+    $cn_stmt->execute([$customer_id]);
+    $customer_credit_notes = $cn_stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    // table may not exist yet
 }
 
 global $company_name, $company_logo;
@@ -850,13 +930,25 @@ global $company_name, $company_logo;
                     <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-orders" type="button" role="tab"><i class="bi bi-cart-check me-1"></i> Sales Orders</button>
                 </li>
                 <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-quotations" type="button" role="tab"><i class="bi bi-file-earmark-ruled me-1"></i> Quotations</button>
+                </li>
+                <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-invoices" type="button" role="tab"><i class="bi bi-file-earmark-text me-1"></i> Invoices</button>
+                </li>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-payments" type="button" role="tab"><i class="bi bi-cash-coin me-1"></i> Payments</button>
+                </li>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-deliveries" type="button" role="tab"><i class="bi bi-truck me-1"></i> Deliveries</button>
                 </li>
                 <?php if (!empty($customer_lpos) || $can_create_lpos): ?>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-lpos" type="button" role="tab"><i class="bi bi-file-earmark-check me-1"></i> LPOs</button>
                 </li>
                 <?php endif; ?>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-creditnotes" type="button" role="tab"><i class="bi bi-arrow-counterclockwise me-1"></i> Credit Notes &amp; Advances</button>
+                </li>
                 <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-sysinfo" type="button" role="tab"><i class="bi bi-clock-history me-1"></i> System Info</button>
                 </li>
@@ -922,6 +1014,101 @@ global $company_name, $company_logo;
                 </div>
             </div>
             </div><!-- #pane-orders -->
+
+            <div class="tab-pane fade" id="pane-quotations" role="tabpanel">
+            <!-- Quotations -->
+            <div class="card border-0 shadow-sm mb-4<?= empty($customer_quotations) ? ' d-print-none' : '' ?>">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold text-primary">
+                        <i class="bi bi-file-earmark-ruled me-2"></i> Quotations
+                        <span class="badge bg-primary ms-2"><?= count($customer_quotations) ?> Records</span>
+                    </h6>
+                    <div class="d-flex align-items-center gap-2">
+                        <a href="<?= getUrl('quotation_create') ?>" class="btn btn-primary btn-sm rounded-pill">
+                            <i class="bi bi-plus-circle me-1"></i> New Quotation
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (empty($customer_quotations)): ?>
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-file-earmark-x fs-3"></i>
+                        <p class="mt-2 mb-0">No quotations recorded yet.</p>
+                    </div>
+                    <?php else: ?>
+                    <div class="d-none d-md-block table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light text-uppercase small fw-bold">
+                                <tr>
+                                    <th class="ps-3">Quote #</th>
+                                    <th>Date</th>
+                                    <th>Valid Until</th>
+                                    <th class="text-end">Amount</th>
+                                    <th>Status</th>
+                                    <th class="text-end pe-3 d-print-none">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($customer_quotations as $quo):
+                                    $qs = strtolower($quo['status'] ?? 'draft');
+                                    $qb = 'secondary';
+                                    if ($qs == 'approved' || $qs == 'completed') { $qb = 'success'; }
+                                    elseif ($qs == 'reviewed' || $qs == 'processing') { $qb = 'primary'; }
+                                    elseif ($qs == 'pending') { $qb = 'warning'; }
+                                    elseif ($qs == 'cancelled') { $qb = 'danger'; }
+                                    elseif ($qs == 'shipped' || $qs == 'delivered') { $qb = 'info'; }
+                                ?>
+                                    <tr>
+                                        <td class="ps-3 fw-bold text-primary"><?= safe_output($quo['order_number']) ?></td>
+                                        <td><?= format_date($quo['order_date']) ?></td>
+                                        <td><?= !empty($quo['quote_valid_until']) ? format_date($quo['quote_valid_until']) : '—' ?></td>
+                                        <td class="text-end fw-bold"><?= number_format((float)$quo['grand_total']) ?> <?= safe_output($quo['currency'] ?? '') ?></td>
+                                        <td><span class="badge bg-<?= $qb ?>"><?= strtoupper(str_replace('_',' ',$qs)) ?></span></td>
+                                        <td class="text-end pe-3 d-print-none">
+                                            <a href="<?= getUrl('quotation_view') ?>?id=<?= $quo['sales_order_id'] ?>" class="btn btn-sm btn-outline-primary py-0">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="d-md-none row g-2 px-2">
+                        <?php foreach ($customer_quotations as $quo):
+                            $qs = strtolower($quo['status'] ?? 'draft');
+                            $qb = 'secondary';
+                            if ($qs == 'approved' || $qs == 'completed') { $qb = 'success'; }
+                            elseif ($qs == 'reviewed' || $qs == 'processing') { $qb = 'primary'; }
+                            elseif ($qs == 'pending') { $qb = 'warning'; }
+                            elseif ($qs == 'cancelled') { $qb = 'danger'; }
+                            elseif ($qs == 'shipped' || $qs == 'delivered') { $qb = 'info'; }
+                        ?>
+                        <div class="col-12">
+                            <div class="card border-0 shadow-sm" style="border-radius:10px;">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <span class="fw-bold text-primary" style="font-size:0.9rem;"><?= safe_output($quo['order_number']) ?></span>
+                                        <span class="badge bg-<?= $qb ?>"><?= strtoupper(str_replace('_',' ',$qs)) ?></span>
+                                    </div>
+                                    <div style="font-size:0.8rem;color:#555;">
+                                        <small class="text-muted">Date:</small> <?= format_date($quo['order_date']) ?><br>
+                                        <small class="text-muted">Amount:</small> <strong><?= number_format((float)$quo['grand_total']) ?> <?= safe_output($quo['currency'] ?? '') ?></strong>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
+                                    <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                                        <a href="<?= getUrl('quotation_view') ?>?id=<?= $quo['sales_order_id'] ?>" style="flex:1;padding:3px 4px;font-size:0.72rem;" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            </div><!-- #pane-quotations -->
 
             <div class="tab-pane fade" id="pane-invoices" role="tabpanel">
             <!-- Invoice & Payment History -->
@@ -1000,6 +1187,168 @@ global $company_name, $company_logo;
                 </div>
             </div>
             </div><!-- #pane-invoices -->
+
+            <div class="tab-pane fade" id="pane-payments" role="tabpanel">
+            <!-- Payments / Receipts -->
+            <div class="card border-0 shadow-sm mb-4<?= empty($customer_payments) ? ' d-print-none' : '' ?>">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold text-primary">
+                        <i class="bi bi-cash-coin me-2"></i> Payments
+                        <span class="badge bg-success ms-2"><?= count($customer_payments) ?> Records</span>
+                    </h6>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (empty($customer_payments)): ?>
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-cash-stack fs-3"></i>
+                        <p class="mt-2 mb-0">No payments recorded yet.</p>
+                    </div>
+                    <?php else: ?>
+                    <div class="d-none d-md-block table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light text-uppercase small fw-bold">
+                                <tr>
+                                    <th class="ps-3">Payment #</th>
+                                    <th>Date</th>
+                                    <th class="text-end">Amount</th>
+                                    <th>Method</th>
+                                    <th>Applied To</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($customer_payments as $pay):
+                                    $ps = strtolower($pay['status'] ?? 'pending');
+                                    $pb = ['completed' => 'success', 'pending' => 'warning', 'cancelled' => 'secondary', 'failed' => 'danger'][$ps] ?? 'secondary';
+                                    $appliedTo = $pay['allocated_invoices'] ?: $pay['direct_invoice_number'];
+                                    if (!empty($pay['advance_amount'])) {
+                                        $appliedTo = trim(($appliedTo ? $appliedTo . ' + ' : '') . 'Advance/Deposit');
+                                    }
+                                    $appliedTo = $appliedTo ?: '—';
+                                ?>
+                                    <tr>
+                                        <td class="ps-3 fw-bold text-dark"><?= safe_output($pay['payment_number']) ?></td>
+                                        <td><?= format_date($pay['payment_date']) ?></td>
+                                        <td class="text-end fw-bold text-success"><?= format_number($pay['amount']) ?></td>
+                                        <td><span class="badge bg-light text-dark border"><?= ucwords(str_replace('_',' ', $pay['payment_method'] ?? '')) ?></span></td>
+                                        <td class="small"><?= safe_output($appliedTo) ?></td>
+                                        <td class="text-center"><span class="badge bg-<?= $pb ?>"><?= strtoupper($ps) ?></span></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="d-md-none row g-2 px-2">
+                        <?php foreach ($customer_payments as $pay):
+                            $ps = strtolower($pay['status'] ?? 'pending');
+                            $pb = ['completed' => 'success', 'pending' => 'warning', 'cancelled' => 'secondary', 'failed' => 'danger'][$ps] ?? 'secondary';
+                            $appliedTo = $pay['allocated_invoices'] ?: $pay['direct_invoice_number'];
+                            if (!empty($pay['advance_amount'])) {
+                                $appliedTo = trim(($appliedTo ? $appliedTo . ' + ' : '') . 'Advance/Deposit');
+                            }
+                            $appliedTo = $appliedTo ?: '—';
+                        ?>
+                        <div class="col-12">
+                            <div class="card border-0 shadow-sm" style="border-radius:10px;">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <span class="fw-bold text-dark" style="font-size:0.9rem;"><?= safe_output($pay['payment_number']) ?></span>
+                                        <span class="badge bg-<?= $pb ?>"><?= strtoupper($ps) ?></span>
+                                    </div>
+                                    <div style="font-size:0.8rem;color:#555;">
+                                        <small class="text-muted">Date:</small> <?= format_date($pay['payment_date']) ?><br>
+                                        <small class="text-muted">Amount:</small> <strong class="text-success"><?= format_number($pay['amount']) ?></strong><br>
+                                        <small class="text-muted">Applied to:</small> <?= safe_output($appliedTo) ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            </div><!-- #pane-payments -->
+
+            <div class="tab-pane fade" id="pane-deliveries" role="tabpanel">
+            <!-- Deliveries -->
+            <div class="card border-0 shadow-sm mb-4<?= empty($customer_deliveries) ? ' d-print-none' : '' ?>">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold text-primary">
+                        <i class="bi bi-truck me-2"></i> Deliveries
+                        <span class="badge bg-primary ms-2"><?= count($customer_deliveries) ?> Records</span>
+                    </h6>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (empty($customer_deliveries)): ?>
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-truck fs-3"></i>
+                        <p class="mt-2 mb-0">No deliveries recorded yet.</p>
+                    </div>
+                    <?php else: ?>
+                    <div class="d-none d-md-block table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light text-uppercase small fw-bold">
+                                <tr>
+                                    <th class="ps-3">DN #</th>
+                                    <th>Order #</th>
+                                    <th>Delivery Date</th>
+                                    <th>Received By</th>
+                                    <th>Status</th>
+                                    <th class="text-end pe-3 d-print-none">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($customer_deliveries as $dn):
+                                    $ds = strtolower($dn['status'] ?? 'draft');
+                                    $db = ['draft' => 'secondary', 'ready' => 'info', 'in_transit' => 'primary', 'delivered' => 'success', 'cancelled' => 'danger'][$ds] ?? 'secondary';
+                                ?>
+                                    <tr>
+                                        <td class="ps-3 fw-bold text-primary"><?= safe_output($dn['delivery_number']) ?></td>
+                                        <td><?= safe_output($dn['order_number'], '—') ?></td>
+                                        <td><?= format_date($dn['delivery_date']) ?></td>
+                                        <td><?= safe_output($dn['received_by'], '—') ?></td>
+                                        <td><span class="badge bg-<?= $db ?>"><?= strtoupper(str_replace('_',' ',$ds)) ?></span></td>
+                                        <td class="text-end pe-3 d-print-none">
+                                            <a href="<?= getUrl('dn_view') ?>?id=<?= $dn['delivery_id'] ?>" class="btn btn-sm btn-outline-primary py-0">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="d-md-none row g-2 px-2">
+                        <?php foreach ($customer_deliveries as $dn):
+                            $ds = strtolower($dn['status'] ?? 'draft');
+                            $db = ['draft' => 'secondary', 'ready' => 'info', 'in_transit' => 'primary', 'delivered' => 'success', 'cancelled' => 'danger'][$ds] ?? 'secondary';
+                        ?>
+                        <div class="col-12">
+                            <div class="card border-0 shadow-sm" style="border-radius:10px;">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <span class="fw-bold text-primary" style="font-size:0.9rem;"><?= safe_output($dn['delivery_number']) ?></span>
+                                        <span class="badge bg-<?= $db ?>"><?= strtoupper(str_replace('_',' ',$ds)) ?></span>
+                                    </div>
+                                    <div style="font-size:0.8rem;color:#555;">
+                                        <small class="text-muted">Order:</small> <?= safe_output($dn['order_number'], '—') ?><br>
+                                        <small class="text-muted">Date:</small> <?= format_date($dn['delivery_date']) ?>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
+                                    <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                                        <a href="<?= getUrl('dn_view') ?>?id=<?= $dn['delivery_id'] ?>" style="flex:1;padding:3px 4px;font-size:0.72rem;" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            </div><!-- #pane-deliveries -->
 
             <?php if (!empty($customer_lpos) || $can_create_lpos): ?>
             <div class="tab-pane fade" id="pane-lpos" role="tabpanel">
@@ -1145,6 +1494,115 @@ global $company_name, $company_logo;
             </div>
             </div><!-- #pane-lpos -->
             <?php endif; ?>
+
+            <div class="tab-pane fade" id="pane-creditnotes" role="tabpanel">
+            <!-- Advances / Deposits -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-piggy-bank me-2"></i> Advances &amp; Deposits</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <div class="card border-0 bg-light text-center p-2">
+                                <div class="fs-5 fw-bold text-primary"><?= number_format($adv_gross, 2) ?></div>
+                                <div class="small text-muted">Total Received</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="card border-0 bg-light text-center p-2">
+                                <div class="fs-5 fw-bold text-secondary"><?= number_format($adv_applied, 2) ?></div>
+                                <div class="small text-muted">Applied to Invoices</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="card border-0 bg-light text-center p-2">
+                                <div class="fs-5 fw-bold text-success"><?= number_format($adv_available, 2) ?></div>
+                                <div class="small text-muted">Available Balance</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Credit Notes -->
+            <div class="card border-0 shadow-sm mb-4<?= empty($customer_credit_notes) ? ' d-print-none' : '' ?>">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold text-primary">
+                        <i class="bi bi-arrow-counterclockwise me-2"></i> Credit Notes
+                        <span class="badge bg-primary ms-2"><?= count($customer_credit_notes) ?> Records</span>
+                    </h6>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (empty($customer_credit_notes)): ?>
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-receipt-cutoff fs-3"></i>
+                        <p class="mt-2 mb-0">No credit notes recorded yet.</p>
+                    </div>
+                    <?php else: ?>
+                    <div class="d-none d-md-block table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light text-uppercase small fw-bold">
+                                <tr>
+                                    <th class="ps-3">Credit Note #</th>
+                                    <th>Date</th>
+                                    <th>Reason</th>
+                                    <th class="text-end">Amount</th>
+                                    <th>Status</th>
+                                    <th class="text-end pe-3 d-print-none">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($customer_credit_notes as $cn):
+                                    $cs = strtolower($cn['status'] ?? 'pending');
+                                    $cb = ['pending' => 'warning', 'reviewed' => 'info', 'approved' => 'primary', 'paid' => 'success', 'rejected' => 'danger', 'cancelled' => 'secondary'][$cs] ?? 'secondary';
+                                ?>
+                                    <tr>
+                                        <td class="ps-3 fw-bold text-primary"><?= safe_output($cn['credit_note_number']) ?></td>
+                                        <td><?= format_date($cn['credit_date']) ?></td>
+                                        <td class="small"><?= safe_output($cn['reason'], '—') ?></td>
+                                        <td class="text-end fw-bold"><?= format_number($cn['grand_total']) ?></td>
+                                        <td><span class="badge bg-<?= $cb ?>"><?= strtoupper($cs) ?></span></td>
+                                        <td class="text-end pe-3 d-print-none">
+                                            <a href="<?= getUrl('credit_note_view') ?>?id=<?= $cn['credit_note_id'] ?>" class="btn btn-sm btn-outline-primary py-0">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="d-md-none row g-2 px-2">
+                        <?php foreach ($customer_credit_notes as $cn):
+                            $cs = strtolower($cn['status'] ?? 'pending');
+                            $cb = ['pending' => 'warning', 'reviewed' => 'info', 'approved' => 'primary', 'paid' => 'success', 'rejected' => 'danger', 'cancelled' => 'secondary'][$cs] ?? 'secondary';
+                        ?>
+                        <div class="col-12">
+                            <div class="card border-0 shadow-sm" style="border-radius:10px;">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <span class="fw-bold text-primary" style="font-size:0.9rem;"><?= safe_output($cn['credit_note_number']) ?></span>
+                                        <span class="badge bg-<?= $cb ?>"><?= strtoupper($cs) ?></span>
+                                    </div>
+                                    <div style="font-size:0.8rem;color:#555;">
+                                        <small class="text-muted">Date:</small> <?= format_date($cn['credit_date']) ?><br>
+                                        <small class="text-muted">Amount:</small> <strong><?= format_number($cn['grand_total']) ?></strong>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
+                                    <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                                        <a href="<?= getUrl('credit_note_view') ?>?id=<?= $cn['credit_note_id'] ?>" style="flex:1;padding:3px 4px;font-size:0.72rem;" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            </div><!-- #pane-creditnotes -->
 
             <div class="tab-pane fade" id="pane-sysinfo" role="tabpanel">
             <!-- System Information -->
