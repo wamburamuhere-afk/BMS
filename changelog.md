@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-08-21 (perf) — query optimization phase 1: missing read-path indexes
+
+**Files:** `migrations/2026_08_21_query_perf_indexes.php` (new)
+
+Index-only migration — pure `ALTER TABLE ... ADD KEY`. No query text, no result set and no business rule was touched; the optimiser is simply given a path it previously lacked. Each statement is guarded by a `SHOW INDEX` check, so the file is safe to re-run (verified: second run skipped all three).
+
+**Two gaps found by inspecting the live DB, not by reading code:**
+
+`activity_logs` (18,127 rows) had **no index at all beyond `PRIMARY(id)`** — nothing on `created_at`, nothing on `user_id`. The dashboard activity feed (`app/dashboard.php:430-447`) runs on every dashboard load, the highest-traffic page in the app. Added `ix_al_user_created (user_id, created_at)` for the non-admin variant (equality on the leading column, ordered second column) and `ix_al_created (created_at)` for the admin variant, which has no `user_id` predicate and therefore cannot use the composite. Eight files read this table; all benefit with zero code change.
+
+`journal_entries` had indexes for tracing and project scope (`ix_je_entity`, `ix_je_parent`, `ix_je_reverses`, `ix_je_project`) but **none covering `status = 'posted' AND entry_date <= ?`** — the filter every financial report is required to use per `.claude/reporting-source.md`. Added `ix_je_status_date (status, entry_date)`: equality first, range second, the correct column order for this shape. Only 321 rows today so the win is invisible now, but it feeds every Trial Balance, P&L, Balance Sheet, Cash Flow and AR-aging query and grows with every posting.
+
+**Measured before → after (EXPLAIN on the real query text):**
+
+| Query | Before | After |
+|---|---|---|
+| Dashboard feed (admin) | `type=ALL` `key=NULL` rows=16372 + `Using filesort` | `type=index` `key=ix_al_created` rows=10, backward index scan, no filesort |
+| Dashboard feed (non-admin) | `type=ALL` `key=NULL` rows=16372 + `Using filesort` | `type=ref` `key=ix_al_user_created` rows=193, no filesort |
+| Trial balance (posted + as-of) | `type=ALL` `key=NULL` + `Using temporary` | `type=range` `key=ix_je_status_date`, `Using index` (covering) |
+
+**Verified logic unchanged:** ran each query twice — once free to use the new index, once with `IGNORE INDEX` to reproduce the pre-migration plan — and hashed both result sets. Trial balance hashed identical (`4c3f8176…` both ways); ledger guard still balances (Dr = Cr = 29,162,836,707.49).
+
+**Pre-existing issue surfaced (not caused by this change, deliberately left alone):** the two dashboard feed queries hashed *differently* between plans. Investigated — both plans return **the same 10 rows** (same id set); only the order within an identical timestamp differs, because 3 rows share `23:02:15` and 3 share `23:02:14` and the query orders by `created_at DESC` alone, which does not define an order among ties. Re-testing with `ORDER BY created_at DESC, id DESC` made both plans agree exactly. So that ordering was already unstable — any MySQL upgrade or plan flip could have reshuffled tied rows at any time; the index only made a latent flaw visible. No user sees different activities. Left the `ORDER BY` untouched to keep this phase strictly index-only; adding the `, id DESC` tie-break is a separate one-line change.
+
 ## 2026-08-21 — Purge generated daily reports + stop tracking them
 
 **Files:** `.gitignore`, `scripts/clean_daily_reports.sh` (new), removed 18 previously-committed report files, deleted 62 more untracked local copies
