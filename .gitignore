@@ -34,6 +34,16 @@ backups/*
 api/debug_grn_log.txt
 
 # -----------------------------------------------
+# GENERATED DAILY REPORTS (local-only, never deploy)
+# See scripts/clean_daily_reports.sh to purge these locally.
+# -----------------------------------------------
+/Report_*.html
+/Report_*.md
+/Report_*.pdf
+docs/BMS_Daily_Report_*.html
+docs/BMS_Daily_Report_*.pdf
+
+# -----------------------------------------------
 # WINDOWS SYSTEM FILES
 # -----------------------------------------------
 Thumbs.db
