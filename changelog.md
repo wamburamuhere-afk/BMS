@@ -1,5 +1,11 @@
 # BMS Changelog
 
+## 2026-08-21 — Purge generated daily reports + stop tracking them
+
+**Files:** `.gitignore`, `scripts/clean_daily_reports.sh` (new), removed 18 previously-committed report files, deleted 62 more untracked local copies
+
+The daily report generator (`Report_DD_Mon_YYYY.{html,md,pdf}` at repo root, `docs/BMS_Daily_Report_*.{html,pdf}`) had been accumulating files locally, and 18 of them (22–27 Jun 2026 + one 4 Jul 2026 pair in `docs/`) had been committed to git at some point — meaning they were shipping to the live server on every deploy. Added `.gitignore` rules for both naming patterns so future generated reports never get staged again, and added `scripts/clean_daily_reports.sh` (supports `--dry-run`) so the local pile can be purged on demand going forward. Removed the 18 tracked files from git (`git rm`, so the next deploy of this branch drops them from the server) and deleted the other 62 untracked local copies from disk. Left everything else in the untracked pile alone (training PDFs, `docs/` guide documents, `migrations/2026_07_03_attendance_capture.php` — real uncommitted work — etc.).
+
 ## 2026-08-20 — Customer Details: Quotations, Payments, Deliveries, Credit Notes & Advances tabs
 
 **Files:** `app/bms/customer/customer_details.php`
