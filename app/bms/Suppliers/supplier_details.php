@@ -153,6 +153,23 @@ if (isAdmin()) {
     }
 }
 
+// Audit trail for the System Info tab.
+// NOTE: audit_logs rows for suppliers are currently written without entity_id,
+// so this comes back empty for most suppliers until logAudit() is passed the
+// supplier id at the write sites. The join is correct; the data is the gap.
+$audit_stmt = $pdo->prepare("
+    SELECT al.action, al.activity_type, al.description, al.created_at,
+           TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) AS user_name,
+           u.username
+    FROM audit_logs al
+    LEFT JOIN users u ON u.user_id = al.user_id
+    WHERE al.entity_type = 'supplier' AND al.entity_id = ?
+    ORDER BY al.id DESC
+    LIMIT 100
+");
+$audit_stmt->execute([$supplier_id]);
+$supplier_audit = $audit_stmt->fetchAll(PDO::FETCH_ASSOC);
+
 // Calculate statistics
 $total_orders = count($purchase_orders);
 $total_spent = array_sum(array_column($purchase_orders, 'total_amount'));
@@ -670,9 +687,21 @@ global $company_name, $company_logo;
                     </button>
                 </li>
                 <?php endif; ?>
+                <?php if (canView('expenses')): ?>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-expenses" type="button" role="tab">
+                        <i class="bi bi-wallet2 me-1"></i> Expenses
+                    </button>
+                </li>
+                <?php endif; ?>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-projects" type="button" role="tab">
                         <i class="bi bi-diagram-3 me-1"></i> Projects Involved
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-sysinfo" type="button" role="tab">
+                        <i class="bi bi-clock-history me-1"></i> System Info
                     </button>
                 </li>
             </ul>
@@ -889,6 +918,49 @@ global $company_name, $company_logo;
         </div>
         <?php endif; ?>
 
+        <!-- Expenses paid to this supplier — same table code as
+             app/constant/accounts/expenses.php, filtered on the payee. -->
+        <?php if (canView('expenses')): ?>
+        <div class="tab-pane fade" id="pane-expenses" role="tabpanel">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 d-flex align-items-center flex-wrap gap-2">
+                            <h6 class="mb-0 fw-bold text-dark">
+                                <i class="bi bi-wallet2 text-primary me-2"></i> Expenses
+                                <span class="badge bg-primary ms-1" id="sup-expenses-count">0</span>
+                            </h6>
+                            <div class="d-flex gap-2 ms-auto">
+                                <?php if (canCreate('expenses')): ?>
+                                <a href="<?= getUrl('expenses') ?>?paid_to_type=supplier&paid_to_id=<?= $supplier_id ?>&add=1" class="btn btn-primary btn-sm shadow-sm">
+                                    <i class="bi bi-plus-circle me-1"></i> New Expense
+                                </a>
+                                <?php endif; ?>
+                                <a href="<?= getUrl('expenses') ?>?paid_to_type=supplier&paid_to_id=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
+                                    View All
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php
+                            $tbl = [
+                                'id'           => 'supExpensesTable',
+                                'paid_to_type' => 'supplier',
+                                'paid_to_id'   => (int) $supplier_id,
+                                'hide'         => ['paid_to'],
+                                'defer_pane'   => '#pane-expenses',
+                                'on_count'     => 'function (n) { $("#sup-expenses-count").text(n); }',
+                                'page_length'  => 10,
+                            ];
+                            include ROOT_DIR . '/includes/tables/expenses_table.php';
+                            ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <!-- Projects Involved -->
         <div class="tab-pane fade" id="pane-projects" role="tabpanel">
             <div class="row mt-2 mb-4">
@@ -1021,7 +1093,9 @@ global $company_name, $company_logo;
                                 <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cart"></i> Recent Purchase Orders</h6>
                                 <div class="d-flex gap-2">
                                     <?php if (canCreate('purchase_orders')): ?>
-                                    <a href="<?= getUrl('purchase_order_create') ?>?supplier_id=<?= $supplier_id ?>" class="btn btn-primary btn-sm shadow-sm">
+                                    <!-- purchase_order_create.php reads ?supplier, not ?supplier_id —
+                                         with the old name the supplier never pre-selected. -->
+                                    <a href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier_id ?>" class="btn btn-primary btn-sm shadow-sm">
                                         <i class="bi bi-plus-circle me-1"></i> Create PO
                                     </a>
                                     <?php endif; ?>
@@ -1174,6 +1248,90 @@ global $company_name, $company_logo;
             </div>
         </div>
 
+        <!-- System Info -->
+        <div class="tab-pane fade" id="pane-sysinfo" role="tabpanel">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header bg-white py-3">
+                            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-info-circle text-primary me-2"></i> Record Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label text-muted small mb-1">Supplier Code</label>
+                                    <p class="mb-0 fw-semibold"><code><?= safe_output($supplier['supplier_code']) ?></code></p>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label text-muted small mb-1">Status</label>
+                                    <p class="mb-0"><span class="badge bg-<?= get_status_badge($supplier['status']) ?>"><?= ucfirst($supplier['status']) ?></span></p>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label text-muted small mb-1">Created By</label>
+                                    <p class="mb-0 fw-semibold"><?= safe_output($supplier['created_by_name'], '—') ?></p>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label text-muted small mb-1">Date Created</label>
+                                    <p class="mb-0 fw-semibold"><?= !empty($supplier['created_at']) ? format_date($supplier['created_at']) : '—' ?></p>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label text-muted small mb-1">Last Updated By</label>
+                                    <p class="mb-0 fw-semibold"><?= safe_output($supplier['updated_by_name'], '—') ?></p>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label text-muted small mb-1">Last Updated</label>
+                                    <p class="mb-0 fw-semibold"><?= !empty($supplier['updated_at']) ? format_date($supplier['updated_at']) : '—' ?></p>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label text-muted small mb-1">Category</label>
+                                    <p class="mb-0 fw-semibold"><?= safe_output($supplier['category_name'], '—') ?></p>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label text-muted small mb-1">Projects Linked</label>
+                                    <p class="mb-0 fw-semibold"><?= (int) $total_supplier_projects ?></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 d-flex align-items-center">
+                            <h6 class="mb-0 fw-bold text-dark">
+                                <i class="bi bi-clock-history text-primary me-2"></i> Audit Trail
+                                <span class="badge bg-primary ms-1"><?= count($supplier_audit) ?></span>
+                            </h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0" id="supplierAuditTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th style="width:50px;">S/NO</th>
+                                            <th>When</th>
+                                            <th>Action</th>
+                                            <th>By</th>
+                                            <th>Description</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($supplier_audit as $i => $a): ?>
+                                        <tr>
+                                            <td class="text-muted"><?= $i + 1 ?></td>
+                                            <td><?= !empty($a['created_at']) ? date('d M Y H:i', strtotime($a['created_at'])) : '—' ?></td>
+                                            <td><span class="badge bg-light text-dark border"><?= safe_output($a['action'] ?: $a['activity_type'], '—') ?></span></td>
+                                            <td><?= safe_output($a['user_name'] ?: $a['username'], '—') ?></td>
+                                            <td><?= safe_output($a['description'], '—') ?></td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -1219,6 +1377,14 @@ $(document).ready(function() {
         order: [[0, 'asc']],
         columnDefs: [{ orderable: false, targets: [0, -1] }],
         language: { emptyTable: 'No payment history found.', zeroRecords: 'No matching payments found.' }
+    });
+
+    $('#supplierAuditTable').DataTable({
+        pageLength: 10,
+        responsive: false,
+        order: [[1, 'desc']],
+        columnDefs: [{ orderable: false, targets: [0] }],
+        language: { emptyTable: 'No audit entries recorded for this supplier yet.', zeroRecords: 'No matching audit entries.' }
     });
 });
 
