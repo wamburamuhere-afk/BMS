@@ -12,6 +12,10 @@ autoEnforcePermission('grn');
 // link — the Purchases entry point (no type param) must not offer it at all.
 $is_outbound_view = (($_GET['type'] ?? '') === 'outbound');
 
+// ?supplier=<id> — arriving from a supplier's Delivery Notes tab; pre-selects
+// the filter so the list opens showing only that supplier.
+$dn_supplier_filter = intval($_GET['supplier'] ?? 0);
+
 // Include the header
 includeHeader();
 
@@ -186,7 +190,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <select class="form-select select2-static" name="supplier" id="dn_filter_supplier">
                         <option value="">All Suppliers</option>
                         <?php foreach ($suppliers as $supplier): ?>
-                            <option value="<?= $supplier['supplier_id'] ?>"><?= safe_output($supplier['supplier_name']) ?></option>
+                            <option value="<?= $supplier['supplier_id'] ?>" <?= $dn_supplier_filter == $supplier['supplier_id'] ? 'selected' : '' ?>><?= safe_output($supplier['supplier_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -287,7 +291,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
             
             <div class="d-flex align-items-center bg-white shadow-sm px-3 py-1" style="border: 1px solid #dee2e6; border-radius: 10px;">
                 <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> Show:</span>
-                <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 50px; box-shadow: none; background: transparent;" onchange="dnTable.page.len(this.value).draw();">
+                <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 50px; box-shadow: none; background: transparent;" onchange="BMSDnTable.dt("dnTable").page.len(this.value).draw();">
                     <option value="10">10</option>
                     <option value="25" selected>25</option>
                     <option value="50">50</option>
@@ -338,26 +342,30 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
         </div>
         <div class="card-body p-0">
             <!-- Table View Container -->
-            <div id="table-view-container" class="table-responsive">
-                <table class="table table-hover align-middle mb-0" id="dnTable" style="width:100%">
-                    <thead class="bg-light sticky-header">
-                        <tr>
-                            <th style="width:50px;" class="ps-3">S/NO</th>
-                            <th>DN Number</th>
-                            <th style="width:90px;" class="d-print-none">Type</th>
-                            <th>Date</th>
-                            <th id="dnPartyColHeading"><?= $is_outbound_view ? 'Customer' : 'Supplier / Sub-Contractor' ?></th>
-                            <?php if ($enable_projects): ?><th>Project</th><?php endif; ?>
-                            <th>Items</th>
-                            <th>Warehouse</th>
-                            <th>Status</th>
-                            <th style="width:80px;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Loaded via AJAX -->
-                    </tbody>
-                </table>
+            <div id="table-view-container">
+                <?php
+                // Shared Delivery Notes table — same code path as the Delivery
+                // Notes tab in supplier_details.
+                $tbl = [
+                    'id'             => 'dnTable',
+                    'card'           => '#card-view-container',
+                    'party_label'    => $is_outbound_view ? 'Customer' : 'Supplier / Sub-Contractor',
+                    'on_stats'       => 'updateStats',
+                    'on_type_counts' => 'function (c) { $("#tabCountInbound").text(c.inbound || 0); $("#tabCountOutbound").text(c.outbound || 0); }',
+                    'page_length'    => 25,
+                    'filters_js'     => 'function () {
+                        return {
+                            supplier:  $(\'select[name="supplier"]\').val(),
+                            dn_type:   currentDnType,
+                            status:    $(\'select[name="status"]\').val(),
+                            warehouse: $(\'select[name="warehouse"]\').val(),
+                            date_from: $(\'input[name="date_from"]\').val(),
+                            date_to:   $(\'input[name="date_to"]\').val()
+                        };
+                    }',
+                ];
+                include ROOT_DIR . '/includes/tables/delivery_notes_table.php';
+                ?>
             </div>
 
             <!-- Card View Container -->
@@ -371,15 +379,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 
 <script>
 // Three-approval capability flags (mirrored from PHP)
-const DN_CAN_REVIEW      = <?= $dn_can_review    ? 'true' : 'false' ?>;
-const DN_CAN_APPROVE     = <?= $dn_can_approve   ? 'true' : 'false' ?>;
-const DN_IS_ADMIN        = <?= $dn_is_admin      ? 'true' : 'false' ?>;
-const DN_CAN_CREATE_GRN  = <?= $can_create_grn   ? 'true' : 'false' ?>;
-const GRN_CREATE_URL     = '<?= getUrl('grn_create') ?>';
-
-let dnTable;
 let currentDnType = '<?= $is_outbound_view ? 'outbound' : 'inbound' ?>'; // active tab: 'inbound' or 'outbound'
-const API_URL = "<?= getUrl('api/get_delivery_notes_list.php') ?>";
 
 // View Mode Toggle Logic
 function toggleViewMode(mode) {
@@ -408,79 +408,6 @@ function checkResponsiveView() {
     }
 }
 
-function renderCards(data) {
-    const container = $('#card-view-container');
-    container.empty();
-    
-    if (data.length === 0) {
-        container.html('<div class="col-12 text-center py-5 text-muted"><i class="bi bi-inbox fs-1 d-block mb-2"></i> No records found</div>');
-        return;
-    }
-    
-    data.each(function(row) {
-        const statusClass = getStatusClass(row.status);
-        const cardHtml = `
-            <div class="col-md-6 col-lg-4">
-                <div class="card h-100 shadow-sm border-0 hover-shadow transition-all" style="border-radius: 12px; border: 1px solid #eef2f6 !important;">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-start mb-3">
-                            <div>
-                                <code class="small d-block mb-1">${safe_output(row.dn_number || row.delivery_number || 'No DN #')}</code>
-                                <div class="mb-1">${dnTypeBadge(row.dn_type)}</div>
-                                <h6 class="fw-bold mb-0">${safe_output(row.supplier_name)}</h6>
-                                <small class="text-muted">${safe_output(row.company_name || '')}</small>
-                            </div>
-                            <span class="badge bg-${statusClass} small" style="font-size: 0.65rem;">${row.status.toUpperCase()}</span>
-                        </div>
-                        
-                        <div class="row g-2 mb-3">
-                            <div class="col-6">
-                                <small class="text-muted d-block small">Date</small>
-                                <span class="small fw-medium text-dark">${formatDate(row.delivery_date)}</span>
-                            </div>
-                            <div class="col-6">
-                                <small class="text-muted d-block small">Status</small>
-                                <span class="badge bg-${getStatusClass(row.status)} small" style="font-size:0.65rem;">${row.status.toUpperCase()}</span>
-                            </div>
-                            <div class="col-6">
-                                <small class="text-muted d-block small">Warehouse</small>
-                                <span class="small text-dark text-truncate d-block" title="${safe_output(row.warehouse_name)}">${safe_output(row.warehouse_name)}</span>
-                            </div>
-                            <div class="col-6">
-                                <small class="text-muted d-block small">Items</small>
-                                <span class="small text-dark">${row.total_items} items</span>
-                            </div>
-                            <?php if ($enable_projects): ?>
-                            <div class="col-12 mt-2">
-                                <small class="text-muted d-block small">Project</small>
-                                <span class="badge bg-info-soft text-info border border-info small p-1 text-wrap d-inline-block w-100" style="white-space: normal; word-break: break-word;">${safe_output(row.project_name || 'N/A')}</span>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                        
-                        <div class="dn-card-actions">
-                            <a href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}" class="btn btn-sm btn-outline-primary dn-card-btn" title="View"><i class="bi bi-eye"></i></a>
-                            ${(row.status === 'pending' || row.status === 'reviewed' || DN_IS_ADMIN) ? `<a href="${dnEditUrl(row)}" class="btn btn-sm btn-outline-warning dn-card-btn" title="Edit"><i class="bi bi-pencil"></i></a>` : ''}
-                            ${(row.status === 'pending' && DN_CAN_REVIEW) ? `<button class="btn btn-sm btn-outline-primary dn-card-btn" onclick="markReviewed(${row.delivery_id})" title="Mark Reviewed"><i class="bi bi-check2"></i></button>` : ''}
-                            ${(row.status === 'reviewed' && DN_CAN_APPROVE) ? `<button class="btn btn-sm btn-outline-success dn-card-btn" onclick="approveDN(${row.delivery_id})" title="Approve"><i class="bi bi-check-circle"></i></button>` : ''}
-                            ${(DN_CAN_CREATE_GRN && row.dn_type === 'inbound' && ['approved','partially_delivered'].includes(row.status)) ? `<a href="${GRN_CREATE_URL}?dn=${row.delivery_id}" class="btn btn-sm btn-success dn-card-btn" title="Create GRN"><i class="bi bi-clipboard-plus"></i></a>` : ''}
-                            <?php if ($can_delete_grn): ?>
-                            ${(DN_IS_ADMIN || ['draft','pending','cancelled'].includes(row.status)) ? `<button class="btn btn-sm btn-outline-danger dn-card-btn" onclick="deleteDN(${row.delivery_id})" title="Delete"><i class="bi bi-trash"></i></button>` : ''}
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        container.append(cardHtml);
-    });
-}
-
-function safe_output(str) {
-    if (!str) return '';
-    return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-}
-
 $(document).ready(function() {
     checkResponsiveView();
     $(window).resize(checkResponsiveView);
@@ -493,153 +420,6 @@ $(document).ready(function() {
         $('#dnListHeading').text('Outbound Delivery Notes — Sent');
     }
 
-    dnTable = $('#dnTable').DataTable({
-        processing: true,
-        serverSide: true,
-        pageLength: 25,
-        order: [[1, 'desc']],
-        ajax: {
-            url: API_URL,
-            data: function(d) {
-                return $.extend({}, d, {
-                    supplier: $('select[name="supplier"]').val(),
-                    dn_type: currentDnType,
-                    status: $('select[name="status"]').val(),
-                    warehouse: $('select[name="warehouse"]').val(),
-                    date_from: $('input[name="date_from"]').val(),
-                    date_to: $('input[name="date_to"]').val()
-                });
-            },
-            dataSrc: function(json) {
-                if (json.success) {
-                    updateStats(json.stats);
-                    if (json.type_counts) {
-                        $('#tabCountInbound').text(json.type_counts.inbound || 0);
-                        $('#tabCountOutbound').text(json.type_counts.outbound || 0);
-                    }
-                    return json.data;
-                }
-                return [];
-            }
-        },
-        drawCallback: function(settings) {
-            renderCards(this.api().rows({page:'current'}).data());
-        },
-        dom: 'rtp',
-        columns: [
-            {
-                data: null,
-                orderable: false,
-                searchable: false,
-                width: '50px',
-                className: 'ps-3 text-muted small fw-bold text-center',
-                render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1
-            },
-            {
-                data: 'dn_number',
-                render: function(data, type, row) {
-                    const display = data || row.delivery_number || '';
-                    const label   = display ? `<strong>${safe_output(display)}</strong>` : '<span class="text-muted fst-italic">No DN #</span>';
-                    const sub     = data && row.delivery_number ? `<small class="text-muted">Ref: ${safe_output(row.delivery_number)}</small>` : `<small class="text-muted">ID: ${row.delivery_id}</small>`;
-                    return label + '<br>' + sub;
-                }
-            },
-            {
-                data: 'dn_type',
-                className: 'text-center d-print-none',
-                render: function(data) { return dnTypeBadge(data); }
-            },
-            {
-                data: 'delivery_date',
-                render: function(data) { return formatDate(data); }
-            },
-            {
-                data: 'supplier_name',
-                render: function(data, type, row) {
-                    const kindLabels = { subcontractor: 'Sub-Contractor', customer: 'Customer' };
-                    const kind = `<small class="badge bg-light text-dark border">${kindLabels[row.party_type] || 'Supplier'}</small>`;
-                    return `<span class="fw-bold">${safe_output(data)}</span> ${kind}${row.company_name ? `<br><small class="text-muted">${safe_output(row.company_name)}</small>` : ''}`;
-                }
-            },
-            <?php if ($enable_projects): ?>
-            {
-                data: 'project_name',
-                render: function(data) {
-                    return data ? `<span class="badge bg-info-soft text-info border border-info small p-1 text-wrap w-100 dn-project-badge" style="white-space: normal; word-break: break-word;">${safe_output(data)}</span>` : '<span class="text-muted small">N/A</span>';
-                }
-            },
-            <?php endif; ?>
-            { 
-                data: 'total_items',
-                render: function(data) { return `<span class="badge bg-secondary p-1">${data}</span> <small>items</small>`; }
-            },
-            { data: 'warehouse_name' },
-            { 
-                data: 'status',
-                className: 'text-center',
-                render: function(data) {
-                    const cls = getStatusClass(data);
-                    return `<span class="badge bg-${cls} small" style="font-size: 0.7rem; padding: 4px 8px;">${data.toUpperCase()}</span>`;
-                }
-            },
-            {
-                data: null,
-                orderable: false,
-                render: function(data, type, row) {
-                    const isPending  = (row.status === 'pending');
-                    const isReviewed = (row.status === 'reviewed');
-                    const isApproved = (row.status === 'approved');
-                    const inWorkflow = (isPending || isReviewed);
-                    const canEditNow = (inWorkflow || DN_IS_ADMIN);
-                    const canDeleteNow = (DN_IS_ADMIN || ['draft','pending','cancelled'].includes(row.status));
-
-                    let actions = `
-                        <div class="dropdown">
-                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-gear"></i>
-                            </button>
-                            <ul class="dropdown-menu shadow-sm">
-                                <li><a class="dropdown-item" href="<?= getUrl('dn_view') ?>?id=${row.delivery_id}"><i class="bi bi-eye text-info"></i> View Details</a></li>
-                    `;
-
-                    if (canEditNow) {
-                        actions += `<li><a class="dropdown-item" href="${dnEditUrl(row)}"><i class="bi bi-pencil text-warning"></i> Edit Details</a></li>`;
-                    }
-
-                    // Parallel Review + Approve (one active, one disabled)
-                    if (inWorkflow && DN_CAN_REVIEW) {
-                        if (isPending) {
-                            actions += `<li><a class="dropdown-item text-primary fw-bold" href="#" onclick="markReviewed(${row.delivery_id}); return false;"><i class="bi bi-check2"></i> Mark Reviewed</a></li>`;
-                        } else {
-                            actions += `<li><a class="dropdown-item text-muted disabled" href="#" tabindex="-1" aria-disabled="true" title="Already reviewed"><i class="bi bi-check2"></i> Mark Reviewed</a></li>`;
-                        }
-                    }
-                    if (inWorkflow && DN_CAN_APPROVE) {
-                        if (isReviewed) {
-                            actions += `<li><a class="dropdown-item text-success fw-bold" href="#" onclick="approveDN(${row.delivery_id}); return false;"><i class="bi bi-check-circle"></i> Approve DN</a></li>`;
-                        } else {
-                            actions += `<li><a class="dropdown-item text-muted disabled" href="#" tabindex="-1" aria-disabled="true" title="Must be reviewed before approval"><i class="bi bi-check-circle"></i> Approve DN</a></li>`;
-                        }
-                    }
-
-                    if (DN_CAN_CREATE_GRN && row.dn_type === 'inbound' && ['approved','partially_delivered'].includes(row.status)) {
-                        actions += `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item text-success fw-bold" href="${GRN_CREATE_URL}?dn=${row.delivery_id}"><i class="bi bi-clipboard-plus me-1"></i> Create GRN</a></li>`;
-                    }
-
-                    if (canDeleteNow) {
-                        actions += `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item text-danger" href="#" onclick="deleteDN(${row.delivery_id}); return false;"><i class="bi bi-trash"></i> Delete</a></li>`;
-                    }
-
-                    actions += `</ul></div>`;
-                    return actions;
-                }
-            }
-        ],
-        language: {
-            processing: '<div class="spinner-border spinner-border-sm text-primary"></div> Loading...',
-            zeroRecords: 'No delivery notes found match your filters'
-        }
-    });
 
     $('#filterForm').on('submit', function(e) {
         e.preventDefault();
@@ -665,12 +445,12 @@ $(document).ready(function() {
         $('#dnListHeading').text(currentDnType === 'outbound'
             ? 'Outbound Delivery Notes — Sent'
             : 'Inbound Delivery Notes — Received');
-        dnTable.ajax.reload();
+        BMSDnTable.reload("dnTable");
     });
 });
 
 function loadDNs() {
-    dnTable.ajax.reload();
+    BMSDnTable.reload("dnTable");
 }
 
 function clearDNFilters() {
@@ -686,106 +466,11 @@ function updateStats(stats) {
     $('#stat-pending-grns').text(stats.pending_count || stats.draft_count); 
 }
 
-function formatDate(dateString) {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-function getStatusClass(status) {
-    switch(status.toLowerCase()) {
-        case 'pending':   return 'warning';
-        case 'reviewed':  return 'primary';
-        case 'approved':              return 'info';
-        case 'partially_delivered':   return 'warning';
-        case 'dispatched':            return 'info';
-        case 'delivered':             return 'success';
-        case 'completed': return 'success';
-        case 'cancelled': return 'danger';
-        default: return 'secondary';
-    }
-}
-
-// Three-approval — dedicated APIs (replaces the legacy change_dn_status calls)
-function markReviewed(id) {
-    Swal.fire({
-        title: 'Mark as Reviewed?',
-        text: 'DN will move to Reviewed and become approvable.',
-        icon: 'question', showCancelButton: true,
-        confirmButtonColor: '#0d6efd', confirmButtonText: 'Yes, mark reviewed'
-    }).then(r => {
-        if (!r.isConfirmed) return;
-        $.post('<?= buildUrl('api/review_dn.php') ?>', { delivery_id: id }, function(res) {
-            if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Reviewed!', text: res.message, timer: 1800, showConfirmButton: false });
-                dnTable.ajax.reload();
-            } else { Swal.fire('Error', res.message, 'error'); }
-        }, 'json');
-    });
-}
-
-function approveDN(id) {
-    Swal.fire({
-        title: 'Approve Delivery Note?',
-        text: 'Once approved, stock movements will fire.',
-        icon: 'question', showCancelButton: true,
-        confirmButtonColor: '#198754', confirmButtonText: 'Yes, approve'
-    }).then(r => {
-        if (!r.isConfirmed) return;
-        $.post('<?= buildUrl('api/approve_dn.php') ?>', { delivery_id: id }, function(res) {
-            if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Approved!', text: res.message, timer: 2000, showConfirmButton: false });
-                dnTable.ajax.reload();
-            } else { Swal.fire('Error', res.message, 'error'); }
-        }, 'json');
-    });
-}
-
-// Inbound (Record) vs Outbound (Create) badge
-function dnTypeBadge(t) {
-    return t === 'outbound'
-        ? '<span class="badge bg-info-subtle text-info border border-info" style="font-size:0.62rem;"><i class="bi bi-box-arrow-up-right"></i> OUTBOUND</span>'
-        : '<span class="badge bg-primary-subtle text-primary border border-primary" style="font-size:0.62rem;"><i class="bi bi-box-arrow-in-down"></i> INBOUND</span>';
-}
-
-// Route edit to the correct form depending on the DN direction
-function dnEditUrl(row) {
-    const base = row.dn_type === 'outbound' ? '<?= getUrl("dn_outbound") ?>' : '<?= getUrl("dn_create") ?>';
-    return base + '?edit=' + row.delivery_id;
-}
-
 function exportExcel() {
     logReportAction('Exported Delivery Notes', 'User downloaded the delivery notes list as CSV');
     window.location.href = `<?= getUrl('api/export_grns.php') ?>?` + $('#filterForm').serialize();
 }
 
-function deleteDN(id) {
-    Swal.fire({
-        title: 'Delete Delivery Note?',
-        text: 'This action cannot be undone.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#dc3545',
-        confirmButtonText: 'Yes, Delete',
-        cancelButtonText: 'Cancel'
-    }).then(r => {
-        if (!r.isConfirmed) return;
-        Swal.fire({ title: 'Deleting...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-        const fd = new FormData();
-        fd.append('delivery_id', id);
-        fetch('<?= getUrl('api/delete_dn.php') ?>', { method: 'POST', body: fd })
-        .then(r => r.json())
-        .then(res => {
-            if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message || 'Delivery note deleted.', confirmButtonColor: '#198754' })
-                    .then(() => dnTable.ajax.reload(null, false));
-            } else {
-                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Failed to delete delivery note.' });
-            }
-        })
-        .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Network error while deleting.' }));
-    });
-}
 function changeStatus(id, newStatus) {
     const cfg = {
         'review':   { title: 'Submit for Review?',  text: 'This DN will be sent for review.',            color: '#0d6efd', btn: 'Yes, Submit' },
@@ -805,7 +490,7 @@ function changeStatus(id, newStatus) {
             $.post('<?= getUrl("api/operations/change_dn_status") ?>', { delivery_id: id, status: newStatus }, function(res) {
                 if (res.success) {
                     Swal.fire({ icon: 'success', title: 'Updated!', text: res.message, confirmButtonColor: '#198754' })
-                        .then(() => dnTable.ajax.reload(null, false));
+                        .then(() => BMSDnTable.reload("dnTable"));
                 } else {
                     Swal.fire({ icon: 'error', title: 'Error', text: res.message });
                 }

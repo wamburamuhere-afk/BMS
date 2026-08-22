@@ -47,6 +47,14 @@ $suppliers       = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers
 $employees       = $pdo->query("SELECT employee_id, first_name, last_name FROM employees WHERE status = 'active' ORDER BY first_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $sub_contractors = $pdo->query("SELECT supplier_id, supplier_name FROM sub_contractors WHERE status = 'active' ORDER BY supplier_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
+// ?paid_to_type=&paid_to_id=[&add=1] — arriving from a payee's Expenses tab
+// (supplier / sub-contractor / staff). Locks the list to that payee and, with
+// add=1, opens the Add modal with the payee pre-selected.
+$exp_payee_type = in_array($_GET['paid_to_type'] ?? '', ['supplier', 'sub_contractor', 'staff'], true)
+    ? $_GET['paid_to_type'] : '';
+$exp_payee_id   = intval($_GET['paid_to_id'] ?? 0);
+$exp_open_add   = !empty($_GET['add']);
+
 // Fetch company logo and settings for print
 $c_logo = getSetting('company_logo', '');
 $c_name = getSetting('company_name', 'BMS');
@@ -437,28 +445,40 @@ if (!function_exists('renderExpenseCatRows')) {
         <div class="card-body">
             <div id="form-message" class="mb-3"></div>
             
-            <div class="table-responsive">
-                <table id="expensesTable" class="table table-hover align-middle" style="width:100%">
-                    <thead class="bg-light text-muted small uppercase">
-                        <tr>
-                            <th style="width:70px;">S/NO</th>
-                            <th>Date</th>
-                            <th>Description</th>
-                            <th>Category</th>
-                            <?php if ($enable_projects == '1'): ?>
-                            <th>Project</th>
-                            <?php endif; ?>
-                            <th>Amount</th>
-                            <th>Paid To</th>
-                            <th>Status</th>
-                            <th class="text-end">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="small">
-                        <!-- Data loaded via AJAX -->
-                    </tbody>
-                </table>
-            </div>
+            <?php
+            // Shared Expenses table — same code path as the Expenses tab in
+            // supplier_details. This page's filters (category tree, status,
+            // dates) feed it through filters_js; the stat cards through on_stats.
+            $tbl = [
+                'id'           => 'expensesTable',
+                'card'         => '#mobile-expense-cards',
+                'page_length'  => 25,
+                // Set only when arriving from a payee's Expenses tab
+                'paid_to_type' => $exp_payee_type,
+                'paid_to_id'   => $exp_payee_id,
+                'on_stats'    => 'function (json) {
+                    const recCount = (json.filteredCount != null) ? json.filteredCount : json.recordsTotal;
+                    $("#stat-total-expenses").text(formatCurrency(json.totalExpenses));
+                    $("#stat-month-total").text(formatCurrency(json.monthTotal));
+                    $("#stat-year-total").text(formatCurrency(json.yearTotal));
+                    $("#stat-total-records").text(recCount);
+                    $("#stat-total-records-badge").text(recCount + " records");
+                    setTimeout(resizeTextToFit, 10);
+                }',
+                'filters_js'  => 'function () {
+                    return {
+                        expense_account_id:   $("#categoryFilter").val(),
+                        status:               $("#statusFilter").val(),
+                        date_from:            $("#dateFromFilter").val(),
+                        date_to:              $("#dateToFilter").val(),
+                        filter_type_id:       window.expFilterType || 0,
+                        filter_category_id:   window.expFilterCat || 0,
+                        filter_uncategorised: window.expFilterUncat ? 1 : 0
+                    };
+                }',
+            ];
+            include ROOT_DIR . '/includes/tables/expenses_table.php';
+            ?>
         </div>
     </div>
     </div><!-- /col-lg-9 -->
@@ -628,217 +648,32 @@ $(document).ready(function() {
     }
     initSelect2();
 
-    // Custom mobile card renderer
-    function renderMobileCards(api) {
-        if ($(window).width() > 768) {
-            $('#mobile-expense-cards').hide();
-            $('#expensesTable_wrapper').show();
-            return;
-        }
-        $('#expensesTable_wrapper').hide();
-        const container = $('#mobile-expense-cards').empty().show();
-        api.rows({ page: 'current' }).every(function() {
-            const d = this.data();
-            const date = d.expense_date ? new Date(d.expense_date.includes('T') ? d.expense_date : d.expense_date + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '-';
-            const amount = typeof formatCurrency === 'function' ? formatCurrency(d.amount) : d.amount;
-            const statusMap = { pending: 'warning', reviewed: 'primary', approved: 'success', paid: 'info', rejected: 'danger' };
-            const statusBadge = `<span class="badge bg-${statusMap[d.status] || 'secondary'}">${(d.status||'').charAt(0).toUpperCase()+(d.status||'').slice(1)}</span>`;
-            let actions = `<div class="dropdown"><button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button><ul class="dropdown-menu dropdown-menu-end shadow-sm"><li><a class="dropdown-item" href="<?= getUrl('expenses/details') ?>?id=${d.expense_id}"><i class="bi bi-eye text-info"></i> View Details</a></li>`;
-            <?php if (canEdit('expenses')): ?>
-            if (d.status === 'pending' || d.status === 'reviewed') {
-                actions += `<li><a class="dropdown-item" href="#" onclick="editExpense(${d.expense_id})"><i class="bi bi-pencil text-primary"></i> Edit</a></li>`;
-            }
-            if (d.status === 'pending') {
-                actions += `<li><a class="dropdown-item" href="#" onclick="updateStatus(${d.expense_id}, 'reviewed')"><i class="bi bi-search text-info"></i> Review</a></li>`;
-            } else if (d.status === 'reviewed') {
-                actions += `<li><a class="dropdown-item" href="#" onclick="updateStatus(${d.expense_id}, 'approved')"><i class="bi bi-check-circle text-success"></i> Approve</a></li>`;
-                actions += `<li><a class="dropdown-item text-danger" href="#" onclick="updateStatus(${d.expense_id}, 'rejected')"><i class="bi bi-x-circle"></i> Reject</a></li>`;
-            } else if (d.status === 'approved') {
-                actions += `<li><a class="dropdown-item" href="#" onclick="updateStatus(${d.expense_id}, 'paid')"><i class="bi bi-cash text-success"></i> Mark Paid</a></li>`;
-            }
-            <?php endif; ?>
-            <?php if (canDelete('expenses')): ?>
-            actions += `<li><a class="dropdown-item text-danger" href="#" onclick="confirmDelete(${d.expense_id})"><i class="bi bi-trash"></i> Delete</a></li>`;
-            <?php endif; ?>
-            actions += `</ul></div>`;
-            container.append(`
-                <div class="expense-mobile-card mb-2">
-                    <div class="d-flex justify-content-between align-items-start mb-1">
-                        <div>
-                            <strong class="d-block" style="font-size:0.85rem">${escapeHtml(d.description||'-')}</strong>
-                            <small class="text-muted">${date}</small>
-                        </div>
-                        <div class="d-flex align-items-center gap-2">${statusBadge}${actions}</div>
-                    </div>
-                    <div class="d-flex flex-wrap gap-1" style="font-size:0.78rem">
-                        ${d.categories && Array.isArray(d.categories) && d.categories.length > 0
-                            ? d.categories.map(cat => { const p = cat.category_path || cat.category_name || cat.name; const leaf = p.includes(' › ') ? p.split(' › ').pop() : p; return `<span class="small text-dark">${escapeHtml(leaf)}</span>`; }).join(', ')
-                            : (d.category_name ? `<span class="small text-dark">${escapeHtml(d.category_name)}</span>` : '')
-                        }
-                        <span class="text-danger fw-bold">${amount}</span>
-                        ${d.daily_category_total && parseFloat(d.daily_category_total) !== parseFloat(d.amount) ? `<span class="text-muted ms-1" style="font-size:0.7rem">Day: ${typeof formatCurrency==='function'?formatCurrency(d.daily_category_total):d.daily_category_total}</span>` : ''}
-                        ${d.paid_to_name ? `<span class="text-muted"><i class="bi bi-person"></i> ${escapeHtml(d.paid_to_name)}</span>` : ''}
+    // Deep links from a payee's Expenses tab (supplier / sub-contractor / staff).
+    <?php $exp_edit_id = intval($_GET['edit'] ?? 0); ?>
+    const EXP_PAYEE_TYPE = <?= json_encode($exp_payee_type) ?>;
+    const EXP_PAYEE_ID   = <?= (int) $exp_payee_id ?>;
 
-                    </div>
-                </div>
-            `);
+    if (<?= $exp_edit_id ?> > 0) {
+        // The tab has no edit modal of its own, so it hands the record back here.
+        editExpense(<?= $exp_edit_id ?>);
+    } else if (<?= $exp_open_add ? 'true' : 'false' ?>) {
+        // Open the Add modal with the payee already chosen. paid_to_type drives
+        // which payee list loads, so set it first and let its change handler run.
+        $('#addExpenseModal').one('shown.bs.modal', function () {
+            if (EXP_PAYEE_TYPE) {
+                $('#paid_to_type').val(EXP_PAYEE_TYPE).trigger('change');
+                if (EXP_PAYEE_ID > 0) {
+                    $('#paid_to_id_select').val(String(EXP_PAYEE_ID)).trigger('change');
+                }
+            }
         });
+        new bootstrap.Modal(document.getElementById('addExpenseModal')).show();
     }
 
-    const table = $('#expensesTable').DataTable({
-        responsive: false,
-        serverSide: true,
-        processing: true,
-        ajax: {
-            url: '<?= buildUrl('api/get_expenses.php') ?>',
-            data: d => {
-                d.expense_account_id = $('#categoryFilter').val();
-                d.status = $('#statusFilter').val();
-                d.date_from = $('#dateFromFilter').val();
-                d.date_to = $('#dateToFilter').val();
-                // Left-panel Types & Categories tree selection
-                d.filter_type_id = window.expFilterType || 0;
-                d.filter_category_id = window.expFilterCat || 0;
-                d.filter_uncategorised = window.expFilterUncat ? 1 : 0;
-            },
-            dataSrc: json => {
-                // All summary cards reflect the active filter (Type/Category/etc.);
-                // with no filter selected they show the totals for all expenses.
-                const recCount = (json.filteredCount != null) ? json.filteredCount : json.recordsTotal;
-                $('#stat-total-expenses').text(formatCurrency(json.totalExpenses));
-                $('#stat-month-total').text(formatCurrency(json.monthTotal));
-                $('#stat-year-total').text(formatCurrency(json.yearTotal));
-                $('#stat-total-records').text(recCount);
-                $('#stat-total-records-badge').text(recCount + ' records');
-                setTimeout(resizeTextToFit, 10);
-                return json.data;
-            }
-        },
-        columns: [
-            {
-                data: null,
-                orderable: false,
-                searchable: false,
-                width: '50px',
-                className: 'text-center text-muted small fw-bold',
-                render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1
-            },
-            { 
-                data: 'expense_date',
-                width: '110px',
-                render: data => `${new Date(data.includes('T') ? data : data + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}`
-            },
-            {
-                data: 'description',
-                width: '20%',
-                render: (data, t, row) => {
-                    return `<div><strong>${escapeHtml(data)}</strong>${row.notes ? `<br><small class="text-muted text-truncate d-inline-block" style="max-width:200px">${escapeHtml(row.notes)}</small>` : ''}</div>`;
-                }
-            },
-            {
-                data: 'categories',
-                width: '15%',
-                orderable: false,
-                render: (data, t, row) => {
-                    if (data && Array.isArray(data) && data.length > 0) {
-                        return data.map(cat => {
-                            const path = cat.category_path || cat.category_name || cat.name;
-                            const leaf = path.includes(' › ') ? path.split(' › ').pop() : path;
-                            return `<span class="small text-dark">${escapeHtml(leaf)}</span>`;
-                        }).join('<br>');
-                    }
-                    if (row.category_name) {
-                        return `<span class="small text-dark">${escapeHtml(row.category_name)}</span>`;
-                    }
-                    return '<span class="text-muted small">—</span>';
-                }
-            },
-            <?php if ($enable_projects == '1'): ?>
-            {
-                data: 'project_name',
-                width: '12%',
-                render: data => data ? `<span class="small text-dark">${escapeHtml(data)}</span>` : '<span class="text-muted small">—</span>'
-            },
-            <?php endif; ?>
-            {
-                data: 'amount',
-                width: '110px',
-                render: (data, t, row) => {
-                    let html = `<strong class="text-danger">${formatCurrency(data)}</strong>`;
-                    if (row.daily_category_total && parseFloat(row.daily_category_total) !== parseFloat(data)) {
-                        html += `<br><small class="text-muted" style="font-size:0.65rem" title="Daily total for this category">Day: ${formatCurrency(row.daily_category_total)}</small>`;
-                    }
-                    return html;
-                }
-            },
-            { 
-                data: 'paid_to_name',
-                width: '12%',
-                render: (data, t, row) => {
-                    if (row.paid_to_type === 'supplier') {
-                        return `<div><span class="badge bg-primary-soft text-primary border border-primary small mb-1">Supplier</span><br><strong>${escapeHtml(data || row.vendor || 'N/A')}</strong></div>`;
-                    } else if (row.paid_to_type === 'staff') {
-                        return `<div><span class="badge bg-info-soft text-info border border-info small mb-1">Staff</span><br><strong>${escapeHtml(data || row.vendor || 'N/A')}</strong></div>`;
-                    }
-                    return `<strong>${escapeHtml(data || row.vendor || 'N/A')}</strong>`;
-                }
-            },
 
-            { 
-                data: 'status',
-                width: '80px',
-                render: data => {
-                    if (!data) return '<span class="badge bg-secondary">Unknown</span>';
-                    const label = data.charAt(0).toUpperCase() + data.slice(1);
-                    return `<span class="badge bg-${getStatusBadgeClass(data)}">${label}</span>`;
-                }
-            },
-            {
-                data: null,
-                width: '50px',
-                orderable: false,
-                className: 'text-end',
-                render: (data, t, row) => {
-                    let html = `<div class="dropdown action-dropdown">
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-gear"></i>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                            <li><a class="dropdown-item" href="<?= getUrl('expenses/details') ?>?id=${row.expense_id}"><i class="bi bi-eye text-info"></i> View Details</a></li>
-                            <li><a class="dropdown-item" href="#" onclick="printVoucher(${row.expense_id})"><i class="bi bi-printer text-secondary"></i> Print Voucher</a></li>`;
-                    
-                    if (userPermissions.canEdit && (row.status === 'pending' || row.status === 'reviewed')) {
-                        html += `<li><hr class="dropdown-divider opacity-50"></li>
-                                 <li><a class="dropdown-item" href="#" onclick="editExpense(${row.expense_id})"><i class="bi bi-pencil text-primary"></i> Edit Expense</a></li>`;
-                    }
-                    
-                    if (userPermissions.canEdit) {
-                        if (row.status === 'pending') {
-                            html += `<li><a class="dropdown-item" href="#" onclick="updateStatus(${row.expense_id}, 'reviewed')"><i class="bi bi-search text-info"></i> Mark as Reviewed</a></li>`;
-                        } else if (row.status === 'reviewed') {
-                            html += `<li><a class="dropdown-item" href="#" onclick="updateStatus(${row.expense_id}, 'approved')"><i class="bi bi-check-circle text-success"></i> Approve</a></li>`;
-                            html += `<li><a class="dropdown-item" href="#" onclick="updateStatus(${row.expense_id}, 'rejected')"><i class="bi bi-x-circle text-danger"></i> Reject</a></li>`;
-                        } else if (row.status === 'approved') {
-                            html += `<li><a class="dropdown-item" href="#" onclick="updateStatus(${row.expense_id}, 'paid')"><i class="bi bi-cash text-success"></i> Mark as Paid</a></li>`;
-                        }
-                    }
-                    
-                    if (userPermissions.canDelete) {
-                        html += `<li><hr class="dropdown-divider opacity-50"></li>
-                                 <li><a class="dropdown-item text-danger" href="#" onclick="confirmDelete(${row.expense_id})"><i class="bi bi-trash"></i> Delete</a></li>`;
-                    }
-                    
-                    html += `</ul></div>`;
-                    return html;
-                }
-            }
-        ],
-        dom: 'rtipB',
-        pageLength: 25,
-        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
-        drawCallback: function() {
-            renderMobileCards(this.api());
-        },
+    // Export / print buttons stay on this page — they carry its company header
+    // and the printed-by line. Attached to the shared table after init.
+    new $.fn.dataTable.Buttons(BMSExpensesTable.dt('expensesTable'), {
         buttons: [
             {
                 extend: 'copy',
@@ -1036,7 +871,7 @@ $(document).ready(function() {
                         timer: 3000
                     }).then(() => {
                         closeAddExpenseModal();
-                        table.ajax.reload();
+                        BMSExpensesTable.reload('expensesTable');
                     });
                 } else {
                     Swal.fire('Error', response.message, 'error');
@@ -1638,245 +1473,8 @@ function editExpense(id) {
     });
 }
 
-function printVoucher(id) {
-    logReportAction('Print Voucher', 'User printed payment voucher for expense #' + id);
 
-    $.get('/api/get_expense.php', { id: id }, function(response) {
-        if (!response.success) { Swal.fire('Error', response.message || 'Could not load expense', 'error'); return; }
-        const d = response.data;
 
-        // ── Amount in words helper ──────────────────────────────────────
-        function numToWords(n) {
-            const a = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
-                       'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen',
-                       'Seventeen','Eighteen','Nineteen'];
-            const b = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
-            n = Math.floor(parseFloat(n) || 0);
-            if (n === 0) return 'Zero';
-            if (n < 20)  return a[n];
-            if (n < 100) return b[Math.floor(n/10)] + (n%10 ? ' ' + a[n%10] : '');
-            if (n < 1000) return a[Math.floor(n/100)] + ' Hundred' + (n%100 ? ' ' + numToWords(n%100) : '');
-            if (n < 1000000) return numToWords(Math.floor(n/1000)) + ' Thousand' + (n%1000 ? ' ' + numToWords(n%1000) : '');
-            return numToWords(Math.floor(n/1000000)) + ' Million' + (n%1000000 ? ' ' + numToWords(n%1000000) : '');
-        }
-
-        const amount   = parseFloat(d.amount) || 0;
-        const amtWords = numToWords(amount) + ' Only';
-        const fmtAmt   = amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        const voucherNo = 'PV-' + String(d.expense_id).padStart(5, '0');
-        const date = d.expense_date ? new Date(d.expense_date.includes('T') ? d.expense_date : d.expense_date + 'T00:00:00').toLocaleDateString('en-US', { day:'2-digit', month:'long', year:'numeric' }) : '-';
-        const paidTo = d.paid_to_name || d.vendor || '-';
-        const printedBy = '<?= htmlspecialchars(($_SESSION["first_name"] ?? "") . " " . ($_SESSION["last_name"] ?? "")) ?>';
-        const printedRole = '<?= htmlspecialchars($_SESSION["user_role"] ?? "User") ?>';
-        const now = new Date();
-        const printDate = now.getDate().toString().padStart(2,'0') + ' ' +
-            ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][now.getMonth()] +
-            ' ' + now.getFullYear() + ' at ' +
-            now.getHours().toString().padStart(2,'0') + ':' +
-            now.getMinutes().toString().padStart(2,'0') + ':' +
-            now.getSeconds().toString().padStart(2,'0');
-
-        const logoHtml = '<?= $_pv_logo_js ?>';
-        const cName    = '<?= addslashes(htmlspecialchars($c_name)) ?>';
-
-        // ── Build Voucher HTML ──────────────────────────────────────────
-        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-        <title>Payment Voucher - ${voucherNo}</title>
-        <style>
-            * { margin:0; padding:0; box-sizing:border-box; }
-            body { font-family: Arial, sans-serif; font-size: 10pt; color: #222; background:#fff; padding:15mm 15mm 20mm 15mm; }
-
-            /* Header */
-            .pv-header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #0d6efd; padding-bottom:10px; margin-bottom:14px; }
-            .pv-logo-area { display:flex; flex-direction:column; gap:4px; }
-            .pv-company  { font-size:16pt; font-weight:800; color:#0d6efd; text-transform:uppercase; }
-            .pv-title-area { text-align:right; }
-            .pv-title    { font-size:14pt; font-weight:800; text-transform:uppercase; color:#333; letter-spacing:2px; }
-            .pv-voucher-no { font-size:9pt; color:#666; margin-top:4px; }
-            .pv-date     { font-size:9pt; color:#333; font-weight:600; margin-top:2px; }
-
-            /* Amount box */
-            .pv-amount-box { background:#f0f7ff; border:2px solid #0d6efd; border-radius:6px; padding:10px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; }
-            .pv-amount-label { font-size:8pt; text-transform:uppercase; color:#555; }
-            .pv-amount-value { font-size:20pt; font-weight:900; color:#0d6efd; }
-            .pv-amount-words { font-size:8.5pt; color:#333; font-style:italic; text-align:right; }
-
-            /* Details table */
-            .pv-table { width:100%; border-collapse:collapse; margin-bottom:14px; }
-            .pv-table tr { border-bottom:1px solid #eee; }
-            .pv-table td { padding:6px 8px; vertical-align:top; font-size:9.5pt; }
-            .pv-table td:first-child { width:35%; font-weight:700; color:#555; text-transform:uppercase; font-size:8.5pt; }
-            .pv-table td:last-child  { color:#222; }
-
-            /* Status badge */
-            .pv-status { display:inline-block; padding:2px 10px; border-radius:20px; font-size:8pt; font-weight:700; text-transform:uppercase; }
-            .pv-status-pending  { background:#fff3cd; color:#856404; border:1px solid #ffc107; }
-            .pv-status-approved { background:#d1e7dd; color:#0f5132; border:1px solid #198754; }
-            .pv-status-paid     { background:#cfe2ff; color:#084298; border:1px solid #0d6efd; }
-            .pv-status-rejected { background:#f8d7da; color:#842029; border:1px solid #dc3545; }
-
-            /* Signature section */
-            .pv-signatures { display:flex; justify-content:space-between; margin-top:24px; gap:20px; }
-            .pv-sig-block  { flex:1; text-align:center; }
-            .pv-sig-line   { border-top:1px solid #333; margin-bottom:4px; margin-top:30px; }
-            .pv-sig-label  { font-size:8pt; text-transform:uppercase; color:#555; font-weight:700; }
-            .pv-sig-name   { font-size:8pt; color:#333; margin-top:2px; }
-
-            /* Footer */
-            .pv-footer { position:fixed; bottom:0; left:0; right:0; padding:3mm 15mm; border-top:1px solid #ccc; background:#fff; text-align:center; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-            .pv-footer p { font-size:7pt; margin:0; line-height:1.4; }
-            .pv-footer .pv-powered { color:#0d6efd; font-weight:700; }
-            .pv-spacer { height:15mm; }
-
-            /* Note box */
-            .pv-note { background:#fffbee; border-left:3px solid #ffc107; padding:6px 10px; font-size:8.5pt; color:#555; margin-bottom:14px; border-radius:0 4px 4px 0; }
-
-            @media print {
-                body { padding:10mm 12mm 18mm 12mm; }
-                .pv-footer { position:fixed; bottom:0; }
-            }
-        </style></head><body>
-
-        <!-- HEADER -->
-        <div class="pv-header">
-            <div class="pv-logo-area">
-                ${logoHtml}
-                <span class="pv-company">${cName}</span>
-            </div>
-            <div class="pv-title-area">
-                <div class="pv-title">Payment Voucher</div>
-                <div class="pv-voucher-no">Voucher No: <strong>${voucherNo}</strong></div>
-                <div class="pv-date">Date: <strong>${date}</strong></div>
-            </div>
-        </div>
-
-        <!-- AMOUNT BOX -->
-        <div class="pv-amount-box">
-            <div>
-                <div class="pv-amount-label">Amount Paid</div>
-                <div class="pv-amount-value">${fmtAmt}</div>
-            </div>
-            <div class="pv-amount-words">
-                <div style="font-size:7.5pt; color:#888; margin-bottom:2px;">In Words:</div>
-                <strong>${amtWords}</strong>
-            </div>
-        </div>
-
-        <!-- DETAILS TABLE -->
-        <table class="pv-table">
-            <tr><td>Paid To</td><td><strong>${d.paid_to_name || d.vendor || '-'}</strong>${d.paid_to_type ? ' <span style="font-size:8pt;color:#888;">('+d.paid_to_type+')</span>' : ''}</td></tr>
-            <tr><td>Description</td><td>${d.description || '-'}</td></tr>
-            <tr><td>Expense Account</td><td>${d.expense_account_name ? ((d.expense_account_code ? d.expense_account_code + ' — ' : '') + d.expense_account_name) : '-'}</td></tr>
-            <tr><td>Paid From (Bank)</td><td>${d.bank_account_name ? ((d.bank_account_code ? d.bank_account_code + ' — ' : '') + d.bank_account_name) : '-'}</td></tr>
-            <tr><td>Reference No.</td><td>${d.reference_number || '-'}</td></tr>
-            ${d.notes ? `<tr><td>Notes</td><td>${d.notes}</td></tr>` : ''}
-            <tr><td>Status</td><td><span class="pv-status pv-status-${d.status||'pending'}">${(d.status||'pending').charAt(0).toUpperCase()+(d.status||'pending').slice(1)}</span></td></tr>
-            <tr><td>Prepared By</td><td>${d.created_by_name || '-'}</td></tr>
-        </table>
-
-        <!-- NOTE -->
-        <div class="pv-note">
-            <strong>Note:</strong> This is a computer-generated payment voucher. Please verify all details before processing payment.
-        </div>
-
-        <!-- SIGNATURES -->
-        <div class="pv-signatures">
-            <div class="pv-sig-block">
-                <div class="pv-sig-line"></div>
-                <div class="pv-sig-label">Prepared By</div>
-                <div class="pv-sig-name">${d.created_by_name || ''}</div>
-            </div>
-            <div class="pv-sig-block">
-                <div class="pv-sig-line"></div>
-                <div class="pv-sig-label">Approved By</div>
-                <div class="pv-sig-name">&nbsp;</div>
-            </div>
-            <div class="pv-sig-block">
-                <div class="pv-sig-line"></div>
-                <div class="pv-sig-label">Received By</div>
-                <div class="pv-sig-name">${paidTo}</div>
-            </div>
-        </div>
-
-        <!-- BUFFER -->
-        <div class="pv-spacer"></div>
-
-        <!-- FOOTER -->
-        <div class="pv-footer">
-            <p>This document was <strong>Printed</strong> by <strong>${printedBy} - ${printedRole}</strong> on ${printDate}</p>
-            <p class="pv-powered">Powered by BJP Technologies &copy; ${now.getFullYear()}, All Rights Reserved.</p>
-        </div>
-
-        <script>window.onload = function() { window.print(); };<\/script>
-        </body></html>`;
-
-        const win = window.open('', '_blank', 'width=850,height=650');
-        win.document.write(html);
-        win.document.close();
-
-    }, 'json');
-}
-
-function updateStatus(id, status) {
-    Swal.fire({
-        title: 'Update Status?',
-        text: `Are you sure you want to mark this as ${status}?`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Yes, Proceed'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            $.post('/api/update_expense_status.php', { expense_id: id, status: status }, response => {
-                if (response.success) {
-                    logReportAction('Updated Expense Status', 'User updated status of expense record #' + id + ' to ' + status);
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Updated!',
-                        text: response.message,
-                        confirmButtonColor: '#28a745',
-                        confirmButtonText: 'OK',
-                        timer: 3000
-                    }).then(() => {
-                        $('#expensesTable').DataTable().ajax.reload();
-                    });
-                } else {
-                    Swal.fire('Error', response.message, 'error');
-                }
-            });
-        }
-    });
-}
-
-function confirmDelete(id) {
-    Swal.fire({
-        title: 'Delete Expense?',
-        text: 'Permanently delete this expense? This action cannot be undone.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        confirmButtonText: 'Yes, Delete'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            $.post('/api/delete_expense.php', { expense_id: id }, response => {
-                if (response.success) {
-                    logReportAction('Deleted Expense Record', 'User deleted expense record #' + id);
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Deleted!',
-                        text: 'Expense record deleted.',
-                        confirmButtonColor: '#28a745',
-                        confirmButtonText: 'OK',
-                        timer: 3000
-                    }).then(() => {
-                        $('#expensesTable').DataTable().ajax.reload();
-                    });
-                } else {
-                    Swal.fire('Error', response.message, 'error');
-                }
-            });
-        }
-    });
-}
 
 function formatCurrency(v) { return parseFloat(v).toLocaleString('en-US', {minimumFractionDigits: 2}); }
 function getStatusBadgeClass(s) {

@@ -633,7 +633,7 @@ function generate_grn_number() {
             
             <div class="d-flex align-items-center bg-white shadow-sm px-3 py-1" style="border: 1px solid #dee2e6; border-radius: 8px;">
                 <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> Show:</span>
-                <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 60px; box-shadow: none; background: transparent;" onchange="grnTable.page.len(this.value).draw();">
+                <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 60px; box-shadow: none; background: transparent;" onchange="BMSGrnTable.dt('grnTable').page.len(this.value).draw();">
                     <option value="10" selected>10</option>
                     <option value="25">25</option>
                     <option value="50">50</option>
@@ -717,28 +717,28 @@ function generate_grn_number() {
         <div class="card-body">
             <div id="form-message" class="mb-3"></div>
             
-                <div class="table-responsive" id="table-view-container">
-                    <table class="table table-striped table-hover align-middle" id="grnTable" style="width:100%">
-                        <thead class="bg-light">
-                            <tr>
-                                <th class="text-center" style="width:50px;">S/NO</th>
-                                <th class="text-center">GRN #</th>
-                                <th class="text-center">Date</th>
-                                <th class="text-center">Supplier</th>
-                                <th class="text-center">PO #</th>
-                                <?php if ($enable_projects): ?><th class="text-center">Project</th><?php endif; ?>
-                                <th class="text-center">Warehouse</th>
-                                <th class="text-center">Items</th>
-                                <th class="text-center">Total Value</th>
-                                <th class="text-center">Received By</th>
-                                <th class="text-center">Status</th>
-                                <th class="text-center d-print-none">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Loaded via AJAX -->
-                        </tbody>
-                    </table>
+                <div id="table-view-container">
+                    <?php
+                    // Shared GRN table — same code path as the GRN tab in supplier_details.
+                    $tbl = [
+                        'id'          => 'grnTable',
+                        'card'        => '#card-view-container',
+                        'on_stats'    => 'updateStats',
+                        'page_length' => 10,
+                        'filters_js'  => 'function () {
+                            return {
+                                status:    $(\'select[name="status"]\').val(),
+                                supplier:  $(\'select[name="supplier"]\').val(),
+                                warehouse: $(\'select[name="warehouse"]\').val(),
+                                po:        $(\'select[name="po"]\').val(),
+                                project:   $(\'select[name="project"]\').val(),
+                                date_from: $(\'input[name="date_from"]\').val(),
+                                date_to:   $(\'input[name="date_to"]\').val()
+                            };
+                        }',
+                    ];
+                    include ROOT_DIR . '/includes/tables/grn_table.php';
+                    ?>
                 </div>
 
                 <!-- Card View Container (Initially Hidden) -->
@@ -752,10 +752,6 @@ function generate_grn_number() {
 
 
 
-<script>
-    // Define API URL dynamically or absolute
-    const API_URL = "<?= getUrl('api/get_grns.php') ?>";
-</script>
 
 <!-- Include necessary scripts -->
 <!--script src="https://code.jquery.com/jquery-3.6.0.min.js"></script-->
@@ -770,46 +766,10 @@ function generate_grn_number() {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <script>
-// JavaScript helper function for building URLs
-function buildUrl(path) {
-    return path;
-}
-
-// Format currency function
-function formatCurrency(amount, currency = 'TZS') {
-    const num = parseFloat(amount) || 0;
-    return currency + ' ' + num.toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    });
-}
-
-function formatDate(dateString) {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric'
-    });
-}
-
-let grnTable;
-const canCreate = <?= json_encode($can_create_grn) ?>;
-const canApprove = <?= json_encode($can_approve_grn) ?>;
-const canDelete = <?= json_encode($can_delete_grn) ?>;
-
-// Three-approval capability flags (mirrored from PHP)
-const GRN_CAN_REVIEW  = <?= $grn_can_review  ? 'true' : 'false' ?>;
-const GRN_CAN_APPROVE = <?= $grn_can_approve ? 'true' : 'false' ?>;
-const GRN_IS_ADMIN    = <?= $grn_is_admin    ? 'true' : 'false' ?>;
-
-// Define safe_output equivalent in JS
-function safeOutput(str) {
-    if (str === 0 || str === '0') return '0';
-    if (!str) return '';
-    return $('<div>').text(str).html();
-}
+// Table rendering, the action dropdown, workflow transitions, print and delete
+// all live in assets/js/tables/bms-grn-table.js, wired up by
+// includes/tables/grn_table.php — the same code the GRN tab in supplier_details
+// uses. Only this page's own chrome (filters, view toggle, stats, export) is here.
 
     // View Mode Toggle Logic
     function toggleViewMode(mode) {
@@ -837,77 +797,6 @@ function safeOutput(str) {
         }
     }
 
-    function renderCards(data) {
-        const container = $('#card-view-container');
-        container.empty();
-        
-        if (data.length === 0) {
-            container.html('<div class="col-12 text-center py-5 text-muted"><i class="bi bi-inbox fs-1 d-block mb-2"></i> No records found</div>');
-            return;
-        }
-        
-        data.each(function(row) {
-            const statusClass = getStatusBadge(row.status);
-            const cardHtml = `
-                <div class="col-md-6 col-lg-4">
-                    <div class="card h-100 shadow-sm border-0 hover-shadow transition-all" style="border-radius: 12px; border: 1px solid #eef2f6 !important;">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <div>
-                                    <code class="small d-block mb-1">${safeOutput(row.receipt_number)}</code>
-                                    <h6 class="fw-bold mb-0">${safeOutput(row.supplier_name)}</h6>
-                                    <small class="text-muted">${safeOutput(row.company_name || '')}</small>
-                                </div>
-                                <span class="badge bg-${statusClass} small" style="font-size: 0.65rem;">${row.status.toUpperCase()}</span>
-                            </div>
-                            
-                            <div class="row g-2 mb-3">
-                                <div class="col-6">
-                                    <small class="text-muted d-block small">Date</small>
-                                    <span class="small fw-medium text-dark">${formatDate(row.receipt_date)}</span>
-                                </div>
-                                <div class="col-6">
-                                    <small class="text-muted d-block small">Total Value</small>
-                                    <span class="small fw-bold text-dark">${formatCurrency(row.total_value)}</span>
-                                </div>
-                                <div class="col-6">
-                                    <small class="text-muted d-block small">Warehouse</small>
-                                    <span class="small text-dark text-truncate d-block" title="${safeOutput(row.warehouse_name)}">${safeOutput(row.warehouse_name)}</span>
-                                </div>
-                                <div class="col-6">
-                                    <small class="text-muted d-block small">Items</small>
-                                    <span class="small text-dark">${row.total_items} items</span>
-                                </div>
-                                <?php if ($enable_projects): ?>
-                                <div class="col-12 mt-2">
-                                    <small class="text-muted d-block small">Project</small>
-                                    <span class="badge bg-info-soft text-info border border-info small p-1 text-wrap d-inline-block" style="max-width: 100%;">${safeOutput(row.project_name || 'N/A')}</span>
-                                </div>
-                                <?php endif; ?>
-                            </div>
-                            
-                            <div class="border-top mt-2 pt-1">
-                                <div class="small text-muted mb-1"><i class="bi bi-person me-1"></i> ${safeOutput(row.received_by_name)}</div>
-                                <div style="display:flex; flex-wrap:nowrap; gap:4px;">
-                                    <a href="<?= getUrl('grn_view') ?>?id=${row.receipt_id}" class="btn btn-outline-primary" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" title="View">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    <a href="<?= getUrl('grn_edit') ?>?id=${row.receipt_id}" class="btn btn-outline-secondary" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" title="Edit">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <button type="button" class="btn btn-outline-danger" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" onclick="confirmDeleteGRN(${row.receipt_id})" title="Delete">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            container.append(cardHtml);
-        });
-    }
-
     $(document).ready(function() {
         // Select2 on DB-backed filter selects
         $('#grn_filter_supplier').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'All Suppliers' });
@@ -927,458 +816,30 @@ function safeOutput(str) {
         // Log page view
         logReportAction('Viewed GRNs List', 'User viewed the goods received notes management list');
 
-
-    // Load initial stats
-    updateStatsFromPHP();
-
-    // Initialize DataTable
-    initTable();
-
     // Bind Filter Form
     $('#filterForm').on('submit', function(e) { // Make sure form has id="filterForm"
         e.preventDefault();
         loadGRNs();
     });
-    
-    // Also bind individual inputs for auto-search on change if desired, 
+
+    // Also bind individual inputs for auto-search on change if desired,
     // but the users usually expect "Apply Filters" button to work.
     // We can keep the button execution model.
 });
 
-function updateStatsFromPHP() {
-    // Initial stats from PHP variables if needed, but we will rely on AJAX updates mostly.
-    // Since we removed PHP loop, $total_grns etc might still be valid from initial page load if query was kept at top.
-    // However, to be fully AJAX, let's update stats via the API response.
-    // For the very first load, the top cards might be empty or show PHP values. 
-    // To ensure consistency, we will let the first AJAX draw update them.
-    // The PHP variables at TOP of file ($total_grns etc) calculate based on initial load.
-    // If we want to keep using PHP for first paint, we can. 
-    // But since we are moving to AJAX, the top query in grn.php should essentially be removed or minimized 
-    // to just getting filter options (suppliers, warehouses).
-}
-
-function initTable() {
-    grnTable = $('#grnTable').DataTable({
-        processing: true,
-        serverSide: true,
-        responsive: false, 
-        autoWidth: false, 
-        drawCallback: function(settings) {
-            renderCards(this.api().rows({page:'current'}).data());
-        },
-        columnDefs: [
-            { className: 'text-center', targets: '_all' }
-        ],
-        pageLength: 10,
-        order: [[2, 'desc']], 
-        ajax: {
-            url: API_URL,
-            data: function(d) {
-                return $.extend({}, d, {
-                    status: $('select[name="status"]').val(),
-                    supplier: $('select[name="supplier"]').val(),
-                    warehouse: $('select[name="warehouse"]').val(),
-                    po: $('select[name="po"]').val(),
-                    project: $('select[name="project"]').val(),
-                    date_from: $('input[name="date_from"]').val(),
-                    date_to: $('input[name="date_to"]').val()
-                });
-            },
-            dataSrc: function(json) {
-                if (json.success) {
-                    if (json.stats) {
-                        updateStats(json.stats);
-                    }
-                    return json.data;
-                } else {
-                    console.error("API Error: ", json.message);
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Data Load Error',
-                        text: 'API Error: ' + (json.message || 'Unknown error')
-                    });
-                    return [];
-                }
-            },
-            error: function(xhr, error, thrown) {
-                console.error("DataTables AJAX error:", error);
-                console.error("Response:", xhr.responseText);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Connection Error',
-                    text: 'Failed to load data. Status: ' + xhr.status + ' ' + xhr.statusText
-                });
-            }
-        },
-        columns: [
-            {
-                data: null,
-                orderable: false,
-                searchable: false,
-                width: '50px',
-                className: 'ps-4 text-center text-muted small fw-bold',
-                render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1
-            },
-            { 
-                data: 'receipt_number',
-                render: function(data, type, row) {
-                    let html = `<code class="small text-wrap-cell">${safeOutput(data)}</code>`;
-                    if (row.notes) {
-                        html += `<small class="text-muted d-block text-wrap-cell" title="${safeOutput(row.notes)}">${safeOutput(row.notes)}</small>`;
-                    }
-                    return html;
-                }
-            },
-            { 
-                data: 'receipt_date',
-                render: function(data) { return `<span class="text-wrap-cell">${formatDate(data)}</span>`; }
-            },
-            { 
-                data: 'supplier_name',
-                render: function(data, type, row) {
-                    let html = `<div class="text-wrap-cell fw-bold" title="${safeOutput(data)}">${safeOutput(data)}</div>`;
-                    if (row.company_name) {
-                        html += `<div class="text-wrap-cell text-muted small" title="${safeOutput(row.company_name)}">${safeOutput(row.company_name)}</div>`;
-                    }
-                    return html;
-                }
-            },
-            { 
-                data: 'order_number',
-                width: '100px',
-                render: function(data, type, row) {
-                    if (data) {
-                        return `<a href="<?= getUrl('purchase_order_view') ?>?id=${row.purchase_order_id}" class="text-decoration-none small">${safeOutput(data)}</a>`;
-                    }
-                    return '<span class="text-muted small">N/A</span>';
-                }
-            },
-            <?php if ($enable_projects): ?>
-            {
-                data: 'project_name',
-                render: function(data) {
-                    return data ? `<div class="text-wrap-cell"><span class="badge bg-info-soft text-info border border-info small p-1 text-wrap w-100 grn-project-badge" style="white-space: normal; word-break: break-word;">${safeOutput(data)}</span></div>` : '<span class="text-muted small">N/A</span>';
-                }
-            },
-            <?php endif; ?>
-            { 
-                data: 'warehouse_name',
-                render: function(data) { return `<div class="text-truncate small" style="max-width: 100px;" title="${safeOutput(data)}">${safeOutput(data)}</div>`; }
-            },
-            { 
-                data: 'total_items',
-                width: '80px',
-                render: function(data, type, row) {
-                    return `<span class="badge bg-secondary p-1">${data}</span> <small>items</small>`;
-                }
-            },
-            { 
-                data: 'total_value',
-                width: '110px',
-                render: function(data) {
-                    return `<strong class="small">${formatCurrency(data)}</strong>`;
-                }
-            },
-            { 
-                data: 'received_by_name',
-                width: '100px',
-                render: function(data) { return `<div class="text-truncate small" style="max-width: 80px;" title="${safeOutput(data)}">${safeOutput(data)}</div>`; }
-            },
-            {
-                data: 'status',
-                className: 'text-center',
-                width: '90px',
-                render: function(data) {
-                    const badgeClass = getStatusBadge(data);
-                    return `<span class="badge bg-${badgeClass} small grn-status-badge" style="font-size: 0.7rem; padding: 4px 8px;">${data.toUpperCase()}</span>`;
-                }
-            },
-            {
-                data: null,
-                orderable: false,
-                className: 'd-print-none',
-                render: function(data, type, row) {
-                    let actions = `
-                        <div class="dropdown">
-                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-gear"></i>
-                            </button>
-                            <ul class="dropdown-menu">
-                                <li>
-                                    <a class="dropdown-item" href="<?= getUrl('grn_view') ?>?id=${row.receipt_id}" onclick="logReportAction('Viewed GRN Details', 'User viewed details for GRN #' + row.receipt_number)">
-                                        <i class="bi bi-eye"></i> View GRN
-                                    </a>
-                                </li>
-                    `;
-                    
-                    const isPending  = (row.status === 'pending');
-                    const isReviewed = (row.status === 'reviewed');
-                    const isApproved = (row.status === 'approved');
-                    const inWorkflow = (isPending || isReviewed);
-                    const canEditNow = (inWorkflow || GRN_IS_ADMIN);
-
-                    if (canEditNow) {
-                        actions += `
-                            <li>
-                                <a class="dropdown-item text-primary" href="<?= getUrl('grn_edit') ?>?id=${row.receipt_id}" onclick="logReportAction('Initiated GRN Edit', 'User clicked edit for GRN #' + row.receipt_number)">
-                                    <i class="bi bi-pencil"></i> Edit GRN
-                                </a>
-                            </li>
-                        `;
-                    }
-
-                    // Parallel Review + Approve (one active, one disabled)
-                    if (inWorkflow && GRN_CAN_REVIEW) {
-                        if (isPending) {
-                            actions += `<li><a class="dropdown-item text-primary fw-bold" href="#" onclick="markReviewedGRN(${row.receipt_id})"><i class="bi bi-check2"></i> Mark Reviewed</a></li>`;
-                        } else {
-                            actions += `<li><a class="dropdown-item text-muted disabled" href="#" tabindex="-1" aria-disabled="true" title="Already reviewed"><i class="bi bi-check2"></i> Mark Reviewed</a></li>`;
-                        }
-                    }
-                    if (inWorkflow && GRN_CAN_APPROVE) {
-                        if (isReviewed) {
-                            actions += `<li><a class="dropdown-item text-success fw-bold" href="#" onclick="approveGRN(${row.receipt_id})"><i class="bi bi-check-circle"></i> Approve GRN</a></li>`;
-                        } else {
-                            actions += `<li><a class="dropdown-item text-muted disabled" href="#" tabindex="-1" aria-disabled="true" title="Must be reviewed before approval"><i class="bi bi-check-circle"></i> Approve GRN</a></li>`;
-                        }
-                    }
-
-                    if (canEditNow) {
-                        actions += `
-                            <li>
-                                <a class="dropdown-item text-warning" href="#" onclick="updateGRNStatus(${row.receipt_id}, 'cancelled')">
-                                    <i class="bi bi-x-octagon"></i> Cancel GRN
-                                </a>
-                            </li>
-                        `;
-                    }
-                    
-                    actions += `
-                            <li>
-                                <a class="dropdown-item" href="#" onclick="printGRN(${row.receipt_id})">
-                                    <i class="bi bi-printer"></i> Print GRN
-                                </a>
-                            </li>
-                    `;
-                    
-                    if (canDelete && (isPending || GRN_IS_ADMIN)) {
-                        actions += `<li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item text-danger" href="#" onclick="confirmDeleteGRN(${row.receipt_id})">
-                                    <i class="bi bi-trash"></i> Delete GRN
-                                </a>
-                            </li>
-                        `;
-                    }
-                    
-                    actions += `</ul></div>`;
-                    return actions;
-                }
-            }
-        ],
-        language: {
-            processing: '<div class="spinner-border text-primary" role="status"><span></span></div>',
-            emptyTable: '<div class="text-center my-3"><i class="bi bi-clipboard-check display-4 text-muted"></i><p class="mt-2">No Goods Received Notes Found</p></div>',
-            lengthMenu: "Show _MENU_ entries"
-        },
-        lengthChange: false, // Using custom selector
-        dom: 'rtip' // Hide default length and filter
-    });
-}
-
 function loadGRNs() {
-    grnTable.ajax.reload();
+    BMSGrnTable.reload('grnTable');
 }
 
 function updateStats(stats) {
     if (!stats) return;
-    
-    // Update logic assuming the ID's exist in the DOM
-    // The previous PHP file had generic classes, we need to make sure IDs exist or are targetable.
-    // Let's add IDs to the stats cards in a separate edit or verify they exist.
-    // The sales_orders.php used specific IDs like #stat-total-orders.
-    // grn.php used PHP echo directly. I need to update the HTML to include IDs for these stats.
-    
-    // Safe update based on finding elements by text or position is risky.
-    // Better to update the HTML first to add IDs.
-    // I will do that in the next step. For now, I'll log the stats.
-    console.log("Stats update:", stats);
-    
-    // Attempt to update if IDs are added (I will add them next)
+
     // Safe update for statistics cards
     if ($('#stat-total-grns').length) $('#stat-total-grns').text(stats.total_grns || 0);
     if ($('#stat-draft-grns').length) $('#stat-draft-grns').text(stats.draft_count || 0);
     if ($('#stat-completed-grns').length) $('#stat-completed-grns').text(stats.completed_count || 0);
     if ($('#stat-cancelled-grns').length) $('#stat-cancelled-grns').text(stats.cancelled_count || 0);
-    if ($('#stat-total-value').length) $('#stat-total-value').text(formatCurrency(stats.total_value || 0));
-}
-
-function getStatusBadge(status) {
-    switch (status) {
-        case 'active':
-        case 'approved':
-        case 'completed':
-        case 'success':
-            return 'success';
-        case 'pending':
-        case 'waiting':
-            return 'warning';
-        case 'draft':
-            return 'secondary';
-        case 'cancelled':
-        case 'deleted':
-        case 'void':
-            return 'danger';
-        default:
-            return 'secondary';
-    }
-}
-
-function markReviewedGRN(receiptId) {
-    Swal.fire({
-        title: 'Mark as Reviewed?',
-        text: 'GRN will move to Reviewed and become approvable.',
-        icon: 'question', showCancelButton: true,
-        confirmButtonColor: '#0d6efd', confirmButtonText: 'Yes, mark reviewed'
-    }).then(r => {
-        if (!r.isConfirmed) return;
-        $.post('<?= buildUrl('api/review_grn.php') ?>', { receipt_id: receiptId }, function(res) {
-            if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Reviewed!', text: res.message, timer: 1800, showConfirmButton: false });
-                grnTable.ajax.reload();
-            } else { Swal.fire('Error', res.message, 'error'); }
-        }, 'json');
-    });
-}
-
-function approveGRN(receiptId) {
-    Swal.fire({
-        title: 'Approve GRN?',
-        text: 'Stock will be updated on approval.',
-        icon: 'question', showCancelButton: true,
-        confirmButtonColor: '#198754', confirmButtonText: 'Yes, approve'
-    }).then(r => {
-        if (!r.isConfirmed) return;
-        $.post('<?= buildUrl('api/approve_grn.php') ?>', { receipt_id: receiptId }, function(res) {
-            if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Approved!', text: res.message, timer: 2000, showConfirmButton: false });
-                grnTable.ajax.reload();
-            } else { Swal.fire('Error', res.message, 'error'); }
-        }, 'json');
-    });
-}
-
-function updateGRNStatus(receiptId, status) {
-    const actionMap = {
-        'completed': 'complete',
-        'cancelled': 'cancel'
-    };
-    
-    const action = actionMap[status] || 'update';
-    const actionText = status.charAt(0).toUpperCase() + status.slice(1);
-    const icon = status === 'completed' ? 'success' : 'warning';
-    
-    Swal.fire({
-        title: `Are you sure?`,
-        text: `Do you want to ${action} this GRN?`,
-        icon: icon,
-        showCancelButton: true,
-        confirmButtonText: `Yes, ${actionText}`,
-        cancelButtonText: 'Cancel'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            $.ajax({
-                url: '<?= getUrl("api/update_grn_status.php") ?>',
-                type: 'POST',
-                data: { 
-                    receipt_id: receiptId,
-                    status: status
-                },
-                dataType: 'json',
-                success: function(response) {
-                    if (response.success) {
-                        logReportAction('Updated GRN Status', 'User updated GRN #' + receiptId + ' status to ' + status);
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Success!',
-                            text: response.message,
-                            timer: 1500,
-                            showConfirmButton: false
-                        }).then(() => {
-                            loadGRNs(); // Reload DataTables instead of location.reload()
-                        });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Error',
-                            text: response.message
-                        });
-                    }
-                },
-                error: function(xhr, status, error) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: 'An error occurred. Please try again.'
-                    });
-                }
-            });
-        }
-    });
-}
-
-function confirmDeleteGRN(receiptId) {
-    Swal.fire({
-        title: 'Delete GRN',
-        text: 'Are you sure you want to delete this GRN? This action cannot be undone.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Yes, Delete',
-        confirmButtonColor: '#dc3545',
-        cancelButtonText: 'Cancel'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            $.ajax({
-                url: '<?= getUrl("api/delete_grn.php") ?>',
-                type: 'POST',
-                data: { receipt_id: receiptId },
-                dataType: 'json',
-                success: function(response) {
-                    if (response.success) {
-                        logReportAction('Deleted GRN', 'User deleted GRN ID #' + receiptId);
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Deleted!',
-                            text: response.message,
-                            timer: 1500,
-                            showConfirmButton: false
-                        }).then(() => {
-                            loadGRNs();
-                        });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Error',
-                            text: response.message
-                        });
-                    }
-                },
-                error: function(xhr, status, error) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: 'An error occurred. Please try again.'
-                    });
-                }
-            });
-        }
-    });
-}
-
-function printGRN(receiptId) {
-    logReportAction('Printed GRN', 'User generated a printed GRN for ID #' + receiptId);
-    // Open the dedicated print page in the same window to enable back button
-    window.location.href = `<?= getUrl('grn_print') ?>?id=${receiptId}`;
+    if ($('#stat-total-value').length) $('#stat-total-value').text(BMSTbl.money(stats.total_value || 0));
 }
 
 function exportGRNs() {
@@ -1392,7 +853,7 @@ function exportGRNs() {
         date_from: $('input[name="date_from"]').val(),
         date_to: $('input[name="date_to"]').val()
     });
-    
+
     window.location.href = '<?= getUrl("api/export_grns.php") ?>?' + params.toString();
 }
 

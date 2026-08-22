@@ -153,6 +153,23 @@ if (isAdmin()) {
     }
 }
 
+// Audit trail for the System Info tab.
+// NOTE: audit_logs rows for suppliers are currently written without entity_id,
+// so this comes back empty for most suppliers until logAudit() is passed the
+// supplier id at the write sites. The join is correct; the data is the gap.
+$audit_stmt = $pdo->prepare("
+    SELECT al.action, al.activity_type, al.description, al.created_at,
+           TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) AS user_name,
+           u.username
+    FROM audit_logs al
+    LEFT JOIN users u ON u.user_id = al.user_id
+    WHERE al.entity_type = 'supplier' AND al.entity_id = ?
+    ORDER BY al.id DESC
+    LIMIT 100
+");
+$audit_stmt->execute([$supplier_id]);
+$supplier_audit = $audit_stmt->fetchAll(PDO::FETCH_ASSOC);
+
 // Calculate statistics
 $total_orders = count($purchase_orders);
 $total_spent = array_sum(array_column($purchase_orders, 'total_amount'));
@@ -619,25 +636,74 @@ global $company_name, $company_logo;
     <!-- Section Tab Navigation -->
     <div class="row mb-3">
         <div class="col-12">
-            <ul class="nav nav-pills flex-wrap gap-2 d-print-none" id="supplierSectionTabs" role="tablist">
-                <li class="nav-item" role="presentation">
+            <!-- flex-nowrap + overflow-auto: eleven tabs scroll sideways on a phone
+                 instead of wrapping into three stacked rows. Same as customer details. -->
+            <ul class="nav nav-pills flex-nowrap overflow-auto gap-1 mb-3 pb-1 d-print-none" id="supplierSectionTabs" role="tablist">
+                <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-payments" type="button" role="tab">
                         <i class="bi bi-cash-coin me-1"></i> Recent Payments
                     </button>
                 </li>
-                <li class="nav-item" role="presentation">
+                <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-invoices" type="button" role="tab">
                         <i class="bi bi-receipt me-1"></i> Bills
                     </button>
                 </li>
-                <li class="nav-item" role="presentation">
+                <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-pos" type="button" role="tab">
                         <i class="bi bi-cart me-1"></i> Recent Purchase Orders
                     </button>
                 </li>
-                <li class="nav-item" role="presentation">
+                <?php if (canView('grn')): ?>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-grn" type="button" role="tab">
+                        <i class="bi bi-box-seam me-1"></i> Goods Received
+                    </button>
+                </li>
+                <?php endif; ?>
+                <?php if (hasPermission('purchase_returns')): ?>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-returns" type="button" role="tab">
+                        <i class="bi bi-arrow-return-left me-1"></i> Purchase Returns
+                    </button>
+                </li>
+                <?php endif; ?>
+                <?php if (canView('dn') || canView('grn')): ?>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-dn" type="button" role="tab">
+                        <i class="bi bi-truck me-1"></i> Delivery Notes
+                    </button>
+                </li>
+                <?php endif; ?>
+                <?php if (canView('rfq')): ?>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-rfq" type="button" role="tab">
+                        <i class="bi bi-file-earmark-text me-1"></i> RFQs
+                    </button>
+                </li>
+                <?php endif; ?>
+                <?php if (canView('debit_notes')): ?>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-debitnotes" type="button" role="tab">
+                        <i class="bi bi-receipt-cutoff me-1"></i> Debit Notes
+                    </button>
+                </li>
+                <?php endif; ?>
+                <?php if (canView('expenses')): ?>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-expenses" type="button" role="tab">
+                        <i class="bi bi-wallet2 me-1"></i> Expenses
+                    </button>
+                </li>
+                <?php endif; ?>
+                <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-projects" type="button" role="tab">
                         <i class="bi bi-diagram-3 me-1"></i> Projects Involved
+                    </button>
+                </li>
+                <li class="nav-item flex-shrink-0" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-sysinfo" type="button" role="tab">
+                        <i class="bi bi-clock-history me-1"></i> System Info
                     </button>
                 </li>
             </ul>
@@ -645,6 +711,257 @@ global $company_name, $company_logo;
     </div>
 
     <div class="tab-content" id="supplierSectionTabContent">
+
+        <!-- Goods Received (GRN) — same table code as app/bms/grn/grn.php, locked
+             to this supplier and with the (redundant) Supplier column hidden. -->
+        <?php if (canView('grn')): ?>
+        <div class="tab-pane fade" id="pane-grn" role="tabpanel">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 d-flex align-items-center flex-wrap gap-2">
+                            <h6 class="mb-0 fw-bold text-dark">
+                                <i class="bi bi-box-seam text-primary me-2"></i> Goods Received (GRN)
+                                <span class="badge bg-primary ms-1" id="sup-grn-count">0</span>
+                            </h6>
+                            <div class="d-flex gap-2 ms-auto">
+                                <?php if (canCreate('grn')): ?>
+                                <a href="<?= getUrl('grn_create') ?>?supplier=<?= $supplier_id ?>" class="btn btn-primary btn-sm shadow-sm">
+                                    <i class="bi bi-plus-circle me-1"></i> New GRN
+                                </a>
+                                <?php endif; ?>
+                                <a href="<?= getUrl('grn') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
+                                    View All
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php
+                            $tbl = [
+                                'id'          => 'supGrnTable',
+                                'supplier_id' => (int) $supplier_id,
+                                'hide'        => ['supplier'],
+                                'defer_pane'  => '#pane-grn',
+                                'on_count'    => 'function (n) { $("#sup-grn-count").text(n); }',
+                                'page_length' => 10,
+                            ];
+                            include ROOT_DIR . '/includes/tables/grn_table.php';
+                            ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Purchase Returns — same table code as app/bms/purchase/purchase_returns.php -->
+        <?php if (hasPermission('purchase_returns')): ?>
+        <div class="tab-pane fade" id="pane-returns" role="tabpanel">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 d-flex align-items-center flex-wrap gap-2">
+                            <h6 class="mb-0 fw-bold text-dark">
+                                <i class="bi bi-arrow-return-left text-primary me-2"></i> Purchase Returns
+                                <span class="badge bg-primary ms-1" id="sup-returns-count">0</span>
+                            </h6>
+                            <div class="d-flex gap-2 ms-auto">
+                                <?php if (canCreate('purchase_returns')): ?>
+                                <a href="<?= getUrl('purchase_returns') ?>?supplier=<?= $supplier_id ?>&add=1" class="btn btn-primary btn-sm shadow-sm">
+                                    <i class="bi bi-plus-circle me-1"></i> New Return
+                                </a>
+                                <?php endif; ?>
+                                <a href="<?= getUrl('purchase_returns') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
+                                    View All
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php
+                            $tbl = [
+                                'id'          => 'supReturnsTable',
+                                'supplier_id' => (int) $supplier_id,
+                                'hide'        => ['supplier'],
+                                'defer_pane'  => '#pane-returns',
+                                'on_count'    => 'function (n) { $("#sup-returns-count").text(n); }',
+                                'page_length' => 10,
+                            ];
+                            include ROOT_DIR . '/includes/tables/purchase_returns_table.php';
+                            ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Delivery Notes (inbound) — same table code as app/bms/grn/delivery_notes.php.
+             Inbound only: an outbound DN goes to a customer, not to this supplier. -->
+        <?php if (canView('dn') || canView('grn')): ?>
+        <div class="tab-pane fade" id="pane-dn" role="tabpanel">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 d-flex align-items-center flex-wrap gap-2">
+                            <h6 class="mb-0 fw-bold text-dark">
+                                <i class="bi bi-truck text-primary me-2"></i> Delivery Notes <span class="text-muted small fw-normal">(Inbound)</span>
+                                <span class="badge bg-primary ms-1" id="sup-dn-count">0</span>
+                            </h6>
+                            <div class="d-flex gap-2 ms-auto">
+                                <?php if (canCreate('grn')): ?>
+                                <a href="<?= getUrl('dn_create') ?>?supplier=<?= $supplier_id ?>" class="btn btn-primary btn-sm shadow-sm">
+                                    <i class="bi bi-plus-circle me-1"></i> Record DN
+                                </a>
+                                <?php endif; ?>
+                                <a href="<?= getUrl('delivery_notes') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
+                                    View All
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php
+                            $tbl = [
+                                'id'          => 'supDnTable',
+                                'supplier_id' => (int) $supplier_id,
+                                'hide'        => ['party', 'dn_type'],
+                                'defer_pane'  => '#pane-dn',
+                                'on_count'    => 'function (n) { $("#sup-dn-count").text(n); }',
+                                'filters_js'  => 'function () { return { dn_type: "inbound" }; }',
+                                'page_length' => 10,
+                            ];
+                            include ROOT_DIR . '/includes/tables/delivery_notes_table.php';
+                            ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- RFQs / Supplier Quotes — same table code as app/bms/purchase/rfq.php -->
+        <?php if (canView('rfq')): ?>
+        <div class="tab-pane fade" id="pane-rfq" role="tabpanel">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 d-flex align-items-center flex-wrap gap-2">
+                            <h6 class="mb-0 fw-bold text-dark">
+                                <i class="bi bi-file-earmark-text text-primary me-2"></i> RFQs / Supplier Quotes
+                                <span class="badge bg-primary ms-1" id="sup-rfq-count">0</span>
+                            </h6>
+                            <div class="d-flex gap-2 ms-auto">
+                                <?php if (canCreate('rfq')): ?>
+                                <a href="<?= getUrl('rfq_create') ?>?supplier=<?= $supplier_id ?>" class="btn btn-primary btn-sm shadow-sm">
+                                    <i class="bi bi-plus-circle me-1"></i> Create RFQ
+                                </a>
+                                <?php endif; ?>
+                                <a href="<?= getUrl('rfq') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
+                                    View All
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php
+                            $tbl = [
+                                'id'          => 'supRfqTable',
+                                'supplier_id' => (int) $supplier_id,
+                                'hide'        => ['supplier'],
+                                'defer_pane'  => '#pane-rfq',
+                                'on_count'    => 'function (n) { $("#sup-rfq-count").text(n); }',
+                                'page_length' => 10,
+                            ];
+                            include ROOT_DIR . '/includes/tables/rfq_table.php';
+                            ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Debit Notes — same table code as app/bms/purchase/debit_notes/debit_notes.php -->
+        <?php if (canView('debit_notes')): ?>
+        <div class="tab-pane fade" id="pane-debitnotes" role="tabpanel">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 d-flex align-items-center flex-wrap gap-2">
+                            <h6 class="mb-0 fw-bold text-dark">
+                                <i class="bi bi-receipt-cutoff text-primary me-2"></i> Debit Notes
+                                <span class="badge bg-primary ms-1" id="sup-debitnotes-count">0</span>
+                            </h6>
+                            <div class="d-flex gap-2 ms-auto">
+                                <?php if (canCreate('debit_notes')): ?>
+                                <a href="<?= getUrl('debit_note_create') ?>?supplier=<?= $supplier_id ?>" class="btn btn-primary btn-sm shadow-sm">
+                                    <i class="bi bi-plus-circle me-1"></i> New Debit Note
+                                </a>
+                                <?php endif; ?>
+                                <a href="<?= getUrl('debit_notes') ?>" class="btn btn-outline-primary btn-sm shadow-sm">
+                                    View All
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php
+                            $tbl = [
+                                'id'          => 'supDebitNotesTable',
+                                'supplier_id' => (int) $supplier_id,
+                                'hide'        => ['supplier'],
+                                'defer_pane'  => '#pane-debitnotes',
+                                'on_count'    => 'function (n) { $("#sup-debitnotes-count").text(n); }',
+                                'page_length' => 10,
+                            ];
+                            include ROOT_DIR . '/includes/tables/debit_notes_table.php';
+                            ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Expenses paid to this supplier — same table code as
+             app/constant/accounts/expenses.php, filtered on the payee. -->
+        <?php if (canView('expenses')): ?>
+        <div class="tab-pane fade" id="pane-expenses" role="tabpanel">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 d-flex align-items-center flex-wrap gap-2">
+                            <h6 class="mb-0 fw-bold text-dark">
+                                <i class="bi bi-wallet2 text-primary me-2"></i> Expenses
+                                <span class="badge bg-primary ms-1" id="sup-expenses-count">0</span>
+                            </h6>
+                            <div class="d-flex gap-2 ms-auto">
+                                <?php if (canCreate('expenses')): ?>
+                                <a href="<?= getUrl('expenses') ?>?paid_to_type=supplier&paid_to_id=<?= $supplier_id ?>&add=1" class="btn btn-primary btn-sm shadow-sm">
+                                    <i class="bi bi-plus-circle me-1"></i> New Expense
+                                </a>
+                                <?php endif; ?>
+                                <a href="<?= getUrl('expenses') ?>?paid_to_type=supplier&paid_to_id=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
+                                    View All
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php
+                            $tbl = [
+                                'id'           => 'supExpensesTable',
+                                'paid_to_type' => 'supplier',
+                                'paid_to_id'   => (int) $supplier_id,
+                                'hide'         => ['paid_to'],
+                                'defer_pane'   => '#pane-expenses',
+                                'on_count'     => 'function (n) { $("#sup-expenses-count").text(n); }',
+                                'page_length'  => 10,
+                            ];
+                            include ROOT_DIR . '/includes/tables/expenses_table.php';
+                            ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <!-- Projects Involved -->
         <div class="tab-pane fade" id="pane-projects" role="tabpanel">
@@ -775,10 +1092,15 @@ global $company_name, $company_logo;
                     <div class="card<?= empty($purchase_orders) ? ' d-print-none' : '' ?>">
                         <div class="card-header bg-light border-bottom">
                             <div class="d-flex justify-content-between align-items-center gap-2">
-                                <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cart"></i> Recent Purchase Orders</h6>
+                                <h6 class="mb-0 fw-bold text-primary">
+                                    <i class="bi bi-cart"></i> Recent Purchase Orders
+                                    <span class="badge bg-primary ms-1"><?= count($purchase_orders) ?></span>
+                                </h6>
                                 <div class="d-flex gap-2">
                                     <?php if (canCreate('purchase_orders')): ?>
-                                    <a href="<?= getUrl('purchase_order_create') ?>?supplier_id=<?= $supplier_id ?>" class="btn btn-primary btn-sm shadow-sm">
+                                    <!-- purchase_order_create.php reads ?supplier, not ?supplier_id —
+                                         with the old name the supplier never pre-selected. -->
+                                    <a href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier_id ?>" class="btn btn-primary btn-sm shadow-sm">
                                         <i class="bi bi-plus-circle me-1"></i> Create PO
                                     </a>
                                     <?php endif; ?>
@@ -863,7 +1185,10 @@ global $company_name, $company_logo;
                     <div class="card<?= empty($payments) ? ' d-print-none' : '' ?>">
                         <div class="card-header bg-light border-bottom">
                             <div class="d-flex justify-content-between align-items-center gap-2">
-                                <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cash"></i> Recent Payments</h6>
+                                <h6 class="mb-0 fw-bold text-primary">
+                                    <i class="bi bi-cash"></i> Recent Payments
+                                    <span class="badge bg-primary ms-1"><?= count($payments) ?></span>
+                                </h6>
                                 <div class="d-flex gap-2">
                                     <a href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>&create=1" class="btn btn-primary btn-sm shadow-sm">
                                         <i class="bi bi-plus-circle me-1"></i> Add Payment
@@ -931,6 +1256,90 @@ global $company_name, $company_logo;
             </div>
         </div>
 
+        <!-- System Info -->
+        <div class="tab-pane fade" id="pane-sysinfo" role="tabpanel">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header bg-white py-3">
+                            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-info-circle text-primary me-2"></i> Record Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label text-muted small mb-1">Supplier Code</label>
+                                    <p class="mb-0 fw-semibold"><code><?= safe_output($supplier['supplier_code']) ?></code></p>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label text-muted small mb-1">Status</label>
+                                    <p class="mb-0"><span class="badge bg-<?= get_status_badge($supplier['status']) ?>"><?= ucfirst($supplier['status']) ?></span></p>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label text-muted small mb-1">Created By</label>
+                                    <p class="mb-0 fw-semibold"><?= safe_output($supplier['created_by_name'], '—') ?></p>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label text-muted small mb-1">Date Created</label>
+                                    <p class="mb-0 fw-semibold"><?= !empty($supplier['created_at']) ? format_date($supplier['created_at']) : '—' ?></p>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label text-muted small mb-1">Last Updated By</label>
+                                    <p class="mb-0 fw-semibold"><?= safe_output($supplier['updated_by_name'], '—') ?></p>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label text-muted small mb-1">Last Updated</label>
+                                    <p class="mb-0 fw-semibold"><?= !empty($supplier['updated_at']) ? format_date($supplier['updated_at']) : '—' ?></p>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label text-muted small mb-1">Category</label>
+                                    <p class="mb-0 fw-semibold"><?= safe_output($supplier['category_name'], '—') ?></p>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label text-muted small mb-1">Projects Linked</label>
+                                    <p class="mb-0 fw-semibold"><?= (int) $total_supplier_projects ?></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 d-flex align-items-center">
+                            <h6 class="mb-0 fw-bold text-dark">
+                                <i class="bi bi-clock-history text-primary me-2"></i> Audit Trail
+                                <span class="badge bg-primary ms-1"><?= count($supplier_audit) ?></span>
+                            </h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0" id="supplierAuditTable">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th style="width:50px;">S/NO</th>
+                                            <th>When</th>
+                                            <th>Action</th>
+                                            <th>By</th>
+                                            <th>Description</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($supplier_audit as $i => $a): ?>
+                                        <tr>
+                                            <td class="text-muted"><?= $i + 1 ?></td>
+                                            <td><?= !empty($a['created_at']) ? date('d M Y H:i', strtotime($a['created_at'])) : '—' ?></td>
+                                            <td><span class="badge bg-light text-dark border"><?= safe_output($a['action'] ?: $a['activity_type'], '—') ?></span></td>
+                                            <td><?= safe_output($a['user_name'] ?: $a['username'], '—') ?></td>
+                                            <td><?= safe_output($a['description'], '—') ?></td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -976,6 +1385,14 @@ $(document).ready(function() {
         order: [[0, 'asc']],
         columnDefs: [{ orderable: false, targets: [0, -1] }],
         language: { emptyTable: 'No payment history found.', zeroRecords: 'No matching payments found.' }
+    });
+
+    $('#supplierAuditTable').DataTable({
+        pageLength: 10,
+        responsive: false,
+        order: [[1, 'desc']],
+        columnDefs: [{ orderable: false, targets: [0] }],
+        language: { emptyTable: 'No audit entries recorded for this supplier yet.', zeroRecords: 'No matching audit entries.' }
     });
 });
 
@@ -1382,25 +1799,24 @@ window.addEventListener('resize', resizeTextToFit);
         visibility: visible !important;
     }
 }
+/* Same pill styling as #customerDetailTabs and #employeeExtrasTabs, so the three
+   record pages read as one thing. */
 #supplierSectionTabs .nav-link {
-    background: #f8f9fa;
-    color: #495057;
     border: 1px solid #dee2e6;
+    color: #495057;
     border-radius: 6px;
-    font-weight: 600;
-    font-size: 0.85rem;
-    padding: 8px 18px;
-    transition: background .15s, color .15s, border-color .15s;
+    font-size: 0.82rem;
+    padding: 6px 14px;
+    white-space: nowrap;
 }
-#supplierSectionTabs .nav-link:hover:not(.active) {
-    background: #e7f0ff;
-    color: #0d6efd;
-    border-color: #b6ccfe;
+#supplierSectionTabs .nav-link.active,
+#supplierSectionTabs .nav-link:hover {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
 }
-#supplierSectionTabs .nav-link.active {
-    background: #0d6efd !important;
-    color: #fff !important;
-    border-color: #0d6efd !important;
+@media (max-width: 576px) {
+    #supplierSectionTabs .nav-link { font-size: 0.75rem; padding: 5px 10px; }
 }
 </style>
 
