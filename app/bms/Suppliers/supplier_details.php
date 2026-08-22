@@ -649,6 +649,13 @@ global $company_name, $company_logo;
                     </button>
                 </li>
                 <?php endif; ?>
+                <?php if (canView('dn') || canView('grn')): ?>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-dn" type="button" role="tab">
+                        <i class="bi bi-truck me-1"></i> Delivery Notes
+                    </button>
+                </li>
+                <?php endif; ?>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-projects" type="button" role="tab">
                         <i class="bi bi-diagram-3 me-1"></i> Projects Involved
@@ -735,6 +742,49 @@ global $company_name, $company_logo;
                                 'page_length' => 10,
                             ];
                             include ROOT_DIR . '/includes/tables/purchase_returns_table.php';
+                            ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Delivery Notes (inbound) — same table code as app/bms/grn/delivery_notes.php.
+             Inbound only: an outbound DN goes to a customer, not to this supplier. -->
+        <?php if (canView('dn') || canView('grn')): ?>
+        <div class="tab-pane fade" id="pane-dn" role="tabpanel">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 d-flex align-items-center flex-wrap gap-2">
+                            <h6 class="mb-0 fw-bold text-dark">
+                                <i class="bi bi-truck text-primary me-2"></i> Delivery Notes <span class="text-muted small fw-normal">(Inbound)</span>
+                                <span class="badge bg-primary ms-1" id="sup-dn-count">0</span>
+                            </h6>
+                            <div class="d-flex gap-2 ms-auto">
+                                <?php if (canCreate('grn')): ?>
+                                <a href="<?= getUrl('dn_create') ?>?supplier=<?= $supplier_id ?>" class="btn btn-primary btn-sm shadow-sm">
+                                    <i class="bi bi-plus-circle me-1"></i> Record DN
+                                </a>
+                                <?php endif; ?>
+                                <a href="<?= getUrl('delivery_notes') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
+                                    View All
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php
+                            $tbl = [
+                                'id'          => 'supDnTable',
+                                'supplier_id' => (int) $supplier_id,
+                                'hide'        => ['party', 'dn_type'],
+                                'defer_pane'  => '#pane-dn',
+                                'on_count'    => 'function (n) { $("#sup-dn-count").text(n); }',
+                                'filters_js'  => 'function () { return { dn_type: "inbound" }; }',
+                                'page_length' => 10,
+                            ];
+                            include ROOT_DIR . '/includes/tables/delivery_notes_table.php';
                             ?>
                         </div>
                     </div>
