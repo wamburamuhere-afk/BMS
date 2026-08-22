@@ -12,6 +12,10 @@ autoEnforcePermission('grn');
 // link — the Purchases entry point (no type param) must not offer it at all.
 $is_outbound_view = (($_GET['type'] ?? '') === 'outbound');
 
+// ?supplier=<id> — arriving from a supplier's Delivery Notes tab; pre-selects
+// the filter so the list opens showing only that supplier.
+$dn_supplier_filter = intval($_GET['supplier'] ?? 0);
+
 // Include the header
 includeHeader();
 
@@ -186,7 +190,7 @@ $initial_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <select class="form-select select2-static" name="supplier" id="dn_filter_supplier">
                         <option value="">All Suppliers</option>
                         <?php foreach ($suppliers as $supplier): ?>
-                            <option value="<?= $supplier['supplier_id'] ?>"><?= safe_output($supplier['supplier_name']) ?></option>
+                            <option value="<?= $supplier['supplier_id'] ?>" <?= $dn_supplier_filter == $supplier['supplier_id'] ? 'selected' : '' ?>><?= safe_output($supplier['supplier_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>

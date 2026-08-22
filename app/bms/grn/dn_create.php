@@ -152,6 +152,9 @@ if ($dn) {
     $cur_party_id   = ($cur_party_type === 'subcontractor') ? intval($dn['subcontractor_id'] ?? 0) : intval($dn['supplier_id'] ?? 0);
 } elseif ($po_data) {
     $cur_party_id = intval($po_data['supplier_id']);
+} elseif (!empty($_GET['supplier'])) {
+    // Arriving from a supplier's Delivery Notes tab — pre-select that supplier.
+    $cur_party_id = intval($_GET['supplier']);
 }
 
 $return_url = $is_from_po

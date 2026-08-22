@@ -47,6 +47,14 @@ $suppliers       = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers
 $employees       = $pdo->query("SELECT employee_id, first_name, last_name FROM employees WHERE status = 'active' ORDER BY first_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $sub_contractors = $pdo->query("SELECT supplier_id, supplier_name FROM sub_contractors WHERE status = 'active' ORDER BY supplier_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
+// ?paid_to_type=&paid_to_id=[&add=1] — arriving from a payee's Expenses tab
+// (supplier / sub-contractor / staff). Locks the list to that payee and, with
+// add=1, opens the Add modal with the payee pre-selected.
+$exp_payee_type = in_array($_GET['paid_to_type'] ?? '', ['supplier', 'sub_contractor', 'staff'], true)
+    ? $_GET['paid_to_type'] : '';
+$exp_payee_id   = intval($_GET['paid_to_id'] ?? 0);
+$exp_open_add   = !empty($_GET['add']);
+
 // Fetch company logo and settings for print
 $c_logo = getSetting('company_logo', '');
 $c_name = getSetting('company_name', 'BMS');
@@ -442,9 +450,12 @@ if (!function_exists('renderExpenseCatRows')) {
             // supplier_details. This page's filters (category tree, status,
             // dates) feed it through filters_js; the stat cards through on_stats.
             $tbl = [
-                'id'          => 'expensesTable',
-                'card'        => '#mobile-expense-cards',
-                'page_length' => 25,
+                'id'           => 'expensesTable',
+                'card'         => '#mobile-expense-cards',
+                'page_length'  => 25,
+                // Set only when arriving from a payee's Expenses tab
+                'paid_to_type' => $exp_payee_type,
+                'paid_to_id'   => $exp_payee_id,
                 'on_stats'    => 'function (json) {
                     const recCount = (json.filteredCount != null) ? json.filteredCount : json.recordsTotal;
                     $("#stat-total-expenses").text(formatCurrency(json.totalExpenses));
@@ -637,11 +648,26 @@ $(document).ready(function() {
     }
     initSelect2();
 
-    // ?edit=<id> deep link — an Expenses tab elsewhere (e.g. supplier details)
-    // has no edit modal of its own, so it hands the record back here.
+    // Deep links from a payee's Expenses tab (supplier / sub-contractor / staff).
     <?php $exp_edit_id = intval($_GET['edit'] ?? 0); ?>
+    const EXP_PAYEE_TYPE = <?= json_encode($exp_payee_type) ?>;
+    const EXP_PAYEE_ID   = <?= (int) $exp_payee_id ?>;
+
     if (<?= $exp_edit_id ?> > 0) {
+        // The tab has no edit modal of its own, so it hands the record back here.
         editExpense(<?= $exp_edit_id ?>);
+    } else if (<?= $exp_open_add ? 'true' : 'false' ?>) {
+        // Open the Add modal with the payee already chosen. paid_to_type drives
+        // which payee list loads, so set it first and let its change handler run.
+        $('#addExpenseModal').one('shown.bs.modal', function () {
+            if (EXP_PAYEE_TYPE) {
+                $('#paid_to_type').val(EXP_PAYEE_TYPE).trigger('change');
+                if (EXP_PAYEE_ID > 0) {
+                    $('#paid_to_id_select').val(String(EXP_PAYEE_ID)).trigger('change');
+                }
+            }
+        });
+        new bootstrap.Modal(document.getElementById('addExpenseModal')).show();
     }
 
 

@@ -9,6 +9,10 @@ logActivity($pdo, $_SESSION['user_id'], 'View RFQs', 'User viewed the RFQ manage
 global $pdo;
 
 $suppliers  = $pdo->query("SELECT supplier_id, supplier_name FROM suppliers WHERE status='active' ORDER BY supplier_name")->fetchAll(PDO::FETCH_ASSOC);
+
+// ?supplier=<id> — arriving from a supplier's RFQs tab; pre-selects the filter
+// so the list opens showing only that supplier.
+$rfq_supplier_filter = intval($_GET['supplier'] ?? 0);
 // Scoped to the current user's assigned projects AND their warehouse grant
 // (Phase 6 — pos_upgrade_plan.md); was a flat, fully-unscoped query before.
 $warehouses = warehousesForSelect($pdo);
@@ -142,7 +146,7 @@ $c_vrn   = getSetting('company_vrn', '');
                     <select class="form-select" name="supplier">
                         <option value="">All Suppliers</option>
                         <?php foreach ($suppliers as $s): ?>
-                        <option value="<?= $s['supplier_id'] ?>"><?= htmlspecialchars($s['supplier_name']) ?></option>
+                        <option value="<?= $s['supplier_id'] ?>" <?= $rfq_supplier_filter == $s['supplier_id'] ? 'selected' : '' ?>><?= htmlspecialchars($s['supplier_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
