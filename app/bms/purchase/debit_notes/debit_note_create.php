@@ -15,6 +15,18 @@ $origin_return_id = isset($_GET['purchase_return_id']) ? intval($_GET['purchase_
 // Project context — when creating from inside a project workspace (?project=ID),
 // the new note is tagged to that project and navigation stays anchored to it.
 $project_ctx  = isset($_GET['project']) ? intval($_GET['project']) : 0;
+
+// ?supplier=<id> — arriving from a supplier's Debit Notes tab. The supplier
+// picker is a remote select2, so it needs the name too in order to show a
+// pre-selected option before the user has searched anything.
+$prefill_supplier_id   = isset($_GET['supplier']) ? intval($_GET['supplier']) : 0;
+$prefill_supplier_name = '';
+if ($prefill_supplier_id > 0) {
+    $_ps = $pdo->prepare("SELECT supplier_name FROM suppliers WHERE supplier_id = ? AND status != 'deleted'");
+    $_ps->execute([$prefill_supplier_id]);
+    $prefill_supplier_name = $_ps->fetchColumn() ?: '';
+    if ($prefill_supplier_name === '') $prefill_supplier_id = 0;
+}
 $project_name = '';
 if ($project_ctx > 0) {
     if (!userCan('project', $project_ctx)) { $project_ctx = 0; }  // ignore out-of-scope context
@@ -168,6 +180,9 @@ const DN_API_RET    = '<?= buildUrl('api/purchase/search_approved_purchase_retur
 const DN_API_SRC    = '<?= buildUrl('api/purchase/get_debit_note_source.php') ?>';
 const DN_API_PROD   = '<?= buildUrl('api/search_products.php') ?>';
 const ORIGIN_RET_ID = <?= $origin_return_id ?: 'null' ?>;
+const PREFILL_SUPPLIER = <?= $prefill_supplier_id > 0
+    ? json_encode(['id' => $prefill_supplier_id, 'name' => $prefill_supplier_name])
+    : 'null' ?>;
 const PROJECT_ID    = <?= $project_ctx ?: 'null' ?>;
 
 function money(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -283,6 +298,11 @@ $(document).ready(function(){
     $('#dnItemsBody').on('click', '.li-del', function(){ $(this).closest('tr').remove(); recalc(); });
 
     $('#btnRefreshNo').on('click', function(){ $.getJSON(DN_API_CREATE, { action:'get_next_ref' }, function(res){ if(res.success) $('#f_number').val(res.ref); }); });
+
+    // From a supplier's Debit Notes tab → seed the remote picker with that supplier.
+    if(PREFILL_SUPPLIER){
+        $('#f_supplier').append(new Option(PREFILL_SUPPLIER.name, PREFILL_SUPPLIER.id, true, true)).trigger('change');
+    }
 
     // From the purchase-return "Create Debit Note" button → preload everything.
     if(ORIGIN_RET_ID){ loadSource(ORIGIN_RET_ID); }

@@ -68,6 +68,11 @@ $apiU     = readSrc('api/update_dn.php');
 $apiL     = readSrc('api/get_delivery_notes_list.php');
 $helper   = readSrc('api/dn_attachment_helper.php');
 $print    = readSrc('api/account/print_delivery_note.php');
+// The list table (columns, type badge, direction-aware edit link, action
+// dropdown) is a shared module — the same code delivery_notes.php and the
+// Delivery Notes tab on Supplier Details both include, instead of each
+// carrying its own copy. See includes/tables/delivery_notes_table.php.
+$listModule = readSrc('assets/js/tables/bms-delivery-notes-table.js');
 $migr     = readSrc('migrations/2026_05_21_dn_record_vs_create.php');
 
 // ── 3. Migration adds the new columns ─────────────────────────────────────────
@@ -132,8 +137,9 @@ has($list, 'dnTypeTabs',           'delivery_notes.php: inbound/outbound tabs pr
 has($list, 'currentDnType',        'delivery_notes.php: tracks active tab');
 has($list, 'data-dntype="inbound"',  'delivery_notes.php: inbound tab');
 has($list, 'data-dntype="outbound"', 'delivery_notes.php: outbound tab');
-has($list, 'dnTypeBadge',          'delivery_notes.php: type badge renderer');
-has($list, 'dnEditUrl',            'delivery_notes.php: direction-aware edit links');
+has($list, 'includes/tables/delivery_notes_table.php', 'delivery_notes.php: wires in the shared list table');
+has($listModule, 'function typeBadge', 'bms-delivery-notes-table.js: type badge renderer');
+has($listModule, 'function editUrl',   'bms-delivery-notes-table.js: direction-aware edit links');
 has($apiL, "d.dn_type = ?",        'get_delivery_notes_list.php: filters by dn_type');
 has($apiL, 'sub_contractors',      'get_delivery_notes_list.php: joins sub_contractors');
 has($apiL, 'type_counts',          'get_delivery_notes_list.php: returns per-tab counts');

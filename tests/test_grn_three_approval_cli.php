@@ -126,6 +126,11 @@ $reviewApi  = readSrc($root, 'api/review_grn.php');
 $approveApi = readSrc($root, 'api/approve_grn.php');
 $createApi  = readSrc($root, 'api/create_grn.php');
 $listPage   = readSrc($root, 'app/bms/grn/grn.php');
+// The list table (columns, permission flags, review/approve wiring, the menu
+// itself) is now a shared module included by both grn.php and the Goods
+// Received tab on Supplier Details, instead of living inline in grn.php.
+$grnTablePartial = readSrc($root, 'includes/tables/grn_table.php');
+$grnTableModule  = readSrc($root, 'assets/js/tables/bms-grn-table.js');
 $viewPage   = readSrc($root, 'app/bms/grn/grn_view.php');
 $printPage  = readSrc($root, 'app/bms/grn/grn_print.php');
 $routes     = readSrc($root, 'roots.php');
@@ -150,15 +155,18 @@ preg_match('/\$updateStock\s*=\s*\(\$status\s*===\s*[\'"]completed[\'"]/', $crea
     ? fail('create_grn.php still has the old $updateStock = ($status === completed) line')
     : pass('create_grn.php no longer auto-updates stock on direct-to-completed creation');
 
-// List page contracts
-str_contains($listPage, 'GRN_CAN_REVIEW')  ? pass('grn.php injects JS flag GRN_CAN_REVIEW')  : fail('grn.php missing GRN_CAN_REVIEW');
-str_contains($listPage, 'GRN_CAN_APPROVE') ? pass('grn.php injects JS flag GRN_CAN_APPROVE') : fail('grn.php missing GRN_CAN_APPROVE');
-str_contains($listPage, 'GRN_IS_ADMIN')    ? pass('grn.php injects JS flag GRN_IS_ADMIN')    : fail('grn.php missing GRN_IS_ADMIN');
-str_contains($listPage, 'review_grn.php')  ? pass('grn.php calls new review_grn.php API')    : fail('grn.php missing review_grn API call');
-str_contains($listPage, 'approve_grn.php') ? pass('grn.php calls new approve_grn.php API')   : fail('grn.php missing approve_grn API call');
-str_contains($listPage, 'Mark Reviewed') && str_contains($listPage, 'Approve GRN')
-    ? pass('grn.php menu renders Mark Reviewed + Approve GRN')
-    : fail('grn.php menu missing Mark Reviewed or Approve GRN');
+// List page contracts — grn.php includes the shared table partial, which
+// injects the permission flags (canReview/canApprove/isAdmin — the JS module's
+// perms object, no longer page-global GRN_-prefixed consts) and wires the
+// review/approve menu. Checked on the partial + module, not grn.php itself.
+str_contains($grnTablePartial, 'canReview:  ')  ? pass('grn table partial injects the canReview permission flag')  : fail('grn table partial missing canReview flag');
+str_contains($grnTablePartial, 'canApprove: ')  ? pass('grn table partial injects the canApprove permission flag') : fail('grn table partial missing canApprove flag');
+str_contains($grnTablePartial, 'isAdmin:    ')  ? pass('grn table partial injects the isAdmin permission flag')    : fail('grn table partial missing isAdmin flag');
+str_contains($grnTablePartial, 'review_grn.php')  ? pass('grn table partial calls review_grn.php API')  : fail('grn table partial missing review_grn API call');
+str_contains($grnTablePartial, 'approve_grn.php') ? pass('grn table partial calls approve_grn.php API') : fail('grn table partial missing approve_grn API call');
+str_contains($grnTableModule, 'Mark Reviewed') && str_contains($grnTableModule, 'Approve GRN')
+    ? pass('grn table module renders Mark Reviewed + Approve GRN')
+    : fail('grn table module missing Mark Reviewed or Approve GRN');
 
 // View page contracts
 str_contains($viewPage, 'workflow_audit_panel.php') ? pass('grn_view.php includes workflow_audit_panel.php')

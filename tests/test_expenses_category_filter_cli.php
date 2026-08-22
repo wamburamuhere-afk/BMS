@@ -54,9 +54,13 @@ has($page, 'bi-caret-right-fill', 'Planning-style caret used');
 has($page, 'function pickExpNode', 'pickExpNode() defined');
 has($page, 'function toggleExpNode', 'toggleExpNode() defined');
 has($page, 'renderExpenseCatRows', 'category rows rendered server-side');
-has($page, 'd.filter_type_id = window.expFilterType', 'type filter wired into DataTable');
-has($page, 'd.filter_category_id = window.expFilterCat', 'category filter wired into DataTable');
-has($page, 'd.filter_uncategorised', 'uncategorised filter wired into DataTable');
+// The DataTable itself now lives in includes/tables/expenses_table.php (shared
+// with the Expenses tab on Supplier Details); expenses.php hands it these three
+// filters as an object literal via 'filters_js' rather than assigning onto `d`
+// directly. Same values, reached through the shared table's own callback.
+has($page, 'filter_type_id:       window.expFilterType', 'type filter wired into the shared table');
+has($page, 'filter_category_id:   window.expFilterCat',  'category filter wired into the shared table');
+has($page, 'filter_uncategorised: window.expFilterUncat', 'uncategorised filter wired into the shared table');
 has($page, 'col-lg-3', 'left column present');
 has($page, 'col-lg-9', 'right column present');
 

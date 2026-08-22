@@ -73,7 +73,9 @@ if ($enable_projects) {
 
 $selected_project   = $is_edit ? ($rfq_data['project_id'] ?? 0) : (isset($_GET['project']) ? intval($_GET['project']) : 0);
 $selected_warehouse = $is_edit ? ($rfq_data['warehouse_id'] ?? 0) : 0;
-$selected_supplier  = $is_edit ? ($rfq_data['supplier_id']  ?? 0) : 0;
+// On create, ?supplier=<id> pre-selects the supplier — set when arriving from
+// a supplier's RFQs tab.
+$selected_supplier  = $is_edit ? ($rfq_data['supplier_id']  ?? 0) : intval($_GET['supplier'] ?? 0);
 
 // Context-aware back navigation — short ?back=<tab> keeps URLs clean
 $back_tab     = $_GET['back'] ?? '';

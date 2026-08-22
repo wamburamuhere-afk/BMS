@@ -29,6 +29,11 @@ $date_to               = $_GET['date_to'] ?? '';
 
 // Left-panel tree filters (Expense Types & Categories): pick a Type to see all its
 // expenses across its categories, or a single Category to see only that one.
+// Payee scope (supplier / sub_contractor / staff) — both must be present to apply
+$paid_to_type = in_array($_GET['paid_to_type'] ?? '', ['supplier', 'sub_contractor', 'staff'], true)
+    ? $_GET['paid_to_type'] : '';
+$paid_to_id   = (int)($_GET['paid_to_id'] ?? 0);
+
 $filter_type_id       = (int)($_GET['filter_type_id'] ?? 0);
 $filter_category_id   = (int)($_GET['filter_category_id'] ?? 0);
 $filter_uncategorised = !empty($_GET['filter_uncategorised']);
@@ -117,6 +122,14 @@ if (!empty($expense_account_id)) { $filterSql .= " AND e.expense_account_id = :e
 if (!empty($status))            { $filterSql .= " AND e.status = :status";                          $params[':status'] = $status; }
 if (!empty($date_from))         { $filterSql .= " AND e.expense_date >= :date_from";                 $params[':date_from'] = $date_from; }
 if (!empty($date_to))           { $filterSql .= " AND e.expense_date <= :date_to";                   $params[':date_to'] = $date_to; }
+
+// Payee filter — used by the Expenses tab on a supplier / sub-contractor /
+// staff record, which shows only what was paid to that one party.
+if (!empty($paid_to_type) && $paid_to_id > 0) {
+    $filterSql .= " AND e.paid_to_type = :paid_to_type AND e.paid_to_id = :paid_to_id";
+    $params[':paid_to_type'] = $paid_to_type;
+    $params[':paid_to_id']   = $paid_to_id;
+}
 
 // Left-panel tree filter (category subtree, whole type, or uncategorised).
 if ($filter_uncategorised) {

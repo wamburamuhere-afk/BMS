@@ -138,10 +138,17 @@ foreach (['enabled' => true, 'disabled' => false] as $label => $isEnabled) {
 }
 
 head('Actions column dropped from print (freed width redistributed, not left blank)');
-str_contains($src, '<th class="text-center d-print-none">Actions</th>')
+// The table markup + column definitions moved into a shared partial/module
+// (includes/tables/grn_table.php + assets/js/tables/bms-grn-table.js) so the
+// GRN tab on Supplier Details can reuse them instead of a second copy. Same
+// facts, now assembled from a column-attrs array / declared in the JS module
+// rather than typed inline into grn.php.
+$grnTablePartial = file_get_contents($root . '/includes/tables/grn_table.php') ?: '';
+$grnTableModule  = file_get_contents($root . '/assets/js/tables/bms-grn-table.js') ?: '';
+str_contains($grnTablePartial, "'actions'        => ['label' => 'Actions',     'attrs' => 'class=\"text-center d-print-none\"']")
     ? ok('Actions <th> carries d-print-none')
     : bad('Actions header no longer marked d-print-none');
-(preg_match("/data: null,\s*orderable: false,\s*className: 'd-print-none'/", $src) === 1)
+(preg_match("/data: null, orderable: false, className: 'd-print-none'/", $grnTableModule) === 1)
     ? ok("Actions column's DataTable definition carries className: 'd-print-none'")
     : bad("Actions column's DataTable definition is missing className: 'd-print-none'");
 
