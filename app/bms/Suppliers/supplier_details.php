@@ -663,6 +663,13 @@ global $company_name, $company_logo;
                     </button>
                 </li>
                 <?php endif; ?>
+                <?php if (canView('debit_notes')): ?>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-debitnotes" type="button" role="tab">
+                        <i class="bi bi-receipt-cutoff me-1"></i> Debit Notes
+                    </button>
+                </li>
+                <?php endif; ?>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-projects" type="button" role="tab">
                         <i class="bi bi-diagram-3 me-1"></i> Projects Involved
@@ -833,6 +840,47 @@ global $company_name, $company_logo;
                                 'page_length' => 10,
                             ];
                             include ROOT_DIR . '/includes/tables/rfq_table.php';
+                            ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Debit Notes — same table code as app/bms/purchase/debit_notes/debit_notes.php -->
+        <?php if (canView('debit_notes')): ?>
+        <div class="tab-pane fade" id="pane-debitnotes" role="tabpanel">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 d-flex align-items-center flex-wrap gap-2">
+                            <h6 class="mb-0 fw-bold text-dark">
+                                <i class="bi bi-receipt-cutoff text-primary me-2"></i> Debit Notes
+                                <span class="badge bg-primary ms-1" id="sup-debitnotes-count">0</span>
+                            </h6>
+                            <div class="d-flex gap-2 ms-auto">
+                                <?php if (canCreate('debit_notes')): ?>
+                                <a href="<?= getUrl('debit_note_create') ?>?supplier=<?= $supplier_id ?>" class="btn btn-primary btn-sm shadow-sm">
+                                    <i class="bi bi-plus-circle me-1"></i> New Debit Note
+                                </a>
+                                <?php endif; ?>
+                                <a href="<?= getUrl('debit_notes') ?>" class="btn btn-outline-primary btn-sm shadow-sm">
+                                    View All
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php
+                            $tbl = [
+                                'id'          => 'supDebitNotesTable',
+                                'supplier_id' => (int) $supplier_id,
+                                'hide'        => ['supplier'],
+                                'defer_pane'  => '#pane-debitnotes',
+                                'on_count'    => 'function (n) { $("#sup-debitnotes-count").text(n); }',
+                                'page_length' => 10,
+                            ];
+                            include ROOT_DIR . '/includes/tables/debit_notes_table.php';
                             ?>
                         </div>
                     </div>
