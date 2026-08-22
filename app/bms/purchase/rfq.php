@@ -211,24 +211,29 @@ $c_vrn   = getSetting('company_vrn', '');
     <!-- ===== DATA TABLE ===== -->
     <div class="card border-0 shadow-sm" id="rfqReportContainer">
         <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" id="rfqTable" style="width:100%;">
-                    <thead class="text-uppercase small fw-bold d-print-table-header" style="background:#f8fafc;">
-                        <tr>
-                            <th class="ps-4" style="width:55px;">S/No</th>
-                            <th>RFQ #</th>
-                            <th>Date</th>
-                            <th>Supplier</th>
-                            <?php if ($enable_projects): ?><th>Project</th><?php endif; ?>
-                            <th>Warehouse</th>
-                            <th>Status</th>
-                            <th class="text-end pe-4 d-print-none">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                    <tfoot class="d-none d-print-table-footer"><tr><td colspan="8"></td></tr></tfoot>
-                </table>
-            </div>
+            <?php
+            // Shared RFQ table — same code path as the RFQs tab in supplier_details.
+            $tbl = [
+                'id'         => 'rfqTable',
+                'on_stats'   => 'function (s) {
+                    $("#stat-total").text(s.total || 0);
+                    $("#stat-pending").text(s.pending || 0);
+                    $("#stat-approved").text(s.approved || 0);
+                    $("#stat-closed").text(s.closed || 0);
+                }',
+                'filters_js' => 'function () {
+                    return {
+                        supplier:  $(\'select[name="supplier"]\').val(),
+                        project:   $(\'select[name="project"]\').val(),
+                        warehouse: $(\'select[name="warehouse"]\').val(),
+                        status:    $(\'select[name="status"]\').val(),
+                        date_from: $(\'input[name="date_from"]\').val(),
+                        date_to:   $(\'input[name="date_to"]\').val()
+                    };
+                }',
+            ];
+            include ROOT_DIR . '/includes/tables/rfq_table.php';
+            ?>
         </div>
     </div>
 </div>
@@ -324,141 +329,13 @@ $c_vrn   = getSetting('company_vrn', '');
 <?php require_once ROOT_DIR . '/includes/print_footer_css.php'; ?>
 
 <script>
-$(document).ready(function(){
-    const projEnabled = <?= $enable_projects ? 'true' : 'false' ?>;
-
-    const cols = [
-        {data:null,orderable:false,searchable:false,
-            className:'ps-3 text-center text-muted small fw-bold',
-            responsivePriority:1,
-            render:(d,t,r,m)=>m.row+m.settings._iDisplayStart+1},
-        {data:'rfq_number',responsivePriority:1,
-            render:d=>`<span class="rfq-code">${d||'—'}</span>`},
-        {data:'rfq_date',responsivePriority:5,
-            render:d=>d||'—'},
-        {data:'supplier_name',responsivePriority:2,
-            render:d=>d?`<span style="white-space:normal;word-break:break-word;">${d}</span>`:'<span class="text-muted">—</span>'},
-    ];
-    if(projEnabled) cols.push({data:'project_name',defaultContent:'—',responsivePriority:6,
-        render:d=>d?`<span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 rfq-project-badge" style="white-space:normal;">${d}</span>`:'—'});
-    cols.push(
-        {data:'warehouse_name',responsivePriority:4,
-            render:d=>d?`<span style="white-space:normal;word-break:break-word;">${d}</span>`:'<span class="text-muted">—</span>'},
-        {data:'status',responsivePriority:3,render:d=>{
-            const map={
-                pending:   {c:'text-warning', l:'Pending'},
-                draft:     {c:'text-muted',   l:'Draft'},
-                review:    {c:'text-primary', l:'In Review'},
-                approved:  {c:'text-success', l:'Approved'},
-                sent:      {c:'text-info',    l:'Sent'},
-                received:  {c:'text-primary', l:'Quote Received'},
-                evaluated: {c:'text-primary', l:'Evaluated'},
-                awarded:   {c:'text-success', l:'Awarded'},
-                partially: {c:'text-warning', l:'Partially Ordered'},
-                completed: {c:'text-primary', l:'Completed'},
-                cancelled: {c:'text-danger',  l:'Cancelled'}
-            };
-            const s=map[d]||{c:'text-dark',l:d};
-            return `<span class="${s.c} text-uppercase fw-bold" style="font-size:.8rem;letter-spacing:.4px;">${s.l}</span>`;
-        }},
-        {data:null,orderable:false,className:'text-end pe-3 d-print-none',responsivePriority:1,
-            render:(d,t,row)=>{
-                const isApproved = row.status === 'approved';
-                const createPOOption = isApproved && row.supplier_id ? `
-                    <li><hr class="dropdown-divider opacity-50"></li>
-                    <li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('purchase_order_create') ?>?supplier=${row.supplier_id}&rfq_ref=${row.rfq_id}">
-                        <i class="bi bi-cart-plus me-2"></i>Create Purchase Order</a></li>` : '';
-                return `
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-white border dropdown-toggle"
-                        style="background:#fff;" type="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-gear"></i>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                        <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_view') ?>?id=${row.rfq_id}">
-                            <i class="bi bi-eye text-primary me-2"></i>View</a></li>
-                        ${row.status === 'draft' ? `
-                            <li><a class="dropdown-item py-2 text-primary fw-semibold" href="<?= getUrl('rfq_view') ?>?id=${row.rfq_id}">
-                                <i class="bi bi-eye-fill me-2"></i>Review</a></li>
-                        ` : ''}
-                        ${row.status === 'review' ? `
-                            <li><a class="dropdown-item py-2 text-success fw-semibold" href="#" onclick="approveRFQ(${row.rfq_id},'${row.rfq_number}');return false;">
-                                <i class="bi bi-check-circle me-2"></i>Approve</a></li>
-                        ` : ''}
-                        <li>
-                            <div class="d-flex align-items-center dropdown-item py-0 pe-1">
-                                <a class="flex-grow-1 py-2 text-decoration-none text-dark" href="#" onclick="printRFQ(${row.rfq_id});return false;"><i class="bi bi-printer text-dark me-2"></i>Print</a>
-                                <button type="button" class="btn btn-sm border-0 p-1 text-muted" title="Choose a different template" onclick="event.stopPropagation(); $('#rfqTplSub${row.rfq_id}').toggleClass('d-none'); $(this).find('i').toggleClass('bi-chevron-down bi-chevron-up');">
-                                    <i class="bi bi-chevron-down"></i>
-                                </button>
-                            </div>
-                            <ul class="list-unstyled ms-4 mb-1 d-none" id="rfqTplSub${row.rfq_id}">
-                                <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printRFQ(${row.rfq_id}, 'navy'); return false;"><i class="bi bi-file-earmark-text me-2"></i>Striped Template</a></li>
-                                <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printRFQ(${row.rfq_id}, 'corporate'); return false;"><i class="bi bi-file-earmark-text me-2"></i>Minimal Template</a></li>
-                                <li><a class="dropdown-item py-1 small text-muted" href="#" onclick="printRFQ(${row.rfq_id}, 'banded'); return false;"><i class="bi bi-file-earmark-text me-2"></i>Radiant Template</a></li>
-                            </ul>
-                        </li>
-                        ${row.status === 'draft' ? `
-                        <li><a class="dropdown-item py-2" href="<?= getUrl('rfq_create') ?>?edit=${row.rfq_id}">
-                            <i class="bi bi-pencil text-info me-2"></i>Edit</a></li>
-                        ` : ''}
-                        ${createPOOption}
-                        <li><hr class="dropdown-divider opacity-50"></li>
-                        <li><a class="dropdown-item py-2 text-danger" href="#"
-                            onclick="deleteRFQ(${row.rfq_id},'${row.rfq_number}');return false;">
-                            <i class="bi bi-trash me-2"></i>Delete</a></li>
-                    </ul>
-                </div>`;}
-        }
-    );
-
-    const table=$('#rfqTable').DataTable({
-        dom:'rtip',
-        responsive:true,
-        scrollX:false,
-        ajax:{
-            url:'<?= getUrl('api/get_rfqs') ?>',
-            data:function(d){
-                d.supplier   =$('select[name="supplier"]').val();
-                d.project    =$('select[name="project"]').val();
-                d.warehouse  =$('select[name="warehouse"]').val();
-                d.status     =$('select[name="status"]').val();
-                d.date_from  =$('input[name="date_from"]').val();
-                d.date_to    =$('input[name="date_to"]').val();
-            },
-            dataSrc:function(json){
-                if(json.stats){
-                    $('#stat-total').text(json.stats.total||0);
-                    $('#stat-pending').text(json.stats.pending||0);
-                    $('#stat-approved').text(json.stats.approved||0);
-                    $('#stat-closed').text(json.stats.closed||0);
-                }
-                return json.data||[];
-            },
-            error:function(){}
-        },
-        columns:cols,order:[[0,'desc']],
-        language:{
-            emptyTable:'<div class="text-center py-5 text-muted"><i class="bi bi-file-earmark-text fs-1 d-block mb-2 opacity-25"></i>No RFQ records found</div>',
-            zeroRecords:'<div class="text-center py-4 text-muted">No records match your filters</div>'
-        }
-    });
-
-    $('#filterForm').on('submit',function(e){e.preventDefault();table.ajax.reload();});
+$(document).ready(function () {
+    // The RFQ table itself is initialised by includes/tables/rfq_table.php.
+    $('#filterForm').on('submit', function (e) { e.preventDefault(); BMSRfqTable.reload('rfqTable'); });
 });
 
-function clearFilters(){$('#filterForm')[0].reset();$('#rfqTable').DataTable().ajax.reload();}
 
-const RFQ_PRINT_TEMPLATES = {
-    standard:  '<?= getUrl('print_rfq') ?>',
-    navy:      '<?= getUrl('print_rfq_navy') ?>',
-    corporate: '<?= getUrl('print_rfq_corporate') ?>',
-    banded:    '<?= getUrl('print_rfq_banded') ?>'
-};
-function printRFQ(id, template) {
-    const base = RFQ_PRINT_TEMPLATES[template] || RFQ_PRINT_TEMPLATES.standard;
-    window.open(base + '?id=' + id, '_blank');
-}
+function clearFilters(){$('#filterForm')[0].reset();$('#rfqTable').DataTable().ajax.reload();}
 
 function exportRFQ(){
     const t=document.getElementById('rfqTable');
@@ -471,48 +348,6 @@ function exportRFQ(){
     document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
 
-function deleteRFQ(id,number){
-    Swal.fire({
-        title:'Delete RFQ?',
-        text:`RFQ #${number} will be permanently deleted and cannot be recovered.`,
-        icon:'warning',showCancelButton:true,
-        confirmButtonColor:'#dc3545',confirmButtonText:'Yes, Delete It',cancelButtonText:'Cancel'
-    }).then(r=>{
-        if(r.isConfirmed){
-            $.post('<?= getUrl('api/delete_rfq') ?>',{rfq_id:id},function(res){
-                if(res.success){
-                    Swal.fire({icon:'success',title:'Deleted!',text:res.message,confirmButtonColor:'#198754',confirmButtonText:'OK'});
-                    $('#rfqTable').DataTable().ajax.reload();
-                } else {
-                    Swal.fire({icon:'error',title:'Error',text:res.message||'Could not delete RFQ.',confirmButtonText:'OK'});
-                }
-            },'json').fail(function(){
-                Swal.fire({icon:'error',title:'Error',text:'Server error. Please try again.',confirmButtonText:'OK'});
-            });
-        }
-    });
-}
-
-function approveRFQ(id,number){
-    Swal.fire({
-        title:'Approve RFQ?',
-        text:`RFQ #${number} will be marked as approved.`,
-        icon:'question',showCancelButton:true,
-        confirmButtonColor:'#198754',confirmButtonText:'Yes, Approve It',cancelButtonText:'Cancel'
-    }).then(r=>{
-        if(r.isConfirmed){
-            $.post('<?= getUrl('api/approve_rfq') ?>',{rfq_id:id},function(res){
-                if(res.success){
-                    Swal.fire({icon:'success',title:'Approved!',text:res.message,confirmButtonColor:'#198754',confirmButtonText:'OK'});
-                    $('#rfqTable').DataTable().ajax.reload();
-                } else {
-                    Swal.fire({icon:'error',title:'Error',text:res.message||'Could not approve RFQ.',confirmButtonText:'OK'});
-                }
-            },'json').fail(function(){
-                Swal.fire({icon:'error',title:'Error',text:'Server error. Please try again.',confirmButtonText:'OK'});
-            });
-        }
-    });
 }
 
 </script>
