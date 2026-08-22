@@ -155,7 +155,10 @@ try {
             </button>
             <ul class="dropdown-menu">';
             
-        $actions .= '<li><a class="dropdown-item" href="#" onclick="viewReturn(' . $row['purchase_return_id'] . ')"><i class="bi bi-eye"></i> View Details</a></li>';
+        // Actions call back into assets/js/tables/bms-purchase-returns-table.js,
+        // which resolves the owning table from the clicked element — so this one
+        // block of HTML drives the module page and the supplier-details tab alike.
+        $actions .= '<li><a class="dropdown-item" href="#" onclick="return BMSReturnsTable.act(this,\'view\',' . $row['purchase_return_id'] . ')"><i class="bi bi-eye"></i> View Details</a></li>';
 
         // Print, with a chevron toggle revealing the alternate templates (hidden by
         // default) — the plain "Print" link still opens the default template directly.
@@ -177,32 +180,32 @@ try {
         // workflow_signatures row + reviewed_by/approved_by stamps are captured.
         if ($row['status'] == 'pending') {
             if (canCreate('purchase_returns')) {
-                $actions .= '<li><a class="dropdown-item" href="#" onclick="editReturn(' . $row['purchase_return_id'] . ')"><i class="bi bi-pencil"></i> Edit Return</a></li>';
+                $actions .= '<li><a class="dropdown-item" href="#" onclick="return BMSReturnsTable.act(this,\'edit\',' . $row['purchase_return_id'] . ')"><i class="bi bi-pencil"></i> Edit Return</a></li>';
             }
             if (canReview('purchase_returns')) {
-                $actions .= '<li><a class="dropdown-item text-warning" href="#" onclick="sendForReviewPR(' . $row['purchase_return_id'] . ')"><i class="bi bi-send-check"></i> Send for Review</a></li>';
+                $actions .= '<li><a class="dropdown-item text-warning" href="#" onclick="return BMSReturnsTable.act(this,\'review\',' . $row['purchase_return_id'] . ')"><i class="bi bi-send-check"></i> Send for Review</a></li>';
             }
         }
 
         if ($row['status'] == 'reviewed' && canApprove('purchase_returns')) {
-            $actions .= '<li><a class="dropdown-item text-success" href="#" onclick="approvePR(' . $row['purchase_return_id'] . ')"><i class="bi bi-check-circle"></i> Approve</a></li>';
+            $actions .= '<li><a class="dropdown-item text-success" href="#" onclick="return BMSReturnsTable.act(this,\'approve\',' . $row['purchase_return_id'] . ')"><i class="bi bi-check-circle"></i> Approve</a></li>';
         }
 
         if ($row['status'] == 'approved' && canCreate('purchase_returns')) {
-            $actions .= '<li><a class="dropdown-item text-success" href="#" onclick="updateReturnStatus(' . $row['purchase_return_id'] . ', \'completed\')"><i class="bi bi-check2-all"></i> Mark as Completed</a></li>';
+            $actions .= '<li><a class="dropdown-item text-success" href="#" onclick="return BMSReturnsTable.act(this,\'status\',' . $row['purchase_return_id'] . ',\'completed\')"><i class="bi bi-check2-all"></i> Mark as Completed</a></li>';
         }
 
         if (in_array($row['status'], ['pending', 'reviewed', 'approved']) && canCreate('purchase_returns')) {
-            $actions .= '<li><a class="dropdown-item text-warning" href="#" onclick="updateReturnStatus(' . $row['purchase_return_id'] . ', \'cancelled\')"><i class="bi bi-x-octagon"></i> Cancel</a></li>';
+            $actions .= '<li><a class="dropdown-item text-warning" href="#" onclick="return BMSReturnsTable.act(this,\'status\',' . $row['purchase_return_id'] . ',\'cancelled\')"><i class="bi bi-x-octagon"></i> Cancel</a></li>';
         }
 
         if ($row['status'] == 'pending' && canCreate('purchase_returns')) {
-            $actions .= '<li><a class="dropdown-item text-danger" href="#" onclick="updateReturnStatus(' . $row['purchase_return_id'] . ', \'rejected\')"><i class="bi bi-x-circle"></i> Reject</a></li>';
+            $actions .= '<li><a class="dropdown-item text-danger" href="#" onclick="return BMSReturnsTable.act(this,\'status\',' . $row['purchase_return_id'] . ',\'rejected\')"><i class="bi bi-x-circle"></i> Reject</a></li>';
         }
         
         if (hasPermission('delete_purchase_returns')) {
              $actions .= '<li><hr class="dropdown-divider"></li>';
-             $actions .= '<li><a class="dropdown-item text-danger" href="#" onclick="deleteReturn(' . $row['purchase_return_id'] . ')"><i class="bi bi-trash"></i> Delete</a></li>';
+             $actions .= '<li><a class="dropdown-item text-danger" href="#" onclick="return BMSReturnsTable.act(this,\'delete\',' . $row['purchase_return_id'] . ')"><i class="bi bi-trash"></i> Delete</a></li>';
         }
 
         $actions .= '</ul></div>';
@@ -228,6 +231,10 @@ try {
         }
 
         $formatted_data[] = [
+            // Raw id + status so the card view can build its buttons directly
+            // instead of regex-scraping them back out of the actions HTML.
+            'id'            => (int) $row['purchase_return_id'],
+            'status_key'    => $row['status'],
             'return_number' => $return_number_html,
             'return_date' => date('d M Y', strtotime($row['return_date'])),
             'supplier_name' => $supplier_html,

@@ -436,7 +436,7 @@ $initial_stats = [
 
             <div class="d-flex align-items-center bg-white shadow-sm px-3 py-1" style="border: 1px solid #dee2e6; border-radius: 8px;">
                 <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> Show:</span>
-                <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 60px; box-shadow: none; background: transparent;" onchange="dataTable.page.len(this.value).draw();">
+                <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 60px; box-shadow: none; background: transparent;" onchange="BMSReturnsTable.dt('returnsTable').page.len(this.value).draw();">
                     <option value="10">10</option>
                     <option value="25" selected>25</option>
                     <option value="50">50</option>
@@ -466,25 +466,26 @@ $initial_stats = [
         </div>
         <div class="card-body">
             <div id="prTableView">
-                <div class="table-responsive">
-                    <table id="returnsTable" class="table table-striped table-hover w-100">
-                        <thead>
-                            <tr>
-                                <th style="width:50px;">S/NO</th>
-                                <th>Return #</th>
-                                <th>Date</th>
-                                <th>Supplier</th>
-                                <th>GRN Number</th>
-                                <th>Items</th>
-                                <th>Total Value</th>
-                                <th>Reason</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
+                <?php
+                // Shared Purchase Returns table — same code path as the Purchase
+                // Returns tab in supplier_details.
+                $tbl = [
+                    'id'          => 'returnsTable',
+                    'card'        => '#prCardGrid',
+                    'page_length' => 25,
+                    'on_count'    => 'function (n) { $("#returns-count-badge").html(\'<i class="bi bi-check-circle-fill me-1"></i> \' + n + \' records found\'); }',
+                    'on_reload'   => 'loadStats',
+                    'filters_js'  => 'function () {
+                        return {
+                            status:      $("#filter_status").val(),
+                            supplier_id: $("#filter_supplier").val(),
+                            date_from:   $("#filter_date_from").val(),
+                            date_to:     $("#filter_date_to").val()
+                        };
+                    }',
+                ];
+                include ROOT_DIR . '/includes/tables/purchase_returns_table.php';
+                ?>
             </div>
             <div id="prCardView" style="display:none;">
                 <div class="row g-3" id="prCardGrid"></div>
@@ -783,7 +784,15 @@ $initial_stats = [
 
 <script>
 let returnItemCount = 0;
-let dataTable;
+// ?edit=<id> deep link — a Purchase Returns tab elsewhere (e.g. supplier
+// details) has no edit modal of its own, so it hands the record back here.
+const PR_EDIT_ID = <?= json_encode(intval($_GET['edit'] ?? 0)) ?>;
+
+// ?supplier=<id>[&add=1] — arriving from a supplier's Purchase Returns tab.
+// Filters the list to that supplier, and (with add=1) opens the Create modal
+// with the supplier pre-selected as soon as a warehouse makes it selectable.
+const PR_PREFILL_SUPPLIER = <?= json_encode(intval($_GET['supplier'] ?? 0)) ?>;
+const PR_OPEN_ADD = <?= json_encode(!empty($_GET['add'])) ?>;
 let productsCache = [];
 let currentItemIndex = null;
 
@@ -817,49 +826,6 @@ function togglePRView(viewType) {
     if (!isMobile) localStorage.setItem('prView', viewType);
 }
 
-function extractReturnId(actionsHtml) {
-    if (!actionsHtml) return null;
-    const m = actionsHtml.match(/deleteReturn\((\d+)\)|editReturn\((\d+)\)|viewReturn\((\d+)\)/);
-    return m ? parseInt(m[1] || m[2] || m[3]) : null;
-}
-
-function renderPRCards(data) {
-    const grid = document.getElementById('prCardGrid');
-    grid.innerHTML = '';
-    if (!data || data.length === 0) {
-        grid.innerHTML = '<div class="col-12 text-center py-5 text-muted"><i class="bi bi-inbox fs-1 d-block mb-2"></i> No records found</div>';
-        return;
-    }
-    const statusMap = { pending:'warning', approved:'primary', completed:'success', rejected:'danger', cancelled:'secondary' };
-    data.each(function(row) {
-        const badge = statusMap[row.status] || 'secondary';
-        const rid = extractReturnId(row.actions);
-        grid.innerHTML += `
-            <div class="col-xl-3 col-lg-4 col-md-6">
-                <div class="card h-100 border-0 shadow-sm rounded-3">
-                    <div class="card-header bg-white d-flex justify-content-between align-items-center py-2 px-3">
-                        <code class="small">${row.return_number || ''}</code>
-                        <span class="badge bg-${badge}" style="font-size:0.65rem;">${(row.status||'').toUpperCase()}</span>
-                    </div>
-                    <div class="card-body py-2 px-3">
-                        <div class="small text-muted mb-1">Supplier: <strong class="text-dark">${row.supplier_name || ''}</strong></div>
-                        <div class="small text-muted mb-1">Date: <span class="text-dark">${row.return_date || ''}</span></div>
-                        <div class="small text-muted mb-1">GRN: <span class="text-dark">${row.receipt_number || 'N/A'}</span></div>
-                        <div class="small text-muted mb-1">Items: <span class="text-dark">${row.total_items || 0}</span></div>
-                        <div class="small text-muted">Value: <strong class="text-dark">${row.total_amount || ''}</strong></div>
-                    </div>
-                    <div class="card-footer bg-white" style="padding:6px 8px;">
-                        <div style="display:flex;flex-wrap:nowrap;gap:4px;">
-                            <button onclick="viewReturn(${rid})" class="btn btn-outline-primary" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" title="View"><i class="bi bi-eye"></i></button>
-                            <button onclick="editReturn(${rid})" class="btn btn-outline-secondary" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" title="Edit"><i class="bi bi-pencil"></i></button>
-                            <button onclick="deleteReturn(${rid})" class="btn btn-outline-danger" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;" title="Delete"><i class="bi bi-trash"></i></button>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-    });
-}
-
 $(document).ready(function() {
     logReportAction('Viewed Purchase Returns List', 'User viewed the purchase returns management list');
 
@@ -882,8 +848,19 @@ $(document).ready(function() {
     window.addEventListener('resize', function() { if (window.innerWidth <= 767) togglePRView('card'); });
 
     loadStats();
-    initializeDataTable();
+    // The returns table itself is initialised by includes/tables/purchase_returns_table.php
     loadProductsCache();
+
+    // Deep links from another page's Purchase Returns tab.
+    if (PR_PREFILL_SUPPLIER > 0) {
+        $('#filter_supplier').val(PR_PREFILL_SUPPLIER).trigger('change.select2');
+        refreshTable();
+    }
+    if (PR_EDIT_ID > 0) {
+        editReturn(PR_EDIT_ID);          // ?edit=<id> — the tab has no modal of its own
+    } else if (PR_OPEN_ADD) {
+        new bootstrap.Modal(document.getElementById('addReturnModal')).show();
+    }
     
     // Hide search results when clicking outside
     $(document).on('click', function(e) {
@@ -926,59 +903,8 @@ $(document).ready(function() {
     }
 });
 
-function initializeDataTable() {
-    dataTable = $('#returnsTable').DataTable({
-        processing: true,
-        serverSide: true,
-        ajax: {
-            url: '<?= getUrl('api/get_purchase_returns.php') ?>',
-            type: 'GET',
-            data: function(d) {
-                d.status = $('#filter_status').val();
-                d.supplier_id = $('#filter_supplier').val();
-                d.date_from = $('#filter_date_from').val();
-                d.date_to = $('#filter_date_to').val();
-            }
-        },
-        columns: [
-            {
-                data: null,
-                orderable: false,
-                searchable: false,
-                width: '50px',
-                className: 'text-muted small fw-bold',
-                render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1
-            },
-            { data: 'return_number' },
-            { data: 'return_date' },
-            { data: 'supplier_name' },
-            { data: 'receipt_number' },
-            { data: 'total_items' },
-            { data: 'total_amount' },
-            { data: 'reason' },
-            { data: 'status' },
-            { data: 'actions', orderable: false, searchable: false }
-        ],
-        order: [[1, 'desc']],
-        pageLength: 25,
-        lengthChange: false,
-        dom: 'rtip',
-        language: {
-            search: "_INPUT_",
-            searchPlaceholder: "Search returns..."
-        },
-        drawCallback: function(settings) {
-            const api = this.api();
-            const count = api.rows({search:'applied'}).count();
-            $('#returns-count-badge').html(`<i class="bi bi-check-circle-fill me-1"></i> ${count} records found`);
-            renderPRCards(api.rows({page:'current'}).data());
-        }
-    });
-}
-
 function refreshTable() {
-    dataTable.ajax.reload();
-    loadStats();
+    BMSReturnsTable.reload('returnsTable');   // also calls loadStats via onReload
 }
 
 function resetFilters() {
@@ -1242,6 +1168,13 @@ function loadWarehouseSuppliers(warehouseId, targetId) {
             $el.html(html);
             const $modal = $el.closest('.modal');
             $el.select2({ theme: 'bootstrap-5', dropdownParent: $modal.length ? $modal : null, width: '100%', allowClear: true, placeholder: 'Select Supplier' });
+
+            // Arrived from a supplier's Purchase Returns tab: the supplier list
+            // only exists once a warehouse is chosen, so pre-select it here —
+            // the first moment it can actually be selected.
+            if (PR_PREFILL_SUPPLIER > 0 && $el.find('option[value="' + PR_PREFILL_SUPPLIER + '"]').length) {
+                $el.val(PR_PREFILL_SUPPLIER).trigger('change');
+            }
         }
     });
 }
@@ -1476,120 +1409,6 @@ function updatePurchaseReturn() {
             $('#edit-return-message').html('<div class="alert alert-danger">Server error. Please try again.</div>');
         }
     });
-}
-
-function updateReturnStatus(id, status) {
-    Swal.fire({
-        title: 'Confirm Update',
-        text: `Are you sure you want to mark this return as ${status}?`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Yes, update it!'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            $.post('<?= getUrl('api/update_purchase_return_status.php') ?>', { return_id: id, status: status }, function(response) {
-                if (response.success) {
-                    logReportAction('Updated Purchase Return Status', 'User updated purchase return #' + id + ' status to ' + status);
-                    Swal.fire('Updated!', response.message, 'success');
-                    refreshTable();
-                } else {
-                    Swal.fire('Error', response.message, 'error');
-                }
-            }, 'json');
-        }
-    });
-}
-
-// ── Three-approval workflow actions (returns three-approval slice) ──
-// These go through the canonical endpoints so the workflow_signatures
-// rows + reviewed_by/approved_by stamps are captured (the legacy
-// updateReturnStatus() above now rejects 'reviewed'/'approved' transitions).
-function sendForReviewPR(id) {
-    Swal.fire({
-        title: 'Send for Review?',
-        text: 'This will mark the return as reviewed and capture your e-signature.',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Yes, send for review',
-        confirmButtonColor: '#ffc107'
-    }).then((result) => {
-        if (!result.isConfirmed) return;
-        Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
-        $.post('<?= getUrl('api/account/review_purchase_return.php') ?>',
-            { return_id: id },
-            function(response) {
-                if (response.success) {
-                    logReportAction('Reviewed Purchase Return', 'User reviewed purchase return #' + id);
-                    Swal.fire('Reviewed', response.message, 'success');
-                    refreshTable();
-                } else {
-                    Swal.fire('Error', response.message, 'error');
-                }
-            }, 'json'
-        ).fail(function(xhr) {
-            var msg = 'Server error';
-            try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
-            Swal.fire('Error', msg, 'error');
-        });
-    });
-}
-
-function approvePR(id) {
-    Swal.fire({
-        title: 'Approve Purchase Return?',
-        text: 'This will deduct stock from the warehouse and capture your e-signature.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Yes, approve',
-        confirmButtonColor: '#198754'
-    }).then((result) => {
-        if (!result.isConfirmed) return;
-        Swal.fire({ title: 'Processing...', didOpen: () => Swal.showLoading() });
-        $.post('<?= getUrl('api/account/approve_purchase_return.php') ?>',
-            { return_id: id },
-            function(response) {
-                if (response.success) {
-                    logReportAction('Approved Purchase Return', 'User approved purchase return #' + id);
-                    Swal.fire('Approved', response.message, 'success');
-                    refreshTable();
-                } else {
-                    Swal.fire('Error', response.message, 'error');
-                }
-            }, 'json'
-        ).fail(function(xhr) {
-            var msg = 'Server error';
-            try { var r = JSON.parse(xhr.responseText); if (r && r.message) msg = r.message; } catch (e) {}
-            Swal.fire('Error', msg, 'error');
-        });
-    });
-}
-
-function deleteReturn(id) {
-    Swal.fire({
-        title: 'Are you sure?',
-        text: "You won't be able to revert this!",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        confirmButtonText: 'Yes, delete it!'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            $.post('<?= getUrl('api/delete_purchase_return.php') ?>', { return_id: id }, function(response) {
-                if (response.success) {
-                    logReportAction('Deleted Purchase Return', 'User deleted purchase return #' + id);
-                    Swal.fire('Deleted!', response.message, 'success');
-                    refreshTable();
-                } else {
-                    Swal.fire('Error', response.message, 'error');
-                }
-            }, 'json');
-        }
-    });
-}
-function viewReturn(id) {
-    logReportAction('Viewed Purchase Return Details Link', 'User clicked to view details for purchase return #' + id);
-    // Redirect to view page
-    window.location.href = '<?= getUrl('purchase_return_view') ?>?id=' + id;
 }
 
 function printList() {
