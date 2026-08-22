@@ -636,70 +636,72 @@ global $company_name, $company_logo;
     <!-- Section Tab Navigation -->
     <div class="row mb-3">
         <div class="col-12">
-            <ul class="nav nav-pills flex-wrap gap-2 d-print-none" id="supplierSectionTabs" role="tablist">
-                <li class="nav-item" role="presentation">
+            <!-- flex-nowrap + overflow-auto: eleven tabs scroll sideways on a phone
+                 instead of wrapping into three stacked rows. Same as customer details. -->
+            <ul class="nav nav-pills flex-nowrap overflow-auto gap-1 mb-3 pb-1 d-print-none" id="supplierSectionTabs" role="tablist">
+                <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-payments" type="button" role="tab">
                         <i class="bi bi-cash-coin me-1"></i> Recent Payments
                     </button>
                 </li>
-                <li class="nav-item" role="presentation">
+                <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-invoices" type="button" role="tab">
                         <i class="bi bi-receipt me-1"></i> Bills
                     </button>
                 </li>
-                <li class="nav-item" role="presentation">
+                <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-pos" type="button" role="tab">
                         <i class="bi bi-cart me-1"></i> Recent Purchase Orders
                     </button>
                 </li>
                 <?php if (canView('grn')): ?>
-                <li class="nav-item" role="presentation">
+                <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-grn" type="button" role="tab">
                         <i class="bi bi-box-seam me-1"></i> Goods Received
                     </button>
                 </li>
                 <?php endif; ?>
                 <?php if (hasPermission('purchase_returns')): ?>
-                <li class="nav-item" role="presentation">
+                <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-returns" type="button" role="tab">
                         <i class="bi bi-arrow-return-left me-1"></i> Purchase Returns
                     </button>
                 </li>
                 <?php endif; ?>
                 <?php if (canView('dn') || canView('grn')): ?>
-                <li class="nav-item" role="presentation">
+                <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-dn" type="button" role="tab">
                         <i class="bi bi-truck me-1"></i> Delivery Notes
                     </button>
                 </li>
                 <?php endif; ?>
                 <?php if (canView('rfq')): ?>
-                <li class="nav-item" role="presentation">
+                <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-rfq" type="button" role="tab">
                         <i class="bi bi-file-earmark-text me-1"></i> RFQs
                     </button>
                 </li>
                 <?php endif; ?>
                 <?php if (canView('debit_notes')): ?>
-                <li class="nav-item" role="presentation">
+                <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-debitnotes" type="button" role="tab">
                         <i class="bi bi-receipt-cutoff me-1"></i> Debit Notes
                     </button>
                 </li>
                 <?php endif; ?>
                 <?php if (canView('expenses')): ?>
-                <li class="nav-item" role="presentation">
+                <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-expenses" type="button" role="tab">
                         <i class="bi bi-wallet2 me-1"></i> Expenses
                     </button>
                 </li>
                 <?php endif; ?>
-                <li class="nav-item" role="presentation">
+                <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-projects" type="button" role="tab">
                         <i class="bi bi-diagram-3 me-1"></i> Projects Involved
                     </button>
                 </li>
-                <li class="nav-item" role="presentation">
+                <li class="nav-item flex-shrink-0" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-sysinfo" type="button" role="tab">
                         <i class="bi bi-clock-history me-1"></i> System Info
                     </button>
@@ -1090,7 +1092,10 @@ global $company_name, $company_logo;
                     <div class="card<?= empty($purchase_orders) ? ' d-print-none' : '' ?>">
                         <div class="card-header bg-light border-bottom">
                             <div class="d-flex justify-content-between align-items-center gap-2">
-                                <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cart"></i> Recent Purchase Orders</h6>
+                                <h6 class="mb-0 fw-bold text-primary">
+                                    <i class="bi bi-cart"></i> Recent Purchase Orders
+                                    <span class="badge bg-primary ms-1"><?= count($purchase_orders) ?></span>
+                                </h6>
                                 <div class="d-flex gap-2">
                                     <?php if (canCreate('purchase_orders')): ?>
                                     <!-- purchase_order_create.php reads ?supplier, not ?supplier_id —
@@ -1180,7 +1185,10 @@ global $company_name, $company_logo;
                     <div class="card<?= empty($payments) ? ' d-print-none' : '' ?>">
                         <div class="card-header bg-light border-bottom">
                             <div class="d-flex justify-content-between align-items-center gap-2">
-                                <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-cash"></i> Recent Payments</h6>
+                                <h6 class="mb-0 fw-bold text-primary">
+                                    <i class="bi bi-cash"></i> Recent Payments
+                                    <span class="badge bg-primary ms-1"><?= count($payments) ?></span>
+                                </h6>
                                 <div class="d-flex gap-2">
                                     <a href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier_id ?>&create=1" class="btn btn-primary btn-sm shadow-sm">
                                         <i class="bi bi-plus-circle me-1"></i> Add Payment
@@ -1791,25 +1799,24 @@ window.addEventListener('resize', resizeTextToFit);
         visibility: visible !important;
     }
 }
+/* Same pill styling as #customerDetailTabs and #employeeExtrasTabs, so the three
+   record pages read as one thing. */
 #supplierSectionTabs .nav-link {
-    background: #f8f9fa;
-    color: #495057;
     border: 1px solid #dee2e6;
+    color: #495057;
     border-radius: 6px;
-    font-weight: 600;
-    font-size: 0.85rem;
-    padding: 8px 18px;
-    transition: background .15s, color .15s, border-color .15s;
+    font-size: 0.82rem;
+    padding: 6px 14px;
+    white-space: nowrap;
 }
-#supplierSectionTabs .nav-link:hover:not(.active) {
-    background: #e7f0ff;
-    color: #0d6efd;
-    border-color: #b6ccfe;
+#supplierSectionTabs .nav-link.active,
+#supplierSectionTabs .nav-link:hover {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
 }
-#supplierSectionTabs .nav-link.active {
-    background: #0d6efd !important;
-    color: #fff !important;
-    border-color: #0d6efd !important;
+@media (max-width: 576px) {
+    #supplierSectionTabs .nav-link { font-size: 0.75rem; padding: 5px 10px; }
 }
 </style>
 

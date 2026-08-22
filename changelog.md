@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-08-22 (feature) — Supplier Details: 7 related-record tabs, shared with their module pages
+
+**Files (new):** `assets/js/tables/bms-table-utils.js`, `assets/js/tables/bms-grn-table.js`, `assets/js/tables/bms-purchase-returns-table.js`, `assets/js/tables/bms-delivery-notes-table.js`, `assets/js/tables/bms-rfq-table.js`, `assets/js/tables/bms-debit-notes-table.js`, `assets/js/tables/bms-expenses-table.js`, `includes/tables/grn_table.php`, `includes/tables/purchase_returns_table.php`, `includes/tables/delivery_notes_table.php`, `includes/tables/rfq_table.php`, `includes/tables/debit_notes_table.php`, `includes/tables/expenses_table.php`, `api/purchase/get_debit_notes.php`, `tests/test_supplier_details_related_tabs_cli.php`
+**Files (changed):** `app/bms/Suppliers/supplier_details.php`, `app/bms/grn/grn.php`, `app/bms/purchase/purchase_returns.php`, `api/get_purchase_returns.php`, `app/bms/grn/delivery_notes.php`, `app/bms/purchase/rfq.php`, `app/bms/purchase/debit_notes/debit_notes.php`, `app/constant/accounts/expenses.php`, `api/account/get_expenses.php`, `app/bms/grn/dn_create.php`, `app/bms/purchase/rfq_create.php`, `app/bms/purchase/debit_notes/debit_note_create.php`
+
+Supplier Details had 4 tabs (Payments, Bills, POs, Projects); Customer and Employee Details had 8–12. Added the 7 tabs the user asked for: **Goods Received (GRN), Purchase Returns, Delivery Notes (inbound), RFQs, Debit Notes, Expenses, System Info.**
+
+Per the user's explicit instruction to avoid double coding, each list (GRN, Purchase Returns, Delivery Notes, RFQs, Debit Notes, Expenses) is **one implementation** shared by its module page and its supplier-details tab — a JS module in `assets/js/tables/` plus a PHP partial in `includes/tables/` that both hosts `include`. The tab differs from the module page only by a forced `supplier_id`/`paid_to_id` filter and a hidden Supplier/Paid-To column; everything else — the action dropdown, workflow buttons (review/approve/reject/mark paid/cancel), print templates, delete — is the exact same code running in both places, so a fix in one fixes both. `debit_notes.php` and `api/account/get_expenses.php` gained a supplier filter they didn't have before (debit notes' rows moved out of an inline JSON blob into `api/purchase/get_debit_notes.php`; expenses gained `paid_to_type`/`paid_to_id` params).
+
+Every New/Record/Create button and every "View All" link carries the supplier through (`?supplier=`, or `?paid_to_type=&paid_to_id=` for expenses) and the target page now actually pre-selects it — several of these links existed before but pointed at query params the target page silently ignored (e.g. Create PO used `?supplier_id` while `purchase_order_create.php` reads `?supplier`; fixed as a drive-by). Each of the 6 tab tables holds its first AJAX query until its tab is opened, so loading the page doesn't fire 6 queries for panes nobody has looked at.
+
+System Info shows record metadata plus an audit trail from `audit_logs` — currently empty for most suppliers because those rows are written with a NULL `entity_id`; the query is correct, the write-side gap is a separate fix.
+
+Tab bar CSS switched to the same pill/scroll rule already used by `#customerDetailTabs` and `#employeeExtrasTabs`, so all three record pages read as one system.
+
+**New test** `tests/test_supplier_details_related_tabs_cli.php` (85 assertions) — every shared asset exists and loads exactly once per page; module page and tab render the identical table minus exactly the redundant column; each feed actually filters to the supplier/payee it's given; every create/list target really pre-selects on the query string its button sends.
+
 ## 2026-08-21 (perf) — query optimization phase 3: activity log duplicate COUNT
 
 **Files:** `app/activity_log.php`, `tests/test_activity_log_count_reuse_cli.php` (new)
