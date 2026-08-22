@@ -635,6 +635,13 @@ global $company_name, $company_logo;
                         <i class="bi bi-cart me-1"></i> Recent Purchase Orders
                     </button>
                 </li>
+                <?php if (canView('grn')): ?>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-grn" type="button" role="tab">
+                        <i class="bi bi-box-seam me-1"></i> Goods Received
+                    </button>
+                </li>
+                <?php endif; ?>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-projects" type="button" role="tab">
                         <i class="bi bi-diagram-3 me-1"></i> Projects Involved
@@ -645,6 +652,48 @@ global $company_name, $company_logo;
     </div>
 
     <div class="tab-content" id="supplierSectionTabContent">
+
+        <!-- Goods Received (GRN) — same table code as app/bms/grn/grn.php, locked
+             to this supplier and with the (redundant) Supplier column hidden. -->
+        <?php if (canView('grn')): ?>
+        <div class="tab-pane fade" id="pane-grn" role="tabpanel">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white py-3 d-flex align-items-center flex-wrap gap-2">
+                            <h6 class="mb-0 fw-bold text-dark">
+                                <i class="bi bi-box-seam text-primary me-2"></i> Goods Received (GRN)
+                                <span class="badge bg-primary ms-1" id="sup-grn-count">0</span>
+                            </h6>
+                            <div class="d-flex gap-2 ms-auto">
+                                <?php if (canCreate('grn')): ?>
+                                <a href="<?= getUrl('grn_create') ?>?supplier=<?= $supplier_id ?>" class="btn btn-primary btn-sm shadow-sm">
+                                    <i class="bi bi-plus-circle me-1"></i> New GRN
+                                </a>
+                                <?php endif; ?>
+                                <a href="<?= getUrl('grn') ?>?supplier=<?= $supplier_id ?>" class="btn btn-outline-primary btn-sm shadow-sm">
+                                    View All
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php
+                            $tbl = [
+                                'id'          => 'supGrnTable',
+                                'supplier_id' => (int) $supplier_id,
+                                'hide'        => ['supplier'],
+                                'defer_pane'  => '#pane-grn',
+                                'on_count'    => 'function (n) { $("#sup-grn-count").text(n); }',
+                                'page_length' => 10,
+                            ];
+                            include ROOT_DIR . '/includes/tables/grn_table.php';
+                            ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <!-- Projects Involved -->
         <div class="tab-pane fade" id="pane-projects" role="tabpanel">
