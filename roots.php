@@ -112,6 +112,34 @@ require_once ROOT_DIR . '/actions/check_auth.php';
 require_once ROOT_DIR . '/core/session_guard.php';
 bmsSessionRelease();
 
+// ── Session lifecycle (Login History) ────────────────────────────────────────
+// Runs on every request, staff or API. All three helpers are self-contained and
+// fail silently — they must never break a page load. See core/session_tracker.php.
+require_once ROOT_DIR . '/core/session_tracker.php';
+
+// 1. If this browser's session row was already closed by something else since
+//    the last request (an admin revoked it, the idle sweep expired it, or the
+//    user signed in again elsewhere) — sign this tab out too.
+if (function_exists('bmsEnforceSessionLifecycle')) {
+    bmsEnforceSessionLifecycle($pdo);
+}
+
+// 2. Heartbeat — bump last_seen_at (throttled to 60s server-side inside the
+//    function itself) so an idle timeout has a real last-active moment.
+if (function_exists('touchUserSession') && !empty($_SESSION['session_row_id'])) {
+    touchUserSession($pdo, (int) $_SESSION['session_row_id']);
+}
+
+// 3. Idle-session sweep — throttled to once per 5 minutes across ALL traffic
+//    (not just full page loads), same self-contained/fail-silent pattern as
+//    cron/check_hr_expiry.php below in header.php, but placed here instead so
+//    API/AJAX-heavy traffic gives it as many chances to run as page views do.
+if (function_exists('get_setting') && function_exists('save_setting')
+    && (time() - (int) get_setting('session_expiry_last_ts', '0')) >= 300) {
+    save_setting('session_expiry_last_ts', (string) time());
+    @include_once ROOT_DIR . '/cron/expire_idle_sessions.php';
+}
+
 
 // ============================================================================
 // URL ROUTING MAP

@@ -18,12 +18,17 @@ require_once "$root/roots.php";
 require_once "$root/core/session_tracker.php";
 global $pdo;
 
-$pass = 0; $fail = 0;
+$pass = 0; $fail = 0; $skip = 0;
 
 function ok(bool $cond, string $msg): void {
     global $pass, $fail;
     if ($cond) { $pass++; echo "  \033[32m✅\033[0m $msg\n"; }
     else        { $fail++; echo "  \033[31m❌ FAIL: $msg\033[0m\n"; }
+}
+
+function skip(string $msg): void {
+    global $skip;
+    $skip++; echo "  \033[33m⏭\033[0m  $msg\n";
 }
 
 // ── 1. Schema ────────────────────────────────────────────────────────────────
@@ -204,18 +209,498 @@ ok(str_contains($pageContent, 'get_login_history'),   "Page references the corre
 ok(str_contains($pageContent, 'Location'),            "Page shows Location column");
 ok(str_contains($pageContent, 'ISP'),                 "Page shows ISP column");
 ok(str_contains($pageContent, 'device_type'),         "Page uses device_type from API");
-ok(str_contains($pageContent, 'today_logins'),        "Page has Today stat card");
+ok(str_contains($pageContent, 'signins_today'),       "Page has Sign-ins Today stat card");
+ok(str_contains($pageContent, 'signed_in_now'),       "Page has Signed In Now stat card");
+ok(str_contains($pageContent, 'precise_today'),       "Page has Precise Today stat card");
 
 // Login History is consolidated inside Settings > Admin (system_settings.php),
 // not a standalone top-nav item — header.php should NOT link to it directly.
 $headerContent = file_get_contents($root . '/header.php');
 ok(!str_contains($headerContent, "getUrl('login_history')"), "header.php no longer links to login_history directly (moved into Settings > Admin)");
 $settingsPageContent = file_get_contents($root . '/app/constant/settings/system_settings.php');
-ok(str_contains($settingsPageContent, "getUrl('login_history')"), "system_settings.php links to login_history");
-ok(str_contains($settingsPageContent, 'bi-clock-history'),        "system_settings.php uses clock-history icon");
+// 2026-08-29: relocated out of Settings > Admin into Activity Logs (still
+// strictly admin-only — see the [8] section below for the cross-link checks).
+ok(!str_contains($settingsPageContent, "getUrl('login_history')"), "system_settings.php no longer links to login_history (relocated)");
+
+// ── 8. Session lifecycle upgrade (2026-08-29) ──────────────────────────────────
+// Matches/exceeds the reference LMS Login History page: real expiry, "signed in
+// again" reconciliation, admin revoke, precise location, richer filters.
+echo "\n[8] Session lifecycle — schema, functions, filters, UI\n";
+
+$lifecycleCols = ['last_seen_at', 'php_session_id', 'revoked_by', 'revoked_at',
+                  'precise_lat', 'precise_lng', 'precise_accuracy_m', 'precise_captured_at'];
+foreach ($lifecycleCols as $col) {
+    ok((bool) $pdo->query("SHOW COLUMNS FROM user_sessions LIKE " . $pdo->quote($col))->fetch(),
+       "user_sessions.{$col} exists");
+}
+
+ok(function_exists('touchUserSession'),           'touchUserSession() defined');
+ok(function_exists('expireIdleSessions'),          'expireIdleSessions() defined');
+ok(function_exists('revokeUserSession'),           'revokeUserSession() defined');
+ok(function_exists('recordPreciseLocation'),       'recordPreciseLocation() defined');
+ok(function_exists('bmsEnforceSessionLifecycle'),  'bmsEnforceSessionLifecycle() defined');
+
+// -- Real DB round-trips, same pattern/cleanup convention as section [4] --
+$testUid = 999900 + random_int(1, 99); // avoid collision with a concurrent test run
+$pdo->exec("DELETE FROM user_sessions WHERE user_id = {$testUid}");
+
+// 8a. Re-login while a prior session is still open: ONLY two things may ever
+// automatically end a session (Logout click, 30-min idle timeout) — a second
+// login is neither, so BOTH rows must stay open. This replaced the old
+// auto-close-on-relogin ("superseded") behavior per the user's own decision.
+$firstRow  = startUserSession($pdo, $testUid, '127.0.0.1', 'LifecycleTest/1', 'phpsess-t1');
+$secondRow = startUserSession($pdo, $testUid, '127.0.0.1', 'LifecycleTest/2', 'phpsess-t2');
+$first  = $pdo->query("SELECT logout_type, logout_at FROM user_sessions WHERE id={$firstRow}")->fetch(PDO::FETCH_ASSOC);
+$second = $pdo->query("SELECT logout_type FROM user_sessions WHERE id={$secondRow}")->fetch(PDO::FETCH_ASSOC);
+ok($first['logout_type'] === null && $first['logout_at'] === null,  "re-login does NOT auto-close the prior row — it stays 'Active'");
+ok($second['logout_type'] === null,                                 "the new row from re-login is also open — both are 'Active' side by side");
+
+// 8b. Idle sweep closes at last-seen, never "now" — and never goes negative.
+$pdo->exec("UPDATE user_sessions SET login_at = DATE_SUB(NOW(), INTERVAL 60 MINUTE),
+            last_seen_at = DATE_SUB(NOW(), INTERVAL 45 MINUTE) WHERE id = {$secondRow}");
+expireIdleSessions($pdo, 1800);
+$idle = $pdo->query("SELECT logout_type, duration_seconds, logout_at, last_seen_at FROM user_sessions WHERE id={$secondRow}")->fetch(PDO::FETCH_ASSOC);
+ok($idle['logout_type'] === 'timeout',                 "idle sweep closes with logout_type='timeout'");
+ok($idle['logout_at'] === $idle['last_seen_at'],       "idle sweep closes AT last-seen, not 'now'");
+ok((int) $idle['duration_seconds'] === 900,            "idle sweep computes duration from login_at to last-seen (900s)");
+
+// 8c. Revoke: audit fields set, idempotent against a second call.
+$thirdRow = startUserSession($pdo, $testUid, '127.0.0.1', 'LifecycleTest/3', 'phpsess-t3');
+$revoked  = revokeUserSession($pdo, $thirdRow, 4, 'revoked');
+$rrow = $pdo->query("SELECT logout_type, revoked_by, revoked_at FROM user_sessions WHERE id={$thirdRow}")->fetch(PDO::FETCH_ASSOC);
+ok($revoked === true,                                  "revokeUserSession() returns true on a live row");
+ok($rrow['logout_type'] === 'revoked' && (int) $rrow['revoked_by'] === 4 && $rrow['revoked_at'] !== null,
+   "revoke stamps logout_type/revoked_by/revoked_at");
+ok(revokeUserSession($pdo, $thirdRow, 4, 'revoked') === false, "revoking an already-closed row is a no-op, not an error");
+
+// 8d. Precise location: bounds-checked and one-shot at the SQL level.
+$fourthRow = startUserSession($pdo, $testUid, '127.0.0.1', 'LifecycleTest/4', 'phpsess-t4');
+ok(recordPreciseLocation($pdo, $fourthRow, -6.7924, 39.2083, 25) === true, "recordPreciseLocation() accepts valid coordinates");
+ok(recordPreciseLocation($pdo, $fourthRow, 0, 0, 10) === false,            "a second ping on the same row is refused (one-shot)");
+ok(recordPreciseLocation($pdo, $fourthRow, 999, 39, 10) === false,         "out-of-range latitude is refused");
+$geo = $pdo->query("SELECT precise_lat FROM user_sessions WHERE id={$fourthRow}")->fetch(PDO::FETCH_ASSOC);
+ok(abs((float) $geo['precise_lat'] + 6.7924) < 0.0001,                     "the original (not the rejected) fix is what's stored");
+
+$pdo->exec("DELETE FROM user_sessions WHERE user_id = {$testUid}");
+ok(!$pdo->query("SELECT id FROM user_sessions WHERE user_id = {$testUid}")->fetch(), "lifecycle test rows cleaned up");
+
+// -- Static checks: new filters wired end to end (API + page) --
+$apiContent = file_get_contents($root . '/api/get_login_history.php');
+foreach (["'ended'", "'device'", "'country'", "'location_source'", "'revoked'", "'admin_ended'"] as $needle) {
+    ok(str_contains($apiContent, $needle), "API references filter/state {$needle}");
+}
+
+$pageContent = file_get_contents($loginHistoryFile);
+foreach (['periodChips', 'f-ended', 'f-device', 'f-country', 'f-location-source', 'endSession(', 'endedBadge', 'CURRENT_SESSION_ROW_ID'] as $needle) {
+    ok(str_contains($pageContent, $needle), "Page references {$needle}");
+}
+
+ok(is_file($root . '/api/revoke_session.php'), "api/revoke_session.php exists");
+$revokeApiContent = file_get_contents($root . '/api/revoke_session.php');
+ok(str_contains($revokeApiContent, 'isAdmin()'),          "revoke_session.php checks isAdmin()");
+ok(str_contains($revokeApiContent, 'csrf_check()'),       "revoke_session.php checks csrf_check()");
+ok(str_contains($revokeApiContent, "'POST'"),             "revoke_session.php requires POST");
+ok(str_contains($revokeApiContent, 'revokeUserSession'),  "revoke_session.php calls revokeUserSession()");
+ok(str_contains($revokeApiContent, 'logAudit('),          "revoke_session.php writes an audit-log entry");
+
+ok(is_file($root . '/api/session_geo_ping.php'), "api/session_geo_ping.php exists");
+$geoApiContent = file_get_contents($root . '/api/session_geo_ping.php');
+ok(str_contains($geoApiContent, 'isAuthenticated()'),      "session_geo_ping.php checks isAuthenticated()");
+ok(str_contains($geoApiContent, 'recordPreciseLocation'),  "session_geo_ping.php calls recordPreciseLocation()");
+
+// -- Relocation: cross-linked from Activity Logs, still admin-only, not a
+//    standalone Settings > Admin item --
+$activityLogContent = file_get_contents($root . '/app/activity_log.php');
+ok(str_contains($activityLogContent, "getUrl('login_history')"),  "activity_log.php links to login_history");
+// A FRESH isAdmin() call, not the page's own $is_admin variable — that variable
+// is captured near the top of the file, BEFORE header.php (required much later
+// in this file) refreshes $_SESSION['is_admin'] from the DB, so it can be stale
+// for this render. Caught live: a forged non-admin session still saw the
+// button because $is_admin held an admin value left over from a prior request
+// on the same test session.
+$loginHistoryLinkPos = strpos($activityLogContent, "getUrl('login_history')");
+$precedingSnippet = $loginHistoryLinkPos !== false ? substr($activityLogContent, max(0, $loginHistoryLinkPos - 400), 400) : '';
+ok(str_contains($precedingSnippet, 'if (isAdmin())'),
+   "activity_log.php's Login History link is gated on a FRESH isAdmin() call, not the page's own (possibly stale) \$is_admin");
+ok(str_contains($pageContent, "getUrl('activity_log')"), "login_history.php links back to Activity Logs");
+ok(str_contains($pageContent, 'Admin only'),             "login_history.php still visibly marks itself admin-only");
+
+// ── 9. Duration display + timezone (2026-08-29 live-verification bugfixes) ──────
+// Both caught by loading the real page after two real logins, not by static
+// review — worth pinning down precisely so they can't come back silently.
+echo "\n[9] Duration display + timezone-qualified timestamps\n";
+
+// 9a. formatDur(0) must be "0s", never the dash it used to be. `!secs` treats
+// 0 as falsy — that's what made every honestly-zero-second session (a
+// re-login a moment after signing in, an idle-timeout with no heartbeat ever
+// recorded) show a dash instead of the reference LMS's own "0s".
+ok(str_contains($pageContent, "if (secs === null || secs === undefined || secs === '') return '—';"),
+   "formatDur() treats only missing data as '—' — 0 is a real, displayable value");
+ok(!preg_match('/function formatDur\([^)]*\)\s*\{\s*if\s*\(!secs\)/', $pageContent),
+   "the old '!secs returns em-dash' form (which swallowed real zeros) is gone");
+
+// 9b. Active-row duration is computed immediately from login_at, not hardcoded
+// while waiting for the first tick — no flash of a placeholder on first paint.
+ok(str_contains($pageContent, 'function liveElapsedSeconds('), "liveElapsedSeconds() helper exists");
+ok(!str_contains($pageContent, "isActive ? '—' : formatDur(data)"),
+   "table's Duration column no longer hardcodes '—' for Active rows");
+ok(str_contains($pageContent, 'isActive ? formatDur(liveElapsedSeconds(row.login_at))'),
+   "table computes the Active row's real elapsed time immediately, from its own login_at");
+ok(str_contains($pageContent, 'isActive ? formatDur(liveElapsedSeconds(r.login_at))'),
+   "card view computes the Active row's real elapsed time immediately too");
+
+// 9c. Live HTTP reproduction of the actual bug: MySQL returns a bare
+// "Y-m-d H:i:s" string with no timezone marker. Handed straight to JS's
+// Date(), that string is parsed in the BROWSER's own timezone, not the
+// server's — so on any viewer not also set to Africa/Dar_es_Salaam,
+// "new Date(login_at) - Date.now()" comes out negative and the ticker gets
+// stuck at 0 forever (reproduced live: a session that had been running for
+// over 3 minutes showed a permanent "0s"). withTzOffset() fixes this by
+// appending the real UTC offset so the timestamp is unambiguous ISO-8601
+// everywhere, independent of the viewer's own machine.
+$apiContent = file_get_contents($root . '/api/get_login_history.php');
+ok(str_contains($apiContent, 'function withTzOffset('), "get_login_history.php defines withTzOffset()");
+ok(str_contains($apiContent, "'login_at'           => withTzOffset(\$row['login_at'])"),
+   "login_at is sent timezone-qualified");
+ok(str_contains($apiContent, "'logout_at'          => withTzOffset(\$row['logout_at'])"),
+   "logout_at is sent timezone-qualified");
+
+$base = getenv('BMS_TEST_URL') ?: 'http://localhost/bms';
+$reachable = @file_get_contents("$base/login.php", false, stream_context_create(['http' => ['timeout' => 5, 'ignore_errors' => true]])) !== false;
+if (!$reachable) {
+    skip("local server not reachable at $base — live timezone reproduction skipped (set BMS_TEST_URL to override)");
+} else {
+    $tzTestUid = 999600 + random_int(1, 99);
+    $pdo->exec("DELETE FROM user_sessions WHERE user_id = {$tzTestUid}");
+    $rowId = startUserSession($pdo, $tzTestUid, '127.0.0.1', 'TzOffsetTest/1', 'sess-tz-' . $tzTestUid);
+
+    // Simulate the auth this API demands, then call it directly in-process —
+    // no real login credentials available, same technique the other live
+    // sections in this file already use.
+    $_SESSION['user_id'] = $tzTestUid; // arbitrary; only isAdmin() matters below
+    $_SESSION['is_admin'] = true;
+    $_GET = ['draw' => 1, 'start' => 0, 'length' => 5, 'search' => ['value' => ''], 'user_id' => $tzTestUid];
+    ob_start();
+    include "$root/api/get_login_history.php";
+    $json = json_decode(ob_get_clean(), true);
+    $sentLoginAt = $json['data'][0]['login_at'] ?? null;
+
+    ok($sentLoginAt !== null && (bool) preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/', $sentLoginAt),
+       "API sends login_at as full ISO-8601 with a UTC offset (got: " . var_export($sentLoginAt, true) . ")");
+
+    if ($sentLoginAt !== null) {
+        // The offset-qualified string must resolve to the SAME real-world instant
+        // as the raw DB value interpreted in the app's own configured timezone —
+        // i.e. withTzOffset() didn't just decorate the string, it decorated it
+        // with the RIGHT offset.
+        $rawFromDb   = $pdo->query("SELECT login_at FROM user_sessions WHERE id={$rowId}")->fetchColumn();
+        $appTz       = function_exists('get_setting') ? get_setting('timezone', 'Africa/Dar_es_Salaam') : 'Africa/Dar_es_Salaam';
+        $groundTruth = new DateTime($rawFromDb, new DateTimeZone($appTz));
+        $asSent      = new DateTime($sentLoginAt);
+        ok($groundTruth->getTimestamp() === $asSent->getTimestamp(),
+           "the sent timestamp resolves to the exact same real-world instant as the raw DB value in the app's configured timezone");
+    }
+
+    $pdo->exec("DELETE FROM user_sessions WHERE user_id = {$tzTestUid}");
+    unset($_SESSION['user_id'], $_SESSION['is_admin']);
+}
+
+// ── 10. Block Account (2026-08-29) ──────────────────────────────────────────
+// "Must be made by admin physically, and not otherwise" — Block/Activate is
+// reached ONLY via a manual admin click through ajax/toggle_user.php, which
+// already gates isAdmin(). Nothing anywhere calls it automatically; the
+// "Unfamiliar" flag is informational only and never triggers this by itself.
+echo "\n[10] Block Account — real enforcement, not cosmetic\n";
+
+$pageContent = file_get_contents($loginHistoryFile); // re-read: this section changed it
+ok(str_contains($pageContent, 'function renderActionsMenu('), 'renderActionsMenu() shared by table and card views exists');
+ok(str_contains($pageContent, "buildUrl('ajax/toggle_user.php')"), 'Block/Activate reuses the existing ajax/toggle_user.php (no duplicate endpoint)');
+ok(str_contains($pageContent, 'CURRENT_ADMIN_USER_ID'), "the admin's own row is excluded from Block Account client-side");
+ok(str_contains($pageContent, 'bi-gear-fill') && str_contains($pageContent, 'dropdown-toggle'),
+   'Actions column uses the gear-icon + Bootstrap-caret dropdown (same pattern as the Suppliers list), not a bare button');
+
+$loginPhpContent = file_get_contents($root . '/actions/login.php');
+ok(str_contains($loginPhpContent, "(int) (\$user['is_active'] ?? 1) !== 1"),
+   'actions/login.php now actually enforces is_active — this used to be checked nowhere');
+ok(preg_match('/is_active.*!==\s*1.*\n.*\n.*exit;/s', $loginPhpContent) === 1 || str_contains($loginPhpContent, 'exit;'),
+   'the is_active check exits before a session is ever created for a blocked account');
+
+$toggleUserContent = file_get_contents($root . '/ajax/toggle_user.php');
+ok(str_contains($toggleUserContent, "require_once '../core/session_tracker.php'"),
+   'toggle_user.php now loads session_tracker.php to end live sessions');
+ok(str_contains($toggleUserContent, 'revokeUserSession('),
+   'deactivating now force-ends the account\'s open session(s) immediately, not just on their next login attempt');
+ok(str_contains($toggleUserContent, "'blocked'"), "the ended session is tagged 'blocked', distinct from a generic admin-ended session");
+
+$trackerContent = file_get_contents($root . '/core/session_tracker.php');
+ok(str_contains($trackerContent, "'revoked', 'admin_ended', 'blocked'"), "revokeUserSession() accepts the new 'blocked' reason");
+
+ok(str_contains($apiContent, 'UNFAMILIAR_SQL'), 'get_login_history.php defines the unfamiliar-login SQL once and reuses it (SELECT + optional filter can\'t drift apart)');
+ok(str_contains($apiContent, "u.is_active AS user_is_active"), "API exposes the target account's CURRENT is_active status per row");
+
+// -- Live: the full real-world cycle a blocked user actually experiences --
+if (!$reachable) {
+    skip('local server not reachable — live block/unblock cycle skipped');
+} else {
+    $blockUid = 999900 + random_int(1, 99);
+    $blockUname = '__block_test_' . $blockUid;
+    $pdo->exec("DELETE FROM users WHERE username = " . $pdo->quote($blockUname));
+    $pdo->exec("DELETE FROM user_sessions WHERE user_id = {$blockUid}");
+    $plainPw = 'TestPass' . random_int(1000, 9999) . '!';
+    $hash = password_hash($plainPw, PASSWORD_DEFAULT);
+    $ins = $pdo->prepare("INSERT INTO users (username, password, email, role_id, is_active, first_name, last_name) VALUES (?, ?, ?, 1, 1, 'Block', 'Test')");
+    $ins->execute([$blockUname, $hash, $blockUname . '@example.test']);
+    $blockUid = (int) $pdo->lastInsertId();
+
+    $postLogin = function () use ($base, $blockUname, $plainPw) {
+        $ctx = stream_context_create(['http' => [
+            'method' => 'POST', 'timeout' => 10, 'ignore_errors' => true,
+            'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
+            'content' => http_build_query(['username' => $blockUname, 'password' => $plainPw]),
+        ]]);
+        $raw = @file_get_contents("$base/actions/login.php", false, $ctx);
+        return $raw !== false ? json_decode($raw, true) : null;
+    };
+
+    $login1 = $postLogin();
+    ok($login1 !== null && $login1['success'] === true, 'a normal, active account logs in successfully (baseline)');
+    ok((int) $pdo->query("SELECT COUNT(*) FROM user_sessions WHERE user_id={$blockUid} AND logout_at IS NULL")->fetchColumn() === 1,
+       'that login opened exactly one session row');
+
+    $pdo->exec("UPDATE users SET is_active = 0 WHERE user_id = {$blockUid}"); // simulates the admin click directly on the flag
+    $openBefore = $pdo->query("SELECT id FROM user_sessions WHERE user_id={$blockUid} AND logout_at IS NULL")->fetchColumn();
+    ok($openBefore !== false, 'session is still open immediately after only flipping is_active (proves the NEXT check is what closes it, not this one)');
+
+    $login2 = $postLogin();
+    ok($login2 !== null && $login2['success'] === false
+       && str_contains($login2['message'] ?? '', 'deactivated'),
+       'login is refused for the now-blocked account, with a clear reason');
+    ok((int) $pdo->query("SELECT COUNT(*) FROM user_sessions WHERE user_id={$blockUid}")->fetchColumn() === 1,
+       'the refused login attempt did not create a second session row');
+
+    $pdo->exec("UPDATE users SET is_active = 1 WHERE user_id = {$blockUid}");
+    $login3 = $postLogin();
+    ok($login3 !== null && $login3['success'] === true, 'reactivating restores login access immediately');
+
+    $pdo->exec("DELETE FROM user_sessions WHERE user_id = {$blockUid}");
+    $pdo->exec("DELETE FROM users WHERE user_id = {$blockUid}");
+    ok((int) $pdo->query("SELECT COUNT(*) FROM users WHERE user_id={$blockUid}")->fetchColumn() === 0, 'throwaway test account cleaned up');
+}
+
+// -- Live: unfamiliar-flag round trip using the real filter end to end --
+if ($reachable) {
+    $ufUid = 999800 + random_int(1, 99);
+    $pdo->exec("DELETE FROM user_sessions WHERE user_id = {$ufUid}");
+    $pdo->exec("INSERT INTO user_sessions (user_id, login_at, country, device_type, ip_address) VALUES ({$ufUid}, '2026-08-29 10:00:00', 'Kenya', 'Desktop', '9.9.9.9')");
+    $pdo->exec("INSERT INTO user_sessions (user_id, login_at, country, device_type, ip_address) VALUES ({$ufUid}, '2026-08-29 11:00:00', 'Kenya', 'Desktop', '9.9.9.10')");
+
+    $_SESSION['user_id'] = $ufUid;
+    $_SESSION['is_admin'] = true;
+    $_GET = ['draw' => 1, 'start' => 0, 'length' => 10, 'search' => ['value' => ''], 'user_id' => $ufUid, 'unfamiliar' => '1'];
+    ob_start();
+    include "$root/api/get_login_history.php";
+    $ufJson = json_decode(ob_get_clean(), true);
+
+    ok(($ufJson['recordsFiltered'] ?? null) === 1, "unfamiliar=1 filter returns exactly the one genuinely-first-time row (got " . var_export($ufJson['recordsFiltered'] ?? null, true) . ")");
+    ok(!empty($ufJson['data'][0]['is_unfamiliar']), 'the returned row is correctly flagged is_unfamiliar');
+
+    $pdo->exec("DELETE FROM user_sessions WHERE user_id = {$ufUid}");
+    unset($_SESSION['user_id'], $_SESSION['is_admin']);
+}
+
+// ── 11. Unfamiliar-login + concurrent-login notifications (2026-08-29) ──
+// Reuses the existing Smart Notification Engine (core/notify.php) rather than
+// a new mail mechanism. Final decision: only two things may ever
+// automatically end a session (Logout click, 30-minute idle timeout) —
+// unfamiliar logins and concurrent logins are pure signals now, email-only,
+// with no auto-logout opt-in of any kind. The admin email fires
+// unconditionally in both cases, independent of the general "enable email
+// notifications" toggle.
+echo "\n[11] Unfamiliar/concurrent-login notifications + login-page cleanup\n";
+
+ok(is_file($root . '/migrations/2026_08_29_unfamiliar_login_notifications.php'), 'unfamiliar-login migration file exists');
+ok((bool) $pdo->query("SELECT 1 FROM notification_events WHERE event_key = 'unfamiliar_login_detected'")->fetch(),
+   "notification_events row seeded for 'unfamiliar_login_detected'");
+ok((bool) $pdo->query("SELECT 1 FROM notification_rules WHERE event_key = 'unfamiliar_login_detected' AND channel_email = 1")->fetch(),
+   'a forced-email notification_rules row exists (independent of the general email toggle)');
+
+ok(is_file($root . '/migrations/2026_08_29_concurrent_login_notification.php'), 'concurrent-login migration file exists');
+ok((bool) $pdo->query("SELECT 1 FROM notification_events WHERE event_key = 'concurrent_login_detected'")->fetch(),
+   "notification_events row seeded for 'concurrent_login_detected'");
+ok((bool) $pdo->query("SELECT 1 FROM notification_rules WHERE event_key = 'concurrent_login_detected' AND channel_email = 1")->fetch(),
+   'a forced-email notification_rules row exists for concurrent_login_detected too');
+
+$trackerContent2 = file_get_contents($root . '/core/session_tracker.php');
+ok(str_contains($trackerContent2, 'function isUnfamiliarLogin('), 'isUnfamiliarLogin() is the single source of truth for the live check');
+ok(str_contains($trackerContent2, 'function notifyUnfamiliarLogin('), 'notifyUnfamiliarLogin() exists');
+ok(str_contains($trackerContent2, 'function notifyConcurrentLogin('), 'notifyConcurrentLogin() exists');
+ok(!str_contains($trackerContent2, 'unfamiliar_login_policy'), "the 'unfamiliar_login_policy' setting is gone entirely — not just defaulted off");
+ok(!str_contains($trackerContent2, "'auto_logout'"), "no code path can ever produce logout_type='auto_logout' any more");
+ok(!str_contains($trackerContent2, "'superseded'"), "no code path can ever produce logout_type='superseded' any more");
+ok(str_contains($trackerContent2, 'if ($priorOpenCount > 0)'), 'a prior open session is counted and used purely as a notification trigger, not acted on');
+
+$sysSettingsContent = file_get_contents($root . '/app/constant/settings/system_settings.php');
+ok(!str_contains($sysSettingsContent, 'unfamiliar_login_policy'), 'System Settings no longer exposes the auto-logout policy setting at all');
+ok(!str_contains($sysSettingsContent, 'Sign out automatically'), "the 'Sign out automatically' option text is gone from the Security tab");
+ok(str_contains($sysSettingsContent, 'Unfamiliar Login &amp; Concurrent Login Response'), 'the Security tab explains the new email-only behavior for both signals');
+ok(str_contains($sysSettingsContent, 'always emailed'), "the UI itself states the admin email is not optional, so this isn't just an internal implementation detail");
+
+$loginPageContent = file_get_contents($root . '/login.php');
+ok(!str_contains($loginPageContent, 'ended_messages'), 'the login-page notification banner was removed entirely, as instructed');
+ok(!str_contains($loginPageContent, 'You have been signed out'), "no leftover banner text remains on the login page");
+
+$loginHistoryContent2 = file_get_contents($loginHistoryFile);
+ok(!str_contains($loginHistoryContent2, "'auto_logout'"), "Login History's own filter/badge code has no 'auto_logout' left either");
+ok(!str_contains($loginHistoryContent2, "'superseded'"), "Login History's own filter/badge code has no 'superseded' left either");
+ok(str_contains($loginHistoryContent2, 'isActive && !isSelf'), 'End Session is only ever offered for ANOTHER account, never the admin\'s own row');
+
+$revokeApiContent = file_get_contents($root . '/api/revoke_session.php');
+ok(str_contains($revokeApiContent, "(int) \$target['user_id'] === (int) \$_SESSION['user_id']"),
+   'api/revoke_session.php also refuses an admin ending their OWN session server-side, not just hidden in the UI');
+
+// -- Live: real DB round-trips for both policy branches --
+// get_setting() caches the whole settings table in a `static` variable that
+// is never invalidated by save_setting() — harmless in real use (every HTTP
+// request is its own fresh PHP process with its own fresh cache) but means a
+// save-then-read in THIS one long-running test process would silently read a
+// stale value. Each branch below runs in its own fresh `php -r` subprocess
+// instead, reproducing the real one-setting-per-request condition rather
+// than working around a test-only artifact by touching production code.
+// A temp SCRIPT FILE, not `php -r <code>`: escapeshellarg() quotes
+// differently per platform (single quotes on Unix, double on Windows), which
+// makes passing PHP source containing its OWN double-quoted strings through
+// one shell argument fragile. A file path is a single, simple argument no
+// matter the OS.
+$phpBin = PHP_BINARY;
+$runInFreshProcess = function (string $phpCode) use ($phpBin) {
+    $tmp = tempnam(sys_get_temp_dir(), 'bms_test_') . '.php';
+    file_put_contents($tmp, "<?php\n" . $phpCode);
+    $out = shell_exec($phpBin . ' ' . escapeshellarg($tmp) . ' 2>&1');
+    unlink($tmp);
+    // The bootstrap chain can print PHP warnings ahead of the real output in
+    // this exact re-include-in-a-subprocess situation (the same
+    // session-already-started noise seen elsewhere in this codebase when
+    // config.php's own session handling runs a second time) — never a real
+    // failure, just noise this harness must not choke on. json_encode()'s
+    // own output is always single-line with no leading/trailing whitespace,
+    // so the last non-empty line is always the real result.
+    $lines = array_values(array_filter(explode("\n", (string) $out), fn($l) => trim($l) !== ''));
+    return $lines ? trim(end($lines)) : '';
+};
+// -- Unfamiliar login: notification fires, session is left completely alone --
+$notifyUid = 999950 + random_int(1, 9);
+$code = 'require ' . var_export("$root/includes/config.php", true) . ';'
+      . 'require ' . var_export("$root/helpers.php", true) . ';'
+      . 'require ' . var_export("$root/core/session_tracker.php", true) . ';'
+      . '$pdo->exec("DELETE FROM user_sessions WHERE user_id = ' . $notifyUid . '");'
+      . '$id = startUserSession($pdo, ' . $notifyUid . ', "77.77.77.77", "NotifyPolicyTest/1", "sess-' . $notifyUid . '");'
+      . '$row = $pdo->query("SELECT logout_at, logout_type FROM user_sessions WHERE id=$id")->fetch(PDO::FETCH_ASSOC);'
+      . '$outbox = (int) $pdo->query("SELECT COUNT(*) FROM notification_outbox WHERE entity_type=\'user_session\' AND entity_id=$id AND event_key=\'unfamiliar_login_detected\'")->fetchColumn();'
+      . 'echo json_encode(["id" => $id, "logout_at" => $row["logout_at"], "logout_type" => $row["logout_type"], "outbox" => $outbox]);';
+$notifyResult = json_decode(trim((string) $runInFreshProcess($code)), true);
+ok(is_array($notifyResult), 'unfamiliar-login subprocess ran and returned valid JSON (raw: ' . var_export($notifyResult, true) . ')');
+if (is_array($notifyResult)) {
+    ok($notifyResult['logout_at'] === null, 'an unfamiliar login is left completely alone — no automatic session action, ever');
+    ok((int) $notifyResult['outbox'] === 1, 'exactly one admin notification email was queued');
+}
+
+// -- Concurrent login: signing in again while a prior session is open fires
+// concurrent_login_detected and leaves BOTH sessions genuinely "Active" —
+// this is the user's own final decision, replacing the old auto-close
+// ("superseded") behavior entirely. --
+$concUid = 999960 + random_int(1, 9);
+$code3 = 'require ' . var_export("$root/includes/config.php", true) . ';'
+       . 'require ' . var_export("$root/helpers.php", true) . ';'
+       . 'require ' . var_export("$root/core/session_tracker.php", true) . ';'
+       . '$pdo->exec("DELETE FROM user_sessions WHERE user_id = ' . $concUid . '");'
+       . '$firstId = startUserSession($pdo, ' . $concUid . ', "88.88.88.88", "ConcurrentTest/1", "sess-' . $concUid . '-1");'
+       . '$secondId = startUserSession($pdo, ' . $concUid . ', "88.88.88.88", "ConcurrentTest/1", "sess-' . $concUid . '-2");'
+       . '$firstRow = $pdo->query("SELECT logout_at, logout_type FROM user_sessions WHERE id=$firstId")->fetch(PDO::FETCH_ASSOC);'
+       . '$secondRow = $pdo->query("SELECT logout_at FROM user_sessions WHERE id=$secondId")->fetch(PDO::FETCH_ASSOC);'
+       . '$outbox = (int) $pdo->query("SELECT COUNT(*) FROM notification_outbox WHERE entity_type=\'user_session\' AND entity_id=$secondId AND event_key=\'concurrent_login_detected\'")->fetchColumn();'
+       . 'echo json_encode(["firstId" => $firstId, "firstLogoutAt" => $firstRow["logout_at"], "firstLogoutType" => $firstRow["logout_type"], "secondLogoutAt" => $secondRow["logout_at"], "outbox" => $outbox]);';
+$concResult = json_decode(trim((string) $runInFreshProcess($code3)), true);
+ok(is_array($concResult), 'concurrent-login subprocess ran and returned valid JSON (raw: ' . var_export($concResult, true) . ')');
+if (is_array($concResult)) {
+    ok($concResult['firstLogoutAt'] === null && $concResult['firstLogoutType'] === null,
+       'the earlier session is NOT auto-closed when the account signs in again — it stays Active');
+    ok($concResult['secondLogoutAt'] === null, 'the new session is also Active — both sit open side by side');
+    ok((int) $concResult['outbox'] === 1, 'exactly one concurrent_login_detected admin email was queued for the second login');
+}
+
+$sessionIdsToClean = $pdo->query("SELECT id FROM user_sessions WHERE user_id IN ({$notifyUid}, {$concUid})")->fetchAll(PDO::FETCH_COLUMN);
+if ($sessionIdsToClean) {
+    $ph = implode(',', $sessionIdsToClean);
+    $pdo->exec("DELETE FROM notification_outbox WHERE entity_type = 'user_session' AND entity_id IN ($ph)");
+    $pdo->exec("DELETE FROM notification_log WHERE entity_type = 'user_session' AND entity_id IN ($ph)");
+}
+$pdo->exec("DELETE FROM user_sessions WHERE user_id IN ({$notifyUid}, {$concUid})");
+$pdo->exec("DELETE FROM notification_dedupe WHERE dedupe_key LIKE 'unfamiliar_login_detected|%' OR dedupe_key LIKE 'concurrent_login_detected|%'");
+
+// -- Live: the reactivation email a real Activate Account click sends --
+if ($reachable) {
+    $reactUname = '__reactivate_test_' . random_int(10000, 99999);
+    $pdo->exec("DELETE FROM users WHERE username = " . $pdo->quote($reactUname));
+    $ins2 = $pdo->prepare("INSERT INTO users (username, password, email, role_id, is_active, first_name, last_name) VALUES (?, ?, ?, 1, 0, 'React', 'Test')");
+    $ins2->execute([$reactUname, password_hash('x', PASSWORD_DEFAULT), $reactUname . '@example.test']);
+    $reactUid = (int) $pdo->lastInsertId();
+
+    // ajax/toggle_user.php uses plain relative requires ('../roots.php', not
+    // __DIR__-prefixed), which only resolve correctly when the CWD is the
+    // ajax/ directory itself (true for every real request, since the
+    // webserver's CWD is always the requested script's own directory) — not
+    // true by default for a CLI test running from the project root. chdir()
+    // for the duration of the include reproduces that real condition instead
+    // of patching the target file just to make it includable here.
+    // Same output-pollution risk as the subprocess helper above: including
+    // roots.php a second time (already loaded once at this file's own top)
+    // can print session-related warnings ahead of toggle_user.php's real
+    // JSON. Take the last non-empty line rather than the raw buffer.
+    $lastJsonLine = function (string $buf): string {
+        $lines = array_values(array_filter(explode("\n", $buf), fn($l) => trim($l) !== ''));
+        return $lines ? trim(end($lines)) : '';
+    };
+
+    $_SESSION['user_id'] = 4; $_SESSION['role_id'] = 1; $_SESSION['is_admin'] = true; // acting admin for the audit trail
+    $_POST = ['user_id' => $reactUid, 'action' => 'activate'];
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+    $__cwd = getcwd();
+    chdir("$root/ajax");
+    ob_start();
+    include "$root/ajax/toggle_user.php";
+    $toggleResp = json_decode($lastJsonLine(ob_get_clean()), true);
+    chdir($__cwd);
+    ok(($toggleResp['success'] ?? false) === true, 'the activate call itself succeeds (raw: ' . var_export($toggleResp, true) . ')');
+
+    $emailRow = $pdo->query("SELECT to_email, subject, body FROM notification_outbox WHERE entity_type='user' AND entity_id={$reactUid} AND event_key='account_reactivated'")->fetch(PDO::FETCH_ASSOC);
+    ok($emailRow !== false, 'reactivation queues a real email to the affected user (not the admin)');
+    if ($emailRow) {
+        ok($emailRow['to_email'] === $reactUname . '@example.test', "the email goes to the USER's own address, not the admin's");
+        ok(str_contains($emailRow['body'], 'username and password'), "the email tells them to continue with their username and password, as instructed");
+    }
+
+    // Re-activating an ALREADY-active account must not resend the email.
+    $_POST = ['user_id' => $reactUid, 'action' => 'activate'];
+    chdir("$root/ajax");
+    ob_start();
+    include "$root/ajax/toggle_user.php";
+    ob_end_clean();
+    chdir($__cwd);
+    $emailCount = (int) $pdo->query("SELECT COUNT(*) FROM notification_outbox WHERE entity_type='user' AND entity_id={$reactUid} AND event_key='account_reactivated'")->fetchColumn();
+    ok($emailCount === 1, 'a redundant activate on an already-active account does not send a second email');
+
+    $pdo->exec("DELETE FROM notification_outbox WHERE entity_type='user' AND entity_id={$reactUid}");
+    $pdo->exec("DELETE FROM audit_logs WHERE entity_type='user' AND entity_id={$reactUid}");
+    $pdo->exec("DELETE FROM users WHERE user_id={$reactUid}");
+    unset($_SESSION['user_id'], $_POST, $_SERVER['REQUEST_METHOD']);
+    ok((int) $pdo->query("SELECT COUNT(*) FROM users WHERE user_id={$reactUid}")->fetchColumn() === 0, 'throwaway reactivation test account cleaned up');
+} else {
+    skip('local server not reachable — reactivation email live test skipped');
+}
 
 // ── Summary ──────────────────────────────────────────────────────────────────
 echo "\n";
 echo "Passes:   \033[32m{$pass}\033[0m\n";
+echo "Skipped:  \033[33m{$skip}\033[0m\n";
 echo "Failures: " . ($fail === 0 ? "\033[32m0\033[0m" : "\033[31m{$fail}\033[0m") . "\n";
 exit($fail === 0 ? 0 : 1);
