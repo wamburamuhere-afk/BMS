@@ -478,8 +478,11 @@ if (isAdmin()) {
                                             <?php if ($can_edit_suppliers): ?>
                                             <li><a class="dropdown-item py-2 rounded" href="#" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)"><i class="bi bi-pencil text-primary me-2"></i> Edit Supplier</a></li>
                                             <?php endif; ?>
-                                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier['supplier_id'] ?>"><i class="bi bi-cart text-success me-2"></i> View Orders</a></li>
-                                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('suppliers/payments') ?>?id=<?= $supplier['supplier_id'] ?>"><i class="bi bi-cash text-warning me-2"></i> View Payments</a></li>
+                                            <!-- View Orders / View Payments removed (2026-08-29): both are already
+                                                 tabs inside suppliers/view (Recent Purchase Orders, Recent Payments) —
+                                                 reachable one click after "View Details" instead of duplicated here.
+                                                 View Account is kept: it opens the full vendor statement, which is a
+                                                 separate report, not one of that page's tabs. -->
                                             <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('vendor_statement') ?>?vendor_id=<?= $supplier['supplier_id'] ?>&vendor_type=supplier"><i class="bi bi-file-earmark-text text-primary me-2"></i> View Account</a></li>
                                             <?php if ($company_type != 'microfinance' && $can_edit_suppliers): ?>
                                             <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>"><i class="bi bi-file-plus me-2"></i> New Order</a></li>
