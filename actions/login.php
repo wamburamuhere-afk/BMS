@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             require_once __DIR__ . '/../helpers.php';
             $ip = $_SERVER['REMOTE_ADDR'] ?? null;
             $ua = $_SERVER['HTTP_USER_AGENT'] ?? null;
-            $sid = startUserSession($pdo, (int) $user['user_id'], $ip, $ua);
+            $sid = startUserSession($pdo, (int) $user['user_id'], $ip, $ua, session_id());
             if ($sid) $_SESSION['session_row_id'] = $sid;
             if (function_exists('logActivity')) {
                 logActivity($pdo, (int) $user['user_id'], 'Login', 'Logged in to the system');

@@ -175,7 +175,24 @@ if ($company_logo && strpos($company_logo, 'http') !== 0) {
                 <h5 class="company-name"><?= htmlspecialchars($company_name) ?></h5>
                 <p class="text-muted mb-0" style="font-size: 0.85rem;">Please sign in to continue</p>
             </div>
-            
+
+            <?php
+            // Session-lifecycle messages — see bmsEnforceSessionLifecycle() in
+            // core/session_tracker.php. Never trust $_GET as a source of truth for
+            // WHY, only WHAT to say — the reason string is one of a fixed set.
+            $ended_messages = [
+                'superseded'  => 'You were signed out because your account signed in from another device or browser.',
+                'timeout'     => 'You were signed out after a period of inactivity.',
+                'revoked'     => 'Your session was ended by an administrator for security reasons.',
+                'admin_ended' => 'Your session was ended by an administrator.',
+            ];
+            $ended = $_GET['ended'] ?? '';
+            if (isset($ended_messages[$ended])): ?>
+                <div class="alert alert-warning py-2 small mb-3"><i class="fas fa-info-circle me-1"></i><?= htmlspecialchars($ended_messages[$ended]) ?></div>
+            <?php elseif (isset($_GET['logout'])): ?>
+                <div class="alert alert-success py-2 small mb-3"><i class="fas fa-check-circle me-1"></i>You have been signed out.</div>
+            <?php endif; ?>
+
             <form id="loginForm">
                 <div class="mb-3">
                     <label for="username" class="form-label">Username</label>

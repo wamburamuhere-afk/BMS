@@ -105,23 +105,41 @@ if (!function_exists('startUserSession')) {
     /**
      * Open a session row on successful login. Enriches with GeoIP + parsed UA.
      * Returns the new row id (to stash in $_SESSION) or null on failure.
+     *
+     * Before inserting, closes any session this user left open — browser closed
+     * without logging out, a crash, or simply logging in again elsewhere. Ends it
+     * at its own last-seen moment (never invents a logout time nobody observed)
+     * and tags it 'superseded', so Login History reads "Signed in again" instead
+     * of an "Active" row that would otherwise sit open forever.
      */
-    function startUserSession(PDO $pdo, int $userId, ?string $ip = null, ?string $ua = null): ?int
+    function startUserSession(PDO $pdo, int $userId, ?string $ip = null, ?string $ua = null, ?string $phpSessionId = null): ?int
     {
         if ($userId <= 0) return null;
         try {
+            $openRows = $pdo->prepare("SELECT id, login_at, last_seen_at FROM user_sessions WHERE user_id = ? AND logout_at IS NULL");
+            $openRows->execute([$userId]);
+            foreach ($openRows->fetchAll(PDO::FETCH_ASSOC) as $open) {
+                $asOf = $open['last_seen_at'] ?? $open['login_at'];
+                $dur  = max(0, strtotime($asOf) - strtotime($open['login_at']));
+                $pdo->prepare(
+                    "UPDATE user_sessions SET logout_at = ?, duration_seconds = ?, logout_type = 'superseded'
+                      WHERE id = ? AND logout_at IS NULL"
+                )->execute([$asOf, $dur, $open['id']]);
+            }
+
             $geo    = lookupGeoIP($ip);
             $device = parseUserAgent($ua);
 
             $stmt = $pdo->prepare(
                 "INSERT INTO user_sessions
-                    (user_id, login_at, ip_address, user_agent,
+                    (user_id, php_session_id, login_at, last_seen_at, ip_address, user_agent,
                      city, region, country, country_code, isp, org, timezone,
                      browser, os, device_type)
-                 VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                 VALUES (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             );
             $stmt->execute([
                 $userId,
+                $phpSessionId !== null ? substr($phpSessionId, 0, 128) : null,
                 $ip !== null ? substr($ip, 0, 45)  : null,
                 $ua !== null ? substr($ua, 0, 255)  : null,
                 $geo['city']         ?? null,
@@ -145,11 +163,16 @@ if (!function_exists('startUserSession')) {
 
 if (!function_exists('endUserSession')) {
     /**
-     * Close a session row on logout: stamp logout_at + compute duration_seconds.
+     * Close a session row: stamp logout_at + compute duration_seconds.
      * Idempotent (skips rows already closed). Returns the duration in seconds, or
      * null if it couldn't be closed.
+     *
+     * $asOf lets a caller close using a specific moment rather than "now" — used
+     * by expireIdleSessions() to end an idle row at its true last-seen time, never
+     * a fabricated one. Omit it (the normal manual-logout call) and the database's
+     * own NOW() is used, exactly as before.
      */
-    function endUserSession(PDO $pdo, ?int $sessionRowId, string $logoutType = 'manual'): ?int
+    function endUserSession(PDO $pdo, ?int $sessionRowId, string $logoutType = 'manual', ?string $asOf = null): ?int
     {
         if (!$sessionRowId) return null;
         try {
@@ -159,17 +182,162 @@ if (!function_exists('endUserSession')) {
             $r = $row->fetch(PDO::FETCH_ASSOC);
             if (!$r || $r['logout_at'] !== null) return null;
 
-            $dur = max(0, time() - strtotime($r['login_at']));
-            $upd = $pdo->prepare(
-                "UPDATE user_sessions
-                    SET logout_at = NOW(), duration_seconds = ?, logout_type = ?
-                  WHERE id = ? AND logout_at IS NULL"
-            );
-            $upd->execute([$dur, substr($logoutType, 0, 20), $sessionRowId]);
+            if ($asOf !== null) {
+                $dur = max(0, strtotime($asOf) - strtotime($r['login_at']));
+                $upd = $pdo->prepare(
+                    "UPDATE user_sessions SET logout_at = ?, duration_seconds = ?, logout_type = ?
+                      WHERE id = ? AND logout_at IS NULL"
+                );
+                $upd->execute([$asOf, $dur, substr($logoutType, 0, 20), $sessionRowId]);
+            } else {
+                $dur = max(0, time() - strtotime($r['login_at']));
+                $upd = $pdo->prepare(
+                    "UPDATE user_sessions SET logout_at = NOW(), duration_seconds = ?, logout_type = ?
+                      WHERE id = ? AND logout_at IS NULL"
+                );
+                $upd->execute([$dur, substr($logoutType, 0, 20), $sessionRowId]);
+            }
             return $dur;
         } catch (Throwable $e) {
             error_log('endUserSession: ' . $e->getMessage());
             return null;
+        }
+    }
+}
+
+if (!function_exists('touchUserSession')) {
+    /**
+     * Heartbeat: bump last_seen_at for an open session so an idle timeout has a
+     * real last-active moment to expire from, instead of guessing from login_at.
+     * Throttled server-side (default 60s) regardless of how often the caller
+     * pings, so normal navigation can never generate a write per request.
+     */
+    function touchUserSession(PDO $pdo, ?int $sessionRowId, int $minIntervalSeconds = 60): void
+    {
+        if (!$sessionRowId) return;
+        try {
+            $pdo->prepare(
+                "UPDATE user_sessions SET last_seen_at = NOW()
+                  WHERE id = ? AND logout_at IS NULL
+                    AND (last_seen_at IS NULL OR last_seen_at < (NOW() - INTERVAL ? SECOND))"
+            )->execute([$sessionRowId, $minIntervalSeconds]);
+        } catch (Throwable $e) {
+            error_log('touchUserSession: ' . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('expireIdleSessions')) {
+    /**
+     * Close every session that has gone quiet past $idleSeconds. Set-based (one
+     * UPDATE, no loop) so it is cheap enough to run from a throttled header.php
+     * include exactly like cron/check_hr_expiry.php — BMS has no OS-level cron,
+     * everything real-world piggybacks on ordinary page loads.
+     *
+     * Closes at COALESCE(last_seen_at, login_at) — the row's own last-observed
+     * moment — never "now". A session nobody has touched in 45 minutes should not
+     * show a duration that includes the 45 minutes nobody was there.
+     * Returns the number of rows closed.
+     */
+    function expireIdleSessions(PDO $pdo, int $idleSeconds = 1800): int
+    {
+        try {
+            // GREATEST(0, ...) is defensive, not load-bearing: last_seen_at is only
+            // ever advanced by touchUserSession()'s own NOW(), so it cannot really
+            // precede login_at — but a negative duration must never reach the UI
+            // regardless of how it happened.
+            $stmt = $pdo->prepare(
+                "UPDATE user_sessions
+                    SET logout_at = COALESCE(last_seen_at, login_at),
+                        duration_seconds = GREATEST(0, TIMESTAMPDIFF(SECOND, login_at, COALESCE(last_seen_at, login_at))),
+                        logout_type = 'timeout'
+                  WHERE logout_at IS NULL
+                    AND COALESCE(last_seen_at, login_at) < (NOW() - INTERVAL ? SECOND)"
+            );
+            $stmt->execute([$idleSeconds]);
+            return $stmt->rowCount();
+        } catch (Throwable $e) {
+            error_log('expireIdleSessions: ' . $e->getMessage());
+            return 0;
+        }
+    }
+}
+
+if (!function_exists('revokeUserSession')) {
+    /**
+     * Admin action: forcibly end a live session. Enforced on the target user's
+     * NEXT request (see bmsEnforceSessionLifecycle()) — BMS has no websocket/push
+     * layer, so "instant across every open tab" is not achievable without new
+     * infrastructure; ending it on the next request they take is the standard,
+     * honest version of this feature.
+     *
+     * $reason distinguishes a security action ('revoked' — e.g. suspected
+     * compromise, stolen device) from routine housekeeping ('admin_ended' — e.g.
+     * tidying a stale row) so the audit trail can tell them apart.
+     */
+    function revokeUserSession(PDO $pdo, int $sessionRowId, int $adminUserId, string $reason = 'revoked'): bool
+    {
+        $reason = in_array($reason, ['revoked', 'admin_ended'], true) ? $reason : 'revoked';
+        try {
+            $row = $pdo->prepare("SELECT login_at, logout_at FROM user_sessions WHERE id = ?");
+            $row->execute([$sessionRowId]);
+            $r = $row->fetch(PDO::FETCH_ASSOC);
+            if (!$r || $r['logout_at'] !== null) return false;
+
+            $dur = max(0, time() - strtotime($r['login_at']));
+            $upd = $pdo->prepare(
+                "UPDATE user_sessions
+                    SET logout_at = NOW(), duration_seconds = ?, logout_type = ?,
+                        revoked_by = ?, revoked_at = NOW()
+                  WHERE id = ? AND logout_at IS NULL"
+            );
+            $upd->execute([$dur, $reason, $adminUserId, $sessionRowId]);
+            return $upd->rowCount() > 0;
+        } catch (Throwable $e) {
+            error_log('revokeUserSession: ' . $e->getMessage());
+            return false;
+        }
+    }
+}
+
+if (!function_exists('bmsEnforceSessionLifecycle')) {
+    /**
+     * Runs once per authenticated request (called from roots.php). If this
+     * browser's own user_sessions row has been closed by something OTHER than
+     * this request's own logout.php call — an admin revoked it, the idle sweep
+     * expired it, or the user signed in again elsewhere and superseded it — the
+     * system has already ended this session even though the browser doesn't know
+     * it yet. Sign this tab out too, rather than let it keep acting as a user
+     * whose access was actually withdrawn.
+     *
+     * A plain page load is redirected to the login page with the reason. An
+     * API/AJAX call just has its $_SESSION cleared — isAuthenticated() then
+     * correctly reports false for the rest of that request, which is the right
+     * behaviour for a JSON endpoint (no HTML redirect to send).
+     */
+    function bmsEnforceSessionLifecycle(PDO $pdo): void
+    {
+        if (empty($_SESSION['user_id']) || empty($_SESSION['session_row_id'])) return;
+        try {
+            $st = $pdo->prepare("SELECT logout_at, logout_type FROM user_sessions WHERE id = ?");
+            $st->execute([(int) $_SESSION['session_row_id']]);
+            $r = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$r || $r['logout_at'] === null) return;   // still open — normal case, nothing to do
+
+            $reason = $r['logout_type'] ?: 'ended';
+            $_SESSION = [];
+
+            $uri = $_SERVER['REQUEST_URI'] ?? '';
+            $isApiLike = strpos($uri, '/api/') !== false
+                || strpos($uri, '/ajax') !== false
+                || (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
+
+            if (!$isApiLike && !headers_sent() && function_exists('getUrl')) {
+                header('Location: ' . getUrl('login') . '?ended=' . urlencode($reason));
+                exit;
+            }
+        } catch (Throwable $e) {
+            error_log('bmsEnforceSessionLifecycle: ' . $e->getMessage());
         }
     }
 }
