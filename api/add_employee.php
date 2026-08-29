@@ -189,7 +189,7 @@ try {
             probation_end_date, contract_end_date, department_id,
             designation_id, employment_type_id, employment_status, reporting_to, reporting_to_id, work_location,
             basic_salary, hourly_rate, standard_working_hours, currency, payment_frequency,
-            bank_name, bank_account, bank_branch, mobile_money,
+            bank_name, account_holder_name, bank_account, bank_branch, bank_swift_code, mobile_money,
             tax_id, social_security_number, emergency_contact,
             emergency_contact_relationship, emergency_contact_phone, emergency_contact_postal_address,
             emergency_contact_physical_address, emergency_contact_email,
@@ -202,7 +202,7 @@ try {
             ?, ?, ?,         -- row 5: 3
             ?, ?, ?, ?, ?, ?, -- row 6: 6
             ?, ?, ?, ?, ?,   -- row 7: 5 (basic_salary, hourly_rate, standard_working_hours, currency, payment_frequency)
-            ?, ?, ?, ?,      -- row 8: 4
+            ?, ?, ?, ?, ?, ?, -- row 8: 6 (bank_name, account_holder_name, bank_account, bank_branch, bank_swift_code, mobile_money)
             ?, ?, ?,         -- row 9: 3
             ?, ?, ?, ?, ?,   -- row 10: 5
             ?, ?, ?, ?, ?, ?, ?, NOW() -- row 11: 7 + NOW()
@@ -246,9 +246,11 @@ try {
         $_POST['standard_working_hours'] ?? 8,
         $_POST['currency'] ?? 'TZS',
         ($_POST['payment_frequency'] === 'other') ? ($_POST['payment_frequency_other'] ?? 'other') : ($_POST['payment_frequency'] ?? 'monthly'),
-        $_POST['bank_name'] ?? null, 
-        $_POST['bank_account'] ?? null, 
-        $_POST['bank_branch'] ?? null, 
+        $_POST['bank_name'] ?? null,
+        $_POST['account_holder_name'] ?? null,
+        $_POST['bank_account'] ?? null,
+        $_POST['bank_branch'] ?? null,
+        $_POST['bank_swift_code'] ?? null,
         $_POST['mobile_money'] ?? null,
         $_POST['tax_id'] ?? null, 
         $_POST['social_security_number'] ?? null,

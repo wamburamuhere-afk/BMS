@@ -889,8 +889,20 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     <input type="text" class="form-control" id="bank_name" name="bank_name" placeholder="Bank name">
                                 </div>
                                 <div class="col-md-6 mb-3">
+                                    <label for="account_holder_name" class="form-label">Account Holder Name</label>
+                                    <input type="text" class="form-control" id="account_holder_name" name="account_holder_name" placeholder="Name on the bank account">
+                                </div>
+                                <div class="col-md-6 mb-3">
                                     <label for="bank_account" class="form-label">Bank Account Number</label>
                                     <input type="text" class="form-control" id="bank_account" name="bank_account" placeholder="Bank account number">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="bank_swift_code" class="form-label">Bank Identifier Code <small class="text-muted">(SWIFT/routing)</small></label>
+                                    <input type="text" class="form-control" id="bank_swift_code" name="bank_swift_code" placeholder="e.g. CORUTZTZ">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="bank_branch" class="form-label">Bank Branch</label>
+                                    <input type="text" class="form-control" id="bank_branch" name="bank_branch" placeholder="Bank branch">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="mobile_money" class="form-label">Mobile Money Number</label>
@@ -1062,88 +1074,6 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
     </div>
 </div>
 
-<!-- Quick Edit Modal -->
-<div class="modal fade" id="editEmployeeModal" tabindex="-1" aria-labelledby="editEmployeeModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title" id="editEmployeeModalLabel">
-                    <i class="bi bi-pencil"></i> Quick Edit Employee
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form id="editEmployeeForm">
-                <div class="modal-body">
-                    <div id="edit-employee-message" class="mb-3"></div>
-                    <?php if ($proj_ctx_id > 0): ?>
-                    <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3">
-                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Editing within project: <strong><?= safe_output($proj_ctx_name) ?></strong></span>
-                        <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
-                            <i class="bi bi-arrow-left me-1"></i> Back to Project
-                        </a>
-                    </div>
-                    <?php endif; ?>
-                    <input type="hidden" id="edit_employee_id" name="employee_id">
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="edit_first_name" class="form-label">First Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="edit_first_name" name="first_name" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="edit_last_name" class="form-label">Last Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="edit_last_name" name="last_name" required>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="edit_email" class="form-label">Email <span class="text-danger">*</span></label>
-                        <input type="email" class="form-control" id="edit_email" name="email" required>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="edit_phone" class="form-label">Phone <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="edit_phone" name="phone" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="edit_employment_status" class="form-label">Status</label>
-                            <select class="form-select select2-static" id="edit_employment_status" name="employment_status">
-                                <option value="active">Active</option>
-                                <option value="probation">Probation</option>
-                                <option value="contract">Contract</option>
-                                <option value="on_leave">On Leave</option>
-                                <option value="resigned">Resigned</option>
-                                <option value="terminated">Terminated</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="edit_department_id" class="form-label">Department</label>
-                        <select class="form-select select2-static" id="edit_department_id" name="department_id">
-                            <option value="">Select Department</option>
-                            <?php foreach ($departments as $dept): ?>
-                            <option value="<?= $dept['department_id'] ?>"><?= safe_output($dept['department_name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="edit_basic_salary" class="form-label">Basic Salary</label>
-                        <input type="number" class="form-control" id="edit_basic_salary" name="basic_salary" step="0.01">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-success">
-                        <i class="bi bi-check-circle"></i> Update Employee
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 <?php endif; ?>
 
 <!-- Include DataTables and other scripts -->
@@ -1352,10 +1282,6 @@ $(document).ready(function() {
         loadReportingToOptions(deptVal, window._editReportingToId || '', window._editReportingToName || '', $(this));
         window._editReportingToId = ''; window._editReportingToName = '';
     });
-    $('#editEmployeeModal').on('shown.bs.modal', function() {
-        initEmpSelect2($(this), $(this));
-    });
-
     // Department → Designation cascade + "Other (specify)" wiring (delegated so
     // it survives the Designation select being rebuilt/re-init'd by Select2).
     $(document).on('change', '#department_id', function() {
@@ -1568,45 +1494,6 @@ $(document).ready(function() {
         });
     });
 
-    // Edit employee form submission
-    $('#editEmployeeForm').on('submit', function(e) {
-        e.preventDefault();
-        
-        const formData = $(this).serialize();
-        const submitBtn = $(this).find('[type="submit"]');
-        
-        submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating...');
-
-        $.ajax({
-            url: APP_URL + '/api/update_employee',
-            type: 'POST',
-            data: formData,
-            dataType: 'json',
-            success: function(response) {
-                if (response.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Success!',
-                        text: response.message || 'Employee updated successfully.',
-                        confirmButtonText: 'OK',
-                        confirmButtonColor: '#28a745'
-                    }).then(() => {
-                        if (window.__projReturnUrl) { window.location.href = window.__projReturnUrl; }
-                        else { location.reload(); }
-                    });
-                } else {
-                    Swal.fire('Error', response.message || 'Update failed.', 'error');
-                    submitBtn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> Update Employee');
-                }
-            },
-            error: function(xhr, status, error) {
-                console.error('Error:', error);
-                Swal.fire('Error', 'An error occurred. Please try again.', 'error');
-                submitBtn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> Update Employee');
-            }
-        });
-    });
-
     // Location cascade (OOP location engine): defined dropdowns for Tanzania,
     // free-text automatically for countries without imported subdivisions.
     employeeLocationCascade = initLocationCascade({
@@ -1635,12 +1522,6 @@ $(document).ready(function() {
         $('#importEmployeesForm [type="submit"]').prop('disabled', false).html('<i class="bi bi-upload"></i> Import Employees');
     });
     
-    $('#editEmployeeModal').on('hidden.bs.modal', function() {
-        $('#editEmployeeForm')[0].reset();
-        $('#edit-employee-message').html('');
-        toggleEmpOther('payment_frequency', 'payment_frequency_other_box', 'payment_frequency_other', false);
-        $('#editEmployeeForm [type="submit"]').prop('disabled', false).html('<i class="bi bi-check-circle"></i> Update Employee');
-});
 });
 </script>
 
@@ -2247,7 +2128,10 @@ function editEmployee(employeeId) {
                 
                 // Step 4: Bank & Documents
                 $('#bank_name').val(emp.bank_name || '');
+                $('#account_holder_name').val(emp.account_holder_name || '');
                 $('#bank_account').val(emp.bank_account || '');
+                $('#bank_swift_code').val(emp.bank_swift_code || '');
+                $('#bank_branch').val(emp.bank_branch || '');
                 $('#mobile_money').val(emp.mobile_money || '');
                 $('#additional_notes').val(emp.additional_notes || '');
                 
