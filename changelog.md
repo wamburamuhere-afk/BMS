@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — HR Dashboard rework: Employees vs Payroll trend chart
+
+**Files (changed):** `app/bms/pos/hr_dashboard.php`, `tests/test_hr_dashboard_cli.php`
+
+Replaced the department bar chart and HR-actions doughnut with a single line chart matching `app/dashboard.php`'s own gradient/line style exactly — a trend, not a snapshot. Headcount is reconstructed month-by-month (cumulative hires minus approved terminations/resignations to date — `employees` only stores current status, not history) and plotted against payroll actually paid that month on a second y-axis, since the two scales differ by orders of magnitude. Tooltip derives "avg cost per employee" — the real insight the chart exists to surface. Department headcount and HR Actions breakdown weren't dropped, just turned into a proportional list and a badge list instead of a pie/bar.
+
+Stat cards: added **Inactive Employees**, **New Hires (this year)**, and **Payroll Paid (this year)** (amount + employees-paid count, from `payroll.amount_paid` where `status='paid'`). Every card's background is now the standard `#d1e7dd` used everywhere else in BMS (was plain white, inconsistent with the rest of the app).
+
+Test suite extended to 23 assertions — new KPIs cross-checked against direct queries, background-color count, explicit checks that no bar/doughnut chart remains, dual y-axis presence, and headcount reconstruction sanity (subtracts exits, lands close to live Active Employees). No regressions.
+
+## 2026-08-29 (refactor) — Operations menu: regrouped Human Resources into 6 categories
+
+**Files (changed):** `header.php`
+
+The whole Human Resources section had become one flat run of 18 links (only Org Structure and Assets & Maintenance had their own sub-header) — the wall-of-links problem LMS avoids with its 5-category Operations menu. Adapted that grouping logic rather than copying it literally: BMS has more distinct HR pages than LMS (Org Chart, Contracts, Performance, Training, Recruitment, Checklists, Trips, Salary Components are all separate pages here), so forcing exactly 5 buckets would just move the crowding around.
+
+New grouping, none with just a single item: **Workforce** (HR Dashboard, Employees, HR Actions, Org Chart, Contracts), **Org Structure** (unchanged), **Performance & Growth** (Performance, Training, Recruitment, Checklists), **Payroll** (Payroll, Salary Components), **Attendance & Leave** (Attendance, Leaves, Working Days & Holidays), **Communication & Calendar** (Meetings, Trips, Announcements), **Assets & Maintenance** (unchanged).
+
+Pure reorganisation — same 22 links, same `canView()` gate on every one (verified identical page_key set before/after). Every test that greps `header.php` for menu wiring (org structure, HR dashboard, company calendar) still passes.
+
 ## 2026-08-29 (feature) — HR Dashboard: a real command centre
 
 **Files (new):** `app/bms/pos/hr_dashboard.php`, `migrations/2026_08_29_hr_dashboard_permission.php`, `tests/test_hr_dashboard_cli.php`

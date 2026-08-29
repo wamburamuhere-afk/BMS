@@ -16,20 +16,38 @@ includeHeader();
 global $pdo;
 
 $emp_scope = scopeFilterSqlNullable('project', 'e');
+$year = (int)date('Y');
 
 // ── KPI row ──────────────────────────────────────────────────────────────
 $kpi_total_active = (int)$pdo->query("SELECT COUNT(*) FROM employees e WHERE e.status = 'active' $emp_scope")->fetchColumn();
+// 'Inactive' mirrors inactive_employees.php's own definition exactly (status != 'active'
+// covers both 'inactive' and 'terminated' — the natural complement of Active).
+$kpi_inactive      = (int)$pdo->query("SELECT COUNT(*) FROM employees e WHERE e.status != 'active' $emp_scope")->fetchColumn();
 $kpi_probation     = (int)$pdo->query("SELECT COUNT(*) FROM employees e WHERE e.status = 'active' AND e.employment_status = 'probation' $emp_scope")->fetchColumn();
 $kpi_on_leave      = (int)$pdo->query("
     SELECT COUNT(DISTINCT l.employee_id) FROM leaves l
     JOIN employees e ON e.employee_id = l.employee_id
     WHERE l.status = 'approved' AND CURDATE() BETWEEN l.start_date AND l.end_date $emp_scope
 ")->fetchColumn();
+$kpi_new_hires = (int)$pdo->query("SELECT COUNT(*) FROM employees e WHERE YEAR(e.hire_date) = $year $emp_scope")->fetchColumn();
 $kpi_pending_actions = (int)$pdo->query("
     SELECT COUNT(*) FROM employee_lifecycle_events ele
     JOIN employees e ON e.employee_id = ele.employee_id
     WHERE ele.status = 'pending' $emp_scope
 ")->fetchColumn();
+
+// Payroll actually disbursed this year ('paid' = the same status value
+// api/bulk_update_payroll_status.php writes when a run is marked paid;
+// amount_paid is the column that holds what actually went out, not the
+// computed net_salary that may differ on a partial payment).
+$payroll_row = $pdo->query("
+    SELECT COALESCE(SUM(p.amount_paid), 0) AS total_paid, COUNT(DISTINCT p.employee_id) AS employees_paid
+    FROM payroll p
+    JOIN employees e ON e.employee_id = p.employee_id
+    WHERE p.status = 'paid' AND p.year = $year $emp_scope
+")->fetch(PDO::FETCH_ASSOC) ?: ['total_paid' => 0, 'employees_paid' => 0];
+$kpi_payroll_amount   = (float)$payroll_row['total_paid'];
+$kpi_payroll_employees = (int)$payroll_row['employees_paid'];
 
 // ── Contract & probation expiry (mirrors cron/check_hr_expiry.php's own scan —
 //    that job only ever fires notifications; this is the first place you can
@@ -88,8 +106,44 @@ $dept_headcount = $pdo->query("
     LIMIT 10
 ")->fetchAll(PDO::FETCH_ASSOC);
 
+// ── Employees vs Payroll — the headline chart. Headcount is reconstructed
+//    historically (employees carries only the CURRENT status, no history table):
+//    cumulative hires by month-end minus cumulative exits by month-end, where an
+//    "exit" is an approved termination/resignation lifecycle event on or before
+//    that date. Payroll is the same 'paid' definition as the KPI card above.
+//    Covers January through the current month of $year (a trailing YTD line,
+//    not a full Jan-Dec chart padded with meaningless future zeros). ────────
+$monthsSoFar = ($year === (int)date('Y')) ? (int)date('n') : 12;
+$evp_labels = []; $evp_headcount = []; $evp_payroll = [];
+for ($m = 1; $m <= $monthsSoFar; $m++) {
+    $asOf = ($year === (int)date('Y') && $m === $monthsSoFar) ? date('Y-m-d') : date('Y-m-t', strtotime("$year-$m-01"));
+
+    $hiresStmt = $pdo->prepare("SELECT COUNT(*) FROM employees e WHERE e.hire_date <= ? $emp_scope");
+    $hiresStmt->execute([$asOf]);
+    $hiresToDate = (int)$hiresStmt->fetchColumn();
+
+    $exitsStmt = $pdo->prepare("
+        SELECT COUNT(*) FROM employee_lifecycle_events ele
+        JOIN employees e ON e.employee_id = ele.employee_id
+        WHERE ele.event_type IN ('termination', 'resignation') AND ele.status = 'approved' AND ele.event_date <= ? $emp_scope
+    ");
+    $exitsStmt->execute([$asOf]);
+    $exitsToDate = (int)$exitsStmt->fetchColumn();
+
+    $payrollStmt = $pdo->prepare("
+        SELECT COALESCE(SUM(p.amount_paid), 0) FROM payroll p
+        JOIN employees e ON e.employee_id = p.employee_id
+        WHERE p.status = 'paid' AND p.year = ? AND p.month = ? $emp_scope
+    ");
+    $payrollStmt->execute([$year, $m]);
+    $monthPayroll = (float)$payrollStmt->fetchColumn();
+
+    $evp_labels[]    = date('M', strtotime("$year-$m-01"));
+    $evp_headcount[] = max(0, $hiresToDate - $exitsToDate);
+    $evp_payroll[]   = $monthPayroll;
+}
+
 // ── Recruitment pipeline — identical queries to api/get_openings.php's stats block ──
-$year = (int)date('Y');
 $recruitment = [
     'open_positions'   => (int)$pdo->query("SELECT COUNT(*) FROM job_openings WHERE status = 'open'")->fetchColumn(),
     'total_candidates' => (int)$pdo->query("SELECT COUNT(*) FROM candidates WHERE status = 'active'")->fetchColumn(),
@@ -106,41 +160,93 @@ $recruitment = [
         </div>
     </div>
 
-    <!-- KPI row -->
+    <!-- KPI row — uniform card background (#d1e7dd) matching the rest of the app -->
     <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4 col-lg-3">
             <a href="<?= getUrl('employees') ?>" class="text-decoration-none">
-                <div class="card border-0 shadow-sm text-center p-3 h-100"><div class="fs-3 fw-bold text-primary"><?= $kpi_total_active ?></div><div class="small text-muted">Active Employees</div></div>
+                <div class="card border-0 shadow-sm text-center p-3 h-100" style="background:#d1e7dd;"><div class="fs-3 fw-bold text-primary"><?= $kpi_total_active ?></div><div class="small text-muted">Active Employees</div></div>
             </a>
         </div>
-        <div class="col-6 col-md-3">
-            <a href="<?= getUrl('employees') ?>" class="text-decoration-none">
-                <div class="card border-0 shadow-sm text-center p-3 h-100"><div class="fs-3 fw-bold text-warning"><?= $kpi_probation ?></div><div class="small text-muted">On Probation</div></div>
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="<?= getUrl('inactive_employees') ?>" class="text-decoration-none">
+                <div class="card border-0 shadow-sm text-center p-3 h-100" style="background:#d1e7dd;"><div class="fs-3 fw-bold text-secondary"><?= $kpi_inactive ?></div><div class="small text-muted">Inactive Employees</div></div>
             </a>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="<?= getUrl('employees') ?>" class="text-decoration-none">
+                <div class="card border-0 shadow-sm text-center p-3 h-100" style="background:#d1e7dd;"><div class="fs-3 fw-bold text-warning"><?= $kpi_probation ?></div><div class="small text-muted">On Probation</div></div>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg-3">
             <a href="<?= getUrl('leaves') ?>" class="text-decoration-none">
-                <div class="card border-0 shadow-sm text-center p-3 h-100"><div class="fs-3 fw-bold text-info"><?= $kpi_on_leave ?></div><div class="small text-muted">On Leave Today</div></div>
+                <div class="card border-0 shadow-sm text-center p-3 h-100" style="background:#d1e7dd;"><div class="fs-3 fw-bold text-info"><?= $kpi_on_leave ?></div><div class="small text-muted">On Leave Today</div></div>
             </a>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4 col-lg-3">
+            <a href="<?= getUrl('employees') ?>" class="text-decoration-none">
+                <div class="card border-0 shadow-sm text-center p-3 h-100" style="background:#d1e7dd;"><div class="fs-3 fw-bold text-success"><?= $kpi_new_hires ?></div><div class="small text-muted">New Hires (<?= $year ?>)</div></div>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg-3">
             <a href="<?= getUrl('hr_actions') ?>?status=pending" class="text-decoration-none">
-                <div class="card border-0 shadow-sm text-center p-3 h-100"><div class="fs-3 fw-bold text-danger"><?= $kpi_pending_actions ?></div><div class="small text-muted">HR Actions Pending</div></div>
+                <div class="card border-0 shadow-sm text-center p-3 h-100" style="background:#d1e7dd;"><div class="fs-3 fw-bold text-danger"><?= $kpi_pending_actions ?></div><div class="small text-muted">HR Actions Pending</div></div>
+            </a>
+        </div>
+        <div class="col-12 col-lg-6">
+            <a href="<?= getUrl('payroll') ?>" class="text-decoration-none">
+                <div class="card border-0 shadow-sm text-center p-3 h-100" style="background:#d1e7dd;">
+                    <div class="fs-3 fw-bold text-primary">TSh <?= number_format($kpi_payroll_amount, 0) ?></div>
+                    <div class="small text-muted">Payroll Paid (<?= $year ?>) · <?= $kpi_payroll_employees ?> employee<?= $kpi_payroll_employees === 1 ? '' : 's' ?> paid</div>
+                </div>
             </a>
         </div>
     </div>
 
+    <!-- Employees vs Payroll — the headline chart -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h6 class="mb-0"><i class="bi bi-graph-up text-primary me-1"></i> Employees vs Payroll — <?= $year ?></h6>
+                <small class="text-muted">Headcount growth against payroll cost, month by month. The gap between the two lines is your average cost per head trending up or down.</small>
+            </div>
+            <a href="<?= getUrl('payroll') ?>" class="small text-decoration-none">View Payroll <i class="bi bi-arrow-right"></i></a>
+        </div>
+        <div class="card-body">
+            <?php if (array_sum($evp_payroll) > 0 || array_sum($evp_headcount) > 0): ?>
+            <div style="height:340px;"><canvas id="empVsPayrollChart"></canvas></div>
+            <?php else: ?>
+            <div class="text-center text-muted py-5">No employees or payroll runs recorded yet this year.</div>
+            <?php endif; ?>
+        </div>
+    </div>
+
     <div class="row g-3 mb-4">
-        <!-- Department headcount chart -->
+        <!-- Department headcount — compact ranked list, not a chart -->
         <div class="col-lg-7">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0"><i class="bi bi-bar-chart text-primary me-1"></i> Headcount by Department</h6>
+                    <h6 class="mb-0"><i class="bi bi-diagram-2 text-primary me-1"></i> Headcount by Department</h6>
                     <a href="<?= getUrl('departments') ?>" class="small text-decoration-none">Manage Departments <i class="bi bi-arrow-right"></i></a>
                 </div>
-                <div class="card-body">
-                    <?php if ($dept_headcount): ?>
-                    <canvas id="deptChart" height="110"></canvas>
+                <div class="card-body p-0">
+                    <?php if ($dept_headcount): $maxHeadcount = max(array_column($dept_headcount, 'headcount')); ?>
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                <?php foreach ($dept_headcount as $d): $pct = $maxHeadcount > 0 ? round(((int)$d['headcount'] / $maxHeadcount) * 100) : 0; ?>
+                                <tr>
+                                    <td class="ps-3" style="width:35%"><?= safe_output($d['department_name']) ?></td>
+                                    <td>
+                                        <div class="progress" style="height:10px;">
+                                            <div class="progress-bar bg-primary" style="width:<?= $pct ?>%"></div>
+                                        </div>
+                                    </td>
+                                    <td class="text-end pe-3 fw-semibold" style="width:10%"><?= (int)$d['headcount'] ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
                     <?php else: ?>
                     <div class="text-center text-muted py-5">No employees assigned to a department yet.</div>
                     <?php endif; ?>
@@ -148,17 +254,30 @@ $recruitment = [
             </div>
         </div>
 
-        <!-- HR Actions breakdown chart -->
+        <!-- HR Actions this year — compact badge strip, not a chart -->
         <div class="col-lg-5">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0"><i class="bi bi-pie-chart text-primary me-1"></i> HR Actions (<?= $year ?>)</h6>
+                    <h6 class="mb-0"><i class="bi bi-person-lines-fill text-primary me-1"></i> HR Actions (<?= $year ?>)</h6>
                     <a href="<?= getUrl('hr_actions') ?>" class="small text-decoration-none">View All <i class="bi bi-arrow-right"></i></a>
                 </div>
                 <div class="card-body">
                     <?php $hrActionsTotal = array_sum(array_map('intval', $hr_action_stats)); ?>
-                    <?php if ($hrActionsTotal > 0): ?>
-                    <canvas id="hrActionsChart" height="180"></canvas>
+                    <?php if ($hrActionsTotal > 0):
+                        $hr_action_display = [
+                            ['promotions', 'Promotions', 'primary'], ['transfers', 'Transfers', 'info'],
+                            ['awards', 'Awards', 'success'], ['warnings', 'Warnings/Complaints', 'warning'],
+                            ['exits', 'Exits', 'danger'],
+                        ];
+                    ?>
+                    <ul class="list-group list-group-flush">
+                        <?php foreach ($hr_action_display as [$k, $label, $color]): ?>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <?= $label ?>
+                            <span class="badge bg-<?= $color ?> rounded-pill"><?= (int)($hr_action_stats[$k] ?? 0) ?></span>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
                     <?php else: ?>
                     <div class="text-center text-muted py-5">No approved HR actions recorded this year.</div>
                     <?php endif; ?>
@@ -284,31 +403,110 @@ $recruitment = [
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-<?php if ($dept_headcount): ?>
-new Chart(document.getElementById('deptChart'), {
-    type: 'bar',
+<?php if (array_sum($evp_payroll) > 0 || array_sum($evp_headcount) > 0): ?>
+new Chart(document.getElementById('empVsPayrollChart').getContext('2d'), {
+    type: 'line',
     data: {
-        labels: <?= json_encode(array_column($dept_headcount, 'department_name')) ?>,
+        labels: <?= json_encode($evp_labels) ?>,
         datasets: [{
-            label: 'Active Employees',
-            data: <?= json_encode(array_map('intval', array_column($dept_headcount, 'headcount'))) ?>,
-            backgroundColor: '#0d6efd'
+            label: 'Payroll Paid (TSh)',
+            data: <?= json_encode($evp_payroll) ?>,
+            yAxisID: 'yMoney',
+            borderColor: '#0d6efd',
+            backgroundColor: function (context) {
+                const chart = context.chart;
+                const { ctx: c, chartArea } = chart;
+                if (!chartArea) return 'rgba(13,110,253,0.08)';
+                const gradient = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                gradient.addColorStop(0, 'rgba(13,110,253,0.18)');
+                gradient.addColorStop(1, 'rgba(13,110,253,0.01)');
+                return gradient;
+            },
+            fill: true, tension: 0.4, borderWidth: 2.5,
+            pointRadius: 4, pointHoverRadius: 7,
+            pointBackgroundColor: '#fff', pointBorderColor: '#0d6efd', pointBorderWidth: 2,
+        }, {
+            label: 'Headcount',
+            data: <?= json_encode($evp_headcount) ?>,
+            yAxisID: 'yCount',
+            borderColor: '#198754',
+            backgroundColor: function (context) {
+                const chart = context.chart;
+                const { ctx: c, chartArea } = chart;
+                if (!chartArea) return 'rgba(25,135,84,0.05)';
+                const gradient = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                gradient.addColorStop(0, 'rgba(25,135,84,0.13)');
+                gradient.addColorStop(1, 'rgba(25,135,84,0.01)');
+                return gradient;
+            },
+            fill: true, tension: 0.4, borderWidth: 2, borderDash: [6, 3],
+            pointRadius: 4, pointHoverRadius: 7,
+            pointBackgroundColor: '#fff', pointBorderColor: '#198754', pointBorderWidth: 2,
         }]
     },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
-});
-<?php endif; ?>
-<?php if ($hrActionsTotal > 0): ?>
-new Chart(document.getElementById('hrActionsChart'), {
-    type: 'doughnut',
-    data: {
-        labels: ['Promotions', 'Transfers', 'Awards', 'Warnings/Complaints', 'Exits'],
-        datasets: [{
-            data: [<?= (int)($hr_action_stats['promotions'] ?? 0) ?>, <?= (int)($hr_action_stats['transfers'] ?? 0) ?>, <?= (int)($hr_action_stats['awards'] ?? 0) ?>, <?= (int)($hr_action_stats['warnings'] ?? 0) ?>, <?= (int)($hr_action_stats['exits'] ?? 0) ?>],
-            backgroundColor: ['#0d6efd', '#6f42c1', '#198754', '#ffc107', '#dc3545']
-        }]
-    },
-    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { intersect: false, mode: 'index' },
+        plugins: {
+            legend: {
+                display: true, position: 'top', align: 'end',
+                labels: { usePointStyle: true, pointStyleWidth: 12, boxHeight: 8, font: { size: 12 }, padding: 20 }
+            },
+            tooltip: {
+                padding: 14, backgroundColor: 'rgba(17,24,39,0.9)',
+                titleFont: { size: 13, weight: 'bold' }, bodyFont: { size: 12 },
+                borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, cornerRadius: 8,
+                callbacks: {
+                    label: function (context) {
+                        const label = context.dataset.label || '';
+                        const val = context.parsed.y;
+                        if (context.dataset.yAxisID === 'yMoney') {
+                            if (val >= 1000000) return label + ': TSh ' + (val / 1000000).toFixed(2) + 'M';
+                            if (val >= 1000) return label + ': TSh ' + (val / 1000).toFixed(1) + 'K';
+                            return label + ': TSh ' + val.toLocaleString();
+                        }
+                        return label + ': ' + val;
+                    },
+                    afterBody: function (items) {
+                        const money = items.find(i => i.dataset.yAxisID === 'yMoney');
+                        const count = items.find(i => i.dataset.yAxisID === 'yCount');
+                        if (money && count && count.parsed.y > 0) {
+                            const perHead = money.parsed.y / count.parsed.y;
+                            return ['─────────────────', 'Avg cost per employee: TSh ' + Math.round(perHead).toLocaleString()];
+                        }
+                        return [];
+                    }
+                }
+            }
+        },
+        scales: {
+            yMoney: {
+                beginAtZero: true, position: 'left',
+                ticks: {
+                    color: '#6b7280', font: { size: 11 }, maxTicksLimit: 7,
+                    callback: function (value) {
+                        if (value >= 1000000) return 'TSh ' + (value / 1000000).toFixed(1) + 'M';
+                        if (value >= 1000) return 'TSh ' + (value / 1000).toFixed(0) + 'K';
+                        return 'TSh ' + value;
+                    }
+                },
+                grid: { color: 'rgba(107,114,128,0.15)', lineWidth: 1, drawBorder: false },
+                border: { dash: [4, 4], display: false }
+            },
+            yCount: {
+                beginAtZero: true, position: 'right',
+                ticks: { color: '#6b7280', font: { size: 11 }, precision: 0 },
+                grid: { display: false },
+                border: { display: false }
+            },
+            x: {
+                ticks: { color: '#6b7280', font: { size: 11 }, maxRotation: 0 },
+                grid: { color: 'rgba(107,114,128,0.08)', lineWidth: 1, drawBorder: false },
+                border: { display: false }
+            }
+        }
+    }
 });
 <?php endif; ?>
 </script>
