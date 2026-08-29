@@ -36,6 +36,13 @@ try {
         exit();
     }
 
+    // Same gate for the optional warehouse assignment.
+    if (!empty($_POST['warehouse_id']) && function_exists('userCan') && !userCan('warehouse', (int)$_POST['warehouse_id'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: warehouse not in your scope.']);
+        exit();
+    }
+
     $pdo->beginTransaction();
 
     // Resolve "Other (specify)" Department/Designation: create the row from the
@@ -193,7 +200,7 @@ try {
             tax_id, social_security_number, emergency_contact,
             emergency_contact_relationship, emergency_contact_phone, emergency_contact_postal_address,
             emergency_contact_physical_address, emergency_contact_email,
-            benefits, notes, documents, other_doc_name, photo, project_id, created_by, created_at
+            benefits, notes, documents, other_doc_name, photo, project_id, warehouse_id, created_by, created_at
         ) VALUES (
             ?, ?, ?, ?, ?,   -- row 1: 5
             ?, ?, ?, ?, ?,   -- row 2: 5
@@ -205,7 +212,7 @@ try {
             ?, ?, ?, ?, ?, ?, -- row 8: 6 (bank_name, account_holder_name, bank_account, bank_branch, bank_swift_code, mobile_money)
             ?, ?, ?,         -- row 9: 3
             ?, ?, ?, ?, ?,   -- row 10: 5
-            ?, ?, ?, ?, ?, ?, ?, NOW() -- row 11: 7 + NOW()
+            ?, ?, ?, ?, ?, ?, ?, ?, NOW() -- row 11: 8 + NOW() (…, project_id, warehouse_id)
         )
     ");
 
@@ -266,6 +273,7 @@ try {
         $other_doc_name,
         $photo_rel_path,
         !empty($_POST['project_id']) ? $_POST['project_id'] : null,
+        !empty($_POST['warehouse_id']) ? $_POST['warehouse_id'] : null,
         $_SESSION['user_id']
     ]);
 
