@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — HR Dashboard rework: Employees vs Payroll trend chart
+
+**Files (changed):** `app/bms/pos/hr_dashboard.php`, `tests/test_hr_dashboard_cli.php`
+
+Replaced the department bar chart and HR-actions doughnut with a single line chart matching `app/dashboard.php`'s own gradient/line style exactly — a trend, not a snapshot. Headcount is reconstructed month-by-month (cumulative hires minus approved terminations/resignations to date — `employees` only stores current status, not history) and plotted against payroll actually paid that month on a second y-axis, since the two scales differ by orders of magnitude. Tooltip derives "avg cost per employee" — the real insight the chart exists to surface. Department headcount and HR Actions breakdown weren't dropped, just turned into a proportional list and a badge list instead of a pie/bar.
+
+Stat cards: added **Inactive Employees**, **New Hires (this year)**, and **Payroll Paid (this year)** (amount + employees-paid count, from `payroll.amount_paid` where `status='paid'`). Every card's background is now the standard `#d1e7dd` used everywhere else in BMS (was plain white, inconsistent with the rest of the app).
+
+Test suite extended to 23 assertions — new KPIs cross-checked against direct queries, background-color count, explicit checks that no bar/doughnut chart remains, dual y-axis presence, and headcount reconstruction sanity (subtracts exits, lands close to live Active Employees). No regressions.
+
 ## 2026-08-29 (refactor) — Operations menu: regrouped Human Resources into 6 categories
 
 **Files (changed):** `header.php`
