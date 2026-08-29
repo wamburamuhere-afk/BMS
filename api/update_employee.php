@@ -228,7 +228,7 @@ try {
         'department_id', 'designation_id', 'employment_type_id', 'employment_status', 
         'reporting_to', 'work_location',
         'basic_salary', 'hourly_rate', 'standard_working_hours', 'currency', 'payment_frequency',
-        'bank_name', 'bank_account', 'bank_branch', 'mobile_money',
+        'bank_name', 'account_holder_name', 'bank_account', 'bank_branch', 'bank_swift_code', 'mobile_money',
         'tax_id', 'social_security_number', 'emergency_contact',
         'emergency_contact_relationship', 'emergency_contact_phone', 'emergency_contact_postal_address',
         'emergency_contact_physical_address', 'emergency_contact_email',

@@ -675,16 +675,24 @@ $sr_status_badge = [
                             <p class="fw-bold text-success"><?= format_currency($employee['basic_salary']) ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
-                            <label class="text-muted small text-uppercase">Bank Account</label>
-                            <p class="fw-bold"><?= safe_output($employee['bank_account'] ?? 'N/A') ?></p>
-                        </div>
-                        <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Bank Name</label>
                             <p class="fw-bold"><?= safe_output($employee['bank_name'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Account Holder Name</label>
+                            <p class="fw-bold"><?= safe_output($employee['account_holder_name'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Bank Account</label>
+                            <p class="fw-bold"><?= safe_output($employee['bank_account'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Bank Branch</label>
                             <p class="fw-bold"><?= safe_output($employee['bank_branch'] ?? 'N/A') ?></p>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase">Bank Identifier Code <small>(SWIFT/routing)</small></label>
+                            <p class="fw-bold"><?= safe_output($employee['bank_swift_code'] ?? 'N/A') ?></p>
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase">Mobile Money</label>

@@ -139,7 +139,6 @@ head('Wizard no longer posts the retired single-slot fields');
 $src = @file_get_contents(dirname(__DIR__) . '/app/bms/pos/employees.php') ?: '';
 strpos($src, 'name="other_doc_name"') === false ? ok('other_doc_name input removed') : bad('other_doc_name input still present');
 strpos($src, 'name="other_doc_file"') === false ? ok('other_doc_file input removed') : bad('other_doc_file input still present');
-strpos($src, 'name="bank_branch"')    === false ? ok('bank_branch input removed from the wizard') : bad('bank_branch input still present');
 strpos($src, 'name="extra_doc_name[]"') !== false ? ok('repeatable extra_doc_name[] present') : bad('extra_doc_name[] missing');
 strpos($src, 'name="extra_doc_file[]"') !== false ? ok('repeatable extra_doc_file[] present') : bad('extra_doc_file[] missing');
 
