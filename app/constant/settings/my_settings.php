@@ -107,7 +107,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 save_setting($key . '_' . $user_id, $value);
             }
 
-            $success_msg = "Preferences saved successfully!";
+            // Keep the session's cached language in sync with what was just
+            // saved — header.php already rendered this response's nav using
+            // the posted value (see header.php's $__bms_lang_pref), but the
+            // NEXT page load reads $_SESSION['user_lang'] directly, so it
+            // must be updated here too or it would show the stale language
+            // for one more request.
+            $_SESSION['user_lang'] = $prefs['user_language'];
+
+            $success_msg = t("Preferences saved successfully!");
         } catch (Exception $e) {
             $error_msg = $e->getMessage();
         }
@@ -364,8 +372,8 @@ $prefs = [
                                     <div class="col-md-6">
                                         <label for="user_language" class="form-label">Language</label>
                                         <select class="form-select" id="user_language" name="user_language">
-                                            <option value="en" <?= $prefs['user_language'] == 'en' ? 'selected' : '' ?>>English</option>
-                                            <option value="sw" <?= $prefs['user_language'] == 'sw' ? 'selected' : '' ?>>Kiswahili</option>
+                                            <option value="en" <?= $prefs['user_language'] == 'en' ? 'selected' : '' ?>><?= t('English') ?></option>
+                                            <option value="sw" <?= $prefs['user_language'] == 'sw' ? 'selected' : '' ?>><?= t('Kiswahili') ?></option>
                                         </select>
                                     </div>
 
