@@ -90,12 +90,51 @@ $directActive = (int)$pdo->query("SELECT COUNT(*) FROM employees WHERE status = 
 strpos($adminHtml, '>' . $directActive . '<') !== false
     ? ok("Active Employees KPI ($directActive) appears in the rendered page") : bad("Active Employees KPI ($directActive) not found in rendered output");
 
+$directInactive = (int)$pdo->query("SELECT COUNT(*) FROM employees WHERE status != 'active'")->fetchColumn();
+strpos($adminHtml, '>' . $directInactive . '<') !== false
+    ? ok("Inactive Employees KPI ($directInactive) appears in the rendered page") : bad("Inactive Employees KPI ($directInactive) not found in rendered output");
+
+$year = (int)date('Y');
+$directNewHires = (int)$pdo->query("SELECT COUNT(*) FROM employees WHERE YEAR(hire_date) = $year")->fetchColumn();
+strpos($adminHtml, '>' . $directNewHires . '<') !== false
+    ? ok("New Hires KPI ($directNewHires) appears in the rendered page") : bad("New Hires KPI ($directNewHires) not found in rendered output");
+
 $directPending = (int)$pdo->query("SELECT COUNT(*) FROM employee_lifecycle_events WHERE status = 'pending'")->fetchColumn();
 strpos($adminHtml, '>' . $directPending . '<') !== false
     ? ok("HR Actions Pending KPI ($directPending) appears in the rendered page") : bad("pending-actions KPI ($directPending) not found in rendered output");
 
+$directPayroll = $pdo->query("SELECT COALESCE(SUM(amount_paid),0) FROM payroll WHERE status = 'paid' AND year = $year")->fetchColumn();
+strpos($adminHtml, 'TSh ' . number_format((float)$directPayroll, 0)) !== false
+    ? ok("Payroll Paid KPI (TSh " . number_format((float)$directPayroll, 0) . ") appears in the rendered page") : bad('Payroll Paid KPI not found in rendered output');
+
 head('6. Quick Links only show pages the viewer can actually reach');
 strpos($src, 'canView($key)') !== false ? ok('quick links are permission-gated per link') : bad('quick links are not gated — could show a 403 link to a restricted module');
+
+head('7. Stat cards use the standard app-wide card background (#d1e7dd), no pie/bar chart used');
+$cardBgCount = substr_count($src, 'style="background:#d1e7dd;"');
+($cardBgCount >= 7) ? ok("$cardBgCount stat cards use the standard #d1e7dd background") : bad("only $cardBgCount cards use #d1e7dd — expected at least 7");
+strpos($src, "type: 'bar'") === false ? ok('no bar chart used (as requested)') : bad('a bar chart is still present');
+strpos($src, "type: 'doughnut'") === false ? ok('no doughnut/pie chart used (as requested)') : bad('a doughnut/pie chart is still present');
+strpos($src, "type: 'line'") !== false ? ok('the headline chart is a line chart (matches app/dashboard.php style)') : bad('no line chart found');
+(strpos($src, "yAxisID: 'yMoney'") !== false && strpos($src, "yAxisID: 'yCount'") !== false)
+    ? ok('dual y-axis: money (payroll) and count (headcount) plotted on separate scales') : bad('dual y-axis setup missing — payroll and headcount would be unreadable on one scale');
+
+head('8. Employees-vs-Payroll monthly series: headcount reconstruction is internally consistent');
+strpos($src, "'termination', 'resignation'") !== false ? ok('headcount reconstruction subtracts approved terminations/resignations') : bad('exit subtraction missing — headcount trend would only ever go up');
+// The LAST point of the series (as-of today) must equal the live Active Employees KPI
+// when nobody has ever been hired after leaving and rehired (the one known approximation
+// this reconstruction makes) — cross-check it is at least in the right ballpark.
+preg_match('/data: \[([\d.,]*)\]\s*,\s*yAxisID: .yCount./s', $adminHtml, $m2)
+    ?: preg_match("/'Headcount'.*?data: \\[([\\d.,]*)\\]/s", $adminHtml, $m2);
+if (!empty($m2[1])) {
+    $series = array_map('intval', explode(',', $m2[1]));
+    $lastPoint = end($series);
+    (abs($lastPoint - $directActive) <= 5)
+        ? ok("chart's latest headcount point ($lastPoint) is close to live Active Employees ($directActive)")
+        : bad("chart's latest headcount point ($lastPoint) is far from live Active Employees ($directActive) — reconstruction may be wrong");
+} else {
+    echo "  — could not extract the headcount series from rendered output to cross-check\n";
+}
 
 echo "\n\033[1m═══ Result ═══\033[0m\n";
 if ($failures === 0) { echo "\033[32m✅ All $passes checks passed.\033[0m\n"; exit(0); }
