@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — UI language translation: Sub-Contractors CRUD
+
+**Files (changed):** `app/bms/operations/sub_contractors.php`, `lang/sw.php`
+
+Sub-Contractors module translated to the same depth as Customers/Suppliers: list page (stats,
+filters, server-rendered table + card view), Add/Edit modals across all 4 tabs, and every
+SweetAlert confirmation (status change, delete). Added `sc_status_label()` (same pattern as
+Suppliers' `supplier_status_label()`, file-scoped since this page doesn't share suppliers.php).
+
+Verified with a full-page text sweep (not just visual screenshots) for stray English UI words —
+none found. Confirms the two catalog gaps fixed in the previous commit ("Filters & Search",
+"Primary contact person") are holding across all three modules now.
+
 ## 2026-08-29 (feature) — UI language translation: Suppliers CRUD + two catalog gaps fixed
 
 **Files (changed):** `app/bms/Suppliers/suppliers.php`, `lang/sw.php`

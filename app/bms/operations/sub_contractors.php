@@ -128,13 +128,27 @@ if (!empty($_SESSION['scope']['is_admin'])) {
         $projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
+// Translated status label for badges (t() keys already exist from Customers/Suppliers).
+function sc_status_label($status) {
+    static $labels = null;
+    if ($labels === null) {
+        $labels = [
+            'active'      => t('Active'),
+            'inactive'    => t('Inactive'),
+            'suspended'   => t('Suspended'),
+            'blacklisted' => t('Blacklisted'),
+            'deleted'     => t('Deleted'),
+        ];
+    }
+    return $labels[$status] ?? ucfirst($status);
+}
 ?>
 
 <div class="container-fluid mt-4">
     <!-- Standardized Print Header -->
     <div class="bms-print-header d-none d-print-block">
-        <h2 class="bph-title">Official Sub-Contractors Report</h2>
-        <p class="bph-sub">Generated on: <?= date('d M Y, H:i') ?></p>
+        <h2 class="bph-title"><?= t('Official Sub-Contractors Report') ?></h2>
+        <p class="bph-sub"><?= t('Generated on:') ?> <?= date('d M Y, H:i') ?></p>
         <div class="bph-bar"></div>
     </div>
 
@@ -143,13 +157,13 @@ if (!empty($_SESSION['scope']['is_admin'])) {
         <div class="col-12">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
                 <div class="flex-grow-1">
-                    <h2 class="mb-0 fs-4 fs-md-3 fw-bold text-nowrap"><i class="bi bi-person-workspace text-info"></i> Sub-Contractor Management</h2>
-                    <p class="text-muted mb-0 d-none d-md-block small mt-1">Manage your sub-contractors and field service providers</p>
+                    <h2 class="mb-0 fs-4 fs-md-3 fw-bold text-nowrap"><i class="bi bi-person-workspace text-info"></i> <?= t('Sub-Contractor Management') ?></h2>
+                    <p class="text-muted mb-0 d-none d-md-block small mt-1"><?= t('Manage your sub-contractors and field service providers') ?></p>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <?php if ($can_create_sc): ?>
                     <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm text-nowrap" style="border-radius: 6px;" data-bs-toggle="modal" data-bs-target="#addSubContractorModal">
-                        <i class="bi bi-plus-circle me-1"></i> Add Sub-Contractor
+                        <i class="bi bi-plus-circle me-1"></i> <?= t('Add Sub-Contractor') ?>
                     </button>
                     <?php endif; ?>
                 </div>
@@ -167,7 +181,7 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                             <i class="bi bi-people"></i>
                         </div>
                         <div class="overflow-hidden flex-grow-1">
-                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap" style="font-size: 0.65rem;">Total</p>
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap" style="font-size: 0.65rem;"><?= t('Total') ?></p>
                             <h4 class="mb-0 fw-bold"><?= $total_sc ?></h4>
                         </div>
                     </div>
@@ -182,7 +196,7 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                             <i class="bi bi-check-circle"></i>
                         </div>
                         <div class="overflow-hidden flex-grow-1">
-                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap" style="font-size: 0.65rem;">Active</p>
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap" style="font-size: 0.65rem;"><?= t('Active') ?></p>
                             <h4 class="mb-0 fw-bold"><?= count($active_sc) ?></h4>
                         </div>
                     </div>
@@ -197,7 +211,7 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                             <i class="bi bi-exclamation-triangle"></i>
                         </div>
                         <div class="overflow-hidden flex-grow-1">
-                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap" style="font-size: 0.65rem;">Suspended</p>
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap" style="font-size: 0.65rem;"><?= t('Suspended') ?></p>
                             <h4 class="mb-0 fw-bold"><?= count($suspended_sc) ?></h4>
                         </div>
                     </div>
@@ -212,7 +226,7 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                             <i class="bi bi-x-circle"></i>
                         </div>
                         <div class="overflow-hidden flex-grow-1">
-                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap" style="font-size: 0.65rem;">Blacklisted</p>
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap" style="font-size: 0.65rem;"><?= t('Blacklisted') ?></p>
                             <h4 class="mb-0 fw-bold"><?= count($blacklisted_sc) ?></h4>
                         </div>
                     </div>
@@ -226,40 +240,40 @@ if (!empty($_SESSION['scope']['is_admin'])) {
         <div class="col-12">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-funnel"></i> Filters & Search</h6>
+                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-funnel"></i> <?= t('Filters & Search') ?></h6>
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-6 col-md-3">
-                            <label for="statusFilter" class="form-label small fw-bold">Status</label>
+                            <label for="statusFilter" class="form-label small fw-bold"><?= t('Status') ?></label>
                             <select class="form-select" id="statusFilter">
-                                <option value="">All Status</option>
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                                <option value="suspended">Suspended</option>
-                                <option value="blacklisted">Blacklisted</option>
+                                <option value=""><?= t('All Status') ?></option>
+                                <option value="active"><?= t('Active') ?></option>
+                                <option value="inactive"><?= t('Inactive') ?></option>
+                                <option value="suspended"><?= t('Suspended') ?></option>
+                                <option value="blacklisted"><?= t('Blacklisted') ?></option>
                             </select>
                         </div>
                         <div class="col-6 col-md-3">
-                            <label for="categoryFilter" class="form-label small fw-bold">Category</label>
+                            <label for="categoryFilter" class="form-label small fw-bold"><?= t('Category') ?></label>
                             <select class="form-select select2-static" id="categoryFilter">
-                                <option value="">All Categories</option>
+                                <option value=""><?= t('All Categories') ?></option>
                                 <?php foreach ($categories as $category): ?>
                                     <option value="<?= safe_output($category['category_name']) ?>"><?= safe_output($category['category_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-6 col-md-3">
-                            <label for="countryFilter" class="form-label small fw-bold">Country</label>
-                            <input type="text" class="form-control" id="countryFilter" placeholder="Filter by country">
+                            <label for="countryFilter" class="form-label small fw-bold"><?= t('Country') ?></label>
+                            <input type="text" class="form-control" id="countryFilter" placeholder="<?= t('Filter by country') ?>">
                         </div>
                         <div class="col-6 col-md-3">
-                            <label for="cityFilter" class="form-label small fw-bold">City</label>
-                            <input type="text" class="form-control" id="cityFilter" placeholder="Filter by city">
+                            <label for="cityFilter" class="form-label small fw-bold"><?= t('City') ?></label>
+                            <input type="text" class="form-control" id="cityFilter" placeholder="<?= t('Filter by city') ?>">
                         </div>
                         <div class="col-md-12 d-flex justify-content-end gap-2">
-                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">Clear</button>
-                            <button type="button" class="btn btn-primary btn-sm" onclick="applyFilters()">Apply</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearFilters()"><?= t('Clear') ?></button>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="applyFilters()"><?= t('Apply') ?></button>
                         </div>
                     </div>
                 </div>
@@ -275,7 +289,7 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                     <!-- Action Buttons -->
                     <div class="d-flex flex-wrap shadow-sm bg-white" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                         <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="copyTable()" style="background: #fff; height: 38px;">
-                            <i class="bi bi-clipboard text-info me-1"></i> Copy
+                            <i class="bi bi-clipboard text-info me-1"></i> <?= t('Copy') ?>
                         </button>
                         <div class="bg-light d-none d-sm-block" style="width: 1px; height: 38px;"></div>
                         <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="exportSC()" style="background: #fff; height: 38px;">
@@ -283,31 +297,31 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                         </button>
                         <div class="bg-light d-none d-sm-block" style="width: 1px; height: 38px;"></div>
                         <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="printTable()" style="background: #fff; height: 38px;">
-                            <i class="bi bi-printer text-primary me-1"></i> Print
+                            <i class="bi bi-printer text-primary me-1"></i> <?= t('Print') ?>
                         </button>
                     </div>
 
                     <!-- Toolbar -->
                     <div class="d-flex align-items-center gap-2 flex-grow-1">
                         <div class="d-flex align-items-center bg-white shadow-sm px-2 py-1" style="border: 1px solid #dee2e6; border-radius: 8px; height: 38px;">
-                            <span class="small text-muted me-2 text-nowrap">Show:</span>
+                            <span class="small text-muted me-2 text-nowrap"><?= t('Show:') ?></span>
                             <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 45px; background: transparent;" onchange="$('#scTable').DataTable().page.len(this.value).draw();">
                                 <option value="10">10</option>
                                 <option value="25" selected>25</option>
                                 <option value="50">50</option>
                                 <option value="100">100</option>
-                                <option value="-1">All</option>
+                                <option value="-1"><?= t('All') ?></option>
                             </select>
                         </div>
                         <div class="input-group input-group-sm shadow-sm flex-grow-1" style="border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6; height: 38px; min-width: 150px; max-width: 350px;">
                             <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
-                            <input type="text" class="form-control border-0" id="searchSC" placeholder="Search sub-contractors..." onkeyup="$('#scTable').DataTable().search(this.value).draw();">
+                            <input type="text" class="form-control border-0" id="searchSC" placeholder="<?= t('Search sub-contractors...') ?>" onkeyup="$('#scTable').DataTable().search(this.value).draw();">
                         </div>
                     </div>
                 </div>
                 <div class="d-none d-xl-block">
                     <span class="badge bg-success-soft text-success border border-success px-3 py-2 rounded-pill shadow-sm">
-                        <i class="bi bi-check-circle-fill me-1"></i> <?= $total_sc ?> records
+                        <i class="bi bi-check-circle-fill me-1"></i> <?= $total_sc ?> <?= t('records') ?>
                     </span>
                 </div>
             </div>
@@ -319,10 +333,10 @@ if (!empty($_SESSION['scope']['is_admin'])) {
         <div class="col-12">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-bold text-dark d-print-none">Sub-Contractor Records</h5>
+                    <h5 class="mb-0 fw-bold text-dark d-print-none"><?= t('Sub-Contractor Records') ?></h5>
                     <div class="btn-group shadow-sm d-none d-md-flex" role="group">
-                        <button type="button" class="btn btn-primary btn-sm border" onclick="toggleSCView('table')" id="sc-btn-table" title="Table View"><i class="bi bi-table"></i></button>
-                        <button type="button" class="btn btn-light btn-sm border" onclick="toggleSCView('card')" id="sc-btn-card" title="Card View"><i class="bi bi-grid"></i></button>
+                        <button type="button" class="btn btn-primary btn-sm border" onclick="toggleSCView('table')" id="sc-btn-table" title="<?= t('Table View') ?>"><i class="bi bi-table"></i></button>
+                        <button type="button" class="btn btn-light btn-sm border" onclick="toggleSCView('card')" id="sc-btn-card" title="<?= t('Card View') ?>"><i class="bi bi-grid"></i></button>
                     </div>
                 </div>
                 <div class="card-body p-0">
@@ -331,14 +345,14 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                             <thead>
                                 <tr>
                                     <th class="text-center">S/NO</th>
-                                    <th>Code</th>
-                                    <th>Name</th>
-                                    <th>Contact Info</th>
-                                    <th>Address</th>
-                                    <th>Category</th>
-                                    <th>Projects</th>
-                                    <th>Status</th>
-                                    <th class="d-print-none text-center">Actions</th>
+                                    <th><?= t('Code') ?></th>
+                                    <th><?= t('Name') ?></th>
+                                    <th><?= t('Contact Info') ?></th>
+                                    <th><?= t('Address') ?></th>
+                                    <th><?= t('Category') ?></th>
+                                    <th><?= t('Projects') ?></th>
+                                    <th><?= t('Status') ?></th>
+                                    <th class="d-print-none text-center"><?= t('Actions') ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -359,7 +373,7 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                             <strong><?= safe_output($sc['city'] ?? '') ?></strong>
                                         </div>
                                     </td>
-                                    <td><span class="badge bg-secondary"><?= safe_output($sc['category_name'] ?? 'General') ?></span></td>
+                                    <td><span class="badge bg-secondary"><?= safe_output($sc['category_name'] ?? t('General')) ?></span></td>
                                     <td>
                                         <?php if (!empty($sc['primary_project_name'])): ?>
                                         <a href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc['supplier_id'] ?>" class="badge bg-primary text-white text-decoration-none">
@@ -367,13 +381,13 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                         </a>
                                         <?php elseif ($sc['project_count'] > 0): ?>
                                         <a href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc['supplier_id'] ?>" class="badge bg-primary text-white text-decoration-none">
-                                            <?= (int)$sc['project_count'] ?> <?= $sc['project_count'] == 1 ? 'project' : 'projects' ?>
+                                            <?= (int)$sc['project_count'] ?> <?= $sc['project_count'] == 1 ? t('project') : t('projects') ?>
                                         </a>
                                         <?php else: ?>
                                         <span class="text-muted small">—</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td><span class="badge bg-<?= get_status_badge($sc['status']) ?>"><?= ucfirst($sc['status']) ?></span></td>
+                                    <td><span class="badge bg-<?= get_status_badge($sc['status']) ?>"><?= sc_status_label($sc['status']) ?></span></td>
                                     <td class="d-print-none text-center">
                                         <div class="dropdown">
                                             <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -381,34 +395,34 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                             </button>
                                             <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
                                                 <!-- View Options -->
-                                                <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc['supplier_id'] ?>"><i class="bi bi-eye text-info me-2"></i> View Details</a></li>
+                                                <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc['supplier_id'] ?>"><i class="bi bi-eye text-info me-2"></i> <?= t('View Details') ?></a></li>
                                                 <?php if ($can_edit_sc): ?>
-                                                <li><a class="dropdown-item py-2 rounded" href="#" onclick="editSC(<?= $sc['supplier_id'] ?>)"><i class="bi bi-pencil text-primary me-2"></i> Edit Sub-Contractor</a></li>
+                                                <li><a class="dropdown-item py-2 rounded" href="#" onclick="editSC(<?= $sc['supplier_id'] ?>)"><i class="bi bi-pencil text-primary me-2"></i> <?= t('Edit Sub-Contractor') ?></a></li>
                                                 <?php endif; ?>
-                                                <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_orders') ?>?supplier=<?= $sc['supplier_id'] ?>"><i class="bi bi-cart text-success me-2"></i> View Orders</a></li>
-                                                <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('suppliers/payments') ?>?id=<?= $sc['supplier_id'] ?>"><i class="bi bi-cash-stack text-warning me-2"></i> View Payments</a></li>
-                                                <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('vendor_statement') ?>?vendor_id=<?= $sc['supplier_id'] ?>&vendor_type=sub_contractor"><i class="bi bi-file-earmark-text text-primary me-2"></i> View Account</a></li>
+                                                <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_orders') ?>?supplier=<?= $sc['supplier_id'] ?>"><i class="bi bi-cart text-success me-2"></i> <?= t('View Orders') ?></a></li>
+                                                <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('suppliers/payments') ?>?id=<?= $sc['supplier_id'] ?>"><i class="bi bi-cash-stack text-warning me-2"></i> <?= t('View Payments') ?></a></li>
+                                                <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('vendor_statement') ?>?vendor_id=<?= $sc['supplier_id'] ?>&vendor_type=sub_contractor"><i class="bi bi-file-earmark-text text-primary me-2"></i> <?= t('View Account') ?></a></li>
 
                                                 <li><hr class="dropdown-divider"></li>
 
                                                 <!-- Status Management -->
                                                 <?php if ($can_edit_sc): ?>
                                                 <?php if ($sc['status'] === 'active'): ?>
-                                                <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatusSC(<?= $sc['supplier_id'] ?>, 'inactive')"><i class="bi bi-pause-circle text-warning me-2"></i> Deactivate</a></li>
+                                                <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatusSC(<?= $sc['supplier_id'] ?>, 'inactive')"><i class="bi bi-pause-circle text-warning me-2"></i> <?= t('Deactivate') ?></a></li>
                                                 <?php elseif ($sc['status'] === 'inactive'): ?>
-                                                <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatusSC(<?= $sc['supplier_id'] ?>, 'active')"><i class="bi bi-play-circle text-success me-2"></i> Activate</a></li>
+                                                <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatusSC(<?= $sc['supplier_id'] ?>, 'active')"><i class="bi bi-play-circle text-success me-2"></i> <?= t('Activate') ?></a></li>
                                                 <?php endif; ?>
                                                 <?php if ($sc['status'] !== 'suspended'): ?>
-                                                <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatusSC(<?= $sc['supplier_id'] ?>, 'suspended')"><i class="bi bi-exclamation-triangle text-warning me-2"></i> Suspend</a></li>
+                                                <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatusSC(<?= $sc['supplier_id'] ?>, 'suspended')"><i class="bi bi-exclamation-triangle text-warning me-2"></i> <?= t('Suspend') ?></a></li>
                                                 <?php endif; ?>
                                                 <?php if ($sc['status'] !== 'blacklisted'): ?>
-                                                <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatusSC(<?= $sc['supplier_id'] ?>, 'blacklisted')"><i class="bi bi-slash-circle text-danger me-2"></i> Blacklist</a></li>
+                                                <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatusSC(<?= $sc['supplier_id'] ?>, 'blacklisted')"><i class="bi bi-slash-circle text-danger me-2"></i> <?= t('Blacklist') ?></a></li>
                                                 <?php endif; ?>
-                                                
+
                                                 <li><hr class="dropdown-divider"></li>
-                                                
+
                                                 <!-- Delete -->
-                                                <li><a class="dropdown-item py-2 rounded text-danger" href="#" onclick="confirmDeleteSC(<?= $sc['supplier_id'] ?>)"><i class="bi bi-trash me-2"></i> Delete</a></li>
+                                                <li><a class="dropdown-item py-2 rounded text-danger" href="#" onclick="confirmDeleteSC(<?= $sc['supplier_id'] ?>)"><i class="bi bi-trash me-2"></i> <?= t('Delete') ?></a></li>
                                                 <?php endif; ?>
                                             </ul>
                                         </div>
@@ -428,9 +442,9 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                         <div>
                                             <div class="fw-bold" style="font-size:0.9rem"><?= safe_output($sc['supplier_name']) ?></div>
-                                            <small class="text-muted"><?= safe_output($sc['supplier_code']) ?> &bull; <?= safe_output($sc['category_name'] ?? 'General') ?></small>
+                                            <small class="text-muted"><?= safe_output($sc['supplier_code']) ?> &bull; <?= safe_output($sc['category_name'] ?? t('General')) ?></small>
                                         </div>
-                                        <span class="badge bg-<?= get_status_badge($sc['status']) ?>" style="font-size:0.65rem"><?= ucfirst($sc['status']) ?></span>
+                                        <span class="badge bg-<?= get_status_badge($sc['status']) ?>" style="font-size:0.65rem"><?= sc_status_label($sc['status']) ?></span>
                                     </div>
                                     <?php if (!empty($sc['contact_person']) || !empty($sc['phone'])): ?>
                                     <div class="small text-muted mb-1">
@@ -446,19 +460,19 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                         <?php if (!empty($sc['primary_project_name'])): ?>
                                         <?= safe_output($sc['primary_project_name']) ?><?php if ($sc['project_count'] > 0): ?> +<?= (int)$sc['project_count'] ?><?php endif; ?>
                                         <?php elseif ($sc['project_count'] > 0): ?>
-                                        <?= (int)$sc['project_count'] ?> project<?= $sc['project_count'] != 1 ? 's' : '' ?>
-                                        <?php else: ?><span>No projects</span><?php endif; ?>
+                                        <?= (int)$sc['project_count'] ?> <?= $sc['project_count'] != 1 ? t('projects') : t('project') ?>
+                                        <?php else: ?><span><?= t('No projects') ?></span><?php endif; ?>
                                     </div>
                                 </div>
                                 <div class="card-footer bg-white border-top p-0" style="border-radius:0 0 10px 10px;">
                                     <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
-                                        <a href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc['supplier_id'] ?>" class="btn btn-sm btn-outline-info" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="View"><i class="bi bi-eye"></i></a>
+                                        <a href="<?= getUrl('sub_contractors/view') ?>?id=<?= $sc['supplier_id'] ?>" class="btn btn-sm btn-outline-info" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('View') ?>"><i class="bi bi-eye"></i></a>
                                         <?php if ($can_edit_sc): ?>
-                                        <button class="btn btn-sm btn-outline-primary" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" onclick="editSC(<?= $sc['supplier_id'] ?>)" title="Edit"><i class="bi bi-pencil"></i></button>
+                                        <button class="btn btn-sm btn-outline-primary" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" onclick="editSC(<?= $sc['supplier_id'] ?>)" title="<?= t('Edit') ?>"><i class="bi bi-pencil"></i></button>
                                         <?php endif; ?>
-                                        <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $sc['supplier_id'] ?>" class="btn btn-sm btn-outline-success" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="Orders"><i class="bi bi-cart"></i></a>
+                                        <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $sc['supplier_id'] ?>" class="btn btn-sm btn-outline-success" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" title="<?= t('Orders') ?>"><i class="bi bi-cart"></i></a>
                                         <?php if ($can_delete_sc): ?>
-                                        <button class="btn btn-sm btn-outline-danger" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" onclick="confirmDeleteSC(<?= $sc['supplier_id'] ?>)" title="Delete"><i class="bi bi-trash"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem" onclick="confirmDeleteSC(<?= $sc['supplier_id'] ?>)" title="<?= t('Delete') ?>"><i class="bi bi-trash"></i></button>
                                         <?php endif; ?>
                                     </div>
                                 </div>
@@ -478,18 +492,18 @@ if (!empty($_SESSION['scope']['is_admin'])) {
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="addSubContractorModalLabel">
-                    <i class="bi bi-plus-circle"></i> Add New Sub-Contractor
+                    <i class="bi bi-plus-circle"></i> <?= t('Add New Sub-Contractor') ?>
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= t('Close') ?>"></button>
             </div>
             <form id="addSubContractorForm" method="POST" enctype="multipart/form-data" novalidate>
                 <div class="modal-body">
                     <div id="add-sc-message" class="mb-3"></div>
                     <?php if ($proj_ctx_id > 0): ?>
                     <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3">
-                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Adding to project: <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i><?= t('Adding to project:') ?> <strong><?= safe_output($proj_ctx_name) ?></strong></span>
                         <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
-                            <i class="bi bi-arrow-left me-1"></i> Back to Project
+                            <i class="bi bi-arrow-left me-1"></i> <?= t('Back to Project') ?>
                         </a>
                     </div>
                     <?php endif; ?>
@@ -498,22 +512,22 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                 <ul class="nav nav-tabs mb-3" id="addSubContractorTabs" role="tablist">
                     <li class="nav-item">
                         <button class="nav-link active" id="add-sc-basic-tab" data-bs-toggle="tab" data-bs-target="#tab-add-basic" type="button" role="tab" aria-controls="tab-add-basic" aria-selected="true">
-                            <i class="bi bi-info-circle me-1"></i>Basic Info
+                            <i class="bi bi-info-circle me-1"></i><?= t('Basic Info') ?>
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="add-sc-contact-tab" data-bs-toggle="tab" data-bs-target="#tab-add-contact" type="button" role="tab" aria-controls="tab-add-contact" aria-selected="false">
-                            <i class="bi bi-person-lines-fill me-1"></i>Contact Details
+                            <i class="bi bi-person-lines-fill me-1"></i><?= t('Contact Details') ?>
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="add-sc-address-tab" data-bs-toggle="tab" data-bs-target="#tab-add-address" type="button" role="tab" aria-controls="tab-add-address" aria-selected="false">
-                            <i class="bi bi-geo-alt me-1"></i>Address
+                            <i class="bi bi-geo-alt me-1"></i><?= t('Address') ?>
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="add-sc-financial-tab" data-bs-toggle="tab" data-bs-target="#tab-add-financial" type="button" role="tab" aria-controls="tab-add-financial" aria-selected="false">
-                            <i class="bi bi-wallet2 me-1"></i>Financial
+                            <i class="bi bi-wallet2 me-1"></i><?= t('Financial') ?>
                         </button>
                     </li>
                 </ul>
@@ -523,59 +537,59 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                     <div class="tab-pane fade show active" id="tab-add-basic" role="tabpanel" aria-labelledby="add-sc-basic-tab">
                             <div class="row">
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="sc_name" class="form-label">Sub-Contractor Name <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="sc_name" name="supplier_name" required placeholder="Enter sub-contractor name">
+                                    <label for="sc_name" class="form-label"><?= t('Sub-Contractor Name') ?> <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="sc_name" name="supplier_name" required placeholder="<?= t('Enter sub-contractor name') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="company_name" class="form-label">Company Name</label>
-                                    <input type="text" class="form-control" id="company_name" name="company_name" placeholder="Company name (if different)">
+                                    <label for="company_name" class="form-label"><?= t('Company Name') ?></label>
+                                    <input type="text" class="form-control" id="company_name" name="company_name" placeholder="<?= t('Company name (if different)') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="acronym" class="form-label">Acronym</label>
+                                    <label for="acronym" class="form-label"><?= t('Acronym') ?></label>
                                     <input type="text" class="form-control" id="acronym" name="acronym" placeholder="e.g. TANESCO, TRA">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="logo" class="form-label">Company Logo</label>
+                                    <label for="logo" class="form-label"><?= t('Company Logo') ?></label>
                                     <input type="file" class="form-control" id="logo" name="logo" accept="image/*">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="sc_type" class="form-label">Sub-Contractor Type</label>
-                                    <?= renderOtherSelect('sc_type', 'supplier_type', $lk_sc_type, '', 'supplier_type_other', 'Select Type') ?>
+                                    <label for="sc_type" class="form-label"><?= t('Sub-Contractor Type') ?></label>
+                                    <?= renderOtherSelect('sc_type', 'supplier_type', $lk_sc_type, '', 'supplier_type_other', t('Select Type')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="sc_year" class="form-label">Year <span class="text-danger">*</span></label>
-                                    <?= renderOtherSelect('sc_year', 'year', $lk_years, '', 'year_other', 'Select Year', true) ?>
+                                    <label for="sc_year" class="form-label"><?= t('Year') ?> <span class="text-danger">*</span></label>
+                                    <?= renderOtherSelect('sc_year', 'year', $lk_years, '', 'year_other', t('Select Year'), true) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="category_id" class="form-label">Category</label>
-                                    <?= renderOtherSelect('category_id', 'category_id', $lk_categories, '', 'category_other', 'Select Category') ?>
+                                    <label for="category_id" class="form-label"><?= t('Category') ?></label>
+                                    <?= renderOtherSelect('category_id', 'category_id', $lk_categories, '', 'category_other', t('Select Category')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="status" class="form-label">Status</label>
+                                    <label for="status" class="form-label"><?= t('Status') ?></label>
                                     <select class="form-select" id="status" name="status">
-                                        <option value="active" selected>Active</option>
-                                        <option value="inactive">Inactive</option>
-                                        <option value="suspended">Suspended</option>
-                                        <option value="blacklisted">Blacklisted</option>
+                                        <option value="active" selected><?= t('Active') ?></option>
+                                        <option value="inactive"><?= t('Inactive') ?></option>
+                                        <option value="suspended"><?= t('Suspended') ?></option>
+                                        <option value="blacklisted"><?= t('Blacklisted') ?></option>
                                     </select>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="project_id" class="form-label">Linked Project (Optional)</label>
+                                    <label for="project_id" class="form-label"><?= t('Linked Project') ?> (<?= t('Optional') ?>)</label>
                                     <select class="form-select select2-enable" id="project_id" name="project_id">
-                                        <option value="">-- General Sub-Contractor (No Project) --</option>
+                                        <option value="">-- <?= t('General Sub-Contractor (No Project)') ?> --</option>
                                         <?php foreach ($projects as $project): ?>
                                         <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <div class="form-text">Associate this sub-contractor with a specific project context.</div>
+                                    <div class="form-text"><?= t('Associate this sub-contractor with a specific project context.') ?></div>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="credit_limit" class="form-label">Credit Limit</label>
+                                    <label for="credit_limit" class="form-label"><?= t('Credit Limit') ?></label>
                                     <input type="number" class="form-control" id="credit_limit" name="credit_limit" placeholder="0.00" step="0.01">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="description" class="form-label">Description</label>
-                                    <textarea class="form-control" id="description" name="description" rows="2" placeholder="Sub-Contractor description or notes"></textarea>
+                                    <label for="description" class="form-label"><?= t('Description') ?></label>
+                                    <textarea class="form-control" id="description" name="description" rows="2" placeholder="<?= t('Sub-Contractor description or notes') ?>"></textarea>
                                 </div>
                             </div>
                         </div>
@@ -583,35 +597,35 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                     <div class="tab-pane fade" id="tab-add-contact" role="tabpanel" aria-labelledby="add-sc-contact-tab">
                             <div class="row">
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="contact_person" class="form-label">Contact Person</label>
-                                    <input type="text" class="form-control" id="contact_person" name="contact_person" placeholder="Primary contact person">
+                                    <label for="contact_person" class="form-label"><?= t('Contact Person') ?></label>
+                                    <input type="text" class="form-control" id="contact_person" name="contact_person" placeholder="<?= t('Primary contact person') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="contact_title" class="form-label">Contact Title</label>
-                                    <input type="text" class="form-control" id="contact_title" name="contact_title" placeholder="e.g., Manager, Director">
+                                    <label for="contact_title" class="form-label"><?= t('Contact Title') ?></label>
+                                    <input type="text" class="form-control" id="contact_title" name="contact_title" placeholder="<?= t('e.g., Manager, Director') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="email" class="form-label">Contact Email</label>
+                                    <label for="email" class="form-label"><?= t('Contact Email') ?></label>
                                     <input type="email" class="form-control" id="email" name="email" placeholder="contact@example.com">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="company_email" class="form-label">Company Email</label>
+                                    <label for="company_email" class="form-label"><?= t('Company Email') ?></label>
                                     <input type="email" class="form-control" id="company_email" name="company_email" placeholder="company@example.com">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="phone" class="form-label">Phone Number</label>
+                                    <label for="phone" class="form-label"><?= t('Phone Number') ?></label>
                                     <input type="text" class="form-control" id="phone" name="phone" placeholder="+255 123 456 789">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="mobile" class="form-label">Mobile Number</label>
+                                    <label for="mobile" class="form-label"><?= t('Mobile Number') ?></label>
                                     <input type="text" class="form-control" id="mobile" name="mobile" placeholder="+255 123 456 789">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="fax" class="form-label">Fax Number</label>
-                                    <input type="text" class="form-control" id="fax" name="fax" placeholder="Fax number">
+                                    <label for="fax" class="form-label"><?= t('Fax Number') ?></label>
+                                    <input type="text" class="form-control" id="fax" name="fax" placeholder="<?= t('Fax number') ?>">
                                 </div>
                                 <div class="col-md-12 mb-3">
-                                    <label for="website" class="form-label">Website</label>
+                                    <label for="website" class="form-label"><?= t('Website') ?></label>
                                     <input type="url" class="form-control" id="website" name="website" placeholder="https://www.example.com">
                                 </div>
                             </div>
@@ -620,35 +634,35 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                     <div class="tab-pane fade" id="tab-add-address" role="tabpanel" aria-labelledby="add-sc-address-tab">
                             <div class="row">
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="country" class="form-label">Country</label>
+                                    <label for="country" class="form-label"><?= t('Country') ?></label>
                                     <input type="text" class="form-control" id="country" name="country" placeholder="e.g. Tanzania">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="state" class="form-label">Region</label>
+                                    <label for="state" class="form-label"><?= t('Region') ?></label>
                                     <input type="text" class="form-control" id="state" name="state" placeholder="e.g. Dar es Salaam">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="city" class="form-label">District</label>
+                                    <label for="city" class="form-label"><?= t('District') ?></label>
                                     <input type="text" class="form-control" id="city" name="city" placeholder="e.g. Ilala">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="ward" class="form-label">Ward</label>
+                                    <label for="ward" class="form-label"><?= t('Ward') ?></label>
                                     <input type="text" class="form-control" id="ward" name="ward" placeholder="e.g. Kariakoo">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="village" class="form-label">Street/Village</label>
+                                    <label for="village" class="form-label"><?= t('Street/Village') ?></label>
                                     <input type="text" class="form-control" id="village" name="village" placeholder="e.g. Mtaa wa Kariakoo">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="postal_code" class="form-label">Zip Code</label>
-                                    <input type="text" class="form-control" id="postal_code" name="postal_code" placeholder="Zip code">
+                                    <label for="postal_code" class="form-label"><?= t('Zip Code') ?></label>
+                                    <input type="text" class="form-control" id="postal_code" name="postal_code" placeholder="<?= t('Zip code') ?>">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="address" class="form-label">Physical Address</label>
+                                    <label for="address" class="form-label"><?= t('Physical Address') ?></label>
                                     <textarea class="form-control" id="address" name="address" rows="2" placeholder="e.g. Ilala - Dar-es-salaam"></textarea>
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="postal_address" class="form-label">Postal Address</label>
+                                    <label for="postal_address" class="form-label"><?= t('Postal Address') ?></label>
                                     <input type="text" class="form-control" id="postal_address" name="postal_address" placeholder="e.g. p.o. box 120, mbezi">
                                 </div>
                             </div>
@@ -657,50 +671,50 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                     <div class="tab-pane fade" id="tab-add-financial" role="tabpanel" aria-labelledby="add-sc-financial-tab">
                             <div class="row">
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="tax_id" class="form-label">Tax ID (TIN)</label>
-                                    <input type="text" class="form-control" id="tax_id" name="tax_id" placeholder="Tax Identification Number">
+                                    <label for="tax_id" class="form-label"><?= t('Tax ID (TIN)') ?></label>
+                                    <input type="text" class="form-control" id="tax_id" name="tax_id" placeholder="<?= t('Tax Identification Number') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="vat_number" class="form-label">VAT Number</label>
-                                    <input type="text" class="form-control" id="vat_number" name="vat_number" placeholder="VAT registration number">
+                                    <label for="vat_number" class="form-label"><?= t('VAT Number') ?></label>
+                                    <input type="text" class="form-control" id="vat_number" name="vat_number" placeholder="<?= t('VAT registration number') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="default_wht_rate_id" class="form-label">Default Withholding Tax</label>
+                                    <label for="default_wht_rate_id" class="form-label"><?= t('Default Withholding Tax') ?></label>
                                     <select class="form-select" id="default_wht_rate_id" name="default_wht_rate_id">
-                                        <option value="">None</option>
+                                        <option value=""><?= t('None') ?></option>
                                         <?php foreach ($sc_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
                                         <option value="<?= (int)$w['rate_id'] ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <div class="form-text">Auto-fills WHT when recording this sub-contractor's invoice payments.</div>
+                                    <div class="form-text"><?= t("Auto-fills WHT when recording this sub-contractor's invoice payments.") ?></div>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="payment_terms" class="form-label">Payment Terms</label>
-                                    <?= renderOtherSelect('payment_terms', 'payment_terms', $lk_payment_terms, '', 'payment_terms_other', 'Select Terms') ?>
+                                    <label for="payment_terms" class="form-label"><?= t('Payment Terms') ?></label>
+                                    <?= renderOtherSelect('payment_terms', 'payment_terms', $lk_payment_terms, '', 'payment_terms_other', t('Select Terms')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="currency" class="form-label">Currency</label>
-                                    <?= renderOtherSelect('currency', 'currency', $lk_currency, 'TZS', 'currency_other', 'Select Currency') ?>
+                                    <label for="currency" class="form-label"><?= t('Currency') ?></label>
+                                    <?= renderOtherSelect('currency', 'currency', $lk_currency, 'TZS', 'currency_other', t('Select Currency')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="bank_name" class="form-label">Bank Name</label>
-                                    <input type="text" class="form-control" id="bank_name" name="bank_name" placeholder="Bank name">
+                                    <label for="bank_name" class="form-label"><?= t('Bank Name') ?></label>
+                                    <input type="text" class="form-control" id="bank_name" name="bank_name" placeholder="<?= t('Bank name') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="bank_account" class="form-label">Bank Account</label>
-                                    <input type="text" class="form-control" id="bank_account" name="bank_account" placeholder="Bank account number">
+                                    <label for="bank_account" class="form-label"><?= t('Bank Account') ?></label>
+                                    <input type="text" class="form-control" id="bank_account" name="bank_account" placeholder="<?= t('Bank account number') ?>">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="bank_address" class="form-label">Bank Address</label>
-                                    <textarea class="form-control" id="bank_address" name="bank_address" rows="2" placeholder="Bank address details"></textarea>
+                                    <label for="bank_address" class="form-label"><?= t('Bank Address') ?></label>
+                                    <textarea class="form-control" id="bank_address" name="bank_address" rows="2" placeholder="<?= t('Bank address details') ?>"></textarea>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary" id="saveSubContractorBtn"><i class="bi bi-check-circle me-1"></i> Save Sub-Contractor</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-primary" id="saveSubContractorBtn"><i class="bi bi-check-circle me-1"></i> <?= t('Save Sub-Contractor') ?></button>
                 </div>
             </form>
         </div>
@@ -713,9 +727,9 @@ if (!empty($_SESSION['scope']['is_admin'])) {
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="editSCModalLabel">
-                    <i class="bi bi-pencil"></i> Edit Sub-Contractor
+                    <i class="bi bi-pencil"></i> <?= t('Edit Sub-Contractor') ?>
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= t('Close') ?>"></button>
             </div>
             <form id="editSCForm" method="POST" enctype="multipart/form-data" novalidate>
                 <input type="hidden" name="supplier_id" id="edit_sc_id">
@@ -723,9 +737,9 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                     <div id="edit-sc-message" class="mb-3"></div>
                     <?php if ($proj_ctx_id > 0): ?>
                     <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3">
-                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Editing within project: <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i><?= t('Editing within project:') ?> <strong><?= safe_output($proj_ctx_name) ?></strong></span>
                         <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
-                            <i class="bi bi-arrow-left me-1"></i> Back to Project
+                            <i class="bi bi-arrow-left me-1"></i> <?= t('Back to Project') ?>
                         </a>
                     </div>
                     <?php endif; ?>
@@ -734,22 +748,22 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                 <ul class="nav nav-tabs mb-3" id="editSubContractorTabs" role="tablist">
                     <li class="nav-item">
                         <button class="nav-link active" id="edit-sc-basic-tab" data-bs-toggle="tab" data-bs-target="#tab-edit-basic" type="button" role="tab" aria-controls="tab-edit-basic" aria-selected="true">
-                            <i class="bi bi-info-circle me-1"></i>Basic Info
+                            <i class="bi bi-info-circle me-1"></i><?= t('Basic Info') ?>
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="edit-sc-contact-tab" data-bs-toggle="tab" data-bs-target="#tab-edit-contact" type="button" role="tab" aria-controls="tab-edit-contact" aria-selected="false">
-                            <i class="bi bi-person-lines-fill me-1"></i>Contact Details
+                            <i class="bi bi-person-lines-fill me-1"></i><?= t('Contact Details') ?>
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="edit-sc-address-tab" data-bs-toggle="tab" data-bs-target="#tab-edit-address" type="button" role="tab" aria-controls="tab-edit-address" aria-selected="false">
-                            <i class="bi bi-geo-alt me-1"></i>Address
+                            <i class="bi bi-geo-alt me-1"></i><?= t('Address') ?>
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="edit-sc-financial-tab" data-bs-toggle="tab" data-bs-target="#tab-edit-financial" type="button" role="tab" aria-controls="tab-edit-financial" aria-selected="false">
-                            <i class="bi bi-wallet2 me-1"></i>Financial
+                            <i class="bi bi-wallet2 me-1"></i><?= t('Financial') ?>
                         </button>
                     </li>
                 </ul>
@@ -759,19 +773,19 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                     <div class="tab-pane fade show active" id="tab-edit-basic" role="tabpanel" aria-labelledby="edit-sc-basic-tab">
                             <div class="row">
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_sc_name" class="form-label">Sub-Contractor Name <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="edit_sc_name" name="supplier_name" required placeholder="Enter sub-contractor name">
+                                    <label for="edit_sc_name" class="form-label"><?= t('Sub-Contractor Name') ?> <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="edit_sc_name" name="supplier_name" required placeholder="<?= t('Enter sub-contractor name') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_company_name" class="form-label">Company Name</label>
-                                    <input type="text" class="form-control" id="edit_company_name" name="company_name" placeholder="Company name (if different)">
+                                    <label for="edit_company_name" class="form-label"><?= t('Company Name') ?></label>
+                                    <input type="text" class="form-control" id="edit_company_name" name="company_name" placeholder="<?= t('Company name (if different)') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_acronym" class="form-label">Acronym</label>
+                                    <label for="edit_acronym" class="form-label"><?= t('Acronym') ?></label>
                                     <input type="text" class="form-control" id="edit_acronym" name="acronym" placeholder="e.g. TANESCO, TRA">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_logo" class="form-label">Company Logo</label>
+                                    <label for="edit_logo" class="form-label"><?= t('Company Logo') ?></label>
                                     <input type="file" class="form-control" id="edit_logo" name="logo" accept="image/*">
                                     <div id="sc_logo_container" class="mt-2" style="display:none;">
                                         <img id="edit_sc_logo_preview" src="" alt="Logo" class="img-thumbnail" style="height:50px;">
@@ -780,170 +794,170 @@ if (!empty($_SESSION['scope']['is_admin'])) {
                                     </div>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_sc_type" class="form-label">Sub-Contractor Type</label>
-                                    <?= renderOtherSelect('edit_sc_type', 'supplier_type', $lk_sc_type, '', 'supplier_type_other', 'Select Type') ?>
+                                    <label for="edit_sc_type" class="form-label"><?= t('Sub-Contractor Type') ?></label>
+                                    <?= renderOtherSelect('edit_sc_type', 'supplier_type', $lk_sc_type, '', 'supplier_type_other', t('Select Type')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_sc_year" class="form-label">Year <span class="text-danger">*</span></label>
-                                    <?= renderOtherSelect('edit_sc_year', 'year', $lk_years, '', 'year_other', 'Select Year', true) ?>
+                                    <label for="edit_sc_year" class="form-label"><?= t('Year') ?> <span class="text-danger">*</span></label>
+                                    <?= renderOtherSelect('edit_sc_year', 'year', $lk_years, '', 'year_other', t('Select Year'), true) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_category_id" class="form-label">Category</label>
-                                    <?= renderOtherSelect('edit_category_id', 'category_id', $lk_categories, '', 'category_other', 'Select Category') ?>
+                                    <label for="edit_category_id" class="form-label"><?= t('Category') ?></label>
+                                    <?= renderOtherSelect('edit_category_id', 'category_id', $lk_categories, '', 'category_other', t('Select Category')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_status" class="form-label">Status</label>
+                                    <label for="edit_status" class="form-label"><?= t('Status') ?></label>
                                     <select class="form-select" id="edit_status" name="status">
-                                        <option value="active">Active</option>
-                                        <option value="inactive">Inactive</option>
-                                        <option value="suspended">Suspended</option>
-                                        <option value="blacklisted">Blacklisted</option>
+                                        <option value="active"><?= t('Active') ?></option>
+                                        <option value="inactive"><?= t('Inactive') ?></option>
+                                        <option value="suspended"><?= t('Suspended') ?></option>
+                                        <option value="blacklisted"><?= t('Blacklisted') ?></option>
                                     </select>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_project_id" class="form-label">Linked Project (Optional)</label>
+                                    <label for="edit_project_id" class="form-label"><?= t('Linked Project') ?> (<?= t('Optional') ?>)</label>
                                     <select class="form-select select2-enable" id="edit_project_id" name="project_id">
-                                        <option value="">-- General Sub-Contractor (No Project) --</option>
+                                        <option value="">-- <?= t('General Sub-Contractor (No Project)') ?> --</option>
                                         <?php foreach ($projects as $project): ?>
                                         <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_credit_limit" class="form-label">Credit Limit</label>
+                                    <label for="edit_credit_limit" class="form-label"><?= t('Credit Limit') ?></label>
                                     <input type="number" class="form-control" id="edit_credit_limit" name="credit_limit" placeholder="0.00" step="0.01">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="edit_description" class="form-label">Description</label>
-                                    <textarea class="form-control" id="edit_description" name="description" rows="2" placeholder="Sub-Contractor description or notes"></textarea>
+                                    <label for="edit_description" class="form-label"><?= t('Description') ?></label>
+                                    <textarea class="form-control" id="edit_description" name="description" rows="2" placeholder="<?= t('Sub-Contractor description or notes') ?>"></textarea>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Tab 2: Contact Details -->
                     <div class="tab-pane fade" id="tab-edit-contact" role="tabpanel" aria-labelledby="edit-sc-contact-tab">
                             <div class="row">
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_contact_person" class="form-label">Contact Person</label>
-                                    <input type="text" class="form-control" id="edit_contact_person" name="contact_person" placeholder="Primary contact person">
+                                    <label for="edit_contact_person" class="form-label"><?= t('Contact Person') ?></label>
+                                    <input type="text" class="form-control" id="edit_contact_person" name="contact_person" placeholder="<?= t('Primary contact person') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_contact_title" class="form-label">Contact Title</label>
-                                    <input type="text" class="form-control" id="edit_contact_title" name="contact_title" placeholder="e.g., Manager, Director">
+                                    <label for="edit_contact_title" class="form-label"><?= t('Contact Title') ?></label>
+                                    <input type="text" class="form-control" id="edit_contact_title" name="contact_title" placeholder="<?= t('e.g., Manager, Director') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_email" class="form-label">Contact Email</label>
+                                    <label for="edit_email" class="form-label"><?= t('Contact Email') ?></label>
                                     <input type="email" class="form-control" id="edit_email" name="email" placeholder="contact@example.com">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_company_email" class="form-label">Company Email</label>
+                                    <label for="edit_company_email" class="form-label"><?= t('Company Email') ?></label>
                                     <input type="email" class="form-control" id="edit_company_email" name="company_email" placeholder="company@example.com">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_phone" class="form-label">Phone Number</label>
+                                    <label for="edit_phone" class="form-label"><?= t('Phone Number') ?></label>
                                     <input type="text" class="form-control" id="edit_phone" name="phone" placeholder="+255 123 456 789">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_mobile" class="form-label">Mobile Number</label>
+                                    <label for="edit_mobile" class="form-label"><?= t('Mobile Number') ?></label>
                                     <input type="text" class="form-control" id="edit_mobile" name="mobile" placeholder="+255 123 456 789">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_fax" class="form-label">Fax Number</label>
-                                    <input type="text" class="form-control" id="edit_fax" name="fax" placeholder="Fax number">
+                                    <label for="edit_fax" class="form-label"><?= t('Fax Number') ?></label>
+                                    <input type="text" class="form-control" id="edit_fax" name="fax" placeholder="<?= t('Fax number') ?>">
                                 </div>
                                 <div class="col-md-12 mb-3">
-                                    <label for="edit_website" class="form-label">Website</label>
+                                    <label for="edit_website" class="form-label"><?= t('Website') ?></label>
                                     <input type="url" class="form-control" id="edit_website" name="website" placeholder="https://www.example.com">
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Tab 3: Address -->
                     <div class="tab-pane fade" id="tab-edit-address" role="tabpanel" aria-labelledby="edit-sc-address-tab">
                             <div class="row">
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_country" class="form-label">Country</label>
+                                    <label for="edit_country" class="form-label"><?= t('Country') ?></label>
                                     <input type="text" class="form-control" id="edit_country" name="country" placeholder="e.g. Tanzania">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_state" class="form-label">Region</label>
+                                    <label for="edit_state" class="form-label"><?= t('Region') ?></label>
                                     <input type="text" class="form-control" id="edit_state" name="state" placeholder="e.g. Dar es Salaam">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_city" class="form-label">District</label>
+                                    <label for="edit_city" class="form-label"><?= t('District') ?></label>
                                     <input type="text" class="form-control" id="edit_city" name="city" placeholder="e.g. Ilala">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_ward" class="form-label">Ward</label>
+                                    <label for="edit_ward" class="form-label"><?= t('Ward') ?></label>
                                     <input type="text" class="form-control" id="edit_ward" name="ward" placeholder="e.g. Kariakoo">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_village" class="form-label">Street/Village</label>
+                                    <label for="edit_village" class="form-label"><?= t('Street/Village') ?></label>
                                     <input type="text" class="form-control" id="edit_village" name="village" placeholder="e.g. Mtaa wa Kariakoo">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_postal_code" class="form-label">Zip Code</label>
-                                    <input type="text" class="form-control" id="edit_postal_code" name="postal_code" placeholder="Zip code">
+                                    <label for="edit_postal_code" class="form-label"><?= t('Zip Code') ?></label>
+                                    <input type="text" class="form-control" id="edit_postal_code" name="postal_code" placeholder="<?= t('Zip code') ?>">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="edit_address" class="form-label">Physical Address</label>
+                                    <label for="edit_address" class="form-label"><?= t('Physical Address') ?></label>
                                     <textarea class="form-control" id="edit_address" name="address" rows="2" placeholder="e.g. Ilala - Dar-es-salaam"></textarea>
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="edit_postal_address" class="form-label">Postal Address</label>
+                                    <label for="edit_postal_address" class="form-label"><?= t('Postal Address') ?></label>
                                     <input type="text" class="form-control" id="edit_postal_address" name="postal_address" placeholder="e.g. p.o. box 120, mbezi">
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Tab 4: Financial -->
                     <div class="tab-pane fade" id="tab-edit-financial" role="tabpanel" aria-labelledby="edit-sc-financial-tab">
                             <div class="row">
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_tax_id" class="form-label">Tax ID (TIN)</label>
-                                    <input type="text" class="form-control" id="edit_tax_id" name="tax_id" placeholder="Tax Identification Number">
+                                    <label for="edit_tax_id" class="form-label"><?= t('Tax ID (TIN)') ?></label>
+                                    <input type="text" class="form-control" id="edit_tax_id" name="tax_id" placeholder="<?= t('Tax Identification Number') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_vat_number" class="form-label">VAT Number</label>
-                                    <input type="text" class="form-control" id="edit_vat_number" name="vat_number" placeholder="VAT registration number">
+                                    <label for="edit_vat_number" class="form-label"><?= t('VAT Number') ?></label>
+                                    <input type="text" class="form-control" id="edit_vat_number" name="vat_number" placeholder="<?= t('VAT registration number') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_default_wht_rate_id" class="form-label">Default Withholding Tax</label>
+                                    <label for="edit_default_wht_rate_id" class="form-label"><?= t('Default Withholding Tax') ?></label>
                                     <select class="form-select" id="edit_default_wht_rate_id" name="default_wht_rate_id">
-                                        <option value="">None</option>
+                                        <option value=""><?= t('None') ?></option>
                                         <?php foreach ($sc_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
                                         <option value="<?= (int)$w['rate_id'] ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <div class="form-text">Auto-fills WHT when recording this sub-contractor's invoice payments.</div>
+                                    <div class="form-text"><?= t("Auto-fills WHT when recording this sub-contractor's invoice payments.") ?></div>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_payment_terms" class="form-label">Payment Terms</label>
-                                    <?= renderOtherSelect('edit_payment_terms', 'payment_terms', $lk_payment_terms, '', 'payment_terms_other', 'Select Terms') ?>
+                                    <label for="edit_payment_terms" class="form-label"><?= t('Payment Terms') ?></label>
+                                    <?= renderOtherSelect('edit_payment_terms', 'payment_terms', $lk_payment_terms, '', 'payment_terms_other', t('Select Terms')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_currency" class="form-label">Currency</label>
-                                    <?= renderOtherSelect('edit_currency', 'currency', $lk_currency, '', 'currency_other', 'Select Currency') ?>
+                                    <label for="edit_currency" class="form-label"><?= t('Currency') ?></label>
+                                    <?= renderOtherSelect('edit_currency', 'currency', $lk_currency, '', 'currency_other', t('Select Currency')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_bank_name" class="form-label">Bank Name</label>
-                                    <input type="text" class="form-control" id="edit_bank_name" name="bank_name" placeholder="Bank name">
+                                    <label for="edit_bank_name" class="form-label"><?= t('Bank Name') ?></label>
+                                    <input type="text" class="form-control" id="edit_bank_name" name="bank_name" placeholder="<?= t('Bank name') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_bank_account" class="form-label">Bank Account</label>
-                                    <input type="text" class="form-control" id="edit_bank_account" name="bank_account" placeholder="Bank account number">
+                                    <label for="edit_bank_account" class="form-label"><?= t('Bank Account') ?></label>
+                                    <input type="text" class="form-control" id="edit_bank_account" name="bank_account" placeholder="<?= t('Bank account number') ?>">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="edit_bank_address" class="form-label">Bank Address</label>
-                                    <textarea class="form-control" id="edit_bank_address" name="bank_address" rows="2" placeholder="Bank address details"></textarea>
+                                    <label for="edit_bank_address" class="form-label"><?= t('Bank Address') ?></label>
+                                    <textarea class="form-control" id="edit_bank_address" name="bank_address" rows="2" placeholder="<?= t('Bank address details') ?>"></textarea>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary" id="updateSubContractorBtn"><i class="bi bi-check-circle me-1"></i> Update Sub-Contractor</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-primary" id="updateSubContractorBtn"><i class="bi bi-check-circle me-1"></i> <?= t('Update Sub-Contractor') ?></button>
                 </div>
             </form>
         </div>
@@ -961,7 +975,7 @@ $(document).ready(function() {
         pageLength: 25,
         lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
         dom: 'rtip',
-        language: { emptyTable: 'No records found.', zeroRecords: 'No matching records.' }
+        language: { emptyTable: <?= json_encode(t('No records found.')) ?>, zeroRecords: <?= json_encode(t('No matching records.')) ?> }
     });
 
     // Location cascade (OOP location engine): defined dropdowns for Tanzania,
@@ -980,7 +994,7 @@ $(document).ready(function() {
     // Select2 for filter (outside modal)
     $('#categoryFilter').select2({
         theme: 'bootstrap-5',
-        placeholder: 'All Categories',
+        placeholder: <?= json_encode(t('All Categories')) ?>,
         allowClear: true,
         width: '100%'
     });
@@ -997,7 +1011,7 @@ $(document).ready(function() {
                 dropdownParent: $parent,
                 width: '100%',
                 allowClear: true,
-                placeholder: $el.data('placeholder') || 'Select…'
+                placeholder: $el.data('placeholder') || <?= json_encode(t('Select…')) ?>
             });
         });
     }
@@ -1022,7 +1036,7 @@ $(document).ready(function() {
                 $(this).select2({
                     theme: 'bootstrap-5',
                     dropdownParent: $('#addSubContractorModal'),
-                    placeholder: 'Select...',
+                    placeholder: <?= json_encode(t('Select...')) ?>,
                     allowClear: true,
                     width: '100%'
                 });
@@ -1038,7 +1052,7 @@ $(document).ready(function() {
                 $(this).select2({
                     theme: 'bootstrap-5',
                     dropdownParent: $('#editSCModal'),
-                    placeholder: 'Select...',
+                    placeholder: <?= json_encode(t('Select...')) ?>,
                     allowClear: true,
                     width: '100%'
                 });
@@ -1125,9 +1139,9 @@ $(document).ready(function() {
             const paneId = $invalid.closest('.tab-pane').attr('id');
             $('#addSubContractorTabs button[data-bs-target="#' + paneId + '"]').tab('show');
             $invalid.trigger('focus');
-            const fieldLabel = $('label[for="' + $invalid.attr('id') + '"]').text().replace('*', '').trim() || 'This field';
+            const fieldLabel = $('label[for="' + $invalid.attr('id') + '"]').text().replace('*', '').trim() || <?= json_encode(t('This field')) ?>;
             setTimeout(() => $invalid[0].reportValidity(), 150);
-            Swal.fire('Missing or invalid information', fieldLabel + ' is required or not in the correct format.', 'warning');
+            Swal.fire(<?= json_encode(t('Missing or invalid information')) ?>, fieldLabel + <?= json_encode(t(' is required or not in the correct format.')) ?>, 'warning');
             return;
         }
         const formData = new FormData(this);
@@ -1140,9 +1154,9 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(res) {
                 if(res.success) {
-                    Swal.fire('Success', res.message, 'success').then(() => { if (window.__projReturnUrl) window.location.href = window.__projReturnUrl; else location.reload(); });
+                    Swal.fire(<?= json_encode(t('Success')) ?>, res.message, 'success').then(() => { if (window.__projReturnUrl) window.location.href = window.__projReturnUrl; else location.reload(); });
                 } else {
-                    Swal.fire('Error', res.message, 'error');
+                    Swal.fire(<?= json_encode(t('Error')) ?>, res.message, 'error');
                 }
             }
         });
@@ -1156,9 +1170,9 @@ $(document).ready(function() {
             const paneId = $invalid.closest('.tab-pane').attr('id');
             $('#editSubContractorTabs button[data-bs-target="#' + paneId + '"]').tab('show');
             $invalid.trigger('focus');
-            const fieldLabel = $('label[for="' + $invalid.attr('id') + '"]').text().replace('*', '').trim() || 'This field';
+            const fieldLabel = $('label[for="' + $invalid.attr('id') + '"]').text().replace('*', '').trim() || <?= json_encode(t('This field')) ?>;
             setTimeout(() => $invalid[0].reportValidity(), 150);
-            Swal.fire('Missing or invalid information', fieldLabel + ' is required or not in the correct format.', 'warning');
+            Swal.fire(<?= json_encode(t('Missing or invalid information')) ?>, fieldLabel + <?= json_encode(t(' is required or not in the correct format.')) ?>, 'warning');
             return;
         }
         const formData = new FormData(this);
@@ -1171,9 +1185,9 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(res) {
                 if(res.success) {
-                    Swal.fire('Updated', res.message, 'success').then(() => { if (window.__projReturnUrl) window.location.href = window.__projReturnUrl; else location.reload(); });
+                    Swal.fire(<?= json_encode(t('Updated')) ?>, res.message, 'success').then(() => { if (window.__projReturnUrl) window.location.href = window.__projReturnUrl; else location.reload(); });
                 } else {
-                    Swal.fire('Error', res.message, 'error');
+                    Swal.fire(<?= json_encode(t('Error')) ?>, res.message, 'error');
                 }
             }
         });
@@ -1287,26 +1301,26 @@ function editSC(id) {
             
             $('#editSCModal').modal('show');
         } else {
-            Swal.fire('Error', res.message, 'error');
+            Swal.fire(<?= json_encode(t('Error')) ?>, res.message, 'error');
         }
     });
 }
 
 function confirmDeleteSC(id) {
     Swal.fire({
-        title: 'Delete Sub-Contractor?',
-        text: 'This action cannot be undone!',
+        title: <?= json_encode(t('Delete Sub-Contractor?')) ?>,
+        text: <?= json_encode(t('This action cannot be undone!')) ?>,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
-        confirmButtonText: 'Yes, delete it!'
+        confirmButtonText: <?= json_encode(t('Yes, delete it!')) ?>
     }).then((result) => {
         if (result.isConfirmed) {
             $.post('api/delete_sub_contractor.php', { supplier_id: id }, function(res) {
                 if(res.success) {
-                    Swal.fire('Deleted!', res.message, 'success').then(() => location.reload());
+                    Swal.fire(<?= json_encode(t('Deleted!')) ?>, res.message, 'success').then(() => location.reload());
                 } else {
-                    Swal.fire('Error', res.message, 'error');
+                    Swal.fire(<?= json_encode(t('Error')) ?>, res.message, 'error');
                 }
             }, 'json');
         }
@@ -1367,21 +1381,25 @@ function checkSCResponsiveView() {
 }
 
 function updateStatusSC(id, status) {
-    const statusText = status.charAt(0).toUpperCase() + status.slice(1);
+    const STATUS_LABELS = <?= json_encode([
+        'active' => t('Active'), 'inactive' => t('Inactive'),
+        'suspended' => t('Suspended'), 'blacklisted' => t('Blacklisted'),
+    ]) ?>;
+    const statusText = STATUS_LABELS[status] || (status.charAt(0).toUpperCase() + status.slice(1));
     Swal.fire({
-        title: `${statusText} Sub-Contractor?`,
-        text: `Are you sure you want to change status to ${statusText}?`,
+        title: `${statusText} ` + <?= json_encode(t('Sub-Contractor?')) ?>,
+        text: <?= json_encode(t('Are you sure you want to change status to')) ?> + ` ${statusText}?`,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: status === 'active' ? '#198754' : (status === 'blacklisted' ? '#dc3545' : '#ffc107'),
-        confirmButtonText: `Yes, ${statusText}!`
+        confirmButtonText: <?= json_encode(t('Yes,')) ?> + ` ${statusText}!`
     }).then((result) => {
         if (result.isConfirmed) {
             $.post('api/update_sub_contractor_status.php', { supplier_id: id, status: status }, function(res) {
                 if(res.success) {
-                    Swal.fire('Success', res.message, 'success').then(() => location.reload());
+                    Swal.fire(<?= json_encode(t('Success')) ?>, res.message, 'success').then(() => location.reload());
                 } else {
-                    Swal.fire('Error', res.message, 'error');
+                    Swal.fire(<?= json_encode(t('Error')) ?>, res.message, 'error');
                 }
             }, 'json');
         }
@@ -1410,7 +1428,7 @@ function copyTable() {
     document.execCommand('copy');
     window.getSelection().removeAllRanges();
     logReportAction('Copied Sub-Contractors List', 'User copied sub-contractors list to clipboard');
-    Swal.fire({ icon: 'success', title: 'Copied!', text: 'Table data copied to clipboard', timer: 1500, showConfirmButton: false });
+    Swal.fire({ icon: 'success', title: <?= json_encode(t('Copied!')) ?>, text: <?= json_encode(t('Table data copied to clipboard')) ?>, timer: 1500, showConfirmButton: false });
 }
 
 function exportSC() {
