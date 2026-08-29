@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — Working Days & Holidays calendar, opt-in business-day leave counting (Phase 4 of 5)
+
+**Files (new):** `core/company_calendar.php`, `app/bms/pos/company_calendar.php`, `api/pos/save_working_days.php`, `api/pos/save_holiday.php`, `api/pos/toggle_holiday_status.php`, `migrations/2026_08_29_company_calendar.php`, `migrations/2026_08_29_company_calendar_permission.php`, `tests/test_company_calendar_cli.php`
+**Files (changed):** `core/leave_rules.php`, `core/leave_type_validation.php`, `api/add_leave_type.php`, `api/update_leave_type.php`, `api/get_leave_type.php`, `api/apply_leave.php`, `api/update_leave.php`, `app/bms/pos/leave_types.php`, `app/bms/pos/leaves.php`, `header.php`, `roots.php`
+
+`leaveDaysFor()` always counted pure calendar days — no way to exclude weekends or public holidays. While building this, found `public_holidays` already existed in the live schema (holiday_type, recurring, country, region) with **zero rows and zero code references anywhere** — reused it rather than creating a competing table.
+
+New admin page **Working Days & Holidays**: weekday checkboxes (which days count as working days, company-wide) + full Public Holidays CRUD (activate/deactivate; no hard delete, no "in use" guard needed since a holiday isn't referenced by FK anywhere). New `core/company_calendar.php` provides `companyWorkingDays()`, `isPublicHoliday()` (exact date or recurring same month/day), and `businessDaysBetween()`.
+
+`leaveDaysFor()` gained two **optional** trailing parameters — fully backward compatible, every existing call site and the existing test suite's exact assertions are unaffected since the default preserves calendar-day counting byte-for-byte. New `leave_types.count_working_days_only` column (default 0) makes business-day counting **opt-in per leave type** — nothing about existing leave types or already-applied leave changes on deploy; an admin must deliberately flip it on.
+
+Wired end-to-end: `apply_leave.php`/`update_leave.php` pass the type's flag through; `leave_types.php` exposes the toggle; `get_leave_type.php`'s list-mode `SELECT` (an explicit column list) had to be updated too or the leave-application dropdown would silently never see the flag; `leaves.php`'s live day-count preview embeds the same calendar data and mirrors the exact business-day algorithm in JS so what the user sees before submitting matches what the server saves. New permission `company_calendar` (seeded from each role's `leave_types` grant), route, and gated menu link.
+
+**New test** `test_company_calendar_cli.php` (51 assertions) — lint, schema, wiring, calendar math (weekday/holiday/recurring/business-day-across-a-weekend), `leaveDaysFor()` backward-compatibility + opt-in mode + fail-safe without a PDO, the JS embed, and live round trips through the real endpoints — including restoring the real `company_working_days` setting afterward. Verified no regression (`test_leaves_upgrade_cli.php` 49/49, `test_leave_balance_cli.php` 25/25, project-scope's 4 remaining failures are the same pre-existing files as before this task).
+
 ## 2026-08-29 (feature) — Org Structure management: Departments, Designations, Employment Types (Phase 3 of 5)
 
 **Files (new):** `app/bms/pos/departments.php`, `app/bms/pos/designations.php`, `app/bms/pos/employment_types.php`, `api/pos/save_department.php`, `api/pos/toggle_department_status.php`, `api/pos/save_designation.php`, `api/pos/toggle_designation_status.php`, `api/pos/save_employment_type.php`, `api/pos/toggle_employment_type_status.php`, `migrations/2026_08_29_org_structure_permissions.php`, `tests/test_org_structure_management_cli.php`
