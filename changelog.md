@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — Unfamiliar-login email alerts, optional auto-logout, reactivation email, login page cleanup
+
+**Files (new):** `migrations/2026_08_29_unfamiliar_login_notifications.php`
+**Files (changed):** `login.php`, `core/session_tracker.php`, `api/get_login_history.php`, `app/constant/settings/login_history.php`, `app/constant/settings/system_settings.php`, `ajax/toggle_user.php`, `tests/test_login_history_cli.php`
+
+Three requests: strip the notification banner off the login page, don't automate session termination against a user by default, and route the "unfamiliar login" signal to admin **email** instead — with a symmetric email back to the user once an admin has manually verified and reactivated them.
+
+**Login page** — the `?ended=...` banner added earlier this session (superseded/timeout/revoked/admin_ended messages) is gone entirely. Clean, as before.
+
+**Unfamiliar-login email, built on the existing Smart Notification Engine (`core/notify.php`)** — no new mail mechanism. `core/session_tracker.php` gained `isUnfamiliarLogin()` (the single source of truth for the *live* check — evaluated once, at login time, before the new row is inserted) and `notifyUnfamiliarLogin()`, which calls the same `dispatchEvent()` bus every other alert in BMS already goes through. Recipients resolve via `usersWithPermission()` on the `login_history` page_key, which — being admin-only and hidden from Roles & Permissions — always resolves to exactly the admins, "determined by role as normal," nothing new invented. A seeded `notification_rules` row forces the email channel independent of the general "enable email notifications" toggle: confirmed with the user that a security alert like this must not be silently muted by an unrelated setting.
+
+**New Settings > System Settings > Security control: "Unfamiliar Login Response"** — not Company Profile, which turned out to have no editable settings at all; this lives where the other session/security policies (timeout, login attempts, 2FA) already do. Two options, submitted value whitelisted server-side:
+- **Notify admin only (default)** — the session is left completely alone; an admin reviews Login History and Blocks manually if warranted. This is the *only* shipped default — "by default require admin manual action, not automatically."
+- **Sign out automatically** — additionally force-ends that session immediately (`logout_type='auto_logout'`), on top of the same admin email. An admin's own explicit opt-in, never the default.
+
+**Reactivation email** — when an admin clicks Activate Account (genuinely 0→1, not a redundant re-click), `ajax/toggle_user.php` now queues a direct email to *that user's own address* via the engine's `enqueueEmail()` primitive — not a broadcast, not run through the RBAC recipient system, since this is about one specific person's own account. "An administrator has verified your account and reactivated it. You can continue by signing in with your username and password to access [Company]," with a login link.
+
+Verified live and by real DB round-trip, not assumed: a genuinely unfamiliar login (first country+device combination for that user) correctly queues exactly one admin email under `notify`, leaves the session untouched; under `auto_logout` the session is force-closed *and* the admin is still emailed (confirmed this isn't skipped just because the session was also closed); a second login from the same country+device does not re-fire. A real Activate Account call queues the reactivation email to the correct recipient with the correct wording, and a redundant activate does not resend it. Caught two real subprocess-testing bugs along the way (both in the new test code, not production): `escapeshellarg()` quotes differently on Windows than Unix, which broke passing PHP source containing its own double-quoted strings through `php -r` — fixed by writing to a temp script file instead of an inline `-r` argument; and `get_setting()`'s `static` in-process cache (a pre-existing, harmless-in-real-use characteristic — each real HTTP request is its own fresh process) meant a save-then-read within one long test process silently read a stale value — fixed by running each policy branch in its own fresh subprocess, which is what actually happens in production anyway.
+
+`tests/test_login_history_cli.php` grew from 179 to 205 assertions. Existing suites unaffected: `session_guard` (24), `warehouse_scope` (147), `hr_dashboard` (23), `employee_documents` (26), `employee_rehire_uniqueness` (8).
+
 ## 2026-08-29 (feature) — Login History: Block Account + Unfamiliar-login flag, advanced Actions menu
 
 **Files (changed):** `app/constant/settings/login_history.php`, `api/get_login_history.php`, `actions/login.php`, `ajax/toggle_user.php`, `core/session_tracker.php`, `tests/test_login_history_cli.php`

@@ -143,7 +143,14 @@ if ($_POST) {
                 'password_expiry_days' => $_POST['password_expiry_days'],
                 'require_strong_password' => $_POST['require_strong_password'] ?? 0,
                 'enable_2fa' => $_POST['enable_2fa'] ?? 0,
-                'enable_audit_log' => $_POST['enable_audit_log'] ?? 0
+                'enable_audit_log' => $_POST['enable_audit_log'] ?? 0,
+                // Admins are always emailed about an unfamiliar login regardless
+                // of this — see migrations/2026_08_29_unfamiliar_login_notifications.php.
+                // This ONLY chooses whether the session also gets force-ended.
+                // Whitelisted, not trusted as free text: only these two values
+                // are ever meaningful to core/session_tracker.php's dispatch logic.
+                'unfamiliar_login_policy' => in_array($_POST['unfamiliar_login_policy'] ?? '', ['notify', 'auto_logout'], true)
+                    ? $_POST['unfamiliar_login_policy'] : 'notify',
             ];
             
             foreach ($settings as $key => $value) {
@@ -757,6 +764,33 @@ if ($_POST) {
                                                     <input class="form-check-input" type="checkbox" id="enable_audit_log" name="enable_audit_log" value="1" <?= get_setting('enable_audit_log', '1') ? 'checked' : '' ?>>
                                                 </div>
                                             </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-4 mt-1">
+                            <div class="col-12">
+                                <div class="card info-card h-100">
+                                    <div class="card-body p-4">
+                                        <h6 class="fw-bold mb-1 text-dark text-uppercase small letter-spacing-1">Unfamiliar Login Response</h6>
+                                        <p class="text-muted small mb-3">
+                                            When a user signs in from a country + device combination never seen on their account before, an admin
+                                            is <strong>always emailed</strong> — that part isn't optional. This only chooses whether anything else happens automatically.
+                                        </p>
+                                        <?php $ulp = get_setting('unfamiliar_login_policy', 'notify'); ?>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="radio" name="unfamiliar_login_policy" id="ulp_notify" value="notify" <?= $ulp !== 'auto_logout' ? 'checked' : '' ?>>
+                                            <label class="form-check-label" for="ulp_notify">
+                                                <strong>Notify admin only</strong> — the session is left alone; an admin reviews Login History and decides manually whether to Block Account. <span class="badge bg-success-subtle text-success border border-success-subtle">Default</span>
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="unfamiliar_login_policy" id="ulp_auto" value="auto_logout" <?= $ulp === 'auto_logout' ? 'checked' : '' ?>>
+                                            <label class="form-check-label" for="ulp_auto">
+                                                <strong>Sign out automatically</strong> — in addition to the admin email, that session is force-ended immediately; the user simply has to sign in again.
+                                            </label>
                                         </div>
                                     </div>
                                 </div>

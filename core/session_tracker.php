@@ -130,6 +130,13 @@ if (!function_exists('startUserSession')) {
             $geo    = lookupGeoIP($ip);
             $device = parseUserAgent($ua);
 
+            // Computed BEFORE the insert — checks whether any PRIOR row for this
+            // user already used this country+device. Same logic as
+            // UNFAMILIAR_SQL in api/get_login_history.php (that one re-derives it
+            // for display, across many rows, at browse time; this is the one
+            // live check that can actually act on a login as it happens).
+            $unfamiliar = isUnfamiliarLogin($pdo, $userId, $geo['country'] ?? null, $device['device_type'] ?? null);
+
             $stmt = $pdo->prepare(
                 "INSERT INTO user_sessions
                     (user_id, php_session_id, login_at, last_seen_at, ip_address, user_agent,
@@ -153,10 +160,98 @@ if (!function_exists('startUserSession')) {
                 $device['os'],
                 $device['device_type'],
             ]);
-            return (int) $pdo->lastInsertId();
+            $newRowId = (int) $pdo->lastInsertId();
+
+            if ($unfamiliar) {
+                // Isolated try/catch: a notification problem must never make
+                // startUserSession() itself fail or skip returning the row id —
+                // this file's own rule, restated at the top.
+                try {
+                    notifyUnfamiliarLogin($pdo, $userId, $newRowId, $geo, $device, $ip);
+                } catch (Throwable $e) {
+                    error_log('startUserSession/notifyUnfamiliarLogin: ' . $e->getMessage());
+                }
+            }
+
+            return $newRowId;
         } catch (Throwable $e) {
             error_log('startUserSession: ' . $e->getMessage());
             return null;
+        }
+    }
+}
+
+if (!function_exists('isUnfamiliarLogin')) {
+    /**
+     * True the first time this user has ever signed in from this
+     * country+device combination. Single source of truth for the LIVE check
+     * (called from startUserSession(), before the new row exists) — the
+     * display-time equivalent for existing rows is UNFAMILIAR_SQL in
+     * api/get_login_history.php; both must apply the same rule: real
+     * country (not empty/'Local') + real device_type, never seen together
+     * before for this user.
+     */
+    function isUnfamiliarLogin(PDO $pdo, int $userId, ?string $country, ?string $deviceType): bool
+    {
+        if (empty($country) || $country === 'Local' || empty($deviceType)) return false;
+        try {
+            $st = $pdo->prepare(
+                "SELECT 1 FROM user_sessions
+                  WHERE user_id = ? AND country = ? AND device_type = ?
+                  LIMIT 1"
+            );
+            $st->execute([$userId, $country, $deviceType]);
+            return $st->fetchColumn() === false; // no prior row -> unfamiliar
+        } catch (Throwable $e) {
+            error_log('isUnfamiliarLogin: ' . $e->getMessage());
+            return false; // never let a lookup failure block or flag a login
+        }
+    }
+}
+
+if (!function_exists('notifyUnfamiliarLogin')) {
+    /**
+     * Fires on a genuinely unfamiliar login. Always emails admins (Settings >
+     * System Settings > Security > "Unfamiliar Login Response" only chooses
+     * whether the session ALSO gets force-ended — the admin notification
+     * itself is not optional, confirmed deliberately independent of the
+     * general "enable email notifications" toggle via the forced
+     * notification_rules row this feature's migration seeds).
+     *
+     * "By default require admin manual action, not automatic": the default
+     * policy value is 'notify' (session left alone); 'auto_logout' is an
+     * admin's own explicit opt-in, never the shipped default.
+     */
+    function notifyUnfamiliarLogin(PDO $pdo, int $userId, int $sessionRowId, array $geo, array $device, ?string $ip): void
+    {
+        if (!function_exists('dispatchEvent')) {
+            require_once __DIR__ . '/notify.php';
+        }
+        if (!function_exists('dispatchEvent')) return; // engine unavailable — never block login over this
+
+        $u = $pdo->prepare("SELECT username, email FROM users WHERE user_id = ?");
+        $u->execute([$userId]);
+        $user = $u->fetch(PDO::FETCH_ASSOC) ?: [];
+        $who  = $user['username'] ?? ('user #' . $userId);
+
+        $where = trim(implode(', ', array_filter([$geo['city'] ?? '', $geo['country'] ?? '']))) ?: 'an unknown location';
+        $what  = trim(($device['browser'] ?? '') . ' on ' . ($device['os'] ?? '') . ' (' . ($device['device_type'] ?? '') . ')');
+
+        dispatchEvent($pdo, 'unfamiliar_login_detected', [
+            'title'       => 'Unfamiliar login: ' . $who,
+            'message'     => "$who signed in from $where using $what — the first time this account has been seen from that country and device combination." . ($ip ? " IP: $ip." : ''),
+            'severity'    => 'high',
+            'action_url'  => 'login_history',
+            'entity_type' => 'user_session',
+            'entity_id'   => $sessionRowId,
+            // Once per session row, not once per day like most events — each
+            // unfamiliar login is its own distinct thing worth its own alert.
+            'dedupe_suffix' => (string) $sessionRowId,
+        ]);
+
+        $policy = function_exists('get_setting') ? get_setting('unfamiliar_login_policy', 'notify') : 'notify';
+        if ($policy === 'auto_logout' && function_exists('endUserSession')) {
+            endUserSession($pdo, $sessionRowId, 'auto_logout');
         }
     }
 }

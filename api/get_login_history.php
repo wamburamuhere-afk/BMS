@@ -88,7 +88,7 @@ switch ($period) {
 
 // Other filters
 $userId   = intval($_GET['user_id'] ?? 0);
-$ended    = $_GET['ended']    ?? '';   // '', 'active', 'manual', 'timeout', 'superseded', 'revoked', 'admin_ended', 'blocked'
+$ended    = $_GET['ended']    ?? '';   // '', 'active', 'manual', 'timeout', 'superseded', 'revoked', 'admin_ended', 'blocked', 'auto_logout'
 $device   = $_GET['device']   ?? '';   // '', 'Desktop', 'Mobile', 'Tablet'
 $country  = $_GET['country']  ?? '';
 $locSrc   = $_GET['location_source'] ?? ''; // '', 'precise', 'approximate', 'none'
@@ -111,7 +111,7 @@ if (!empty($dateTo)) {
 }
 if ($ended === 'active') {
     $where[] = "us.logout_at IS NULL";
-} elseif (in_array($ended, ['manual', 'timeout', 'superseded', 'revoked', 'admin_ended', 'blocked'], true)) {
+} elseif (in_array($ended, ['manual', 'timeout', 'superseded', 'revoked', 'admin_ended', 'blocked', 'auto_logout'], true)) {
     $where[] = "us.logout_type = ?";
     $params[] = $ended;
 }

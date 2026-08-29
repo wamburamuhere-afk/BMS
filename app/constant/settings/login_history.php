@@ -152,6 +152,7 @@ $current_session_row_id = (int) ($_SESSION['session_row_id'] ?? 0);
                         <option value="revoked">Revoked</option>
                         <option value="admin_ended">Ended by admin</option>
                         <option value="blocked">Account blocked</option>
+                        <option value="auto_logout">Auto signed out (unfamiliar)</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -345,6 +346,7 @@ function endedBadge(r) {
         case 'revoked':     return { badge: '<span class="badge bg-danger">Revoked</span>',                   detail: 'at ' + at(r.logout_at) + by };
         case 'admin_ended': return { badge: '<span class="badge bg-dark">Ended by admin</span>',              detail: 'at ' + at(r.logout_at) + by };
         case 'blocked':     return { badge: '<span class="badge bg-danger"><i class="bi bi-slash-circle me-1"></i>Account Blocked</span>', detail: 'at ' + at(r.logout_at) + by };
+        case 'auto_logout': return { badge: '<span class="badge bg-warning text-dark"><i class="bi bi-shield-exclamation me-1"></i>Auto Signed Out</span>', detail: 'unfamiliar login, at ' + at(r.logout_at) };
         default:            return { badge: '<span class="badge bg-secondary-subtle text-secondary border">Signed out</span>', detail: 'at ' + at(r.logout_at) };
     }
 }
