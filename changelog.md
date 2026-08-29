@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-08-28 (feature) — Employee wizard: dead Quick Edit modal removed, 3 bank fields added (Phase 1 & 2 of 5)
+
+**Files (new):** `migrations/2026_08_28_employee_bank_account_holder_swift.php`, `tests/test_employee_bank_fields_cli.php`
+**Files (changed):** `app/bms/pos/employees.php`, `app/bms/pos/employee_details.php`, `api/add_employee.php`, `api/update_employee.php`, `tests/test_employee_extra_documents_cli.php`
+
+Compared BMS's Add/Edit Employee wizard against a reference LMS. The real edit path (`editEmployee()`, used by both the employee list's Edit button and View Details' "Edit Profile") already reuses the full 5-step Add wizard pre-filled with every field — that part was already correct. Found instead a second, unused "Quick Edit" modal (6 fields only) with no button anywhere opening it — confirmed dead via project-wide search — and removed it along with its two orphaned `bs.modal` handlers and now-pointless submit handler.
+
+Added 3 bank fields to Step 5 (Bank & Documents): **Account Holder Name** and **Bank Identifier Code** (SWIFT/routing) are new nullable `employees` columns; **Bank Branch** already existed in the schema and was already shown on View Details, but had no input anywhere since commit `4a85ca0` intentionally dropped it — restored per this task. All three wired through `add_employee.php`'s INSERT, `update_employee.php`'s field whitelist, the edit-populate JS, and View Details display.
+
+**New test** `tests/test_employee_bank_fields_cli.php` (21 assertions) — schema, both wizard steps, both APIs, View Details, and a real DB round trip (existing row's values restored after). `test_employee_extra_documents_cli.php` had its now-outdated "bank_branch removed" assertion dropped (13/13 still pass).
+
+Remaining phases (confirmed with user, done one at a time): 3) optional `warehouse_id` on Step 2, 4) Linked User Account (employee ↔ login), 5) Days Per Week / Rate Per Hour for hourly pay.
+
 ## 2026-08-22 (feature) — Supplier Details: 7 related-record tabs, shared with their module pages
 
 **Files (new):** `assets/js/tables/bms-table-utils.js`, `assets/js/tables/bms-grn-table.js`, `assets/js/tables/bms-purchase-returns-table.js`, `assets/js/tables/bms-delivery-notes-table.js`, `assets/js/tables/bms-rfq-table.js`, `assets/js/tables/bms-debit-notes-table.js`, `assets/js/tables/bms-expenses-table.js`, `includes/tables/grn_table.php`, `includes/tables/purchase_returns_table.php`, `includes/tables/delivery_notes_table.php`, `includes/tables/rfq_table.php`, `includes/tables/debit_notes_table.php`, `includes/tables/expenses_table.php`, `api/purchase/get_debit_notes.php`, `tests/test_supplier_details_related_tabs_cli.php`
