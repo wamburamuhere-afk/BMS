@@ -4,6 +4,12 @@
  * Provides CSRF protection, input validation, sanitization, and audit logging
  */
 
+// pos_controller.php (the only caller of this class) never includes roots.php —
+// it does its own raw session_start() — so endUserSession()/bmsSessionReopen()/
+// bmsSessionMarkDestroyed() are not defined unless pulled in explicitly here.
+require_once __DIR__ . '/../../../../core/session_tracker.php';
+require_once __DIR__ . '/../../../../core/session_guard.php';
+
 class POSSecurity {
     private $pdo;
     private $sessionKey = 'pos_csrf_token';
@@ -252,6 +258,15 @@ class POSSecurity {
                 // session first — session_unset()/session_destroy() only warn and
                 // do nothing when the session is closed.
                 if (function_exists('bmsSessionReopen')) bmsSessionReopen();
+                // Close the Login History row before it's gone from $_SESSION —
+                // this timeout is a real end-of-session event and belongs in the
+                // same ledger as every other one, not a silent gap in the audit
+                // trail. Closes at last_activity (the true last-seen moment), not
+                // "now" — the user was gone the whole gap in between.
+                if (function_exists('endUserSession') && !empty($_SESSION['session_row_id'])) {
+                    endUserSession($this->pdo, (int) $_SESSION['session_row_id'], 'timeout',
+                        date('Y-m-d H:i:s', (int) $_SESSION['last_activity']));
+                }
                 session_unset();
                 session_destroy();
                 if (function_exists('bmsSessionMarkDestroyed')) bmsSessionMarkDestroyed();
@@ -267,6 +282,11 @@ class POSSecurity {
                 // See the timeout branch above — the lock is released early, so the
                 // session must be re-opened before it can be destroyed.
                 if (function_exists('bmsSessionReopen')) bmsSessionReopen();
+                // Record this as a revoke, not a plain timeout — a hijack attempt is
+                // a security event and the audit trail should say so.
+                if (function_exists('endUserSession') && !empty($_SESSION['session_row_id'])) {
+                    endUserSession($this->pdo, (int) $_SESSION['session_row_id'], 'revoked');
+                }
                 session_unset();
                 session_destroy();
                 if (function_exists('bmsSessionMarkDestroyed')) bmsSessionMarkDestroyed();

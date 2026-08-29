@@ -175,7 +175,7 @@ if ($company_logo && strpos($company_logo, 'http') !== 0) {
                 <h5 class="company-name"><?= htmlspecialchars($company_name) ?></h5>
                 <p class="text-muted mb-0" style="font-size: 0.85rem;">Please sign in to continue</p>
             </div>
-            
+
             <form id="loginForm">
                 <div class="mb-3">
                     <label for="username" class="form-label">Username</label>

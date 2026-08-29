@@ -83,6 +83,26 @@ if (!empty($_SESSION['user_id'])) {
     }
 }
 
+// Login History — precise location (one-shot, consent-based). Only ask the
+// browser once per session: check here whether THIS session's row already has
+// a fix, and skip emitting the JS entirely if so, rather than relying only on
+// a client-side "don't ask again" flag that a private window/cleared storage
+// could bypass. Never required — Approximate (GeoIP) location always works
+// with no prompt at all; this only ever upgrades it.
+$__bmsAskPreciseLocation = false;
+if (!empty($_SESSION['session_row_id'])) {
+    try {
+        $__geoStmt = $pdo->prepare("SELECT precise_captured_at FROM user_sessions WHERE id = ?");
+        $__geoStmt->execute([(int) $_SESSION['session_row_id']]);
+        // fetchColumn() returns false when no row matches and null/'' when the
+        // column itself is unset — every one of those means "not captured yet".
+        // Only a real timestamp string should suppress the prompt.
+        $__bmsAskPreciseLocation = empty($__geoStmt->fetchColumn());
+    } catch (Throwable $e) {
+        // column not present yet (pre-migration) — leave false, never blocks the page
+    }
+}
+
 // Document expiry check — runs at most once per day (see cron/check_document_expiry.php).
 // The engine is self-contained and fails silently so it can never break a page load.
 if (function_exists('get_setting') && get_setting('doc_expiry_last_run') !== date('Y-m-d')) {
@@ -262,6 +282,31 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     }
 </script>
 
+<?php if ($__bmsAskPreciseLocation): ?>
+<script>
+    // Login History — precise location (one-shot, consent-based upgrade over
+    // the always-on IP-based Approximate location). PHP has already confirmed
+    // this session doesn't have a fix yet, so this only ever runs once per
+    // login. If the browser lacks the API, the user already declined at the
+    // OS/browser level, or the origin isn't secure, geolocation fails or is
+    // simply absent — either way this must never surface an error to the user
+    // or block anything else on the page.
+    (function () {
+        if (!('geolocation' in navigator)) return;
+        navigator.geolocation.getCurrentPosition(
+            function (pos) {
+                $.post('<?= buildUrl('api/session_geo_ping.php') ?>', {
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude,
+                    accuracy: pos.coords.accuracy
+                });
+            },
+            function () { /* denied or unavailable — Approximate location remains authoritative, silently */ },
+            { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+        );
+    })();
+</script>
+<?php endif; ?>
 
     <!-- Font Awesome 5 CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">

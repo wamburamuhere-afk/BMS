@@ -143,7 +143,7 @@ if ($_POST) {
                 'password_expiry_days' => $_POST['password_expiry_days'],
                 'require_strong_password' => $_POST['require_strong_password'] ?? 0,
                 'enable_2fa' => $_POST['enable_2fa'] ?? 0,
-                'enable_audit_log' => $_POST['enable_audit_log'] ?? 0
+                'enable_audit_log' => $_POST['enable_audit_log'] ?? 0,
             ];
             
             foreach ($settings as $key => $value) {
@@ -278,18 +278,9 @@ if ($_POST) {
                                 </div>
                             </div>
                         </a>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('login_history') ?>">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-dark-soft text-dark">
-                                    <i class="bi bi-clock-history"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold">Login History</h6>
-                                    <small class="text-muted">Who logged in, from where</small>
-                                </div>
-                            </div>
-                        </a>
+                        <!-- Login History moved to Activity Logs (linked from there, admin-only) —
+                             see app/activity_log.php. Kept out of this list so admin oversight
+                             tools live in one place instead of being split across two menus. -->
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            href="<?= getUrl('backup_restore') ?>">
                             <div class="d-flex align-items-center">
@@ -767,6 +758,23 @@ if ($_POST) {
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-4 mt-1">
+                            <div class="col-12">
+                                <div class="card info-card h-100">
+                                    <div class="card-body p-4">
+                                        <h6 class="fw-bold mb-1 text-dark text-uppercase small letter-spacing-1">Unfamiliar Login &amp; Concurrent Login Response</h6>
+                                        <p class="text-muted small mb-0">
+                                            When a user signs in from a country + device combination never seen on their account before, or signs in
+                                            again while a previous session is still open, an admin is <strong>always emailed</strong> — nothing else
+                                            happens automatically. Only two things can ever end a session on their own: the user clicking Logout, or the
+                                            30-minute idle timeout. For anything else, an admin reviews Login History and decides manually — for example,
+                                            using <strong>End Session</strong> or <strong>Block Account</strong> on the account in question.
+                                        </p>
                                     </div>
                                 </div>
                             </div>
