@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-08-29 (performance) — Release the PHP session lock: the system no longer freezes when you open a second page
+
+**Files (new):** `core/session_guard.php`
+**Files (changed):** `roots.php`, `footer.php`, `header.php`, `app/bms/pos/includes/security.php`
+
+Users reported that signing in sometimes took a very long time, that pages would occasionally crawl, and that clicking a second page while one was still loading locked the whole system — yet opening BMS in a different browser profile was instantly fast.
+
+**Root cause: PHP session file locking.** PHP's default `files` handler takes an *exclusive* lock on the session file at `session_start()` and holds it until the script ends. `session_write_close()` appeared nowhere in the codebase, so every request belonging to one logged-in user ran strictly one at a time. Measured on localhost with four concurrent requests doing 1.5s of work each:
+
+| | request 1 | request 2 | request 3 | request 4 |
+|---|---|---|---|---|
+| same session cookie (before) | 1.50s | 2.95s | 4.43s | **5.91s** |
+| different cookies (before) | 1.50s | 1.51s | 1.52s | 1.50s |
+| same session cookie (after) | 1.51s | 1.52s | 1.58s | **1.58s** |
+
+That is exactly why a different browser profile felt fast — a different `PHPSESSID` means a different session file and therefore no lock to queue behind. It is per-*user*, not per-server, so having only 5 users never helped. The database was never implicated: the largest table is 4.5 MB and all 309 tables are InnoDB.
+
+`core/session_guard.php` adds `bmsSessionRelease()`, called from `roots.php` once the bootstrap has read the session. After `session_write_close()`, `$_SESSION` stays an ordinary readable **and writable** array, so no page logic changed — flash messages, `csrf_token()`, the project-scope cache and `header.php`'s role writes all behave as before. Writes made after the release are saved by a shutdown handler that re-opens the session for microseconds and writes back **only the keys this request changed**, so concurrent requests can no longer clobber each other's session writes (the old whole-file overwrite actually could). `bmsSessionReopen()` / `bmsSessionMarkDestroyed()` guard the two POS paths in `security.php` that call `session_destroy()` — those only warn and silently do nothing on a closed session, which would have broken the timeout and hijack logouts. `logout.php` never includes `roots.php`, so it was already unaffected.
+
+**Errors are no longer displayed on the live site** (`roots.php`). `display_errors` was hardcoded on, leaking file paths and SQL to users and — worse — injecting stray warning HTML into JSON API responses, making them unparseable. Now display is enabled only for localhost/`.test`/`.local`/CLI; everything is still written to the error log on every environment.
+
+**Front-end:** added `preconnect`/`dns-prefetch` for the four CDN hosts every page pulls from (`code.jquery.com`, `cdn.jsdelivr.net`, `cdnjs.cloudflare.com`, `cdn.datatables.net`) so their DNS+TCP+TLS handshakes happen in parallel up front instead of serially on first use — the cost that makes the live site feel slower than localhost. Added `defer` to the eleven DataTables/export scripts plus `loading.js` in `footer.php` so ~2.3 MB downloads in parallel instead of blocking the parser tag by tag; execution order is preserved and deferred scripts still run before `DOMContentLoaded`, which is when every page initialises its table. jQuery is deliberately **not** deferred — page markup contains inline `<script>` blocks that use `$` during parsing.
+
+Verified in a real browser: jQuery 3.7.0, DataTables, Buttons, JSZip, pdfMake (4 VFS font entries), Swal, Select2 and Bootstrap all present; a live table initialised with its rows; `excelHtml5`, `pdfHtml5` and `csvHtml5` all report **AVAILABLE** (DataTables hides those buttons when JSZip/pdfMake are missing, so this was the specific regression risk); zero console errors. An A/B run with the fix toggled on and off produced byte-identical pages and identical warning counts, confirming no new errors. Session behaviour tested end to end: lock confirmed released mid-request, post-release writes persisted, `unset()` persisted, five concurrent writes to different keys all survived, and `csrf_token()` stayed stable across requests.
+
+Not done, deliberately: `jszip`/`pdfmake`/`vfs_fonts` (~2.3 MB) are export-only and unused by 287 of 313 pages, but DataTables Buttons hides the Excel/PDF buttons outright when those globals are absent, so making them lazy needs an `available` override and its own browser-tested change.
+
 ## 2026-08-29 (feature) — HR Dashboard rework: Employees vs Payroll trend chart
 
 **Files (changed):** `app/bms/pos/hr_dashboard.php`, `tests/test_hr_dashboard_cli.php`
