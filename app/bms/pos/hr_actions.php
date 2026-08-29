@@ -222,6 +222,14 @@ function statusBadge(s) {
     const [bg, fg] = STATUS_BADGES[s] || ['#e9ecef', '#495057'];
     return `<span class="badge" style="background:${bg};color:${fg}">${s.charAt(0).toUpperCase() + s.slice(1)}</span>`;
 }
+// Warnings/complaints carry an employee acknowledgment (My HR ESS) with real
+// compliance weight — flag it inline so HR can spot stragglers without opening each row.
+function ackIndicator(r) {
+    if (!['warning', 'complaint'].includes(r.event_type) || r.status !== 'approved') return '';
+    return r.acknowledged_at
+        ? ' <i class="bi bi-check-circle-fill text-success" title="Acknowledged by employee on ' + safeOutput(r.acknowledged_at) + '"></i>'
+        : ' <i class="bi bi-exclamation-circle-fill text-warning" title="Not yet acknowledged by employee"></i>';
+}
 function changeSummary(r) {
     switch (r.event_type) {
         case 'promotion':
@@ -290,7 +298,7 @@ function loadData() {
             typeBadge(r.event_type),
             safeOutput(r.title),
             changeSummary(r),
-            statusBadge(r.status),
+            statusBadge(r.status) + ackIndicator(r),
             actionButtons(r)
         ]);
         table.clear().rows.add(data).draw();
@@ -378,6 +386,11 @@ function viewEvent(id) {
             <tr><th>Recorded by</th><td>${safeOutput(r.created_by_name || '—')} <small class="text-muted">on ${safeOutput((r.created_at || '').substring(0, 10))}</small></td></tr>
             ${r.approved_by_name ? `<tr><th>${r.status === 'rejected' ? 'Rejected' : 'Approved'} by</th><td>${safeOutput(r.approved_by_name)} <small class="text-muted">on ${safeOutput((r.approved_at || '').substring(0, 10))}</small></td></tr>` : ''}
             ${r.effect_applied_at ? `<tr><th>Effect applied</th><td>${safeOutput(r.effect_applied_at)}</td></tr>` : ''}
+            ${['warning', 'complaint'].includes(r.event_type) ? `<tr><th>Employee acknowledgment</th><td>${
+                r.acknowledged_at
+                    ? `<span class="badge bg-success">Acknowledged</span> <small class="text-muted">on ${safeOutput(r.acknowledged_at)}</small>${r.acknowledgment_note ? `<div class="small text-muted mt-1">"${safeOutput(r.acknowledgment_note)}"</div>` : ''}`
+                    : `<span class="badge bg-warning text-dark">Pending — not yet acknowledged</span>`
+            }</td></tr>` : ''}
             ${r.attachment_path ? `<tr><th>Attachment</th><td><a href="<?= buildUrl('api/download_lifecycle_attachment.php') ?>?event_id=${r.event_id}"><i class="bi bi-download me-1"></i>${safeOutput(r.attachment_name || 'Download')}</a></td></tr>` : ''}
         </table>`;
     $('#viewBody').html(html);
@@ -454,7 +467,7 @@ function renderCards(rows) {
                 <div class="card-body p-3">
                     <div class="d-flex justify-content-between align-items-start">
                         <div class="fw-bold">${safeOutput(r.first_name + ' ' + r.last_name)}</div>
-                        ${statusBadge(r.status)}
+                        ${statusBadge(r.status)}${ackIndicator(r)}
                     </div>
                     <div class="mt-1">${typeBadge(r.event_type)} <small class="text-muted">${safeOutput(r.event_date)}</small></div>
                     <div class="small mt-1">${safeOutput(r.title)}</div>

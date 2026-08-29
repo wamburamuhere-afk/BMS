@@ -924,6 +924,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="operationsDropdown">
                                 <li><h6 class="dropdown-header">Human Resources</h6></li>
+                                <?php if(canView('hr_dashboard')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('hr_dashboard') ?>"><i class="bi bi-speedometer2"></i> HR Dashboard</a></li>
+                                <?php endif; ?>
                                 <?php if(canView('employees')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('employees') ?>"><i class="bi bi-person-badge"></i> Employees</a></li>
                                 <?php endif; ?>
@@ -935,6 +938,18 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php endif; ?>
                                 <?php if(canView('org_chart')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('org_chart') ?>"><i class="bi bi-diagram-3"></i> Org Chart</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('departments') || canView('designations') || canView('employment_types')): ?>
+                                <li><h6 class="dropdown-header">Org Structure</h6></li>
+                                <?php if(canView('departments')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('departments') ?>"><i class="bi bi-diagram-2"></i> Departments</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('designations')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('designations') ?>"><i class="bi bi-person-badge"></i> Designations</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('employment_types')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('employment_types') ?>"><i class="bi bi-person-workspace"></i> Employment Types</a></li>
+                                <?php endif; ?>
                                 <?php endif; ?>
                                 <?php if(canView('hr_performance')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('hr_performance') ?>"><i class="bi bi-graph-up-arrow"></i> Performance (HR)</a></li>
@@ -968,6 +983,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php endif; ?>
                                 <?php if(canView('leaves')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('leaves') ?>"><i class="bi bi-calendar"></i> Leaves</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('company_calendar')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('company_calendar') ?>"><i class="bi bi-calendar-week"></i> Working Days &amp; Holidays</a></li>
                                 <?php endif; ?>
                                 <li><h6 class="dropdown-header">Assets & Maintenance</h6></li>
                                 <?php if(canView('assets')): ?>

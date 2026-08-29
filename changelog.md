@@ -1,5 +1,67 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — HR Dashboard: a real command centre
+
+**Files (new):** `app/bms/pos/hr_dashboard.php`, `migrations/2026_08_29_hr_dashboard_permission.php`, `tests/test_hr_dashboard_cli.php`
+**Files (changed):** `header.php`, `roots.php`
+
+LMS's own "HR Dashboard" menu item is a thin link with no real content of its own. Built ours to be the opposite: a single page aggregating data that already existed in BMS but had no visual home.
+
+Biggest find: `cron/check_hr_expiry.php` has scanned expiring contracts and ending probations daily for months and dispatches notification alerts — but there was no page where anyone could actually look at the list. The new **Expiring Soon** widget mirrors that exact scan (60-day contract / 30-day probation window) — the first visual surface for data that existed purely as notification plumbing until now.
+
+Every other number reuses an existing, already-trusted query shape rather than inventing a new source of truth: HR Actions breakdown mirrors `hr_actions.php`'s own stat query, department headcount mirrors `departments.php`'s, recruitment pipeline mirrors `api/get_openings.php`'s exact stats block. **Acknowledgment Compliance** closes the loop on the acknowledgment feature shipped earlier today — a pending-count widget so that number isn't invisible without opening every warning individually.
+
+Charts use Chart.js (matching `app/dashboard.php`'s existing choice). A **Quick Links** section ties together every HR module built across this whole workstream — Org Structure, Company Calendar, HR Actions, Recruitment, Performance, Checklists, Payroll, Contracts — into one hub, each link permission-gated.
+
+**§23 project-scope:** employees, leaves, and employee_lifecycle_events (joined to employees) are all filtered through `scopeFilterSqlNullable('project','e')`, matching every other scoped page in BMS. New permission `hr_dashboard` (seeded from each role's `hr_performance` grant), route, and menu link placed first in Operations → Human Resources.
+
+**New test** `test_hr_dashboard_cli.php` (13 assertions) — lint, wiring, scope-guard presence, real renders for both an admin and a genuinely scoped non-admin role with zero fatals/notices/SQL errors, KPI numbers cross-checked against independent queries, and quick-link permission gating. No regressions across the whole workstream's suite; project-scope's 4 remaining failures are the same pre-existing files as before this session.
+
+This completes the Operations-menu-gap workstream (Org Structure → Company Calendar → Acknowledgments → HR Dashboard).
+
+## 2026-08-29 (feature) — Employee acknowledgment of warnings/complaints (Acknowledgments gap)
+
+**Files (new):** `api/acknowledge_lifecycle_event.php`, `migrations/2026_08_29_lifecycle_event_acknowledgment.php`, `tests/test_lifecycle_acknowledgment_cli.php`
+**Files (changed):** `api/my_hr_data.php`, `app/bms/pos/my_hr.php`, `app/bms/pos/hr_actions.php`, `app/bms/pos/employee_details.php`
+
+Announcements already have a read-receipt (`announcement_reads`, a "Mark read" button on the ESS My HR page). Warnings and complaints — formal HR disciplinary actions — had no equivalent: nothing recorded whether the employee was ever actually informed.
+
+New `employee_lifecycle_events.acknowledged_at` + `acknowledgment_note` columns. New `api/acknowledge_lifecycle_event.php` reuses the exact security linchpin already established by `api/my_hr_data.php`: the employee is resolved from the **session only** (`users.employee_id`) — an employee can only acknowledge their own record, HR/admin cannot set it on their behalf, already-acknowledged and wrong-event-type requests are rejected, and an unlinked user is refused outright.
+
+Wired to every surface, nothing left inert: an "Acknowledge" button on the ESS **My HR → Record** tab (required extending `my_hr_data.php`'s record query with the new columns, or the button would never know what to show); a green-check/amber-exclamation indicator on **HR Actions** (list, mobile card, and detail panel) so HR can spot stragglers without opening each row; and the same status inline on **Employee Details → Service Record**.
+
+**New test** `test_lifecycle_acknowledgment_cli.php` (21 assertions) — lint, schema, wiring across all 3 surfaces, and a real subprocess-session security round trip (cross-employee rejected, wrong event type rejected, own acknowledgment persists, double-acknowledgment rejected, unlinked user refused). No regressions across the HR/announcements/lifecycle/project-scope test suites.
+
+## 2026-08-29 (feature) — Working Days & Holidays calendar, opt-in business-day leave counting (Phase 4 of 5)
+
+**Files (new):** `core/company_calendar.php`, `app/bms/pos/company_calendar.php`, `api/pos/save_working_days.php`, `api/pos/save_holiday.php`, `api/pos/toggle_holiday_status.php`, `migrations/2026_08_29_company_calendar.php`, `migrations/2026_08_29_company_calendar_permission.php`, `tests/test_company_calendar_cli.php`
+**Files (changed):** `core/leave_rules.php`, `core/leave_type_validation.php`, `api/add_leave_type.php`, `api/update_leave_type.php`, `api/get_leave_type.php`, `api/apply_leave.php`, `api/update_leave.php`, `app/bms/pos/leave_types.php`, `app/bms/pos/leaves.php`, `header.php`, `roots.php`
+
+`leaveDaysFor()` always counted pure calendar days — no way to exclude weekends or public holidays. While building this, found `public_holidays` already existed in the live schema (holiday_type, recurring, country, region) with **zero rows and zero code references anywhere** — reused it rather than creating a competing table.
+
+New admin page **Working Days & Holidays**: weekday checkboxes (which days count as working days, company-wide) + full Public Holidays CRUD (activate/deactivate; no hard delete, no "in use" guard needed since a holiday isn't referenced by FK anywhere). New `core/company_calendar.php` provides `companyWorkingDays()`, `isPublicHoliday()` (exact date or recurring same month/day), and `businessDaysBetween()`.
+
+`leaveDaysFor()` gained two **optional** trailing parameters — fully backward compatible, every existing call site and the existing test suite's exact assertions are unaffected since the default preserves calendar-day counting byte-for-byte. New `leave_types.count_working_days_only` column (default 0) makes business-day counting **opt-in per leave type** — nothing about existing leave types or already-applied leave changes on deploy; an admin must deliberately flip it on.
+
+Wired end-to-end: `apply_leave.php`/`update_leave.php` pass the type's flag through; `leave_types.php` exposes the toggle; `get_leave_type.php`'s list-mode `SELECT` (an explicit column list) had to be updated too or the leave-application dropdown would silently never see the flag; `leaves.php`'s live day-count preview embeds the same calendar data and mirrors the exact business-day algorithm in JS so what the user sees before submitting matches what the server saves. New permission `company_calendar` (seeded from each role's `leave_types` grant), route, and gated menu link.
+
+**New test** `test_company_calendar_cli.php` (51 assertions) — lint, schema, wiring, calendar math (weekday/holiday/recurring/business-day-across-a-weekend), `leaveDaysFor()` backward-compatibility + opt-in mode + fail-safe without a PDO, the JS embed, and live round trips through the real endpoints — including restoring the real `company_working_days` setting afterward. Verified no regression (`test_leaves_upgrade_cli.php` 49/49, `test_leave_balance_cli.php` 25/25, project-scope's 4 remaining failures are the same pre-existing files as before this task).
+
+## 2026-08-29 (feature) — Org Structure management: Departments, Designations, Employment Types (Phase 3 of 5)
+
+**Files (new):** `app/bms/pos/departments.php`, `app/bms/pos/designations.php`, `app/bms/pos/employment_types.php`, `api/pos/save_department.php`, `api/pos/toggle_department_status.php`, `api/pos/save_designation.php`, `api/pos/toggle_designation_status.php`, `api/pos/save_employment_type.php`, `api/pos/toggle_employment_type_status.php`, `migrations/2026_08_29_org_structure_permissions.php`, `tests/test_org_structure_management_cli.php`
+**Files (changed):** `app/bms/pos/employees.php`, `header.php`, `roots.php`
+
+Compared BMS's Operations menu against the reference LMS's "Org Structure" section (Departments, Designations, Employment Types, Shifts, Working Days). Found Departments/Designations/Employment Types had existed as tables since the HR foundation with **no admin page at all** — the only way a row ever got created was as a side-effect of the Employee wizard's "Other (specify)" box. Skipped Shifts and Working Days (no shift-based operations or holiday calendar in BMS yet — separate task).
+
+Built all 3 as full CRUD lookup pages. Departments also gained Manager/Assistant Manager pickers and a **Parent Department** hierarchy field — `parent_department_id` had existed in the schema since day one but was read/written nowhere in the codebase; this is its first real consumer, with a cycle guard (walks the ancestor chain, rejects A→B→A). No hard delete on any of the 3 — matches the pre-existing active/inactive-only convention already used at ~30 call sites for these tables — and deactivating is blocked while still in active use (employees, or an active sub-department for Departments) so the Employee wizard's dropdown can never silently orphan an in-use selection.
+
+Wired end-to-end: new permissions (seeded from each role's existing `employees` grant), routes, gated menu links under Operations → Org Structure, and each row's "N employees" count links to `employees.php` pre-filtered — which required teaching `employees.php` to actually read `department_id`/`designation_id`/`employment_type_id` off the query string and apply its existing (previously inert-on-load) filter dropdowns.
+
+**§23 project-scope:** these 3 tables are global lookups, but the employees they reference/count are project-scoped. Employee counts and the manager pickers use `scopeFilterSqlNullable('project', 'e')`; `save_department.php` gates a chosen manager/assistant via `assertScopeForEmployee()`. The 3 toggle-status endpoints' "still in use" checks are marked `scope-audit: skip` deliberately — they're company-wide integrity guards, not data listings, so they must see across all projects on purpose. Confirmed via `test_project_scope_cli.php` that this task introduced zero new unscoped files (its 4 remaining failures are pre-existing, reproduced identically with these changes stashed out).
+
+**New test** `test_org_structure_management_cli.php` (37 assertions) — lint, permissions, routes, menu wiring, the employees.php cross-link filter, and live create/update/duplicate-reject/in-use-guard/cycle-guard/deactivate/reactivate round trips through the real endpoints.
+
 ## 2026-08-28 (feature) — Employee wizard: dead Quick Edit modal removed, 3 bank fields added (Phase 1 & 2 of 5)
 
 **Files (new):** `migrations/2026_08_28_employee_bank_account_holder_swift.php`, `tests/test_employee_bank_fields_cli.php`

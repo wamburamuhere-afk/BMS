@@ -58,18 +58,36 @@ if (!function_exists('leaveDaysFor')) {
     /**
      * Days actually consumed by this leave, given the half-day selection.
      *
-     * @param ?float $leave_hours  Unused — kept in the signature for call-site
-     *                             compatibility (leaves.leave_hours column and its
-     *                             callers still exist, always null now).
+     * @param ?float $leave_hours     Unused — kept in the signature for call-site
+     *                                compatibility (leaves.leave_hours column and its
+     *                                callers still exist, always null now).
+     * @param bool   $workingDaysOnly Opt-in per leave type (leave_types.count_working_days_only).
+     *                                False (the default) preserves the original calendar-day
+     *                                count exactly — every existing leave type keeps behaving
+     *                                identically unless an admin deliberately turns this on.
+     * @param ?PDO   $pdo             Required when $workingDaysOnly is true (needs the
+     *                                working-days setting + public_holidays table).
      */
-    function leaveDaysFor(string $start_date, string $end_date, string $half_day, ?float $leave_hours): float
+    function leaveDaysFor(
+        string $start_date, string $end_date, string $half_day, ?float $leave_hours,
+        bool $workingDaysOnly = false, ?PDO $pdo = null
+    ): float
     {
         $start = new DateTime($start_date);
         $end   = new DateTime($end_date);
         if ($end < $start) {
             throw new InvalidArgumentException('The end date cannot be before the start date.');
         }
-        $days = (int)$start->diff($end)->days + 1;
+
+        if ($workingDaysOnly) {
+            if ($pdo === null) {
+                throw new InvalidArgumentException('Internal error: business-day leave counting requires a database connection.');
+            }
+            require_once __DIR__ . '/company_calendar.php';
+            $days = businessDaysBetween($pdo, $start_date, $end_date);
+        } else {
+            $days = (int)$start->diff($end)->days + 1;
+        }
 
         if ($half_day === 'first_half' || $half_day === 'second_half') {
             return max(0.5, $days - 0.5);

@@ -111,6 +111,9 @@ $unpaid_types = $active_types - $paid_types;
                     <td>
                         <span class="d-inline-block rounded-circle me-1" style="width:10px;height:10px;background:<?= htmlspecialchars($t['color'] ?: '#0d6efd') ?>"></span>
                         <span class="fw-bold"><?= safe_output($t['type_name']) ?></span>
+                        <?php if ((int)($t['count_working_days_only'] ?? 0) === 1): ?>
+                            <i class="bi bi-calendar-week text-info ms-1" title="Counts working days only — excludes weekends & public holidays"></i>
+                        <?php endif; ?>
                         <?php if (!empty($t['description'])): ?>
                             <div class="small text-muted"><?= safe_output($t['description']) ?></div>
                         <?php endif; ?>
@@ -231,6 +234,15 @@ $modalFields = function (string $p) {
                 <label class="form-check-label" for="<?= $p ?>requires_document">
                     Requires a supporting document
                     <div class="small text-muted">e.g. a medical certificate for Sick Leave.</div>
+                </label>
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="count_working_days_only" id="<?= $p ?>count_working_days_only" value="1">
+                <label class="form-check-label" for="<?= $p ?>count_working_days_only">
+                    Count only working days
+                    <div class="small text-muted">Excludes weekends &amp; public holidays (<a href="<?= getUrl('company_calendar') ?>" target="_blank">configure calendar</a>). Off = calendar days, the original behaviour.</div>
                 </label>
             </div>
         </div>
@@ -387,6 +399,7 @@ function editType(id) {
         $('#edit_carry_over_days').val(d.carry_over_days);
         $('#edit_color').val(d.color || '#0d6efd');
         $('#edit_requires_document').prop('checked', String(d.requires_document) === '1');
+        $('#edit_count_working_days_only').prop('checked', String(d.count_working_days_only) === '1');
         $(String(d.is_paid) === '1' ? '#edit_is_paid_yes' : '#edit_is_paid_no').prop('checked', true);
         $('#edit_status').val(d.status);
 

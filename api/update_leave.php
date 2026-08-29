@@ -77,7 +77,7 @@ try {
 
     // Days are computed server-side from the dates + half-day, never trusted from
     // the posted total_days, and then checked against the type's limits.
-    $total_days = leaveDaysFor($start_date, $end_date, $half_day, $leave_hours);
+    $total_days = leaveDaysFor($start_date, $end_date, $half_day, $leave_hours, (bool)($type['count_working_days_only'] ?? 0), $pdo);
 
     $emp = $pdo->prepare("SELECT employee_id FROM leaves WHERE leave_id = ?");
     $emp->execute([$leave_id]);

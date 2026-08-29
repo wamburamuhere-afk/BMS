@@ -20,7 +20,7 @@ if ($listOnly) {
     }
     $rows = $pdo->query("
         SELECT type_id, type_name, max_days_per_year, max_consecutive_days,
-               requires_document, is_paid
+               requires_document, is_paid, count_working_days_only
           FROM leave_types
          WHERE status = 'active'
          ORDER BY type_name ASC
