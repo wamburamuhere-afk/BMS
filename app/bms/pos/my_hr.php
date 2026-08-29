@@ -109,13 +109,32 @@ function loadPerf(){ $.getJSON(MH_API, { section:'performance' }, function(r){ i
         <h6 class="mt-3">Training</h6><table class="table table-sm"><thead><tr><th>Title</th><th>Type</th><th>Result</th><th>Cert</th></tr></thead><tbody>${tr}</tbody></table></div>`);
 }); }
 function loadRecord(){ $.getJSON(MH_API, { section:'record' }, function(r){ if (!r.success) return;
-    const sr = r.service_record.map(e=>`<tr><td>${esc(e.event_date)}</td><td>${esc(e.event_type)}</td><td>${esc(e.title)}</td></tr>`).join('') || '<tr><td colspan="3" class="text-muted text-center">No service record entries.</td></tr>';
+    const needsAck = ['warning','complaint'];
+    const sr = r.service_record.map(e=>{
+        let ack = '<span class="text-muted">—</span>';
+        if (needsAck.includes(e.event_type)) {
+            ack = e.acknowledged_at
+                ? `<span class="badge bg-success" title="${esc(e.acknowledged_at)}">Acknowledged</span>`
+                : `<button class="btn btn-sm btn-warning" onclick="acknowledgeEvent(${e.event_id},this)"><i class="bi bi-pen"></i> Acknowledge</button>`;
+        }
+        return `<tr><td>${esc(e.event_date)}</td><td>${esc(e.event_type)}</td><td>${esc(e.title)}</td><td>${ack}</td></tr>`;
+    }).join('') || '<tr><td colspan="4" class="text-muted text-center">No service record entries.</td></tr>';
     const tp = r.trips.map(t=>`<tr><td>${esc(t.destination)}</td><td>${esc(t.start_date)} → ${esc(t.end_date)}</td><td><span class="badge bg-secondary">${esc(t.status)}</span></td></tr>`).join('') || '<tr><td colspan="3" class="text-muted text-center">No trips.</td></tr>';
     const mt = r.meetings.map(m=>`<tr><td>${esc(m.title)}</td><td>${esc(m.meeting_date)} ${m.start_time?esc(m.start_time.substring(0,5)):''}</td></tr>`).join('') || '<tr><td colspan="2" class="text-muted text-center">No upcoming meetings.</td></tr>';
-    $('#pane-record').html(`<div class="card-body"><h6>Service Record</h6><table class="table table-sm"><thead><tr><th>Date</th><th>Type</th><th>Title</th></tr></thead><tbody>${sr}</tbody></table>
+    $('#pane-record').html(`<div class="card-body"><h6>Service Record</h6><table class="table table-sm"><thead><tr><th>Date</th><th>Type</th><th>Title</th><th>Acknowledgment</th></tr></thead><tbody>${sr}</tbody></table>
         <h6 class="mt-3">Trips</h6><table class="table table-sm"><thead><tr><th>Destination</th><th>Dates</th><th>Status</th></tr></thead><tbody>${tp}</tbody></table>
         <h6 class="mt-3">Upcoming meetings</h6><table class="table table-sm"><thead><tr><th>Title</th><th>When</th></tr></thead><tbody>${mt}</tbody></table></div>`);
 }); }
+window.acknowledgeEvent=function(eventId,btn){
+    Swal.fire({ title:'Acknowledge this notice?', text:'This confirms you have received and read it. You may add an optional comment.',
+        input:'textarea', inputPlaceholder:'Optional comment…', showCancelButton:true, confirmButtonText:'Acknowledge' })
+    .then(res=>{ if (!res.isConfirmed) return;
+        $.post('<?= buildUrl('api/acknowledge_lifecycle_event.php') ?>', { event_id:eventId, acknowledgment_note:res.value||'', _csrf:MH_CSRF }, function(r){
+            if (r.success) { $(btn).closest('td').html('<span class="badge bg-success">Acknowledged</span>'); }
+            else { Swal.fire({icon:'error',title:'Error',text:r.message}); }
+        }, 'json');
+    });
+};
 function loadAnn(){ $.getJSON('<?= buildUrl('api/get_announcements.php') ?>', { mode:'feed' }, function(r){ if (!r.success) return;
     if (!r.data.length){ $('#pane-ann').html('<div class="card-body text-muted">No current announcements.</div>'); return; }
     $('#pane-ann').html('<div class="card-body">'+r.data.map(a=>`<div class="border-bottom py-2"><div class="d-flex justify-content-between"><strong>${esc(a.title)}</strong>${Number(a.is_read)?'':'<span class="badge bg-primary">New</span>'}</div><div style="white-space:pre-wrap">${esc(a.body)}</div>${Number(a.is_read)?'':`<button class="btn btn-sm btn-link p-0" onclick="markRead(${a.announcement_id},this)">Mark read</button>`}</div>`).join('')+'</div>');
