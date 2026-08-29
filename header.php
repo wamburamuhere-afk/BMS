@@ -173,8 +173,24 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo isset($page_title) ? $page_title : 'Business Management System'; ?></title>
-    
-    <!-- jQuery first -->
+
+    <!-- Open the DNS + TCP + TLS connection to each CDN in parallel, immediately.
+         Every page pulls scripts, stylesheets and webfonts from these four hosts,
+         and the browser would otherwise pay a fresh handshake for each one only
+         when it first reaches that tag. On a high-latency link (which is what
+         users see on the live site, versus localhost) those serial handshakes
+         cost more than the downloads. Purely a hint — no behaviour changes. -->
+    <link rel="preconnect" href="https://code.jquery.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.datatables.net" crossorigin>
+    <link rel="dns-prefetch" href="https://code.jquery.com">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://cdn.datatables.net">
+
+    <!-- jQuery first — deliberately NOT deferred: page markup contains inline
+         <script> blocks that use $ during parsing, which would break. -->
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <!-- Select2 JS -->
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>

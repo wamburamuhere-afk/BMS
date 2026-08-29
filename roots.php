@@ -1,8 +1,24 @@
 <?php
-// Enable Error Reporting for Debugging
+// Error reporting — always RECORD everything, only DISPLAY it locally.
+//
+// Printing warnings into the response on the live site leaks file paths and SQL
+// to users, and worse, injects stray HTML into JSON API responses (a warning
+// emitted before json_encode() makes the payload unparseable, so the page shows
+// a silent "server error" instead of the real result). Errors are still written
+// to the PHP error log on every environment, so nothing is lost.
+$__bms_host  = strtolower($_SERVER['HTTP_HOST'] ?? '');
+$__bms_local = PHP_SAPI === 'cli'
+    || $__bms_host === ''
+    || str_starts_with($__bms_host, 'localhost')
+    || str_starts_with($__bms_host, '127.0.0.1')
+    || str_starts_with($__bms_host, '::1')
+    || str_ends_with(explode(':', $__bms_host)[0], '.test')
+    || str_ends_with(explode(':', $__bms_host)[0], '.local');
+
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+ini_set('display_errors',         $__bms_local ? '1' : '0');
+ini_set('display_startup_errors', $__bms_local ? '1' : '0');
+ini_set('log_errors', '1');
 
 // Ensure session cookie is accessible across the whole site
 // This must be set BEFORE session_start()
@@ -87,6 +103,14 @@ if (in_array($bms_timezone, timezone_identifiers_list(), true)) {
 
 require_once ROOT_DIR . '/core/permissions.php'; // Load permissions
 require_once ROOT_DIR . '/actions/check_auth.php';
+
+// The bootstrap has finished reading the session, so drop the session file lock
+// now instead of holding it until the script ends. Without this, two requests
+// from the same logged-in user run strictly one after the other — which is why
+// clicking a second page while the first was loading froze the whole system.
+// $_SESSION stays readable and writable; later writes are saved on shutdown.
+require_once ROOT_DIR . '/core/session_guard.php';
+bmsSessionRelease();
 
 
 // ============================================================================
