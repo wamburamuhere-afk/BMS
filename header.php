@@ -53,6 +53,24 @@ $_SESSION['user_role'] = $user_role;
 $_SESSION['role']      = $user_role;
 $_SESSION['is_admin']  = (bool)($role_data['is_admin'] ?? false);
 
+// Resolve the user's Language preference and load the matching translation
+// catalog for the rest of this request (t()/te() calls in header.php and
+// every page that includes it). Cached in session so this only hits the DB
+// once per session rather than on every page load — refreshed only when
+// absent from session (my_settings.php's save_preferences handler updates
+// $_SESSION['user_lang'] directly whenever it saves a new value to the DB).
+if (!isset($_SESSION['user_lang'])) {
+    $_SESSION['user_lang'] = get_setting('user_language_' . $_SESSION['user_id'], 'en');
+}
+// header.php always runs before a page's own POST handling, so without this
+// the navbar would keep showing the *previous* language for exactly one
+// request — the one where the user just changed it — even though the save
+// itself succeeds. Prefer the just-posted value on that one request only.
+$__bms_lang_pref = ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_preferences']) && isset($_POST['user_language']))
+    ? $_POST['user_language']
+    : $_SESSION['user_lang'];
+loadLanguage($__bms_lang_pref);
+
 // Load permissions if not in session or if we want to ensure they are fresh
 // Note: In production, you might only do this if !isset($_SESSION['permissions'])
 // But for now, let's ensure they are loaded to fix the user's issue.
@@ -187,7 +205,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<?= htmlspecialchars(currentLanguage()) ?>">
 
 <head>
     <meta charset="UTF-8">
@@ -756,27 +774,27 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php if(canView('dashboard') || canView('customers') || canView('suppliers') || canView('products')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="coreDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-house"></i> Core
+                                <i class="bi bi-house"></i> <?= t('Core') ?>
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="coreDropdown">
-                                <li><h6 class="dropdown-header">Business Core</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Business Core') ?></h6></li>
                                 <?php if(canView('dashboard')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('dashboard') ?>"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('dashboard') ?>"><i class="bi bi-speedometer2"></i> <?= t('Dashboard') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('customers')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('customers') ?>"><i class="bi bi-people"></i> Customers</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('customers') ?>"><i class="bi bi-people"></i> <?= t('Customers') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('suppliers')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('suppliers') ?>"><i class="bi bi-truck"></i> Suppliers</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('suppliers') ?>"><i class="bi bi-truck"></i> <?= t('Suppliers') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('suppliers')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('sub_contractors') ?>"><i class="bi bi-person-workspace text-info"></i> Sub-Contractors</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('sub_contractors') ?>"><i class="bi bi-person-workspace text-info"></i> <?= t('Sub-Contractors') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('products')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('products') ?>"><i class="bi bi-box text-success"></i> Inventory Products</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('products') ?>"><i class="bi bi-box text-success"></i> <?= t('Inventory Products') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('products')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam text-primary"></i> Non-Inventory Products</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam text-primary"></i> <?= t('Non-Inventory Products') ?></a></li>
                                 <?php endif; ?>
                             </ul>
                         </li>
@@ -786,54 +804,54 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php if(canView('expenses') || canView('budget') || canView('chart_of_accounts') || canView('bank_accounts') || canView('cash_register')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="financeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-cash-stack"></i> Finance
+                                <i class="bi bi-cash-stack"></i> <?= t('Finance') ?>
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="financeDropdown">
-                                <li><h6 class="dropdown-header">Accounting</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Accounting') ?></h6></li>
                                 <?php if(canView('expenses')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('expenses') ?>"><i class="bi bi-currency-dollar"></i> Expenses</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('expenses') ?>"><i class="bi bi-currency-dollar"></i> <?= t('Expenses') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('revenue')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('revenue') ?>"><i class="bi bi-cash-coin"></i> Revenue / Other Income</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('revenue') ?>"><i class="bi bi-cash-coin"></i> <?= t('Revenue / Other Income') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('budget')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('budget') ?>"><i class="bi bi-pie-chart"></i> Budget</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('budget') ?>"><i class="bi bi-pie-chart"></i> <?= t('Budget') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('chart_of_accounts')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('chart_of_accounts') ?>"><i class="bi bi-diagram-3"></i> Chart of Accounts</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('chart_of_accounts') ?>"><i class="bi bi-diagram-3"></i> <?= t('Chart of Accounts') ?></a></li>
                                 <?php endif; ?>
-                                
-                                <li><h6 class="dropdown-header">Banking & Cash</h6></li>
+
+                                <li><h6 class="dropdown-header"><?= t('Banking & Cash') ?></h6></li>
                                 <?php if(canView('bank_accounts')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('bank_accounts') ?>"><i class="bi bi-bank"></i> Bank Accounts</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('bank_accounts') ?>"><i class="bi bi-bank"></i> <?= t('Bank Accounts') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('cash_register')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('cash_register') ?>"><i class="bi bi-cash"></i> Cash Register</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('cash_register') ?>"><i class="bi bi-cash"></i> <?= t('Cash Register') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('petty_cash')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('petty_cash') ?>"><i class="bi bi-wallet"></i> Petty Cash</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('petty_cash') ?>"><i class="bi bi-wallet"></i> <?= t('Petty Cash') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('bank_transfers')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('bank_transfers') ?>"><i class="bi bi-arrow-left-right"></i> Bank Transfers</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('bank_transfers') ?>"><i class="bi bi-arrow-left-right"></i> <?= t('Bank Transfers') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('bank_reconciliation')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('bank_reconciliation') ?>"><i class="bi bi-check-circle"></i> Reconciliation</a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('bank_statement') ?>"><i class="bi bi-card-list"></i> Bank Statement</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('bank_reconciliation') ?>"><i class="bi bi-check-circle"></i> <?= t('Reconciliation') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('bank_statement') ?>"><i class="bi bi-card-list"></i> <?= t('Bank Statement') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('journals')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('journals') ?>"><i class="bi bi-journal-text"></i> Journals</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('journals') ?>"><i class="bi bi-journal-text"></i> <?= t('Journals') ?></a></li>
                                 <?php endif; ?>
-                                
-                                <li><h6 class="dropdown-header">Sales & Purchases</h6></li>
+
+                                <li><h6 class="dropdown-header"><?= t('Sales & Purchases') ?></h6></li>
                                 <?php if(canView('invoices')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('invoices') ?>"><i class="bi bi-receipt"></i> Invoices</a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('receive_payment') ?>"><i class="bi bi-cash-stack"></i> Receive Payment</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('invoices') ?>"><i class="bi bi-receipt"></i> <?= t('Invoices') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('receive_payment') ?>"><i class="bi bi-cash-stack"></i> <?= t('Receive Payment') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('purchase_orders')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('purchase_orders') ?>"><i class="bi bi-file-text"></i> Purchase Orders</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('purchase_orders') ?>"><i class="bi bi-file-text"></i> <?= t('Purchase Orders') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('payment_vouchers')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('payment_vouchers') ?>"><i class="bi bi-credit-card"></i> Payment Vouchers</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('payment_vouchers') ?>"><i class="bi bi-credit-card"></i> <?= t('Payment Vouchers') ?></a></li>
                                 <?php endif; ?>
                             </ul>
                         </li>
@@ -843,21 +861,21 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php if(canView('crm_dashboard') || canView('crm_leads') || canView('crm_pipeline')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="crmDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-funnel"></i> CRM
+                                <i class="bi bi-funnel"></i> <?= t('CRM') ?>
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="crmDropdown">
-                                <li><h6 class="dropdown-header">Customer Relations</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Customer Relations') ?></h6></li>
                                 <?php if(canView('crm_dashboard')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('crm/dashboard') ?>"><i class="bi bi-speedometer2 me-1"></i>CRM Dashboard</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('crm/dashboard') ?>"><i class="bi bi-speedometer2 me-1"></i><?= t('CRM Dashboard') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('crm_leads')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('crm/leads') ?>"><i class="bi bi-person-plus me-1"></i>Leads</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('crm/leads') ?>"><i class="bi bi-person-plus me-1"></i><?= t('Leads') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('crm_pipeline')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('crm/pipeline') ?>"><i class="bi bi-kanban me-1"></i>Pipeline Board</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('crm/pipeline') ?>"><i class="bi bi-kanban me-1"></i><?= t('Pipeline Board') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('crm_pipeline')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('crm/pipeline_stages') ?>"><i class="bi bi-gear me-1"></i>Pipeline Stages</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('crm/pipeline_stages') ?>"><i class="bi bi-gear me-1"></i><?= t('Pipeline Stages') ?></a></li>
                                 <?php endif; ?>
                             </ul>
                         </li>
@@ -867,35 +885,35 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php if(canView('sales_orders') || canView('invoices') || canView('pos')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="salesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-cart"></i> Sales
+                                <i class="bi bi-cart"></i> <?= t('Sales') ?>
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="salesDropdown">
-                                <li><h6 class="dropdown-header">Sales Operations</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Sales Operations') ?></h6></li>
                                 <?php if(canView('quotations')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('quotations') ?>"><i class="bi bi-file-text"></i> Quotations</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('quotations') ?>"><i class="bi bi-file-text"></i> <?= t('Quotations') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('sales_orders')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('sales_orders') ?>"><i class="bi bi-bag"></i>Sales Orders</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('sales_orders') ?>"><i class="bi bi-bag"></i><?= t('Sales Orders') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('lpo')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('lpos') ?>"><i class="bi bi-file-earmark-text"></i> LPO</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('lpos') ?>"><i class="bi bi-file-earmark-text"></i> <?= t('LPO') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('dn')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('delivery_notes') ?>?type=outbound"><i class="bi bi-box-arrow-up-right"></i> DN (Outbound)</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('delivery_notes') ?>?type=outbound"><i class="bi bi-box-arrow-up-right"></i> <?= t('DN (Outbound)') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('invoices')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('invoices') ?>"><i class="bi bi-receipt"></i> Invoices</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('invoices') ?>"><i class="bi bi-receipt"></i> <?= t('Invoices') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('pos')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> POS</a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('pos/dashboard') ?>"><i class="bi bi-speedometer2"></i> POS Dashboard &amp; Sales</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> <?= t('POS') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('pos/dashboard') ?>"><i class="bi bi-speedometer2"></i> <?= t('POS Dashboard & Sales') ?></a></li>
                                 <?php endif; ?>
-                                <li><h6 class="dropdown-header">Returns</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Returns') ?></h6></li>
                                 <?php if(canView('sales_returns')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('sales_returns') ?>"><i class="bi bi-arrow-return-left"></i> Sales Returns</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('sales_returns') ?>"><i class="bi bi-arrow-return-left"></i> <?= t('Sales Returns') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('credit_notes')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('credit_notes') ?>"><i class="bi bi-receipt"></i> Credit Notes</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('credit_notes') ?>"><i class="bi bi-receipt"></i> <?= t('Credit Notes') ?></a></li>
                                 <?php endif; ?>
                             </ul>
                         </li>
@@ -905,73 +923,73 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php if(canView('products') || canView('warehouses')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="inventoryDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-boxes"></i> Inventory
+                                <i class="bi bi-boxes"></i> <?= t('Inventory') ?>
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="inventoryDropdown">
-                                <li><h6 class="dropdown-header">Stock Management</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Stock Management') ?></h6></li>
                                 <?php if(canView('products')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('products') ?>"><i class="bi bi-box text-success"></i> Inventory Products</a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam text-primary"></i> Non-Inventory Products</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('products') ?>"><i class="bi bi-box text-success"></i> <?= t('Inventory Products') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('services') ?>"><i class="bi bi-box-seam text-primary"></i> <?= t('Non-Inventory Products') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('categories')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('categories') ?>"><i class="bi bi-tags"></i> Categories</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('categories') ?>"><i class="bi bi-tags"></i> <?= t('Categories') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('stock_adjustments')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('stock_adjustments') ?>"><i class="bi bi-arrow-left-right"></i> Adjustments</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('stock_adjustments') ?>"><i class="bi bi-arrow-left-right"></i> <?= t('Adjustments') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('inventory_valuation')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('inventory_valuation') ?>"><i class="bi bi-calculator"></i> Valuation</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('inventory_valuation') ?>"><i class="bi bi-calculator"></i> <?= t('Valuation') ?></a></li>
                                 <?php endif; ?>
-                                <li><h6 class="dropdown-header">Warehouse</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Warehouse') ?></h6></li>
                                 <?php if(canView('warehouses')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('warehouses') ?>"><i class="bi bi-house-door"></i> Warehouses</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('warehouses') ?>"><i class="bi bi-house-door"></i> <?= t('Warehouses') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('locations')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('locations') ?>"><i class="bi bi-geo-alt"></i> Locations</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('locations') ?>"><i class="bi bi-geo-alt"></i> <?= t('Locations') ?></a></li>
                                 <?php endif; ?>
                             </ul>
                         </li>
                         <?php endif; ?>
-                        
+
                         <!-- Purchases -->
                         <?php if (canView('suppliers')|| canView('rfq') || canView('purchase_orders') || canView('tenders')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="purchasesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-basket"></i> Procurement
+                                <i class="bi bi-basket"></i> <?= t('Procurement') ?>
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="purchasesDropdown">
-                                <li><h6 class="dropdown-header">Procurement</h6></li>
-                                
+                                <li><h6 class="dropdown-header"><?= t('Procurement') ?></h6></li>
+
                                 <?php if(canView('suppliers')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('suppliers') ?>"><i class="bi bi-truck"></i> Suppliers</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('suppliers') ?>"><i class="bi bi-truck"></i> <?= t('Suppliers') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('rfq')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('rfq') ?>"><i class="bi bi-file-earmark-text"></i> RFQ</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('rfq') ?>"><i class="bi bi-file-earmark-text"></i> <?= t('RFQ') ?></a></li>
                                 <?php endif; ?>
-                                
+
                                 <?php if(canView('purchase_orders')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('purchase_orders') ?>"><i class="bi bi-file-text"></i>Purchase Order</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('purchase_orders') ?>"><i class="bi bi-file-text"></i><?= t('Purchase Order') ?></a></li>
                                 <?php endif; ?>
                                  <?php if(canView('grn')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('delivery_notes') ?>"><i class="bi bi-file-earmark-check"></i> DN</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('delivery_notes') ?>"><i class="bi bi-file-earmark-check"></i> <?= t('DN') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('grn')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('grn') ?>"><i class="bi bi-check-square"></i> GRN</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('grn') ?>"><i class="bi bi-check-square"></i> <?= t('GRN') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('received_invoices')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('received_invoices') ?>"><i class="bi bi-inbox"></i> Bills</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('received_invoices') ?>"><i class="bi bi-inbox"></i> <?= t('Bills') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('purchase_returns')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('purchase_returns') ?>"><i class="bi bi-arrow-return-right"></i> Return Note</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('purchase_returns') ?>"><i class="bi bi-arrow-return-right"></i> <?= t('Return Note') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('debit_notes')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('debit_notes') ?>"><i class="bi bi-receipt-cutoff"></i> Debit Notes</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('debit_notes') ?>"><i class="bi bi-receipt-cutoff"></i> <?= t('Debit Notes') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('nip_materials')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('nip_materials') ?>"><i class="bi bi-boxes"></i> Materials</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('nip_materials') ?>"><i class="bi bi-boxes"></i> <?= t('Materials') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('tenders')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('tenders') ?>"><i class="bi bi-clipboard-check"></i> Tenders</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('tenders') ?>"><i class="bi bi-clipboard-check"></i> <?= t('Tenders') ?></a></li>
                                 <?php endif; ?>
                             </ul>
                         </li>
@@ -981,93 +999,93 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php if(canView('employees') || canView('assets')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="operationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-gear"></i> Operations
+                                <i class="bi bi-gear"></i> <?= t('Operations') ?>
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="operationsDropdown">
                                 <?php if(canView('hr_dashboard') || canView('employees') || canView('employee_lifecycle') || canView('employee_contracts') || canView('org_chart')): ?>
-                                <li><h6 class="dropdown-header">Workforce</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Workforce') ?></h6></li>
                                 <?php if(canView('hr_dashboard')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('hr_dashboard') ?>"><i class="bi bi-speedometer2"></i> HR Dashboard</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('hr_dashboard') ?>"><i class="bi bi-speedometer2"></i> <?= t('HR Dashboard') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('employees')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('employees') ?>"><i class="bi bi-person-badge"></i> Employees</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('employees') ?>"><i class="bi bi-person-badge"></i> <?= t('Employees') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('employee_lifecycle')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('hr_actions') ?>"><i class="bi bi-person-lines-fill"></i> HR Actions</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('hr_actions') ?>"><i class="bi bi-person-lines-fill"></i> <?= t('HR Actions') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('org_chart')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('org_chart') ?>"><i class="bi bi-diagram-3"></i> Org Chart</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('org_chart') ?>"><i class="bi bi-diagram-3"></i> <?= t('Org Chart') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('employee_contracts')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('employee_contracts') ?>"><i class="bi bi-file-earmark-text"></i> Contracts</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('employee_contracts') ?>"><i class="bi bi-file-earmark-text"></i> <?= t('Contracts') ?></a></li>
                                 <?php endif; ?>
                                 <?php endif; ?>
                                 <?php if(canView('departments') || canView('designations') || canView('employment_types')): ?>
-                                <li><h6 class="dropdown-header">Org Structure</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Org Structure') ?></h6></li>
                                 <?php if(canView('departments')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('departments') ?>"><i class="bi bi-diagram-2"></i> Departments</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('departments') ?>"><i class="bi bi-diagram-2"></i> <?= t('Departments') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('designations')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('designations') ?>"><i class="bi bi-person-badge"></i> Designations</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('designations') ?>"><i class="bi bi-person-badge"></i> <?= t('Designations') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('employment_types')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('employment_types') ?>"><i class="bi bi-person-workspace"></i> Employment Types</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('employment_types') ?>"><i class="bi bi-person-workspace"></i> <?= t('Employment Types') ?></a></li>
                                 <?php endif; ?>
                                 <?php endif; ?>
                                 <?php if(canView('hr_performance') || canView('trainings') || canView('recruitment') || canView('hr_checklists')): ?>
-                                <li><h6 class="dropdown-header">Performance &amp; Growth</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Performance & Growth') ?></h6></li>
                                 <?php if(canView('hr_performance')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('hr_performance') ?>"><i class="bi bi-graph-up-arrow"></i> Performance (HR)</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('hr_performance') ?>"><i class="bi bi-graph-up-arrow"></i> <?= t('Performance (HR)') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('trainings')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('trainings') ?>"><i class="bi bi-mortarboard"></i> Training</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('trainings') ?>"><i class="bi bi-mortarboard"></i> <?= t('Training') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('recruitment')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('recruitment') ?>"><i class="bi bi-person-badge"></i> Recruitment</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('recruitment') ?>"><i class="bi bi-person-badge"></i> <?= t('Recruitment') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('hr_checklists')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('hr_checklists') ?>"><i class="bi bi-check2-square"></i> Checklists</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('hr_checklists') ?>"><i class="bi bi-check2-square"></i> <?= t('Checklists') ?></a></li>
                                 <?php endif; ?>
                                 <?php endif; ?>
                                 <?php if(canView('payroll') || canView('salary_components')): ?>
-                                <li><h6 class="dropdown-header">Payroll</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Payroll') ?></h6></li>
                                 <?php if(canView('payroll')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('payroll') ?>"><i class="bi bi-cash"></i> Payroll</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('payroll') ?>"><i class="bi bi-cash"></i> <?= t('Payroll') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('salary_components')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('salary_components') ?>"><i class="bi bi-sliders"></i> Salary Components</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('salary_components') ?>"><i class="bi bi-sliders"></i> <?= t('Salary Components') ?></a></li>
                                 <?php endif; ?>
                                 <?php endif; ?>
                                 <?php if(canView('attendance') || canView('leaves') || canView('company_calendar')): ?>
-                                <li><h6 class="dropdown-header">Attendance &amp; Leave</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Attendance & Leave') ?></h6></li>
                                 <?php if(canView('attendance')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('attendance') ?>"><i class="bi bi-clock"></i> Attendance</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('attendance') ?>"><i class="bi bi-clock"></i> <?= t('Attendance') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('leaves')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('leaves') ?>"><i class="bi bi-calendar"></i> Leaves</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('leaves') ?>"><i class="bi bi-calendar"></i> <?= t('Leaves') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('company_calendar')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('company_calendar') ?>"><i class="bi bi-calendar-week"></i> Working Days &amp; Holidays</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('company_calendar') ?>"><i class="bi bi-calendar-week"></i> <?= t('Working Days & Holidays') ?></a></li>
                                 <?php endif; ?>
                                 <?php endif; ?>
                                 <?php if(canView('meetings') || canView('employee_trips') || canView('announcements')): ?>
-                                <li><h6 class="dropdown-header">Communication &amp; Calendar</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Communication & Calendar') ?></h6></li>
                                 <?php if(canView('meetings')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('meetings') ?>"><i class="bi bi-calendar-event"></i> Meetings</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('meetings') ?>"><i class="bi bi-calendar-event"></i> <?= t('Meetings') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('employee_trips')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('employee_trips') ?>"><i class="bi bi-airplane"></i> Trips</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('employee_trips') ?>"><i class="bi bi-airplane"></i> <?= t('Trips') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('announcements')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('announcements') ?>"><i class="bi bi-megaphone"></i> Announcements</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('announcements') ?>"><i class="bi bi-megaphone"></i> <?= t('Announcements') ?></a></li>
                                 <?php endif; ?>
                                 <?php endif; ?>
-                                <li><h6 class="dropdown-header">Assets & Maintenance</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Assets & Maintenance') ?></h6></li>
                                 <?php if(canView('assets')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('assets') ?>"><i class="bi bi-pc-display"></i> Assets</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('assets') ?>"><i class="bi bi-pc-display"></i> <?= t('Assets') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('maintenance')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('maintenance') ?>"><i class="bi bi-tools"></i> Maintenance</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('maintenance') ?>"><i class="bi bi-tools"></i> <?= t('Maintenance') ?></a></li>
                                 <?php endif; ?>
                             </ul>
                         </li>
@@ -1077,65 +1095,65 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php if (get_setting('enable_projects') == '1' && canView('projects')): ?>
                         <li class="nav-item">
                             <a class="nav-link" href="<?= getUrl('projects') ?>">
-                                <i class="bi bi-kanban"></i> Projects
+                                <i class="bi bi-kanban"></i> <?= t('Projects') ?>
                             </a>
                         </li>
                         <?php endif; ?>
-    
+
                         <!-- Comms -->
                         <?php if(canView('message_center') || canView('notification_center') || canView('ai_assistant')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="communicationDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-chat"></i> Comms
+                                <i class="bi bi-chat"></i> <?= t('Comms') ?>
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="communicationDropdown">
-                                <li><h6 class="dropdown-header">Communication</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Communication') ?></h6></li>
                                 <?php if(canView('ai_assistant') && function_exists('aiConfigured') && aiConfigured()): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('ai_assistant') ?>"><i class="bi bi-stars text-primary"></i> Ask BMS <span class="badge bg-primary-subtle text-primary ms-1" style="font-size:.6rem;">AI</span></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('ai_assistant') ?>"><i class="bi bi-stars text-primary"></i> <?= t('Ask BMS') ?> <span class="badge bg-primary-subtle text-primary ms-1" style="font-size:.6rem;">AI</span></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('message_center')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('message_center') ?>"><i class="bi bi-chat-left"></i> Messages</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('message_center') ?>"><i class="bi bi-chat-left"></i> <?= t('Messages') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('email_templates')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('email_templates') ?>"><i class="bi bi-envelope"></i> Email</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('email_templates') ?>"><i class="bi bi-envelope"></i> <?= t('Email') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('notification_center')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('notification_center') ?>"><i class="bi bi-bell"></i> Notifications</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('notification_center') ?>"><i class="bi bi-bell"></i> <?= t('Notifications') ?></a></li>
                                 <?php endif; ?>
-                                <li><h6 class="dropdown-header">Marketing</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Marketing') ?></h6></li>
                                 <?php if(canView('campaigns')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('campaigns') ?>"><i class="bi bi-megaphone"></i> Campaigns</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('campaigns') ?>"><i class="bi bi-megaphone"></i> <?= t('Campaigns') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('leads')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('leads') ?>"><i class="bi bi-person-plus"></i> Leads</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('leads') ?>"><i class="bi bi-person-plus"></i> <?= t('Leads') ?></a></li>
                                 <?php endif; ?>
                             </ul>
                         </li>
                         <?php endif; ?>
-                        
+
                         <!-- Docs -->
                         <?php if(canView('document_library') || canView('document_templates') || canView('e_signatures') || canView('compliance_documents') || canView('audit_logs')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="documentsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-files"></i> Docs
+                                <i class="bi bi-files"></i> <?= t('Docs') ?>
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="documentsDropdown">
-                                <li><h6 class="dropdown-header">Document Management</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Document Management') ?></h6></li>
                                 <?php if(canView('document_library')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('library') ?>"><i class="bi bi-folder"></i> Library</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('library') ?>"><i class="bi bi-folder"></i> <?= t('Library') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('document_templates')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('templates') ?>"><i class="bi bi-file-earmark"></i> Templates</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('templates') ?>"><i class="bi bi-file-earmark"></i> <?= t('Templates') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('e_signatures')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('e_signatures') ?>"><i class="bi bi-pen"></i> E-Sign</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('e_signatures') ?>"><i class="bi bi-pen"></i> <?= t('E-Sign') ?></a></li>
                                 <?php endif; ?>
-                                <li><h6 class="dropdown-header">Compliance</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('Compliance') ?></h6></li>
                                 <?php if(canView('compliance_documents')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('compliance_documents') ?>"><i class="bi bi-shield-check"></i> Compliance</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('compliance_documents') ?>"><i class="bi bi-shield-check"></i> <?= t('Compliance') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('audit_logs')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('audit_logs') ?>"><i class="bi bi-clock-history"></i> Audit Logs</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('audit_logs') ?>"><i class="bi bi-clock-history"></i> <?= t('Audit Logs') ?></a></li>
                                 <?php endif; ?>
                             </ul>
                         </li>
@@ -1145,50 +1163,50 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php if(hasReportsAccess()): ?>
                         <li class="nav-item mega-dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="reportsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-graph-up"></i> Reports
+                                <i class="bi bi-graph-up"></i> <?= t('Reports') ?>
                             </a>
                             <div class="dropdown-menu mega-dropdown-menu" aria-labelledby="reportsDropdown">
                                 <div class="row">
                                     <div class="col-lg-3 mega-column">
-                                        <h6>Financial Reports</h6>
-                                        <?php if(canView('income_statement')): ?><a class="dropdown-item" href="<?= getUrl('income_statement') ?>"><i class="bi bi-graph-up-arrow"></i> Income Statement</a><?php endif; ?>
-                                        <?php if(canView('balance_sheet')): ?><a class="dropdown-item" href="<?= getUrl('balance_sheet') ?>"><i class="bi bi-bar-chart"></i> Balance Sheet</a><?php endif; ?>
-                                        <?php if(canView('cash_flow')): ?><a class="dropdown-item" href="<?= getUrl('cash_flow') ?>"><i class="bi bi-arrow-left-right"></i> Cash Flow</a><?php endif; ?>
-                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('consolidated_expenses') ?>"><i class="bi bi-cash-stack"></i> Consolidated Expenses</a><?php endif; ?>
-                                        <?php if(canView('trial_balance')): ?><a class="dropdown-item" href="<?= getUrl('trial_balance') ?>"><i class="bi bi-journal"></i> Trial Balance</a><?php endif; ?>
-                                        <?php if(canView('ledger_report')): ?><a class="dropdown-item" href="<?= getUrl('ledger_report') ?>"><i class="bi bi-journal-text"></i> General Ledger</a><?php endif; ?>
-                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('ar_aging') ?>"><i class="bi bi-hourglass-split"></i> Receivables Aging</a><?php endif; ?>
-                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('ap_aging') ?>"><i class="bi bi-hourglass-split"></i> Payables Aging</a><?php endif; ?>
-                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('customer_statement') ?>"><i class="bi bi-file-earmark-text"></i> Customer Statement</a><?php endif; ?>
-                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('vendor_statement') ?>"><i class="bi bi-file-earmark-text"></i> Vendor Statement</a><?php endif; ?>
+                                        <h6><?= t('Financial Reports') ?></h6>
+                                        <?php if(canView('income_statement')): ?><a class="dropdown-item" href="<?= getUrl('income_statement') ?>"><i class="bi bi-graph-up-arrow"></i> <?= t('Income Statement') ?></a><?php endif; ?>
+                                        <?php if(canView('balance_sheet')): ?><a class="dropdown-item" href="<?= getUrl('balance_sheet') ?>"><i class="bi bi-bar-chart"></i> <?= t('Balance Sheet') ?></a><?php endif; ?>
+                                        <?php if(canView('cash_flow')): ?><a class="dropdown-item" href="<?= getUrl('cash_flow') ?>"><i class="bi bi-arrow-left-right"></i> <?= t('Cash Flow') ?></a><?php endif; ?>
+                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('consolidated_expenses') ?>"><i class="bi bi-cash-stack"></i> <?= t('Consolidated Expenses') ?></a><?php endif; ?>
+                                        <?php if(canView('trial_balance')): ?><a class="dropdown-item" href="<?= getUrl('trial_balance') ?>"><i class="bi bi-journal"></i> <?= t('Trial Balance') ?></a><?php endif; ?>
+                                        <?php if(canView('ledger_report')): ?><a class="dropdown-item" href="<?= getUrl('ledger_report') ?>"><i class="bi bi-journal-text"></i> <?= t('General Ledger') ?></a><?php endif; ?>
+                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('ar_aging') ?>"><i class="bi bi-hourglass-split"></i> <?= t('Receivables Aging') ?></a><?php endif; ?>
+                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('ap_aging') ?>"><i class="bi bi-hourglass-split"></i> <?= t('Payables Aging') ?></a><?php endif; ?>
+                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('customer_statement') ?>"><i class="bi bi-file-earmark-text"></i> <?= t('Customer Statement') ?></a><?php endif; ?>
+                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('vendor_statement') ?>"><i class="bi bi-file-earmark-text"></i> <?= t('Vendor Statement') ?></a><?php endif; ?>
                                     </div>
                                     <div class="col-lg-3 mega-column">
-                                        <h6>Business Reports</h6>
-                                        <?php if(canView('sales_report')): ?><a class="dropdown-item" href="<?= getUrl('sales_report') ?>"><i class="bi bi-cart"></i> Sales Report</a><?php endif; ?>
-                                        <?php if(canView('purchase_report')): ?><a class="dropdown-item" href="<?= getUrl('purchase_report') ?>"><i class="bi bi-basket"></i> Purchase Report</a><?php endif; ?>
-                                        <?php if(canView('received_invoices')): ?><a class="dropdown-item" href="<?= getUrl('po_invoice_report') ?>"><i class="bi bi-clipboard-data"></i> PO vs Invoice Report</a><?php endif; ?>
-                                        <?php if(canView('inventory_report')): ?><a class="dropdown-item" href="<?= getUrl('inventory_report') ?>"><i class="bi bi-boxes"></i> Inventory Report</a><?php endif; ?>
-                                    
-                                            
-                                        <?php if(canView('expense_report')): ?><a class="dropdown-item" href="<?= getUrl('expense_report') ?>"><i class="bi bi-cash-stack"></i> Expense Report</a><?php endif; ?>
+                                        <h6><?= t('Business Reports') ?></h6>
+                                        <?php if(canView('sales_report')): ?><a class="dropdown-item" href="<?= getUrl('sales_report') ?>"><i class="bi bi-cart"></i> <?= t('Sales Report') ?></a><?php endif; ?>
+                                        <?php if(canView('purchase_report')): ?><a class="dropdown-item" href="<?= getUrl('purchase_report') ?>"><i class="bi bi-basket"></i> <?= t('Purchase Report') ?></a><?php endif; ?>
+                                        <?php if(canView('received_invoices')): ?><a class="dropdown-item" href="<?= getUrl('po_invoice_report') ?>"><i class="bi bi-clipboard-data"></i> <?= t('PO vs Invoice Report') ?></a><?php endif; ?>
+                                        <?php if(canView('inventory_report')): ?><a class="dropdown-item" href="<?= getUrl('inventory_report') ?>"><i class="bi bi-boxes"></i> <?= t('Inventory Report') ?></a><?php endif; ?>
+
+
+                                        <?php if(canView('expense_report')): ?><a class="dropdown-item" href="<?= getUrl('expense_report') ?>"><i class="bi bi-cash-stack"></i> <?= t('Expense Report') ?></a><?php endif; ?>
                                     </div>
                                     <div class="col-lg-3 mega-column">
-                                        <h6>Analytics</h6>
-                                        <?php if(canView('performance_dashboard')): ?><a class="dropdown-item" href="<?= getUrl('performance_dashboard') ?>"><i class="bi bi-speedometer2"></i> Performance</a><?php endif; ?>
-                                        <?php if(canView('customer_analysis')): ?><a class="dropdown-item" href="<?= getUrl('customer_analysis') ?>"><i class="bi bi-people"></i> Customer Analysis</a><?php endif; ?>
-                                        <?php if(canView('product_analysis')): ?><a class="dropdown-item" href="<?= getUrl('product_analysis') ?>"><i class="bi bi-box"></i> Product Analysis</a><?php endif; ?>
-                                        <?php if(canView('sales_forecast')): ?><a class="dropdown-item" href="<?= getUrl('sales_forecast') ?>"><i class="bi bi-graph-up-arrow"></i> Sales Forecast</a><?php endif; ?>
-                                        <?php if(canView('trends_analysis')): ?><a class="dropdown-item" href="<?= getUrl('trends_analysis') ?>"><i class="bi bi-activity"></i> Trends</a><?php endif; ?>
+                                        <h6><?= t('Analytics') ?></h6>
+                                        <?php if(canView('performance_dashboard')): ?><a class="dropdown-item" href="<?= getUrl('performance_dashboard') ?>"><i class="bi bi-speedometer2"></i> <?= t('Performance') ?></a><?php endif; ?>
+                                        <?php if(canView('customer_analysis')): ?><a class="dropdown-item" href="<?= getUrl('customer_analysis') ?>"><i class="bi bi-people"></i> <?= t('Customer Analysis') ?></a><?php endif; ?>
+                                        <?php if(canView('product_analysis')): ?><a class="dropdown-item" href="<?= getUrl('product_analysis') ?>"><i class="bi bi-box"></i> <?= t('Product Analysis') ?></a><?php endif; ?>
+                                        <?php if(canView('sales_forecast')): ?><a class="dropdown-item" href="<?= getUrl('sales_forecast') ?>"><i class="bi bi-graph-up-arrow"></i> <?= t('Sales Forecast') ?></a><?php endif; ?>
+                                        <?php if(canView('trends_analysis')): ?><a class="dropdown-item" href="<?= getUrl('trends_analysis') ?>"><i class="bi bi-activity"></i> <?= t('Trends') ?></a><?php endif; ?>
                                     </div>
                                     <div class="col-lg-3 mega-column">
-                                        <h6>Compliance & Operations</h6>
-                                        <?php if(canView('tax_report')): ?><a class="dropdown-item" href="<?= getUrl('tax_report') ?>"><i class="bi bi-percent"></i> Tax Report</a><?php endif; ?>
-                                        <?php if(canView('tax_report')): ?><a class="dropdown-item" href="<?= getUrl('wht_report') ?>"><i class="bi bi-cash-stack"></i> WHT Report</a><?php endif; ?>
-                                        <?php if(canView('tax_report')): ?><a class="dropdown-item" href="<?= getUrl('wht_receivable_report') ?>"><i class="bi bi-cash-coin"></i> WHT Credit (Received)</a><?php endif; ?>
-                                        <?php if(canView('audit_report')): ?><a class="dropdown-item" href="<?= getUrl('audit_report') ?>"><i class="bi bi-shield-check"></i> Audit Report</a><?php endif; ?>
-                                        <?php if(canView('compliance_report')): ?><a class="dropdown-item" href="<?= getUrl('compliance_report') ?>"><i class="bi bi-file-check"></i> Compliance</a><?php endif; ?>
-                                        <?php if(canView('employee_report')): ?><a class="dropdown-item" href="<?= getUrl('employee_report') ?>"><i class="bi bi-person-badge"></i> Employee Report</a><?php endif; ?>
-                                        <?php if(canView('asset_report')): ?><a class="dropdown-item" href="<?= getUrl('asset_report') ?>"><i class="bi bi-pc-display"></i> Asset Report</a><?php endif; ?>
+                                        <h6><?= t('Compliance & Operations') ?></h6>
+                                        <?php if(canView('tax_report')): ?><a class="dropdown-item" href="<?= getUrl('tax_report') ?>"><i class="bi bi-percent"></i> <?= t('Tax Report') ?></a><?php endif; ?>
+                                        <?php if(canView('tax_report')): ?><a class="dropdown-item" href="<?= getUrl('wht_report') ?>"><i class="bi bi-cash-stack"></i> <?= t('WHT Report') ?></a><?php endif; ?>
+                                        <?php if(canView('tax_report')): ?><a class="dropdown-item" href="<?= getUrl('wht_receivable_report') ?>"><i class="bi bi-cash-coin"></i> <?= t('WHT Credit (Received)') ?></a><?php endif; ?>
+                                        <?php if(canView('audit_report')): ?><a class="dropdown-item" href="<?= getUrl('audit_report') ?>"><i class="bi bi-shield-check"></i> <?= t('Audit Report') ?></a><?php endif; ?>
+                                        <?php if(canView('compliance_report')): ?><a class="dropdown-item" href="<?= getUrl('compliance_report') ?>"><i class="bi bi-file-check"></i> <?= t('Compliance') ?></a><?php endif; ?>
+                                        <?php if(canView('employee_report')): ?><a class="dropdown-item" href="<?= getUrl('employee_report') ?>"><i class="bi bi-person-badge"></i> <?= t('Employee Report') ?></a><?php endif; ?>
+                                        <?php if(canView('asset_report')): ?><a class="dropdown-item" href="<?= getUrl('asset_report') ?>"><i class="bi bi-pc-display"></i> <?= t('Asset Report') ?></a><?php endif; ?>
                                     </div>
                                 </div>
                             </div>
@@ -1215,20 +1233,20 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php if ($_set_sys_visible || $_set_biz_visible): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-sliders"></i> Settings
+                                <i class="bi bi-sliders"></i> <?= t('Settings') ?>
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="adminDropdown">
                                 <?php if ($_set_sys_visible): ?>
-                                <li><h6 class="dropdown-header">System Configuration</h6></li>
+                                <li><h6 class="dropdown-header"><?= t('System Configuration') ?></h6></li>
                                 <?php if (isAdmin()): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i> Admin</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('system_settings') ?>"><i class="bi bi-gear"></i> <?= t('Admin') ?></a></li>
                                 <?php endif; ?>
-                                <?php if (canView('pos_config_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('pos_config_settings') ?>"><i class="bi bi-cart"></i> POS Settings</a></li><?php endif; ?>
-                                <?php if (canView('color_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('color_settings') ?>"><i class="bi bi-palette"></i> Color Setting</a></li><?php endif; ?>
+                                <?php if (canView('pos_config_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('pos_config_settings') ?>"><i class="bi bi-cart"></i> <?= t('POS Settings') ?></a></li><?php endif; ?>
+                                <?php if (canView('color_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('color_settings') ?>"><i class="bi bi-palette"></i> <?= t('Color Setting') ?></a></li><?php endif; ?>
                                 <?php endif; ?>
                                 <?php if ($_set_biz_visible): ?>
-                                <li><h6 class="dropdown-header">Business Settings</h6></li>
-                                <?php if (canView('tax_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('tax_settings') ?>"><i class="bi bi-percent"></i> Tax</a></li><?php endif; ?>
+                                <li><h6 class="dropdown-header"><?= t('Business Settings') ?></h6></li>
+                                <?php if (canView('tax_settings')): ?><li><a class="dropdown-item" href="<?= getUrl('tax_settings') ?>"><i class="bi bi-percent"></i> <?= t('Tax') ?></a></li><?php endif; ?>
                                 <?php endif; ?>
                             </ul>
                         </li>
@@ -1250,15 +1268,14 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                     <div class="fw-bold" style="font-size:0.85rem;"><?= htmlspecialchars($username) ?></div>
                                     <div class="text-muted" style="font-size:0.72rem;text-transform:uppercase;"><?= htmlspecialchars($user_role) ?></div>
                                 </li>
-                                <li><a class="dropdown-item py-2" href="<?= getUrl('profile') ?>"><i class="bi bi-person me-2"></i> Profile</a></li>
                                 <?php if (!empty($_SESSION['employee_id'])): // ESS "My HR" — only for users linked to an employee (D24) ?>
-                                <li><a class="dropdown-item py-2" href="<?= getUrl('my_hr') ?>"><i class="bi bi-person-workspace me-2"></i> My HR</a></li>
+                                <li><a class="dropdown-item py-2" href="<?= getUrl('my_hr') ?>"><i class="bi bi-person-workspace me-2"></i> <?= t('My HR') ?></a></li>
                                 <?php endif; ?>
-                                <li><a class="dropdown-item py-2" href="<?= getUrl('my_settings') ?>"><i class="bi bi-gear me-2"></i> Settings</a></li>
+                                <li><a class="dropdown-item py-2" href="<?= getUrl('my_settings') ?>"><i class="bi bi-person-gear me-2"></i> <?= t('My Profile & Settings') ?></a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item py-2" href="<?= getUrl('help') ?>"><i class="bi bi-question-circle me-2"></i> Help</a></li>
+                                <li><a class="dropdown-item py-2" href="<?= getUrl('help') ?>"><i class="bi bi-question-circle me-2"></i> <?= t('Help') ?></a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item py-2 text-danger fw-bold" href="<?= getUrl('logout') ?>"><i class="bi bi-box-arrow-right me-2"></i> Logout</a></li>
+                                <li><a class="dropdown-item py-2 text-danger fw-bold" href="<?= getUrl('logout') ?>"><i class="bi bi-box-arrow-right me-2"></i> <?= t('Logout') ?></a></li>
                             </ul>
                         </li>
                     </ul>

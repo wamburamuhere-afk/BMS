@@ -53,7 +53,7 @@ if (!function_exists('renderOtherSelect')) {
             $opts .= '<option value="' . $h($selected) . '" selected>' . $h($selected) . '</option>';
         }
         $req = $required ? ' required' : '';
-        $otherOpt = '<option value="other">➕ Other (type new)…</option>';
+        $otherOpt = '<option value="other">➕ ' . $h(t('Other (type new)…')) . '</option>';
 
         return '<div class="other-field-wrap">'
              .   '<select class="form-select other-trigger" id="' . $h($id) . '" name="' . $h($name) . '"'
@@ -63,8 +63,8 @@ if (!function_exists('renderOtherSelect')) {
              .   '<div class="other-input-box mt-2 d-none">'
              .     '<div class="input-group">'
              .       '<input type="text" class="form-control other-input" name="' . $h($otherName) . '"'
-             .             ' placeholder="Type a new value — it will be saved for next time">'
-             .       '<button type="button" class="btn btn-outline-secondary other-back" title="Back to list"><i class="bi bi-arrow-left"></i></button>'
+             .             ' placeholder="' . $h(t('Type a new value — it will be saved for next time')) . '">'
+             .       '<button type="button" class="btn btn-outline-secondary other-back" title="' . $h(t('Back to list')) . '"><i class="bi bi-arrow-left"></i></button>'
              .     '</div>'
              .   '</div>'
              . '</div>';
