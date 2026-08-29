@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — Employee acknowledgment of warnings/complaints (Acknowledgments gap)
+
+**Files (new):** `api/acknowledge_lifecycle_event.php`, `migrations/2026_08_29_lifecycle_event_acknowledgment.php`, `tests/test_lifecycle_acknowledgment_cli.php`
+**Files (changed):** `api/my_hr_data.php`, `app/bms/pos/my_hr.php`, `app/bms/pos/hr_actions.php`, `app/bms/pos/employee_details.php`
+
+Announcements already have a read-receipt (`announcement_reads`, a "Mark read" button on the ESS My HR page). Warnings and complaints — formal HR disciplinary actions — had no equivalent: nothing recorded whether the employee was ever actually informed.
+
+New `employee_lifecycle_events.acknowledged_at` + `acknowledgment_note` columns. New `api/acknowledge_lifecycle_event.php` reuses the exact security linchpin already established by `api/my_hr_data.php`: the employee is resolved from the **session only** (`users.employee_id`) — an employee can only acknowledge their own record, HR/admin cannot set it on their behalf, already-acknowledged and wrong-event-type requests are rejected, and an unlinked user is refused outright.
+
+Wired to every surface, nothing left inert: an "Acknowledge" button on the ESS **My HR → Record** tab (required extending `my_hr_data.php`'s record query with the new columns, or the button would never know what to show); a green-check/amber-exclamation indicator on **HR Actions** (list, mobile card, and detail panel) so HR can spot stragglers without opening each row; and the same status inline on **Employee Details → Service Record**.
+
+**New test** `test_lifecycle_acknowledgment_cli.php` (21 assertions) — lint, schema, wiring across all 3 surfaces, and a real subprocess-session security round trip (cross-employee rejected, wrong event type rejected, own acknowledgment persists, double-acknowledgment rejected, unlinked user refused). No regressions across the HR/announcements/lifecycle/project-scope test suites.
+
 ## 2026-08-29 (feature) — Working Days & Holidays calendar, opt-in business-day leave counting (Phase 4 of 5)
 
 **Files (new):** `core/company_calendar.php`, `app/bms/pos/company_calendar.php`, `api/pos/save_working_days.php`, `api/pos/save_holiday.php`, `api/pos/toggle_holiday_status.php`, `migrations/2026_08_29_company_calendar.php`, `migrations/2026_08_29_company_calendar_permission.php`, `tests/test_company_calendar_cli.php`
