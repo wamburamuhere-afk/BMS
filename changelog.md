@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-08-29 (refactor) — Suppliers list: decluttered the row Actions dropdown
+
+**Files (changed):** `app/bms/Suppliers/suppliers.php`
+
+Removed **View Orders** and **View Payments** from the per-row Actions dropdown on the suppliers list. Both just navigated to a filtered report that is now one click away as a tab inside `suppliers/view` (Recent Purchase Orders, Recent Payments) — reachable via the dropdown's own **View Details** entry, so they were a redundant second path to the same data, not a separate capability.
+
+**View Account** is kept — it opens the full vendor statement (`vendor_statement.php`), a distinct report that is not one of that page's tabs. Everything else (View Details, Edit Supplier, New Order, Deactivate/Activate/Suspend/Blacklist, Delete) is untouched: none of those are available anywhere inside `suppliers/view` (confirmed by reading its own action buttons — Back/Print/Record Invoice/Edit only, no status-change or delete), so removing them would have been a real capability loss, not decluttering.
+
+Verified live in a real browser: the row dropdown now shows exactly 7 items (down from 9) — View Details, Edit Supplier, View Account, Deactivate, Suspend, Blacklist, Delete. Found and ruled out a red herring along the way: a `DataTable initialization failed` console error on this page — reproduced identically on the unmodified file via `git stash`, confirming it's pre-existing and unrelated to this change, not something introduced here. Existing suites unaffected: `vendor_account_button_supplier` (5), `supplier_details_related_tabs` (85), `phase4_supplier_payment` (29) — none reference the removed menu text.
+
 ## 2026-08-29 (feature) — Add Employee: optional "Assign to Warehouse" field, cascaded by Project
 
 **Files (new):** `migrations/2026_08_29_employee_warehouse_field.php`, `tests/test_employee_warehouse_field_cli.php`
