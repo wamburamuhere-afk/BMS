@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — Org Structure management: Departments, Designations, Employment Types (Phase 3 of 5)
+
+**Files (new):** `app/bms/pos/departments.php`, `app/bms/pos/designations.php`, `app/bms/pos/employment_types.php`, `api/pos/save_department.php`, `api/pos/toggle_department_status.php`, `api/pos/save_designation.php`, `api/pos/toggle_designation_status.php`, `api/pos/save_employment_type.php`, `api/pos/toggle_employment_type_status.php`, `migrations/2026_08_29_org_structure_permissions.php`, `tests/test_org_structure_management_cli.php`
+**Files (changed):** `app/bms/pos/employees.php`, `header.php`, `roots.php`
+
+Compared BMS's Operations menu against the reference LMS's "Org Structure" section (Departments, Designations, Employment Types, Shifts, Working Days). Found Departments/Designations/Employment Types had existed as tables since the HR foundation with **no admin page at all** — the only way a row ever got created was as a side-effect of the Employee wizard's "Other (specify)" box. Skipped Shifts and Working Days (no shift-based operations or holiday calendar in BMS yet — separate task).
+
+Built all 3 as full CRUD lookup pages. Departments also gained Manager/Assistant Manager pickers and a **Parent Department** hierarchy field — `parent_department_id` had existed in the schema since day one but was read/written nowhere in the codebase; this is its first real consumer, with a cycle guard (walks the ancestor chain, rejects A→B→A). No hard delete on any of the 3 — matches the pre-existing active/inactive-only convention already used at ~30 call sites for these tables — and deactivating is blocked while still in active use (employees, or an active sub-department for Departments) so the Employee wizard's dropdown can never silently orphan an in-use selection.
+
+Wired end-to-end: new permissions (seeded from each role's existing `employees` grant), routes, gated menu links under Operations → Org Structure, and each row's "N employees" count links to `employees.php` pre-filtered — which required teaching `employees.php` to actually read `department_id`/`designation_id`/`employment_type_id` off the query string and apply its existing (previously inert-on-load) filter dropdowns.
+
+**§23 project-scope:** these 3 tables are global lookups, but the employees they reference/count are project-scoped. Employee counts and the manager pickers use `scopeFilterSqlNullable('project', 'e')`; `save_department.php` gates a chosen manager/assistant via `assertScopeForEmployee()`. The 3 toggle-status endpoints' "still in use" checks are marked `scope-audit: skip` deliberately — they're company-wide integrity guards, not data listings, so they must see across all projects on purpose. Confirmed via `test_project_scope_cli.php` that this task introduced zero new unscoped files (its 4 remaining failures are pre-existing, reproduced identically with these changes stashed out).
+
+**New test** `test_org_structure_management_cli.php` (37 assertions) — lint, permissions, routes, menu wiring, the employees.php cross-link filter, and live create/update/duplicate-reject/in-use-guard/cycle-guard/deactivate/reactivate round trips through the real endpoints.
+
 ## 2026-08-28 (feature) — Employee wizard: dead Quick Edit modal removed, 3 bank fields added (Phase 1 & 2 of 5)
 
 **Files (new):** `migrations/2026_08_28_employee_bank_account_holder_swift.php`, `tests/test_employee_bank_fields_cli.php`
