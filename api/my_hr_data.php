@@ -79,7 +79,8 @@ try {
             break;
         }
         case 'record': {
-            $sr = $pdo->prepare("SELECT event_type, event_date, title, status FROM employee_lifecycle_events WHERE employee_id = ? AND status = 'approved' ORDER BY event_date DESC");
+            $sr = $pdo->prepare("SELECT event_id, event_type, event_date, title, status, description, severity, acknowledged_at
+                                   FROM employee_lifecycle_events WHERE employee_id = ? AND status = 'approved' ORDER BY event_date DESC");
             $sr->execute([$eid]);
             $tp = $pdo->prepare("SELECT trip_id, destination, start_date, end_date, status FROM employee_trips WHERE employee_id = ? AND status != 'deleted' ORDER BY start_date DESC");
             $tp->execute([$eid]);

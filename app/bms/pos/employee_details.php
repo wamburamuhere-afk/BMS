@@ -877,6 +877,14 @@ $sr_status_badge = [
                                     <?php if (!empty($ev['attachment_path'])): ?>
                                         · <a href="<?= buildUrl('api/download_lifecycle_attachment.php') ?>?event_id=<?= (int)$ev['event_id'] ?>" class="d-print-none"><i class="bi bi-paperclip"></i> <?= safe_output($ev['attachment_name'], 'Attachment') ?></a>
                                     <?php endif; ?>
+                                    <?php if (in_array($ev['event_type'], ['warning', 'complaint'], true) && $ev['status'] === 'approved'): ?>
+                                        <?php if (!empty($ev['acknowledged_at'])): ?>
+                                        · <span class="text-success"><i class="bi bi-check-circle-fill"></i> Acknowledged by employee on <?= date('d M Y', strtotime($ev['acknowledged_at'])) ?></span>
+                                        <?php if (!empty($ev['acknowledgment_note'])): ?><div class="fst-italic">"<?= safe_output($ev['acknowledgment_note']) ?>"</div><?php endif; ?>
+                                        <?php else: ?>
+                                        · <span class="text-warning"><i class="bi bi-exclamation-circle-fill"></i> Not yet acknowledged by employee</span>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
