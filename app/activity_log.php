@@ -840,9 +840,25 @@ $page_title = "Activity Log";
         </div>
     </div>
 
-    <div class="mb-4 no-print">
-        <h2 class="fw-bold text-primary" style="text-transform: uppercase;"><i class="bi bi-clock-history"></i> ACTIVITY LOG</h2>
-        <p class="text-muted mb-0">Track and analyze all system transactions</p>
+    <div class="mb-4 no-print d-flex justify-content-between align-items-start flex-wrap gap-2">
+        <div>
+            <h2 class="fw-bold text-primary" style="text-transform: uppercase;"><i class="bi bi-clock-history"></i> ACTIVITY LOG</h2>
+            <p class="text-muted mb-0">Track and analyze all system transactions</p>
+        </div>
+        <?php
+        // NOT reusing the page's own $is_admin (captured at the top of this file,
+        // BEFORE header.php below refreshes $_SESSION['is_admin'] from the DB) —
+        // that variable can be stale for this render. A fresh isAdmin() call here
+        // always reflects the just-refreshed session, which matters for a button
+        // gating a privacy-sensitive audit page.
+        if (isAdmin()): ?>
+        <!-- Login History lives here, cross-linked, instead of buried in Settings >
+             Admin — strictly admin-only, same lock as the page itself
+             (autoEnforcePermission('login_history') + isAdmin() on that page). -->
+        <a href="<?= getUrl('login_history') ?>" class="btn btn-outline-dark">
+            <i class="bi bi-shield-lock me-1"></i>Login History <span class="badge bg-dark ms-1">Admin only</span>
+        </a>
+        <?php endif; ?>
     </div>
 
     <!-- Activity Stats Cards -->

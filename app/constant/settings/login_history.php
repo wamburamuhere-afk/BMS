@@ -5,7 +5,9 @@
  * Strictly admin-only by design (privacy-sensitive audit trail of every
  * user's login IPs/devices/locations) — not delegable via Roles &
  * Permissions no matter what is granted (the 'login_history' permission row
- * is hidden from that UI entirely). Reached only via Settings > Admin.
+ * is hidden from that UI entirely). Reached only via the "Login History"
+ * button on Activity Logs (app/activity_log.php), itself only rendered for
+ * admins — not a standalone Settings > Admin menu item.
  * Data fed by user_sessions table enriched with GeoIP + UA parsing.
  */
 require_once __DIR__ . '/../../../roots.php';
@@ -53,9 +55,12 @@ $current_session_row_id = (int) ($_SESSION['session_row_id'] ?? 0);
     <!-- Page header -->
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <div>
-            <h4 class="mb-0 fw-bold text-primary"><i class="bi bi-clock-history me-2"></i>User Login History</h4>
-            <p class="text-muted mb-0 small">Track who accessed the system, from where, and on what device</p>
+            <h4 class="mb-0 fw-bold text-primary"><i class="bi bi-clock-history me-2"></i>User Login History <span class="badge bg-dark">Admin only</span></h4>
+            <p class="text-muted mb-0 small">Every sign-in by staff: when, from where, on what device, for how long, and how it ended.</p>
         </div>
+        <a href="<?= getUrl('activity_log') ?>" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Back to Activity Logs
+        </a>
     </div>
 
     <!-- Stats cards — always "today", independent of the table's own filters -->

@@ -278,18 +278,9 @@ if ($_POST) {
                                 </div>
                             </div>
                         </a>
-                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
-                           href="<?= getUrl('login_history') ?>">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box me-3 bg-dark-soft text-dark">
-                                    <i class="bi bi-clock-history"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0 fw-bold">Login History</h6>
-                                    <small class="text-muted">Who logged in, from where</small>
-                                </div>
-                            </div>
-                        </a>
+                        <!-- Login History moved to Activity Logs (linked from there, admin-only) —
+                             see app/activity_log.php. Kept out of this list so admin oversight
+                             tools live in one place instead of being split across two menus. -->
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            href="<?= getUrl('backup_restore') ?>">
                             <div class="d-flex align-items-center">

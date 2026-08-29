@@ -213,8 +213,9 @@ ok(str_contains($pageContent, 'precise_today'),       "Page has Precise Today st
 $headerContent = file_get_contents($root . '/header.php');
 ok(!str_contains($headerContent, "getUrl('login_history')"), "header.php no longer links to login_history directly (moved into Settings > Admin)");
 $settingsPageContent = file_get_contents($root . '/app/constant/settings/system_settings.php');
-ok(str_contains($settingsPageContent, "getUrl('login_history')"), "system_settings.php links to login_history");
-ok(str_contains($settingsPageContent, 'bi-clock-history'),        "system_settings.php uses clock-history icon");
+// 2026-08-29: relocated out of Settings > Admin into Activity Logs (still
+// strictly admin-only — see the [8] section below for the cross-link checks).
+ok(!str_contains($settingsPageContent, "getUrl('login_history')"), "system_settings.php no longer links to login_history (relocated)");
 
 // ── 8. Session lifecycle upgrade (2026-08-29) ──────────────────────────────────
 // Matches/exceeds the reference LMS Login History page: real expiry, "signed in
@@ -298,6 +299,23 @@ ok(is_file($root . '/api/session_geo_ping.php'), "api/session_geo_ping.php exist
 $geoApiContent = file_get_contents($root . '/api/session_geo_ping.php');
 ok(str_contains($geoApiContent, 'isAuthenticated()'),      "session_geo_ping.php checks isAuthenticated()");
 ok(str_contains($geoApiContent, 'recordPreciseLocation'),  "session_geo_ping.php calls recordPreciseLocation()");
+
+// -- Relocation: cross-linked from Activity Logs, still admin-only, not a
+//    standalone Settings > Admin item --
+$activityLogContent = file_get_contents($root . '/app/activity_log.php');
+ok(str_contains($activityLogContent, "getUrl('login_history')"),  "activity_log.php links to login_history");
+// A FRESH isAdmin() call, not the page's own $is_admin variable — that variable
+// is captured near the top of the file, BEFORE header.php (required much later
+// in this file) refreshes $_SESSION['is_admin'] from the DB, so it can be stale
+// for this render. Caught live: a forged non-admin session still saw the
+// button because $is_admin held an admin value left over from a prior request
+// on the same test session.
+$loginHistoryLinkPos = strpos($activityLogContent, "getUrl('login_history')");
+$precedingSnippet = $loginHistoryLinkPos !== false ? substr($activityLogContent, max(0, $loginHistoryLinkPos - 400), 400) : '';
+ok(str_contains($precedingSnippet, 'if (isAdmin())'),
+   "activity_log.php's Login History link is gated on a FRESH isAdmin() call, not the page's own (possibly stale) \$is_admin");
+ok(str_contains($pageContent, "getUrl('activity_log')"), "login_history.php links back to Activity Logs");
+ok(str_contains($pageContent, 'Admin only'),             "login_history.php still visibly marks itself admin-only");
 
 // ── Summary ──────────────────────────────────────────────────────────────────
 echo "\n";
