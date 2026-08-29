@@ -2836,6 +2836,23 @@ $(document).ready(function() {
         }, 500);
     }
 
+    // Pre-apply a filter when arriving from a cross-link (e.g. the "employees
+    // using this" count on Departments/Designations/Employment Types).
+    const qsDept = urlParams.get('department_id');
+    const qsDesig = urlParams.get('designation_id');
+    const qsEmpType = urlParams.get('employment_type_id');
+    if (qsDept || qsDesig || qsEmpType) {
+        setTimeout(function() {
+            if (qsDept) $('#departmentFilter').val(qsDept).trigger('change');
+            if (qsEmpType) $('#employmentTypeFilter').val(qsEmpType).trigger('change');
+            if (qsDesig) {
+                rebuildDesignationFilterOptions();
+                $('#designationFilter').val(qsDesig).trigger('change');
+            }
+            applyFilters();
+        }, 400);
+    }
+
     // Delegate clicks for table actions (View, Attendance, Payroll)
     $('#employeesTable').on('click', '.dropdown-item', function() {
         const text = $(this).text().trim();
