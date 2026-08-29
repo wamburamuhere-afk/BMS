@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — UI language translation: Non-Inventory Products CRUD (final module)
+
+**Files (changed):** `app/bms/product/services.php`, `lang/sw.php`
+
+Translates Non-Inventory Products (`services.php`) to the same depth as every other module,
+completing the user's full explicit module order for this feature: Customers → Suppliers →
+Sub-Contractors → Products → Non-Inventory Products. Covers the list page (stats, filters, Card
+View + DataTable Table View), the inline Add Service and Edit Service modals (Product Identity +
+Pricing & Planning steps, including the dynamic materials/BOM component table with its warehouse
+product-search dropdown), and all JS/SweetAlert dialogs — via a `SVC_I18N` JS dictionary
+(`json_encode` from PHP `t()` calls), the same pattern as `PE_I18N`/`DASH_I18N` in the earlier
+modules.
+
+Reused a large share of existing catalog keys (Active, Inactive, Categories, Print, Table View,
+Card View, Description, Delete, Project, Select Warehouse, Selling Price, Tax Rate, No Tax,
+Missing Field, View Details, Save & Add Another, Create Product, Updated!, Cancel, and the
+`Please enter the %s before saving.` / `Product Created!` keys added for `product_edit.php`);
+added new keys only where this page's wording is genuinely different (e.g. "S/NO", "Item Code",
+the Job/Pieces/Set/Box/Litre/Kg unit words, the materials-BOM table headers, the delete
+confirmation's product-history warning text).
+
+Verified via the automated `t()`-key audit across all 10 translated files (887 keys used, 0
+missing from `lang/sw.php`, 0 value conflicts) and live in-browser on `/services`: a full-page
+text sweep found only expected UI strings (one apparent "leftover" — "No Tax (0.00%)" in the tax
+column — turned out to be a real tax-rate record literally named "No Tax" in the database, not
+untranslated UI text, and was correctly left alone); the Add and Edit Service modals (both steps)
+and the delete-confirmation SweetAlert were opened directly and confirmed fully Swahili, including
+the dialog's Cancel button (added `cancelButtonText`, matching the pattern already used for delete
+confirmations in `products.php`).
+
 ## 2026-08-29 (feature) — UI language translation: Products CRUD (list, Add, Edit)
 
 **Files (changed):** `app/bms/product/products.php`, `app/bms/product/product_edit.php`, `app/bms/product/product_create_footer.php`, `lang/sw.php`
