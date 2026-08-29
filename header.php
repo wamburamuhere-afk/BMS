@@ -924,6 +924,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="operationsDropdown">
                                 <li><h6 class="dropdown-header">Human Resources</h6></li>
+                                <?php if(canView('hr_dashboard')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('hr_dashboard') ?>"><i class="bi bi-speedometer2"></i> HR Dashboard</a></li>
+                                <?php endif; ?>
                                 <?php if(canView('employees')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('employees') ?>"><i class="bi bi-person-badge"></i> Employees</a></li>
                                 <?php endif; ?>
