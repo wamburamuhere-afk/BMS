@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — HR Dashboard: a real command centre
+
+**Files (new):** `app/bms/pos/hr_dashboard.php`, `migrations/2026_08_29_hr_dashboard_permission.php`, `tests/test_hr_dashboard_cli.php`
+**Files (changed):** `header.php`, `roots.php`
+
+LMS's own "HR Dashboard" menu item is a thin link with no real content of its own. Built ours to be the opposite: a single page aggregating data that already existed in BMS but had no visual home.
+
+Biggest find: `cron/check_hr_expiry.php` has scanned expiring contracts and ending probations daily for months and dispatches notification alerts — but there was no page where anyone could actually look at the list. The new **Expiring Soon** widget mirrors that exact scan (60-day contract / 30-day probation window) — the first visual surface for data that existed purely as notification plumbing until now.
+
+Every other number reuses an existing, already-trusted query shape rather than inventing a new source of truth: HR Actions breakdown mirrors `hr_actions.php`'s own stat query, department headcount mirrors `departments.php`'s, recruitment pipeline mirrors `api/get_openings.php`'s exact stats block. **Acknowledgment Compliance** closes the loop on the acknowledgment feature shipped earlier today — a pending-count widget so that number isn't invisible without opening every warning individually.
+
+Charts use Chart.js (matching `app/dashboard.php`'s existing choice). A **Quick Links** section ties together every HR module built across this whole workstream — Org Structure, Company Calendar, HR Actions, Recruitment, Performance, Checklists, Payroll, Contracts — into one hub, each link permission-gated.
+
+**§23 project-scope:** employees, leaves, and employee_lifecycle_events (joined to employees) are all filtered through `scopeFilterSqlNullable('project','e')`, matching every other scoped page in BMS. New permission `hr_dashboard` (seeded from each role's `hr_performance` grant), route, and menu link placed first in Operations → Human Resources.
+
+**New test** `test_hr_dashboard_cli.php` (13 assertions) — lint, wiring, scope-guard presence, real renders for both an admin and a genuinely scoped non-admin role with zero fatals/notices/SQL errors, KPI numbers cross-checked against independent queries, and quick-link permission gating. No regressions across the whole workstream's suite; project-scope's 4 remaining failures are the same pre-existing files as before this session.
+
+This completes the Operations-menu-gap workstream (Org Structure → Company Calendar → Acknowledgments → HR Dashboard).
+
 ## 2026-08-29 (feature) — Employee acknowledgment of warnings/complaints (Acknowledgments gap)
 
 **Files (new):** `api/acknowledge_lifecycle_event.php`, `migrations/2026_08_29_lifecycle_event_acknowledgment.php`, `tests/test_lifecycle_acknowledgment_cli.php`
