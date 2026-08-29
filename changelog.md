@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-08-29 (fix) — Session guard: write-back failed once headers were sent, silently losing session data
+
+**Files (new):** `tests/test_session_guard_cli.php`
+**Files (changed):** `core/session_guard.php`, `api/operations/get_po_items.php`, `migrations/status.php`
+
+Sentry flagged `ErrorException: Warning: session_id(): Session ID cannot be changed after headers have already been sent` at `core/session_guard.php:78` on `GET /purchase_orders` in production, from the session-lock change earlier today.
+
+It was **not** just noise. Reproduced locally: when a page flushes its output before shutdown, `headers_sent()` is true by the time `bmsSessionPersist()` runs, `session_id()` then fails, and `session_start()` went on to mint a **brand-new session** — so everything the request wrote to `$_SESSION` after the lock was released landed in an orphan file and was lost. That covers flash messages, `$_SESSION['employee_id']`, the project-scope cache and, worst of all, a lazily generated `csrf_token()`, whose loss would 419 every subsequent POST. It went unnoticed initially because `roots.php` calls `ob_start()`, so in local testing headers were still buffered at shutdown and the write-back worked.
+
+PHP gates three separate things on headers having been sent, and each one had to be dealt with:
+
+| call | error when headers sent | lifted by |
+|---|---|---|
+| `session_id()` | Session ID cannot be changed… | `session.use_cookies=0` |
+| `session_start()` | Cannot start session when headers already sent | `session.use_cookies=0` |
+| `session_start()` | Session cache limiter cannot be sent… | `session.cache_limiter=''` |
+| `ini_set('session.*')` | Session ini settings cannot be changed… | must run *before* any output |
+
+Because the ini changes are themselves blocked once output has started, both are now applied inside `bmsSessionRelease()` during bootstrap, right after `session_write_close()` and before anything is echoed. `bmsSessionPersist()` and `bmsSessionReopen()` now call `session_start()` with **no options array** — every entry in that array is applied as an `ini_set` at start time and fails the same way (the first fix attempt passed `use_cookies` there, which is precisely why it kept failing). A `session_id()` mismatch check now aborts without writing rather than corrupting an unrelated session.
+
+Turning off `session.use_cookies` for the remainder of the request means a bare `session_start()` after `roots.php` would build a new empty session and blank `$_SESSION`. Exactly two files did that, both redundantly (`roots.php` had already handled the session, and `$_SESSION` stays populated after release — `session_status()` reporting `PHP_SESSION_NONE` is expected, not a signal to restart). Removed from `api/operations/get_po_items.php` and `migrations/status.php`; verified both still authenticate correctly and still reject anonymous callers (`Unauthorized` / HTTP 403).
+
+New `tests/test_session_guard_cli.php` — 24 assertions. It pins the ini ordering and the no-options-array rule as static invariants so the regression cannot return, checks that neither file re-opens a session, checks both POS destroy paths are guarded, and over live HTTP reproduces the production condition directly: write after flush persists, `csrf_token()` stays stable across flushed requests, successive writes don't clobber, `unset()` propagates, and same-session requests still run without queueing. The HTTP section self-skips when no server is reachable. Existing suites unaffected (23 / 92 / 55, zero failures).
+
 ## 2026-08-29 (performance) — Release the PHP session lock: the system no longer freezes when you open a second page
 
 **Files (new):** `core/session_guard.php`
