@@ -73,19 +73,19 @@ if (isset($_GET['start_date']) || isset($_GET['end_date'])) {
 // whichever range is actually active, instead of always claiming "Monthly"
 // even when Today/This Week/etc. is selected.
 $revenue_period_labels = [
-    'today'     => ['title' => "Today's Revenue",       'caption' => 'Sales today'],
-    'yesterday' => ['title' => "Yesterday's Revenue",   'caption' => 'Sales yesterday'],
-    'week'      => ['title' => "This Week's Revenue",   'caption' => 'Sales this week'],
-    'month'     => ['title' => 'Monthly Revenue',       'caption' => 'Sales this month'],
-    'quarter'   => ['title' => "This Quarter's Revenue", 'caption' => 'Sales this quarter'],
-    'year'      => ['title' => "This Year's Revenue",   'caption' => 'Sales this year'],
+    'today'     => ['title' => t("Today's Revenue"),       'caption' => t('Sales today')],
+    'yesterday' => ['title' => t("Yesterday's Revenue"),   'caption' => t('Sales yesterday')],
+    'week'      => ['title' => t("This Week's Revenue"),   'caption' => t('Sales this week')],
+    'month'     => ['title' => t('Monthly Revenue'),       'caption' => t('Sales this month')],
+    'quarter'   => ['title' => t("This Quarter's Revenue"), 'caption' => t('Sales this quarter')],
+    'year'      => ['title' => t("This Year's Revenue"),   'caption' => t('Sales this year')],
 ];
 if (isset($revenue_period_labels[$time_range])) {
     $revenue_card_title   = $revenue_period_labels[$time_range]['title'];
     $revenue_card_caption = $revenue_period_labels[$time_range]['caption'];
 } else {
-    $revenue_card_title   = 'Revenue (' . date('M d', strtotime($start_date)) . ' - ' . date('M d', strtotime($end_date)) . ')';
-    $revenue_card_caption = 'Sales in range';
+    $revenue_card_title   = t('Revenue') . ' (' . date('M d', strtotime($start_date)) . ' - ' . date('M d', strtotime($end_date)) . ')';
+    $revenue_card_caption = t('Sales in range');
 }
 
 // Get dashboard statistics — always use business stats for the main cards
@@ -109,17 +109,17 @@ $alerts = get_system_alerts($pdo, $user_id);
 
 // Group notifications by category
 $notif_groups = [
-    'invoices' => ['title' => 'Invoices & Payments', 'icon' => 'bi-receipt', 'color' => 'warning', 'items' => []],
-    'products' => ['title' => 'Inventory & Products', 'icon' => 'bi-box-seam', 'color' => 'danger', 'items' => []],
-    'approvals' => ['title' => 'Pending Approvals', 'icon' => 'bi-shield-check', 'color' => 'primary', 'items' => []],
-    'cash_bank' => ['title' => 'Cash & Bank Controls', 'icon' => 'bi-bank', 'color' => 'danger', 'items' => []],
-    'credit_risk' => ['title' => 'Customers Over Credit Limit', 'icon' => 'bi-exclamation-octagon', 'color' => 'danger', 'items' => []],
-    'grn_pending' => ['title' => 'Goods Receipt Pending', 'icon' => 'bi-truck', 'color' => 'warning', 'items' => []],
-    'hr_payroll' => ['title' => 'HR & Payroll', 'icon' => 'bi-people-fill', 'color' => 'warning', 'items' => []],
-    'quotes' => ['title' => 'Expiring Quotations', 'icon' => 'bi-file-earmark-text', 'color' => 'warning', 'items' => []],
-    'tenders' => ['title' => 'Expiring Tenders', 'icon' => 'bi-clock-history', 'color' => 'warning', 'items' => []],
-    'documents' => ['title' => 'Document Expiry', 'icon' => 'bi-file-earmark-text', 'color' => 'warning', 'items' => []],
-    'others' => ['title' => 'General Notifications', 'icon' => 'bi-bell', 'color' => 'info', 'items' => []]
+    'invoices' => ['title' => t('Invoices & Payments'), 'icon' => 'bi-receipt', 'color' => 'warning', 'items' => []],
+    'products' => ['title' => t('Inventory & Products'), 'icon' => 'bi-box-seam', 'color' => 'danger', 'items' => []],
+    'approvals' => ['title' => t('Pending Approvals'), 'icon' => 'bi-shield-check', 'color' => 'primary', 'items' => []],
+    'cash_bank' => ['title' => t('Cash & Bank Controls'), 'icon' => 'bi-bank', 'color' => 'danger', 'items' => []],
+    'credit_risk' => ['title' => t('Customers Over Credit Limit'), 'icon' => 'bi-exclamation-octagon', 'color' => 'danger', 'items' => []],
+    'grn_pending' => ['title' => t('Goods Receipt Pending'), 'icon' => 'bi-truck', 'color' => 'warning', 'items' => []],
+    'hr_payroll' => ['title' => t('HR & Payroll'), 'icon' => 'bi-people-fill', 'color' => 'warning', 'items' => []],
+    'quotes' => ['title' => t('Expiring Quotations'), 'icon' => 'bi-file-earmark-text', 'color' => 'warning', 'items' => []],
+    'tenders' => ['title' => t('Expiring Tenders'), 'icon' => 'bi-clock-history', 'color' => 'warning', 'items' => []],
+    'documents' => ['title' => t('Document Expiry'), 'icon' => 'bi-file-earmark-text', 'color' => 'warning', 'items' => []],
+    'others' => ['title' => t('General Notifications'), 'icon' => 'bi-bell', 'color' => 'info', 'items' => []]
 ];
 
 foreach ($alerts as $a) {
@@ -992,16 +992,16 @@ function time_ago($datetime) {
     $diff = $now - $time;
     
     if ($diff < 60) {
-        return 'just now';
+        return t('just now');
     } elseif ($diff < 3600) {
         $mins = floor($diff / 60);
-        return $mins . ' minute' . ($mins > 1 ? 's' : '') . ' ago';
+        return $mins . ' ' . ($mins > 1 ? t('minutes ago') : t('minute ago'));
     } elseif ($diff < 86400) {
         $hours = floor($diff / 3600);
-        return $hours . ' hour' . ($hours > 1 ? 's' : '') . ' ago';
+        return $hours . ' ' . ($hours > 1 ? t('hours ago') : t('hour ago'));
     } elseif ($diff < 604800) {
         $days = floor($diff / 86400);
-        return $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
+        return $days . ' ' . ($days > 1 ? t('days ago') : t('day ago'));
     } else {
         return date('M d, Y', $time);
     }
@@ -1020,8 +1020,8 @@ function get_progress_color($percentage) {
         <div class="col-12">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
                 <div>
-                    <h2 class="mb-1"><i class="bi bi-speedometer2"></i> Dashboard</h2>
-                    <p class="text-muted mb-0">Welcome back, <?= htmlspecialchars($username) ?>! 
+                    <h2 class="mb-1"><i class="bi bi-speedometer2"></i> <?= t('Dashboard') ?></h2>
+                    <p class="text-muted mb-0"><?= t('Welcome back') ?>, <?= htmlspecialchars($username) ?>!
                         <span class="badge bg-primary"><?= $user_role ?></span>
                     </p>
                 </div>
@@ -1029,45 +1029,45 @@ function get_progress_color($percentage) {
                     <!-- Date Range Selector -->
                     <div class="dropdown flex-fill flex-md-grow-0">
                         <button class="btn btn-outline-primary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-calendar"></i> 
+                            <i class="bi bi-calendar"></i>
                             <?= date('M d', strtotime($start_date)) ?> - <?= date('M d', strtotime($end_date)) ?>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="?time_range=today">Today</a></li>
-                            <li><a class="dropdown-item" href="?time_range=yesterday">Yesterday</a></li>
-                            <li><a class="dropdown-item" href="?time_range=week">This Week</a></li>
-                            <li><a class="dropdown-item" href="?time_range=month">This Month</a></li>
-                            <li><a class="dropdown-item" href="?time_range=quarter">This Quarter</a></li>
-                            <li><a class="dropdown-item" href="?time_range=year">This Year</a></li>
+                            <li><a class="dropdown-item" href="?time_range=today"><?= t('Today') ?></a></li>
+                            <li><a class="dropdown-item" href="?time_range=yesterday"><?= t('Yesterday') ?></a></li>
+                            <li><a class="dropdown-item" href="?time_range=week"><?= t('This Week') ?></a></li>
+                            <li><a class="dropdown-item" href="?time_range=month"><?= t('This Month') ?></a></li>
+                            <li><a class="dropdown-item" href="?time_range=quarter"><?= t('This Quarter') ?></a></li>
+                            <li><a class="dropdown-item" href="?time_range=year"><?= t('This Year') ?></a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <form method="GET" class="px-3 py-2">
                                     <div class="mb-2">
-                                        <label class="form-label small">Custom Range</label>
+                                        <label class="form-label small"><?= t('Custom Range') ?></label>
                                         <input type="date" class="form-control form-control-sm mb-2" name="start_date" value="<?= $start_date ?>">
                                         <input type="date" class="form-control form-control-sm" name="end_date" value="<?= $end_date ?>">
                                     </div>
-                                    <button type="submit" class="btn btn-sm btn-primary w-100">Apply</button>
+                                    <button type="submit" class="btn btn-sm btn-primary w-100"><?= t('Apply') ?></button>
                                 </form>
                             </li>
                         </ul>
                     </div>
-                    
+
                     <!-- Quick Actions -->
                     <div class="dropdown flex-fill flex-md-grow-0">
                         <button class="btn btn-primary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-lightning"></i> Quick Actions
+                            <i class="bi bi-lightning"></i> <?= t('Quick Actions') ?>
                         </button>
                         <ul class="dropdown-menu">
                             <?php if ($company_type != 'microfinance'): ?>
                                 <?php if(canView('pos')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> POS</a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> <?= t('POS') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canCreate('invoices')): ?>
-                                <li><a class="dropdown-item" href="invoice_create"><i class="bi bi-receipt"></i> Create Invoice</a></li>
+                                <li><a class="dropdown-item" href="invoice_create"><i class="bi bi-receipt"></i> <?= t('Create Invoice') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('sales_orders')): ?>
-                                <li><a class="dropdown-item" href="sales_orders"><i class="bi bi-cart"></i> Sales Order</a></li>
+                                <li><a class="dropdown-item" href="sales_orders"><i class="bi bi-cart"></i> <?= t('Sales Order') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('pos') || canCreate('invoices') || canView('sales_orders')): ?>
                                 <li><hr class="dropdown-divider"></li>
@@ -1075,18 +1075,18 @@ function get_progress_color($percentage) {
                             <?php endif; ?>
 
                             <?php if(canCreate('customers')): ?>
-                            <li><a class="dropdown-item" href="<?= getUrl('customers') ?>?action=add"><i class="bi bi-person-plus"></i> Add Customer</a></li>
+                            <li><a class="dropdown-item" href="<?= getUrl('customers') ?>?action=add"><i class="bi bi-person-plus"></i> <?= t('Add Customer') ?></a></li>
                             <?php endif; ?>
                             <?php if(canCreate('products')): ?>
-                            <li><a class="dropdown-item" href="<?= getUrl('product_create') ?>"><i class="bi bi-plus-circle"></i> Add Product</a></li>
+                            <li><a class="dropdown-item" href="<?= getUrl('product_create') ?>"><i class="bi bi-plus-circle"></i> <?= t('Add Product') ?></a></li>
                             <?php endif; ?>
                             <?php if(canCreate('suppliers')): ?>
-                            <li><a class="dropdown-item" href="<?= getUrl('suppliers') ?>?action=add"><i class="bi bi-truck"></i> Add Supplier</a></li>
+                            <li><a class="dropdown-item" href="<?= getUrl('suppliers') ?>?action=add"><i class="bi bi-truck"></i> <?= t('Add Supplier') ?></a></li>
                             <?php endif; ?>
 
                             <?php if (get_setting('enable_projects') == '1' && canView('projects')): ?>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="projects"><i class="bi bi-kanban"></i> Projects Management</a></li>
+                            <li><a class="dropdown-item" href="projects"><i class="bi bi-kanban"></i> <?= t('Projects Management') ?></a></li>
                             <?php endif; ?>
                         </ul>
                     </div>
@@ -1104,8 +1104,8 @@ function get_progress_color($percentage) {
         <div class="col-12">
             <div class="alert alert-warning alert-dismissible fade show py-2 mb-0 d-flex align-items-center gap-2" role="alert">
                 <i class="bi bi-clock-history fs-5"></i>
-                <span id="crmOverdueText">You have overdue CRM activities.</span>
-                <a href="<?= getUrl('crm/dashboard') ?>" class="btn btn-sm btn-warning ms-2">View CRM</a>
+                <span id="crmOverdueText"><?= t('You have overdue CRM activities.') ?></span>
+                <a href="<?= getUrl('crm/dashboard') ?>" class="btn btn-sm btn-warning ms-2"><?= t('View CRM') ?></a>
                 <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
             </div>
         </div>
@@ -1113,7 +1113,10 @@ function get_progress_color($percentage) {
     <script>
     $.getJSON('<?= buildUrl('api/crm/get_dashboard_data.php') ?>?period=this_month', function(r) {
         if (r.success && r.kpi && r.kpi.overdue_activities > 0) {
-            $('#crmOverdueText').text('You have ' + r.kpi.overdue_activities + ' overdue CRM ' + (r.kpi.overdue_activities === 1 ? 'activity' : 'activities') + '.');
+            var n = r.kpi.overdue_activities;
+            var noun = n === 1 ? <?= json_encode(t('activity')) ?> : <?= json_encode(t('activities')) ?>;
+            var tmpl = <?= json_encode(t('You have {n} overdue CRM {noun}.')) ?>;
+            $('#crmOverdueText').text(tmpl.replace('{n}', n).replace('{noun}', noun));
             $('#crmOverdueAlert').show();
         }
     });
@@ -1135,13 +1138,13 @@ function get_progress_color($percentage) {
                                 <i class="bi bi-bell-fill fs-4 pulse-icon"></i>
                             </div>
                             <div>
-                                <h6 class="mb-0 fw-bold text-dark">System requires your attention</h6>
-                                <p class="mb-0 text-muted small">You have <strong><?= $total_notifs ?></strong> pending notifications across <?= count($active_notif_groups) ?> categories.</p>
+                                <h6 class="mb-0 fw-bold text-dark"><?= t('System requires your attention') ?></h6>
+                                <p class="mb-0 text-muted small"><?= t('You have') ?> <strong><?= $total_notifs ?></strong> <?= t('pending notifications across') ?> <?= count($active_notif_groups) ?> <?= t('categories.') ?></p>
                             </div>
                         </div>
                         <div class="d-flex gap-2">
                             <button class="btn btn-warning btn-sm fw-bold px-3 shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#detailedNotifications" aria-expanded="false" id="toggleNotifBtn">
-                                <i class="bi bi-eye me-1"></i> View Details
+                                <i class="bi bi-eye me-1"></i> <?= t('View Details') ?>
                             </button>
                             <button type="button" class="btn-close small" onclick="$(this).closest('.row').fadeOut()"></button>
                         </div>
@@ -1161,12 +1164,12 @@ function get_progress_color($percentage) {
                                     <span class="badge bg-<?= $group['color'] ?> rounded-pill"><?= count($group['items']) ?></span>
                                     <div class="ms-auto d-flex gap-2">
                                         <?php if ($grp_src !== ''): ?>
-                                        <a href="<?= htmlspecialchars($grp_src) ?>" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1" title="Open the source page, filtered to only these items">
-                                            <i class="bi bi-box-arrow-up-right"></i><span class="d-none d-sm-inline">Go to source</span>
+                                        <a href="<?= htmlspecialchars($grp_src) ?>" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1" title="<?= t('Open the source page, filtered to only these items') ?>">
+                                            <i class="bi bi-box-arrow-up-right"></i><span class="d-none d-sm-inline"><?= t('Go to source') ?></span>
                                         </a>
                                         <?php endif; ?>
                                         <button type="button" class="btn btn-sm btn-outline-<?= $group['color'] ?> collapsed d-flex align-items-center gap-1" data-bs-toggle="collapse" data-bs-target="#notifGrp-<?= $key ?>" aria-expanded="false" aria-controls="notifGrp-<?= $key ?>">
-                                            <i class="bi bi-list-ul"></i><span class="d-none d-sm-inline">View here</span>
+                                            <i class="bi bi-list-ul"></i><span class="d-none d-sm-inline"><?= t('View here') ?></span>
                                         </button>
                                     </div>
                                 </div>
@@ -1185,30 +1188,30 @@ function get_progress_color($percentage) {
                                                     <?php else: ?>
                                                         <h6 class="small mb-1 fw-bold <?= ($item['type'] == 'low_stock' && $item['stock_quantity'] <= 0) ? 'text-danger' : ($item['type'] == 'negative_stock' ? 'text-danger' : 'text-dark') ?>">
                                                             <?php if ($item['type'] == 'low_stock'): ?>
-                                                                <?= $item['stock_quantity'] <= 0 ? '<span class="badge bg-danger p-1 me-1">OUT</span>' : '<span class="badge bg-warning text-dark p-1 me-1">LOW</span>' ?>
+                                                                <?= $item['stock_quantity'] <= 0 ? '<span class="badge bg-danger p-1 me-1">' . t('OUT') . '</span>' : '<span class="badge bg-warning text-dark p-1 me-1">' . t('LOW') . '</span>' ?>
                                                                 <?= htmlspecialchars((string)$item['product_name']) ?>
                                                             <?php elseif ($item['type'] == 'negative_stock'): ?>
-                                                                <span class="badge bg-danger p-1 me-1">NEG</span><?= htmlspecialchars((string)$item['product_name']) ?>
+                                                                <span class="badge bg-danger p-1 me-1"><?= t('NEG') ?></span><?= htmlspecialchars((string)$item['product_name']) ?>
                                                             <?php elseif ($item['type'] == 'overdue'): ?>
-                                                                Overdue: <?= htmlspecialchars((string)$item['reference']) ?>
+                                                                <?= t('Overdue') ?>: <?= htmlspecialchars((string)$item['reference']) ?>
                                                             <?php elseif ($item['type'] == 'expiring'): ?>
-                                                                Expiry: <?= htmlspecialchars((string)$item['product_name']) ?>
+                                                                <?= t('Expiry') ?>: <?= htmlspecialchars((string)$item['product_name']) ?>
                                                             <?php elseif ($item['type'] == 'doc_expiring'): ?>
                                                                 <i class="bi bi-file-earmark-text me-1"></i><?= htmlspecialchars((string)$item['title']) ?>
                                                             <?php elseif ($item['type'] == 'cash_shift_open'): ?>
-                                                                <i class="bi bi-cash-register me-1"></i>Shift open: <?= htmlspecialchars((string)$item['reference']) ?>
+                                                                <i class="bi bi-cash-register me-1"></i><?= t('Shift open') ?>: <?= htmlspecialchars((string)$item['reference']) ?>
                                                             <?php elseif ($item['type'] == 'bank_recon_overdue'): ?>
                                                                 <i class="bi bi-bank me-1"></i><?= htmlspecialchars((string)$item['reference']) ?>
                                                             <?php elseif ($item['type'] == 'leave_pending'): ?>
-                                                                <i class="bi bi-person-badge me-1"></i>Leave: <?= htmlspecialchars(trim((string)$item['reference']) ?: 'Employee') ?>
+                                                                <i class="bi bi-person-badge me-1"></i><?= t('Leave') ?>: <?= htmlspecialchars(trim((string)$item['reference']) ?: t('Employee')) ?>
                                                             <?php elseif ($item['type'] == 'payroll_due'): ?>
-                                                                <i class="bi bi-calendar-month me-1"></i>Payroll: <?= htmlspecialchars((string)$item['period']) ?>
+                                                                <i class="bi bi-calendar-month me-1"></i><?= t('Payroll') ?>: <?= htmlspecialchars((string)$item['period']) ?>
                                                             <?php elseif ($item['type'] == 'quote_expiring'): ?>
-                                                                <i class="bi bi-file-earmark-text me-1"></i>Quote #<?= (int)$item['id'] ?> — <?= htmlspecialchars((string)$item['reference']) ?>
+                                                                <i class="bi bi-file-earmark-text me-1"></i><?= t('Quote') ?> #<?= (int)$item['id'] ?> — <?= htmlspecialchars((string)$item['reference']) ?>
                                                             <?php elseif ($item['type'] == 'tender_deadline'): ?>
-                                                                <i class="bi bi-clipboard-check me-1"></i>Tender: <?= htmlspecialchars((string)$item['reference']) ?>
+                                                                <i class="bi bi-clipboard-check me-1"></i><?= t('Tender') ?>: <?= htmlspecialchars((string)$item['reference']) ?>
                                                             <?php elseif ($item['type'] == 'grn_pending'): ?>
-                                                                <i class="bi bi-truck me-1"></i>PO: <?= htmlspecialchars((string)$item['reference']) ?>
+                                                                <i class="bi bi-truck me-1"></i><?= t('PO') ?>: <?= htmlspecialchars((string)$item['reference']) ?>
                                                             <?php elseif ($item['type'] == 'credit_over'): ?>
                                                                 <i class="bi bi-exclamation-octagon me-1"></i><?= htmlspecialchars((string)$item['reference']) ?>
                                                             <?php elseif ($item['type'] == 'engine_action'): ?>
@@ -1217,31 +1220,31 @@ function get_progress_color($percentage) {
                                                         </h6>
                                                         <small class="text-muted d-block" style="font-size: 0.7rem;">
                                                             <?php if ($item['type'] == 'low_stock'): ?>
-                                                                Available: <span class="fw-bold"><?= $item['stock_quantity'] ?></span> | Reorder: <?= $item['reorder_level'] ?>
+                                                                <?= t('Available') ?>: <span class="fw-bold"><?= $item['stock_quantity'] ?></span> | <?= t('Reorder') ?>: <?= $item['reorder_level'] ?>
                                                             <?php elseif ($item['type'] == 'negative_stock'): ?>
-                                                                Balance: <span class="text-danger fw-bold"><?= $item['stock_quantity'] ?></span> | SKU: <?= htmlspecialchars((string)$item['sku']) ?>
+                                                                <?= t('Balance') ?>: <span class="text-danger fw-bold"><?= $item['stock_quantity'] ?></span> | SKU: <?= htmlspecialchars((string)$item['sku']) ?>
                                                             <?php elseif ($item['type'] == 'overdue'): ?>
-                                                                Due: <span class="text-danger fw-bold"><?= format_currency($item['overdue_amount']) ?></span>
+                                                                <?= t('Due') ?>: <span class="text-danger fw-bold"><?= format_currency($item['overdue_amount']) ?></span>
                                                             <?php elseif ($item['type'] == 'expiring'): ?>
-                                                                Exp: <?= $item['expiry_date'] ?> (<?= $item['days_remaining'] ?>d left)
+                                                                <?= t('Exp') ?>: <?= $item['expiry_date'] ?> (<?= $item['days_remaining'] ?><?= t('d left') ?>)
                                                             <?php elseif ($item['type'] == 'doc_expiring'): ?>
                                                                 <?= htmlspecialchars((string)$item['message']) ?>
                                                             <?php elseif ($item['type'] == 'cash_shift_open'): ?>
-                                                                Open <span class="text-danger fw-bold"><?= (int)$item['days_open'] ?>d</span> · started <?= date('M d, H:i', strtotime($item['start_time'])) ?>
+                                                                <?= t('Open') ?> <span class="text-danger fw-bold"><?= (int)$item['days_open'] ?>d</span> · <?= t('started') ?> <?= date('M d, H:i', strtotime($item['start_time'])) ?>
                                                             <?php elseif ($item['type'] == 'bank_recon_overdue'): ?>
-                                                                <span class="text-danger fw-bold"><?= (int)$item['days_since'] ?>d</span> since last reconciliation
+                                                                <span class="text-danger fw-bold"><?= (int)$item['days_since'] ?>d</span> <?= t('since last reconciliation') ?>
                                                             <?php elseif ($item['type'] == 'leave_pending'): ?>
-                                                                <?= htmlspecialchars((string)($item['leave_type'] ?? 'Leave')) ?> · waiting <?= (int)$item['days_waiting'] ?>d
+                                                                <?= htmlspecialchars((string)($item['leave_type'] ?? t('Leave'))) ?> · <?= t('waiting') ?> <?= (int)$item['days_waiting'] ?>d
                                                             <?php elseif ($item['type'] == 'payroll_due'): ?>
-                                                                Not processed · <?= (int)$item['days_left'] ?>d to month-end
+                                                                <?= t('Not processed') ?> · <?= (int)$item['days_left'] ?><?= t('d to month-end') ?>
                                                             <?php elseif ($item['type'] == 'quote_expiring'): ?>
-                                                                Valid until <?= $item['expiry_date'] ?> (<?= (int)$item['days_remaining'] ?>d left)
+                                                                <?= t('Valid until') ?> <?= $item['expiry_date'] ?> (<?= (int)$item['days_remaining'] ?><?= t('d left') ?>)
                                                             <?php elseif ($item['type'] == 'tender_deadline'): ?>
-                                                                Deadline <?= $item['deadline'] ?> (<?= (int)$item['days_remaining'] ?>d left)
+                                                                <?= t('Deadline') ?> <?= $item['deadline'] ?> (<?= (int)$item['days_remaining'] ?><?= t('d left') ?>)
                                                             <?php elseif ($item['type'] == 'grn_pending'): ?>
-                                                                <?= htmlspecialchars((string)$item['supplier_name']) ?> · <?= (int)$item['days_overdue'] ?>d overdue
+                                                                <?= htmlspecialchars((string)$item['supplier_name']) ?> · <?= (int)$item['days_overdue'] ?><?= t('d overdue') ?>
                                                             <?php elseif ($item['type'] == 'credit_over'): ?>
-                                                                Owes <span class="text-danger fw-bold"><?= format_currency($item['outstanding']) ?></span> · Limit <?= format_currency($item['credit_limit']) ?>
+                                                                <?= t('Owes') ?> <span class="text-danger fw-bold"><?= format_currency($item['outstanding']) ?></span> · <?= t('Limit') ?> <?= format_currency($item['credit_limit']) ?>
                                                             <?php elseif ($item['type'] == 'engine_action'): ?>
                                                                 <?= htmlspecialchars((string)$item['message']) ?>
                                                             <?php endif; ?>
@@ -1255,11 +1258,11 @@ function get_progress_color($percentage) {
                                                         if ($item['subtype'] === 'expense') $link = getUrl('accounts/expense_details') . '?id=' . $item['id'];
                                                         elseif ($item['subtype'] === 'purchase') $link = getUrl('purchase_order_details') . '?id=' . $item['id'];
                                                         ?>
-                                                        <a href="<?= $link ?>" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" title="Go to details">
+                                                        <a href="<?= $link ?>" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" title="<?= t('Go to details') ?>">
                                                             <i class="bi bi-arrow-right-short fs-5 text-primary"></i>
                                                         </a>
                                                     <?php elseif ($key === 'documents'): ?>
-                                                        <a href="<?= htmlspecialchars($item['action_url'] ?? (getUrl('document_library') . '?attention=1')) ?>" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" title="View expiring documents">
+                                                        <a href="<?= htmlspecialchars($item['action_url'] ?? (getUrl('document_library') . '?attention=1')) ?>" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" title="<?= t('View expiring documents') ?>">
                                                             <i class="bi bi-arrow-right-short fs-5 text-warning"></i>
                                                         </a>
                                                     <?php else:
@@ -1284,11 +1287,11 @@ function get_progress_color($percentage) {
                                                         }
                                                         ?>
                                                         <?php if ($nav_link !== ''): ?>
-                                                            <a href="<?= htmlspecialchars($nav_link) ?>" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" title="View details">
+                                                            <a href="<?= htmlspecialchars($nav_link) ?>" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" title="<?= t('View details') ?>">
                                                                 <i class="bi bi-arrow-right-short fs-5 text-<?= $group['color'] ?>"></i>
                                                             </a>
                                                         <?php else: ?>
-                                                            <button type="button" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" onclick="handleAlertAction(<?= htmlspecialchars(json_encode($item)) ?>)" title="Handle Alert">
+                                                            <button type="button" class="btn btn-xs btn-light border p-1 py-0 shadow-sm" onclick="handleAlertAction(<?= htmlspecialchars(json_encode($item)) ?>)" title="<?= t('Handle Alert') ?>">
                                                                 <i class="bi bi-arrow-right-short fs-5 text-<?= $group['color'] ?>"></i>
                                                             </button>
                                                         <?php endif; ?>
@@ -1338,7 +1341,7 @@ function get_progress_color($percentage) {
         <div class="col-12">
             <div class="card">
                 <div class="card-header bg-light">
-                    <h6 class="mb-0"><i class="bi bi-link-45deg"></i> Quick Links</h6>
+                    <h6 class="mb-0"><i class="bi bi-link-45deg"></i> <?= t('Quick Links') ?></h6>
                 </div>
                 <div class="card-body">
                     <?php if ($ql_has_links): ?>
@@ -1347,7 +1350,7 @@ function get_progress_color($percentage) {
                         <div class="col">
                             <a href="pos" class="btn btn-outline-primary w-100 h-100 py-3">
                                 <i class="bi bi-cart-check display-6"></i>
-                                <div class="mt-2">POS</div>
+                                <div class="mt-2"><?= t('POS') ?></div>
                             </a>
                         </div>
                         <?php endif; ?>
@@ -1356,7 +1359,7 @@ function get_progress_color($percentage) {
                         <div class="col">
                             <a href="invoice_create" class="btn btn-outline-success w-100 h-100 py-3">
                                 <i class="bi bi-receipt display-6"></i>
-                                <div class="mt-2">Create Invoice</div>
+                                <div class="mt-2"><?= t('Create Invoice') ?></div>
                             </a>
                         </div>
                         <?php endif; ?>
@@ -1365,7 +1368,7 @@ function get_progress_color($percentage) {
                         <div class="col">
                             <a href="<?= getUrl('customers') ?>?action=add" class="btn btn-outline-info w-100 h-100 py-3">
                                 <i class="bi bi-person-plus display-6"></i>
-                                <div class="mt-2">Add Customer</div>
+                                <div class="mt-2"><?= t('Add Customer') ?></div>
                             </a>
                         </div>
                         <?php endif; ?>
@@ -1374,7 +1377,7 @@ function get_progress_color($percentage) {
                         <div class="col">
                             <a href="<?= getUrl('suppliers') ?>?action=add" class="btn btn-outline-secondary w-100 h-100 py-3">
                                 <i class="bi bi-truck display-6"></i>
-                                <div class="mt-2">Add Supplier</div>
+                                <div class="mt-2"><?= t('Add Supplier') ?></div>
                             </a>
                         </div>
                         <?php endif; ?>
@@ -1383,7 +1386,7 @@ function get_progress_color($percentage) {
                         <div class="col">
                             <a href="<?= getUrl('product_create') ?>" class="btn btn-outline-warning w-100 h-100 py-3">
                                 <i class="bi bi-plus-circle display-6"></i>
-                                <div class="mt-2">Add Product</div>
+                                <div class="mt-2"><?= t('Add Product') ?></div>
                             </a>
                         </div>
                         <?php endif; ?>
@@ -1392,7 +1395,7 @@ function get_progress_color($percentage) {
                         <div class="col">
                             <a href="projects" class="btn btn-outline-dark w-100 h-100 py-3">
                                 <i class="bi bi-briefcase display-6"></i>
-                                <div class="mt-2">Projects Management</div>
+                                <div class="mt-2"><?= t('Projects Management') ?></div>
                             </a>
                         </div>
                         <?php endif; ?>
@@ -1400,7 +1403,7 @@ function get_progress_color($percentage) {
                     <?php else: ?>
                     <div class="text-center text-muted py-4">
                         <i class="bi bi-lock fs-2 d-block mb-2"></i>
-                        No quick actions available for your role.
+                        <?= t('No quick actions available for your role.') ?>
                     </div>
                     <?php endif; ?>
                 </div>
@@ -1453,7 +1456,7 @@ function get_progress_color($percentage) {
                     <div class="d-flex justify-content-between">
                         <div>
                             <h4 class="mb-0"><?= format_currency($dashboard_stats['pos_today']['pos_revenue_today'] ?? 0) ?></h4>
-                            <p class="mb-0">Today's POS Sales</p>
+                            <p class="mb-0"><?= t("Today's POS Sales") ?></p>
                         </div>
                         <div class="align-self-center">
                             <i class="bi bi-cart-check" style="font-size: 2rem;"></i>
@@ -1462,7 +1465,7 @@ function get_progress_color($percentage) {
                     <div class="mt-3">
                         <small>
                             <i class="bi bi-cart-check"></i>
-                            <?= $dashboard_stats['pos_today']['pos_sales_today'] ?? 0 ?> Transactions today
+                            <?= $dashboard_stats['pos_today']['pos_sales_today'] ?? 0 ?> <?= t('Transactions today') ?>
                         </small>
                     </div>
                 </div>
@@ -1478,7 +1481,7 @@ function get_progress_color($percentage) {
                     <div class="d-flex justify-content-between">
                         <div>
                             <h4 class="mb-0"><?= format_currency($dashboard_stats['overdue_invoices']['overdue_amount'] ?? 0) ?></h4>
-                            <p class="mb-0">Overdue Invoices</p>
+                            <p class="mb-0"><?= t('Overdue Invoices') ?></p>
                         </div>
                         <div class="align-self-center">
                             <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
@@ -1487,7 +1490,7 @@ function get_progress_color($percentage) {
                     <div class="mt-3">
                         <small>
                             <i class="bi bi-clock-history"></i>
-                            <?= $dashboard_stats['overdue_invoices']['overdue_invoices'] ?? 0 ?> Invoices overdue
+                            <?= $dashboard_stats['overdue_invoices']['overdue_invoices'] ?? 0 ?> <?= t('Invoices overdue') ?>
                         </small>
                     </div>
                 </div>
@@ -1503,7 +1506,7 @@ function get_progress_color($percentage) {
                     <div class="d-flex justify-content-between">
                         <div>
                             <h4 class="mb-0"><?= format_currency($dashboard_stats['inventory']['inventory_value'] ?? 0) ?></h4>
-                            <p class="mb-0">Inventory Value</p>
+                            <p class="mb-0"><?= t('Inventory Value') ?></p>
                         </div>
                         <div class="align-self-center">
                             <i class="bi bi-boxes" style="font-size: 2rem;"></i>
@@ -1512,7 +1515,7 @@ function get_progress_color($percentage) {
                     <div class="mt-3">
                         <small>
                             <i class="bi bi-box"></i>
-                            <?= $dashboard_stats['inventory']['total_products'] ?? 0 ?> Products in stock
+                            <?= $dashboard_stats['inventory']['total_products'] ?? 0 ?> <?= t('Products in stock') ?>
                         </small>
                     </div>
                 </div>
@@ -1533,13 +1536,13 @@ function get_progress_color($percentage) {
             <?php if (hasReportsAccess()): ?>
             <div class="card mb-4 shadow-sm">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-line text-primary me-2"></i> Performance Overview</h6>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-line text-primary me-2"></i> <?= t('Performance Overview') ?></h6>
                     <div class="d-flex gap-2">
                         <select class="form-select form-select-sm w-auto border-0 bg-light" id="chartPeriod">
-                            <option value="weekly">Weekly</option>
-                            <option value="monthly" selected>Monthly</option>
-                            <option value="quarterly">Quarterly</option>
-                            <option value="yearly">Yearly</option>
+                            <option value="weekly"><?= t('Weekly') ?></option>
+                            <option value="monthly" selected><?= t('Monthly') ?></option>
+                            <option value="quarterly"><?= t('Quarterly') ?></option>
+                            <option value="yearly"><?= t('Yearly') ?></option>
                         </select>
                         <button class="btn btn-sm btn-light border-0" onclick="loadPerformanceChart($('#chartPeriod').val())">
                             <i class="bi bi-arrow-clockwise"></i>
@@ -1551,9 +1554,9 @@ function get_progress_color($percentage) {
                         <canvas id="performanceChart"></canvas>
                         <div id="chartLoader" class="text-center py-5 position-absolute top-50 start-50 translate-middle w-100" style="display:none;">
                             <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading chart...</span>
+                                <span class="visually-hidden"><?= t('Loading chart...') ?></span>
                             </div>
-                            <p class="mt-2 text-muted small">Loading performance data...</p>
+                            <p class="mt-2 text-muted small"><?= t('Loading performance data...') ?></p>
                         </div>
                     </div>
                     <div id="performanceSummary"></div>
@@ -1567,17 +1570,17 @@ function get_progress_color($percentage) {
                 <div class="col-md-6 mb-4">
                     <div class="card h-100 shadow-sm">
                         <div class="card-header bg-white py-3">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-people text-success me-2"></i> Customer Overview</h6>
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-people text-success me-2"></i> <?= t('Customer Overview') ?></h6>
                         </div>
                         <div class="card-body">
                             <div class="row text-center">
                                 <div class="col-6">
                                     <h3 class="fw-bold"><?= $dashboard_stats['customers']['total_customers'] ?? 0 ?></h3>
-                                    <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;">Total Customers</small>
+                                    <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;"><?= t('Total Customers') ?></small>
                                 </div>
                                 <div class="col-6 border-start">
                                     <h3 class="fw-bold text-success"><?= $dashboard_stats['customers']['active_customers'] ?? 0 ?></h3>
-                                    <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;">Active</small>
+                                    <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;"><?= t('Active') ?></small>
                                 </div>
                             </div>
                             <?php
@@ -1586,7 +1589,7 @@ function get_progress_color($percentage) {
                             ?>
                             <div class="mt-4">
                                 <div class="d-flex justify-content-between mb-1">
-                                    <small class="text-muted">Retention Rate</small>
+                                    <small class="text-muted"><?= t('Retention Rate') ?></small>
                                     <small class="fw-bold"><?= round($active_percentage) ?>%</small>
                                 </div>
                                 <div class="progress" style="height: 6px; border-radius: 10px;">
@@ -1602,25 +1605,25 @@ function get_progress_color($percentage) {
                 <div class="col-md-6 mb-4">
                     <div class="card h-100 shadow-sm">
                         <div class="card-header bg-white py-3">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-box text-warning me-2"></i> Inventory Status</h6>
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-box text-warning me-2"></i> <?= t('Inventory Status') ?></h6>
                         </div>
                         <div class="card-body">
                             <div class="row text-center mb-4">
                                 <div class="col-6">
                                     <h3 class="fw-bold"><?= $dashboard_stats['inventory']['total_products'] ?? 0 ?></h3>
-                                    <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;">Total Products</small>
+                                    <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;"><?= t('Total Products') ?></small>
                                 </div>
                                 <div class="col-6 border-start">
                                     <h3 class="fw-bold <?= ($dashboard_stats['inventory']['low_stock_items'] ?? 0) > 0 ? 'text-danger' : 'text-success' ?>">
                                         <?= $dashboard_stats['inventory']['low_stock_items'] ?? 0 ?>
                                     </h3>
-                                    <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;">Low Stock</small>
+                                    <small class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;"><?= t('Low Stock') ?></small>
                                 </div>
                             </div>
                             <?php if(canView('products')): ?>
                             <div class="mt-auto">
                                 <a href="<?= getUrl('products') ?>?filter=low_stock" class="btn btn-sm btn-outline-danger w-100 border-2 fw-bold">
-                                    <i class="bi bi-exclamation-triangle me-1"></i> View Inventory Alerts
+                                    <i class="bi bi-exclamation-triangle me-1"></i> <?= t('View Inventory Alerts') ?>
                                 </a>
                             </div>
                             <?php endif; ?>
@@ -1638,8 +1641,8 @@ function get_progress_color($percentage) {
             <?php if (canView('audit_logs')): ?>
             <div class="card mb-4">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0 text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em; font-weight: 700;"><i class="bi bi-clock-history"></i> Recent Activities</h6>
-                    <a href="<?= getUrl('activity_log') ?>" class="btn btn-sm btn-primary">View All</a>
+                    <h6 class="mb-0 text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em; font-weight: 700;"><i class="bi bi-clock-history"></i> <?= t('Recent Activities') ?></h6>
+                    <a href="<?= getUrl('activity_log') ?>" class="btn btn-sm btn-primary"><?= t('View All') ?></a>
                 </div>
                 <div class="card-body p-0">
                     <div class="list-group list-group-flush">
@@ -1692,7 +1695,7 @@ function get_progress_color($percentage) {
                         <?php else: ?>
                             <div class="text-center py-4">
                                 <i class="bi bi-activity text-muted" style="font-size: 2rem;"></i>
-                                <p class="text-muted mt-2">No recent activities</p>
+                                <p class="text-muted mt-2"><?= t('No recent activities') ?></p>
                             </div>
                         <?php endif; ?>
                     </div>
@@ -1706,17 +1709,17 @@ function get_progress_color($percentage) {
             <?php if (!empty($user_metrics)): ?>
             <div class="card">
                 <div class="card-header bg-info text-white">
-                    <h6 class="mb-0"><i class="bi bi-person-badge"></i> Your Performance</h6>
+                    <h6 class="mb-0"><i class="bi bi-person-badge"></i> <?= t('Your Performance') ?></h6>
                 </div>
                 <div class="card-body">
                     <?php if ($user_role == 'Sales'): ?>
                     <div class="mb-3">
                         <div class="d-flex justify-content-between mb-1">
-                            <span>Monthly Target</span>
+                            <span><?= t('Monthly Target') ?></span>
                             <span><?= format_currency($user_metrics['total_revenue'] ?? 0) ?> / <?= format_currency($user_metrics['monthly_target'] ?? 0) ?></span>
                         </div>
                         <div class="progress" style="height: 20px;">
-                            <div class="progress-bar bg-<?= get_progress_color($user_metrics['target_achievement'] ?? 0) ?>" 
+                            <div class="progress-bar bg-<?= get_progress_color($user_metrics['target_achievement'] ?? 0) ?>"
                                  style="width: <?= min($user_metrics['target_achievement'] ?? 0, 100) ?>%">
                                 <?= round($user_metrics['target_achievement'] ?? 0) ?>%
                             </div>
@@ -1725,27 +1728,27 @@ function get_progress_color($percentage) {
                     <div class="row text-center">
                         <div class="col-6">
                             <h4><?= $user_metrics['total_sales'] ?? 0 ?></h4>
-                            <small class="text-muted">Total Sales</small>
+                            <small class="text-muted"><?= t('Total Sales') ?></small>
                         </div>
                         <div class="col-6">
                             <h4><?= format_currency($user_metrics['avg_sale_value'] ?? 0) ?></h4>
-                            <small class="text-muted">Avg Sale</small>
+                            <small class="text-muted"><?= t('Avg Sale') ?></small>
                         </div>
                     </div>
-                    
+
                     <?php elseif ($user_role == 'Cashier'): ?>
                     <div class="text-center mb-3">
                         <h1 class="display-6"><?= $user_metrics['total_transactions'] ?? 0 ?></h1>
-                        <p class="text-muted">Transactions Today</p>
+                        <p class="text-muted"><?= t('Transactions Today') ?></p>
                     </div>
                     <div class="row text-center">
                         <div class="col-6">
                             <h4><?= format_currency($user_metrics['total_cash_handled'] ?? 0) ?></h4>
-                            <small class="text-muted">Total Cash</small>
+                            <small class="text-muted"><?= t('Total Cash') ?></small>
                         </div>
                         <div class="col-6">
                             <h4><?= format_currency($user_metrics['avg_transaction'] ?? 0) ?></h4>
-                            <small class="text-muted">Avg Transaction</small>
+                            <small class="text-muted"><?= t('Avg Transaction') ?></small>
                         </div>
                     </div>
                     <?php endif; ?>
@@ -1848,7 +1851,7 @@ function renderChart(data) {
         data: {
             labels: labels,
             datasets: [{
-                label: 'Revenue (Invoiced)',
+                label: <?= json_encode(t('Revenue (Invoiced)')) ?>,
                 data: revenueData,
                 borderColor: '#0d6efd',
                 backgroundColor: function(context) {
@@ -1869,7 +1872,7 @@ function renderChart(data) {
                 pointBorderColor: '#0d6efd',
                 pointBorderWidth: 2,
             }, {
-                label: 'Expenses',
+                label: <?= json_encode(t('Expenses')) ?>,
                 data: expenseData,
                 borderColor: '#dc3545',
                 backgroundColor: function(context) {
@@ -1941,7 +1944,7 @@ function renderChart(data) {
                                     : Math.abs(profit) >= 1000
                                         ? (profit/1000).toFixed(1) + 'K'
                                         : profit.toLocaleString();
-                                return ['─────────────────', `Net Profit: ${sign}TSh ` + formatted];
+                                return ['─────────────────', <?= json_encode(t('Net Profit')) ?> + `: ${sign}TSh ` + formatted];
                             }
                             return [];
                         }
@@ -2003,25 +2006,25 @@ function renderChart(data) {
             <div class="mt-4 p-3 bg-light rounded shadow-sm border">
                 <div class="row align-items-center">
                     <div class="col-md-4 border-end">
-                        <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;">Latest Period (${last.period})</span>
+                        <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Latest Period') ?> (${last.period})</span>
                         <div class="d-flex align-items-center flex-wrap gap-2 mt-1">
-                            <span class="badge bg-primary">Sales: TSh ${last.revenue.toLocaleString()}</span>
-                            <span class="badge bg-success">Cash In: TSh ${(last.collected || 0).toLocaleString()}</span>
+                            <span class="badge bg-primary"><?= t('Sales') ?>: TSh ${last.revenue.toLocaleString()}</span>
+                            <span class="badge bg-success"><?= t('Cash In') ?>: TSh ${(last.collected || 0).toLocaleString()}</span>
                         </div>
                     </div>
                     <div class="col-md-4 border-end text-center py-2 py-md-0">
-                        <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;">Cash Flow</span>
+                        <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Cash Flow') ?></span>
                         <strong class="h5 mb-0 text-${netCash >= 0 ? 'success' : 'danger'}">
-                            Net Cash: ${netCash >= 0 ? '+' : ''}TSh ${netCash.toLocaleString()}
+                            <?= t('Net Cash') ?>: ${netCash >= 0 ? '+' : ''}TSh ${netCash.toLocaleString()}
                         </strong>
-                        <small class="d-block text-muted" style="font-size: 0.75rem;">(Cash In − Cash Out)</small>
+                        <small class="d-block text-muted" style="font-size: 0.75rem;"><?= t('(Cash In − Cash Out)') ?></small>
                     </div>
                     <div class="col-md-4 text-end">
-                        <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;">Net Profit</span>
+                        <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Net Profit') ?></span>
                         <strong class="h6 mb-0 text-${netProfit >= 0 ? 'primary' : 'danger'}">
                             TSh ${netProfit.toLocaleString()}
                         </strong>
-                        <small class="d-block text-muted" style="font-size: 0.75rem;">(Revenue − Expenses)</small>
+                        <small class="d-block text-muted" style="font-size: 0.75rem;"><?= t('(Revenue − Expenses)') ?></small>
                     </div>
                 </div>
             </div>
@@ -2169,14 +2172,14 @@ $(document).keydown(function(e) {
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="alertModalTitle">Alert Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="alertModalTitle"><?= t('Alert Details') ?></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<?= t('Close') ?>"></button>
             </div>
             <div class="modal-body" id="alertModalBody">
                 <!-- Content loaded via JS -->
             </div>
             <div class="modal-footer" id="alertModalFooter">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Close') ?></button>
             </div>
         </div>
     </div>
@@ -2187,67 +2190,67 @@ $(document).keydown(function(e) {
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
-                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Add Stock</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> <?= t('Add Stock') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= t('Close') ?>"></button>
             </div>
             <form id="quickAddStockForm">
                 <div class="modal-body">
                     <input type="hidden" name="product_id" id="quickAddProductId">
                     <input type="hidden" name="movement_type" value="adjustment_in">
                     <input type="hidden" name="reason" value="Dashboard restock">
-                    
+
                     <div class="mb-3">
-                        <label class="form-label">Product</label>
+                        <label class="form-label"><?= t('Product') ?></label>
                         <input type="text" class="form-control" id="quickAddProductName" readonly>
                     </div>
-                    
+
                     <div class="mb-3">
-                        <label class="form-label">Warehouse</label>
+                        <label class="form-label"><?= t('Warehouse') ?></label>
                         <select class="form-select" name="warehouse_id" id="quickAddWarehouse" required onchange="fetchCurrentStock()">
                             <?php foreach ($warehouses as $wh): ?>
                                 <option value="<?= $wh['warehouse_id'] ?>"><?= htmlspecialchars($wh['warehouse_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    
+
                     <div class="mb-3">
-                        <label class="form-label">Quantity to Add</label>
-                        <input type="number" step="any" class="form-control" name="quantity" id="quickAddQuantity" required oninput="calculatePreview()" placeholder="Enter quantity here...">
+                        <label class="form-label"><?= t('Quantity to Add') ?></label>
+                        <input type="number" step="any" class="form-control" name="quantity" id="quickAddQuantity" required oninput="calculatePreview()" placeholder="<?= t('Enter quantity here...') ?>">
                     </div>
 
                     <!-- Live Preview Card -->
                     <div class="card bg-light mb-3 border-0 shadow-sm">
                         <div class="card-body p-3">
-                            <h6 class="card-subtitle mb-2 text-muted small uppercase">Stock Preview</h6>
+                            <h6 class="card-subtitle mb-2 text-muted small uppercase"><?= t('Stock Preview') ?></h6>
                             <div class="row text-center g-0">
                                 <div class="col-4 border-end">
-                                    <div class="text-muted extra-small">Before</div>
+                                    <div class="text-muted extra-small"><?= t('Before') ?></div>
                                     <strong id="previewBefore" class="fs-5">0</strong>
                                 </div>
                                 <div class="col-4 border-end">
-                                    <div class="text-muted extra-small">Add</div>
+                                    <div class="text-muted extra-small"><?= t('Add') ?></div>
                                     <strong id="previewChange" class="fs-5 text-success">+0</strong>
                                 </div>
                                 <div class="col-4">
-                                    <div class="text-muted extra-small">After</div>
+                                    <div class="text-muted extra-small"><?= t('After') ?></div>
                                     <strong id="previewAfter" class="fs-5 text-primary">0</strong>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3" id="errorContainer" style="display: none;">
                         <div class="alert alert-danger py-2 small" id="errorMessage"></div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label text-muted small">Notes (Optional)</label>
-                        <textarea class="form-control" name="notes" rows="2" placeholder="Reason for restocking..."></textarea>
+                        <label class="form-label text-muted small"><?= t('Notes (Optional)') ?></label>
+                        <textarea class="form-control" name="notes" rows="2" placeholder="<?= t('Reason for restocking...') ?>"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-success" id="btnSubmitStock">Save Changes</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-success" id="btnSubmitStock"><?= t('Save Changes') ?></button>
                 </div>
             </form>
         </div>
@@ -2255,19 +2258,46 @@ $(document).keydown(function(e) {
 </div>
 
 <script>
+// Translated strings for JS-generated modal content (handleAlertAction below) —
+// built once from the loaded catalog so the JS doesn't need its own t() call.
+const DASH_I18N = <?= json_encode([
+    'low_stock_title'     => t('Low Stock Alert'),
+    'current_stock'       => t('Current Stock'),
+    'reorder_level'       => t('Reorder level'),
+    'restock_info'        => t('It is recommended to restock this item soon to avoid out-of-stock situations.'),
+    'add_stock'           => t('Add Stock'),
+    'view_product'        => t('View Product'),
+    'overdue_title'       => t('Overdue Payment'),
+    'invoice_hash'        => t('Invoice #'),
+    'customer'            => t('Customer'),
+    'walk_in'             => t('Walk-in'),
+    'overdue_amount'      => t('Overdue Amount'),
+    'days_overdue'        => t('Days Overdue'),
+    'days'                => t('days'),
+    'view_invoice'        => t('View Invoice'),
+    'expiry_title'        => t('Expiry Alert'),
+    'expiry_date'         => t('Expiry Date'),
+    'days_remaining'      => t('Days Remaining'),
+    'notification'        => t('Notification'),
+    'no_details'          => t('No further details available for this notification.'),
+    'no_details_generic'  => t('No further details available.'),
+    'view'                => t('View'),
+    'close'               => t('Close'),
+], JSON_UNESCAPED_UNICODE) ?>;
+
 function handleAlertAction(alert) {
     const title = document.getElementById('alertModalTitle');
     const body = document.getElementById('alertModalBody');
     const footer = document.getElementById('alertModalFooter');
-    
+
     // Clear previous footer buttons except Close
-    footer.innerHTML = '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>';
+    footer.innerHTML = `<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">${DASH_I18N.close}</button>`;
 
     // Check if user has permission to add stock
     const canAddStock = <?= (isAdmin() || canEdit('products')) ? 'true' : 'false' ?>;
     
     if (alert.type === 'low_stock') {
-        title.innerHTML = '<i class="bi bi-box text-danger"></i> Low Stock Alert';
+        title.innerHTML = '<i class="bi bi-box text-danger"></i> ' + DASH_I18N.low_stock_title;
         body.innerHTML = `
             <div class="text-center mb-4">
                 <i class="bi bi-exclamation-triangle text-warning" style="font-size: 3rem;"></i>
@@ -2276,22 +2306,22 @@ function handleAlertAction(alert) {
             </div>
             <div class="list-group">
                 <div class="list-group-item d-flex justify-content-between align-items-center">
-                    Current Stock <span class="badge bg-danger rounded-pill">${alert.stock_quantity}</span>
+                    ${DASH_I18N.current_stock} <span class="badge bg-danger rounded-pill">${alert.stock_quantity}</span>
                 </div>
                 <div class="list-group-item d-flex justify-content-between align-items-center">
-                    Reorder level <span class="badge bg-primary rounded-pill">${alert.reorder_level}</span>
+                    ${DASH_I18N.reorder_level} <span class="badge bg-primary rounded-pill">${alert.reorder_level}</span>
                 </div>
             </div>
             <div class="alert alert-info mt-3">
-                <i class="bi bi-info-circle"></i> It is recommended to restock this item soon to avoid out-of-stock situations.
+                <i class="bi bi-info-circle"></i> ${DASH_I18N.restock_info}
             </div>
         `;
-        
+
         if (canAddStock) {
             // Add "Add Stock" button
             const btnAdd = document.createElement('button');
             btnAdd.className = 'btn btn-success';
-            btnAdd.innerHTML = '<i class="bi bi-plus-circle"></i> Add Stock';
+            btnAdd.innerHTML = '<i class="bi bi-plus-circle"></i> ' + DASH_I18N.add_stock;
             btnAdd.onclick = () => {
                 const modal = bootstrap.Modal.getInstance(document.getElementById('alertDetailsModal'));
                 modal.hide();
@@ -2304,35 +2334,35 @@ function handleAlertAction(alert) {
         const btnView = document.createElement('a');
         btnView.className = 'btn btn-primary';
         btnView.href = `product_view?id=${alert.id}`;
-        btnView.innerHTML = '<i class="bi bi-eye"></i> View Product';
+        btnView.innerHTML = '<i class="bi bi-eye"></i> ' + DASH_I18N.view_product;
         footer.appendChild(btnView);
-        
+
     } else if (alert.type === 'overdue') {
-        title.innerHTML = '<i class="bi bi-clock-history text-danger"></i> Overdue Payment';
+        title.innerHTML = '<i class="bi bi-clock-history text-danger"></i> ' + DASH_I18N.overdue_title;
         body.innerHTML = `
             <div class="text-center mb-4">
                 <i class="bi bi-cash-stack text-danger" style="font-size: 3rem;"></i>
-                <h4>Invoice #${alert.reference}</h4>
-                <p class="text-muted">Customer: ${alert.customer_name || 'Walk-in'}</p>
+                <h4>${DASH_I18N.invoice_hash}${alert.reference}</h4>
+                <p class="text-muted">${DASH_I18N.customer}: ${alert.customer_name || DASH_I18N.walk_in}</p>
             </div>
             <div class="list-group">
                 <div class="list-group-item d-flex justify-content-between align-items-center">
-                    Overdue Amount <span class="badge bg-danger rounded-pill">${new Intl.NumberFormat().format(alert.overdue_amount)}</span>
+                    ${DASH_I18N.overdue_amount} <span class="badge bg-danger rounded-pill">${new Intl.NumberFormat().format(alert.overdue_amount)}</span>
                 </div>
                 <div class="list-group-item d-flex justify-content-between align-items-center">
-                    Days Overdue <span class="badge bg-warning text-dark rounded-pill">${alert.days_overdue} days</span>
+                    ${DASH_I18N.days_overdue} <span class="badge bg-warning text-dark rounded-pill">${alert.days_overdue} ${DASH_I18N.days}</span>
                 </div>
             </div>
         `;
-        
+
         const btnView = document.createElement('a');
         btnView.className = 'btn btn-primary';
         btnView.href = `invoice_view?id=${alert.id}`;
-        btnView.innerHTML = '<i class="bi bi-eye"></i> View Invoice';
+        btnView.innerHTML = '<i class="bi bi-eye"></i> ' + DASH_I18N.view_invoice;
         footer.appendChild(btnView);
-        
+
     } else if (alert.type === 'expiring') {
-        title.innerHTML = '<i class="bi bi-calendar-x text-warning"></i> Expiry Alert';
+        title.innerHTML = '<i class="bi bi-calendar-x text-warning"></i> ' + DASH_I18N.expiry_title;
         body.innerHTML = `
             <div class="text-center mb-4">
                 <i class="bi bi-hourglass-split text-warning" style="font-size: 3rem;"></i>
@@ -2341,18 +2371,18 @@ function handleAlertAction(alert) {
             </div>
             <div class="list-group">
                 <div class="list-group-item d-flex justify-content-between align-items-center">
-                    Expiry Date <span class="badge bg-danger rounded-pill">${alert.expiry_date}</span>
+                    ${DASH_I18N.expiry_date} <span class="badge bg-danger rounded-pill">${alert.expiry_date}</span>
                 </div>
                 <div class="list-group-item d-flex justify-content-between align-items-center">
-                    Days Remaining <span class="badge bg-info rounded-pill">${alert.days_remaining} days</span>
+                    ${DASH_I18N.days_remaining} <span class="badge bg-info rounded-pill">${alert.days_remaining} ${DASH_I18N.days}</span>
                 </div>
             </div>
         `;
-        
+
         const btnView = document.createElement('a');
         btnView.className = 'btn btn-primary';
         btnView.href = `product_view?id=${alert.id}`;
-        btnView.innerHTML = '<i class="bi bi-eye"></i> View Product';
+        btnView.innerHTML = '<i class="bi bi-eye"></i> ' + DASH_I18N.view_product;
         footer.appendChild(btnView);
 
     } else if (alert.type === 'engine_action') {
@@ -2360,24 +2390,24 @@ function handleAlertAction(alert) {
         // straight to alert.action_url and never reaches this modal at all.
         // Only a General Notification with no action_url on record falls
         // through to here, so still show what we have instead of a blank box.
-        title.innerHTML = '<i class="bi bi-bell-fill text-info"></i> ' + (alert.title || 'Notification');
+        title.innerHTML = '<i class="bi bi-bell-fill text-info"></i> ' + (alert.title || DASH_I18N.notification);
         body.innerHTML = `
             <div class="text-center mb-3">
                 <i class="bi bi-bell text-info" style="font-size: 3rem;"></i>
-                <p class="mt-3">${alert.message || 'No further details available for this notification.'}</p>
+                <p class="mt-3">${alert.message || DASH_I18N.no_details}</p>
             </div>
         `;
         if (alert.action_url) {
             const btnView = document.createElement('a');
             btnView.className = 'btn btn-primary';
             btnView.href = alert.action_url;
-            btnView.innerHTML = '<i class="bi bi-eye"></i> View';
+            btnView.innerHTML = '<i class="bi bi-eye"></i> ' + DASH_I18N.view;
             footer.appendChild(btnView);
         }
     } else {
         // Unknown/unhandled alert type — never leave the modal blank.
-        title.innerHTML = '<i class="bi bi-info-circle text-secondary"></i> Notification';
-        body.innerHTML = `<p class="text-center text-muted py-3">${alert.message || 'No further details available.'}</p>`;
+        title.innerHTML = '<i class="bi bi-info-circle text-secondary"></i> ' + DASH_I18N.notification;
+        body.innerHTML = `<p class="text-center text-muted py-3">${alert.message || DASH_I18N.no_details_generic}</p>`;
     }
 
     new bootstrap.Modal(document.getElementById('alertDetailsModal')).show();
@@ -2413,7 +2443,7 @@ function fetchCurrentStock() {
         })
         .catch(err => {
             console.error('Fetch error:', err);
-            beforeEl.innerText = 'Error';
+            beforeEl.innerText = <?= json_encode(t('Error')) ?>;
         });
 }
 
@@ -2434,7 +2464,7 @@ document.getElementById('quickAddStockForm').onsubmit = function(e) {
     e.preventDefault();
     const btn = document.getElementById('btnSubmitStock');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> ' + <?= json_encode(t('Saving...')) ?>;
     
     const formData = new FormData(this);
     
@@ -2455,8 +2485,8 @@ document.getElementById('quickAddStockForm').onsubmit = function(e) {
         if (data.success) {
             Swal.fire({
                 icon: 'success',
-                title: 'Success!',
-                text: 'Stock updated successfully!',
+                title: <?= json_encode(t('Success!')) ?>,
+                text: <?= json_encode(t('Stock updated successfully!')) ?>,
                 timer: 2000,
                 showConfirmButton: false
             }).then(() => {
@@ -2466,7 +2496,7 @@ document.getElementById('quickAddStockForm').onsubmit = function(e) {
             document.getElementById('errorContainer').style.display = 'block';
             document.getElementById('errorMessage').innerText = data.message;
             btn.disabled = false;
-            btn.innerHTML = 'Save Changes';
+            btn.innerHTML = <?= json_encode(t('Save Changes')) ?>;
         }
     })
     .catch(error => {
@@ -2474,7 +2504,7 @@ document.getElementById('quickAddStockForm').onsubmit = function(e) {
         document.getElementById('errorContainer').style.display = 'block';
         document.getElementById('errorMessage').innerText = error.message;
         btn.disabled = false;
-        btn.innerHTML = 'Save Changes';
+        btn.innerHTML = <?= json_encode(t('Save Changes')) ?>;
     });
 };
 </script>

@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — UI language translation (English/Swahili): header, dashboard, Customers CRUD
+
+**Files (new):** `core/i18n.php`, `lang/en.php`, `lang/sw.php`
+**Files (changed):** `roots.php`, `header.php`, `app/dashboard.php`, `app/constant/settings/my_settings.php`, `core/form_lookups.php`, `app/bms/customer/customers.php`
+
+Wires up the existing (previously cosmetic-only) Language field on My Settings > Preferences so it actually translates the UI, instead of just saving a value nothing read. Mechanism mirrors the sibling LMS codebase's `core/i18n.php`: `lang/{code}.php` catalogs keyed by the exact English source string (gettext-style), `loadLanguage($code)` merges the requested locale on top of the English catalog so an untranslated key still resolves to something, `t($key)`/`te($key)` read the loaded catalog. `roots.php` loads the engine (defaults to English) on every request; `header.php` resolves the session-cached language preference each request and — critically — prefers `$_POST['user_language']` over the (still-stale) session value on the exact request that submits Preferences, so the very same response's nav already reflects the new language instead of needing a second reload.
+
+Translated end-to-end and verified live in-browser (not just code-reviewed): the full header nav (all 11 dropdown menus + user account menu), the entire dashboard (stat cards, notification banner, Quick Links, performance chart legend/tooltip/summary, Recent Activities, alert modals), and the Customers module's core CRUD surface (list page, filters, DataTable columns/language block, Add/Edit modals across all 4 tabs, Import modal, delete/status SweetAlert confirmations). The shared `renderOtherSelect()` "Other (type new)…" widget in `core/form_lookups.php` is also wired, so its translation covers every module that uses it (Suppliers, Sub-Contractors, Products) once those pages are translated too.
+
+Remaining per the user's stated order: Suppliers, Sub-Contractors, Products, Non-Inventory Products (each full CRUD), plus the Customers detail/view drill-down page.
+
+## 2026-08-29 (fix) — Login History stat cards go stale while the page stays open
+
+**Files (new):** `api/get_login_history_stats.php`
+**Files (changed):** `app/constant/settings/login_history.php`, `tests/test_login_history_cli.php`
+
+The 5 "today" stat cards ("Signed In Now", "Sign-ins Today", "People Today", "Expired Today", "Precise Today") were computed once in PHP at page load and never refreshed — so "Signed In Now" stayed frozen at its load-time value even after an admin ended a session on that same page, or after the 30-minute idle sweep quietly expired a row while the admin was still looking. The Duration column already ticked live per row; the summary cards above it did not.
+
+New `api/get_login_history_stats.php` (admin-only, same query the page already ran on load) is now polled by a `refreshStatCards()` JS function: once after every DataTable redraw (covers filter changes and the reload after End Session / Block / Activate), and independently every 30 seconds so a purely server-side change with no admin action on this page — the idle-timeout sweep — isn't missed either.
+
+Confirmed via a real in-process round-trip in `tests/test_login_history_cli.php` [12]: seeded an open session, called the new endpoint, and checked `signed_in_now` against a direct `COUNT(*)` of open rows.
+
 ## 2026-08-29 (feature) — Only two automatic session-ending causes; concurrent-login email; End Session restricted to other accounts
 
 **Files (new):** `migrations/2026_08_29_concurrent_login_notification.php`

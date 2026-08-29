@@ -101,6 +101,7 @@ if (in_array($bms_timezone, timezone_identifiers_list(), true)) {
     }
 }
 
+require_once ROOT_DIR . '/core/i18n.php'; // Load UI translation engine (t()/te()) — defaults to English
 require_once ROOT_DIR . '/core/permissions.php'; // Load permissions
 require_once ROOT_DIR . '/actions/check_auth.php';
 
