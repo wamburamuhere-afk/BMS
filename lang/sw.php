@@ -466,6 +466,7 @@ return [
     // ------------------------------------------------------------------
     // Customers — filters, actions toolbar
     // ------------------------------------------------------------------
+    'Filters & Search' => 'Vichujio na Utafutaji',
     'Status' => 'Hali',
     'All Status' => 'Hali Zote',
     'Suspended' => 'Imesimamishwa',
@@ -527,6 +528,7 @@ return [
     'Description' => 'Maelezo',
     'Customer description or notes' => 'Maelezo au maoni kuhusu mteja',
     'Contact Person' => 'Mtu wa Mawasiliano',
+    'Primary contact person' => 'Mtu mkuu wa mawasiliano',
     'Contact Title' => 'Cheo cha Mawasiliano',
     'e.g., Manager, Director' => 'mfano, Meneja, Mkurugenzi',
     'Contact Email' => 'Barua Pepe ya Mawasiliano',
@@ -645,4 +647,95 @@ return [
     'Customer has been deleted.' => 'Mteja amefutwa.',
     'Copied!' => 'Imenakiliwa!',
     'Table data copied to clipboard' => 'Data ya jedwali imenakiliwa kwenye ubao wa kunakili',
+
+    // ------------------------------------------------------------------
+    // Suppliers (app/bms/Suppliers/suppliers.php) — page header, banner, print
+    // ------------------------------------------------------------------
+    'Official Suppliers Report' => 'Ripoti Rasmi ya Wasambazaji',
+    'Generated on:' => 'Imetengenezwa tarehe:',
+    'Supplier Management' => 'Usimamizi wa Wasambazaji',
+    'Manage your suppliers and vendor relationships' => 'Simamia wasambazaji wako na uhusiano wa kibiashara',
+    'Add New Supplier' => 'Ongeza Msambazaji Mpya',
+
+    // ------------------------------------------------------------------
+    // Suppliers — records table
+    // ------------------------------------------------------------------
+    'Suppliers Records' => 'Kumbukumbu za Wasambazaji',
+    'Supplier Code' => 'Nambari ya Msambazaji',
+    'Supplier Name' => 'Jina la Msambazaji',
+    'Project' => 'Mradi',
+    'Total Orders' => 'Jumla ya Oda',
+    'Completed' => 'Zilizokamilika',
+    'No Category' => 'Hakuna Aina',
+    'project' => 'mradi',
+    'projects' => 'miradi',
+    'Edit Supplier' => 'Hariri Msambazaji',
+    'Deactivate' => 'Zima',
+    'Activate' => 'Washa',
+    'Suspend' => 'Simamisha',
+    'Blacklist' => 'Zuia',
+    'No Suppliers Found' => 'Hakuna Wasambazaji Waliopatikana',
+    'Get started by adding your first supplier.' => 'Anza kwa kuongeza msambazaji wako wa kwanza.',
+    'Add Your First Supplier' => 'Ongeza Msambazaji Wako wa Kwanza',
+    'General Supplier' => 'Msambazaji wa Jumla',
+
+    // ------------------------------------------------------------------
+    // Suppliers — Add/Edit modal fields (deltas from Customers' wording)
+    // ------------------------------------------------------------------
+    'Enter supplier name' => 'Weka jina la msambazaji',
+    'Supplier Type' => 'Aina ya Msambazaji',
+    'Linked Project' => 'Mradi Uliounganishwa',
+    'Optional' => 'Hiari',
+    'Supplier description or notes' => 'Maelezo au maoni kuhusu msambazaji',
+    'Zip Code' => 'Msimbo wa Posta',
+    'Zip code' => 'Msimbo wa posta',
+    'Street address' => 'Anwani ya mtaa',
+    'Postal address' => 'Anwani ya posta',
+    "Auto-fills the WHT rate when recording this supplier's payments." => 'Hujaza kiwango cha kodi ya zuio kiotomatiki wakati wa kurekodi malipo ya msambazaji huyu.',
+    'Save Supplier' => 'Hifadhi Msambazaji',
+
+    // ------------------------------------------------------------------
+    // Suppliers — Import modal (deltas)
+    // ------------------------------------------------------------------
+    'Import Suppliers' => 'Ingiza Wasambazaji',
+    'Fill in the supplier data' => 'Jaza taarifa za msambazaji',
+    'Add New Suppliers Only' => 'Ongeza Wasambazaji Wapya Pekee',
+    'Update Existing Suppliers' => 'Sasisha Wasambazaji Waliopo',
+    'Update Supplier' => 'Sasisha Msambazaji',
+
+    // ------------------------------------------------------------------
+    // Suppliers — project-context banner, JS dialogs
+    // ------------------------------------------------------------------
+    'Adding to project:' => 'Inaongeza kwenye mradi:',
+    'Editing within project:' => 'Inahariri ndani ya mradi:',
+    'Back to Project' => 'Rudi kwenye Mradi',
+    'Select or Search...' => 'Chagua au Tafuta...',
+    'Copy to clipboard' => 'Nakili kwenye ubao wa kunakili',
+    'Successful:' => 'Imefanikiwa:',
+    'Failed:' => 'Imeshindwa:',
+    'Load Error' => 'Hitilafu ya Kupakia',
+    'Error loading supplier data:' => 'Hitilafu kupakia taarifa za msambazaji:',
+    'Server Error' => 'Hitilafu ya Seva',
+    'Error loading supplier data. Please try again.' => 'Hitilafu kupakia taarifa za msambazaji. Tafadhali jaribu tena.',
+    'activate' => 'kuwasha',
+    'deactivate' => 'kuzima',
+    'suspend' => 'kusimamisha',
+    'blacklist' => 'kuzuia',
+    'update' => 'kusasisha',
+    'Are you sure?' => 'Una uhakika?',
+    'Do you want to' => 'Je, unataka',
+    'this supplier?' => 'msambazaji huyu?',
+    'Yes,' => 'Ndiyo,',
+    'Status Updated' => 'Hali Imesasishwa',
+    'Update Failed' => 'Kusasisha Kumeshindwa',
+    'Error updating status. Please try again.' => 'Hitilafu kusasisha hali. Tafadhali jaribu tena.',
+    'Delete Supplier?' => 'Futa Msambazaji?',
+    'Supplier has been deleted.' => 'Msambazaji amefutwa.',
+    'Error deleting supplier. Please try again.' => 'Hitilafu kufuta msambazaji. Tafadhali jaribu tena.',
+    'Supplier added successfully.' => 'Msambazaji ameongezwa kwa mafanikio.',
+    'Failed to add supplier.' => 'Imeshindwa kuongeza msambazaji.',
+    'An error occurred. Please try again.' => 'Hitilafu imetokea. Tafadhali jaribu tena.',
+    'Suppliers imported successfully.' => 'Wasambazaji wameingizwa kwa mafanikio.',
+    'An error occurred during import.' => 'Hitilafu imetokea wakati wa kuingiza.',
+    'Supplier updated successfully.' => 'Msambazaji amesasishwa kwa mafanikio.',
 ];

@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — UI language translation: Suppliers CRUD + two catalog gaps fixed
+
+**Files (changed):** `app/bms/Suppliers/suppliers.php`, `lang/sw.php`
+
+Suppliers module translated to the same depth as Customers: list page (stats, filters,
+server-rendered table + card view, DataTables language block), Add/Edit modals across all 4
+tabs, Import modal, and every SweetAlert confirmation (status change, delete). Added a small
+`supplier_status_label()` helper since this table is server-rendered (no AJAX `render()`
+callback like Customers' DataTable) so the status badge needed its own translation point.
+
+While doing a DOM-level sweep for leftover English text (not just visual screenshots), found
+two keys that were wrapped in `t()` on both Customers and Suppliers but never actually added to
+`lang/sw.php` — so they silently fell back to English: the "Filters & Search" card header, and
+the "Primary contact person" field placeholder. Both fixed in the shared catalog, so the fix
+applies to Customers too without touching that file again.
+
 ## 2026-08-29 (feature) — UI language translation (English/Swahili): header, dashboard, Customers CRUD
 
 **Files (new):** `core/i18n.php`, `lang/en.php`, `lang/sw.php`
