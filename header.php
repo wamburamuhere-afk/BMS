@@ -923,7 +923,8 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <i class="bi bi-gear"></i> Operations
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="operationsDropdown">
-                                <li><h6 class="dropdown-header">Human Resources</h6></li>
+                                <?php if(canView('hr_dashboard') || canView('employees') || canView('employee_lifecycle') || canView('employee_contracts') || canView('org_chart')): ?>
+                                <li><h6 class="dropdown-header">Workforce</h6></li>
                                 <?php if(canView('hr_dashboard')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('hr_dashboard') ?>"><i class="bi bi-speedometer2"></i> HR Dashboard</a></li>
                                 <?php endif; ?>
@@ -933,11 +934,12 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('employee_lifecycle')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('hr_actions') ?>"><i class="bi bi-person-lines-fill"></i> HR Actions</a></li>
                                 <?php endif; ?>
+                                <?php if(canView('org_chart')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('org_chart') ?>"><i class="bi bi-diagram-3"></i> Org Chart</a></li>
+                                <?php endif; ?>
                                 <?php if(canView('employee_contracts')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('employee_contracts') ?>"><i class="bi bi-file-earmark-text"></i> Contracts</a></li>
                                 <?php endif; ?>
-                                <?php if(canView('org_chart')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('org_chart') ?>"><i class="bi bi-diagram-3"></i> Org Chart</a></li>
                                 <?php endif; ?>
                                 <?php if(canView('departments') || canView('designations') || canView('employment_types')): ?>
                                 <li><h6 class="dropdown-header">Org Structure</h6></li>
@@ -951,6 +953,8 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('employment_types') ?>"><i class="bi bi-person-workspace"></i> Employment Types</a></li>
                                 <?php endif; ?>
                                 <?php endif; ?>
+                                <?php if(canView('hr_performance') || canView('trainings') || canView('recruitment') || canView('hr_checklists')): ?>
+                                <li><h6 class="dropdown-header">Performance &amp; Growth</h6></li>
                                 <?php if(canView('hr_performance')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('hr_performance') ?>"><i class="bi bi-graph-up-arrow"></i> Performance (HR)</a></li>
                                 <?php endif; ?>
@@ -963,6 +967,30 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('hr_checklists')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('hr_checklists') ?>"><i class="bi bi-check2-square"></i> Checklists</a></li>
                                 <?php endif; ?>
+                                <?php endif; ?>
+                                <?php if(canView('payroll') || canView('salary_components')): ?>
+                                <li><h6 class="dropdown-header">Payroll</h6></li>
+                                <?php if(canView('payroll')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('payroll') ?>"><i class="bi bi-cash"></i> Payroll</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('salary_components')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('salary_components') ?>"><i class="bi bi-sliders"></i> Salary Components</a></li>
+                                <?php endif; ?>
+                                <?php endif; ?>
+                                <?php if(canView('attendance') || canView('leaves') || canView('company_calendar')): ?>
+                                <li><h6 class="dropdown-header">Attendance &amp; Leave</h6></li>
+                                <?php if(canView('attendance')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('attendance') ?>"><i class="bi bi-clock"></i> Attendance</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('leaves')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('leaves') ?>"><i class="bi bi-calendar"></i> Leaves</a></li>
+                                <?php endif; ?>
+                                <?php if(canView('company_calendar')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('company_calendar') ?>"><i class="bi bi-calendar-week"></i> Working Days &amp; Holidays</a></li>
+                                <?php endif; ?>
+                                <?php endif; ?>
+                                <?php if(canView('meetings') || canView('employee_trips') || canView('announcements')): ?>
+                                <li><h6 class="dropdown-header">Communication &amp; Calendar</h6></li>
                                 <?php if(canView('meetings')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('meetings') ?>"><i class="bi bi-calendar-event"></i> Meetings</a></li>
                                 <?php endif; ?>
@@ -972,20 +1000,6 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('announcements')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('announcements') ?>"><i class="bi bi-megaphone"></i> Announcements</a></li>
                                 <?php endif; ?>
-                                <?php if(canView('payroll')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('payroll') ?>"><i class="bi bi-cash"></i> Payroll</a></li>
-                                <?php endif; ?>
-                                <?php if(canView('salary_components')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('salary_components') ?>"><i class="bi bi-sliders"></i> Salary Components</a></li>
-                                <?php endif; ?>
-                                <?php if(canView('attendance')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('attendance') ?>"><i class="bi bi-clock"></i> Attendance</a></li>
-                                <?php endif; ?>
-                                <?php if(canView('leaves')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('leaves') ?>"><i class="bi bi-calendar"></i> Leaves</a></li>
-                                <?php endif; ?>
-                                <?php if(canView('company_calendar')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('company_calendar') ?>"><i class="bi bi-calendar-week"></i> Working Days &amp; Holidays</a></li>
                                 <?php endif; ?>
                                 <li><h6 class="dropdown-header">Assets & Maintenance</h6></li>
                                 <?php if(canView('assets')): ?>
