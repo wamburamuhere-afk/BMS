@@ -317,6 +317,23 @@ function locLine1(r) { return r.city || '—'; }
 function locLine2(r) { return [r.region, r.country].filter(Boolean).join(', '); }
 function ispLine(r)  { return [r.isp, r.org].filter(Boolean).join(' / ') || '—'; }
 
+// The 5 "today" stat cards are rendered server-side once, at page load — a
+// direct PHP-page-load-only value would then stay frozen (e.g. "Signed In
+// Now" not moving after an End Session action, or after the 30-min idle
+// sweep quietly expires a row while the admin is still on the page). Called
+// from the table's own drawCallback so the cards stay in step with whatever
+// just made the table redraw.
+function refreshStatCards() {
+    $.getJSON('<?= buildUrl('api/get_login_history_stats.php') ?>', function (res) {
+        if (!res || !res.success) return;
+        $('#stat-signed-in-now').text(res.signed_in_now);
+        $('#stat-signins-today').text(res.signins_today);
+        $('#stat-people-today').text(res.people_today);
+        $('#stat-expired-today').text(res.expired_today);
+        $('#stat-precise-today').text(res.precise_today);
+    });
+}
+
 // Location-source badge: Precise (device, consent-based) vs Approximate (IP)
 // vs no location captured at all — see the methodology note above the table.
 function locationBadge(r) {
@@ -663,6 +680,7 @@ $(document).ready(function () {
             const rows = api.rows({ page: 'current' }).data().toArray();
             renderCards(rows);
             applyView();
+            refreshStatCards();
         }
     });
 
@@ -708,6 +726,12 @@ $(document).ready(function () {
             $(this).text(formatDur(secs));
         });
     }, 1000);
+
+    // ── Stat cards can also go stale purely from the passage of time (e.g. the
+    //    30-min idle sweep expires a row server-side with no admin action on
+    //    this page at all) — poll independently of table redraws, same idea
+    //    as the duration ticker above but far less often since it's a query.
+    setInterval(refreshStatCards, 30000);
 
     // ── View toggle ──────────────────────────────────────────────────────
     $('#btnTableView').on('click', function () { viewMode = 'table'; applyView(); });

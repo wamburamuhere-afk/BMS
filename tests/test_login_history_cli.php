@@ -698,6 +698,50 @@ if ($reachable) {
     skip('local server not reachable — reactivation email live test skipped');
 }
 
+// ── 12. Stat-card live refresh (2026-08-29) ─────────────────────────────────
+// The 5 "today" stat cards used to be rendered once in PHP at page load and
+// never refreshed — so "Signed In Now" stayed frozen at its load-time value
+// even after an End Session action, an idle-timeout expiry, or just time
+// passing while the admin stayed on the page. api/get_login_history_stats.php
+// exposes the same query live; the page polls it after every table redraw and
+// on its own timer.
+echo "\n[12] Stat-card live refresh\n";
+
+ok(is_file($root . '/api/get_login_history_stats.php'), 'api/get_login_history_stats.php exists');
+$statsApiContent = file_get_contents($root . '/api/get_login_history_stats.php');
+ok(str_contains($statsApiContent, 'isAdmin()'), 'stats API checks isAdmin()');
+foreach (['signed_in_now', 'signins_today', 'people_today', 'expired_today', 'precise_today'] as $key) {
+    ok(str_contains($statsApiContent, "'{$key}'"), "stats API returns '{$key}'");
+}
+
+$pageContent = file_get_contents($loginHistoryFile); // re-read: this section changed it
+ok(str_contains($pageContent, 'function refreshStatCards()'), 'page defines refreshStatCards()');
+ok(str_contains($pageContent, "get_login_history_stats.php'"), 'refreshStatCards() calls the new stats endpoint');
+ok(str_contains($pageContent, 'refreshStatCards();') && str_contains($pageContent, 'drawCallback:'),
+   'refreshStatCards() is called from the table drawCallback');
+ok(str_contains($pageContent, 'setInterval(refreshStatCards, 30000)'),
+   'refreshStatCards() also polls independently of table redraws, so a purely server-side change (e.g. idle timeout) is not missed');
+
+// -- Real round-trip: seed one open session, call the endpoint in-process
+// (same technique as the tz-offset section above), confirm it counts it.
+$statsTestUid = 999700 + random_int(1, 99);
+$pdo->exec("DELETE FROM user_sessions WHERE user_id = {$statsTestUid}");
+$statsRowId = startUserSession($pdo, $statsTestUid, '127.0.0.1', 'StatsTest/1', 'sess-stats-' . $statsTestUid);
+
+$before = (int) $pdo->query("SELECT COUNT(*) FROM user_sessions WHERE logout_at IS NULL")->fetchColumn();
+
+$_SESSION['user_id'] = $statsTestUid;
+$_SESSION['is_admin'] = true;
+ob_start();
+include "$root/api/get_login_history_stats.php";
+$statsJson = json_decode(ob_get_clean(), true);
+unset($_SESSION['user_id'], $_SESSION['is_admin']);
+
+ok(($statsJson['success'] ?? false) === true, 'stats endpoint returns success (raw: ' . var_export($statsJson, true) . ')');
+ok(($statsJson['signed_in_now'] ?? -1) === $before, "signed_in_now matches a direct COUNT of open sessions ({$before})");
+
+$pdo->exec("DELETE FROM user_sessions WHERE user_id = {$statsTestUid}");
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 echo "\n";
 echo "Passes:   \033[32m{$pass}\033[0m\n";

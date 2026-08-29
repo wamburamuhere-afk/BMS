@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-08-29 (fix) — Login History stat cards go stale while the page stays open
+
+**Files (new):** `api/get_login_history_stats.php`
+**Files (changed):** `app/constant/settings/login_history.php`, `tests/test_login_history_cli.php`
+
+The 5 "today" stat cards ("Signed In Now", "Sign-ins Today", "People Today", "Expired Today", "Precise Today") were computed once in PHP at page load and never refreshed — so "Signed In Now" stayed frozen at its load-time value even after an admin ended a session on that same page, or after the 30-minute idle sweep quietly expired a row while the admin was still looking. The Duration column already ticked live per row; the summary cards above it did not.
+
+New `api/get_login_history_stats.php` (admin-only, same query the page already ran on load) is now polled by a `refreshStatCards()` JS function: once after every DataTable redraw (covers filter changes and the reload after End Session / Block / Activate), and independently every 30 seconds so a purely server-side change with no admin action on this page — the idle-timeout sweep — isn't missed either.
+
+Confirmed via a real in-process round-trip in `tests/test_login_history_cli.php` [12]: seeded an open session, called the new endpoint, and checked `signed_in_now` against a direct `COUNT(*)` of open rows.
+
 ## 2026-08-29 (feature) — Only two automatic session-ending causes; concurrent-login email; End Session restricted to other accounts
 
 **Files (new):** `migrations/2026_08_29_concurrent_login_notification.php`
