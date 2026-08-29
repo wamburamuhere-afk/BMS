@@ -204,7 +204,9 @@ ok(str_contains($pageContent, 'get_login_history'),   "Page references the corre
 ok(str_contains($pageContent, 'Location'),            "Page shows Location column");
 ok(str_contains($pageContent, 'ISP'),                 "Page shows ISP column");
 ok(str_contains($pageContent, 'device_type'),         "Page uses device_type from API");
-ok(str_contains($pageContent, 'today_logins'),        "Page has Today stat card");
+ok(str_contains($pageContent, 'signins_today'),       "Page has Sign-ins Today stat card");
+ok(str_contains($pageContent, 'signed_in_now'),       "Page has Signed In Now stat card");
+ok(str_contains($pageContent, 'precise_today'),       "Page has Precise Today stat card");
 
 // Login History is consolidated inside Settings > Admin (system_settings.php),
 // not a standalone top-nav item — header.php should NOT link to it directly.
@@ -213,6 +215,89 @@ ok(!str_contains($headerContent, "getUrl('login_history')"), "header.php no long
 $settingsPageContent = file_get_contents($root . '/app/constant/settings/system_settings.php');
 ok(str_contains($settingsPageContent, "getUrl('login_history')"), "system_settings.php links to login_history");
 ok(str_contains($settingsPageContent, 'bi-clock-history'),        "system_settings.php uses clock-history icon");
+
+// ── 8. Session lifecycle upgrade (2026-08-29) ──────────────────────────────────
+// Matches/exceeds the reference LMS Login History page: real expiry, "signed in
+// again" reconciliation, admin revoke, precise location, richer filters.
+echo "\n[8] Session lifecycle — schema, functions, filters, UI\n";
+
+$lifecycleCols = ['last_seen_at', 'php_session_id', 'revoked_by', 'revoked_at',
+                  'precise_lat', 'precise_lng', 'precise_accuracy_m', 'precise_captured_at'];
+foreach ($lifecycleCols as $col) {
+    ok((bool) $pdo->query("SHOW COLUMNS FROM user_sessions LIKE " . $pdo->quote($col))->fetch(),
+       "user_sessions.{$col} exists");
+}
+
+ok(function_exists('touchUserSession'),           'touchUserSession() defined');
+ok(function_exists('expireIdleSessions'),          'expireIdleSessions() defined');
+ok(function_exists('revokeUserSession'),           'revokeUserSession() defined');
+ok(function_exists('recordPreciseLocation'),       'recordPreciseLocation() defined');
+ok(function_exists('bmsEnforceSessionLifecycle'),  'bmsEnforceSessionLifecycle() defined');
+
+// -- Real DB round-trips, same pattern/cleanup convention as section [4] --
+$testUid = 999900 + random_int(1, 99); // avoid collision with a concurrent test run
+$pdo->exec("DELETE FROM user_sessions WHERE user_id = {$testUid}");
+
+// 8a. Re-login supersedes the prior open row, ended at its own last-seen moment.
+$firstRow  = startUserSession($pdo, $testUid, '127.0.0.1', 'LifecycleTest/1', 'phpsess-t1');
+$secondRow = startUserSession($pdo, $testUid, '127.0.0.1', 'LifecycleTest/2', 'phpsess-t2');
+$first  = $pdo->query("SELECT logout_type, logout_at FROM user_sessions WHERE id={$firstRow}")->fetch(PDO::FETCH_ASSOC);
+$second = $pdo->query("SELECT logout_type FROM user_sessions WHERE id={$secondRow}")->fetch(PDO::FETCH_ASSOC);
+ok($first['logout_type'] === 'superseded' && $first['logout_at'] !== null, "re-login closes the prior row as 'superseded'");
+ok($second['logout_type'] === null,                                       "the new row from re-login is still open");
+
+// 8b. Idle sweep closes at last-seen, never "now" — and never goes negative.
+$pdo->exec("UPDATE user_sessions SET login_at = DATE_SUB(NOW(), INTERVAL 60 MINUTE),
+            last_seen_at = DATE_SUB(NOW(), INTERVAL 45 MINUTE) WHERE id = {$secondRow}");
+expireIdleSessions($pdo, 1800);
+$idle = $pdo->query("SELECT logout_type, duration_seconds, logout_at, last_seen_at FROM user_sessions WHERE id={$secondRow}")->fetch(PDO::FETCH_ASSOC);
+ok($idle['logout_type'] === 'timeout',                 "idle sweep closes with logout_type='timeout'");
+ok($idle['logout_at'] === $idle['last_seen_at'],       "idle sweep closes AT last-seen, not 'now'");
+ok((int) $idle['duration_seconds'] === 900,            "idle sweep computes duration from login_at to last-seen (900s)");
+
+// 8c. Revoke: audit fields set, idempotent against a second call.
+$thirdRow = startUserSession($pdo, $testUid, '127.0.0.1', 'LifecycleTest/3', 'phpsess-t3');
+$revoked  = revokeUserSession($pdo, $thirdRow, 4, 'revoked');
+$rrow = $pdo->query("SELECT logout_type, revoked_by, revoked_at FROM user_sessions WHERE id={$thirdRow}")->fetch(PDO::FETCH_ASSOC);
+ok($revoked === true,                                  "revokeUserSession() returns true on a live row");
+ok($rrow['logout_type'] === 'revoked' && (int) $rrow['revoked_by'] === 4 && $rrow['revoked_at'] !== null,
+   "revoke stamps logout_type/revoked_by/revoked_at");
+ok(revokeUserSession($pdo, $thirdRow, 4, 'revoked') === false, "revoking an already-closed row is a no-op, not an error");
+
+// 8d. Precise location: bounds-checked and one-shot at the SQL level.
+$fourthRow = startUserSession($pdo, $testUid, '127.0.0.1', 'LifecycleTest/4', 'phpsess-t4');
+ok(recordPreciseLocation($pdo, $fourthRow, -6.7924, 39.2083, 25) === true, "recordPreciseLocation() accepts valid coordinates");
+ok(recordPreciseLocation($pdo, $fourthRow, 0, 0, 10) === false,            "a second ping on the same row is refused (one-shot)");
+ok(recordPreciseLocation($pdo, $fourthRow, 999, 39, 10) === false,         "out-of-range latitude is refused");
+$geo = $pdo->query("SELECT precise_lat FROM user_sessions WHERE id={$fourthRow}")->fetch(PDO::FETCH_ASSOC);
+ok(abs((float) $geo['precise_lat'] + 6.7924) < 0.0001,                     "the original (not the rejected) fix is what's stored");
+
+$pdo->exec("DELETE FROM user_sessions WHERE user_id = {$testUid}");
+ok(!$pdo->query("SELECT id FROM user_sessions WHERE user_id = {$testUid}")->fetch(), "lifecycle test rows cleaned up");
+
+// -- Static checks: new filters wired end to end (API + page) --
+$apiContent = file_get_contents($root . '/api/get_login_history.php');
+foreach (["'ended'", "'device'", "'country'", "'location_source'", "'superseded'", "'revoked'", "'admin_ended'"] as $needle) {
+    ok(str_contains($apiContent, $needle), "API references filter/state {$needle}");
+}
+
+$pageContent = file_get_contents($loginHistoryFile);
+foreach (['periodChips', 'f-ended', 'f-device', 'f-country', 'f-location-source', 'endSession(', 'endedBadge', 'CURRENT_SESSION_ROW_ID'] as $needle) {
+    ok(str_contains($pageContent, $needle), "Page references {$needle}");
+}
+
+ok(is_file($root . '/api/revoke_session.php'), "api/revoke_session.php exists");
+$revokeApiContent = file_get_contents($root . '/api/revoke_session.php');
+ok(str_contains($revokeApiContent, 'isAdmin()'),          "revoke_session.php checks isAdmin()");
+ok(str_contains($revokeApiContent, 'csrf_check()'),       "revoke_session.php checks csrf_check()");
+ok(str_contains($revokeApiContent, "'POST'"),             "revoke_session.php requires POST");
+ok(str_contains($revokeApiContent, 'revokeUserSession'),  "revoke_session.php calls revokeUserSession()");
+ok(str_contains($revokeApiContent, 'logAudit('),          "revoke_session.php writes an audit-log entry");
+
+ok(is_file($root . '/api/session_geo_ping.php'), "api/session_geo_ping.php exists");
+$geoApiContent = file_get_contents($root . '/api/session_geo_ping.php');
+ok(str_contains($geoApiContent, 'isAuthenticated()'),      "session_geo_ping.php checks isAuthenticated()");
+ok(str_contains($geoApiContent, 'recordPreciseLocation'),  "session_geo_ping.php calls recordPreciseLocation()");
 
 // ── Summary ──────────────────────────────────────────────────────────────────
 echo "\n";
