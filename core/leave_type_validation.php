@@ -66,6 +66,7 @@ if (!function_exists('validateLeaveTypeInput')) {
         }
         $is_paid = (int)$post['is_paid'];
         $requires_document = !empty($post['requires_document']) ? 1 : 0;
+        $count_working_days_only = !empty($post['count_working_days_only']) ? 1 : 0;
 
         $color = trim($post['color'] ?? '#0d6efd');
         if (!preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
@@ -83,6 +84,7 @@ if (!function_exists('validateLeaveTypeInput')) {
             'requires_document'     => $requires_document,
             'is_paid'               => $is_paid,
             'carry_over_days'       => $carry_over,
+            'count_working_days_only' => $count_working_days_only,
             'color'                 => $color,
             'status'                => $status,
         ];

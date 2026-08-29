@@ -981,6 +981,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('leaves')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('leaves') ?>"><i class="bi bi-calendar"></i> Leaves</a></li>
                                 <?php endif; ?>
+                                <?php if(canView('company_calendar')): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('company_calendar') ?>"><i class="bi bi-calendar-week"></i> Working Days &amp; Holidays</a></li>
+                                <?php endif; ?>
                                 <li><h6 class="dropdown-header">Assets & Maintenance</h6></li>
                                 <?php if(canView('assets')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('assets') ?>"><i class="bi bi-pc-display"></i> Assets</a></li>

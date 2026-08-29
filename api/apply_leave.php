@@ -74,7 +74,7 @@ try {
 
     // Days are computed server-side and checked against the type's limits, which
     // used to be a client-side hint only.
-    $total_days = leaveDaysFor($start_date, $end_date, $half_day, $leave_hours);
+    $total_days = leaveDaysFor($start_date, $end_date, $half_day, $leave_hours, (bool)($type['count_working_days_only'] ?? 0), $pdo);
     assertLeaveWithinTypeLimits($pdo, $type, (int)$employee_id, $start_date, $total_days);
 
     if ((int)$type['requires_document'] === 1

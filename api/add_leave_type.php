@@ -29,14 +29,14 @@ try {
         INSERT INTO leave_types (
             type_name, description, max_days_per_year, min_days_before_apply,
             max_consecutive_days, requires_document, is_paid, carry_over_days,
-            color, status, created_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            count_working_days_only, color, status, created_by, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     ");
     $stmt->execute([
         $data['type_name'], $data['description'], $data['max_days_per_year'],
         $data['min_days_before_apply'], $data['max_consecutive_days'],
         $data['requires_document'], $data['is_paid'], $data['carry_over_days'],
-        $data['color'], $data['status'], $_SESSION['user_id'],
+        $data['count_working_days_only'], $data['color'], $data['status'], $_SESSION['user_id'],
     ]);
     $new_id = (int)$pdo->lastInsertId();
 

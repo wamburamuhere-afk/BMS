@@ -3,6 +3,7 @@
 // Include roots configuration
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/leave_rules.php';   // WORKING_DAY_HOURS + shared limits
+require_once __DIR__ . '/../../../core/company_calendar.php';   // working days + public holidays, for "count working days only" leave types
 
 // Enforce permission BEFORE any output
 autoEnforcePermission('leaves');
@@ -53,6 +54,15 @@ $employees = $pdo->query($employees_query)->fetchAll(PDO::FETCH_ASSOC);
 
 // Get leave types
 $leave_types = $pdo->query("SELECT * FROM leave_types WHERE status = 'active' ORDER BY type_name")->fetchAll(PDO::FETCH_ASSOC);
+
+// Working-days calendar, embedded for the live day-count preview (calculateDays()
+// below) so it matches core/leave_rules.php::leaveDaysFor() exactly for any leave
+// type with count_working_days_only=1. Range covers backdated corrections and
+// forward planning; server-side validation on submit is authoritative regardless.
+$calendar_range_start = date('Y-m-d', strtotime('-1 year'));
+$calendar_range_end   = date('Y-m-d', strtotime('+2 years'));
+$company_working_days = companyWorkingDays();
+$company_holidays     = array_keys(publicHolidaysInRange($pdo, $calendar_range_start, $calendar_range_end));
 
 // Helper functions removed, now in helpers.php
 
@@ -763,7 +773,8 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                         data-max-days="<?= (int)$type['max_days_per_year'] ?>"
                                         data-max-consecutive="<?= (int)$type['max_consecutive_days'] ?>"
                                         data-requires-doc="<?= (int)$type['requires_document'] ?>"
-                                        data-is-paid="<?= (int)$type['is_paid'] ?>">
+                                        data-is-paid="<?= (int)$type['is_paid'] ?>"
+                                        data-working-days-only="<?= (int)$type['count_working_days_only'] ?>">
                                     <?= safe_output($type['type_name']) ?>
                                     (Max: <?= (int)$type['max_days_per_year'] ?> days/year, <?= (int)$type['max_consecutive_days'] ?> consecutive)
                                 </option>
@@ -941,7 +952,8 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                         data-max-days="<?= (int)$type['max_days_per_year'] ?>"
                                         data-max-consecutive="<?= (int)$type['max_consecutive_days'] ?>"
                                         data-requires-doc="<?= (int)$type['requires_document'] ?>"
-                                        data-is-paid="<?= (int)$type['is_paid'] ?>">
+                                        data-is-paid="<?= (int)$type['is_paid'] ?>"
+                                        data-working-days-only="<?= (int)$type['count_working_days_only'] ?>">
                                     <?= safe_output($type['type_name']) ?>
                                     (Max: <?= (int)$type['max_days_per_year'] ?> days/year, <?= (int)$type['max_consecutive_days'] ?> consecutive)
                                 </option>
@@ -1010,6 +1022,11 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 
 <!-- Scripts -->
 <script>
+// Working-days calendar mirror of core/company_calendar.php, for the live day-count
+// preview only — the server always recomputes and is authoritative on submit.
+window.COMPANY_WORKING_DAYS = <?= json_encode($company_working_days) ?>;
+window.COMPANY_HOLIDAYS = <?= json_encode($company_holidays) ?>;
+
 // Initialize Select2 on .select2-static elements
 function initLeavesSelect2(context, dropdownParent) {
     var opts = { theme: 'bootstrap-5', width: '100%', allowClear: true };
@@ -1269,6 +1286,7 @@ function updateLeaveTypeInfo(prefix) {
     const opt = $sel.find(':selected');
     const requiresDoc = opt.data('requires-doc') == 1;
     const isPaid      = opt.data('is-paid');
+    const workingDaysOnly = opt.data('working-days-only') == 1;
 
     if (prefix === 'apply') {
         requiresDoc ? $('#documentSection').show() : $('#documentSection').hide();
@@ -1288,7 +1306,19 @@ function updateLeaveTypeInfo(prefix) {
                 paid ? 'Salary is paid for these days.' : 'Salary is not paid for these days.'
             )
         );
+        if (workingDaysOnly) {
+            $badge.append(
+                $('<span>').addClass('badge bg-info text-dark ms-2')
+                    .html('<i class="bi bi-calendar-week"></i> Working days only')
+            ).append(
+                $('<small>').addClass('text-muted ms-2').text('Weekends and public holidays are not counted.')
+            );
+        }
     }
+
+    // Re-run the day-count preview: switching type can flip between calendar-day
+    // and working-day counting even when the dates haven't changed.
+    calculateDays();
 
     if (prefix === 'apply') updateLeaveBalance();
 }
@@ -1415,17 +1445,34 @@ function bulkExportApplications() {
 // Days consumed, mirroring core/leave_rules.php::leaveDaysFor() so the figure the
 // user sees matches the one the server stores. 'none' is a real value now, so it
 // must be compared explicitly — a truthy test would dock half a day from every leave.
-function leaveDaysFor(startDate, endDate, halfDay) {
+// workingDaysOnly mirrors the selected leave type's count_working_days_only flag
+// (core/company_calendar.php::businessDaysBetween() server-side); false (the
+// default) preserves the original calendar-day count exactly.
+function leaveDaysFor(startDate, endDate, halfDay, workingDaysOnly) {
     const start = new Date(startDate);
     const end   = new Date(endDate);
     if (end < start) return null;
 
-    const diffDays = Math.round((end - start) / 86400000) + 1;
+    let days;
+    if (workingDaysOnly) {
+        const workingIsoWeekdays = window.COMPANY_WORKING_DAYS || [1, 2, 3, 4, 5];
+        const holidays = new Set(window.COMPANY_HOLIDAYS || []);
+        days = 0;
+        const cursor = new Date(start);
+        while (cursor <= end) {
+            const isoWeekday = ((cursor.getDay() + 6) % 7) + 1; // JS 0=Sun..6=Sat -> ISO 1=Mon..7=Sun
+            const ymd = cursor.toISOString().slice(0, 10);
+            if (workingIsoWeekdays.includes(isoWeekday) && !holidays.has(ymd)) days++;
+            cursor.setDate(cursor.getDate() + 1);
+        }
+    } else {
+        days = Math.round((end - start) / 86400000) + 1;
+    }
 
     if (halfDay === 'first_half' || halfDay === 'second_half') {
-        return Math.max(0.5, diffDays - 0.5);
+        return Math.max(0.5, days - 0.5);
     }
-    return diffDays;
+    return days;
 }
 
 function calculateDays() {
@@ -1433,7 +1480,8 @@ function calculateDays() {
     const endDate = $('#apply_end_date').val();
 
     if (startDate && endDate) {
-        const totalDays = leaveDaysFor(startDate, endDate, $('#apply_half_day').val());
+        const workingDaysOnly = $('#apply_leave_type option:selected').data('working-days-only') == 1;
+        const totalDays = leaveDaysFor(startDate, endDate, $('#apply_half_day').val(), workingDaysOnly);
         if (totalDays === null) {
             Swal.fire({
                 icon: 'warning',
@@ -1453,7 +1501,8 @@ function calculateDays() {
     const editStart = $('#edit_start_date').val();
     const editEnd = $('#edit_end_date').val();
     if (editStart && editEnd) {
-        const d = leaveDaysFor(editStart, editEnd, $('#edit_half_day').val());
+        const editWorkingDaysOnly = $('#edit_leave_type option:selected').data('working-days-only') == 1;
+        const d = leaveDaysFor(editStart, editEnd, $('#edit_half_day').val(), editWorkingDaysOnly);
         $('#edit_total_days').val(d === null ? 0 : d);
     }
 }
