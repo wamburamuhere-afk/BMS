@@ -10,7 +10,11 @@ require_once __DIR__ . '/../roots.php';
 global $pdo;
 
 // ── Auth guard ────────────────────────────────────────────────────────
-if (session_status() === PHP_SESSION_NONE) session_start();
+// No session_start() here — roots.php above already handled it, and it then
+// releases the session lock (see core/session_guard.php), which legitimately
+// leaves session_status() as PHP_SESSION_NONE while $_SESSION stays populated.
+// Starting a second session at this point would replace $_SESSION with an empty
+// one and lock every logged-in admin out of this dashboard.
 if (empty($_SESSION['user_id'])) {
     http_response_code(403);
     die('<h3 style="font-family:sans-serif;text-align:center;margin-top:80px;color:#64748b">
