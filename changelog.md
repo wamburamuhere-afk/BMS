@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-08-29 (refactor) — Operations menu: regrouped Human Resources into 6 categories
+
+**Files (changed):** `header.php`
+
+The whole Human Resources section had become one flat run of 18 links (only Org Structure and Assets & Maintenance had their own sub-header) — the wall-of-links problem LMS avoids with its 5-category Operations menu. Adapted that grouping logic rather than copying it literally: BMS has more distinct HR pages than LMS (Org Chart, Contracts, Performance, Training, Recruitment, Checklists, Trips, Salary Components are all separate pages here), so forcing exactly 5 buckets would just move the crowding around.
+
+New grouping, none with just a single item: **Workforce** (HR Dashboard, Employees, HR Actions, Org Chart, Contracts), **Org Structure** (unchanged), **Performance & Growth** (Performance, Training, Recruitment, Checklists), **Payroll** (Payroll, Salary Components), **Attendance & Leave** (Attendance, Leaves, Working Days & Holidays), **Communication & Calendar** (Meetings, Trips, Announcements), **Assets & Maintenance** (unchanged).
+
+Pure reorganisation — same 22 links, same `canView()` gate on every one (verified identical page_key set before/after). Every test that greps `header.php` for menu wiring (org structure, HR dashboard, company calendar) still passes.
+
 ## 2026-08-29 (feature) — HR Dashboard: a real command centre
 
 **Files (new):** `app/bms/pos/hr_dashboard.php`, `migrations/2026_08_29_hr_dashboard_permission.php`, `tests/test_hr_dashboard_cli.php`
