@@ -16,6 +16,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Guard: $user is false when no row matches — never index into it directly.
     if ($user && password_verify($password, $user['password'])) {
+
+        // is_active was previously only cosmetic — Settings > Users could flip
+        // it, and Login History's "Block Account" writes it too, but nothing
+        // ever actually checked it here, so a "deactivated" account could still
+        // log in normally. This is the one place that makes the flag real: an
+        // account manually blocked by an admin (never automatically) cannot
+        // sign back in until an admin reactivates it.
+        if ((int) ($user['is_active'] ?? 1) !== 1) {
+            $response['message'] = 'This account has been deactivated. Please contact an administrator.';
+            echo json_encode($response);
+            exit;
+        }
+
         // Include permissions logic
         require_once '../core/permissions.php';
 

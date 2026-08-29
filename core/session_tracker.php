@@ -277,7 +277,11 @@ if (!function_exists('revokeUserSession')) {
      */
     function revokeUserSession(PDO $pdo, int $sessionRowId, int $adminUserId, string $reason = 'revoked'): bool
     {
-        $reason = in_array($reason, ['revoked', 'admin_ended'], true) ? $reason : 'revoked';
+        // 'blocked' — the account itself was deactivated (ajax/toggle_user.php),
+        // distinct from 'revoked' (a single session force-ended while the
+        // account stays usable) so Login History's Ended column can say
+        // "Account Blocked" rather than a generic "Revoked".
+        $reason = in_array($reason, ['revoked', 'admin_ended', 'blocked'], true) ? $reason : 'revoked';
         try {
             $row = $pdo->prepare("SELECT login_at, logout_at FROM user_sessions WHERE id = ?");
             $row->execute([$sessionRowId]);

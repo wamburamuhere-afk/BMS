@@ -101,7 +101,8 @@ $current_session_row_id = (int) ($_SESSION['session_row_id'] ?? 0);
          admin never misreads what these numbers mean. -->
     <div class="alert alert-light border small mb-4" style="border-radius:10px;">
         <div class="mb-1"><i class="bi bi-info-circle me-1"></i>A session ends when the person signs out, or after <strong>30 minutes</strong> without activity (matching the POS terminal timeout). Nothing runs at the exact moment a session goes idle, so an <strong>Expired</strong> row shows when the person was <strong>last seen</strong> — not a logout time, which was never observed. Duration is measured to that same last-seen moment, and ticks live for anyone signed in right now.</div>
-        <div class="mb-0"><i class="bi bi-geo-alt me-1"></i><strong>Approximate</strong> location is inferred from the IP address — city-level at best, and on mobile networks it can report the carrier's city rather than the person's. <strong>Precise</strong> means the browser reported its actual position and the person's device permission prompt was accepted — the only source accurate to street level, shown with its accuracy radius.</div>
+        <div class="mb-1"><i class="bi bi-geo-alt me-1"></i><strong>Approximate</strong> location is inferred from the IP address — city-level at best, and on mobile networks it can report the carrier's city rather than the person's. <strong>Precise</strong> means the browser reported its actual position and the person's device permission prompt was accepted — the only source accurate to street level, shown with its accuracy radius.</div>
+        <div class="mb-0"><i class="bi bi-exclamation-triangle me-1"></i><strong>Unfamiliar</strong> flags a login the first time a user has ever signed in from that country + device combination — a prompt to look closer, nothing more. It never blocks or restricts anything by itself. <strong>Block Account</strong> is always a deliberate, manual admin action from the row's own menu: it signs the account out immediately and refuses its next login until an admin activates it again from here or Settings &gt; Users.</div>
     </div>
 
     <!-- Filters -->
@@ -150,6 +151,14 @@ $current_session_row_id = (int) ($_SESSION['session_row_id'] ?? 0);
                         <option value="superseded">Signed in again</option>
                         <option value="revoked">Revoked</option>
                         <option value="admin_ended">Ended by admin</option>
+                        <option value="blocked">Account blocked</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Flag</label>
+                    <select id="f-unfamiliar" class="form-select" style="width:100%">
+                        <option value="">Any</option>
+                        <option value="1">Unfamiliar only</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -242,6 +251,10 @@ $current_session_row_id = (int) ($_SESSION['session_row_id'] ?? 0);
 
 <script>
 const CURRENT_SESSION_ROW_ID = <?= (int) $current_session_row_id ?>;
+// So the dropdown can hide Block Account on the admin's own row client-side —
+// ajax/toggle_user.php already refuses it server-side too (defense in depth,
+// not the only guard).
+const CURRENT_ADMIN_USER_ID = <?= (int) ($_SESSION['user_id'] ?? 0) ?>;
 
 function safeOutput(s) {
     if (s == null) return '';
@@ -331,8 +344,19 @@ function endedBadge(r) {
         case 'superseded':  return { badge: '<span class="badge bg-info text-dark">Signed in again</span>',   detail: 'at ' + at(r.logout_at) };
         case 'revoked':     return { badge: '<span class="badge bg-danger">Revoked</span>',                   detail: 'at ' + at(r.logout_at) + by };
         case 'admin_ended': return { badge: '<span class="badge bg-dark">Ended by admin</span>',              detail: 'at ' + at(r.logout_at) + by };
+        case 'blocked':     return { badge: '<span class="badge bg-danger"><i class="bi bi-slash-circle me-1"></i>Account Blocked</span>', detail: 'at ' + at(r.logout_at) + by };
         default:            return { badge: '<span class="badge bg-secondary-subtle text-secondary border">Signed out</span>', detail: 'at ' + at(r.logout_at) };
     }
+}
+
+// "Unfamiliar" flag — informational only, computed server-side
+// (api/get_login_history.php: first time this user signed in from this
+// country+device combination). Never triggers anything by itself; it exists
+// purely so an admin reviewing the table can SEE a row worth a second look
+// before deciding, themselves, whether to act on it.
+function unfamiliarBadge(r) {
+    if (!r.is_unfamiliar) return '';
+    return `<span class="badge bg-warning text-dark ms-1" title="First time this user has signed in from this country + device combination"><i class="bi bi-exclamation-triangle-fill me-1"></i>Unfamiliar</span>`;
 }
 
 // Render the Location & Device cell HTML (shared by table column renderer and card)
@@ -371,6 +395,74 @@ function endSession(id, isSelf) {
     }).then(r => { if (r.isConfirmed) doIt(); });
 }
 
+// Block / Activate Account — reuses the same admin-only, audit-logged
+// endpoint Settings > Users already calls (ajax/toggle_user.php); Login
+// History just gives admins a second, more useful entry point to it, right
+// where a suspicious row is being reviewed. Deactivating there already ends
+// the account's live session immediately (see ajax/toggle_user.php) and
+// actions/login.php refuses the account's next login attempt outright — so
+// "block" here is real, not cosmetic.
+//
+// This is ONLY ever reached by an admin clicking the menu item and then
+// confirming the dialog below — there is no automated path anywhere that
+// calls this. The "Unfamiliar" flag is informational only; it never blocks
+// anything by itself.
+function toggleAccount(userId, username, action) {
+    const isBlock = action === 'deactivate';
+    Swal.fire({
+        title: isBlock ? `Block ${safeOutput(username)}'s account?` : `Activate ${safeOutput(username)}'s account?`,
+        html: isBlock
+            ? `They will be signed out immediately and cannot sign back in until an admin activates the account again from here or Settings &gt; Users.`
+            : `They will be able to sign in again immediately.`,
+        icon: 'warning', showCancelButton: true,
+        confirmButtonColor: isBlock ? '#dc3545' : '#198754',
+        confirmButtonText: isBlock ? 'Yes, block account' : 'Yes, activate account'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('ajax/toggle_user.php') ?>', { user_id: userId, action: action }, function (res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: isBlock ? 'Account blocked' : 'Account activated', text: res.message, timer: 1800, showConfirmButton: false })
+                    .then(() => $('#loginTable').DataTable().ajax.reload(null, false));
+            } else {
+                Swal.fire({ icon: 'error', title: 'Could not update account', text: res.message });
+            }
+        }, 'json').fail(function () {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' });
+        });
+    });
+}
+
+// Shared gear-menu Actions cell — same visual pattern as the Suppliers list's
+// row Actions dropdown (gear icon + Bootstrap's built-in caret), used by both
+// the table and card views so there is exactly one place defining what an
+// admin can do from a Login History row.
+function renderActionsMenu(r) {
+    const isActive = !r.logout_at;
+    const isSelf   = CURRENT_SESSION_ROW_ID > 0 && Number(r.id) === CURRENT_SESSION_ROW_ID;
+    const uname    = r.username || ('user #' + r.user_id);
+
+    let items = '';
+    if (isActive) {
+        items += `<li><a class="dropdown-item py-2 rounded" href="#" onclick="endSession(${r.id}, ${isSelf})"><i class="bi bi-x-octagon text-warning me-2"></i>End Session${isSelf ? ' (yours)' : ''}</a></li>`;
+    }
+    const canToggleAccount = r.user_is_active !== null && Number(r.user_id) !== CURRENT_ADMIN_USER_ID;
+    if (canToggleAccount) {
+        if (items) items += `<li><hr class="dropdown-divider"></li>`;
+        items += r.user_is_active
+            ? `<li><a class="dropdown-item py-2 rounded text-danger" href="#" onclick="toggleAccount(${r.user_id}, '${uname.replace(/'/g, "\\'")}', 'deactivate')"><i class="bi bi-slash-circle me-2"></i>Block Account</a></li>`
+            : `<li><a class="dropdown-item py-2 rounded text-success" href="#" onclick="toggleAccount(${r.user_id}, '${uname.replace(/'/g, "\\'")}', 'activate')"><i class="bi bi-check-circle me-2"></i>Activate Account</a></li>`;
+    }
+
+    if (!items) return '';
+    return `
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-gear-fill"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${items}</ul>
+        </div>`;
+}
+
 // Render cards grid from a DataTables rows data array
 function renderCards(rows) {
     if (!rows.length) {
@@ -381,14 +473,11 @@ function renderCards(rows) {
     rows.forEach(r => {
         const ended      = endedBadge(r);
         const isActive   = ended.isActive;
-        const isSelf     = CURRENT_SESSION_ROW_ID > 0 && Number(r.id) === CURRENT_SESSION_ROW_ID;
         const roleBadge  = r.role_name
             ? `<span class="badge bg-${roleColor(r.role_name)}">${safeOutput(r.role_name)}</span>`
             : '';
         const loginTime  = r.login_at ? new Date(r.login_at).toLocaleString() : '—';
-        const actionBtn  = isActive
-            ? `<button class="btn btn-sm btn-outline-danger w-100" onclick="endSession(${r.id}, ${isSelf})"><i class="bi bi-x-octagon me-1"></i>End Session${isSelf ? ' (yours)' : ''}</button>`
-            : '';
+        const actionsMenu = renderActionsMenu(r);
 
         html += `
         <div class="col-12 col-sm-6 col-lg-4">
@@ -396,7 +485,7 @@ function renderCards(rows) {
                 <div class="card-header py-2 px-3 d-flex align-items-center justify-content-between"
                      style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);">
                     <div>
-                        <div class="fw-bold text-dark small">${safeOutput(r.username)}</div>
+                        <div class="fw-bold text-dark small">${safeOutput(r.username)}${unfamiliarBadge(r)}</div>
                         <div class="text-muted" style="font-size:.72rem">${safeOutput(r.email)}</div>
                     </div>
                     ${roleBadge}
@@ -415,7 +504,7 @@ function renderCards(rows) {
                         <span class="text-muted small"><i class="bi bi-stopwatch me-1"></i>${safeOutput(ended.detail)}</span>
                         <span class="fw-semibold small durvalue ${isActive ? 'text-success' : 'text-secondary'}" data-login-at="${safeOutput(r.login_at)}" data-active="${isActive}">${isActive ? formatDur(liveElapsedSeconds(r.login_at)) : formatDur(r.duration_seconds)}</span>
                     </div>
-                    ${actionBtn}
+                    ${actionsMenu ? `<div class="d-flex justify-content-end">${actionsMenu}</div>` : ''}
                 </div>
             </div>
         </div>`;
@@ -480,6 +569,7 @@ $(document).ready(function () {
                 d.device           = $('#f-device').val()  || '';
                 d.country          = $('#f-country').val() || '';
                 d.location_source  = $('#f-location-source').val() || '';
+                d.unfamiliar       = $('#f-unfamiliar').val() || '';
             },
             error: function (xhr) {
                 console.error('Login History DataTables error:', xhr.status, xhr.statusText);
@@ -495,7 +585,7 @@ $(document).ready(function () {
             {   // User
                 data: null, orderable: true,
                 render: function (data, type, row) {
-                    return `<div class="fw-semibold">${safeOutput(row.username)}</div>`
+                    return `<div class="fw-semibold">${safeOutput(row.username)}${unfamiliarBadge(row)}</div>`
                          + `<div class="text-muted small">${safeOutput(row.email)}</div>`;
                 }
             },
@@ -545,12 +635,13 @@ $(document).ready(function () {
                     return `<span class="durvalue ${isActive ? 'text-success fw-semibold' : 'text-muted'}" data-login-at="${safeOutput(row.login_at)}" data-active="${isActive}">${isActive ? formatDur(liveElapsedSeconds(row.login_at)) : formatDur(data)}</span>`;
                 }
             },
-            {   // Actions
+            {   // Actions — same gear+dropdown pattern as the Suppliers list.
+                // Not just End Session (which only applies to an open row): Block/
+                // Activate Account apply regardless of whether THIS particular row
+                // is still open, since an admin may be reviewing a past login.
                 data: null, orderable: false, className: 'pe-3 text-end',
                 render: function (data, type, row) {
-                    if (row.logout_at) return '';
-                    const isSelf = CURRENT_SESSION_ROW_ID > 0 && Number(row.id) === CURRENT_SESSION_ROW_ID;
-                    return `<button class="btn btn-sm btn-outline-danger" onclick="endSession(${row.id}, ${isSelf})" title="End this session"><i class="bi bi-x-octagon"></i></button>`;
+                    return renderActionsMenu(row);
                 }
             }
         ],
@@ -582,7 +673,7 @@ $(document).ready(function () {
     $('#btn-reset').on('click', function () {
         $('#f-user').val('').trigger('change');
         $('#f-country').val('').trigger('change');
-        $('#f-ended, #f-device, #f-location-source').val('');
+        $('#f-ended, #f-device, #f-location-source, #f-unfamiliar').val('');
         $('#f-search').val('');
         $('#f-from').val('<?= date('Y-m-d', strtotime('-30 days')) ?>');
         $('#f-to').val('<?= date('Y-m-d') ?>');

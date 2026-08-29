@@ -49,9 +49,22 @@ try {
     $stmt = $pdo->prepare("UPDATE users SET is_active = ? WHERE user_id = ?");
     $result = $stmt->execute([$new_status, $user_id]);
 
+    // Deactivating must take effect immediately, not just block the NEXT
+    // login (actions/login.php's is_active check handles that) — end
+    // whatever session they're using RIGHT NOW too, the same way Login
+    // History's own "End Session" admin action does.
+    if ($result && $new_status === 0) {
+        require_once '../core/session_tracker.php';
+        $openRows = $pdo->prepare("SELECT id FROM user_sessions WHERE user_id = ? AND logout_at IS NULL");
+        $openRows->execute([$user_id]);
+        foreach ($openRows->fetchAll(PDO::FETCH_COLUMN) as $openId) {
+            revokeUserSession($pdo, (int) $openId, (int) $_SESSION['user_id'], 'blocked');
+        }
+    }
+
     if ($result) {
         $action_label = ($action === 'activate') ? 'activated' : 'deactivated';
-        
+
         // Log action
         logAudit($pdo, $_SESSION['user_id'], 'toggle_user_status', [
             'entity_type' => 'user',

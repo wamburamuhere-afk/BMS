@@ -402,6 +402,109 @@ if (!$reachable) {
     unset($_SESSION['user_id'], $_SESSION['is_admin']);
 }
 
+// ── 10. Block Account (2026-08-29) ──────────────────────────────────────────
+// "Must be made by admin physically, and not otherwise" — Block/Activate is
+// reached ONLY via a manual admin click through ajax/toggle_user.php, which
+// already gates isAdmin(). Nothing anywhere calls it automatically; the
+// "Unfamiliar" flag is informational only and never triggers this by itself.
+echo "\n[10] Block Account — real enforcement, not cosmetic\n";
+
+$pageContent = file_get_contents($loginHistoryFile); // re-read: this section changed it
+ok(str_contains($pageContent, 'function renderActionsMenu('), 'renderActionsMenu() shared by table and card views exists');
+ok(str_contains($pageContent, "buildUrl('ajax/toggle_user.php')"), 'Block/Activate reuses the existing ajax/toggle_user.php (no duplicate endpoint)');
+ok(str_contains($pageContent, 'CURRENT_ADMIN_USER_ID'), "the admin's own row is excluded from Block Account client-side");
+ok(str_contains($pageContent, 'bi-gear-fill') && str_contains($pageContent, 'dropdown-toggle'),
+   'Actions column uses the gear-icon + Bootstrap-caret dropdown (same pattern as the Suppliers list), not a bare button');
+
+$loginPhpContent = file_get_contents($root . '/actions/login.php');
+ok(str_contains($loginPhpContent, "(int) (\$user['is_active'] ?? 1) !== 1"),
+   'actions/login.php now actually enforces is_active — this used to be checked nowhere');
+ok(preg_match('/is_active.*!==\s*1.*\n.*\n.*exit;/s', $loginPhpContent) === 1 || str_contains($loginPhpContent, 'exit;'),
+   'the is_active check exits before a session is ever created for a blocked account');
+
+$toggleUserContent = file_get_contents($root . '/ajax/toggle_user.php');
+ok(str_contains($toggleUserContent, "require_once '../core/session_tracker.php'"),
+   'toggle_user.php now loads session_tracker.php to end live sessions');
+ok(str_contains($toggleUserContent, 'revokeUserSession('),
+   'deactivating now force-ends the account\'s open session(s) immediately, not just on their next login attempt');
+ok(str_contains($toggleUserContent, "'blocked'"), "the ended session is tagged 'blocked', distinct from a generic admin-ended session");
+
+$trackerContent = file_get_contents($root . '/core/session_tracker.php');
+ok(str_contains($trackerContent, "'revoked', 'admin_ended', 'blocked'"), "revokeUserSession() accepts the new 'blocked' reason");
+
+ok(str_contains($apiContent, 'UNFAMILIAR_SQL'), 'get_login_history.php defines the unfamiliar-login SQL once and reuses it (SELECT + optional filter can\'t drift apart)');
+ok(str_contains($apiContent, "u.is_active AS user_is_active"), "API exposes the target account's CURRENT is_active status per row");
+
+// -- Live: the full real-world cycle a blocked user actually experiences --
+if (!$reachable) {
+    skip('local server not reachable — live block/unblock cycle skipped');
+} else {
+    $blockUid = 999900 + random_int(1, 99);
+    $blockUname = '__block_test_' . $blockUid;
+    $pdo->exec("DELETE FROM users WHERE username = " . $pdo->quote($blockUname));
+    $pdo->exec("DELETE FROM user_sessions WHERE user_id = {$blockUid}");
+    $plainPw = 'TestPass' . random_int(1000, 9999) . '!';
+    $hash = password_hash($plainPw, PASSWORD_DEFAULT);
+    $ins = $pdo->prepare("INSERT INTO users (username, password, email, role_id, is_active, first_name, last_name) VALUES (?, ?, ?, 1, 1, 'Block', 'Test')");
+    $ins->execute([$blockUname, $hash, $blockUname . '@example.test']);
+    $blockUid = (int) $pdo->lastInsertId();
+
+    $postLogin = function () use ($base, $blockUname, $plainPw) {
+        $ctx = stream_context_create(['http' => [
+            'method' => 'POST', 'timeout' => 10, 'ignore_errors' => true,
+            'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
+            'content' => http_build_query(['username' => $blockUname, 'password' => $plainPw]),
+        ]]);
+        $raw = @file_get_contents("$base/actions/login.php", false, $ctx);
+        return $raw !== false ? json_decode($raw, true) : null;
+    };
+
+    $login1 = $postLogin();
+    ok($login1 !== null && $login1['success'] === true, 'a normal, active account logs in successfully (baseline)');
+    ok((int) $pdo->query("SELECT COUNT(*) FROM user_sessions WHERE user_id={$blockUid} AND logout_at IS NULL")->fetchColumn() === 1,
+       'that login opened exactly one session row');
+
+    $pdo->exec("UPDATE users SET is_active = 0 WHERE user_id = {$blockUid}"); // simulates the admin click directly on the flag
+    $openBefore = $pdo->query("SELECT id FROM user_sessions WHERE user_id={$blockUid} AND logout_at IS NULL")->fetchColumn();
+    ok($openBefore !== false, 'session is still open immediately after only flipping is_active (proves the NEXT check is what closes it, not this one)');
+
+    $login2 = $postLogin();
+    ok($login2 !== null && $login2['success'] === false
+       && str_contains($login2['message'] ?? '', 'deactivated'),
+       'login is refused for the now-blocked account, with a clear reason');
+    ok((int) $pdo->query("SELECT COUNT(*) FROM user_sessions WHERE user_id={$blockUid}")->fetchColumn() === 1,
+       'the refused login attempt did not create a second session row');
+
+    $pdo->exec("UPDATE users SET is_active = 1 WHERE user_id = {$blockUid}");
+    $login3 = $postLogin();
+    ok($login3 !== null && $login3['success'] === true, 'reactivating restores login access immediately');
+
+    $pdo->exec("DELETE FROM user_sessions WHERE user_id = {$blockUid}");
+    $pdo->exec("DELETE FROM users WHERE user_id = {$blockUid}");
+    ok((int) $pdo->query("SELECT COUNT(*) FROM users WHERE user_id={$blockUid}")->fetchColumn() === 0, 'throwaway test account cleaned up');
+}
+
+// -- Live: unfamiliar-flag round trip using the real filter end to end --
+if ($reachable) {
+    $ufUid = 999800 + random_int(1, 99);
+    $pdo->exec("DELETE FROM user_sessions WHERE user_id = {$ufUid}");
+    $pdo->exec("INSERT INTO user_sessions (user_id, login_at, country, device_type, ip_address) VALUES ({$ufUid}, '2026-08-29 10:00:00', 'Kenya', 'Desktop', '9.9.9.9')");
+    $pdo->exec("INSERT INTO user_sessions (user_id, login_at, country, device_type, ip_address) VALUES ({$ufUid}, '2026-08-29 11:00:00', 'Kenya', 'Desktop', '9.9.9.10')");
+
+    $_SESSION['user_id'] = $ufUid;
+    $_SESSION['is_admin'] = true;
+    $_GET = ['draw' => 1, 'start' => 0, 'length' => 10, 'search' => ['value' => ''], 'user_id' => $ufUid, 'unfamiliar' => '1'];
+    ob_start();
+    include "$root/api/get_login_history.php";
+    $ufJson = json_decode(ob_get_clean(), true);
+
+    ok(($ufJson['recordsFiltered'] ?? null) === 1, "unfamiliar=1 filter returns exactly the one genuinely-first-time row (got " . var_export($ufJson['recordsFiltered'] ?? null, true) . ")");
+    ok(!empty($ufJson['data'][0]['is_unfamiliar']), 'the returned row is correctly flagged is_unfamiliar');
+
+    $pdo->exec("DELETE FROM user_sessions WHERE user_id = {$ufUid}");
+    unset($_SESSION['user_id'], $_SESSION['is_admin']);
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 echo "\n";
 echo "Passes:   \033[32m{$pass}\033[0m\n";

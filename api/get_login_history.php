@@ -33,10 +33,35 @@ try {
 } catch (Throwable $e) {
     $__tzOffset = '+00:00';
 }
-function withTzOffset(?string $dt): ?string {
-    global $__tzOffset;
-    if (empty($dt)) return null;
-    return str_replace(' ', 'T', $dt) . $__tzOffset;
+if (!function_exists('withTzOffset')) {
+    function withTzOffset(?string $dt): ?string {
+        global $__tzOffset;
+        if (empty($dt)) return null;
+        return str_replace(' ', 'T', $dt) . $__tzOffset;
+    }
+}
+
+// 'Unfamiliar': the first time THIS user has ever signed in from this
+// country+device combination, as of this login. Purely informational — flags
+// a row for the admin to look at, never triggers any action on its own (see
+// "must be admin physically" in the changelog for this feature). Country+
+// device rather than raw IP: matches the page's own Approximate-location
+// caveat that IP/city jitters on mobile networks, so IP alone would flag
+// normal travel constantly. Defined once and reused in both SELECT and an
+// optional WHERE so the two can never drift apart.
+if (!defined('UNFAMILIAR_SQL')) {
+    define('UNFAMILIAR_SQL', "(
+        us.country IS NOT NULL AND us.country NOT IN ('', 'Local')
+        AND us.device_type IS NOT NULL AND us.device_type != ''
+        AND NOT EXISTS (
+            SELECT 1 FROM user_sessions us2
+             WHERE us2.user_id = us.user_id
+               AND us2.id <> us.id
+               AND us2.login_at < us.login_at
+               AND us2.country = us.country
+               AND us2.device_type = us.device_type
+        )
+    )");
 }
 
 $draw   = intval($_GET['draw']   ?? 1);
@@ -63,10 +88,11 @@ switch ($period) {
 
 // Other filters
 $userId   = intval($_GET['user_id'] ?? 0);
-$ended    = $_GET['ended']    ?? '';   // '', 'active', 'manual', 'timeout', 'superseded', 'revoked', 'admin_ended'
+$ended    = $_GET['ended']    ?? '';   // '', 'active', 'manual', 'timeout', 'superseded', 'revoked', 'admin_ended', 'blocked'
 $device   = $_GET['device']   ?? '';   // '', 'Desktop', 'Mobile', 'Tablet'
 $country  = $_GET['country']  ?? '';
 $locSrc   = $_GET['location_source'] ?? ''; // '', 'precise', 'approximate', 'none'
+$unfamiliarOnly = ($_GET['unfamiliar'] ?? '') === '1';
 
 $where  = ["1=1"];
 $params = [];
@@ -85,7 +111,7 @@ if (!empty($dateTo)) {
 }
 if ($ended === 'active') {
     $where[] = "us.logout_at IS NULL";
-} elseif (in_array($ended, ['manual', 'timeout', 'superseded', 'revoked', 'admin_ended'], true)) {
+} elseif (in_array($ended, ['manual', 'timeout', 'superseded', 'revoked', 'admin_ended', 'blocked'], true)) {
     $where[] = "us.logout_type = ?";
     $params[] = $ended;
 }
@@ -108,6 +134,9 @@ if (!empty($search)) {
     $where[] = "(u.username LIKE ? OR u.email LIKE ? OR us.ip_address LIKE ? OR us.city LIKE ? OR us.country LIKE ? OR us.isp LIKE ? OR us.browser LIKE ?)";
     $s = "%$search%";
     array_push($params, $s, $s, $s, $s, $s, $s, $s);
+}
+if ($unfamiliarOnly) {
+    $where[] = UNFAMILIAR_SQL;
 }
 
 $whereSQL = implode(' AND ', $where);
@@ -148,7 +177,8 @@ try {
                us.city, us.region, us.country, us.country_code, us.isp, us.org, us.timezone,
                us.precise_lat, us.precise_lng, us.precise_accuracy_m, us.precise_captured_at,
                us.browser, us.os, us.device_type,
-               u.username, u.email, r.role_name, ru.username AS revoked_by_name
+               u.username, u.email, u.is_active AS user_is_active, r.role_name, ru.username AS revoked_by_name,
+               " . UNFAMILIAR_SQL . " AS is_unfamiliar
         FROM user_sessions us
         LEFT JOIN users u  ON u.user_id  = us.user_id
         LEFT JOIN roles r  ON r.role_id  = u.role_id
@@ -181,9 +211,12 @@ try {
 
         $data[] = [
             'id'                 => $row['id'],
+            'user_id'            => $row['user_id'],
             'username'           => $row['username'] ?? 'Deleted User',
             'email'              => $row['email']    ?? '',
             'role_name'          => $row['role_name'] ?? '',
+            'user_is_active'     => $row['username'] === null ? null : (bool) $row['user_is_active'],
+            'is_unfamiliar'      => (bool) $row['is_unfamiliar'],
             'ip_address'         => $row['ip_address'] ?? '',
             'location'           => $location,
             'city'               => $row['city']     ?? '',

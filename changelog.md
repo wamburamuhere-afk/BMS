@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — Login History: Block Account + Unfamiliar-login flag, advanced Actions menu
+
+**Files (changed):** `app/constant/settings/login_history.php`, `api/get_login_history.php`, `actions/login.php`, `ajax/toggle_user.php`, `core/session_tracker.php`, `tests/test_login_history_cli.php`
+
+Matches the pattern professional systems (Google, Microsoft Entra, GitHub, Okta) use on their own sign-in activity pages: don't just list past logins — let an admin flag one as unusual and act on it from that exact row. Explicitly **not** automated: blocking is only ever a deliberate, manual admin click through a confirmation dialog. The "Unfamiliar" flag is purely informational and never triggers anything by itself.
+
+**Real gap found and fixed first, before anything else was built on top of it:** `users.is_active` existed and Settings > Users could already toggle it, but **nothing anywhere actually checked it at login** — a "deactivated" account could sign in completely normally. Confirmed by grep before writing a line of new code. Fixed in `actions/login.php`: a blocked account is now refused at the password-verify step, before any session is created, with a clear message. This is what makes Block Account *real* — it's the same underlying flag, now finally enforced.
+
+**Reused the existing endpoint rather than building a new one.** Settings > Users already had a working, admin-gated, audit-logged `ajax/toggle_user.php` — Login History's new Actions menu calls that exact same endpoint, not a duplicate. Extended it so deactivating a user now also **immediately** ends whatever session they're currently using (`revokeUserSession()`, tagged with a new `'blocked'` reason distinct from a generic admin-ended session) — previously it only blocked their *next* login attempt, leaving an already-signed-in user unaffected until they happened to be kicked out some other way.
+
+**"Unfamiliar" flag** (`api/get_login_history.php`): a row is flagged the first time a user has ever signed in from that country + device combination, as of that login — computed once as `UNFAMILIAR_SQL` and reused identically in both the SELECT and an optional filter, so they can never silently disagree. Deliberately country+device rather than raw IP, matching the page's own existing caveat that IP/city jitters on mobile networks — flagging every IP change would just be noise on normal travel.
+
+**Actions column rebuilt** to the same gear-icon + Bootstrap-caret dropdown already used on the Suppliers list, replacing the previous bare icon-only button — now shows End Session (only when that row's own session is still open), and Block Account / Activate Account (reflecting the account's *current* status, available regardless of whether the specific row being viewed is open or long closed, since an admin may be reviewing a past login). The admin's own row never offers Block Account, client-side and server-side both (`ajax/toggle_user.php` already refused self-deactivation).
+
+Verified live end to end, not just at the API level: a real account logs in normally; an admin blocks it through the actual UI (click → confirm dialog with the account's name → success toast) → session ends immediately in the database → a real subsequent login attempt is refused with the deactivation message → activating through the same menu restores login access immediately, confirmed again with a real login call. The self-block guard, the gear-menu contents per row state (open+active-account / closed+active-account / closed+blocked-account), and the Unfamiliar badge were all checked in a real browser, not assumed. Caught and fixed one real bug during testing: the API file's top-level `function`/`const` declarations weren't safe to load twice in one PHP process, which only surfaced because the test suite (correctly) exercises it twice — fixed with `function_exists()`/`defined()` guards, the same convention already used everywhere else in this codebase; the file's real single-request behavior is unaffected.
+
+`tests/test_login_history_cli.php` grew from 158 to 179 assertions: static checks for the reused-endpoint/no-duplicate-logic pattern, and two full live cycles — a throwaway account that really logs in, gets really blocked, is really refused re-login, and is really reactivated; and the unfamiliar filter returning exactly the one genuinely-first-time row out of a seeded pair. Existing suites unaffected: `session_guard` (24), `warehouse_scope` (147), `hr_dashboard` (23), `employee_documents` (26).
+
 ## 2026-08-29 (fix) — Login History: real Duration bug + a root-cause misunderstanding cleared up
 
 **Files (changed):** `app/constant/settings/login_history.php`, `api/get_login_history.php`, `tests/test_login_history_cli.php`
