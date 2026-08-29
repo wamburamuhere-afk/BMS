@@ -35,6 +35,12 @@ try {
         echo json_encode(['success' => false, 'message' => 'Access denied: target project not in your scope.']);
         exit();
     }
+    // Same gate for the optional warehouse assignment.
+    if (!empty($_POST['warehouse_id']) && function_exists('userCan') && !userCan('warehouse', (int)$_POST['warehouse_id'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied: target warehouse not in your scope.']);
+        exit();
+    }
 
     $pdo->beginTransaction();
 
@@ -268,6 +274,15 @@ try {
     if ($project_id_present) {
         $update_fields[] = "project_id = ?";
         $update_params[] = $new_project_id;
+    }
+
+    // warehouse_id — same "optional, '' means NULL" handling as project_id above.
+    $warehouse_id_present = array_key_exists('warehouse_id', $_POST);
+    $new_warehouse_id = ($warehouse_id_present && trim((string)$_POST['warehouse_id']) !== '')
+        ? (int)$_POST['warehouse_id'] : null;
+    if ($warehouse_id_present) {
+        $update_fields[] = "warehouse_id = ?";
+        $update_params[] = $new_warehouse_id;
     }
 
     if (empty($update_fields)) {

@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — Add Employee: optional "Assign to Warehouse" field, cascaded by Project
+
+**Files (new):** `migrations/2026_08_29_employee_warehouse_field.php`, `tests/test_employee_warehouse_field_cli.php`
+**Files (changed):** `app/bms/pos/employees.php`, `api/add_employee.php`, `api/update_employee.php`
+
+Compared against the reference LMS's "Branch" field on its own Add Employee form. Rather than introduce a new, separate branches concept, built this on BMS's existing `warehouses` table — the same Project → Warehouse cascade already used in Procurement and Sales (`core/warehouse_scope.php` + `assets/js/warehouse-project-filter.js`, the project's single source of truth for this rule): a project selected narrows the Warehouse dropdown to that project's warehouses; no project shows only warehouses not linked to any project. Never "all warehouses" as a fallback.
+
+`employees.warehouse_id` — nullable, no default, optional exactly like the existing `project_id` field beside it. The new "Assign to Warehouse" field sits next to "Assign to Project" in the wizard's Employment step, built with the exact same shared helpers every other Project+Warehouse page uses (`warehousesForSelect()`, `renderWarehouseOptions()`, `bindWarehouseToProject()`) — no local reimplementation, which the project's own regression guard (`tests/test_warehouse_project_filter_cli.php`) forbids. Deliberately kept as a plain `<select>`, not Select2, matching every other Warehouse field paired with a Project dropdown in this codebase — Select2 needs an extra `.trigger('change')` to stay visually in sync with the shared filter's show/hide + `val('')`, which that helper intentionally doesn't add.
+
+The Add/Edit modal is one shared form (not separate pages), so the cascade binds once at page load; editing an employee restores both `project_id` and `warehouse_id` via direct `.val()` calls (which fire no 'change' event) and then explicitly calls the binding's `refresh()` — ordered so a legitimately-matching saved pair is never mistaken for stale and cleared. The same re-filter is also applied when the Add modal opens or closes fresh, so a leftover filter state from editing one employee can never bleed into adding the next.
+
+`api/add_employee.php` and `api/update_employee.php` gate the target warehouse with `userCan('warehouse', ...)` — the identical mechanism (and identical call shape) as the pre-existing `project_id` gate immediately above each — and persist/clear it with the same "`''` submitted → `NULL`" handling `project_id` already uses.
+
+Verified live end to end (real bootstrap + real browser via Chrome MCP), not just unit-level: with no project selected the dropdown showed only unassigned warehouses; selecting a real project (16, "Upgrade of Transmission Line") narrowed it to exactly that project's one warehouse (14, "POLES"); switching back to "No Project" correctly cleared the now-invalid selection and reverted the list; a real employee saved via the API with `project_id=16, warehouse_id=14` round-tripped exactly through the database; a second employee saved with no warehouse at all confirmed the field is genuinely optional (`NULL`, no error); the edit-restore path (tested directly with real saved data, since the wizard's own AJAX fetch uses a clean URL that doesn't route on this local WAMP config — a known, already-diagnosed local-only quirk, not a defect in this feature) correctly repopulated both fields and re-narrowed the option list without wrongly clearing the legitimate saved value. All test employees, their cascading `employee_checklists`/`employee_documents` rows, and uploaded fixture files were deleted afterward. Along the way, also cleaned up one unrelated week-old orphaned test fixture that was blocking `tests/test_employee_documents_cli.php` from running at all.
+
+`tests/test_employee_warehouse_field_cli.php` — 25 assertions: schema, form wiring (including the plain-`<select>` requirement), both APIs' gates and NULL-handling, and live DB round-trips (insert, clear-to-NULL, `userCan('warehouse', ...)` deny/allow). Existing suites unaffected: `warehouse_project_filter` (84), `warehouse_scope` (147), plus six employee suites (21/25/8/26/32 assertions) — all still pass.
+
 ## 2026-08-29 (fix) — Session guard: write-back failed once headers were sent, silently losing session data
 
 **Files (new):** `tests/test_session_guard_cli.php`

@@ -61,6 +61,12 @@ if (isAdmin()) {
     }
 }
 
+// Warehouses for the optional Project -> Warehouse cascade (same rule as
+// Procurement/Sales — see core/warehouse_scope.php): project selected shows
+// only that project's warehouses; no project shows only unassigned ones.
+require_once ROOT_DIR . '/core/warehouse_scope.php';
+$emp_warehouses = warehousesForSelect($pdo);
+
 // Fetch employees with additional data
 $query = "
     SELECT 
@@ -708,9 +714,22 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     </select>
                                     <small class="text-muted">Optional: Link this employee to a specific project.</small>
                                 </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="warehouse_id" class="form-label">Assign to Warehouse</label>
+                                    <!-- Plain <select>, NOT select2 — every other Project+Warehouse pair in
+                                         BMS keeps Warehouse native so bindWarehouseToProject()'s show/hide +
+                                         val('') can update it directly (Select2 needs an extra
+                                         .trigger('change') to stay in sync, which this shared helper
+                                         intentionally does not add — see assets/js/warehouse-project-filter.js). -->
+                                    <select class="form-select" id="warehouse_id" name="warehouse_id">
+                                        <option value="">No Warehouse</option>
+                                        <?= renderWarehouseOptions($emp_warehouses) ?>
+                                    </select>
+                                    <small class="text-muted">Optional: the employee's physical work location. Shows warehouses for the selected project, or unassigned warehouses when no project is chosen.</small>
+                                </div>
                             </div>
                         </div>
-                        
+
                         <!-- Salary & Benefits Step -->
                         <div class="wizard-step" id="step-2" style="display:none;">
                             <div class="row">
@@ -1087,11 +1106,18 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
 
 <script src="<?= getUrl('assets/js/location_cascade.js') ?>"></script>
+<script src="<?= getUrl('assets/js/warehouse-project-filter.js') ?>"></script>
 <script>
 // Location cascade engine — Tanzania gets defined dropdowns (Region→District→
 // Ward→Street/Village), other countries fall back to free text automatically.
 // The Add modal's form doubles as the full-edit form, so ONE cascade serves both.
 let employeeLocationCascade;
+
+// Project -> Warehouse cascade (assets/js/warehouse-project-filter.js) — same
+// shared helper Procurement/Sales use. The Add/Edit modal is one shared form,
+// so this binds once here rather than per-open; edit-load calls
+// empWarehouseFilter.refresh() after setting both fields (see loadEmployeeData).
+let empWarehouseFilter;
 
 // Initialize Select2 on elements with select2-static class
 function initEmpSelect2(context, dropdownParent) {
@@ -1262,6 +1288,12 @@ $(document).ready(function() {
         if ($el.hasClass('select2-hidden-accessible')) return;
         var placeholder = $el.find('option[value=""]').first().text() || 'Select...';
         $el.select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: placeholder });
+    });
+
+    empWarehouseFilter = bindWarehouseToProject({
+        onFiltered: function (cleared) {
+            if (cleared) { /* selected warehouse no longer valid for the new project — left blank */ }
+        }
     });
 
     // Designation filter narrows to whatever Department filter is selected.
@@ -1507,6 +1539,11 @@ $(document).ready(function() {
         $('#addEmployeeForm')[0].reset();
         $('#add-employee-message').html('');
         employeeLocationCascade.setValues({ country: 'Tanzania' }); // back to defaults
+        // Native form reset() clears #warehouse_id's value but fires no 'change'
+        // event, so the option list itself could still be filtered from whatever
+        // project the last edit session had. Re-apply so a fresh Add always shows
+        // the correct default (unassigned warehouses only).
+        if (empWarehouseFilter) empWarehouseFilter.refresh();
         $('#addEmployeeForm [type="submit"]').prop('disabled', false).html('<i class="bi bi-check-circle"></i> Save Employee');
         toggleEmpOther('payment_frequency', 'payment_frequency_other_box', 'payment_frequency_other', false);
         $('#employeeTabs .nav-link:first').tab('show');
@@ -1900,6 +1937,7 @@ $(document).ready(function() {
             toggleEmpOther('designation_id', 'designation_other_box', 'designation_other', false);
             toggleEmpOther('employment_type_id', 'employment_type_other_box', 'employment_type_other', false);
             toggleEmpOther('payment_frequency', 'payment_frequency_other_box', 'payment_frequency_other', false);
+            if (empWarehouseFilter) empWarehouseFilter.refresh();
         }
         window.currentStep = 0;
         window.showStep(0);
@@ -2062,6 +2100,13 @@ function editEmployee(employeeId) {
                 populateReportingTo(emp);
                 $('#work_location').val(emp.work_location || '');
                 $('#project_id').val(emp.project_id || '');
+                $('#warehouse_id').val(emp.warehouse_id || '');
+                // Re-filter the warehouse list for the project just restored — the
+                // modal's own binding only reacts to a live 'change' event, which
+                // these two direct .val() calls don't fire. Order matters: both
+                // values are set first so refresh() sees a self-consistent saved
+                // pair and does not clear a legitimately-matching warehouse.
+                if (empWarehouseFilter) empWarehouseFilter.refresh();
                 $('#basic_salary').val(emp.basic_salary || '');
                 $('#probation_end_date').val(emp.probation_end_date || '');
                 $('#contract_end_date').val(emp.contract_end_date || '');
