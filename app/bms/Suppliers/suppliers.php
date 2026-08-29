@@ -145,14 +145,28 @@ if (isAdmin()) {
         $projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
+// Translated status label for badges (t() keys already exist from Customers).
+function supplier_status_label($status) {
+    static $labels = null;
+    if ($labels === null) {
+        $labels = [
+            'active'      => t('Active'),
+            'inactive'    => t('Inactive'),
+            'suspended'   => t('Suspended'),
+            'blacklisted' => t('Blacklisted'),
+            'deleted'     => t('Deleted'),
+        ];
+    }
+    return $labels[$status] ?? ucfirst($status);
+}
 ?>
 
 <div class="container-fluid mt-4">
     <!-- Standardized Print Header (Visible only in print) -->
     <div class="bms-print-header d-none d-print-block">
         
-        <h2 class="bph-title">Official Suppliers Report</h2>
-        <p class="bph-sub">Generated on: <?= date('d M Y, H:i') ?></p>
+        <h2 class="bph-title"><?= t('Official Suppliers Report') ?></h2>
+        <p class="bph-sub"><?= t('Generated on:') ?> <?= date('d M Y, H:i') ?></p>
         <div class="bph-bar"></div>
     </div>
 
@@ -161,13 +175,13 @@ if (isAdmin()) {
         <div class="col-12">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
                 <div class="flex-grow-1">
-                    <h2 class="mb-0 fs-4 fs-md-3 fw-bold text-nowrap"><i class="bi bi-truck"></i> Supplier Management</h2>
-                    <p class="text-muted mb-0 d-none d-md-block small mt-1">Manage your suppliers and vendor relationships</p>
+                    <h2 class="mb-0 fs-4 fs-md-3 fw-bold text-nowrap"><i class="bi bi-truck"></i> <?= t('Supplier Management') ?></h2>
+                    <p class="text-muted mb-0 d-none d-md-block small mt-1"><?= t('Manage your suppliers and vendor relationships') ?></p>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <?php if ($can_create_suppliers): ?>
                     <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm text-nowrap" style="border-radius: 6px;" data-bs-toggle="modal" data-bs-target="#addSupplierModal">
-                        <i class="bi bi-plus-circle me-1"></i> Add New Supplier
+                        <i class="bi bi-plus-circle me-1"></i> <?= t('Add New Supplier') ?>
                     </button>
                     <?php endif; ?>
                 </div>
@@ -205,7 +219,7 @@ if (isAdmin()) {
                             <i class="bi bi-people"></i>
                         </div>
                         <div class="overflow-hidden flex-grow-1">
-                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;">Suppliers</p>
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;"><?= t('Suppliers') ?></p>
                             <h4 class="mb-0 fw-bold auto-resize text-nowrap" style="font-size: 1.1rem;"><?= $total_suppliers ?></h4>
                         </div>
                     </div>
@@ -220,7 +234,7 @@ if (isAdmin()) {
                             <i class="bi bi-check-circle"></i>
                         </div>
                         <div class="overflow-hidden flex-grow-1">
-                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;">Active</p>
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;"><?= t('Active') ?></p>
                             <h4 class="mb-0 fw-bold auto-resize text-nowrap" style="font-size: 1.1rem;"><?= count($active_suppliers) ?></h4>
                         </div>
                     </div>
@@ -235,7 +249,7 @@ if (isAdmin()) {
                             <i class="bi bi-exclamation-triangle"></i>
                         </div>
                         <div class="overflow-hidden flex-grow-1">
-                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;">Suspended</p>
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;"><?= t('Suspended') ?></p>
                             <h4 class="mb-0 fw-bold auto-resize text-nowrap" id="stat-suspended-suppliers" style="font-size: 1.1rem;"><?= count($suspended_suppliers) ?></h4>
                         </div>
                     </div>
@@ -250,7 +264,7 @@ if (isAdmin()) {
                             <i class="bi bi-x-circle"></i>
                         </div>
                         <div class="overflow-hidden flex-grow-1">
-                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;">Blacklisted</p>
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;"><?= t('Blacklisted') ?></p>
                             <h4 class="mb-0 fw-bold auto-resize text-nowrap" id="stat-blacklisted-suppliers" style="font-size: 1.1rem;"><?= count($blacklisted_suppliers) ?></h4>
                         </div>
                     </div>
@@ -264,7 +278,7 @@ if (isAdmin()) {
         <div class="col-12">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-funnel"></i> Filters & Search</h6>
+                    <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-funnel"></i> <?= t('Filters & Search') ?></h6>
                     <button class="btn btn-sm btn-outline-secondary border-0" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
                         <i class="bi bi-chevron-down"></i>
                     </button>
@@ -273,38 +287,38 @@ if (isAdmin()) {
                     <div class="card-body">
                         <div class="row g-3">
                             <div class="col-6 col-md-3">
-                                <label for="statusFilter" class="form-label small fw-bold">Status</label>
+                                <label for="statusFilter" class="form-label small fw-bold"><?= t('Status') ?></label>
                                 <select class="form-select" id="statusFilter">
-                                    <option value="">All Status</option>
-                                    <option value="active">Active</option>
-                                    <option value="inactive">Inactive</option>
-                                    <option value="suspended">Suspended</option>
-                                    <option value="blacklisted">Blacklisted</option>
+                                    <option value=""><?= t('All Status') ?></option>
+                                    <option value="active"><?= t('Active') ?></option>
+                                    <option value="inactive"><?= t('Inactive') ?></option>
+                                    <option value="suspended"><?= t('Suspended') ?></option>
+                                    <option value="blacklisted"><?= t('Blacklisted') ?></option>
                                 </select>
                             </div>
                             <div class="col-6 col-md-3">
-                                <label for="categoryFilter" class="form-label small fw-bold">Category</label>
+                                <label for="categoryFilter" class="form-label small fw-bold"><?= t('Category') ?></label>
                                 <select class="form-select select2-static" id="categoryFilter">
-                                    <option value="">All Categories</option>
+                                    <option value=""><?= t('All Categories') ?></option>
                                     <?php foreach ($categories as $category): ?>
                                         <option value="<?= $category['category_id'] ?>"><?= safe_output($category['category_name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
                             <div class="col-6 col-md-3">
-                                <label for="countryFilter" class="form-label small fw-bold">Country</label>
-                                <input type="text" class="form-control" id="countryFilter" placeholder="Filter by country" autocomplete="off">
+                                <label for="countryFilter" class="form-label small fw-bold"><?= t('Country') ?></label>
+                                <input type="text" class="form-control" id="countryFilter" placeholder="<?= t('Filter by country') ?>" autocomplete="off">
                             </div>
                             <div class="col-6 col-md-3">
-                                <label for="cityFilter" class="form-label small fw-bold">City</label>
-                                <input type="text" class="form-control" id="cityFilter" placeholder="Filter by city" autocomplete="off">
+                                <label for="cityFilter" class="form-label small fw-bold"><?= t('City') ?></label>
+                                <input type="text" class="form-control" id="cityFilter" placeholder="<?= t('Filter by city') ?>" autocomplete="off">
                             </div>
                             <div class="col-md-12 d-flex flex-column flex-sm-row justify-content-end pt-2 gap-2">
                                 <button type="button" class="btn btn-outline-secondary btn-sm px-3" onclick="clearFilters()">
-                                    <i class="bi bi-arrow-clockwise"></i> Clear
+                                    <i class="bi bi-arrow-clockwise"></i> <?= t('Clear') ?>
                                 </button>
                                 <button type="button" class="btn btn-primary btn-sm px-4" onclick="applyFilters()">
-                                    <i class="bi bi-filter"></i> Apply Filters
+                                    <i class="bi bi-filter"></i> <?= t('Apply Filters') ?>
                                 </button>
                             </div>
                         </div>
@@ -323,7 +337,7 @@ if (isAdmin()) {
                     <!-- Action Buttons -->
                     <div class="d-flex flex-wrap shadow-sm bg-white" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                         <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="copyTable()" style="background: #fff; height: 38px;">
-                            <i class="bi bi-clipboard text-info me-1"></i> Copy
+                            <i class="bi bi-clipboard text-info me-1"></i> <?= t('Copy') ?>
                         </button>
                         <div class="bg-light d-none d-sm-block" style="width: 1px; height: 38px;"></div>
                         <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="exportSuppliers()" style="background: #fff; height: 38px;">
@@ -331,37 +345,37 @@ if (isAdmin()) {
                         </button>
                         <div class="bg-light d-none d-sm-block" style="width: 1px; height: 38px;"></div>
                         <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="printTable()" style="background: #fff; height: 38px;">
-                            <i class="bi bi-printer text-primary me-1"></i> Print
+                            <i class="bi bi-printer text-primary me-1"></i> <?= t('Print') ?>
                         </button>
                         <?php if ($can_create_suppliers): ?>
                         <div class="bg-light d-none d-sm-block" style="width: 1px; height: 38px;"></div>
                         <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" data-bs-toggle="modal" data-bs-target="#importSuppliersModal" style="background: #fff; height: 38px;">
-                            <i class="bi bi-upload text-info me-1"></i> Import
+                            <i class="bi bi-upload text-info me-1"></i> <?= t('Import') ?>
                         </button>
                         <?php endif; ?>
                     </div>
-                    
+
                     <!-- Toolbar -->
                     <div class="d-flex align-items-center gap-2 flex-grow-1">
                         <div class="d-flex align-items-center bg-white shadow-sm px-2 py-1 d-print-none" style="border: 1px solid #dee2e6; border-radius: 8px; height: 38px;">
-                            <span class="small text-muted me-2 text-nowrap">Show:</span>
+                            <span class="small text-muted me-2 text-nowrap"><?= t('Show:') ?></span>
                             <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 45px; background: transparent;" onchange="$('#suppliersTable').DataTable().page.len(this.value).draw();">
                                 <option value="10">10</option>
                                 <option value="25" selected>25</option>
                                 <option value="50">50</option>
                                 <option value="100">100</option>
-                                <option value="-1">All</option>
+                                <option value="-1"><?= t('All') ?></option>
                             </select>
                         </div>
                         <div class="input-group input-group-sm shadow-sm flex-grow-1 d-print-none" style="border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6; height: 38px; min-width: 150px; max-width: 350px;">
                             <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
-                            <input type="text" class="form-control border-0" id="searchSuppliers" placeholder="Search suppliers..." onkeyup="quickSearch()">
+                            <input type="text" class="form-control border-0" id="searchSuppliers" placeholder="<?= t('Search suppliers...') ?>" onkeyup="quickSearch()">
                         </div>
                     </div>
                 </div>
                 <div class="d-none d-xl-block">
                     <span class="badge bg-success-soft text-success border border-success px-3 py-2 rounded-pill shadow-sm">
-                        <i class="bi bi-check-circle-fill me-1"></i> <?= $total_suppliers ?> records
+                        <i class="bi bi-check-circle-fill me-1"></i> <?= $total_suppliers ?> <?= t('records') ?>
                     </span>
                 </div>
             </div>
@@ -373,19 +387,19 @@ if (isAdmin()) {
         <div class="col-12">
             <div class="card border-0 shadow-sm" style="width: 100% !important;">
                 <div class="page-header card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-bold text-dark">Suppliers Records</h5>
+                    <h5 class="mb-0 fw-bold text-dark"><?= t('Suppliers Records') ?></h5>
                     <div class="btn-group shadow-sm d-none d-md-flex" role="group">
-                        <button type="button" class="btn btn-light btn-sm border" onclick="toggleView('table')" id="btn-table-view" title="Table View">
+                        <button type="button" class="btn btn-light btn-sm border" onclick="toggleView('table')" id="btn-table-view" title="<?= t('Table View') ?>">
                             <i class="bi bi-table"></i>
                         </button>
-                        <button type="button" class="btn btn-light btn-sm border" onclick="toggleView('card')" id="btn-card-view" title="Card View">
+                        <button type="button" class="btn btn-light btn-sm border" onclick="toggleView('card')" id="btn-card-view" title="<?= t('Card View') ?>">
                             <i class="bi bi-grid"></i>
                         </button>
                     </div>
                 </div>
                 <div class="card-body p-0">
                     <div id="form-message" class="mx-3 mt-3"></div>
-            
+
             <?php if (count($suppliers) > 0): ?>
                 <!-- Table View -->
                 <div id="tableView" class="table-responsive">
@@ -393,17 +407,17 @@ if (isAdmin()) {
                         <thead>
                             <tr>
                                 <th class="align-middle text-center col-sno">S/NO</th>
-                                <th class="align-middle col-info col-code">Supplier Code</th>
-                                <th class="align-middle col-info col-name">Supplier Name</th>
-                                <th class="align-middle col-info col-contact">Contact Info</th>
-                                <th class="align-middle col-info col-address">Address</th>
-                                <th class="align-middle col-info col-category">Category</th>
-                                <th class="align-middle col-info col-project">Project</th>
-                                <th class="text-center align-middle col-stat">Total Orders</th>
-                                <th class="text-center align-middle col-stat">Pending</th>
-                                <th class="text-center align-middle col-stat">Completed</th>
-                                <th class="align-middle col-status">Status</th>
-                                <th class="align-middle d-print-none">Actions</th>
+                                <th class="align-middle col-info col-code"><?= t('Supplier Code') ?></th>
+                                <th class="align-middle col-info col-name"><?= t('Supplier Name') ?></th>
+                                <th class="align-middle col-info col-contact"><?= t('Contact Info') ?></th>
+                                <th class="align-middle col-info col-address"><?= t('Address') ?></th>
+                                <th class="align-middle col-info col-category"><?= t('Category') ?></th>
+                                <th class="align-middle col-info col-project"><?= t('Project') ?></th>
+                                <th class="text-center align-middle col-stat"><?= t('Total Orders') ?></th>
+                                <th class="text-center align-middle col-stat"><?= t('Pending') ?></th>
+                                <th class="text-center align-middle col-stat"><?= t('Completed') ?></th>
+                                <th class="align-middle col-status"><?= t('Status') ?></th>
+                                <th class="align-middle d-print-none"><?= t('Actions') ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -438,7 +452,7 @@ if (isAdmin()) {
                                     <?php if (!empty($supplier['category_name'])): ?>
                                     <span class="badge bg-secondary"><?= safe_output($supplier['category_name']) ?></span>
                                     <?php else: ?>
-                                    <span class="badge bg-light text-dark">No Category</span>
+                                    <span class="badge bg-light text-dark"><?= t('No Category') ?></span>
                                     <?php endif; ?>
                                 </td>
                                 <td>
@@ -448,7 +462,7 @@ if (isAdmin()) {
                                     </a>
                                     <?php elseif ($supplier['project_count'] > 0): ?>
                                     <a href="<?= getUrl('suppliers/view') ?>?id=<?= $supplier['supplier_id'] ?>" class="badge bg-primary text-white text-decoration-none">
-                                        <?= (int)$supplier['project_count'] ?> <?= $supplier['project_count'] == 1 ? 'project' : 'projects' ?>
+                                        <?= (int)$supplier['project_count'] ?> <?= $supplier['project_count'] == 1 ? t('project') : t('projects') ?>
                                     </a>
                                     <?php else: ?>
                                     <span class="text-muted small">—</span>
@@ -465,7 +479,7 @@ if (isAdmin()) {
                                 </td>
                                 <td>
                                     <span class="badge bg-<?= get_status_badge($supplier['status']) ?>">
-                                        <?= ucfirst($supplier['status']) ?>
+                                        <?= supplier_status_label($supplier['status']) ?>
                                     </span>
                                 </td>
                                 <td class="d-print-none text-center">
@@ -474,38 +488,38 @@ if (isAdmin()) {
                                             <i class="bi bi-gear-fill"></i>
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
-                                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('suppliers/view') ?>?id=<?= $supplier['supplier_id'] ?>"><i class="bi bi-eye text-info me-2"></i> View Details</a></li>
+                                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('suppliers/view') ?>?id=<?= $supplier['supplier_id'] ?>"><i class="bi bi-eye text-info me-2"></i> <?= t('View Details') ?></a></li>
                                             <?php if ($can_edit_suppliers): ?>
-                                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)"><i class="bi bi-pencil text-primary me-2"></i> Edit Supplier</a></li>
+                                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)"><i class="bi bi-pencil text-primary me-2"></i> <?= t('Edit Supplier') ?></a></li>
                                             <?php endif; ?>
                                             <!-- View Orders / View Payments removed (2026-08-29): both are already
                                                  tabs inside suppliers/view (Recent Purchase Orders, Recent Payments) —
                                                  reachable one click after "View Details" instead of duplicated here.
                                                  View Account is kept: it opens the full vendor statement, which is a
                                                  separate report, not one of that page's tabs. -->
-                                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('vendor_statement') ?>?vendor_id=<?= $supplier['supplier_id'] ?>&vendor_type=supplier"><i class="bi bi-file-earmark-text text-primary me-2"></i> View Account</a></li>
+                                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('vendor_statement') ?>?vendor_id=<?= $supplier['supplier_id'] ?>&vendor_type=supplier"><i class="bi bi-file-earmark-text text-primary me-2"></i> <?= t('View Account') ?></a></li>
                                             <?php if ($company_type != 'microfinance' && $can_edit_suppliers): ?>
-                                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>"><i class="bi bi-file-plus me-2"></i> New Order</a></li>
+                                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>"><i class="bi bi-file-plus me-2"></i> <?= t('New Order') ?></a></li>
                                             <?php endif; ?>
 
                                             <?php if ($can_edit_suppliers): ?>
                                             <li><hr class="dropdown-divider"></li>
                                             <?php if ($supplier['status'] == 'active'): ?>
-                                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'inactive')"><i class="bi bi-pause-circle text-warning me-2"></i> Deactivate</a></li>
+                                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'inactive')"><i class="bi bi-pause-circle text-warning me-2"></i> <?= t('Deactivate') ?></a></li>
                                             <?php elseif ($supplier['status'] == 'inactive'): ?>
-                                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'active')"><i class="bi bi-play-circle text-success me-2"></i> Activate</a></li>
+                                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'active')"><i class="bi bi-play-circle text-success me-2"></i> <?= t('Activate') ?></a></li>
                                             <?php endif; ?>
                                             <?php if ($supplier['status'] !== 'suspended'): ?>
-                                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'suspended')"><i class="bi bi-exclamation-triangle text-warning me-2"></i> Suspend</a></li>
+                                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'suspended')"><i class="bi bi-exclamation-triangle text-warning me-2"></i> <?= t('Suspend') ?></a></li>
                                             <?php endif; ?>
                                             <?php if ($supplier['status'] !== 'blacklisted'): ?>
-                                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'blacklisted')"><i class="bi bi-ban text-danger me-2"></i> Blacklist</a></li>
+                                            <li><a class="dropdown-item py-2 rounded" href="#" onclick="updateStatus(<?= $supplier['supplier_id'] ?>, 'blacklisted')"><i class="bi bi-ban text-danger me-2"></i> <?= t('Blacklist') ?></a></li>
                                             <?php endif; ?>
                                             <?php endif; ?>
 
                                             <?php if ($can_delete_suppliers): ?>
                                             <li><hr class="dropdown-divider"></li>
-                                            <li><a class="dropdown-item py-2 rounded text-danger" href="#" onclick="confirmDelete(<?= $supplier['supplier_id'] ?>)"><i class="bi bi-trash me-2"></i> Delete</a></li>
+                                            <li><a class="dropdown-item py-2 rounded text-danger" href="#" onclick="confirmDelete(<?= $supplier['supplier_id'] ?>)"><i class="bi bi-trash me-2"></i> <?= t('Delete') ?></a></li>
                                             <?php endif; ?>
                                         </ul>
                                     </div>
@@ -528,12 +542,12 @@ if (isAdmin()) {
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <h6 class="mb-0"><?= safe_output($supplier['supplier_name']) ?></h6>
                                 <span class="badge bg-<?= get_status_badge($supplier['status']) ?>">
-                                    <?= ucfirst($supplier['status']) ?>
+                                    <?= supplier_status_label($supplier['status']) ?>
                                 </span>
                             </div>
                             <div class="card-body">
                                 <div class="mb-2">
-                                    <small class="text-muted">Code: <?= safe_output($supplier['supplier_code']) ?></small><br>
+                                    <small class="text-muted"><?= t('Code') ?>: <?= safe_output($supplier['supplier_code']) ?></small><br>
                                     <?php if (!empty($supplier['company_name'])): ?>
                                     <strong><?= safe_output($supplier['company_name']) ?></strong><br>
                                     <?php endif; ?>
@@ -567,46 +581,46 @@ if (isAdmin()) {
                                     </a>
                                     <?php elseif ($supplier['project_count'] > 0): ?>
                                     <a href="<?= getUrl('suppliers/view') ?>?id=<?= $supplier['supplier_id'] ?>" class="badge bg-primary text-white text-decoration-none">
-                                        <i class="bi bi-briefcase me-1"></i><?= (int)$supplier['project_count'] ?> <?= $supplier['project_count'] == 1 ? 'project' : 'projects' ?>
+                                        <i class="bi bi-briefcase me-1"></i><?= (int)$supplier['project_count'] ?> <?= $supplier['project_count'] == 1 ? t('project') : t('projects') ?>
                                     </a>
                                     <?php else: ?>
-                                    <small class="text-muted"><i class="bi bi-globe me-1"></i> General Supplier</small>
+                                    <small class="text-muted"><i class="bi bi-globe me-1"></i> <?= t('General Supplier') ?></small>
                                     <?php endif; ?>
                                 </div>
-                                
+
                                 <div class="d-flex justify-content-between mt-3">
                                     <div class="text-center">
                                         <div class="badge bg-primary"><?= $supplier['total_orders'] ?></div>
                                         <br>
-                                        <small>Orders</small>
+                                        <small><?= t('Orders') ?></small>
                                     </div>
                                     <div class="text-center">
                                         <div class="badge bg-success"><?= $supplier['completed_orders'] ?></div>
                                         <br>
-                                        <small>Completed</small>
+                                        <small><?= t('Completed') ?></small>
                                     </div>
                                     <div class="text-center">
                                         <div class="badge bg-warning"><?= $supplier['pending_orders'] ?></div>
                                         <br>
-                                        <small>Pending</small>
+                                        <small><?= t('Pending') ?></small>
                                     </div>
                                 </div>
                             </div>
                             <div class="card-footer bg-white border-top p-0">
                                 <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
-                                    <a href="<?= getUrl('suppliers/details') ?>?id=<?= $supplier['supplier_id'] ?>" class="btn btn-sm btn-outline-primary" title="View Details" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
+                                    <a href="<?= getUrl('suppliers/details') ?>?id=<?= $supplier['supplier_id'] ?>" class="btn btn-sm btn-outline-primary" title="<?= t('View Details') ?>" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
                                         <i class="bi bi-eye"></i>
                                     </a>
                                     <?php if ($can_edit_suppliers): ?>
-                                    <button class="btn btn-sm btn-outline-warning" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)" title="Edit" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
+                                    <button class="btn btn-sm btn-outline-warning" onclick="editSupplier(<?= $supplier['supplier_id'] ?>)" title="<?= t('Edit') ?>" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
                                         <i class="bi bi-pencil"></i>
                                     </button>
                                     <?php endif; ?>
-                                    <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier['supplier_id'] ?>" class="btn btn-sm btn-outline-success" title="View Orders" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
+                                    <a href="<?= getUrl('purchase_orders') ?>?supplier=<?= $supplier['supplier_id'] ?>" class="btn btn-sm btn-outline-success" title="<?= t('View Orders') ?>" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
                                         <i class="bi bi-cart"></i>
                                     </a>
                                     <?php if ($company_type != 'microfinance' && $can_edit_suppliers): ?>
-                                    <a href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>" class="btn btn-sm btn-outline-info" title="New Order" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
+                                    <a href="<?= getUrl('purchase_order_create') ?>?supplier=<?= $supplier['supplier_id'] ?>" class="btn btn-sm btn-outline-info" title="<?= t('New Order') ?>" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;">
                                         <i class="bi bi-plus-circle"></i>
                                     </a>
                                     <?php endif; ?>
@@ -619,11 +633,11 @@ if (isAdmin()) {
                     <?php else: ?>
                         <div class="text-center py-5">
                             <i class="bi bi-truck" style="font-size: 4rem; color: #6c757d;"></i>
-                            <h4 class="mt-3 text-muted">No Suppliers Found</h4>
-                            <p class="text-muted">Get started by adding your first supplier.</p>
+                            <h4 class="mt-3 text-muted"><?= t('No Suppliers Found') ?></h4>
+                            <p class="text-muted"><?= t('Get started by adding your first supplier.') ?></p>
                             <?php if ($can_edit_suppliers): ?>
                             <button type="button" class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#addSupplierModal">
-                                <i class="bi bi-plus-circle"></i> Add Your First Supplier
+                                <i class="bi bi-plus-circle"></i> <?= t('Add Your First Supplier') ?>
                             </button>
                             <?php endif; ?>
                         </div>
@@ -641,42 +655,42 @@ if (isAdmin()) {
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="addSupplierModalLabel">
-                    <i class="bi bi-plus-circle"></i> Add New Supplier
+                    <i class="bi bi-plus-circle"></i> <?= t('Add New Supplier') ?>
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= t('Close') ?>"></button>
             </div>
             <form id="addSupplierForm" method="POST" enctype="multipart/form-data" novalidate>
                 <div class="modal-body">
                     <div id="add-supplier-message" class="mb-3"></div>
                     <?php if ($proj_ctx_id > 0): ?>
                     <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3">
-                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Adding to project: <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i><?= t('Adding to project:') ?> <strong><?= safe_output($proj_ctx_name) ?></strong></span>
                         <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
-                            <i class="bi bi-arrow-left me-1"></i> Back to Project
+                            <i class="bi bi-arrow-left me-1"></i> <?= t('Back to Project') ?>
                         </a>
                     </div>
                     <?php endif; ?>
-                    
+
                     <!-- Tabs Navigation -->
                 <ul class="nav nav-tabs mb-3" id="addSupplierTabs" role="tablist">
                     <li class="nav-item">
                         <button class="nav-link active" id="add-basic-tab" data-bs-toggle="tab" data-bs-target="#tab-add-basic" type="button" role="tab" aria-controls="tab-add-basic" aria-selected="true">
-                            <i class="bi bi-info-circle me-1"></i>Basic Info
+                            <i class="bi bi-info-circle me-1"></i><?= t('Basic Info') ?>
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="add-contact-tab" data-bs-toggle="tab" data-bs-target="#tab-add-contact" type="button" role="tab" aria-controls="tab-add-contact" aria-selected="false">
-                            <i class="bi bi-person-lines-fill me-1"></i>Contact Details
+                            <i class="bi bi-person-lines-fill me-1"></i><?= t('Contact Details') ?>
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="add-address-tab" data-bs-toggle="tab" data-bs-target="#tab-add-address" type="button" role="tab" aria-controls="tab-add-address" aria-selected="false">
-                            <i class="bi bi-geo-alt me-1"></i>Address
+                            <i class="bi bi-geo-alt me-1"></i><?= t('Address') ?>
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="add-financial-tab" data-bs-toggle="tab" data-bs-target="#tab-add-financial" type="button" role="tab" aria-controls="tab-add-financial" aria-selected="false">
-                            <i class="bi bi-wallet2 me-1"></i>Financial
+                            <i class="bi bi-wallet2 me-1"></i><?= t('Financial') ?>
                         </button>
                     </li>
                 </ul>
@@ -686,187 +700,187 @@ if (isAdmin()) {
                     <div class="tab-pane fade show active" id="tab-add-basic" role="tabpanel" aria-labelledby="add-basic-tab">
                             <div class="row">
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="supplier_name" class="form-label">Supplier Name <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="supplier_name" name="supplier_name" required placeholder="Enter supplier name">
+                                    <label for="supplier_name" class="form-label"><?= t('Supplier Name') ?> <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="supplier_name" name="supplier_name" required placeholder="<?= t('Enter supplier name') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="company_name" class="form-label">Company Name</label>
-                                    <input type="text" class="form-control" id="company_name" name="company_name" placeholder="Company name (if different)">
+                                    <label for="company_name" class="form-label"><?= t('Company Name') ?></label>
+                                    <input type="text" class="form-control" id="company_name" name="company_name" placeholder="<?= t('Company name (if different)') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="acronym" class="form-label">Acronym</label>
+                                    <label for="acronym" class="form-label"><?= t('Acronym') ?></label>
                                     <input type="text" class="form-control" id="acronym" name="acronym" placeholder="e.g. TANESCO, TRA">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="logo" class="form-label">Company Logo</label>
+                                    <label for="logo" class="form-label"><?= t('Company Logo') ?></label>
                                     <input type="file" class="form-control" id="logo" name="logo" accept="image/*">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="supplier_type" class="form-label">Supplier Type</label>
-                                    <?= renderOtherSelect('supplier_type', 'supplier_type', $lk_supplier_type, '', 'supplier_type_other', 'Select Type') ?>
+                                    <label for="supplier_type" class="form-label"><?= t('Supplier Type') ?></label>
+                                    <?= renderOtherSelect('supplier_type', 'supplier_type', $lk_supplier_type, '', 'supplier_type_other', t('Select Type')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="supplier_year" class="form-label">Year <span class="text-danger">*</span></label>
-                                    <?= renderOtherSelect('supplier_year', 'year', $lk_years, '', 'year_other', 'Select Year', true) ?>
+                                    <label for="supplier_year" class="form-label"><?= t('Year') ?> <span class="text-danger">*</span></label>
+                                    <?= renderOtherSelect('supplier_year', 'year', $lk_years, '', 'year_other', t('Select Year'), true) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="category_id" class="form-label">Category</label>
-                                    <?= renderOtherSelect('category_id', 'category_id', $lk_categories, '', 'category_other', 'Select Category') ?>
+                                    <label for="category_id" class="form-label"><?= t('Category') ?></label>
+                                    <?= renderOtherSelect('category_id', 'category_id', $lk_categories, '', 'category_other', t('Select Category')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="status" class="form-label">Status</label>
+                                    <label for="status" class="form-label"><?= t('Status') ?></label>
                                     <select class="form-select" id="status" name="status">
-                                        <option value="active" selected>Active</option>
-                                        <option value="inactive">Inactive</option>
-                                        <option value="suspended">Suspended</option>
-                                        <option value="blacklisted">Blacklisted</option>
+                                        <option value="active" selected><?= t('Active') ?></option>
+                                        <option value="inactive"><?= t('Inactive') ?></option>
+                                        <option value="suspended"><?= t('Suspended') ?></option>
+                                        <option value="blacklisted"><?= t('Blacklisted') ?></option>
                                     </select>
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="project_id" class="form-label">Linked Project <span class="text-muted small fw-normal">(Optional)</span></label>
+                                    <label for="project_id" class="form-label"><?= t('Linked Project') ?> <span class="text-muted small fw-normal">(<?= t('Optional') ?>)</span></label>
                                     <select class="form-select select2-enable" id="project_id" name="project_id">
-                                        <option value="">-- No Project --</option>
+                                        <option value="">-- <?= t('No Project') ?> --</option>
                                         <?php foreach ($projects as $project): ?>
                                         <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="credit_limit" class="form-label">Credit Limit</label>
+                                    <label for="credit_limit" class="form-label"><?= t('Credit Limit') ?></label>
                                     <input type="number" class="form-control" id="credit_limit" name="credit_limit" placeholder="0.00" step="0.01">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="description" class="form-label">Description</label>
-                                    <textarea class="form-control" id="description" name="description" rows="2" placeholder="Supplier description or notes"></textarea>
+                                    <label for="description" class="form-label"><?= t('Description') ?></label>
+                                    <textarea class="form-control" id="description" name="description" rows="2" placeholder="<?= t('Supplier description or notes') ?>"></textarea>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Tab 2: Contact Details -->
                     <div class="tab-pane fade" id="tab-add-contact" role="tabpanel" aria-labelledby="add-contact-tab">
                             <div class="row">
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="contact_person" class="form-label">Contact Person</label>
-                                    <input type="text" class="form-control" id="contact_person" name="contact_person" placeholder="Primary contact person">
+                                    <label for="contact_person" class="form-label"><?= t('Contact Person') ?></label>
+                                    <input type="text" class="form-control" id="contact_person" name="contact_person" placeholder="<?= t('Primary contact person') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="contact_title" class="form-label">Contact Title</label>
-                                    <input type="text" class="form-control" id="contact_title" name="contact_title" placeholder="e.g., Manager, Director">
+                                    <label for="contact_title" class="form-label"><?= t('Contact Title') ?></label>
+                                    <input type="text" class="form-control" id="contact_title" name="contact_title" placeholder="<?= t('e.g., Manager, Director') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="email" class="form-label">Contact Email</label>
+                                    <label for="email" class="form-label"><?= t('Contact Email') ?></label>
                                     <input type="email" class="form-control" id="email" name="email" placeholder="contact@example.com">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="company_email" class="form-label">Company Email</label>
+                                    <label for="company_email" class="form-label"><?= t('Company Email') ?></label>
                                     <input type="email" class="form-control" id="company_email" name="company_email" placeholder="company@example.com">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="phone" class="form-label">Phone Number</label>
+                                    <label for="phone" class="form-label"><?= t('Phone Number') ?></label>
                                     <input type="text" class="form-control" id="phone" name="phone" placeholder="+255 123 456 789">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="mobile" class="form-label">Mobile Number</label>
+                                    <label for="mobile" class="form-label"><?= t('Mobile Number') ?></label>
                                     <input type="text" class="form-control" id="mobile" name="mobile" placeholder="+255 123 456 789">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="fax" class="form-label">Fax Number</label>
-                                    <input type="text" class="form-control" id="fax" name="fax" placeholder="Fax number">
+                                    <label for="fax" class="form-label"><?= t('Fax Number') ?></label>
+                                    <input type="text" class="form-control" id="fax" name="fax" placeholder="<?= t('Fax number') ?>">
                                 </div>
                                 <div class="col-md-12 mb-3">
-                                    <label for="website" class="form-label">Website</label>
+                                    <label for="website" class="form-label"><?= t('Website') ?></label>
                                     <input type="url" class="form-control" id="website" name="website" placeholder="https://www.example.com">
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Tab 3: Address -->
                     <div class="tab-pane fade" id="tab-add-address" role="tabpanel" aria-labelledby="add-address-tab">
                             <div class="row">
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="country" class="form-label">Country</label>
+                                    <label for="country" class="form-label"><?= t('Country') ?></label>
                                     <input type="text" class="form-control" id="country" name="country" placeholder="e.g. Tanzania">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="state" class="form-label">Region</label>
+                                    <label for="state" class="form-label"><?= t('Region') ?></label>
                                     <input type="text" class="form-control" id="state" name="state" placeholder="e.g. Dar es Salaam">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="city" class="form-label">District</label>
+                                    <label for="city" class="form-label"><?= t('District') ?></label>
                                     <input type="text" class="form-control" id="city" name="city" placeholder="e.g. Ilala">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="ward" class="form-label">Ward</label>
+                                    <label for="ward" class="form-label"><?= t('Ward') ?></label>
                                     <input type="text" class="form-control" id="ward" name="ward" placeholder="e.g. Kariakoo">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="village" class="form-label">Street/Village</label>
+                                    <label for="village" class="form-label"><?= t('Street/Village') ?></label>
                                     <input type="text" class="form-control" id="village" name="village" placeholder="e.g. Mtaa wa Kariakoo">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="postal_code" class="form-label">Zip Code</label>
-                                    <input type="text" class="form-control" id="postal_code" name="postal_code" placeholder="Zip code">
+                                    <label for="postal_code" class="form-label"><?= t('Zip Code') ?></label>
+                                    <input type="text" class="form-control" id="postal_code" name="postal_code" placeholder="<?= t('Zip code') ?>">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="address" class="form-label">Physical Address</label>
+                                    <label for="address" class="form-label"><?= t('Physical Address') ?></label>
                                     <textarea class="form-control" id="address" name="address" rows="2" placeholder="e.g. Ilala - Dar-es-salaam"></textarea>
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="postal_address" class="form-label">Postal Address</label>
+                                    <label for="postal_address" class="form-label"><?= t('Postal Address') ?></label>
                                     <input type="text" class="form-control" id="postal_address" name="postal_address" placeholder="e.g. p.o. box 120, mbezi">
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Tab 4: Financial -->
                     <div class="tab-pane fade" id="tab-add-financial" role="tabpanel" aria-labelledby="add-financial-tab">
                             <div class="row">
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="tax_id" class="form-label">Tax ID (TIN)</label>
-                                    <input type="text" class="form-control" id="tax_id" name="tax_id" placeholder="Tax Identification Number">
+                                    <label for="tax_id" class="form-label"><?= t('Tax ID (TIN)') ?></label>
+                                    <input type="text" class="form-control" id="tax_id" name="tax_id" placeholder="<?= t('Tax Identification Number') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="vat_number" class="form-label">VAT Number</label>
-                                    <input type="text" class="form-control" id="vat_number" name="vat_number" placeholder="VAT registration number">
+                                    <label for="vat_number" class="form-label"><?= t('VAT Number') ?></label>
+                                    <input type="text" class="form-control" id="vat_number" name="vat_number" placeholder="<?= t('VAT registration number') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="default_wht_rate_id" class="form-label">Default Withholding Tax</label>
+                                    <label for="default_wht_rate_id" class="form-label"><?= t('Default Withholding Tax') ?></label>
                                     <select class="form-select" id="default_wht_rate_id" name="default_wht_rate_id">
-                                        <option value="">None</option>
+                                        <option value=""><?= t('None') ?></option>
                                         <?php foreach ($sup_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
                                         <option value="<?= (int)$w['rate_id'] ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <div class="form-text">Auto-fills the WHT rate when recording this supplier's payments.</div>
+                                    <div class="form-text"><?= t("Auto-fills the WHT rate when recording this supplier's payments.") ?></div>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="payment_terms" class="form-label">Payment Terms</label>
-                                    <?= renderOtherSelect('payment_terms', 'payment_terms', $lk_payment_terms, '', 'payment_terms_other', 'Select Terms') ?>
+                                    <label for="payment_terms" class="form-label"><?= t('Payment Terms') ?></label>
+                                    <?= renderOtherSelect('payment_terms', 'payment_terms', $lk_payment_terms, '', 'payment_terms_other', t('Select Terms')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="currency" class="form-label">Currency</label>
-                                    <?= renderOtherSelect('currency', 'currency', $lk_currency, 'TZS', 'currency_other', 'Select Currency') ?>
+                                    <label for="currency" class="form-label"><?= t('Currency') ?></label>
+                                    <?= renderOtherSelect('currency', 'currency', $lk_currency, 'TZS', 'currency_other', t('Select Currency')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="bank_name" class="form-label">Bank Name</label>
-                                    <input type="text" class="form-control" id="bank_name" name="bank_name" placeholder="Bank name">
+                                    <label for="bank_name" class="form-label"><?= t('Bank Name') ?></label>
+                                    <input type="text" class="form-control" id="bank_name" name="bank_name" placeholder="<?= t('Bank name') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="bank_account" class="form-label">Bank Account</label>
-                                    <input type="text" class="form-control" id="bank_account" name="bank_account" placeholder="Bank account number">
+                                    <label for="bank_account" class="form-label"><?= t('Bank Account') ?></label>
+                                    <input type="text" class="form-control" id="bank_account" name="bank_account" placeholder="<?= t('Bank account number') ?>">
                                 </div>
                                 <div class="col-md-12 mb-3">
-                                    <label for="bank_address" class="form-label">Bank Address</label>
-                                    <textarea class="form-control" id="bank_address" name="bank_address" rows="2" placeholder="Bank address details"></textarea>
+                                    <label for="bank_address" class="form-label"><?= t('Bank Address') ?></label>
+                                    <textarea class="form-control" id="bank_address" name="bank_address" rows="2" placeholder="<?= t('Bank address details') ?>"></textarea>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-circle"></i> Save Supplier
+                        <i class="bi bi-check-circle"></i> <?= t('Save Supplier') ?>
                     </button>
                 </div>
             </form>
@@ -880,53 +894,53 @@ if (isAdmin()) {
         <div class="modal-content">
             <div class="modal-header bg-info text-white">
                 <h5 class="modal-title" id="importSuppliersModalLabel">
-                    <i class="bi bi-upload"></i> Import Suppliers
+                    <i class="bi bi-upload"></i> <?= t('Import Suppliers') ?>
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= t('Close') ?>"></button>
             </div>
             <form id="importSuppliersForm" enctype="multipart/form-data">
                 <div class="modal-body">
                     <div id="import-message" class="mb-3"></div>
-                    
+
                     <div class="alert alert-info">
-                        <h6><i class="bi bi-info-circle"></i> Import Instructions:</h6>
+                        <h6><i class="bi bi-info-circle"></i> <?= t('Import Instructions:') ?></h6>
                         <ul class="mb-0">
-                            <li>Download the template file first</li>
-                            <li>Fill in the supplier data</li>
-                            <li>Upload the completed file</li>
-                            <li>File must be in CSV format</li>
-                            <li>Maximum file size: 5MB</li>
+                            <li><?= t('Download the template file first') ?></li>
+                            <li><?= t('Fill in the supplier data') ?></li>
+                            <li><?= t('Upload the completed file') ?></li>
+                            <li><?= t('File must be in CSV format') ?></li>
+                            <li><?= t('Maximum file size: 5MB') ?></li>
                         </ul>
                     </div>
-                    
+
                     <div class="mb-3">
-                        <label for="import_file" class="form-label">Select CSV File <span class="text-danger">*</span></label>
+                        <label for="import_file" class="form-label"><?= t('Select CSV File') ?> <span class="text-danger">*</span></label>
                         <input type="file" class="form-control" id="import_file" name="import_file" accept=".csv" required>
                     </div>
-                    
+
                     <div class="mb-3">
-                        <label for="import_action" class="form-label">Import Action</label>
+                        <label for="import_action" class="form-label"><?= t('Import Action') ?></label>
                         <select class="form-select" id="import_action" name="import_action">
-                            <option value="add_new">Add New Suppliers Only</option>
-                            <option value="update_existing">Update Existing Suppliers</option>
-                            <option value="add_update">Add New & Update Existing</option>
+                            <option value="add_new"><?= t('Add New Suppliers Only') ?></option>
+                            <option value="update_existing"><?= t('Update Existing Suppliers') ?></option>
+                            <option value="add_update"><?= t('Add New & Update Existing') ?></option>
                         </select>
                     </div>
-                    
+
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" id="skip_errors" name="skip_errors">
                         <label class="form-check-label" for="skip_errors">
-                            Skip rows with errors and continue
+                            <?= t('Skip rows with errors and continue') ?>
                         </label>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" onclick="downloadTemplate()">
-                        <i class="bi bi-download"></i> Download Template
+                        <i class="bi bi-download"></i> <?= t('Download Template') ?>
                     </button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
                     <button type="submit" class="btn btn-info">
-                        <i class="bi bi-upload"></i> Import Suppliers
+                        <i class="bi bi-upload"></i> <?= t('Import Suppliers') ?>
                     </button>
                 </div>
             </form>
@@ -940,43 +954,43 @@ if (isAdmin()) {
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="editSupplierModalLabel">
-                    <i class="bi bi-pencil"></i> Edit Supplier
+                    <i class="bi bi-pencil"></i> <?= t('Edit Supplier') ?>
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= t('Close') ?>"></button>
             </div>
             <form id="editSupplierForm" method="POST" enctype="multipart/form-data" novalidate>
                 <div class="modal-body">
                     <div id="edit-supplier-message" class="mb-3"></div>
                     <?php if ($proj_ctx_id > 0): ?>
                     <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 mb-3">
-                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i>Editing within project: <strong><?= safe_output($proj_ctx_name) ?></strong></span>
+                        <span class="small mb-0"><i class="bi bi-diagram-3 me-1"></i><?= t('Editing within project:') ?> <strong><?= safe_output($proj_ctx_name) ?></strong></span>
                         <a href="<?= htmlspecialchars($proj_ctx_return) ?>" class="btn btn-outline-primary btn-sm text-nowrap">
-                            <i class="bi bi-arrow-left me-1"></i> Back to Project
+                            <i class="bi bi-arrow-left me-1"></i> <?= t('Back to Project') ?>
                         </a>
                     </div>
                     <?php endif; ?>
                     <input type="hidden" id="edit_supplier_id" name="supplier_id">
-                    
+
                     <!-- Tabs Navigation -->
                 <ul class="nav nav-tabs mb-3" id="editSupplierTabs" role="tablist">
                     <li class="nav-item">
                         <button class="nav-link active" id="edit-tab-basic" data-bs-toggle="tab" data-bs-target="#tab-edit-basic" type="button" role="tab" aria-controls="tab-edit-basic" aria-selected="true">
-                            <i class="bi bi-info-circle me-1"></i>Basic Info
+                            <i class="bi bi-info-circle me-1"></i><?= t('Basic Info') ?>
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="edit-tab-contact" data-bs-toggle="tab" data-bs-target="#tab-edit-contact" type="button" role="tab" aria-controls="tab-edit-contact" aria-selected="false">
-                            <i class="bi bi-person-lines-fill me-1"></i>Contact Details
+                            <i class="bi bi-person-lines-fill me-1"></i><?= t('Contact Details') ?>
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="edit-tab-address" data-bs-toggle="tab" data-bs-target="#tab-edit-address" type="button" role="tab" aria-controls="tab-edit-address" aria-selected="false">
-                            <i class="bi bi-geo-alt me-1"></i>Address
+                            <i class="bi bi-geo-alt me-1"></i><?= t('Address') ?>
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="edit-tab-financial" data-bs-toggle="tab" data-bs-target="#tab-edit-financial" type="button" role="tab" aria-controls="tab-edit-financial" aria-selected="false">
-                            <i class="bi bi-wallet2 me-1"></i>Financial
+                            <i class="bi bi-wallet2 me-1"></i><?= t('Financial') ?>
                         </button>
                     </li>
                 </ul>
@@ -986,19 +1000,19 @@ if (isAdmin()) {
                     <div class="tab-pane fade show active" id="tab-edit-basic" role="tabpanel" aria-labelledby="edit-tab-basic">
                             <div class="row">
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_supplier_name" class="form-label">Supplier Name <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="edit_supplier_name" name="supplier_name" required placeholder="Enter supplier name">
+                                    <label for="edit_supplier_name" class="form-label"><?= t('Supplier Name') ?> <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="edit_supplier_name" name="supplier_name" required placeholder="<?= t('Enter supplier name') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_company_name" class="form-label">Company Name</label>
-                                    <input type="text" class="form-control" id="edit_company_name" name="company_name" placeholder="Company name (if different)">
+                                    <label for="edit_company_name" class="form-label"><?= t('Company Name') ?></label>
+                                    <input type="text" class="form-control" id="edit_company_name" name="company_name" placeholder="<?= t('Company name (if different)') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_acronym" class="form-label">Acronym</label>
+                                    <label for="edit_acronym" class="form-label"><?= t('Acronym') ?></label>
                                     <input type="text" class="form-control" id="edit_acronym" name="acronym" placeholder="e.g. TANESCO, TRA">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_logo" class="form-label">Company Logo</label>
+                                    <label for="edit_logo" class="form-label"><?= t('Company Logo') ?></label>
                                     <input type="file" class="form-control" id="edit_logo" name="logo" accept="image/*">
                                     <div id="logo_container" class="mt-2" style="display:none;">
                                         <img id="edit_logo_preview" src="" alt="Logo" class="img-thumbnail" style="height: 50px;">
@@ -1007,171 +1021,171 @@ if (isAdmin()) {
                                     </div>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_supplier_type" class="form-label">Supplier Type</label>
-                                    <?= renderOtherSelect('edit_supplier_type', 'supplier_type', $lk_supplier_type, '', 'supplier_type_other', 'Select Type') ?>
+                                    <label for="edit_supplier_type" class="form-label"><?= t('Supplier Type') ?></label>
+                                    <?= renderOtherSelect('edit_supplier_type', 'supplier_type', $lk_supplier_type, '', 'supplier_type_other', t('Select Type')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_supplier_year" class="form-label">Year <span class="text-danger">*</span></label>
-                                    <?= renderOtherSelect('edit_supplier_year', 'year', $lk_years, '', 'year_other', 'Select Year', true) ?>
+                                    <label for="edit_supplier_year" class="form-label"><?= t('Year') ?> <span class="text-danger">*</span></label>
+                                    <?= renderOtherSelect('edit_supplier_year', 'year', $lk_years, '', 'year_other', t('Select Year'), true) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_category_id" class="form-label">Category</label>
-                                    <?= renderOtherSelect('edit_category_id', 'category_id', $lk_categories, '', 'category_other', 'Select Category') ?>
+                                    <label for="edit_category_id" class="form-label"><?= t('Category') ?></label>
+                                    <?= renderOtherSelect('edit_category_id', 'category_id', $lk_categories, '', 'category_other', t('Select Category')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_status" class="form-label">Status</label>
+                                    <label for="edit_status" class="form-label"><?= t('Status') ?></label>
                                     <select class="form-select" id="edit_status" name="status">
-                                        <option value="active">Active</option>
-                                        <option value="inactive">Inactive</option>
-                                        <option value="suspended">Suspended</option>
-                                        <option value="blacklisted">Blacklisted</option>
+                                        <option value="active"><?= t('Active') ?></option>
+                                        <option value="inactive"><?= t('Inactive') ?></option>
+                                        <option value="suspended"><?= t('Suspended') ?></option>
+                                        <option value="blacklisted"><?= t('Blacklisted') ?></option>
                                     </select>
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="edit_project_id" class="form-label">Linked Project <span class="text-muted small fw-normal">(Optional)</span></label>
+                                    <label for="edit_project_id" class="form-label"><?= t('Linked Project') ?> <span class="text-muted small fw-normal">(<?= t('Optional') ?>)</span></label>
                                     <select class="form-select select2-enable" id="edit_project_id" name="project_id">
-                                        <option value="">-- No Project --</option>
+                                        <option value="">-- <?= t('No Project') ?> --</option>
                                         <?php foreach ($projects as $project): ?>
                                         <option value="<?= $project['project_id'] ?>"><?= safe_output($project['project_name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_credit_limit" class="form-label">Credit Limit</label>
+                                    <label for="edit_credit_limit" class="form-label"><?= t('Credit Limit') ?></label>
                                     <input type="number" class="form-control" id="edit_credit_limit" name="credit_limit" placeholder="0.00" step="0.01">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="edit_description" class="form-label">Description</label>
-                                    <textarea class="form-control" id="edit_description" name="description" rows="2" placeholder="Supplier description or notes"></textarea>
+                                    <label for="edit_description" class="form-label"><?= t('Description') ?></label>
+                                    <textarea class="form-control" id="edit_description" name="description" rows="2" placeholder="<?= t('Supplier description or notes') ?>"></textarea>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Tab 2: Contact Details -->
                     <div class="tab-pane fade" id="tab-edit-contact" role="tabpanel" aria-labelledby="edit-tab-contact">
                             <div class="row">
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_contact_person" class="form-label">Contact Person</label>
-                                    <input type="text" class="form-control" id="edit_contact_person" name="contact_person" placeholder="Primary contact person">
+                                    <label for="edit_contact_person" class="form-label"><?= t('Contact Person') ?></label>
+                                    <input type="text" class="form-control" id="edit_contact_person" name="contact_person" placeholder="<?= t('Primary contact person') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_contact_title" class="form-label">Contact Title</label>
-                                    <input type="text" class="form-control" id="edit_contact_title" name="contact_title" placeholder="e.g., Manager, Director">
+                                    <label for="edit_contact_title" class="form-label"><?= t('Contact Title') ?></label>
+                                    <input type="text" class="form-control" id="edit_contact_title" name="contact_title" placeholder="<?= t('e.g., Manager, Director') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_email" class="form-label">Contact Email</label>
+                                    <label for="edit_email" class="form-label"><?= t('Contact Email') ?></label>
                                     <input type="email" class="form-control" id="edit_email" name="email" placeholder="contact@example.com">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_company_email" class="form-label">Company Email</label>
+                                    <label for="edit_company_email" class="form-label"><?= t('Company Email') ?></label>
                                     <input type="email" class="form-control" id="edit_company_email" name="company_email" placeholder="company@example.com">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_phone" class="form-label">Phone Number</label>
+                                    <label for="edit_phone" class="form-label"><?= t('Phone Number') ?></label>
                                     <input type="text" class="form-control" id="edit_phone" name="phone" placeholder="+255 123 456 789">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_mobile" class="form-label">Mobile Number</label>
+                                    <label for="edit_mobile" class="form-label"><?= t('Mobile Number') ?></label>
                                     <input type="text" class="form-control" id="edit_mobile" name="mobile" placeholder="+255 123 456 789">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_fax" class="form-label">Fax Number</label>
-                                    <input type="text" class="form-control" id="edit_fax" name="fax" placeholder="Fax number">
+                                    <label for="edit_fax" class="form-label"><?= t('Fax Number') ?></label>
+                                    <input type="text" class="form-control" id="edit_fax" name="fax" placeholder="<?= t('Fax number') ?>">
                                 </div>
                                 <div class="col-md-12 mb-3">
-                                    <label for="edit_website" class="form-label">Website</label>
+                                    <label for="edit_website" class="form-label"><?= t('Website') ?></label>
                                     <input type="url" class="form-control" id="edit_website" name="website" placeholder="https://www.example.com">
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Tab 3: Address -->
                     <div class="tab-pane fade" id="tab-edit-address" role="tabpanel" aria-labelledby="edit-tab-address">
                             <div class="row">
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_country" class="form-label">Country</label>
-                                    <input type="text" class="form-control" id="edit_country" name="country" placeholder="Country">
+                                    <label for="edit_country" class="form-label"><?= t('Country') ?></label>
+                                    <input type="text" class="form-control" id="edit_country" name="country" placeholder="<?= t('Country') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_state" class="form-label">Region</label>
-                                    <input type="text" class="form-control" id="edit_state" name="state" placeholder="Region">
+                                    <label for="edit_state" class="form-label"><?= t('Region') ?></label>
+                                    <input type="text" class="form-control" id="edit_state" name="state" placeholder="<?= t('Region') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_city" class="form-label">District</label>
-                                    <input type="text" class="form-control" id="edit_city" name="city" placeholder="District">
+                                    <label for="edit_city" class="form-label"><?= t('District') ?></label>
+                                    <input type="text" class="form-control" id="edit_city" name="city" placeholder="<?= t('District') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_ward" class="form-label">Ward</label>
-                                    <input type="text" class="form-control" id="edit_ward" name="ward" placeholder="Ward">
+                                    <label for="edit_ward" class="form-label"><?= t('Ward') ?></label>
+                                    <input type="text" class="form-control" id="edit_ward" name="ward" placeholder="<?= t('Ward') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_village" class="form-label">Street/Village</label>
-                                    <input type="text" class="form-control" id="edit_village" name="village" placeholder="Street/Village">
+                                    <label for="edit_village" class="form-label"><?= t('Street/Village') ?></label>
+                                    <input type="text" class="form-control" id="edit_village" name="village" placeholder="<?= t('Street/Village') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_postal_code" class="form-label">Zip Code</label>
-                                    <input type="text" class="form-control" id="edit_postal_code" name="postal_code" placeholder="Postal code">
+                                    <label for="edit_postal_code" class="form-label"><?= t('Zip Code') ?></label>
+                                    <input type="text" class="form-control" id="edit_postal_code" name="postal_code" placeholder="<?= t('Postal code') ?>">
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="edit_address" class="form-label">Physical Address</label>
-                                    <textarea class="form-control" id="edit_address" name="address" rows="2" placeholder="Street address"></textarea>
+                                    <label for="edit_address" class="form-label"><?= t('Physical Address') ?></label>
+                                    <textarea class="form-control" id="edit_address" name="address" rows="2" placeholder="<?= t('Street address') ?>"></textarea>
                                 </div>
                                 <div class="col-12 mb-3">
-                                    <label for="edit_postal_address" class="form-label">Postal Address</label>
-                                    <input type="text" class="form-control" id="edit_postal_address" name="postal_address" placeholder="Postal address">
+                                    <label for="edit_postal_address" class="form-label"><?= t('Postal Address') ?></label>
+                                    <input type="text" class="form-control" id="edit_postal_address" name="postal_address" placeholder="<?= t('Postal address') ?>">
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Tab 4: Financial -->
                     <div class="tab-pane fade" id="tab-edit-financial" role="tabpanel" aria-labelledby="edit-tab-financial">
                             <div class="row">
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_tax_id" class="form-label">Tax ID (TIN)</label>
-                                    <input type="text" class="form-control" id="edit_tax_id" name="tax_id" placeholder="Tax Identification Number">
+                                    <label for="edit_tax_id" class="form-label"><?= t('Tax ID (TIN)') ?></label>
+                                    <input type="text" class="form-control" id="edit_tax_id" name="tax_id" placeholder="<?= t('Tax Identification Number') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_vat_number" class="form-label">VAT Number</label>
-                                    <input type="text" class="form-control" id="edit_vat_number" name="vat_number" placeholder="VAT registration number">
+                                    <label for="edit_vat_number" class="form-label"><?= t('VAT Number') ?></label>
+                                    <input type="text" class="form-control" id="edit_vat_number" name="vat_number" placeholder="<?= t('VAT registration number') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_default_wht_rate_id" class="form-label">Default Withholding Tax</label>
+                                    <label for="edit_default_wht_rate_id" class="form-label"><?= t('Default Withholding Tax') ?></label>
                                     <select class="form-select" id="edit_default_wht_rate_id" name="default_wht_rate_id">
-                                        <option value="">None</option>
+                                        <option value=""><?= t('None') ?></option>
                                         <?php foreach ($sup_wht_rates as $w): $pct = rtrim(rtrim(number_format((float)$w['rate_percentage'], 2), '0'), '.'); ?>
                                         <option value="<?= (int)$w['rate_id'] ?>"><?= safe_output($w['rate_name']) ?> (<?= $pct ?>%)</option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <div class="form-text">Auto-fills the WHT rate when recording this supplier's payments.</div>
+                                    <div class="form-text"><?= t("Auto-fills the WHT rate when recording this supplier's payments.") ?></div>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_payment_terms" class="form-label">Payment Terms</label>
-                                    <?= renderOtherSelect('edit_payment_terms', 'payment_terms', $lk_payment_terms, '', 'payment_terms_other', 'Select Terms') ?>
+                                    <label for="edit_payment_terms" class="form-label"><?= t('Payment Terms') ?></label>
+                                    <?= renderOtherSelect('edit_payment_terms', 'payment_terms', $lk_payment_terms, '', 'payment_terms_other', t('Select Terms')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_currency" class="form-label">Currency</label>
-                                    <?= renderOtherSelect('edit_currency', 'currency', $lk_currency, '', 'currency_other', 'Select Currency') ?>
+                                    <label for="edit_currency" class="form-label"><?= t('Currency') ?></label>
+                                    <?= renderOtherSelect('edit_currency', 'currency', $lk_currency, '', 'currency_other', t('Select Currency')) ?>
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_bank_name" class="form-label">Bank Name</label>
-                                    <input type="text" class="form-control" id="edit_bank_name" name="bank_name" placeholder="Bank name">
+                                    <label for="edit_bank_name" class="form-label"><?= t('Bank Name') ?></label>
+                                    <input type="text" class="form-control" id="edit_bank_name" name="bank_name" placeholder="<?= t('Bank name') ?>">
                                 </div>
                                 <div class="col-6 col-md-6 mb-3">
-                                    <label for="edit_bank_account" class="form-label">Bank Account</label>
-                                    <input type="text" class="form-control" id="edit_bank_account" name="bank_account" placeholder="Bank account number">
+                                    <label for="edit_bank_account" class="form-label"><?= t('Bank Account') ?></label>
+                                    <input type="text" class="form-control" id="edit_bank_account" name="bank_account" placeholder="<?= t('Bank account number') ?>">
                                 </div>
                                 <div class="col-md-12 mb-3">
-                                    <label for="edit_bank_address" class="form-label">Bank Address</label>
-                                    <textarea class="form-control" id="edit_bank_address" name="bank_address" rows="2" placeholder="Bank address details"></textarea>
+                                    <label for="edit_bank_address" class="form-label"><?= t('Bank Address') ?></label>
+                                    <textarea class="form-control" id="edit_bank_address" name="bank_address" rows="2" placeholder="<?= t('Bank address details') ?>"></textarea>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-circle"></i> Update Supplier
+                        <i class="bi bi-check-circle"></i> <?= t('Update Supplier') ?>
                     </button>
                 </div>
             </form>
@@ -1203,7 +1217,7 @@ $(document).ready(function() {
                     theme: 'bootstrap-5',
                     dropdownParent: $modal,
                     width: '100%',
-                    placeholder: 'Select or Search...'
+                    placeholder: <?= json_encode(t('Select or Search...')) ?>
                 });
             });
         } catch (e) {
@@ -1224,7 +1238,7 @@ $(document).ready(function() {
                 dropdownParent: $parent,
                 width: '100%',
                 allowClear: true,
-                placeholder: $el.data('placeholder') || 'Select…'
+                placeholder: $el.data('placeholder') || <?= json_encode(t('Select…')) ?>
             });
         });
     }
@@ -1354,14 +1368,14 @@ $(document).ready(function() {
         try {
             suppliersTable = $('#suppliersTable').DataTable({
                 language: {
-                    search: "Search suppliers:",
-                    lengthMenu: "Show _MENU_ suppliers per page",
-                    info: "Showing _START_ to _END_ of _TOTAL_ suppliers",
+                    search: <?= json_encode(t('Search suppliers:')) ?>,
+                    lengthMenu: <?= json_encode(t('Show _MENU_ suppliers per page')) ?>,
+                    info: <?= json_encode(t('Showing _START_ to _END_ of _TOTAL_ suppliers')) ?>,
                     paginate: {
-                        first: "First",
-                        last: "Last",
-                        next: "Next",
-                        previous: "Previous"
+                        first: <?= json_encode(t('First')) ?>,
+                        last: <?= json_encode(t('Last')) ?>,
+                        next: <?= json_encode(t('Next')) ?>,
+                        previous: <?= json_encode(t('Previous')) ?>
                     }
                 },
                 responsive: true,
@@ -1369,9 +1383,9 @@ $(document).ready(function() {
                 buttons: [
                     {
                         extend: 'copyHtml5',
-                        text: '<i class="bi bi-clipboard"></i> Copy',
+                        text: '<i class="bi bi-clipboard"></i> ' + <?= json_encode(t('Copy')) ?>,
                         className: 'btn btn-sm btn-primary shadow-sm',
-                        titleAttr: 'Copy to clipboard',
+                        titleAttr: <?= json_encode(t('Copy to clipboard')) ?>,
                         exportOptions: { columns: ':not(:last-child)' }
                     },
                     {
@@ -1397,8 +1411,8 @@ $(document).ready(function() {
                                             <img src="<?= getUrl($company_logo) ?>" alt="Logo" style="height: 80px; margin-bottom: 10px;">
                                         <?php endif; ?>
                                         <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;"><?= htmlspecialchars($company_name) ?></h1>
-                                        <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">Official Suppliers Report</h2>
-                                        <p style="color: #6c757d; margin: 0; font-size: 10pt;">Generated on: ${new Date().toLocaleString()}</p>
+                                        <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;"><?= t('Official Suppliers Report') ?></h2>
+                                        <p style="color: #6c757d; margin: 0; font-size: 10pt;"><?= t('Generated on:') ?> ${new Date().toLocaleString()}</p>
                                     </div>
                                 `);
 
@@ -1444,16 +1458,16 @@ $(document).ready(function() {
             const paneId = $invalid.closest('.tab-pane').attr('id');
             $('#addSupplierTabs button[data-bs-target="#' + paneId + '"]').tab('show');
             $invalid.trigger('focus');
-            const fieldLabel = $('label[for="' + $invalid.attr('id') + '"]').text().replace('*', '').trim() || 'This field';
+            const fieldLabel = $('label[for="' + $invalid.attr('id') + '"]').text().replace('*', '').trim() || <?= json_encode(t('This field')) ?>;
             setTimeout(() => $invalid[0].reportValidity(), 150);
-            Swal.fire('Missing or invalid information', fieldLabel + ' is required or not in the correct format.', 'warning');
+            Swal.fire(<?= json_encode(t('Missing or invalid information')) ?>, fieldLabel + <?= json_encode(t(' is required or not in the correct format.')) ?>, 'warning');
             return;
         }
 
         const formData = new FormData(this);
         const submitBtn = $(this).find('[type="submit"]');
 
-        submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...');
+        submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ' + <?= json_encode(t('Saving...')) ?>);
 
         $.ajax({
             url: 'api/add_supplier.php',
@@ -1466,8 +1480,8 @@ $(document).ready(function() {
                 if (response.success) {
                     Swal.fire({
                         icon: 'success',
-                        title: 'Success!',
-                        text: response.message || 'Supplier added successfully.',
+                        title: <?= json_encode(t('Success!')) ?>,
+                        text: response.message || <?= json_encode(t('Supplier added successfully.')) ?>,
                         timer: 2000,
                         showConfirmButton: false
                     }).then(() => {
@@ -1475,14 +1489,14 @@ $(document).ready(function() {
                         else { location.reload(); }
                     });
                 } else {
-                    Swal.fire('Error', response.message || 'Failed to add supplier.', 'error');
-                    submitBtn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> Save Supplier');
+                    Swal.fire(<?= json_encode(t('Error')) ?>, response.message || <?= json_encode(t('Failed to add supplier.')) ?>, 'error');
+                    submitBtn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + <?= json_encode(t('Save Supplier')) ?>);
                 }
             },
             error: function(xhr, status, error) {
                 console.error('Error:', error);
-                Swal.fire('Error', 'An error occurred. Please try again.', 'error');
-                submitBtn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> Save Supplier');
+                Swal.fire(<?= json_encode(t('Error')) ?>, <?= json_encode(t('An error occurred. Please try again.')) ?>, 'error');
+                submitBtn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + <?= json_encode(t('Save Supplier')) ?>);
             }
         });
     });
@@ -1494,7 +1508,7 @@ $(document).ready(function() {
         const formData = new FormData(this);
         const submitBtn = $(this).find('[type="submit"]');
         
-        submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Importing...');
+        submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ' + <?= json_encode(t('Importing...')) ?>);
 
         $.ajax({
             url: 'api/import_suppliers.php',
@@ -1505,27 +1519,27 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(response) {
                 if (response.success) {
-                    let resultMsg = response.message || 'Suppliers imported successfully.';
+                    let resultMsg = response.message || <?= json_encode(t('Suppliers imported successfully.')) ?>;
                     if (response.results) {
-                        resultMsg += `<br><small>Successful: ${response.results.successful}, Failed: ${response.results.failed}</small>`;
+                        resultMsg += '<br><small>' + <?= json_encode(t('Successful:')) ?> + ` ${response.results.successful}, ` + <?= json_encode(t('Failed:')) ?> + ` ${response.results.failed}</small>`;
                     }
                     Swal.fire({
                         icon: 'success',
-                        title: 'Imported!',
+                        title: <?= json_encode(t('Imported!')) ?>,
                         html: resultMsg,
                         showConfirmButton: true
                     }).then(() => {
                         location.reload();
                     });
                 } else {
-                    Swal.fire('Error', response.message || 'Import failed.', 'error');
-                    submitBtn.prop('disabled', false).html('<i class="bi bi-upload"></i> Import Suppliers');
+                    Swal.fire(<?= json_encode(t('Error')) ?>, response.message || <?= json_encode(t('Import failed.')) ?>, 'error');
+                    submitBtn.prop('disabled', false).html('<i class="bi bi-upload"></i> ' + <?= json_encode(t('Import Suppliers')) ?>);
                 }
             },
             error: function(xhr, status, error) {
                 console.error('Error:', error);
-                Swal.fire('Error', 'An error occurred during import.', 'error');
-                submitBtn.prop('disabled', false).html('<i class="bi bi-upload"></i> Import Suppliers');
+                Swal.fire(<?= json_encode(t('Error')) ?>, <?= json_encode(t('An error occurred during import.')) ?>, 'error');
+                submitBtn.prop('disabled', false).html('<i class="bi bi-upload"></i> ' + <?= json_encode(t('Import Suppliers')) ?>);
             }
         });
     });
@@ -1539,16 +1553,16 @@ $(document).ready(function() {
             const paneId = $invalid.closest('.tab-pane').attr('id');
             $('#editSupplierTabs button[data-bs-target="#' + paneId + '"]').tab('show');
             $invalid.trigger('focus');
-            const fieldLabel = $('label[for="' + $invalid.attr('id') + '"]').text().replace('*', '').trim() || 'This field';
+            const fieldLabel = $('label[for="' + $invalid.attr('id') + '"]').text().replace('*', '').trim() || <?= json_encode(t('This field')) ?>;
             setTimeout(() => $invalid[0].reportValidity(), 150);
-            Swal.fire('Missing or invalid information', fieldLabel + ' is required or not in the correct format.', 'warning');
+            Swal.fire(<?= json_encode(t('Missing or invalid information')) ?>, fieldLabel + <?= json_encode(t(' is required or not in the correct format.')) ?>, 'warning');
             return;
         }
 
         const formData = new FormData(this);
         const submitBtn = $(this).find('[type="submit"]');
 
-        submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating...');
+        submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ' + <?= json_encode(t('Updating...')) ?>);
 
         $.ajax({
             url: 'api/update_supplier.php',
@@ -1561,8 +1575,8 @@ $(document).ready(function() {
                 if (response.success) {
                     Swal.fire({
                         icon: 'success',
-                        title: 'Updated!',
-                        text: response.message || 'Supplier updated successfully.',
+                        title: <?= json_encode(t('Updated!')) ?>,
+                        text: response.message || <?= json_encode(t('Supplier updated successfully.')) ?>,
                         timer: 2000,
                         showConfirmButton: false
                     }).then(() => {
@@ -1570,14 +1584,14 @@ $(document).ready(function() {
                         else { location.reload(); }
                     });
                 } else {
-                    Swal.fire('Error', response.message || 'Update failed.', 'error');
-                    submitBtn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> Update Supplier');
+                    Swal.fire(<?= json_encode(t('Error')) ?>, response.message || <?= json_encode(t('Update failed.')) ?>, 'error');
+                    submitBtn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + <?= json_encode(t('Update Supplier')) ?>);
                 }
             },
             error: function(xhr, status, error) {
                 console.error('Error:', error);
-                Swal.fire('Error', 'An error occurred. Please try again.', 'error');
-                submitBtn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> Update Supplier');
+                Swal.fire(<?= json_encode(t('Error')) ?>, <?= json_encode(t('An error occurred. Please try again.')) ?>, 'error');
+                submitBtn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + <?= json_encode(t('Update Supplier')) ?>);
             }
         });
     });
@@ -1594,14 +1608,14 @@ $(document).ready(function() {
     $('#importSuppliersModal').on('hidden.bs.modal', function() {
         $('#importSuppliersForm')[0].reset();
         $('#import-message').html('');
-        $('#importSuppliersForm [type="submit"]').prop('disabled', false).html('<i class="bi bi-upload"></i> Import Suppliers');
+        $('#importSuppliersForm [type="submit"]').prop('disabled', false).html('<i class="bi bi-upload"></i> ' + <?= json_encode(t('Import Suppliers')) ?>);
     });
-    
+
     $('#editSupplierModal').on('hidden.bs.modal', function() {
         $('#editSupplierForm')[0].reset();
         $('#editSupplierModal .select2-enable').val(null).trigger('change');
         $('#edit-supplier-message').html('');
-        $('#editSupplierForm [type="submit"]').prop('disabled', false).html('<i class="bi bi-check-circle"></i> Update Supplier');
+        $('#editSupplierForm [type="submit"]').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + <?= json_encode(t('Update Supplier')) ?>);
         resetOtherFields('#editSupplierModal');
         $('#editSupplierTabs .nav-link:first').tab('show');
     });
@@ -1752,16 +1766,16 @@ function editSupplier(supplierId) {
             } else {
                 Swal.fire({
                     icon: 'error',
-                    title: 'Load Error',
-                    text: 'Error loading supplier data: ' + response.message
+                    title: <?= json_encode(t('Load Error')) ?>,
+                    text: <?= json_encode(t('Error loading supplier data:')) ?> + ' ' + response.message
                 });
             }
         },
         error: function(xhr, status, error) {
             Swal.fire({
                 icon: 'error',
-                title: 'Server Error',
-                text: 'Error loading supplier data. Please try again.'
+                title: <?= json_encode(t('Server Error')) ?>,
+                text: <?= json_encode(t('Error loading supplier data. Please try again.')) ?>
             });
             console.error('Error:', error);
         }
@@ -1770,28 +1784,28 @@ function editSupplier(supplierId) {
 
 function updateStatus(supplierId, status) {
     const actionMap = {
-        'active': 'activate',
-        'inactive': 'deactivate',
-        'suspended': 'suspend',
-        'blacklisted': 'blacklist'
+        'active': <?= json_encode(t('activate')) ?>,
+        'inactive': <?= json_encode(t('deactivate')) ?>,
+        'suspended': <?= json_encode(t('suspend')) ?>,
+        'blacklisted': <?= json_encode(t('blacklist')) ?>
     };
-    
-    const action = actionMap[status] || 'update';
-    
+
+    const action = actionMap[status] || <?= json_encode(t('update')) ?>;
+
     Swal.fire({
-        title: 'Are you sure?',
-        text: 'Do you want to ' + action + ' this supplier?',
+        title: <?= json_encode(t('Are you sure?')) ?>,
+        text: <?= json_encode(t('Do you want to')) ?> + ` ${action} ` + <?= json_encode(t('this supplier?')) ?>,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#3085d6',
         cancelButtonColor: '#aaa',
-        confirmButtonText: 'Yes, ' + action + ' it!'
+        confirmButtonText: <?= json_encode(t('Yes,')) ?> + ` ${action}!`
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
                 url: 'api/update_supplier_status.php',
                 type: 'POST',
-                data: { 
+                data: {
                     supplier_id: supplierId,
                     status: status
                 },
@@ -1800,7 +1814,7 @@ function updateStatus(supplierId, status) {
                     if (response.success) {
                         Swal.fire({
                             icon: 'success',
-                            title: 'Status Updated',
+                            title: <?= json_encode(t('Status Updated')) ?>,
                             text: response.message,
                             timer: 2000,
                             showConfirmButton: false
@@ -1810,7 +1824,7 @@ function updateStatus(supplierId, status) {
                     } else {
                         Swal.fire({
                             icon: 'error',
-                            title: 'Update Failed',
+                            title: <?= json_encode(t('Update Failed')) ?>,
                             text: response.message
                         });
                     }
@@ -1819,8 +1833,8 @@ function updateStatus(supplierId, status) {
                     console.error('Error:', error);
                     Swal.fire({
                         icon: 'error',
-                        title: 'Server Error',
-                        text: 'Error updating status. Please try again.'
+                        title: <?= json_encode(t('Server Error')) ?>,
+                        text: <?= json_encode(t('Error updating status. Please try again.')) ?>
                     });
                 }
             });
@@ -1830,13 +1844,13 @@ function updateStatus(supplierId, status) {
 
 function confirmDelete(supplierId) {
     Swal.fire({
-        title: 'Delete Supplier?',
-        text: "This action cannot be undone!",
+        title: <?= json_encode(t('Delete Supplier?')) ?>,
+        text: <?= json_encode(t('This action cannot be undone!')) ?>,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
         cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Yes, delete it!'
+        confirmButtonText: <?= json_encode(t('Yes, delete it!')) ?>
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
@@ -1848,20 +1862,20 @@ function confirmDelete(supplierId) {
                     if (response.success) {
                         Swal.fire({
                             icon: 'success',
-                            title: 'Deleted!',
-                            text: 'Supplier has been deleted.',
+                            title: <?= json_encode(t('Deleted!')) ?>,
+                            text: <?= json_encode(t('Supplier has been deleted.')) ?>,
                             timer: 1500,
                             showConfirmButton: false
                         }).then(() => {
                             location.reload();
                         });
                     } else {
-                        Swal.fire('Error', response.message, 'error');
+                        Swal.fire(<?= json_encode(t('Error')) ?>, response.message, 'error');
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error:', error);
-                    Swal.fire('Error', 'Error deleting supplier. Please try again.', 'error');
+                    Swal.fire(<?= json_encode(t('Error')) ?>, <?= json_encode(t('Error deleting supplier. Please try again.')) ?>, 'error');
                 }
             });
         }
@@ -1900,7 +1914,7 @@ $(document).ready(function() {
     if ($('#categoryFilter').length) {
         $('#categoryFilter').select2({
             theme: 'bootstrap-5',
-            placeholder: 'All Categories',
+            placeholder: <?= json_encode(t('All Categories')) ?>,
             allowClear: true,
             width: '100%'
         });
