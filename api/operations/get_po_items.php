@@ -8,7 +8,11 @@ require_once __DIR__ . '/../../roots.php';
 
 header('Content-Type: application/json');
 
-if (session_status() === PHP_SESSION_NONE) session_start();
+// No session_start() here — roots.php above already handled it, and it then
+// releases the session lock (see core/session_guard.php), which legitimately
+// leaves session_status() as PHP_SESSION_NONE while $_SESSION stays populated.
+// Starting a second session at this point would replace $_SESSION with an empty
+// one and turn every request into "Unauthorized".
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);

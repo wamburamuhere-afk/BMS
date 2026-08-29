@@ -29,6 +29,27 @@
  * it cannot clobber a concurrent request's writes (the old behaviour, in which
  * the last request to finish overwrote the whole session, was in fact worse).
  *
+ * WHY session.use_cookies IS TURNED OFF AT RELEASE TIME
+ * By shutdown the response headers have usually already gone out, and PHP then
+ * refuses all three of the calls the write-back needs:
+ *   ini_set('session.*') -> "Session ini settings cannot be changed after
+ *                            headers have already been sent"
+ *   session_id()         -> "Session ID cannot be changed after headers have
+ *                            already been sent"
+ *   session_start()      -> "Cannot start session when headers already sent"
+ * The last two gates are lifted when session.use_cookies is 0, and the ini
+ * itself can only be changed BEFORE any output. So it is switched off here, at
+ * release time, while that is still legal. Suppressing the cookie is exactly
+ * what we want anyway: the browser already holds it, and the write-back must
+ * not try to re-send it.
+ *
+ * An earlier revision passed use_cookies through session_start()'s options
+ * array instead. That is too late — session_id() had already failed, so
+ * session_start() minted a brand-new session and the request's changes were
+ * written to an orphan file and silently lost. Sentry caught it in production
+ * (ErrorException at line 78, /purchase_orders); see the regression test in
+ * tests/test_session_guard_cli.php.
+ *
  * @see changelog.md — 2026-08-29
  */
 
@@ -43,11 +64,30 @@ if (!function_exists('bmsSessionRelease')) {
         if (session_status() !== PHP_SESSION_ACTIVE) return;
         if (!empty($GLOBALS['__bms_session_released'])) return;   // already released
 
+        // Only release when the browser already holds this session's cookie.
+        // On the one request where the session is brand new (login) the cookie
+        // is still in flight, so keep PHP's default behaviour for that request
+        // rather than risk writing the new session back under the wrong id.
+        $sid = session_id();
+        if ($sid === '' || ($_COOKIE[session_name()] ?? '') !== $sid) return;
+
         $GLOBALS['__bms_session_snapshot'] = $_SESSION ?? [];
-        $GLOBALS['__bms_session_id']       = session_id();
+        $GLOBALS['__bms_session_id']       = $sid;
         $GLOBALS['__bms_session_released'] = true;
 
         session_write_close();                 // <-- the lock is gone from here on
+
+        // Must happen after the session is closed and before any output. See the
+        // file header: this is what keeps the shutdown write-back legal.
+        //   use_cookies=0   lifts the "headers already sent" gate on session_id()
+        //                   and session_start(), and stops a pointless Set-Cookie.
+        //   cache_limiter=''  stops session_start() trying to emit Cache-Control,
+        //                   which otherwise fails with "Session cache limiter
+        //                   cannot be sent after headers have already been sent"
+        //                   and makes the whole re-open fail.
+        ini_set('session.use_cookies', '0');
+        ini_set('session.cache_limiter', '');
+
         register_shutdown_function('bmsSessionPersist');
     }
 
@@ -60,9 +100,8 @@ if (!function_exists('bmsSessionRelease')) {
         if (empty($GLOBALS['__bms_session_released'])) return;
         $GLOBALS['__bms_session_released'] = false;               // never run twice
 
-        // The page re-opened the session itself (e.g. a guarded session_start(),
-        // or bmsSessionReopen() before a destroy). PHP writes it out normally —
-        // nothing for us to do, and touching it here would fight that.
+        // The page re-opened the session itself (e.g. bmsSessionReopen() before a
+        // destroy). PHP writes it out normally — nothing for us to do.
         if (session_status() === PHP_SESSION_ACTIVE) return;
 
         // The session was destroyed during this request — must not resurrect it.
@@ -72,12 +111,22 @@ if (!function_exists('bmsSessionRelease')) {
         $after  = $_SESSION ?? [];
         if ($after === $before) return;        // unchanged -> never take the lock at all
 
-        // Re-open the SAME session briefly. use_cookies=0 because headers are
-        // normally already sent by shutdown time and the browser already holds
-        // this cookie; re-sending it would emit a "headers already sent" warning.
+        // Legal even after headers are sent, because bmsSessionRelease() already
+        // set session.use_cookies=0 and session.cache_limiter=''.
+        //
+        // No options array: every entry in it is applied as an ini_set at start
+        // time, which fails once headers are sent ("Setting option ... failed").
+        // The settings that matter were applied at release time instead.
         session_id($GLOBALS['__bms_session_id']);
-        if (!@session_start(['use_cookies' => 0, 'use_only_cookies' => 0, 'read_and_close' => false])) {
+        if (!session_start()) {
             error_log('bmsSessionPersist: could not re-open session to save changes');
+            return;
+        }
+
+        // Belt and braces: never write into a session that is not the one we read.
+        if (session_id() !== ($GLOBALS['__bms_session_id'] ?? '')) {
+            session_abort();                   // close without writing anything
+            error_log('bmsSessionPersist: session id changed on reopen; changes not saved');
             return;
         }
 
@@ -106,10 +155,14 @@ if (!function_exists('bmsSessionRelease')) {
     function bmsSessionReopen(): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) return;
-        if (!empty($GLOBALS['__bms_session_id'])) {
-            session_id($GLOBALS['__bms_session_id']);
-        }
-        @session_start(['use_cookies' => 0, 'use_only_cookies' => 0]);
+
+        // As in bmsSessionPersist(): no options array — use_cookies and
+        // cache_limiter were already set at release time, and re-applying them
+        // here fails once headers have been sent.
+        $want = $GLOBALS['__bms_session_id'] ?? '';
+        if ($want !== '') session_id($want);
+        session_start();
+
         // The live session file now wins over our pre-release snapshot.
         $GLOBALS['__bms_session_snapshot'] = $_SESSION ?? [];
     }
