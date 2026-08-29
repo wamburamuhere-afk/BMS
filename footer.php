@@ -95,22 +95,30 @@ $(document).ajaxSuccess(function(event, xhr, settings, data) {
 });
 </script>
 
-<!-- DataTables JS -->
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
-<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+<!-- DataTables JS
+     `defer` lets these ~2.3 MB download in parallel instead of blocking the
+     parser one tag at a time, so the page paints while they arrive. Execution
+     order is preserved and all deferred scripts still run BEFORE
+     DOMContentLoaded — every page initialises its table inside
+     $(document).ready(), so DataTables is always present by then.
+     Note: jszip/pdfmake/vfs_fonts are export-only, but DataTables Buttons hides
+     the Excel/PDF buttons entirely when JSZip/pdfMake are absent, so they can be
+     made lazy only together with an `available` override. Left loaded for now. -->
+<script defer src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script defer src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script defer src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+<script defer src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+<script defer src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+<script defer src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
+<script defer src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<script defer src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
 
 <!-- Sitewide loading UX: top progress bar (automatic on every $.ajax call
      and internal link click) + shared BMSSkeleton helper for pages to opt in.
      Cache-busted with the file's mtime so an edit here is never served stale
      from a browser's heuristic cache (Apache sends no Cache-Control on static
      assets, so browsers may otherwise reuse an old copy for a while). -->
-<script src="<?= getUrl('assets/js/loading.js') ?>?v=<?= @filemtime(__DIR__ . '/assets/js/loading.js') ?>"></script>
+<script defer src="<?= getUrl('assets/js/loading.js') ?>?v=<?= @filemtime(__DIR__ . '/assets/js/loading.js') ?>"></script>

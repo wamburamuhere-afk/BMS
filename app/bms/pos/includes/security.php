@@ -248,8 +248,13 @@ class POSSecurity {
         if (isset($_SESSION['last_activity'])) {
             $timeout = 1800; // 30 minutes
             if (time() - $_SESSION['last_activity'] > $timeout) {
+                // roots.php releases the session lock early, so re-acquire a real
+                // session first — session_unset()/session_destroy() only warn and
+                // do nothing when the session is closed.
+                if (function_exists('bmsSessionReopen')) bmsSessionReopen();
                 session_unset();
                 session_destroy();
+                if (function_exists('bmsSessionMarkDestroyed')) bmsSessionMarkDestroyed();
                 return false;
             }
         }
@@ -259,8 +264,12 @@ class POSSecurity {
         $currentFingerprint = $this->getSessionFingerprint();
         if (isset($_SESSION['fingerprint'])) {
             if ($_SESSION['fingerprint'] !== $currentFingerprint) {
+                // See the timeout branch above — the lock is released early, so the
+                // session must be re-opened before it can be destroyed.
+                if (function_exists('bmsSessionReopen')) bmsSessionReopen();
                 session_unset();
                 session_destroy();
+                if (function_exists('bmsSessionMarkDestroyed')) bmsSessionMarkDestroyed();
                 $this->logAudit('session_hijacking_attempt', [
                     'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
                 ]);
