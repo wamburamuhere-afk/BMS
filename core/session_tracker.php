@@ -106,26 +106,27 @@ if (!function_exists('startUserSession')) {
      * Open a session row on successful login. Enriches with GeoIP + parsed UA.
      * Returns the new row id (to stash in $_SESSION) or null on failure.
      *
-     * Before inserting, closes any session this user left open — browser closed
-     * without logging out, a crash, or simply logging in again elsewhere. Ends it
-     * at its own last-seen moment (never invents a logout time nobody observed)
-     * and tags it 'superseded', so Login History reads "Signed in again" instead
-     * of an "Active" row that would otherwise sit open forever.
+     * Does NOT close any prior open session for this user — see the "only two
+     * automatic causes" note inside the function body. A prior open row just
+     * triggers an admin email (notifyConcurrentLogin()); both rows stay
+     * "Active" until an admin manually ends one.
      */
     function startUserSession(PDO $pdo, int $userId, ?string $ip = null, ?string $ua = null, ?string $phpSessionId = null): ?int
     {
         if ($userId <= 0) return null;
         try {
-            $openRows = $pdo->prepare("SELECT id, login_at, last_seen_at FROM user_sessions WHERE user_id = ? AND logout_at IS NULL");
-            $openRows->execute([$userId]);
-            foreach ($openRows->fetchAll(PDO::FETCH_ASSOC) as $open) {
-                $asOf = $open['last_seen_at'] ?? $open['login_at'];
-                $dur  = max(0, strtotime($asOf) - strtotime($open['login_at']));
-                $pdo->prepare(
-                    "UPDATE user_sessions SET logout_at = ?, duration_seconds = ?, logout_type = 'superseded'
-                      WHERE id = ? AND logout_at IS NULL"
-                )->execute([$asOf, $dur, $open['id']]);
-            }
+            // Only TWO things may ever automatically end a session: the person
+            // clicking Logout, and the 30-minute idle timeout
+            // (expireIdleSessions()). Logging in again while a previous session
+            // is still open used to auto-close that earlier row ("superseded") —
+            // deliberately removed (2026-08-29, the user's own decision after
+            // review). It is now a pure SIGNAL: count how many sessions are
+            // already open, email admins if there are any, and touch NOTHING —
+            // both rows stay genuinely "Active" until an admin reviews Login
+            // History and manually ends one, exactly as intended.
+            $priorOpenStmt = $pdo->prepare("SELECT COUNT(*) FROM user_sessions WHERE user_id = ? AND logout_at IS NULL");
+            $priorOpenStmt->execute([$userId]);
+            $priorOpenCount = (int) $priorOpenStmt->fetchColumn();
 
             $geo    = lookupGeoIP($ip);
             $device = parseUserAgent($ua);
@@ -173,6 +174,14 @@ if (!function_exists('startUserSession')) {
                 }
             }
 
+            if ($priorOpenCount > 0) {
+                try {
+                    notifyConcurrentLogin($pdo, $userId, $newRowId, $priorOpenCount);
+                } catch (Throwable $e) {
+                    error_log('startUserSession/notifyConcurrentLogin: ' . $e->getMessage());
+                }
+            }
+
             return $newRowId;
         } catch (Throwable $e) {
             error_log('startUserSession: ' . $e->getMessage());
@@ -211,16 +220,14 @@ if (!function_exists('isUnfamiliarLogin')) {
 
 if (!function_exists('notifyUnfamiliarLogin')) {
     /**
-     * Fires on a genuinely unfamiliar login. Always emails admins (Settings >
-     * System Settings > Security > "Unfamiliar Login Response" only chooses
-     * whether the session ALSO gets force-ended — the admin notification
-     * itself is not optional, confirmed deliberately independent of the
-     * general "enable email notifications" toggle via the forced
-     * notification_rules row this feature's migration seeds).
-     *
-     * "By default require admin manual action, not automatic": the default
-     * policy value is 'notify' (session left alone); 'auto_logout' is an
-     * admin's own explicit opt-in, never the shipped default.
+     * Fires on a genuinely unfamiliar login. Pure signal, no automatic
+     * session action — the user's own final decision (2026-08-29): only two
+     * things may ever automatically end a session (Logout click, 30-minute
+     * idle timeout). This always emails admins, independent of the general
+     * "enable email notifications" toggle, via the forced notification_rules
+     * row this feature's migration seeds. There used to be an admin-facing
+     * auto-logout opt-in setting here — removed entirely, not just defaulted
+     * off, per that decision.
      */
     function notifyUnfamiliarLogin(PDO $pdo, int $userId, int $sessionRowId, array $geo, array $device, ?string $ip): void
     {
@@ -248,11 +255,43 @@ if (!function_exists('notifyUnfamiliarLogin')) {
             // unfamiliar login is its own distinct thing worth its own alert.
             'dedupe_suffix' => (string) $sessionRowId,
         ]);
+    }
+}
 
-        $policy = function_exists('get_setting') ? get_setting('unfamiliar_login_policy', 'notify') : 'notify';
-        if ($policy === 'auto_logout' && function_exists('endUserSession')) {
-            endUserSession($pdo, $sessionRowId, 'auto_logout');
+if (!function_exists('notifyConcurrentLogin')) {
+    /**
+     * Fires when this account signs in while a PREVIOUS session for the same
+     * account is still open (second device/browser, or someone else with the
+     * same password). Pure signal, same as notifyUnfamiliarLogin() — no
+     * automatic session action. Both rows are left genuinely "Active"; an
+     * admin reviews Login History and manually End Sessions the one that
+     * shouldn't be there. This replaced the old auto-close-on-relogin
+     * ("superseded") behavior per the user's own explicit decision.
+     */
+    function notifyConcurrentLogin(PDO $pdo, int $userId, int $newSessionRowId, int $priorOpenCount): void
+    {
+        if (!function_exists('dispatchEvent')) {
+            require_once __DIR__ . '/notify.php';
         }
+        if (!function_exists('dispatchEvent')) return; // engine unavailable — never block login over this
+
+        $u = $pdo->prepare("SELECT username FROM users WHERE user_id = ?");
+        $u->execute([$userId]);
+        $who = $u->fetchColumn() ?: ('user #' . $userId);
+
+        $totalOpen = $priorOpenCount + 1;
+
+        dispatchEvent($pdo, 'concurrent_login_detected', [
+            'title'       => 'Concurrent login: ' . $who,
+            'message'     => "$who has signed in again while " . ($priorOpenCount === 1 ? 'another session is' : "$priorOpenCount other sessions are") . " still open (now $totalOpen active). Review Login History to see both and End Session on any that shouldn't be there.",
+            'severity'    => 'high',
+            'action_url'  => 'login_history',
+            'entity_type' => 'user_session',
+            'entity_id'   => $newSessionRowId,
+            // Once per new session row — each fresh concurrent login is its
+            // own distinct event worth its own alert.
+            'dedupe_suffix' => (string) $newSessionRowId,
+        ]);
     }
 }
 
@@ -403,11 +442,11 @@ if (!function_exists('bmsEnforceSessionLifecycle')) {
     /**
      * Runs once per authenticated request (called from roots.php). If this
      * browser's own user_sessions row has been closed by something OTHER than
-     * this request's own logout.php call — an admin revoked it, the idle sweep
-     * expired it, or the user signed in again elsewhere and superseded it — the
-     * system has already ended this session even though the browser doesn't know
-     * it yet. Sign this tab out too, rather than let it keep acting as a user
-     * whose access was actually withdrawn.
+     * this request's own logout.php call — an admin ended/revoked it, or the
+     * idle sweep expired it (the only two automatic causes) — the system has
+     * already ended this session even though the browser doesn't know it yet.
+     * Sign this tab out too, rather than let it keep acting as a user whose
+     * access was actually withdrawn.
      *
      * A plain page load is redirected to the login page with the reason. An
      * API/AJAX call just has its $_SESSION cleared — isAuthenticated() then

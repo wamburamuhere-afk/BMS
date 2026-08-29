@@ -43,6 +43,16 @@ if ($target['logout_at'] !== null) {
     exit;
 }
 
+// End Session may only ever target another account's session — never the
+// admin's own current one (an admin who wants that just clicks Logout). Same
+// restriction ajax/toggle_user.php already enforces for Block Account; the
+// UI already hides this option for the admin's own row, but the server must
+// not rely on that alone.
+if ((int) $target['user_id'] === (int) $_SESSION['user_id']) {
+    echo json_encode(['success' => false, 'message' => 'You cannot end your own session this way — use Logout instead']);
+    exit;
+}
+
 $ok = revokeUserSession($pdo, $id, (int) $_SESSION['user_id'], $reason);
 
 if ($ok) {

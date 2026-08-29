@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — Only two automatic session-ending causes; concurrent-login email; End Session restricted to other accounts
+
+**Files (new):** `migrations/2026_08_29_concurrent_login_notification.php`
+**Files (changed):** `core/session_tracker.php`, `app/constant/settings/system_settings.php`, `app/constant/settings/login_history.php`, `api/get_login_history.php`, `api/revoke_session.php`, `tests/test_login_history_cli.php`
+
+The user's own final decision on session lifecycle, after reviewing everything built earlier this session: **exactly two things may ever automatically end a session** — the person clicking Logout, and the 30-minute idle timeout. Everything else that used to auto-act is now a pure email signal with no automatic session action of any kind, not even as an opt-in.
+
+**Removed entirely — not just defaulted off:**
+- The "Sign out automatically" (`unfamiliar_login_policy` = `auto_logout`) setting under Settings > System Settings > Security. `notifyUnfamiliarLogin()` no longer branches on any policy — an unfamiliar login is now unconditionally email-only, full stop. `logout_type='auto_logout'` can never be produced by any code path any more.
+- The "signed in again elsewhere" auto-close ("superseded"). `startUserSession()` used to end the account's prior open row the moment a new login landed; it no longer touches it at all. `logout_type='superseded'` can never be produced any more either. Both the Ended filter dropdown and the `endedBadge()` JS were cleaned of both now-unreachable values (safe to remove outright, not just leave for "historical" rows — PR #1722, the branch that ever wrote either value, was never merged, so no such rows exist).
+
+**Added — concurrent-login is now its own real signal**, exactly as the user described: *"I suppose to get email that another user has logged in using the same account so I can go there in login history [and] meet that there is two account active of the same kind so admin can take action to a specific account."* New migration seeds a `concurrent_login_detected` notification event with a forced-email `notification_rules` row (same non-optional-email pattern as `unfamiliar_login_detected`). `startUserSession()` now counts how many sessions for this user are already open (`$priorOpenCount`, computed before the insert) and, if any, fires `notifyConcurrentLogin()` — isolated try/catch, same as every other notification here, so a mail problem can never block a login. Both the prior row and the new one are left exactly as they were: genuinely "Active" side by side in Login History, for an admin to review and End Session on whichever shouldn't be there.
+
+**End Session restricted to other accounts only** — mirrors the restriction Block Account already had. `renderActionsMenu()` in `login_history.php` now hides End Session entirely for the admin's own current row (`isActive && !isSelf`, was previously offered with an "(yours)" label that redirected the admin to the login page on success). Enforced server-side too, not just hidden in the UI: `api/revoke_session.php` now refuses `target.user_id === $_SESSION['user_id']` outright, since an admin who wants to end their own session should just click Logout.
+
+**System Settings > Security** — the "Unfamiliar Login Response" radio group is gone; replaced with a static statement explaining that an unfamiliar login or a concurrent login always emails admins and never does anything else automatically, and that only Logout and the 30-minute idle timeout can end a session on their own.
+
+Verified live and by real DB round-trip: a second login while a prior session is open leaves both rows completely untouched (`logout_at`/`logout_type` both still `NULL` on the original row) and queues exactly one `concurrent_login_detected` email; an unfamiliar login still queues exactly one email and never touches the session; static checks confirm `auto_logout`/`unfamiliar_login_policy`/`superseded` are gone from every file that used to reference them (tracker, System Settings, Login History's own JS, the API filter whitelist); `api/revoke_session.php`'s self-refusal was checked both by reading the source and by the existing self-exclusion pattern it now shares with `ajax/toggle_user.php`.
+
+`tests/test_login_history_cli.php` grew from 205 to 214 assertions. Existing suites unaffected: `session_guard` (24), `warehouse_scope` (147), `hr_dashboard` (23), `employee_documents` (26), `employee_rehire_uniqueness` (8).
+
 ## 2026-08-29 (feature) — Unfamiliar-login email alerts, optional auto-logout, reactivation email, login page cleanup
 
 **Files (new):** `migrations/2026_08_29_unfamiliar_login_notifications.php`

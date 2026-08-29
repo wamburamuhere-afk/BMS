@@ -244,13 +244,16 @@ ok(function_exists('bmsEnforceSessionLifecycle'),  'bmsEnforceSessionLifecycle()
 $testUid = 999900 + random_int(1, 99); // avoid collision with a concurrent test run
 $pdo->exec("DELETE FROM user_sessions WHERE user_id = {$testUid}");
 
-// 8a. Re-login supersedes the prior open row, ended at its own last-seen moment.
+// 8a. Re-login while a prior session is still open: ONLY two things may ever
+// automatically end a session (Logout click, 30-min idle timeout) — a second
+// login is neither, so BOTH rows must stay open. This replaced the old
+// auto-close-on-relogin ("superseded") behavior per the user's own decision.
 $firstRow  = startUserSession($pdo, $testUid, '127.0.0.1', 'LifecycleTest/1', 'phpsess-t1');
 $secondRow = startUserSession($pdo, $testUid, '127.0.0.1', 'LifecycleTest/2', 'phpsess-t2');
 $first  = $pdo->query("SELECT logout_type, logout_at FROM user_sessions WHERE id={$firstRow}")->fetch(PDO::FETCH_ASSOC);
 $second = $pdo->query("SELECT logout_type FROM user_sessions WHERE id={$secondRow}")->fetch(PDO::FETCH_ASSOC);
-ok($first['logout_type'] === 'superseded' && $first['logout_at'] !== null, "re-login closes the prior row as 'superseded'");
-ok($second['logout_type'] === null,                                       "the new row from re-login is still open");
+ok($first['logout_type'] === null && $first['logout_at'] === null,  "re-login does NOT auto-close the prior row — it stays 'Active'");
+ok($second['logout_type'] === null,                                 "the new row from re-login is also open — both are 'Active' side by side");
 
 // 8b. Idle sweep closes at last-seen, never "now" — and never goes negative.
 $pdo->exec("UPDATE user_sessions SET login_at = DATE_SUB(NOW(), INTERVAL 60 MINUTE),
@@ -283,7 +286,7 @@ ok(!$pdo->query("SELECT id FROM user_sessions WHERE user_id = {$testUid}")->fetc
 
 // -- Static checks: new filters wired end to end (API + page) --
 $apiContent = file_get_contents($root . '/api/get_login_history.php');
-foreach (["'ended'", "'device'", "'country'", "'location_source'", "'superseded'", "'revoked'", "'admin_ended'"] as $needle) {
+foreach (["'ended'", "'device'", "'country'", "'location_source'", "'revoked'", "'admin_ended'"] as $needle) {
     ok(str_contains($apiContent, $needle), "API references filter/state {$needle}");
 }
 
@@ -505,36 +508,55 @@ if ($reachable) {
     unset($_SESSION['user_id'], $_SESSION['is_admin']);
 }
 
-// ── 11. Unfamiliar-login email + optional auto-logout policy (2026-08-29) ──
+// ── 11. Unfamiliar-login + concurrent-login notifications (2026-08-29) ──
 // Reuses the existing Smart Notification Engine (core/notify.php) rather than
-// a new mail mechanism. "By default require admin manual action, not
-// automatically" — 'notify' is the shipped default; 'auto_logout' is an
-// admin's own explicit opt-in. The admin email fires in EITHER case — that
-// part was confirmed non-optional, independent of the general "enable email
+// a new mail mechanism. Final decision: only two things may ever
+// automatically end a session (Logout click, 30-minute idle timeout) —
+// unfamiliar logins and concurrent logins are pure signals now, email-only,
+// with no auto-logout opt-in of any kind. The admin email fires
+// unconditionally in both cases, independent of the general "enable email
 // notifications" toggle.
-echo "\n[11] Unfamiliar-login notifications + login-page cleanup\n";
+echo "\n[11] Unfamiliar/concurrent-login notifications + login-page cleanup\n";
 
-ok(is_file($root . '/migrations/2026_08_29_unfamiliar_login_notifications.php'), 'migration file exists');
+ok(is_file($root . '/migrations/2026_08_29_unfamiliar_login_notifications.php'), 'unfamiliar-login migration file exists');
 ok((bool) $pdo->query("SELECT 1 FROM notification_events WHERE event_key = 'unfamiliar_login_detected'")->fetch(),
    "notification_events row seeded for 'unfamiliar_login_detected'");
 ok((bool) $pdo->query("SELECT 1 FROM notification_rules WHERE event_key = 'unfamiliar_login_detected' AND channel_email = 1")->fetch(),
    'a forced-email notification_rules row exists (independent of the general email toggle)');
 
+ok(is_file($root . '/migrations/2026_08_29_concurrent_login_notification.php'), 'concurrent-login migration file exists');
+ok((bool) $pdo->query("SELECT 1 FROM notification_events WHERE event_key = 'concurrent_login_detected'")->fetch(),
+   "notification_events row seeded for 'concurrent_login_detected'");
+ok((bool) $pdo->query("SELECT 1 FROM notification_rules WHERE event_key = 'concurrent_login_detected' AND channel_email = 1")->fetch(),
+   'a forced-email notification_rules row exists for concurrent_login_detected too');
+
 $trackerContent2 = file_get_contents($root . '/core/session_tracker.php');
 ok(str_contains($trackerContent2, 'function isUnfamiliarLogin('), 'isUnfamiliarLogin() is the single source of truth for the live check');
 ok(str_contains($trackerContent2, 'function notifyUnfamiliarLogin('), 'notifyUnfamiliarLogin() exists');
-ok(str_contains($trackerContent2, "get_setting('unfamiliar_login_policy', 'notify')"), "the policy check DEFAULTS to 'notify' if the setting is somehow missing — never silently automatic");
-ok(str_contains($trackerContent2, "\$policy === 'auto_logout'"), 'auto_logout is the only policy value that touches the session at all');
+ok(str_contains($trackerContent2, 'function notifyConcurrentLogin('), 'notifyConcurrentLogin() exists');
+ok(!str_contains($trackerContent2, 'unfamiliar_login_policy'), "the 'unfamiliar_login_policy' setting is gone entirely — not just defaulted off");
+ok(!str_contains($trackerContent2, "'auto_logout'"), "no code path can ever produce logout_type='auto_logout' any more");
+ok(!str_contains($trackerContent2, "'superseded'"), "no code path can ever produce logout_type='superseded' any more");
+ok(str_contains($trackerContent2, 'if ($priorOpenCount > 0)'), 'a prior open session is counted and used purely as a notification trigger, not acted on');
 
 $sysSettingsContent = file_get_contents($root . '/app/constant/settings/system_settings.php');
-ok(str_contains($sysSettingsContent, "in_array(\$_POST['unfamiliar_login_policy'] ?? '', ['notify', 'auto_logout'], true)"),
-   'System Settings whitelists the submitted policy value rather than trusting it verbatim');
-ok(str_contains($sysSettingsContent, 'Unfamiliar Login Response'), 'the setting is exposed in the Security tab (not Company Profile, which has no editable settings)');
+ok(!str_contains($sysSettingsContent, 'unfamiliar_login_policy'), 'System Settings no longer exposes the auto-logout policy setting at all');
+ok(!str_contains($sysSettingsContent, 'Sign out automatically'), "the 'Sign out automatically' option text is gone from the Security tab");
+ok(str_contains($sysSettingsContent, 'Unfamiliar Login &amp; Concurrent Login Response'), 'the Security tab explains the new email-only behavior for both signals');
 ok(str_contains($sysSettingsContent, 'always emailed'), "the UI itself states the admin email is not optional, so this isn't just an internal implementation detail");
 
 $loginPageContent = file_get_contents($root . '/login.php');
 ok(!str_contains($loginPageContent, 'ended_messages'), 'the login-page notification banner was removed entirely, as instructed');
 ok(!str_contains($loginPageContent, 'You have been signed out'), "no leftover banner text remains on the login page");
+
+$loginHistoryContent2 = file_get_contents($loginHistoryFile);
+ok(!str_contains($loginHistoryContent2, "'auto_logout'"), "Login History's own filter/badge code has no 'auto_logout' left either");
+ok(!str_contains($loginHistoryContent2, "'superseded'"), "Login History's own filter/badge code has no 'superseded' left either");
+ok(str_contains($loginHistoryContent2, 'isActive && !isSelf'), 'End Session is only ever offered for ANOTHER account, never the admin\'s own row');
+
+$revokeApiContent = file_get_contents($root . '/api/revoke_session.php');
+ok(str_contains($revokeApiContent, "(int) \$target['user_id'] === (int) \$_SESSION['user_id']"),
+   'api/revoke_session.php also refuses an admin ending their OWN session server-side, not just hidden in the UI');
 
 // -- Live: real DB round-trips for both policy branches --
 // get_setting() caches the whole settings table in a `static` variable that
@@ -565,74 +587,55 @@ $runInFreshProcess = function (string $phpCode) use ($phpBin) {
     $lines = array_values(array_filter(explode("\n", (string) $out), fn($l) => trim($l) !== ''));
     return $lines ? trim(end($lines)) : '';
 };
-$runPolicyCase = function (string $policy, int $uid, string $ip, string $label) use ($runInFreshProcess, $root) {
-    $code = 'require ' . var_export("$root/includes/config.php", true) . ';'
-          . 'require ' . var_export("$root/helpers.php", true) . ';'
-          . 'require ' . var_export("$root/core/session_tracker.php", true) . ';'
-          . '$pdo->exec("DELETE FROM user_sessions WHERE user_id = ' . $uid . '");'
-          . 'save_setting("unfamiliar_login_policy", ' . var_export($policy, true) . ');'
-          . '$id = startUserSession($pdo, ' . $uid . ', ' . var_export($ip, true) . ', ' . var_export($label, true) . ', ' . var_export('sess-' . $uid, true) . ');'
-          . '$row = $pdo->query("SELECT logout_at, logout_type FROM user_sessions WHERE id=$id")->fetch(PDO::FETCH_ASSOC);'
-          . '$outbox = (int) $pdo->query("SELECT COUNT(*) FROM notification_outbox WHERE entity_type=\'user_session\' AND entity_id=$id")->fetchColumn();'
-          . 'echo json_encode(["id" => $id, "logout_at" => $row["logout_at"], "logout_type" => $row["logout_type"], "outbox" => $outbox]);';
-    $out = $runInFreshProcess($code);
-    return json_decode(trim((string) $out), true);
-};
-
+// -- Unfamiliar login: notification fires, session is left completely alone --
 $notifyUid = 999950 + random_int(1, 9);
-$notifyResult = $runPolicyCase('notify', $notifyUid, '77.77.77.77', 'NotifyPolicyTest/1');
-ok(is_array($notifyResult), 'notify-policy subprocess ran and returned valid JSON (raw: ' . var_export($notifyResult, true) . ')');
+$code = 'require ' . var_export("$root/includes/config.php", true) . ';'
+      . 'require ' . var_export("$root/helpers.php", true) . ';'
+      . 'require ' . var_export("$root/core/session_tracker.php", true) . ';'
+      . '$pdo->exec("DELETE FROM user_sessions WHERE user_id = ' . $notifyUid . '");'
+      . '$id = startUserSession($pdo, ' . $notifyUid . ', "77.77.77.77", "NotifyPolicyTest/1", "sess-' . $notifyUid . '");'
+      . '$row = $pdo->query("SELECT logout_at, logout_type FROM user_sessions WHERE id=$id")->fetch(PDO::FETCH_ASSOC);'
+      . '$outbox = (int) $pdo->query("SELECT COUNT(*) FROM notification_outbox WHERE entity_type=\'user_session\' AND entity_id=$id AND event_key=\'unfamiliar_login_detected\'")->fetchColumn();'
+      . 'echo json_encode(["id" => $id, "logout_at" => $row["logout_at"], "logout_type" => $row["logout_type"], "outbox" => $outbox]);';
+$notifyResult = json_decode(trim((string) $runInFreshProcess($code)), true);
+ok(is_array($notifyResult), 'unfamiliar-login subprocess ran and returned valid JSON (raw: ' . var_export($notifyResult, true) . ')');
 if (is_array($notifyResult)) {
-    ok($notifyResult['logout_at'] === null, "policy='notify': the session is left completely alone");
-    ok((int) $notifyResult['outbox'] === 1, "policy='notify': exactly one admin notification email was queued");
+    ok($notifyResult['logout_at'] === null, 'an unfamiliar login is left completely alone — no automatic session action, ever');
+    ok((int) $notifyResult['outbox'] === 1, 'exactly one admin notification email was queued');
 }
 
-$autoUid = 999960 + random_int(1, 9);
-$autoResult = $runPolicyCase('auto_logout', $autoUid, '88.88.88.88', 'AutoLogoutPolicyTest/1');
-ok(is_array($autoResult), 'auto_logout-policy subprocess ran and returned valid JSON (raw: ' . var_export($autoResult, true) . ')');
-if (is_array($autoResult)) {
-    ok($autoResult['logout_at'] !== null && $autoResult['logout_type'] === 'auto_logout',
-       "policy='auto_logout': the session is force-ended immediately, tagged 'auto_logout'");
-    ok((int) $autoResult['outbox'] === 1, "policy='auto_logout': the admin STILL gets emailed (not skipped just because the session was also closed)");
-
-    // A second login from the SAME country+device must NOT re-fire — this is
-    // a per-combination flag, not a per-request one. Policy is already
-    // 'auto_logout' on disk from the case above; this subprocess only adds
-    // one more login for the same uid+country+device.
-    $code2 = 'require ' . var_export("$root/includes/config.php", true) . ';'
-           . 'require ' . var_export("$root/helpers.php", true) . ';'
-           . 'require ' . var_export("$root/core/session_tracker.php", true) . ';'
-           . '$id = startUserSession($pdo, ' . $autoUid . ', "88.88.88.89", "AutoLogoutPolicyTest/2", "sess-' . $autoUid . '-2");'
-           . '$outbox = (int) $pdo->query("SELECT COUNT(*) FROM notification_outbox WHERE entity_type=\'user_session\' AND entity_id=$id")->fetchColumn();'
-           . 'echo json_encode(["id" => $id, "outbox" => $outbox]);';
-    $out2 = $runInFreshProcess($code2);
-    $secondResult = json_decode(trim((string) $out2), true);
-    ok(is_array($secondResult) && (int) $secondResult['outbox'] === 0,
-       "a second login from the SAME country+device does not re-trigger the notification");
+// -- Concurrent login: signing in again while a prior session is open fires
+// concurrent_login_detected and leaves BOTH sessions genuinely "Active" —
+// this is the user's own final decision, replacing the old auto-close
+// ("superseded") behavior entirely. --
+$concUid = 999960 + random_int(1, 9);
+$code3 = 'require ' . var_export("$root/includes/config.php", true) . ';'
+       . 'require ' . var_export("$root/helpers.php", true) . ';'
+       . 'require ' . var_export("$root/core/session_tracker.php", true) . ';'
+       . '$pdo->exec("DELETE FROM user_sessions WHERE user_id = ' . $concUid . '");'
+       . '$firstId = startUserSession($pdo, ' . $concUid . ', "88.88.88.88", "ConcurrentTest/1", "sess-' . $concUid . '-1");'
+       . '$secondId = startUserSession($pdo, ' . $concUid . ', "88.88.88.88", "ConcurrentTest/1", "sess-' . $concUid . '-2");'
+       . '$firstRow = $pdo->query("SELECT logout_at, logout_type FROM user_sessions WHERE id=$firstId")->fetch(PDO::FETCH_ASSOC);'
+       . '$secondRow = $pdo->query("SELECT logout_at FROM user_sessions WHERE id=$secondId")->fetch(PDO::FETCH_ASSOC);'
+       . '$outbox = (int) $pdo->query("SELECT COUNT(*) FROM notification_outbox WHERE entity_type=\'user_session\' AND entity_id=$secondId AND event_key=\'concurrent_login_detected\'")->fetchColumn();'
+       . 'echo json_encode(["firstId" => $firstId, "firstLogoutAt" => $firstRow["logout_at"], "firstLogoutType" => $firstRow["logout_type"], "secondLogoutAt" => $secondRow["logout_at"], "outbox" => $outbox]);';
+$concResult = json_decode(trim((string) $runInFreshProcess($code3)), true);
+ok(is_array($concResult), 'concurrent-login subprocess ran and returned valid JSON (raw: ' . var_export($concResult, true) . ')');
+if (is_array($concResult)) {
+    ok($concResult['firstLogoutAt'] === null && $concResult['firstLogoutType'] === null,
+       'the earlier session is NOT auto-closed when the account signs in again — it stays Active');
+    ok($concResult['secondLogoutAt'] === null, 'the new session is also Active — both sit open side by side');
+    ok((int) $concResult['outbox'] === 1, 'exactly one concurrent_login_detected admin email was queued for the second login');
 }
 
-// Restore the shipped default in a fresh process too (this one's own cache
-// would otherwise mask whether the write actually landed).
-$runInFreshProcess(
-    'require ' . var_export("$root/includes/config.php", true) . ';'
-  . 'require ' . var_export("$root/helpers.php", true) . ';'
-  . 'save_setting("unfamiliar_login_policy", "notify");'
-);
-$restoredCheck = json_decode(trim((string) $runInFreshProcess(
-    'require ' . var_export("$root/includes/config.php", true) . ';'
-  . 'require ' . var_export("$root/helpers.php", true) . ';'
-  . 'echo json_encode(get_setting("unfamiliar_login_policy", ""));'
-)), true);
-ok($restoredCheck === 'notify', 'policy setting restored to the shipped default (notify)');
-
-$sessionIdsToClean = $pdo->query("SELECT id FROM user_sessions WHERE user_id IN ({$notifyUid}, {$autoUid})")->fetchAll(PDO::FETCH_COLUMN);
+$sessionIdsToClean = $pdo->query("SELECT id FROM user_sessions WHERE user_id IN ({$notifyUid}, {$concUid})")->fetchAll(PDO::FETCH_COLUMN);
 if ($sessionIdsToClean) {
     $ph = implode(',', $sessionIdsToClean);
     $pdo->exec("DELETE FROM notification_outbox WHERE entity_type = 'user_session' AND entity_id IN ($ph)");
     $pdo->exec("DELETE FROM notification_log WHERE entity_type = 'user_session' AND entity_id IN ($ph)");
 }
-$pdo->exec("DELETE FROM user_sessions WHERE user_id IN ({$notifyUid}, {$autoUid})");
-$pdo->exec("DELETE FROM notification_dedupe WHERE dedupe_key LIKE 'unfamiliar_login_detected|%'");
+$pdo->exec("DELETE FROM user_sessions WHERE user_id IN ({$notifyUid}, {$concUid})");
+$pdo->exec("DELETE FROM notification_dedupe WHERE dedupe_key LIKE 'unfamiliar_login_detected|%' OR dedupe_key LIKE 'concurrent_login_detected|%'");
 
 // -- Live: the reactivation email a real Activate Account click sends --
 if ($reachable) {

@@ -103,6 +103,7 @@ $current_session_row_id = (int) ($_SESSION['session_row_id'] ?? 0);
         <div class="mb-1"><i class="bi bi-info-circle me-1"></i>A session ends when the person signs out, or after <strong>30 minutes</strong> without activity (matching the POS terminal timeout). Nothing runs at the exact moment a session goes idle, so an <strong>Expired</strong> row shows when the person was <strong>last seen</strong> — not a logout time, which was never observed. Duration is measured to that same last-seen moment, and ticks live for anyone signed in right now.</div>
         <div class="mb-1"><i class="bi bi-geo-alt me-1"></i><strong>Approximate</strong> location is inferred from the IP address — city-level at best, and on mobile networks it can report the carrier's city rather than the person's. <strong>Precise</strong> means the browser reported its actual position and the person's device permission prompt was accepted — the only source accurate to street level, shown with its accuracy radius.</div>
         <div class="mb-0"><i class="bi bi-exclamation-triangle me-1"></i><strong>Unfamiliar</strong> flags a login the first time a user has ever signed in from that country + device combination — a prompt to look closer, nothing more. It never blocks or restricts anything by itself. <strong>Block Account</strong> is always a deliberate, manual admin action from the row's own menu: it signs the account out immediately and refuses its next login until an admin activates it again from here or Settings &gt; Users.</div>
+        <div class="mb-0 mt-1"><i class="bi bi-people me-1"></i>Signing in again while an earlier session for the same account is still open no longer force-ends that earlier one — an admin is emailed, and both rows stay <strong>Active</strong> here side by side until an admin reviews them and uses <strong>End Session</strong> on whichever shouldn't be there.</div>
     </div>
 
     <!-- Filters -->
@@ -148,11 +149,9 @@ $current_session_row_id = (int) ($_SESSION['session_row_id'] ?? 0);
                         <option value="active">Still signed in</option>
                         <option value="manual">Signed out</option>
                         <option value="timeout">Expired</option>
-                        <option value="superseded">Signed in again</option>
                         <option value="revoked">Revoked</option>
                         <option value="admin_ended">Ended by admin</option>
                         <option value="blocked">Account blocked</option>
-                        <option value="auto_logout">Auto signed out (unfamiliar)</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -342,11 +341,9 @@ function endedBadge(r) {
     const by = r.revoked_by_name ? ` by ${safeOutput(r.revoked_by_name)}` : '';
     switch (r.logout_type) {
         case 'timeout':     return { badge: '<span class="badge bg-warning text-dark">Expired</span>',        detail: 'last seen ' + at(r.logout_at) };
-        case 'superseded':  return { badge: '<span class="badge bg-info text-dark">Signed in again</span>',   detail: 'at ' + at(r.logout_at) };
         case 'revoked':     return { badge: '<span class="badge bg-danger">Revoked</span>',                   detail: 'at ' + at(r.logout_at) + by };
         case 'admin_ended': return { badge: '<span class="badge bg-dark">Ended by admin</span>',              detail: 'at ' + at(r.logout_at) + by };
         case 'blocked':     return { badge: '<span class="badge bg-danger"><i class="bi bi-slash-circle me-1"></i>Account Blocked</span>', detail: 'at ' + at(r.logout_at) + by };
-        case 'auto_logout': return { badge: '<span class="badge bg-warning text-dark"><i class="bi bi-shield-exclamation me-1"></i>Auto Signed Out</span>', detail: 'unfamiliar login, at ' + at(r.logout_at) };
         default:            return { badge: '<span class="badge bg-secondary-subtle text-secondary border">Signed out</span>', detail: 'at ' + at(r.logout_at) };
     }
 }
@@ -375,14 +372,15 @@ function renderLocDevice(r) {
         <div class="mt-1">${locationBadge(r)}</div>`;
 }
 
-// End Session — admin force-ends a live row. Shared by the table and card
-// action buttons.
-function endSession(id, isSelf) {
+// End Session — admin force-ends a live row belonging to ANOTHER account.
+// Shared by the table and card action buttons. Never offered against the
+// admin's own current session — see renderActionsMenu()'s isSelf check.
+function endSession(id) {
     const doIt = () => {
         $.post('<?= buildUrl('api/revoke_session.php') ?>', { id: id, reason: 'revoked' }, function (res) {
             if (res.success) {
                 Swal.fire({ icon: 'success', title: 'Session ended', text: res.message, timer: 1800, showConfirmButton: false })
-                    .then(() => { if (isSelf) { window.location.href = '<?= getUrl('login') ?>'; } else { $('#loginTable').DataTable().ajax.reload(null, false); } });
+                    .then(() => $('#loginTable').DataTable().ajax.reload(null, false));
             } else {
                 Swal.fire({ icon: 'error', title: 'Could not end session', text: res.message });
             }
@@ -391,8 +389,8 @@ function endSession(id, isSelf) {
         });
     };
     Swal.fire({
-        title: isSelf ? 'End your own session?' : 'End this session?',
-        text: isSelf ? 'This is the session you are using right now — you will be signed out immediately.' : 'The user will be signed out the next time they take any action.',
+        title: 'End this session?',
+        text: 'The user will be signed out the next time they take any action.',
         icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, end it'
     }).then(r => { if (r.isConfirmed) doIt(); });
 }
@@ -440,12 +438,16 @@ function toggleAccount(userId, username, action) {
 // admin can do from a Login History row.
 function renderActionsMenu(r) {
     const isActive = !r.logout_at;
+    // End Session can only ever be used against OTHER accounts' sessions —
+    // never the admin's own current one, the same restriction Block Account
+    // already has (canToggleAccount below). An admin who wants to end their
+    // own session just clicks Logout.
     const isSelf   = CURRENT_SESSION_ROW_ID > 0 && Number(r.id) === CURRENT_SESSION_ROW_ID;
     const uname    = r.username || ('user #' + r.user_id);
 
     let items = '';
-    if (isActive) {
-        items += `<li><a class="dropdown-item py-2 rounded" href="#" onclick="endSession(${r.id}, ${isSelf})"><i class="bi bi-x-octagon text-warning me-2"></i>End Session${isSelf ? ' (yours)' : ''}</a></li>`;
+    if (isActive && !isSelf) {
+        items += `<li><a class="dropdown-item py-2 rounded" href="#" onclick="endSession(${r.id})"><i class="bi bi-x-octagon text-warning me-2"></i>End Session</a></li>`;
     }
     const canToggleAccount = r.user_is_active !== null && Number(r.user_id) !== CURRENT_ADMIN_USER_ID;
     if (canToggleAccount) {
