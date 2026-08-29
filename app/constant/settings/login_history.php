@@ -265,14 +265,31 @@ function roleColor(role) {
 }
 
 function formatDur(secs) {
-    if (!secs) return '—';
+    // A real 0-second session is a valid, common answer (e.g. "Signed in
+    // again" a moment after logging in) and must show "0s", not a dash —
+    // only genuinely missing data (null/undefined) is "—". `!secs` used to
+    // treat 0 as missing, which is what produced the dash BMS's own
+    // idle-timeout rows showed instead of LMS's "0s".
+    if (secs === null || secs === undefined || secs === '') return '—';
     secs = parseInt(secs);
+    if (isNaN(secs)) return '—';
     const h = Math.floor(secs / 3600);
     const m = Math.floor((secs % 3600) / 60);
     const s = secs % 60;
     if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m`;
     if (m > 0) return `${m}m ${String(s).padStart(2,'0')}s`;
     return `${s}s`;
+}
+
+// Elapsed seconds for a still-open (Active) row, computed from its own
+// login_at. Shared by the initial render AND the once-a-second ticker below,
+// so an Active row shows its real elapsed time from the very first paint
+// instead of a placeholder that only becomes correct a second later.
+function liveElapsedSeconds(loginAt) {
+    if (!loginAt) return null;
+    const loginMs = new Date(String(loginAt).replace(' ', 'T')).getTime();
+    if (isNaN(loginMs)) return null;
+    return Math.max(0, Math.floor((Date.now() - loginMs) / 1000));
 }
 
 function tzFormat(tz) {
@@ -396,7 +413,7 @@ function renderCards(rows) {
                 <div class="card-footer bg-white border-top py-2 px-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <span class="text-muted small"><i class="bi bi-stopwatch me-1"></i>${safeOutput(ended.detail)}</span>
-                        <span class="fw-semibold small durvalue ${isActive ? 'text-success' : 'text-secondary'}" data-login-at="${safeOutput(r.login_at)}" data-active="${isActive}">${isActive ? formatDur(0) : formatDur(r.duration_seconds)}</span>
+                        <span class="fw-semibold small durvalue ${isActive ? 'text-success' : 'text-secondary'}" data-login-at="${safeOutput(r.login_at)}" data-active="${isActive}">${isActive ? formatDur(liveElapsedSeconds(r.login_at)) : formatDur(r.duration_seconds)}</span>
                     </div>
                     ${actionBtn}
                 </div>
@@ -525,7 +542,7 @@ $(document).ready(function () {
                 render: function (data, type, row) {
                     if (type !== 'display') return data || 0;
                     const isActive = !row.logout_at;
-                    return `<span class="durvalue ${isActive ? 'text-success fw-semibold' : 'text-muted'}" data-login-at="${safeOutput(row.login_at)}" data-active="${isActive}">${isActive ? '—' : formatDur(data)}</span>`;
+                    return `<span class="durvalue ${isActive ? 'text-success fw-semibold' : 'text-muted'}" data-login-at="${safeOutput(row.login_at)}" data-active="${isActive}">${isActive ? formatDur(liveElapsedSeconds(row.login_at)) : formatDur(data)}</span>`;
                 }
             },
             {   // Actions
@@ -591,11 +608,8 @@ $(document).ready(function () {
     //    (tab backgrounded, laptop sleep) instead of drifting.
     setInterval(function () {
         $('.durvalue[data-active="true"]').each(function () {
-            const loginAt = $(this).data('login-at');
-            if (!loginAt) return;
-            const loginMs = new Date(String(loginAt).replace(' ', 'T')).getTime();
-            if (isNaN(loginMs)) return;
-            const secs = Math.max(0, Math.floor((Date.now() - loginMs) / 1000));
+            const secs = liveElapsedSeconds($(this).data('login-at'));
+            if (secs === null) return;
             $(this).text(formatDur(secs));
         });
     }, 1000);

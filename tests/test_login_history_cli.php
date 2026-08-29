@@ -18,12 +18,17 @@ require_once "$root/roots.php";
 require_once "$root/core/session_tracker.php";
 global $pdo;
 
-$pass = 0; $fail = 0;
+$pass = 0; $fail = 0; $skip = 0;
 
 function ok(bool $cond, string $msg): void {
     global $pass, $fail;
     if ($cond) { $pass++; echo "  \033[32m✅\033[0m $msg\n"; }
     else        { $fail++; echo "  \033[31m❌ FAIL: $msg\033[0m\n"; }
+}
+
+function skip(string $msg): void {
+    global $skip;
+    $skip++; echo "  \033[33m⏭\033[0m  $msg\n";
 }
 
 // ── 1. Schema ────────────────────────────────────────────────────────────────
@@ -317,8 +322,89 @@ ok(str_contains($precedingSnippet, 'if (isAdmin())'),
 ok(str_contains($pageContent, "getUrl('activity_log')"), "login_history.php links back to Activity Logs");
 ok(str_contains($pageContent, 'Admin only'),             "login_history.php still visibly marks itself admin-only");
 
+// ── 9. Duration display + timezone (2026-08-29 live-verification bugfixes) ──────
+// Both caught by loading the real page after two real logins, not by static
+// review — worth pinning down precisely so they can't come back silently.
+echo "\n[9] Duration display + timezone-qualified timestamps\n";
+
+// 9a. formatDur(0) must be "0s", never the dash it used to be. `!secs` treats
+// 0 as falsy — that's what made every honestly-zero-second session (a
+// re-login a moment after signing in, an idle-timeout with no heartbeat ever
+// recorded) show a dash instead of the reference LMS's own "0s".
+ok(str_contains($pageContent, "if (secs === null || secs === undefined || secs === '') return '—';"),
+   "formatDur() treats only missing data as '—' — 0 is a real, displayable value");
+ok(!preg_match('/function formatDur\([^)]*\)\s*\{\s*if\s*\(!secs\)/', $pageContent),
+   "the old '!secs returns em-dash' form (which swallowed real zeros) is gone");
+
+// 9b. Active-row duration is computed immediately from login_at, not hardcoded
+// while waiting for the first tick — no flash of a placeholder on first paint.
+ok(str_contains($pageContent, 'function liveElapsedSeconds('), "liveElapsedSeconds() helper exists");
+ok(!str_contains($pageContent, "isActive ? '—' : formatDur(data)"),
+   "table's Duration column no longer hardcodes '—' for Active rows");
+ok(str_contains($pageContent, 'isActive ? formatDur(liveElapsedSeconds(row.login_at))'),
+   "table computes the Active row's real elapsed time immediately, from its own login_at");
+ok(str_contains($pageContent, 'isActive ? formatDur(liveElapsedSeconds(r.login_at))'),
+   "card view computes the Active row's real elapsed time immediately too");
+
+// 9c. Live HTTP reproduction of the actual bug: MySQL returns a bare
+// "Y-m-d H:i:s" string with no timezone marker. Handed straight to JS's
+// Date(), that string is parsed in the BROWSER's own timezone, not the
+// server's — so on any viewer not also set to Africa/Dar_es_Salaam,
+// "new Date(login_at) - Date.now()" comes out negative and the ticker gets
+// stuck at 0 forever (reproduced live: a session that had been running for
+// over 3 minutes showed a permanent "0s"). withTzOffset() fixes this by
+// appending the real UTC offset so the timestamp is unambiguous ISO-8601
+// everywhere, independent of the viewer's own machine.
+$apiContent = file_get_contents($root . '/api/get_login_history.php');
+ok(str_contains($apiContent, 'function withTzOffset('), "get_login_history.php defines withTzOffset()");
+ok(str_contains($apiContent, "'login_at'           => withTzOffset(\$row['login_at'])"),
+   "login_at is sent timezone-qualified");
+ok(str_contains($apiContent, "'logout_at'          => withTzOffset(\$row['logout_at'])"),
+   "logout_at is sent timezone-qualified");
+
+$base = getenv('BMS_TEST_URL') ?: 'http://localhost/bms';
+$reachable = @file_get_contents("$base/login.php", false, stream_context_create(['http' => ['timeout' => 5, 'ignore_errors' => true]])) !== false;
+if (!$reachable) {
+    skip("local server not reachable at $base — live timezone reproduction skipped (set BMS_TEST_URL to override)");
+} else {
+    $tzTestUid = 999600 + random_int(1, 99);
+    $pdo->exec("DELETE FROM user_sessions WHERE user_id = {$tzTestUid}");
+    $rowId = startUserSession($pdo, $tzTestUid, '127.0.0.1', 'TzOffsetTest/1', 'sess-tz-' . $tzTestUid);
+
+    // Simulate the auth this API demands, then call it directly in-process —
+    // no real login credentials available, same technique the other live
+    // sections in this file already use.
+    $_SESSION['user_id'] = $tzTestUid; // arbitrary; only isAdmin() matters below
+    $_SESSION['is_admin'] = true;
+    $_GET = ['draw' => 1, 'start' => 0, 'length' => 5, 'search' => ['value' => ''], 'user_id' => $tzTestUid];
+    ob_start();
+    include "$root/api/get_login_history.php";
+    $json = json_decode(ob_get_clean(), true);
+    $sentLoginAt = $json['data'][0]['login_at'] ?? null;
+
+    ok($sentLoginAt !== null && (bool) preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/', $sentLoginAt),
+       "API sends login_at as full ISO-8601 with a UTC offset (got: " . var_export($sentLoginAt, true) . ")");
+
+    if ($sentLoginAt !== null) {
+        // The offset-qualified string must resolve to the SAME real-world instant
+        // as the raw DB value interpreted in the app's own configured timezone —
+        // i.e. withTzOffset() didn't just decorate the string, it decorated it
+        // with the RIGHT offset.
+        $rawFromDb   = $pdo->query("SELECT login_at FROM user_sessions WHERE id={$rowId}")->fetchColumn();
+        $appTz       = function_exists('get_setting') ? get_setting('timezone', 'Africa/Dar_es_Salaam') : 'Africa/Dar_es_Salaam';
+        $groundTruth = new DateTime($rawFromDb, new DateTimeZone($appTz));
+        $asSent      = new DateTime($sentLoginAt);
+        ok($groundTruth->getTimestamp() === $asSent->getTimestamp(),
+           "the sent timestamp resolves to the exact same real-world instant as the raw DB value in the app's configured timezone");
+    }
+
+    $pdo->exec("DELETE FROM user_sessions WHERE user_id = {$tzTestUid}");
+    unset($_SESSION['user_id'], $_SESSION['is_admin']);
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 echo "\n";
 echo "Passes:   \033[32m{$pass}\033[0m\n";
+echo "Skipped:  \033[33m{$skip}\033[0m\n";
 echo "Failures: " . ($fail === 0 ? "\033[32m0\033[0m" : "\033[31m{$fail}\033[0m") . "\n";
 exit($fail === 0 ? 0 : 1);

@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-08-29 (fix) — Login History: real Duration bug + a root-cause misunderstanding cleared up
+
+**Files (changed):** `app/constant/settings/login_history.php`, `api/get_login_history.php`, `tests/test_login_history_cli.php`
+
+User feedback after the Login History rebuild (below) raised three concerns. Investigated each on the actual `feat/login-history-upgrade` branch rather than assuming — one turned out to be a real, live-reproduced bug; the other two traced back to a single root cause worth stating plainly: **the entire 4-phase rebuild had never been merged**, so what was being tested was still the original, pre-existing feature. Confirmed by grep: the checked-out branch at the time had zero occurrences of `superseded` in `core/session_tracker.php` and `system_settings.php` still linked to Login History — neither the supersede-on-relogin fix nor the relocation to Activity Logs had ever been present in what was running.
+
+**The real bug, found by loading the actual page after two real logins:**
+
+1. `formatDur(0)` returned `'—'` instead of `'0s'` — `if (!secs) return '—'` treats a legitimate zero-second session (a re-login moments after signing in, an idle-timeout that was never touched again) as missing data. The reference LMS shows `0s` explicitly in this exact case. Fixed: only `null`/`undefined`/`''` now render as `'—'`.
+2. Deeper bug found while verifying the fix live: the "so far" duration for a currently-open session was permanently stuck at `0s`, never ticking up. Root cause — `user_sessions.login_at` is stored in the app's configured timezone (`Africa/Dar_es_Salaam`, UTC+3) but MySQL returns it as a bare `"Y-m-d H:i:s"` string with no timezone marker. Handed to JavaScript's `Date()` constructor, that string is parsed in the **browser's own** local timezone, not the server's — so on any viewer whose machine isn't also set to UTC+3, `new Date(login_at) - Date.now()` comes out negative and the ticker's `Math.max(0, …)` clamp hides it as a permanent zero. Fixed at the source: `api/get_login_history.php` now appends the app's real UTC offset to `login_at`/`last_seen_at`/`logout_at`/`revoked_at` (computed from the same `system_settings.timezone` `roots.php` itself uses), turning them into unambiguous ISO-8601 that parses correctly on any viewer's machine regardless of their own timezone setting. As a side benefit, the Login Time column now also displays the objectively correct wall-clock time for the viewer, not just a self-consistent-looking one.
+3. Replaced the initial "—" placeholder for Active rows (which waited up to a full second for the first tick) with an immediate `liveElapsedSeconds()` computation, shared by both the initial render and the ticker — no flash of a dash on first paint, matching the reference page's own polish.
+
+**On the other two concerns:** re-verified live, on the actual finished branch, that the supersede-on-relogin mechanism (two real logins through the real page flow → the first session correctly closes as `superseded`, exactly one `Active` row survives) and the Activity Logs relocation (`system_settings.php` has zero references to Login History; `app/activity_log.php` has the admin-only button) both work exactly as designed. Also found and purged ~20 leftover `user_sessions` rows from earlier feature-development testing (fake IPs like `60.60.60.60`) that had made the live table look far messier than reality — a housekeeping gap on top of the branch-merge gap, not a logic bug.
+
+`tests/test_login_history_cli.php` grew from 147 to 158 assertions — a new section pins the exact `formatDur()`/`liveElapsedSeconds()` behavior as static invariants, and reproduces the timezone bug live: calls `api/get_login_history.php` in-process after a real `startUserSession()`, asserts the returned `login_at` is full ISO-8601 with a UTC offset, and confirms it resolves to the exact same real-world instant as the raw DB value read in the app's configured timezone. Existing suites unaffected: `session_guard` (24), `warehouse_project_filter` (84), `warehouse_scope` (147), `hr_dashboard` (23).
+
 ## 2026-08-29 (feature) — Login History rebuilt to match/exceed the reference LMS implementation
 
 **Files (new):** `migrations/2026_08_29_session_lifecycle_upgrade.php`, `cron/expire_idle_sessions.php`, `api/session_geo_ping.php`, `api/revoke_session.php`

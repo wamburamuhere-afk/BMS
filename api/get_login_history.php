@@ -15,6 +15,30 @@ if (!isAdmin()) {
     exit;
 }
 
+// user_sessions timestamps are stored/read in the app's configured timezone
+// (Africa/Dar_es_Salaam by default — see roots.php), but MySQL returns bare
+// "Y-m-d H:i:s" strings with no timezone marker. A bare string handed to JS's
+// Date() constructor is parsed in the BROWSER's own local timezone, not the
+// server's — so on any viewer whose machine isn't also set to that zone,
+// "new Date(login_at) - Date.now()" is wrong by exactly the offset between
+// the two. This is what made the live "so far" duration ticker for Active
+// rows get stuck at 0 (or worse) instead of counting up: the browser saw a
+// login time that looked hours in the future relative to its own clock.
+// Appending the real UTC offset turns the string into unambiguous ISO-8601,
+// which Date() parses correctly on every viewer regardless of their machine's
+// own timezone setting.
+$__tzName = function_exists('get_setting') ? get_setting('timezone', 'Africa/Dar_es_Salaam') : 'Africa/Dar_es_Salaam';
+try {
+    $__tzOffset = (new DateTime('now', new DateTimeZone($__tzName)))->format('P');
+} catch (Throwable $e) {
+    $__tzOffset = '+00:00';
+}
+function withTzOffset(?string $dt): ?string {
+    global $__tzOffset;
+    if (empty($dt)) return null;
+    return str_replace(' ', 'T', $dt) . $__tzOffset;
+}
+
 $draw   = intval($_GET['draw']   ?? 1);
 $start  = intval($_GET['start']  ?? 0);
 $length = intval($_GET['length'] ?? 25);
@@ -173,13 +197,13 @@ try {
             'browser'            => $row['browser']  ?? '',
             'os'                 => $row['os']       ?? '',
             'device_type'        => $row['device_type'] ?? '',
-            'login_at'           => $row['login_at'] ?? '',
-            'last_seen_at'       => $row['last_seen_at'] ?? '',
-            'logout_at'          => $row['logout_at'] ?? '',
+            'login_at'           => withTzOffset($row['login_at']),
+            'last_seen_at'       => withTzOffset($row['last_seen_at']),
+            'logout_at'          => withTzOffset($row['logout_at']),
             'duration_seconds'   => $row['duration_seconds'],
             'logout_type'        => $row['logout_type'] ?? '',
             'revoked_by_name'    => $row['revoked_by_name'] ?? '',
-            'revoked_at'         => $row['revoked_at'] ?? '',
+            'revoked_at'         => withTzOffset($row['revoked_at']),
             'location_source'    => $locationSource,
             'precise_lat'        => $row['precise_lat'] !== null ? (float) $row['precise_lat'] : null,
             'precise_lng'        => $row['precise_lng'] !== null ? (float) $row['precise_lng'] : null,
