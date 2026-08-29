@@ -342,6 +342,40 @@ if (!function_exists('bmsEnforceSessionLifecycle')) {
     }
 }
 
+if (!function_exists('recordPreciseLocation')) {
+    /**
+     * Attach a one-shot, consent-based browser-reported position to a session
+     * row. Distinct from the always-on GeoIP columns (city/region/country —
+     * "Approximate"): this only ever gets written if the user's browser actually
+     * prompted them and they agreed, and never repeats once set.
+     *
+     * Both guards are enforced here, not just by the caller: WHERE
+     * precise_captured_at IS NULL makes a second ping a no-op even if the
+     * one-shot check on the JS/page side is ever bypassed, and WHERE
+     * logout_at IS NULL refuses to attach a "current" position to a session
+     * that has already ended.
+     */
+    function recordPreciseLocation(PDO $pdo, int $sessionRowId, float $lat, float $lng, ?int $accuracyM): bool
+    {
+        if ($sessionRowId <= 0) return false;
+        // Real-world bounds only — malformed input must not masquerade as a
+        // device-reported position an admin will trust as ground truth.
+        if ($lat < -90 || $lat > 90 || $lng < -180 || $lng > 180) return false;
+        try {
+            $stmt = $pdo->prepare(
+                "UPDATE user_sessions
+                    SET precise_lat = ?, precise_lng = ?, precise_accuracy_m = ?, precise_captured_at = NOW()
+                  WHERE id = ? AND logout_at IS NULL AND precise_captured_at IS NULL"
+            );
+            $stmt->execute([$lat, $lng, $accuracyM, $sessionRowId]);
+            return $stmt->rowCount() > 0;
+        } catch (Throwable $e) {
+            error_log('recordPreciseLocation: ' . $e->getMessage());
+            return false;
+        }
+    }
+}
+
 if (!function_exists('formatDuration')) {
     /**
      * Human, audit-friendly duration: "2h 15m", "45m 03s", "38s", or "—" for
