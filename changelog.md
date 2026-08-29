@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — Login History rebuilt to match/exceed the reference LMS implementation
+
+**Files (new):** `migrations/2026_08_29_session_lifecycle_upgrade.php`, `cron/expire_idle_sessions.php`, `api/session_geo_ping.php`, `api/revoke_session.php`
+**Files (changed):** `core/session_tracker.php`, `roots.php`, `login.php`, `actions/login.php`, `app/bms/pos/includes/security.php`, `header.php`, `api/get_login_history.php`, `app/constant/settings/login_history.php`, `app/activity_log.php`, `app/constant/settings/system_settings.php`, `tests/test_login_history_cli.php`
+
+Compared Login History against a reference LMS implementation and found the gap was real logic, not styling: sessions that never expired (no idle timeout existed at all), no reconciliation when a user logged in again, no way to force-end a live session, and IP-only location. Rebuilt in four phases, each verified live before moving to the next.
+
+**Phase 1 — session lifecycle.** `startUserSession()` now closes any session a user left open (browser closed, crash, logging in again) tagged `'superseded'`, ended at its own last-seen moment — never a fabricated "now". A new `last_seen_at` heartbeat (throttled to 60s) feeds `expireIdleSessions()`, which closes anything idle past 30 minutes (matching the existing POS terminal timeout) at its true last-seen time. Wired into `roots.php`, throttled to once per 5 minutes across all traffic — BMS has no OS-level cron, so this piggybacks on real requests exactly like `cron/check_hr_expiry.php` already does. `revokeUserSession()` gives an admin a way to force-end a live session, enforced on the target's next request via `bmsEnforceSessionLifecycle()` (no websocket layer exists for anything more instant — this is the honest version of that feature). The POS terminal's own timeout/hijack detection now also closes the Login History row instead of leaving it open forever.
+
+**Phase 2 — precise location.** An optional, consent-based upgrade over the always-on IP-based "Approximate" location: the browser's own Geolocation API, asked once per session (server-side gated so a cleared browser storage can't cause a repeat prompt), silently falling back to Approximate on denial.
+
+**Phase 3 — UI rebuild.** Five stat cards (Signed In Now / Sign-ins Today / People Today / Expired Today / Precise Today), inline methodology text explaining the 30-minute timeout and Precise-vs-Approximate location, a real "Ended" column (Signed out / Expired — last seen HH:MM / Signed in again / Revoked / Ended by admin, each with who-and-when), filters for all of Ended/Device/Country/Location-source/Period (the last reusing `app/activity_log.php`'s own period-preset pattern, extended with This Year — a facet the reference page doesn't have), and a live-ticking duration for active rows. Added the admin "End Session" action.
+
+**Phase 4 — relocated.** Moved out of Settings > Admin into a "Login History — Admin only" button on Activity Logs, cross-linked back — mirroring how the reference page links to its own Audit Logs. The lock is unchanged: `autoEnforcePermission('login_history')` + `isAdmin()`, still hidden from Roles & Permissions delegation.
+
+Caught two real bugs during live verification rather than after: `expireIdleSessions()` could compute a negative duration under an edge-case timestamp ordering (fixed with `GREATEST(0, ...)`), and the Phase 4 admin-only button was gated on `activity_log.php`'s own `$is_admin` variable, which is captured before that 2069-line file requires `header.php` (the thing that actually refreshes `$_SESSION['is_admin']`) — a forged stale session leaked the button to a non-admin. Fixed by calling `isAdmin()` fresh at the point of use instead of trusting the file's existing variable.
+
+Verified against the real bootstrap and a real browser throughout, not just unit-level: two logins for one user correctly supersede the first; an idle sweep closes at last-seen with the exact expected duration; a revoked session is caught on the browser's very next request with `$_SESSION` genuinely wiped (confirmed on a follow-up request, not just the redirect response); the End Session confirm dialog shows different wording for ending your own live session vs someone else's, and a real end-to-end revoke was confirmed against the database plus both `activity_logs` and `audit_logs` entries afterward. `tests/test_login_history_cli.php` grew from 92 to 147 assertions covering every new function via real DB round-trips (not just string matching) plus the relocation and its bug fix. Existing suites unaffected: `session_guard` (24), `hr_dashboard` (23), `phase1_trial_balance` (55).
+
 ## 2026-08-29 (fix) — Session guard: write-back failed once headers were sent, silently losing session data
 
 **Files (new):** `tests/test_session_guard_cli.php`
