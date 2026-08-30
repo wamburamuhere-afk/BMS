@@ -2,6 +2,38 @@
 // product_create_footer.php
 ?>
 <script>
+const PE_I18N = <?= json_encode([
+    'file_too_large' => t('File Too Large'),
+    'max_file_size' => t('Maximum file size is 2MB.'),
+    'drop_here' => t('Drop here or Click to Upload'),
+    'empty_unit' => t('Empty Unit'),
+    'enter_unit_first' => t('Please enter a unit code first.'),
+    'add_new_unit' => t('Add New Unit'),
+    'add_unit_confirm' => t('Do you want to add "%s" to the global units list?'),
+    'yes_add_it' => t('Yes, add it'),
+    'unit_added' => t('Unit Added!'),
+    'ok' => t('OK'),
+    'product_name' => t('Product Name'),
+    'cost_price' => t('Cost Price'),
+    'selling_price' => t('Selling Price'),
+    'unit' => t('Unit'),
+    'missing_field' => t('Missing Field'),
+    'enter_field_before_saving' => t('Please enter the %s before saving.'),
+    'updating' => t('Updating...'),
+    'saving' => t('Saving...'),
+    'product_updated' => t('Product Updated!'),
+    'product_created' => t('Product Created!'),
+    'update_failed' => t('Update Failed'),
+    'creation_failed' => t('Creation Failed'),
+    'system_error' => t('System Error'),
+    'comm_failed' => t('Communication with server failed.'),
+    'initializing_camera' => t('Initializing Camera...'),
+    'searching_barcode' => t('Searching for barcode source...'),
+    'loading_scanner' => t('Loading scanner...'),
+    'scan_successful' => t('Scan Successful'),
+    'barcode_label' => t('Barcode:'),
+], JSON_UNESCAPED_UNICODE) ?>;
+
 $(document).ready(function() {
     const isEdit = typeof IS_EDIT !== 'undefined' && IS_EDIT;
     if (isEdit) {
@@ -47,23 +79,23 @@ function startBarcodeScanner() {
     $('#scannerContainer').html(`
         <div class="text-center">
             <div class="spinner-grow text-primary" role="status" style="width: 3rem; height: 3rem;">
-                <span class="visually-hidden">Loading scanner...</span>
+                <span class="visually-hidden">${PE_I18N.loading_scanner}</span>
             </div>
-            <p class="mt-3 fw-bold">Initializing Camera...</p>
-            <small class="text-muted">Searching for barcode source...</small>
+            <p class="mt-3 fw-bold">${PE_I18N.initializing_camera}</p>
+            <small class="text-muted">${PE_I18N.searching_barcode}</small>
         </div>
     `);
-    
+
     setTimeout(() => {
         const barcode = '69' + Math.floor(Math.random() * 100000000000);
         $('#barcode').val(barcode).addClass('is-valid');
         $('#barcodeScannerModal').modal('hide');
         setTimeout(() => $('#barcode').removeClass('is-valid'), 2000);
-        
+
         Swal.fire({
             icon: 'success',
-            title: 'Scan Successful',
-            text: 'Barcode: ' + barcode,
+            title: PE_I18N.scan_successful,
+            text: PE_I18N.barcode_label + ' ' + barcode,
             timer: 1500,
             showConfirmButton: false,
             toast: true,
@@ -90,7 +122,7 @@ function previewImage(event) {
         const file = input.files[0];
         
         if (file.size > 2 * 1024 * 1024) {
-            Swal.fire({ icon: 'error', title: 'File Too Large', text: 'Maximum file size is 2MB.' });
+            Swal.fire({ icon: 'error', title: PE_I18N.file_too_large, text: PE_I18N.max_file_size });
             input.value = '';
             return;
         }
@@ -117,7 +149,7 @@ function removeImage(event) {
     $('#imagePreview').html(`
         <div class="text-center opacity-50">
             <i class="bi bi-image-fill display-3"></i>
-            <p class="small mt-2">Drophere or Click to Upload</p>
+            <p class="small mt-2">${PE_I18N.drop_here}</p>
         </div>
     `).addClass('bg-light opacity-50').removeClass('bg-white');
 }
@@ -168,16 +200,16 @@ function updateUnitLabels() {
 function showQuickAddUnit() {
     const unitCode = $('#unit').val().trim();
     if (!unitCode) {
-        Swal.fire({ icon: 'warning', title: 'Empty Unit', text: 'Please enter a unit code first.' });
+        Swal.fire({ icon: 'warning', title: PE_I18N.empty_unit, text: PE_I18N.enter_unit_first });
         return;
     }
-    
+
     Swal.fire({
-        title: 'Add New Unit',
-        text: `Do you want to add "${unitCode}" to the global units list?`,
+        title: PE_I18N.add_new_unit,
+        text: PE_I18N.add_unit_confirm.replace('%s', unitCode),
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Yes, add it',
+        confirmButtonText: PE_I18N.yes_add_it,
         showLoaderOnConfirm: true,
         preConfirm: () => {
             return $.post('<?= getUrl("/api/save_unit.php") ?>', {
@@ -201,11 +233,11 @@ function showQuickAddUnit() {
                 datalist.append(`<option value="${unitCode}">${unitCode.charAt(0).toUpperCase() + unitCode.slice(1)}</option>`);
             }
             logReportAction('Quick Added Unit', 'User quick-added measurement unit: ' + unitCode);
-            Swal.fire({ 
-                icon: 'success', 
-                title: 'Unit Added!', 
+            Swal.fire({
+                icon: 'success',
+                title: PE_I18N.unit_added,
                 confirmButtonColor: '#28a745',
-                confirmButtonText: 'OK'
+                confirmButtonText: PE_I18N.ok
             });
         }
     });
@@ -263,10 +295,10 @@ function validateForm() {
     // with a SweetAlert (previously it failed silently, so a blocked save looked
     // like "nothing happened / not saved").
     const required = [
-        { id: 'product_name',  label: 'Product Name',  tab: 'general' },
-        { id: 'cost_price',    label: 'Cost Price',     tab: 'pricing' },
-        { id: 'selling_price', label: 'Selling Price',  tab: 'pricing' },
-        { id: 'unit',          label: 'Unit',           tab: 'inventory' }
+        { id: 'product_name',  label: PE_I18N.product_name,  tab: 'general' },
+        { id: 'cost_price',    label: PE_I18N.cost_price,     tab: 'pricing' },
+        { id: 'selling_price', label: PE_I18N.selling_price,  tab: 'pricing' },
+        { id: 'unit',          label: PE_I18N.unit,           tab: 'inventory' }
     ];
 
     for (const field of required) {
@@ -277,8 +309,8 @@ function validateForm() {
             el.addClass('is-invalid').focus();
             Swal.fire({
                 icon: 'warning',
-                title: 'Missing Field',
-                text: `Please enter the ${field.label} before saving.`,
+                title: PE_I18N.missing_field,
+                text: PE_I18N.enter_field_before_saving.replace('%s', field.label),
                 confirmButtonColor: '#ffc107'
             });
             return false;
@@ -295,7 +327,7 @@ function createProduct(status = 'active') {
     const originalText = submitBtn.html();
     const isEdit = typeof IS_EDIT !== 'undefined' && IS_EDIT;
     
-    submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + (isEdit ? 'Updating...' : 'Saving...'));
+    submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + (isEdit ? PE_I18N.updating : PE_I18N.saving));
     
     const formData = new FormData($('#productForm')[0]);
     formData.append('status', status);
@@ -333,20 +365,20 @@ function createProduct(status = 'active') {
                 } else {
                     logReportAction('Created Product', 'User successfully created new product: ' + $('#product_name').val());
                 }
-                Swal.fire({ 
-                    icon: 'success', 
-                    title: isEdit ? 'Product Updated!' : 'Product Created!', 
-                    text: res.message, 
+                Swal.fire({
+                    icon: 'success',
+                    title: isEdit ? PE_I18N.product_updated : PE_I18N.product_created,
+                    text: res.message,
                     confirmButtonColor: '#28a745',
-                    confirmButtonText: 'OK'
+                    confirmButtonText: PE_I18N.ok
                 }).then(() => window.location.href = 'products');
             } else {
-                Swal.fire({ icon: 'error', title: isEdit ? 'Update Failed' : 'Creation Failed', text: res.message });
+                Swal.fire({ icon: 'error', title: isEdit ? PE_I18N.update_failed : PE_I18N.creation_failed, text: res.message });
                 submitBtn.prop('disabled', false).html(originalText);
             }
         },
         error: function() {
-            Swal.fire({ icon: 'error', title: 'System Error', text: 'Communication with server failed.' });
+            Swal.fire({ icon: 'error', title: PE_I18N.system_error, text: PE_I18N.comm_failed });
             submitBtn.prop('disabled', false).html(originalText);
         }
     });

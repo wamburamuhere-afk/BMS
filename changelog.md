@@ -1,5 +1,67 @@
 # BMS Changelog
 
+## 2026-08-29 (feature) — UI language translation: Non-Inventory Products CRUD (final module)
+
+**Files (changed):** `app/bms/product/services.php`, `lang/sw.php`
+
+Translates Non-Inventory Products (`services.php`) to the same depth as every other module,
+completing the user's full explicit module order for this feature: Customers → Suppliers →
+Sub-Contractors → Products → Non-Inventory Products. Covers the list page (stats, filters, Card
+View + DataTable Table View), the inline Add Service and Edit Service modals (Product Identity +
+Pricing & Planning steps, including the dynamic materials/BOM component table with its warehouse
+product-search dropdown), and all JS/SweetAlert dialogs — via a `SVC_I18N` JS dictionary
+(`json_encode` from PHP `t()` calls), the same pattern as `PE_I18N`/`DASH_I18N` in the earlier
+modules.
+
+Reused a large share of existing catalog keys (Active, Inactive, Categories, Print, Table View,
+Card View, Description, Delete, Project, Select Warehouse, Selling Price, Tax Rate, No Tax,
+Missing Field, View Details, Save & Add Another, Create Product, Updated!, Cancel, and the
+`Please enter the %s before saving.` / `Product Created!` keys added for `product_edit.php`);
+added new keys only where this page's wording is genuinely different (e.g. "S/NO", "Item Code",
+the Job/Pieces/Set/Box/Litre/Kg unit words, the materials-BOM table headers, the delete
+confirmation's product-history warning text).
+
+Verified via the automated `t()`-key audit across all 10 translated files (887 keys used, 0
+missing from `lang/sw.php`, 0 value conflicts) and live in-browser on `/services`: a full-page
+text sweep found only expected UI strings (one apparent "leftover" — "No Tax (0.00%)" in the tax
+column — turned out to be a real tax-rate record literally named "No Tax" in the database, not
+untranslated UI text, and was correctly left alone); the Add and Edit Service modals (both steps)
+and the delete-confirmation SweetAlert were opened directly and confirmed fully Swahili, including
+the dialog's Cancel button (added `cancelButtonText`, matching the pattern already used for delete
+confirmations in `products.php`).
+
+## 2026-08-29 (feature) — UI language translation: Products CRUD (list, Add, Edit)
+
+**Files (changed):** `app/bms/product/products.php`, `app/bms/product/product_edit.php`, `app/bms/product/product_create_footer.php`, `lang/sw.php`
+
+Products module translated to the same depth as Customers/Suppliers/Sub-Contractors, completing
+its core CRUD scope (list + add + edit; `product_create.php`'s legacy Ctrl+N entry point and
+`product_view.php` remain deferred, same as the other modules' standalone detail pages):
+
+- `products.php` — page header, print header, 4 stat cards, attention banner, Filters card,
+  Actions bar, table + card views (including the 8+ item action dropdown), Stock Adjustment
+  modal, the inline Add Product modal (4 tabs), and all JS/SweetAlert dialogs. Also fixed a
+  pre-existing duplicate `copyTable()` function definition (the second, later declaration was
+  silently overriding the first — harmless but wasted the first translation pass).
+- `product_edit.php` (the real standalone Edit Product page) — page header, all 4 form tabs
+  (General Info, Pricing & Profit, Inventory & Stock, Advanced Details), the per-warehouse
+  current-stock table, and the Barcode Scanner / Quick Add Category / Quick Add Brand modals.
+- `product_create_footer.php` (shared JS engine behind both Add and Edit forms) — translated via
+  a `PE_I18N` JS dictionary (`json_encode` from PHP `t()` calls), same pattern as dashboard.php's
+  `DASH_I18N`, covering SweetAlert validation/success/error dialogs and the barcode-scanner
+  simulation text.
+
+Reused matching English-string keys already in the catalog where wording was identical to the Add
+modal (Product Name, Category, Wholesale Price, Estimated Profit, Min Selling Price, Brand,
+Manufacturer name, Serial Number, Warranty (Months), Store/Warehouse Name, etc.); added new keys
+where product_edit.php's wording genuinely differs (e.g. "Weight (Gross)" vs. "Weight (kg)",
+"Unit of Measure" vs. "Measurement Unit", "Shelf Life (Days)" vs. "Expiry Days").
+
+Verified via the automated `t()`-key audit (819 keys used across all 10 translated files, 0
+missing from `lang/sw.php`, 0 value conflicts) and live in-browser: a full-page text sweep on
+`/product_edit?id=54` found zero leftover English strings, and the Quick Category / Quick Brand /
+Barcode Scanner modals were opened directly and their text confirmed fully Swahili.
+
 ## 2026-08-29 (feature) — UI language translation: Sub-Contractors CRUD
 
 **Files (changed):** `app/bms/operations/sub_contractors.php`, `lang/sw.php`
