@@ -498,13 +498,13 @@ function get_quick_actions($product) {
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-start flex-nowrap gap-2">
                 <div>
-                    <h2 class="mb-0 fs-4 fs-md-2 fw-bold"><i class="bi bi-box"></i> Product Management</h2>
-                    <p class="text-muted mb-0 d-none d-md-block small mt-1">Manage your inventory, prices, and stock levels</p>
+                    <h2 class="mb-0 fs-4 fs-md-2 fw-bold"><i class="bi bi-box"></i> <?= t('Product Management') ?></h2>
+                    <p class="text-muted mb-0 d-none d-md-block small mt-1"><?= t('Manage your inventory, prices, and stock levels') ?></p>
                 </div>
                 <div class="ms-auto flex-shrink-0 pt-1 pt-md-2">
                     <?php if ($can_create_products): ?>
                     <button type="button" class="btn btn-primary btn-sm px-1 px-md-2 shadow-sm" style="border-radius: 6px;" onclick="openAddProductModal('inventory')" type="button">
-                        <i class="bi bi-plus-circle"></i> <span class="d-none d-sm-inline">Add New Product</span><span class="d-inline d-sm-none text-uppercase fw-bold" style="font-size: 0.7rem;">Add New</span>
+                        <i class="bi bi-plus-circle"></i> <span class="d-none d-sm-inline"><?= t('Add New Product') ?></span><span class="d-inline d-sm-none text-uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Add New') ?></span>
                     </button>
                     <?php endif; ?>
                 </div>
@@ -521,11 +521,11 @@ function get_quick_actions($product) {
         
 
         <h2 style="color: #000; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">
-            Official Products Inventory Report
+            <?= t('Official Products Inventory Report') ?>
         </h2>
 
         <p style="color: #000; margin: 0; font-size: 10pt;">
-            Report Date: <?= date('d M Y, H:i') ?>
+            <?= t('Report Date:') ?> <?= date('d M Y, H:i') ?>
         </p>
 
     </div>
@@ -584,10 +584,10 @@ function get_quick_actions($product) {
     <div class="alert border-0 shadow-sm d-flex flex-wrap align-items-center gap-2 mb-4 d-print-none" style="background:#fff9e6; border-left:5px solid #ffc107 !important; border-radius:10px;">
         <i class="bi bi-funnel-fill fs-5 text-warning"></i>
         <div class="flex-grow-1">
-            <strong>Showing only items that need attention</strong>
-            <span class="text-muted small d-block">Low / out / negative stock, or expiring within 30 days — <?= (int)$total_count ?> item(s).</span>
+            <strong><?= t('Showing only items that need attention') ?></strong>
+            <span class="text-muted small d-block"><?= t('Low / out / negative stock, or expiring within 30 days') ?> — <?= (int)$total_count ?> <?= t('item(s).') ?></span>
         </div>
-        <a href="<?= getUrl('products') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> Show all products</a>
+        <a href="<?= getUrl('products') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> <?= t('Show all products') ?></a>
     </div>
     <?php endif; ?>
     <div class="row mb-4" id="print-stats-cards">
@@ -599,7 +599,7 @@ function get_quick_actions($product) {
                             <i class="bi bi-box"></i>
                         </div>
                         <div class="overflow-hidden flex-grow-1">
-                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;">Total Products</p>
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;"><?= t('Total Products') ?></p>
                             <h4 class="mb-0 fw-bold auto-resize text-nowrap"><?= $total_products ?></h4>
                         </div>
                     </div>
@@ -614,7 +614,7 @@ function get_quick_actions($product) {
                             <i class="bi bi-cash-stack"></i>
                         </div>
                         <div class="overflow-hidden flex-grow-1">
-                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;">Current Value</p>
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;"><?= t('Current Value') ?></p>
                             <h4 class="mb-0 fw-bold auto-resize text-nowrap"><?= format_currency($total_value) ?></h4>
                         </div>
                     </div>
@@ -629,7 +629,7 @@ function get_quick_actions($product) {
                             <i class="bi bi-exclamation-triangle"></i>
                         </div>
                         <div class="overflow-hidden flex-grow-1">
-                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;">Low Stock</p>
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;"><?= t('Low Stock') ?></p>
                             <h4 class="mb-0 fw-bold auto-resize text-nowrap"><?= $low_stock_count ?></h4>
                         </div>
                     </div>
@@ -644,7 +644,7 @@ function get_quick_actions($product) {
                             <i class="bi bi-x-circle"></i>
                         </div>
                         <div class="overflow-hidden flex-grow-1">
-                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;">Out of Stock</p>
+                            <p class="small mb-0 opacity-75 text-uppercase text-nowrap overflow-hidden" style="text-overflow: ellipsis; font-size: 0.65rem;"><?= t('Out of Stock') ?></p>
                             <h4 class="mb-0 fw-bold auto-resize text-nowrap"><?= $out_of_stock_count ?></h4>
                         </div>
                     </div>
@@ -656,7 +656,7 @@ function get_quick_actions($product) {
     <!-- Filters Card -->
     <div class="card mb-4">
         <div class="card-header bg-light d-flex justify-content-between align-items-center">
-            <h6 class="mb-0"><i class="bi bi-funnel"></i> Filters</h6>
+            <h6 class="mb-0"><i class="bi bi-funnel"></i> <?= t('Filters') ?></h6>
             <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
                 <i class="bi bi-chevron-down"></i>
             </button>
@@ -667,11 +667,11 @@ function get_quick_actions($product) {
                     <!-- Search moved to Actions Bar -->
                     <input type="hidden" name="search" id="hiddenSearch" value="<?= safe_output($search) ?>">
                     <div class="col-6 col-md-2">
-                        <label class="form-label small fw-bold">Category</label>
+                        <label class="form-label small fw-bold"><?= t('Category') ?></label>
                         <select class="form-select form-select-sm select2-static" name="category">
-                            <option value="">All Categories</option>
+                            <option value=""><?= t('All Categories') ?></option>
                             <?php foreach ($categories as $category): ?>
-                                <option value="<?= $category['category_id'] ?>" 
+                                <option value="<?= $category['category_id'] ?>"
                                     <?= $category_id == $category['category_id'] ? 'selected' : '' ?>>
                                     <?= safe_output($category['category_name']) ?>
                                 </option>
@@ -679,11 +679,11 @@ function get_quick_actions($product) {
                         </select>
                     </div>
                     <div class="col-6 col-md-2">
-                        <label class="form-label small fw-bold">Brand</label>
+                        <label class="form-label small fw-bold"><?= t('Brand') ?></label>
                         <select class="form-select form-select-sm select2-static" name="brand">
-                            <option value="">All Brands</option>
+                            <option value=""><?= t('All Brands') ?></option>
                             <?php foreach ($brands as $brand): ?>
-                                <option value="<?= $brand['brand_id'] ?>" 
+                                <option value="<?= $brand['brand_id'] ?>"
                                     <?= $brand_id == $brand['brand_id'] ? 'selected' : '' ?>>
                                     <?= safe_output($brand['brand_name']) ?>
                                 </option>
@@ -691,11 +691,11 @@ function get_quick_actions($product) {
                         </select>
                     </div>
                     <div class="col-6 col-md-2">
-                        <label class="form-label small fw-bold">Supplier</label>
+                        <label class="form-label small fw-bold"><?= t('Supplier') ?></label>
                         <select class="form-select form-select-sm select2-static" name="supplier">
-                            <option value="">All Suppliers</option>
+                            <option value=""><?= t('All Suppliers') ?></option>
                             <?php foreach ($suppliers as $supplier): ?>
-                                <option value="<?= $supplier['supplier_id'] ?>" 
+                                <option value="<?= $supplier['supplier_id'] ?>"
                                     <?= $supplier_id == $supplier['supplier_id'] ? 'selected' : '' ?>>
                                     <?= safe_output($supplier['supplier_name']) ?>
                                 </option>
@@ -703,26 +703,26 @@ function get_quick_actions($product) {
                         </select>
                     </div>
                     <div class="col-6 col-md-2">
-                        <label class="form-label small fw-bold">Status</label>
+                        <label class="form-label small fw-bold"><?= t('Status') ?></label>
                         <select class="form-select form-select-sm" name="status">
-                            <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>>All Status</option>
-                            <option value="active" <?= $status_filter == 'active' ? 'selected' : '' ?>>Active</option>
-                            <option value="inactive" <?= $status_filter == 'inactive' ? 'selected' : '' ?>>Inactive</option>
-                            <option value="discontinued" <?= $status_filter == 'discontinued' ? 'selected' : '' ?>>Discontinued</option>
+                            <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>><?= t('All Status') ?></option>
+                            <option value="active" <?= $status_filter == 'active' ? 'selected' : '' ?>><?= t('Active') ?></option>
+                            <option value="inactive" <?= $status_filter == 'inactive' ? 'selected' : '' ?>><?= t('Inactive') ?></option>
+                            <option value="discontinued" <?= $status_filter == 'discontinued' ? 'selected' : '' ?>><?= t('Discontinued') ?></option>
                         </select>
                     </div>
                     <div class="col-6 col-md-2">
-                        <label class="form-label small fw-bold">Stock Status</label>
+                        <label class="form-label small fw-bold"><?= t('Stock Status') ?></label>
                         <select class="form-select form-select-sm" name="low_stock">
-                            <option value="">All Stock</option>
-                            <option value="yes" <?= $low_stock == 'yes' ? 'selected' : '' ?>>Low Stock Only</option>
+                            <option value=""><?= t('All Stock') ?></option>
+                            <option value="yes" <?= $low_stock == 'yes' ? 'selected' : '' ?>><?= t('Low Stock Only') ?></option>
                         </select>
                     </div>
                     <div class="col-6 col-md-2 d-flex align-items-end gap-1">
-                        <button type="submit" class="btn btn-primary btn-sm flex-grow-1" style="height: 31px;" title="Apply Filters">
-                            <i class="bi bi-funnel"></i> Filter
+                        <button type="submit" class="btn btn-primary btn-sm flex-grow-1" style="height: 31px;" title="<?= t('Apply Filters') ?>">
+                            <i class="bi bi-funnel"></i> <?= t('Filter') ?>
                         </button>
-                        <a href="products.php" class="btn btn-outline-secondary btn-sm" style="height: 31px;" title="Reset Filters">
+                        <a href="products.php" class="btn btn-outline-secondary btn-sm" style="height: 31px;" title="<?= t('Reset Filters') ?>">
                             <i class="bi bi-arrow-clockwise"></i>
                         </a>
                     </div>
@@ -739,7 +739,7 @@ function get_quick_actions($product) {
                     <!-- Buttons group: full-width on mobile, auto on desktop -->
                     <div class="d-flex shadow-sm bg-white product-action-btns" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                         <button type="button" class="btn btn-white fw-medium border-0 text-center px-2 px-md-3 py-2" onclick="copyTable()" style="background: #fff; color: #444; min-width: 0;">
-                            <i class="bi bi-clipboard text-info me-1" style="font-size: 0.9rem;"></i><span style="font-size: 0.78rem;">Copy</span>
+                            <i class="bi bi-clipboard text-info me-1" style="font-size: 0.9rem;"></i><span style="font-size: 0.78rem;"><?= t('Copy') ?></span>
                         </button>
                         <div style="width: 1px; background: #eee; height: 24px; margin-top: 8px;"></div>
                         <button type="button" class="btn btn-white fw-medium border-0 text-center px-2 px-md-3 py-2" onclick="exportProducts()" style="background: #fff; color: #444; min-width: 0;">
@@ -747,18 +747,18 @@ function get_quick_actions($product) {
                         </button>
                         <div style="width: 1px; background: #eee; height: 24px; margin-top: 8px;"></div>
                         <button type="button" class="btn btn-white fw-medium border-0 text-center px-2 px-md-3 py-2" onclick="printTable()" style="background: #fff; color: #444; min-width: 0;">
-                            <i class="bi bi-printer text-primary me-1" style="font-size: 0.9rem;"></i><span style="font-size: 0.78rem;">Print</span>
+                            <i class="bi bi-printer text-primary me-1" style="font-size: 0.9rem;"></i><span style="font-size: 0.78rem;"><?= t('Print') ?></span>
                         </button>
                         <div style="width: 1px; background: #eee; height: 24px; margin-top: 8px;"></div>
                         <a href="<?= getUrl('reports') ?>?report=inventory" class="btn btn-white fw-medium border-0 text-center px-2 px-md-3 py-2" style="background: #fff; color: #444; min-width: 0; text-decoration: none;">
-                            <i class="bi bi-graph-up text-warning me-1" style="font-size: 0.9rem;"></i><span style="font-size: 0.78rem;">Reports</span>
+                            <i class="bi bi-graph-up text-warning me-1" style="font-size: 0.9rem;"></i><span style="font-size: 0.78rem;"><?= t('Reports') ?></span>
                         </a>
                     </div>
 
                     <!-- Show + Search: flex row, search grows -->
                     <div class="d-flex align-items-center gap-2 flex-grow-1 flex-nowrap">
                         <div class="d-flex align-items-center bg-white shadow-sm px-2 px-sm-3 py-1 flex-shrink-0" style="border: 1px solid #dee2e6; border-radius: 8px; height: 38px;">
-                            <span class="small text-muted me-1 me-sm-2 text-nowrap"><i class="bi bi-list-ol d-none d-sm-inline"></i> Show:</span>
+                            <span class="small text-muted me-1 me-sm-2 text-nowrap"><i class="bi bi-list-ol d-none d-sm-inline"></i> <?= t('Show:') ?></span>
                             <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 45px; box-shadow: none; background: transparent;" onchange="updatePerPage(this.value)">
                                 <option value="10" <?= $per_page == 10 ? 'selected' : '' ?>>10</option>
                                 <option value="25" <?= $per_page == 25 ? 'selected' : '' ?>>25</option>
@@ -768,23 +768,23 @@ function get_quick_actions($product) {
                         </div>
                         <div class="input-group input-group-sm shadow-sm flex-grow-1" style="border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6; height: 38px; min-width: 120px; max-width: 280px;">
                             <span class="input-group-text bg-white border-0 px-2"><i class="bi bi-search text-muted"></i></span>
-                            <input type="text" class="form-control border-0 p-2" id="productSearch" value="<?= safe_output($search) ?>" placeholder="Search..." onkeyup="if(event.key === 'Enter') handleSearch(this.value)">
+                            <input type="text" class="form-control border-0 p-2" id="productSearch" value="<?= safe_output($search) ?>" placeholder="<?= t('Search...') ?>" onkeyup="if(event.key === 'Enter') handleSearch(this.value)">
                         </div>
                     </div>
 
                     <!-- View Toggle Buttons (Repositioned to Right) -->
                     <div class="btn-group shadow-sm ms-md-auto d-none d-md-flex" role="group">
-                        <button type="button" class="btn btn-primary btn-sm text-white" id="btn-table-view" onclick="toggleView('table')" title="Table View" style="height: 38px; width: 40px;">
+                        <button type="button" class="btn btn-primary btn-sm text-white" id="btn-table-view" onclick="toggleView('table')" title="<?= t('Table View') ?>" style="height: 38px; width: 40px;">
                             <i class="bi bi-table"></i>
                         </button>
-                        <button type="button" class="btn btn-light btn-sm" id="btn-card-view" onclick="toggleView('card')" title="Card View" style="height: 38px; width: 40px;">
+                        <button type="button" class="btn btn-light btn-sm" id="btn-card-view" onclick="toggleView('card')" title="<?= t('Card View') ?>" style="height: 38px; width: 40px;">
                             <i class="bi bi-grid-3x3-gap"></i>
                         </button>
                     </div>
                 </div>
                 <div>
                     <span class="badge bg-success-soft text-success border border-success px-3 py-2 fs-6 rounded-pill shadow-sm d-none d-md-inline-block">
-                        <i class="bi bi-check-circle-fill me-1"></i> <?= $total_count ?> records
+                        <i class="bi bi-check-circle-fill me-1"></i> <?= $total_count ?> <?= t('records') ?>
                     </span>
                 </div>
             </div>
@@ -794,7 +794,7 @@ function get_quick_actions($product) {
     <div id="tableView" class="view-section">
         <div class="card border-0 shadow-sm overflow-hidden">
             <div class="card-header bg-white border-bottom py-3">
-                <h5 class="mb-0 fw-bold">Products List</h5>
+                <h5 class="mb-0 fw-bold"><?= t('Products List') ?></h5>
             </div>
         <div class="card-body p-0 p-md-3">
             <div id="form-message" class="mb-3 px-3 px-md-0"></div>
@@ -805,12 +805,12 @@ function get_quick_actions($product) {
                         <thead class="table-light">
                             <tr>
                                 <th class="px-2 px-md-3" width="5%">S/NO:</th>
-                                <th width="30%">Product</th>
+                                <th width="30%"><?= t('Product') ?></th>
                                 <th width="12%">SKU</th>
-                                <th width="15%">Category</th>
-                                <th width="12%">Stock</th>
-                                <th width="13%">Price</th>
-                                <th class="text-end px-3" width="13%">Actions</th>
+                                <th width="15%"><?= t('Category') ?></th>
+                                <th width="12%"><?= t('Stock') ?></th>
+                                <th width="13%"><?= t('Price') ?></th>
+                                <th class="text-end px-3" width="13%"><?= t('Actions') ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -834,7 +834,7 @@ function get_quick_actions($product) {
                                         </div>
                                         <div>
                                             <div class="fw-bold text-dark"><?= safe_output($product['product_name']) ?></div>
-                                            <small class="text-muted"><?= safe_output($product['brand_name'] ?? 'No Brand') ?></small>
+                                            <small class="text-muted"><?= safe_output($product['brand_name'] ?? t('No Brand')) ?></small>
                                         </div>
                                     </div>
                                 </td>
@@ -845,14 +845,14 @@ function get_quick_actions($product) {
                                     <?php if (!empty($product['category_name'])): ?>
                                     <span class="badge bg-light text-dark border"><?= safe_output($product['category_name']) ?></span>
                                     <?php else: ?>
-                                    <span class="text-muted small">No Category</span>
+                                    <span class="text-muted small"><?= t('No Category') ?></span>
                                     <?php endif; ?>
                                 </td>
                                 <td>
                                     <?php if ($product['stock_status'] == 'out_of_stock'): ?>
-                                    <span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> Out of Stock</span>
+                                    <span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> <?= t('Out of Stock') ?></span>
                                     <?php elseif ($product['stock_status'] == 'low_stock'): ?>
-                                    <span class="text-warning fw-bold"><i class="bi bi-exclamation-triangle-fill"></i> <?= $available_stock ?> (Low)</span>
+                                    <span class="text-warning fw-bold"><i class="bi bi-exclamation-triangle-fill"></i> <?= $available_stock ?> (<?= t('Low') ?>)</span>
                                     <?php else: ?>
                                     <span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> <?= $available_stock ?></span>
                                     <?php endif; ?>
@@ -866,35 +866,35 @@ function get_quick_actions($product) {
                                             <i class="bi bi-gear"></i>
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0">
-                                            <li><a class="dropdown-item" href="<?= getUrl('products/view') ?>?id=<?= $product['product_id'] ?>"><i class="bi bi-eye text-primary"></i> View Details</a></li>
+                                            <li><a class="dropdown-item" href="<?= getUrl('products/view') ?>?id=<?= $product['product_id'] ?>"><i class="bi bi-eye text-primary"></i> <?= t('View Details') ?></a></li>
                                             <?php if ($can_edit_products): ?>
-                                            <li><a class="dropdown-item" href="<?= getUrl('product_edit') ?>?id=<?= $product['product_id'] ?>"><i class="bi bi-pencil text-warning"></i> Edit Product</a></li>
+                                            <li><a class="dropdown-item" href="<?= getUrl('product_edit') ?>?id=<?= $product['product_id'] ?>"><i class="bi bi-pencil text-warning"></i> <?= t('Edit Product') ?></a></li>
                                             <?php endif; ?>
-                                            
+
                                             <?php if ($can_adjust_stock): ?>
                                             <li><hr class="dropdown-divider"></li>
                                             <li>
                                                 <a class="dropdown-item" href="#" onclick="adjustStock(<?= $product['product_id'] ?>); return false;">
-                                                    <i class="bi bi-box-arrow-in-down text-info"></i> Adjust Stock
+                                                    <i class="bi bi-box-arrow-in-down text-info"></i> <?= t('Adjust Stock') ?>
                                                 </a>
                                             </li>
                                             <li>
                                                 <a class="dropdown-item" href="<?= getUrl('stock_transfers') ?>?product=<?= $product['product_id'] ?>">
-                                                    <i class="bi bi-arrow-left-right text-info"></i> Transfer Stock
+                                                    <i class="bi bi-arrow-left-right text-info"></i> <?= t('Transfer Stock') ?>
                                                 </a>
                                             </li>
                                             <?php endif; ?>
-                                            
+
                                             <?php if ($can_edit_products): ?>
                                             <li><hr class="dropdown-divider"></li>
                                             <li>
                                                 <a class="dropdown-item" href="#" onclick="duplicateProduct(<?= $product['product_id'] ?>); return false;">
-                                                    <i class="bi bi-copy"></i> Duplicate Product
+                                                    <i class="bi bi-copy"></i> <?= t('Duplicate Product') ?>
                                                 </a>
                                             </li>
                                             <li>
                                                 <a class="dropdown-item" href="<?= getUrl('purchase_order_create') ?>?product=<?= $product['product_id'] ?>">
-                                                    <i class="bi bi-truck"></i> Create Purchase Order
+                                                    <i class="bi bi-truck"></i> <?= t('Create Purchase Order') ?>
                                                 </a>
                                             </li>
                                             <!-- <li>
@@ -908,27 +908,27 @@ function get_quick_actions($product) {
                                             <li><hr class="dropdown-divider"></li>
                                             <?php if ($product['status'] == 'active'): ?>
                                             <li>
-                                                <a class="dropdown-item text-warning" href="#" 
+                                                <a class="dropdown-item text-warning" href="#"
                                                    onclick="changeStatus(<?= $product['product_id'] ?>, 'inactive'); return false;">
-                                                    <i class="bi bi-slash-circle"></i> Deactivate Product
+                                                    <i class="bi bi-slash-circle"></i> <?= t('Deactivate Product') ?>
                                                 </a>
                                             </li>
                                             <?php else: ?>
                                             <li>
-                                                <a class="dropdown-item text-success" href="#" 
+                                                <a class="dropdown-item text-success" href="#"
                                                    onclick="changeStatus(<?= $product['product_id'] ?>, 'active'); return false;">
-                                                    <i class="bi bi-check-circle"></i> Activate Product
+                                                    <i class="bi bi-check-circle"></i> <?= t('Activate Product') ?>
                                                 </a>
                                             </li>
                                             <?php endif; ?>
                                             <?php endif; ?>
-                                            
+
                                             <?php if ($can_delete_products && $product['status'] == 'inactive'): ?>
                                             <li><hr class="dropdown-divider"></li>
                                             <li>
-                                                <a class="dropdown-item text-danger" href="#" 
+                                                <a class="dropdown-item text-danger" href="#"
                                                    onclick="deleteProduct(<?= $product['product_id'] ?>); return false;">
-                                                    <i class="bi bi-trash"></i> Delete Product
+                                                    <i class="bi bi-trash"></i> <?= t('Delete Product') ?>
                                                 </a>
                                             </li>
                                             <?php endif; ?>
@@ -1006,11 +1006,11 @@ function get_quick_actions($product) {
                             </div>
                             <div class="position-absolute top-0 end-0 p-2">
                                 <?php if ($stock_status == 'out_of_stock'): ?>
-                                <span class="badge bg-danger">Out of Stock</span>
+                                <span class="badge bg-danger"><?= t('Out of Stock') ?></span>
                                 <?php elseif ($stock_status == 'low_stock'): ?>
-                                <span class="badge bg-warning text-dark">Low Stock</span>
+                                <span class="badge bg-warning text-dark"><?= t('Low Stock') ?></span>
                                 <?php else: ?>
-                                <span class="badge bg-success">In Stock</span>
+                                <span class="badge bg-success"><?= t('In Stock') ?></span>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -1018,7 +1018,7 @@ function get_quick_actions($product) {
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <div class="flex-grow-1 overflow-hidden">
                                     <h6 class="fw-bold mb-0 text-truncate" title="<?= safe_output($product['product_name']) ?>"><?= safe_output($product['product_name']) ?></h6>
-                                    <small class="text-muted d-block text-truncate"><?= safe_output($product['category_name'] ?? 'General') ?></small>
+                                    <small class="text-muted d-block text-truncate"><?= safe_output($product['category_name'] ?? t('General')) ?></small>
                                 </div>
                                 <div class="text-end ms-2">
                                     <div class="fw-bold text-primary small"><?= format_currency($product['selling_price']) ?></div>
@@ -1026,18 +1026,18 @@ function get_quick_actions($product) {
                                 </div>
                             </div>
                             <div class="d-flex justify-content-between small mb-3">
-                                <span class="text-muted">Stock:</span>
+                                <span class="text-muted"><?= t('Stock') ?>:</span>
                                 <span class="fw-bold <?= $stock_status == 'out_of_stock' ? 'text-danger' : ($stock_status == 'low_stock' ? 'text-warning' : 'text-success') ?>">
                                     <?= $available_stock ?> <?= safe_output($product['unit'] ?? 'pcs') ?>
                                 </span>
                             </div>
                             <div class="d-flex gap-1 mt-auto">
-                                <a href="<?= getUrl('products/view') ?>?id=<?= $product['product_id'] ?>" class="btn btn-sm btn-outline-primary flex-grow-1 shadow-sm"><i class="bi bi-eye"></i> View</a>
+                                <a href="<?= getUrl('products/view') ?>?id=<?= $product['product_id'] ?>" class="btn btn-sm btn-outline-primary flex-grow-1 shadow-sm"><i class="bi bi-eye"></i> <?= t('View') ?></a>
                                 <?php if ($can_edit_products): ?>
-                                <a href="<?= getUrl('product_edit') ?>?id=<?= $product['product_id'] ?>" class="btn btn-sm btn-outline-warning flex-grow-1 shadow-sm"><i class="bi bi-pencil"></i> Edit</a>
+                                <a href="<?= getUrl('product_edit') ?>?id=<?= $product['product_id'] ?>" class="btn btn-sm btn-outline-warning flex-grow-1 shadow-sm"><i class="bi bi-pencil"></i> <?= t('Edit') ?></a>
                                 <?php endif; ?>
                                 <?php if ($can_delete_products): ?>
-                                <button class="btn btn-sm btn-outline-danger shadow-sm px-2" onclick="deleteProduct(<?= $product['product_id'] ?>); return false;" title="Delete Product">
+                                <button class="btn btn-sm btn-outline-danger shadow-sm px-2" onclick="deleteProduct(<?= $product['product_id'] ?>); return false;" title="<?= t('Delete Product') ?>">
                                     <i class="bi bi-trash"></i>
                                 </button>
                                 <?php endif; ?>
@@ -1066,8 +1066,8 @@ function get_quick_actions($product) {
         <?php else: ?>
             <div class="text-center py-5 bg-white rounded shadow-sm">
                 <i class="bi bi-box text-muted" style="font-size: 3rem;"></i>
-                <p class="mt-3 text-muted">No products found matching your filters.</p>
-                <a href="products.php" class="btn btn-primary btn-sm">Clear All Filters</a>
+                <p class="mt-3 text-muted"><?= t('No products found matching your filters.') ?></p>
+                <a href="products.php" class="btn btn-primary btn-sm"><?= t('Clear All Filters') ?></a>
             </div>
         <?php endif; ?>
     </div>
@@ -1079,83 +1079,83 @@ function get_quick_actions($product) {
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="stockAdjustmentModalLabel">
-                    <i class="bi bi-box-arrow-in-down"></i> Adjust Stock
+                    <i class="bi bi-box-arrow-in-down"></i> <?= t('Adjust Stock') ?>
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<?= t('Close') ?>"></button>
             </div>
             <div class="modal-body">
                 <form id="stockAdjustmentForm">
                     <input type="hidden" id="adjust_product_id" name="product_id">
-                    
+
                     <div class="mb-3">
-                        <label class="form-label">Product</label>
+                        <label class="form-label"><?= t('Product') ?></label>
                         <input type="text" class="form-control" id="adjust_product_name" readonly>
                     </div>
-                    
+
                     <div class="row mb-3">
                         <div class="col-6">
-                            <label class="form-label small fw-bold">Current Stock</label>
+                            <label class="form-label small fw-bold"><?= t('Current Stock') ?></label>
                             <input type="text" class="form-control" id="current_stock" readonly>
                         </div>
                         <div class="col-6">
-                            <label class="form-label small fw-bold">Available Stock</label>
+                            <label class="form-label small fw-bold"><?= t('Available Stock') ?></label>
                             <input type="text" class="form-control" id="available_stock" readonly>
                         </div>
                     </div>
-                    
+
                     <div class="row mb-3">
                         <div class="col-6">
-                            <label class="form-label small fw-bold">Adjustment Type</label>
+                            <label class="form-label small fw-bold"><?= t('Adjustment Type') ?></label>
                             <select class="form-select" id="adjustment_type" name="movement_type" required>
-                                <option value="">Select Type</option>
-                                <option value="adjustment_in">Add Stock</option>
-                                <option value="adjustment_out">Remove Stock</option>
-                                <option value="set">Set Stock Level</option>
+                                <option value=""><?= t('Select Type') ?></option>
+                                <option value="adjustment_in"><?= t('Add Stock') ?></option>
+                                <option value="adjustment_out"><?= t('Remove Stock') ?></option>
+                                <option value="set"><?= t('Set Stock Level') ?></option>
                             </select>
                         </div>
                         <div class="col-6">
-                            <label class="form-label small fw-bold">Quantity</label>
-                            <input type="number" class="form-control" id="adjustment_quantity" 
+                            <label class="form-label small fw-bold"><?= t('Quantity') ?></label>
+                            <input type="number" class="form-control" id="adjustment_quantity"
                                    name="quantity" min="0.001" step="0.001" required>
                         </div>
                     </div>
-                    
+
                     <div class="row mb-3">
                         <div class="col-6">
-                            <label class="form-label small fw-bold">Warehouse</label>
+                            <label class="form-label small fw-bold"><?= t('Warehouse') ?></label>
                             <select class="form-select" id="warehouse_id" name="warehouse_id" required>
-                                <option value="">Select Warehouse</option>
+                                <option value=""><?= t('Select Warehouse') ?></option>
                                 <!-- Warehouses will be loaded via AJAX -->
                             </select>
                         </div>
                         <div class="col-6">
-                            <label class="form-label small fw-bold">Reason</label>
+                            <label class="form-label small fw-bold"><?= t('Reason') ?></label>
                             <select class="form-select" id="adjustment_reason" name="reason" required>
-                                <option value="">Select Reason</option>
-                                <option value="damaged">Damaged Goods</option>
-                                <option value="expired">Expired Products</option>
-                                <option value="found">Found Stock</option>
-                                <option value="theft">Theft/Loss</option>
-                                <option value="correction">Stock Correction</option>
-                                <option value="purchase_return">Purchase Return</option>
-                                <option value="other">Other</option>
+                                <option value=""><?= t('Select Reason') ?></option>
+                                <option value="damaged"><?= t('Damaged Goods') ?></option>
+                                <option value="expired"><?= t('Expired Products') ?></option>
+                                <option value="found"><?= t('Found Stock') ?></option>
+                                <option value="theft"><?= t('Theft/Loss') ?></option>
+                                <option value="correction"><?= t('Stock Correction') ?></option>
+                                <option value="purchase_return"><?= t('Purchase Return') ?></option>
+                                <option value="other"><?= t('Other') ?></option>
                             </select>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3">
-                        <label class="form-label">Notes (Optional)</label>
+                        <label class="form-label"><?= t('Notes (Optional)') ?></label>
                         <textarea class="form-control" id="adjustment_notes" name="notes" rows="2"></textarea>
                     </div>
-                    
+
                     <div class="alert alert-info" id="new_stock_info" style="display: none;">
-                        <strong>New Stock Level: <span id="new_stock_level">0</span></strong>
+                        <strong><?= t('New Stock Level:') ?> <span id="new_stock_level">0</span></strong>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="submitStockAdjustment()">Save Adjustment</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                <button type="button" class="btn btn-primary" onclick="submitStockAdjustment()"><?= t('Save Adjustment') ?></button>
             </div>
         </div>
     </div>
@@ -1181,7 +1181,7 @@ $(document).ready(function() {
 
     // Select2 — filter bar (outside modal)
     $('#filterForm .select2-static').each(function() {
-        $(this).select2({ theme: 'bootstrap-5', placeholder: 'Select...', allowClear: true, width: '100%' });
+        $(this).select2({ theme: 'bootstrap-5', placeholder: <?= json_encode(t('Select...')) ?>, allowClear: true, width: '100%' });
     });
 
     // "Other" dropdowns (renderOtherSelect): searchable Select2; choosing "Other"
@@ -1196,7 +1196,7 @@ $(document).ready(function() {
                 dropdownParent: $parent,
                 width: '100%',
                 allowClear: true,
-                placeholder: $el.data('placeholder') || 'Select…'
+                placeholder: $el.data('placeholder') || <?= json_encode(t('Select…')) ?>
             });
         });
     }
@@ -1228,7 +1228,7 @@ $(document).ready(function() {
     $('#addProductModal').on('shown.bs.modal', function() {
         $('#addProductModal .select2-static').each(function() {
             if (!$(this).hasClass('select2-hidden-accessible')) {
-                $(this).select2({ theme: 'bootstrap-5', dropdownParent: $('#addProductModal'), placeholder: 'Select...', allowClear: true, width: '100%' });
+                $(this).select2({ theme: 'bootstrap-5', dropdownParent: $('#addProductModal'), placeholder: <?= json_encode(t('Select...')) ?>, allowClear: true, width: '100%' });
             }
         });
         initOtherSelects('#addProductModal', $('#addProductModal'));
@@ -1242,7 +1242,7 @@ $(document).ready(function() {
     // Initialize DataTable
     $('#productsTable').DataTable({
         language: {
-            search: "Quick Search:",
+            search: <?= json_encode(t('Quick Search:')) ?>,
             info: false,
             paginate: {
                 next: '<i class="bi bi-chevron-right"></i>',
@@ -1289,7 +1289,7 @@ function adjustStock(productId) {
             } else {
                 Swal.fire({
                     icon: 'error',
-                    title: 'Error',
+                    title: <?= json_encode(t('Error')) ?>,
                     text: response.message
                 });
             }
@@ -1306,12 +1306,12 @@ function loadWarehouses(productId) {
         success: function(response) {
             const select = $('#warehouse_id');
             select.empty();
-            select.append('<option value="">Select Warehouse</option>');
+            select.append('<option value="">' + <?= json_encode(t('Select Warehouse')) ?> + '</option>');
             
             if (response.success) {
                 response.data.forEach(warehouse => {
                     select.append(`<option value="${warehouse.warehouse_id}">
-                        ${warehouse.warehouse_name} (Stock: ${warehouse.stock_quantity})
+                        ${warehouse.warehouse_name} (${<?= json_encode(t('Stock')) ?>}: ${warehouse.stock_quantity})
                     </option>`);
                 });
             }
@@ -1353,12 +1353,12 @@ function submitStockAdjustment() {
     if (!$('#warehouse_id').val()) {
         Swal.fire({
             icon: 'warning',
-            title: 'Missing Information',
-            text: 'Please select a warehouse.'
+            title: <?= json_encode(t('Missing Information')) ?>,
+            text: <?= json_encode(t('Please select a warehouse.')) ?>
         });
         return;
     }
-    
+
     $.ajax({
         url: 'api/adjust_stock.php',
         type: 'POST',
@@ -1369,17 +1369,17 @@ function submitStockAdjustment() {
                 logReportAction('Adjusted Stock', 'User adjusted stock for ' + $('#adjust_product_name').val() + ' (' + $('#adjustment_type').val() + ' ' + $('#adjustment_quantity').val() + ')');
                 Swal.fire({
                     icon: 'success',
-                    title: 'Success!',
+                    title: <?= json_encode(t('Success!')) ?>,
                     text: response.message,
                     confirmButtonColor: '#28a745',
-                    confirmButtonText: 'OK'
+                    confirmButtonText: <?= json_encode(t('OK')) ?>
                 }).then(() => {
                     location.reload();
                 });
             } else {
                 Swal.fire({
                     icon: 'error',
-                    title: 'Error',
+                    title: <?= json_encode(t('Error')) ?>,
                     text: response.message
                 });
             }
@@ -1388,22 +1388,22 @@ function submitStockAdjustment() {
 }
 
 function changeStatus(productId, newStatus) {
-    const action = newStatus === 'active' ? 'activate' : 'deactivate';
-    const actionText = newStatus === 'active' ? 'Activate' : 'Deactivate';
-    
+    const action = newStatus === 'active' ? <?= json_encode(t('activate')) ?> : <?= json_encode(t('deactivate')) ?>;
+    const actionText = newStatus === 'active' ? <?= json_encode(t('Activate')) ?> : <?= json_encode(t('Deactivate')) ?>;
+
     Swal.fire({
-        title: `${actionText} Product?`,
-        text: `Are you sure you want to ${action} this product?`,
+        title: `${actionText} ` + <?= json_encode(t('Product?')) ?>,
+        text: <?= json_encode(t('Are you sure you want to')) ?> + ` ${action} ` + <?= json_encode(t('this product?')) ?>,
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: `Yes, ${actionText}`,
-        cancelButtonText: 'Cancel'
+        confirmButtonText: <?= json_encode(t('Yes,')) ?> + ` ${actionText}`,
+        cancelButtonText: <?= json_encode(t('Cancel')) ?>
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
                 url: 'api/update_product_status.php',
                 type: 'POST',
-                data: { 
+                data: {
                     product_id: productId,
                     status: newStatus
                 },
@@ -1413,17 +1413,17 @@ function changeStatus(productId, newStatus) {
                         logReportAction('Changed Product Status', 'User changed status of product ID ' + productId + ' to ' + newStatus);
                         Swal.fire({
                             icon: 'success',
-                            title: 'Success!',
+                            title: <?= json_encode(t('Success!')) ?>,
                             text: response.message,
                             confirmButtonColor: '#28a745',
-                            confirmButtonText: 'OK'
+                            confirmButtonText: <?= json_encode(t('OK')) ?>
                         }).then(() => {
                             location.reload();
                         });
                     } else {
                         Swal.fire({
                             icon: 'error',
-                            title: 'Error',
+                            title: <?= json_encode(t('Error')) ?>,
                             text: response.message
                         });
                     }
@@ -1435,13 +1435,13 @@ function changeStatus(productId, newStatus) {
 
 function deleteProduct(productId) {
     Swal.fire({
-        title: 'Delete Product',
-        text: 'Are you sure you want to delete this product? This action cannot be undone.',
+        title: <?= json_encode(t('Delete Product')) ?>,
+        text: <?= json_encode(t('Are you sure you want to delete this product? This action cannot be undone.')) ?>,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'Yes, Delete',
+        confirmButtonText: <?= json_encode(t('Yes, Delete')) ?>,
         confirmButtonColor: '#dc3545',
-        cancelButtonText: 'Cancel'
+        cancelButtonText: <?= json_encode(t('Cancel')) ?>
     }).then((result) => {
 
         if (result.isConfirmed) {
@@ -1455,17 +1455,17 @@ function deleteProduct(productId) {
                         logReportAction('Deleted Product', 'User deleted product ID ' + productId);
                         Swal.fire({
                             icon: 'success',
-                            title: 'Deleted!',
-                            text: 'Product has been deleted.',
+                            title: <?= json_encode(t('Deleted!')) ?>,
+                            text: <?= json_encode(t('Product has been deleted.')) ?>,
                             confirmButtonColor: '#28a745',
-                            confirmButtonText: 'OK'
+                            confirmButtonText: <?= json_encode(t('OK')) ?>
                         }).then(() => {
                             location.reload();
                         });
                     } else {
                         Swal.fire({
                             icon: 'error',
-                            title: 'Error',
+                            title: <?= json_encode(t('Error')) ?>,
                             text: response.message
                         });
                     }
@@ -1477,12 +1477,12 @@ function deleteProduct(productId) {
 
 function duplicateProduct(productId) {
     Swal.fire({
-        title: 'Duplicate Product',
-        text: 'Create a copy of this product?',
+        title: <?= json_encode(t('Duplicate Product')) ?>,
+        text: <?= json_encode(t('Create a copy of this product?')) ?>,
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Yes, Duplicate',
-        cancelButtonText: 'Cancel'
+        confirmButtonText: <?= json_encode(t('Yes, Duplicate')) ?>,
+        cancelButtonText: <?= json_encode(t('Cancel')) ?>
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
@@ -1495,17 +1495,17 @@ function duplicateProduct(productId) {
                         logReportAction('Duplicated Product', 'User duplicated product ID ' + productId);
                         Swal.fire({
                             icon: 'success',
-                            title: 'Duplicated!',
-                            text: 'Product duplicated successfully.',
+                            title: <?= json_encode(t('Duplicated!')) ?>,
+                            text: <?= json_encode(t('Product duplicated successfully.')) ?>,
                             confirmButtonColor: '#28a745',
-                            confirmButtonText: 'OK'
+                            confirmButtonText: <?= json_encode(t('OK')) ?>
                         }).then(() => {
                             window.location.href = '<?= getUrl("product_edit") ?>?id=' + response.new_product_id;
                         });
                     } else {
                         Swal.fire({
                             icon: 'error',
-                            title: 'Error',
+                            title: <?= json_encode(t('Error')) ?>,
                             text: response.message
                         });
                     }
@@ -1529,8 +1529,8 @@ function copyTable() {
     $('#productsTable').DataTable().button('.buttons-copy').trigger();
     Swal.fire({
         icon: 'success',
-        title: 'Copied!',
-        text: 'Product data copied to clipboard.',
+        title: <?= json_encode(t('Copied!')) ?>,
+        text: <?= json_encode(t('Product data copied to clipboard.')) ?>,
         timer: 1500,
         showConfirmButton: false
     });
@@ -1779,10 +1779,10 @@ function generate_barcode_local() {
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title fw-bold" id="addProductModalLabel">
-                    <i class="bi bi-plus-circle me-2"></i> Add New Inventory Product
-                    <span id="modal_header_inv_badge" class="badge bg-success bg-opacity-25 text-white ms-2 small">Inventory</span>
+                    <i class="bi bi-plus-circle me-2"></i> <?= t('Add New Inventory Product') ?>
+                    <span id="modal_header_inv_badge" class="badge bg-success bg-opacity-25 text-white ms-2 small"><?= t('Inventory') ?></span>
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= t('Close') ?>"></button>
             </div>
             <form id="addProductForm" enctype="multipart/form-data" autocomplete="off">
                 <input type="hidden" id="modal_is_service_inp"    name="is_service"      value="0">
@@ -1805,16 +1805,16 @@ function generate_barcode_local() {
                     </style>
                     <ul class="nav nav-tabs mb-4 flex-nowrap" id="productFormTabs" role="tablist">
                         <li class="nav-item flex-fill">
-                            <button class="nav-link active fw-bold w-100" id="tab1-tab" data-bs-toggle="tab" data-bs-target="#tab1" type="button" role="tab"><i class="bi bi-info-circle d-block d-sm-inline mb-1 mb-sm-0 me-sm-1"></i><span style="font-size:0.7rem;">Basic Info</span></button>
+                            <button class="nav-link active fw-bold w-100" id="tab1-tab" data-bs-toggle="tab" data-bs-target="#tab1" type="button" role="tab"><i class="bi bi-info-circle d-block d-sm-inline mb-1 mb-sm-0 me-sm-1"></i><span style="font-size:0.7rem;"><?= t('Basic Info') ?></span></button>
                         </li>
                         <li class="nav-item flex-fill">
-                            <button class="nav-link fw-bold w-100" id="tab2-tab" data-bs-toggle="tab" data-bs-target="#tab2" type="button" role="tab"><i class="bi bi-tag d-block d-sm-inline mb-1 mb-sm-0 me-sm-1"></i><span style="font-size:0.7rem;">Pricing</span></button>
+                            <button class="nav-link fw-bold w-100" id="tab2-tab" data-bs-toggle="tab" data-bs-target="#tab2" type="button" role="tab"><i class="bi bi-tag d-block d-sm-inline mb-1 mb-sm-0 me-sm-1"></i><span style="font-size:0.7rem;"><?= t('Pricing') ?></span></button>
                         </li>
                         <li class="nav-item flex-fill modal-inventory-only" id="tab3-nav-item">
-                            <button class="nav-link fw-bold w-100" id="tab3-tab" data-bs-toggle="tab" data-bs-target="#tab3" type="button" role="tab"><i class="bi bi-box-seam d-block d-sm-inline mb-1 mb-sm-0 me-sm-1"></i><span style="font-size:0.7rem;">Inventory</span></button>
+                            <button class="nav-link fw-bold w-100" id="tab3-tab" data-bs-toggle="tab" data-bs-target="#tab3" type="button" role="tab"><i class="bi bi-box-seam d-block d-sm-inline mb-1 mb-sm-0 me-sm-1"></i><span style="font-size:0.7rem;"><?= t('Inventory') ?></span></button>
                         </li>
                         <li class="nav-item flex-fill">
-                            <button class="nav-link fw-bold w-100" id="tab4-tab" data-bs-toggle="tab" data-bs-target="#tab4" type="button" role="tab"><i class="bi bi-card-list d-block d-sm-inline mb-1 mb-sm-0 me-sm-1"></i><span style="font-size:0.7rem;">Details</span></button>
+                            <button class="nav-link fw-bold w-100" id="tab4-tab" data-bs-toggle="tab" data-bs-target="#tab4" type="button" role="tab"><i class="bi bi-card-list d-block d-sm-inline mb-1 mb-sm-0 me-sm-1"></i><span style="font-size:0.7rem;"><?= t('Details') ?></span></button>
                         </li>
                     </ul>
                     
@@ -1825,7 +1825,7 @@ function generate_barcode_local() {
                                 <div class="col-md-8">
                                     <div class="row">
                                         <div class="col-md-12 mb-3">
-                                            <label class="form-label fw-bold">Product Name <span class="text-danger">*</span></label>
+                                            <label class="form-label fw-bold"><?= t('Product Name') ?> <span class="text-danger">*</span></label>
                                             <input type="text" class="form-control" name="product_name" required placeholder="e.g. iPhone 13 Pro">
                                         </div>
                                         <div class="col-md-6 mb-3">
@@ -1836,36 +1836,36 @@ function generate_barcode_local() {
                                             </div>
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label class="form-label fw-bold">Barcode</label>
+                                            <label class="form-label fw-bold"><?= t('Barcode') ?></label>
                                             <div class="input-group">
                                                 <input type="text" class="form-control" name="barcode" id="modal_barcode" value="<?= generate_barcode_local() ?>">
                                                 <button class="btn btn-outline-secondary" type="button" onclick="refreshBarcode()"><i class="bi bi-upc"></i></button>
                                             </div>
                                         </div>
                                         <div class="col-md-12 mb-3">
-                                            <label class="form-label fw-bold">Category</label>
-                                            <?= renderOtherSelect('modal_category_id', 'category_id', $lk_product_categories, '', 'category_other', 'Select Category') ?>
+                                            <label class="form-label fw-bold"><?= t('Category') ?></label>
+                                            <?= renderOtherSelect('modal_category_id', 'category_id', $lk_product_categories, '', 'category_other', t('Select Category')) ?>
                                         </div>
                                         <div class="col-md-12 mb-3">
-                                            <label class="form-label fw-bold">Description</label>
-                                            <textarea class="form-control" name="description" rows="3" placeholder="Detailed product description..."></textarea>
+                                            <label class="form-label fw-bold"><?= t('Description') ?></label>
+                                            <textarea class="form-control" name="description" rows="3" placeholder="<?= t('Detailed product description...') ?>"></textarea>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="card bg-light border-0 mb-3">
                                         <div class="card-body text-center p-3">
-                                            <label class="form-label fw-bold d-block mb-3">Product Image</label>
-                                            <div class="image-preview-container border rounded p-2 bg-white mx-auto d-flex align-items-center justify-content-center position-relative" 
-                                                 id="modal_image_preview_container" 
-                                                 style="height: 180px; width: 100%; cursor: pointer;" 
+                                            <label class="form-label fw-bold d-block mb-3"><?= t('Product Image') ?></label>
+                                            <div class="image-preview-container border rounded p-2 bg-white mx-auto d-flex align-items-center justify-content-center position-relative"
+                                                 id="modal_image_preview_container"
+                                                 style="height: 180px; width: 100%; cursor: pointer;"
                                                  onclick="document.getElementById('modal_product_image').click();">
                                                 <div id="modal_image_placeholder">
                                                     <i class="bi bi-image text-muted" style="font-size: 3rem;"></i>
-                                                    <p class="text-muted small mt-2 mb-0">Click to Upload</p>
+                                                    <p class="text-muted small mt-2 mb-0"><?= t('Click to Upload') ?></p>
                                                 </div>
-                                                <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 m-2 rounded-circle" 
-                                                        style="z-index: 10;" 
+                                                <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 m-2 rounded-circle"
+                                                        style="z-index: 10;"
                                                         onclick="event.stopPropagation(); removeModalImage()">
                                                     <i class="bi bi-x"></i>
                                                 </button>
@@ -1875,10 +1875,10 @@ function generate_barcode_local() {
                                     </div>
                                     <div class="card bg-light border-0">
                                         <div class="card-body p-3">
-                                            <label class="form-label fw-bold">Product Status</label>
+                                            <label class="form-label fw-bold"><?= t('Product Status') ?></label>
                                             <div class="form-check form-switch">
                                                 <input class="form-check-input" type="checkbox" name="status" value="active" checked id="modal_status">
-                                                <label class="form-check-label" for="modal_status">Active / For Sale</label>
+                                                <label class="form-check-label" for="modal_status"><?= t('Active / For Sale') ?></label>
                                             </div>
                                         </div>
                                     </div>
@@ -1890,67 +1890,67 @@ function generate_barcode_local() {
                         <div class="tab-pane fade" id="tab2" role="tabpanel">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">Cost Price <span class="text-danger">*</span></label>
+                                    <label class="form-label fw-bold"><?= t('Cost Price') ?> <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <span class="input-group-text">TZS</span>
                                         <input type="number" class="form-control" name="cost_price" id="modal_cost_price" value="0.00" step="0.01" required onkeyup="modalCalcMarkup()">
                                     </div>
-                                    <small class="text-muted">The price you paid for this product</small>
+                                    <small class="text-muted"><?= t('The price you paid for this product') ?></small>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">Selling Price <span class="text-danger">*</span></label>
+                                    <label class="form-label fw-bold"><?= t('Selling Price') ?> <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <span class="input-group-text bg-success text-white">TZS</span>
                                         <input type="number" class="form-control fw-bold" name="selling_price" id="modal_selling_price" value="0.00" step="0.01" required onkeyup="modalCalcMarkup(); modalCalcMinPrice();">
                                     </div>
-                                    <small class="text-muted">Final price at which you sell to customers</small>
+                                    <small class="text-muted"><?= t('Final price at which you sell to customers') ?></small>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">Wholesale Price</label>
+                                    <label class="form-label fw-bold"><?= t('Wholesale Price') ?></label>
                                     <div class="input-group">
                                         <span class="input-group-text bg-info text-white">TZS</span>
                                         <input type="number" class="form-control" name="wholesale_price" value="0.00" step="0.01">
                                     </div>
-                                    <small class="text-muted">Price for bulk/wholesale buyers</small>
+                                    <small class="text-muted"><?= t('Price for bulk/wholesale buyers') ?></small>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">Discount Rate (%)</label>
+                                    <label class="form-label fw-bold"><?= t('Discount Rate (%)') ?></label>
                                     <div class="input-group">
                                         <input type="number" class="form-control" name="discount_rate" id="modal_discount_rate" value="0.00" step="0.01" onkeyup="modalCalcMinPrice()">
                                         <span class="input-group-text">%</span>
                                     </div>
-                                    <small class="text-muted">Max discount allowed in POS</small>
+                                    <small class="text-muted"><?= t('Max discount allowed in POS') ?></small>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">Min Selling Price</label>
+                                    <label class="form-label fw-bold"><?= t('Min Selling Price') ?></label>
                                     <div class="input-group">
                                         <span class="input-group-text bg-danger text-white">TZS</span>
                                         <input type="number" class="form-control" name="min_selling_price" id="modal_min_selling_price" value="0.00" step="0.01">
                                     </div>
-                                    <small class="text-muted">Auto-calculated but can be overridden</small>
+                                    <small class="text-muted"><?= t('Auto-calculated but can be overridden') ?></small>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">Tax Rate</label>
+                                    <label class="form-label fw-bold"><?= t('Tax Rate') ?></label>
                                     <select class="form-select select2-static" name="tax_id" id="modal_tax_id">
-                                        <option value="">No Tax</option>
+                                        <option value=""><?= t('No Tax') ?></option>
                                         <?php if ($vat18_rate): ?>
                                             <option value="<?= $vat18_rate['rate_id'] ?>"><?= safe_output($vat18_rate['rate_name']) ?> (<?= $vat18_rate['rate_percentage'] ?>%)</option>
                                         <?php endif; ?>
                                     </select>
                                     <div class="form-check mt-2">
                                         <input class="form-check-input" type="checkbox" name="is_taxable" value="1" checked id="modal_taxable">
-                                        <label class="form-check-label small" for="modal_taxable">Calculate tax for this item</label>
+                                        <label class="form-check-label small" for="modal_taxable"><?= t('Calculate tax for this item') ?></label>
                                     </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <div class="p-3 bg-light rounded text-center h-100 d-flex flex-column justify-content-center">
-                                        <small class="text-muted text-uppercase fw-bold d-block mb-1">Estimated Profit</small>
+                                        <small class="text-muted text-uppercase fw-bold d-block mb-1"><?= t('Estimated Profit') ?></small>
                                         <h5 class="fw-bold text-success mb-0" id="modal_profit_badge">TZS 0.00</h5>
                                     </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <div class="p-3 bg-light rounded text-center h-100 d-flex flex-column justify-content-center">
-                                        <small class="text-muted text-uppercase fw-bold d-block mb-1">Gross Margin</small>
+                                        <small class="text-muted text-uppercase fw-bold d-block mb-1"><?= t('Gross Margin') ?></small>
                                         <h5 class="fw-bold text-info mb-0" id="modal_markup_badge">0.00%</h5>
                                     </div>
                                 </div>
@@ -1961,7 +1961,7 @@ function generate_barcode_local() {
                         <div class="tab-pane fade modal-inventory-only" id="tab3" role="tabpanel">
                             <div class="row">
                                 <div class="col-md-4 mb-3">
-                                    <label class="form-label fw-bold">Measurement Unit</label>
+                                    <label class="form-label fw-bold"><?= t('Measurement Unit') ?></label>
                                     <div class="input-group">
                                         <input type="text" class="form-control" name="unit" id="modal_unit_input" list="unit_list" placeholder="e.g. pcs, kg, Box" onchange="updateModalUnit(this.value)">
                                         <datalist id="unit_list">
@@ -1969,44 +1969,44 @@ function generate_barcode_local() {
                                                 <option value="<?= $u['unit_code'] ?>"><?= $u['unit_name'] ?></option>
                                             <?php endforeach; ?>
                                         </datalist>
-                                        <button class="btn btn-outline-primary" type="button" onclick="showQuickAddUnit()" title="Add to Database">
+                                        <button class="btn btn-outline-primary" type="button" onclick="showQuickAddUnit()" title="<?= t('Add to Database') ?>">
                                             <i class="bi bi-plus-lg"></i>
                                         </button>
                                     </div>
                                 </div>
                                 <div class="col-md-4 mb-3 modal-inventory-only">
-                                    <label class="form-label fw-bold">Reorder Level</label>
+                                    <label class="form-label fw-bold"><?= t('Reorder Level') ?></label>
                                     <div class="input-group">
                                         <input type="number" class="form-control" name="reorder_level" value="0">
                                         <span class="input-group-text modal-unit-label">pcs</span>
                                     </div>
-                                    <small class="text-muted">Notify me when stock falls below this</small>
+                                    <small class="text-muted"><?= t('Notify me when stock falls below this') ?></small>
                                 </div>
                                 <div class="col-md-4 mb-3 modal-inventory-only">
-                                    <label class="form-label fw-bold">Min Stock Level</label>
+                                    <label class="form-label fw-bold"><?= t('Min Stock Level') ?></label>
                                     <input type="number" class="form-control" name="min_stock_level" value="0">
                                 </div>
                                 <div class="col-md-4 mb-3 modal-inventory-only">
-                                    <label class="form-label fw-bold">Max Stock Level</label>
+                                    <label class="form-label fw-bold"><?= t('Max Stock Level') ?></label>
                                     <input type="number" class="form-control" name="max_stock_level" value="0">
                                 </div>
 
                                 <div class="col-md-12 mt-3 p-3 bg-white border rounded modal-inventory-only">
                                     <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary">
-                                        <i class="bi bi-box-seam me-2"></i> OPENING STOCK (Current Inventory)
+                                        <i class="bi bi-box-seam me-2"></i> <?= t('OPENING STOCK (Current Inventory)') ?>
                                     </h6>
-                                    <p class="text-muted small mb-3">Enter the current stock quantity for each warehouse/store below:</p>
+                                    <p class="text-muted small mb-3"><?= t('Enter the current stock quantity for each warehouse/store below:') ?></p>
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover border">
                                             <thead class="table-light">
                                                 <tr>
-                                                    <th>Store / Warehouse Name</th>
-                                                    <th style="width: 200px;" class="text-center">Available Quantity</th>
+                                                    <th><?= t('Store / Warehouse Name') ?></th>
+                                                    <th style="width: 200px;" class="text-center"><?= t('Available Quantity') ?></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <?php if (empty($warehouses)): ?>
-                                                    <tr><td colspan="2" class="text-center p-3">No warehouses found. Please create one first.</td></tr>
+                                                    <tr><td colspan="2" class="text-center p-3"><?= t('No warehouses found. Please create one first.') ?></td></tr>
                                                 <?php else: ?>
                                                     <?php foreach ($warehouses as $wh): ?>
                                                     <tr>
@@ -2032,15 +2032,15 @@ function generate_barcode_local() {
                         <div class="tab-pane fade" id="tab4" role="tabpanel">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label fw-bold">Brand</label>
-                                    <?= renderOtherSelect('modal_brand_id', 'brand_id', $lk_brands, '', 'brand_other', 'Select Brand') ?>
+                                    <label class="form-label fw-bold"><?= t('Brand') ?></label>
+                                    <?= renderOtherSelect('modal_brand_id', 'brand_id', $lk_brands, '', 'brand_other', t('Select Brand')) ?>
                                 </div>
                                 <div class="col-md-4 mb-3 modal-inventory-only">
-                                    <label class="form-label fw-bold">Weight (kg)</label>
+                                    <label class="form-label fw-bold"><?= t('Weight (kg)') ?></label>
                                     <input type="number" step="0.001" class="form-control" name="weight" placeholder="0.000">
                                 </div>
                                 <div class="col-md-8 mb-3 modal-inventory-only">
-                                    <label class="form-label fw-bold">Dimensions (L x W x H)</label>
+                                    <label class="form-label fw-bold"><?= t('Dimensions (L x W x H)') ?></label>
                                     <div class="input-group">
                                         <input type="text" class="form-control text-center" name="dim_length" placeholder="L" inputmode="decimal">
                                         <span class="input-group-text">x</span>
@@ -2049,42 +2049,42 @@ function generate_barcode_local() {
                                         <input type="text" class="form-control text-center" name="dim_height" placeholder="H" inputmode="decimal">
                                         <span class="input-group-text">cm</span>
                                     </div>
-                                    <small class="text-muted">Combined automatically as "LxWxH cm"</small>
+                                    <small class="text-muted"><?= t('Combined automatically as "LxWxH cm"') ?></small>
                                 </div>
                                 <div class="col-md-4 mb-3 modal-inventory-only">
-                                    <label class="form-label fw-bold">Warranty (Months)</label>
+                                    <label class="form-label fw-bold"><?= t('Warranty (Months)') ?></label>
                                     <input type="number" class="form-control" name="warranty_period" placeholder="0">
                                 </div>
                                 <div class="col-md-8 mb-3 modal-inventory-only">
-                                    <label class="form-label fw-bold">Manufacturer</label>
-                                    <input type="text" class="form-control" name="manufacturer" placeholder="Manufacturer name">
+                                    <label class="form-label fw-bold"><?= t('Manufacturer') ?></label>
+                                    <input type="text" class="form-control" name="manufacturer" placeholder="<?= t('Manufacturer name') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3 modal-inventory-only">
-                                    <label class="form-label fw-bold">Model</label>
-                                    <input type="text" class="form-control" name="model" placeholder="Model or series">
+                                    <label class="form-label fw-bold"><?= t('Model') ?></label>
+                                    <input type="text" class="form-control" name="model" placeholder="<?= t('Model or series') ?>">
                                 </div>
                                 <div class="col-md-6 mb-3 modal-inventory-only">
-                                    <label class="form-label fw-bold">Serial Number</label>
-                                    <input type="text" class="form-control" name="serial_number" placeholder="Serial or IMEI">
+                                    <label class="form-label fw-bold"><?= t('Serial Number') ?></label>
+                                    <input type="text" class="form-control" name="serial_number" placeholder="<?= t('Serial or IMEI') ?>">
                                 </div>
                                 <div class="col-md-4 mb-3 modal-inventory-only">
-                                    <label class="form-label fw-bold">Expiry Days</label>
+                                    <label class="form-label fw-bold"><?= t('Expiry Days') ?></label>
                                     <input type="number" class="form-control" name="expiry_days" value="0">
-                                    <small class="text-muted">Shelf life in days</small>
+                                    <small class="text-muted"><?= t('Shelf life in days') ?></small>
                                 </div>
-                                
+
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
                     <div class="ms-auto">
                         <button type="button" class="btn btn-outline-primary me-2 px-3" onclick="saveAddAnother()">
-                            Save & Add Another
+                            <?= t('Save & Add Another') ?>
                         </button>
                         <button type="submit" class="btn btn-primary px-5 fw-bold">
-                            <i class="bi bi-check-circle me-1"></i> Create Product
+                            <i class="bi bi-check-circle me-1"></i> <?= t('Create Product') ?>
                         </button>
                     </div>
                 </div>
@@ -2181,8 +2181,8 @@ $(document).ready(function() {
         let addAnother = $(this).data('add-another') || false;
         const btn = $(this).find('[type="submit"]');
         const originalHtml = btn.html();
-        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Saving...');
-        
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + <?= json_encode(t('Saving...')) ?>);
+
         const messageContainer = $('#add-product-message');
         messageContainer.html('');
 
@@ -2196,30 +2196,30 @@ $(document).ready(function() {
             success: function(res) {
                 if (res.success) {
                     logReportAction('Created Product', 'User successfully created product: ' + $('#addProductForm [name="product_name"]').val());
-                    Swal.fire({ 
-                        icon: 'success', 
-                        title: 'Product Created', 
-                        text: res.message || 'Product has been created successfully.',
+                    Swal.fire({
+                        icon: 'success',
+                        title: <?= json_encode(t('Product Created')) ?>,
+                        text: res.message || <?= json_encode(t('Product has been created successfully.')) ?>,
                         confirmButtonColor: '#28a745',
-                        confirmButtonText: 'OK' 
-                    }).then(() => { 
-                        if (addAnother) { 
-                            $('#addProductForm')[0].reset(); 
-                            refreshSKU(); 
-                            refreshBarcode(); 
-                            $('#tab1-tab').tab('show'); 
+                        confirmButtonText: <?= json_encode(t('OK')) ?>
+                    }).then(() => {
+                        if (addAnother) {
+                            $('#addProductForm')[0].reset();
+                            refreshSKU();
+                            refreshBarcode();
+                            $('#tab1-tab').tab('show');
                             $('#addProductForm').data('add-another', false);
                         } else {
                             window.location.href = window.location.pathname + '?sort_by=created_at&sort_order=DESC';
-                        } 
+                        }
                     });
                 } else {
-                    Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                    Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: res.message });
                 }
             },
             error: function(xhr) {
                 console.error('AJAX Error:', xhr);
-                Swal.fire({ icon: 'error', title: 'Server Error', text: 'Could not connect to server.' });
+                Swal.fire({ icon: 'error', title: <?= json_encode(t('Server Error')) ?>, text: <?= json_encode(t('Could not connect to server.')) ?> });
             },
             complete: function() {
                 btn.prop('disabled', false).html(originalHtml);
@@ -2230,24 +2230,24 @@ $(document).ready(function() {
 
 function showQuickAddUnit() {
     Swal.fire({
-        title: 'Add New Measurement Unit',
+        title: <?= json_encode(t('Add New Measurement Unit')) ?>,
         html: `
             <div class="mb-3 text-start">
-                <label class="form-label fw-bold">Unit Name (e.g. Kilogram)</label>
-                <input type="text" id="swal_unit_name" class="form-control" placeholder="Full name">
+                <label class="form-label fw-bold">${<?= json_encode(t('Unit Name (e.g. Kilogram)')) ?>}</label>
+                <input type="text" id="swal_unit_name" class="form-control" placeholder="${<?= json_encode(t('Full name')) ?>}">
             </div>
             <div class="mb-3 text-start">
-                <label class="form-label fw-bold">Unit Code (e.g. kg)</label>
-                <input type="text" id="swal_unit_code" class="form-control" placeholder="Short code">
+                <label class="form-label fw-bold">${<?= json_encode(t('Unit Code (e.g. kg)')) ?>}</label>
+                <input type="text" id="swal_unit_code" class="form-control" placeholder="${<?= json_encode(t('Short code')) ?>}">
             </div>
         `,
         showCancelButton: true,
-        confirmButtonText: 'Save Unit',
+        confirmButtonText: <?= json_encode(t('Save Unit')) ?>,
         preConfirm: () => {
             const name = document.getElementById('swal_unit_name').value;
             const code = document.getElementById('swal_unit_code').value;
             if (!name || !code) {
-                Swal.showValidationMessage('Please enter both name and code');
+                Swal.showValidationMessage(<?= json_encode(t('Please enter both name and code')) ?>);
                 return false;
             }
             return { name: name, code: code };
@@ -2264,13 +2264,13 @@ function showQuickAddUnit() {
                     $('#modal_unit_input').val(res.unit.unit_code).trigger('change');
                     Swal.fire({
                         icon: 'success',
-                        title: 'Success',
+                        title: <?= json_encode(t('Success')) ?>,
                         text: res.message,
                         confirmButtonColor: '#28a745',
-                        confirmButtonText: 'OK'
+                        confirmButtonText: <?= json_encode(t('OK')) ?>
                     });
                 } else {
-                    Swal.fire('Error', res.message, 'error');
+                    Swal.fire(<?= json_encode(t('Error')) ?>, res.message, 'error');
                 }
             }, 'json');
         }
@@ -2316,10 +2316,10 @@ function copyTable() {
         logReportAction('Copied Products Table', 'User copied the products table to clipboard');
         Swal.fire({
             icon: 'success',
-            title: 'Copied!',
-            text: 'Table data copied to clipboard.',
+            title: <?= json_encode(t('Copied!')) ?>,
+            text: <?= json_encode(t('Table data copied to clipboard.')) ?>,
             confirmButtonColor: '#28a745',
-            confirmButtonText: 'OK'
+            confirmButtonText: <?= json_encode(t('OK')) ?>
         });
     } catch(err) {  
         console.error('Oops, unable to copy'); 

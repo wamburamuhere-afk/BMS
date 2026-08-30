@@ -186,7 +186,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
         <div class="text-center mb-4 pb-3" style="border-bottom: 2px solid #0d6efd;">
           
 
-            <h4 class="text-dark">Non-Inventory Products Report</h4>
+            <h4 class="text-dark"><?= t('Non-Inventory Products Report') ?></h4>
             
         </div>
     </div>
@@ -195,20 +195,20 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
     <div class="rounded-4 svc-header text-white p-4 mb-4 d-print-none">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div>
-                <h4 class="fw-bold mb-1"><i class="bi bi-box-seam me-2"></i>Non-Inventory Products</h4>
-                <p class="mb-0 opacity-75 small">Virtual products & services — used in Sales, Invoices and POS only</p>
+                <h4 class="fw-bold mb-1"><i class="bi bi-box-seam me-2"></i><?= t('Non-Inventory Products') ?></h4>
+                <p class="mb-0 opacity-75 small"><?= t('Virtual products & services — used in Sales, Invoices and POS only') ?></p>
             </div>
             <div class="d-flex gap-2 flex-nowrap">
                 <?php if ($can_create): ?>
                 <button type="button" class="btn btn-light fw-bold shadow-sm btn-mobile-sm"
                     onclick="openAddSvcModal()">
-                    <i class="bi bi-plus-circle me-1"></i> 
-                    <span class="d-none d-md-inline">Add Non-Inventory Product</span>
-                    <span class="d-md-none">Add New</span>
+                    <i class="bi bi-plus-circle me-1"></i>
+                    <span class="d-none d-md-inline"><?= t('Add Non-Inventory Product') ?></span>
+                    <span class="d-md-none"><?= t('Add New') ?></span>
                 </button>
                 <?php endif; ?>
                 <button class="btn btn-outline-light btn-sm btn-mobile-sm fw-bold" onclick="window.print()">
-                    <i class="bi bi-printer me-1"></i> Print
+                    <i class="bi bi-printer me-1"></i> <?= t('Print') ?>
                 </button>
             </div>
         </div>
@@ -220,7 +220,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
             <div class="card border-0 shadow-sm rounded-4 h-100">
                 <div class="card-body p-3 text-center">
                     <div class="text-primary fw-bold fs-4"><?= $total_count ?></div>
-                    <small class="text-muted">Total Products</small>
+                    <small class="text-muted"><?= t('Total Products') ?></small>
                 </div>
             </div>
         </div>
@@ -231,7 +231,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                     $active_count = $pdo->query("SELECT COUNT(*) FROM products p WHERE p.is_service=1 AND p.status='active'" . $scope_sql)->fetchColumn();
                     ?>
                     <div class="text-success fw-bold fs-4"><?= $active_count ?></div>
-                    <small class="text-muted">Active</small>
+                    <small class="text-muted"><?= t('Active') ?></small>
                 </div>
             </div>
         </div>
@@ -242,7 +242,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                     $inactive_count = $pdo->query("SELECT COUNT(*) FROM products p WHERE p.is_service=1 AND p.status='inactive'" . $scope_sql)->fetchColumn();
                     ?>
                     <div class="text-danger fw-bold fs-4"><?= $inactive_count ?></div>
-                    <small class="text-muted">Inactive</small>
+                    <small class="text-muted"><?= t('Inactive') ?></small>
                 </div>
             </div>
         </div>
@@ -253,7 +253,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                     $cat_count = $pdo->query("SELECT COUNT(DISTINCT p.category_id) FROM products p WHERE p.is_service=1 AND p.category_id IS NOT NULL" . $scope_sql)->fetchColumn();
                     ?>
                     <div class="text-info fw-bold fs-4"><?= $cat_count ?></div>
-                    <small class="text-muted">Categories</small>
+                    <small class="text-muted"><?= t('Categories') ?></small>
                 </div>
             </div>
         </div>
@@ -269,12 +269,12 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-0"><i class="bi bi-search"></i></span>
                                 <input type="text" class="form-control border-0 bg-light" id="svcTableSearch"
-                                    placeholder="Search products..." autocomplete="off">
+                                    placeholder="<?= t('Search products...') ?>" autocomplete="off">
                             </div>
                         </div>
                         <div class="col-md-3">
                             <select class="form-select border-0 bg-light select2-static" id="svcCategoryFilter" name="category">
-                                <option value="">All Categories</option>
+                                <option value=""><?= t('All Categories') ?></option>
                                 <?php foreach ($categories as $cat): ?>
                                 <option value="<?= $cat['category_id'] ?>" <?= $category_id==$cat['category_id']?'selected':'' ?>>
                                     <?= htmlspecialchars($cat['category_name']) ?>
@@ -284,9 +284,9 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                         </div>
                         <div class="col-md-2">
                             <select class="form-select border-0 bg-light" name="status">
-                                <option value="active"   <?= $status_filter=='active'  ?'selected':'' ?>>Active</option>
-                                <option value="inactive" <?= $status_filter=='inactive'?'selected':'' ?>>Inactive</option>
-                                <option value="all"      <?= $status_filter=='all'     ?'selected':'' ?>>All</option>
+                                <option value="active"   <?= $status_filter=='active'  ?'selected':'' ?>><?= t('Active') ?></option>
+                                <option value="inactive" <?= $status_filter=='inactive'?'selected':'' ?>><?= t('Inactive') ?></option>
+                                <option value="all"      <?= $status_filter=='all'     ?'selected':'' ?>><?= t('All') ?></option>
                             </select>
                         </div>
                         <div class="col-md-2">
@@ -299,10 +299,10 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                 <div class="col-md-4 text-md-end">
                     <div class="d-flex justify-content-md-end align-items-center gap-3">
                         <div class="btn-group shadow-sm d-none d-md-flex" role="group">
-                            <button type="button" class="btn btn-primary btn-sm" id="btn-table-view" onclick="toggleView('table')" title="Table View">
+                            <button type="button" class="btn btn-primary btn-sm" id="btn-table-view" onclick="toggleView('table')" title="<?= t('Table View') ?>">
                                 <i class="bi bi-table"></i>
                             </button>
-                            <button type="button" class="btn btn-light btn-sm" id="btn-card-view" onclick="toggleView('card')" title="Card View">
+                            <button type="button" class="btn btn-light btn-sm" id="btn-card-view" onclick="toggleView('card')" title="<?= t('Card View') ?>">
                                 <i class="bi bi-grid-3x3-gap"></i>
                             </button>
                         </div>
@@ -316,7 +316,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
 
     <!-- Card View -->
     <div id="cardView" class="view-section">
-        <h5 class="fw-bold mb-3 d-md-none text-primary"><i class="bi bi-grid-3x3-gap me-2"></i>Product Cards</h5>
+        <h5 class="fw-bold mb-3 d-md-none text-primary"><i class="bi bi-grid-3x3-gap me-2"></i><?= t('Product Cards') ?></h5>
         <?php if (!empty($all_nip_services)): ?>
             <div class="row g-3">
                 <?php foreach ($all_nip_services as $i => $svc): ?>
@@ -327,9 +327,9 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <span class="badge bg-light text-muted border" style="font-size: 0.7rem;">#<?= $offset + $i + 1 ?></span>
                                 <?php if ($svc['status'] === 'active'): ?>
-                                <span class="badge bg-success" style="font-size: 0.65rem;">Active</span>
+                                <span class="badge bg-success" style="font-size: 0.65rem;"><?= t('Active') ?></span>
                                 <?php else: ?>
-                                <span class="badge bg-secondary" style="font-size: 0.65rem;">Inactive</span>
+                                <span class="badge bg-secondary" style="font-size: 0.65rem;"><?= t('Inactive') ?></span>
                                 <?php endif; ?>
                             </div>
 
@@ -337,7 +337,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <div class="mb-3">
                                 <h6 class="fw-bold text-dark mb-1" style="font-size: 0.95rem;"><?= htmlspecialchars($svc['product_name']) ?></h6>
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <span class="text-muted small">SKU/Code:</span>
+                                    <span class="text-muted small"><?= t('SKU/Code:') ?></span>
                                     <code class="small fw-bold text-primary" style="font-size: 0.75rem;"><?= htmlspecialchars($svc['sku'] ?? 'N/A') ?></code>
                                 </div>
                             </div>
@@ -345,40 +345,40 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <!-- Data Grid: Label Left, Value Right -->
                             <div class="flex-grow-1">
                                 <div class="d-flex justify-content-between align-items-center border-bottom border-light py-2">
-                                    <span class="text-muted small">Project:</span>
+                                    <span class="text-muted small"><?= t('Project:') ?></span>
                                     <span class="small fw-bold text-end"><?= !empty($svc['project_name']) ? htmlspecialchars($svc['project_name']) : '—' ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center border-bottom border-light py-2">
-                                    <span class="text-muted small">Tax:</span>
+                                    <span class="text-muted small"><?= t('Tax:') ?></span>
                                     <span class="small fw-bold text-end">
-                                        <?= !empty($svc['tax_name']) ? htmlspecialchars($svc['tax_name']) : 'No Tax' ?>
+                                        <?= !empty($svc['tax_name']) ? htmlspecialchars($svc['tax_name']) : t('No Tax') ?>
                                     </span>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center py-2 mb-2">
-                                    <span class="text-muted small">Price:</span>
+                                    <span class="text-muted small"><?= t('Price:') ?></span>
                                     <span class="fw-bold text-primary" style="font-size: 1rem;"><?= format_currency($svc['selling_price']) ?></span>
                                 </div>
                             </div>
 
                             <!-- Actions Row: Smaller Buttons -->
                             <div class="d-flex gap-1 pt-3 mt-auto border-top">
-                                <a class="btn btn-sm btn-outline-primary flex-grow-1 py-1" 
-                                   href="<?= getUrl('service_view') ?>?id=<?= $svc['product_id'] ?>" 
+                                <a class="btn btn-sm btn-outline-primary flex-grow-1 py-1"
+                                   href="<?= getUrl('service_view') ?>?id=<?= $svc['product_id'] ?>"
                                    style="font-size: 0.7rem; border-radius: 6px;">
-                                    <i class="bi bi-eye"></i> View
+                                    <i class="bi bi-eye"></i> <?= t('View') ?>
                                 </a>
                                 <?php if ($can_edit): ?>
                                 <button type="button" class="btn btn-sm btn-outline-warning flex-grow-1 py-1"
                                     onclick="openEditSvcModal(<?= htmlspecialchars(json_encode($svc)) ?>)"
                                     style="font-size: 0.7rem; border-radius: 6px;">
-                                    <i class="bi bi-pencil"></i> Edit
+                                    <i class="bi bi-pencil"></i> <?= t('Edit') ?>
                                 </button>
                                 <?php endif; ?>
                                 <?php if ($can_delete): ?>
                                 <button type="button" class="btn btn-sm btn-outline-danger flex-grow-1 py-1"
                                     onclick="deleteSvc(<?= $svc['product_id'] ?>, '<?= addslashes($svc['product_name']) ?>')"
                                     style="font-size: 0.7rem; border-radius: 6px;">
-                                    <i class="bi bi-trash"></i> Delete
+                                    <i class="bi bi-trash"></i> <?= t('Delete') ?>
                                 </button>
                                 <?php endif; ?>
                             </div>
@@ -407,8 +407,8 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
         <?php else: ?>
             <div class="text-center py-5 bg-white rounded-4 shadow-sm">
                 <i class="bi bi-gear display-1 text-muted opacity-25 d-block mb-3"></i>
-                <h5 class="fw-bold">No Services Found</h5>
-                <p class="text-muted small">Try adjusting your filters.</p>
+                <h5 class="fw-bold"><?= t('No Services Found') ?></h5>
+                <p class="text-muted small"><?= t('Try adjusting your filters.') ?></p>
             </div>
         <?php endif; ?>
     </div> <!-- end cardView -->
@@ -421,14 +421,14 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                 <table class="table table-hover align-middle mb-0" id="servicesTable" style="width:100%; table-layout:fixed;">
                     <thead class="table-light text-uppercase small fw-bold">
                         <tr>
-                            <th class="ps-3" style="width:50px;">S/NO</th>
-                            <th style="width:110px;">Item Code</th>
-                            <th>Product Name</th>
-                            <th style="width:120px;">Project</th>
-                            <th style="width:120px;">Selling Price</th>
-                            <th style="width:90px;">Tax</th>
-                            <th style="width:80px;">Status</th>
-                            <th class="text-end pe-3 d-print-none" style="width:70px;">Actions</th>
+                            <th class="ps-3" style="width:50px;"><?= t('S/NO') ?></th>
+                            <th style="width:110px;"><?= t('Item Code') ?></th>
+                            <th><?= t('Product Name') ?></th>
+                            <th style="width:120px;"><?= t('Project') ?></th>
+                            <th style="width:120px;"><?= t('Selling Price') ?></th>
+                            <th style="width:90px;"><?= t('Tax') ?></th>
+                            <th style="width:80px;"><?= t('Status') ?></th>
+                            <th class="text-end pe-3 d-print-none" style="width:70px;"><?= t('Actions') ?></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -464,14 +464,14 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                     <?= htmlspecialchars($svc['tax_name']) ?> (<?= $svc['tax_rate_percentage'] ?>%)
                                 </span>
                                 <?php else: ?>
-                                <span class="text-muted small">No Tax</span>
+                                <span class="text-muted small"><?= t('No Tax') ?></span>
                                 <?php endif; ?>
                             </td>
                             <td>
                                 <?php if ($svc['status'] === 'active'): ?>
-                                <span class="badge bg-success">Active</span>
+                                <span class="badge bg-success"><?= t('Active') ?></span>
                                 <?php else: ?>
-                                <span class="badge bg-secondary">Inactive</span>
+                                <span class="badge bg-secondary"><?= t('Inactive') ?></span>
                                 <?php endif; ?>
                             </td>
                             <td class="text-end pe-3 d-print-none">
@@ -483,14 +483,14 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                     <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                                         <li>
                                             <a class="dropdown-item py-2" href="<?= getUrl('service_view') ?>?id=<?= $svc['product_id'] ?>">
-                                                <i class="bi bi-layout-text-window text-primary me-2"></i> View Details
+                                                <i class="bi bi-layout-text-window text-primary me-2"></i> <?= t('View Details') ?>
                                             </a>
                                         </li>
                                         <?php if ($can_edit): ?>
                                         <li>
                                             <a class="dropdown-item py-2" href="javascript:void(0)"
                                                 onclick="openEditSvcModal(<?= htmlspecialchars(json_encode($svc)) ?>)">
-                                                <i class="bi bi-pencil text-warning me-2"></i> Edit Service
+                                                <i class="bi bi-pencil text-warning me-2"></i> <?= t('Edit Service') ?>
                                             </a>
                                         </li>
                                         <?php endif; ?>
@@ -499,7 +499,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                         <li>
                                             <a class="dropdown-item py-2 text-danger" href="javascript:void(0)"
                                                 onclick="deleteSvc(<?= $svc['product_id'] ?>, '<?= addslashes($svc['product_name']) ?>')">
-                                                <i class="bi bi-trash me-2"></i> Delete Service
+                                                <i class="bi bi-trash me-2"></i> <?= t('Delete Service') ?>
                                             </a>
                                         </li>
                                         <li><hr class="dropdown-divider"></li>
@@ -556,8 +556,8 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title fw-bold">
-                    <i class="bi bi-plus-circle me-2"></i> Add Non-Inventory Product
-<span class="badge bg-white bg-opacity-25 text-white ms-2 small">Non-Inventory</span>
+                    <i class="bi bi-plus-circle me-2"></i> <?= t('Add Non-Inventory Product') ?>
+<span class="badge bg-white bg-opacity-25 text-white ms-2 small"><?= t('Non-Inventory') ?></span>
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -573,10 +573,10 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                     <!-- ── NAVIGATION HEADERS ────────────────────────────────── -->
                     <div class="d-flex gap-4 mb-4 border-bottom pb-2 px-1">
                         <h6 class="fw-bold cursor-pointer mb-0 pb-2" id="svc_add_tab1" onclick="toggleSvcAddStep(1)" style="color: #0d6efd; border-bottom: 2px solid #0d6efd; transition: all 0.3s; cursor: pointer;">
-                            <i class="bi bi-info-circle me-2"></i>Product Identity
+                            <i class="bi bi-info-circle me-2"></i><?= t('Product Identity') ?>
                         </h6>
                         <h6 class="fw-bold cursor-pointer mb-0 pb-2" id="svc_add_tab2" onclick="toggleSvcAddStep(2)" style="color: #000; transition: all 0.3s; cursor: pointer;">
-                            <i class="bi bi-cash-stack me-2"></i>Pricing & Planning
+                            <i class="bi bi-cash-stack me-2"></i><?= t('Pricing & Planning') ?>
                         </h6>
                     </div>
 
@@ -586,36 +586,36 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                         <div class="col-md-7 border-end pe-md-4">
                             <div class="row g-3">
                                 <div class="col-12">
-                                    <label class="form-label fw-bold small">Non-Inventory Product Name <span class="text-danger">*</span></label>
+                                    <label class="form-label fw-bold small"><?= t('Non-Inventory Product Name') ?> <span class="text-danger">*</span></label>
                                     <textarea class="form-control form-control-lg bg-light border-0 shadow-sm"
-                                        name="product_name" required rows="2" placeholder="e.g. Consulting, Delivery Charge"></textarea>
+                                        name="product_name" required rows="2" placeholder="<?= t('e.g. Consulting, Delivery Charge') ?>"></textarea>
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label fw-bold small">Description</label>
+                                    <label class="form-label fw-bold small"><?= t('Description') ?></label>
                                     <textarea class="form-control bg-light border-0" name="description"
-                                        rows="2" placeholder="Describe this service..."></textarea>
+                                        rows="2" placeholder="<?= t('Describe this service...') ?>"></textarea>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label fw-bold small text-primary">Item Code</label>
-                                    <input type="text" class="form-control form-control-sm border-0 bg-secondary bg-opacity-10 fw-bold text-muted" name="contract_item_no" placeholder="Auto-generated on save" readonly>
+                                    <label class="form-label fw-bold small text-primary"><?= t('Item Code') ?></label>
+                                    <input type="text" class="form-control form-control-sm border-0 bg-secondary bg-opacity-10 fw-bold text-muted" name="contract_item_no" placeholder="<?= t('Auto-generated on save') ?>" readonly>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label fw-bold small text-primary">Unit</label>
+                                    <label class="form-label fw-bold small text-primary"><?= t('Unit') ?></label>
                                     <div id="svc_unit_container">
                                         <select class="form-select form-select-sm fw-bold border border-secondary border-opacity-25" name="unit" id="svc_unit_select" onchange="checkOtherUnit(this, 'svc_unit_container')">
-                                            <option value="job">Job</option>
-                                            <option value="pcs">Pieces</option>
-                                            <option value="set">Set</option>
-                                            <option value="box">Box</option>
-                                            <option value="ltr">Litre</option>
-                                            <option value="kg">Kg</option>
-                                            <option value="other">Other (specify)</option>
+                                            <option value="job"><?= t('Job') ?></option>
+                                            <option value="pcs"><?= t('Pieces') ?></option>
+                                            <option value="set"><?= t('Set') ?></option>
+                                            <option value="box"><?= t('Box') ?></option>
+                                            <option value="ltr"><?= t('Litre') ?></option>
+                                            <option value="kg"><?= t('Kg') ?></option>
+                                            <option value="other"><?= t('Other (specify)') ?></option>
                                         </select>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label fw-bold small text-primary">Qty</label>
-                                    <input type="number" class="form-control form-control-sm border-0 bg-secondary bg-opacity-10 fw-bold" 
+                                    <label class="form-label fw-bold small text-primary"><?= t('Qty') ?></label>
+                                    <input type="number" class="form-control form-control-sm border-0 bg-secondary bg-opacity-10 fw-bold"
                                         name="assembly_quantity" id="svc_assembly_qty" value="1" readonly>
                                 </div>
                             </div>
@@ -623,16 +623,16 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
 
                         <div class="col-md-5 ps-md-4">
                             <div class="p-4 bg-primary bg-opacity-10 rounded-4 h-100 border border-primary border-opacity-10">
-                                <h5 class="fw-bold text-primary mb-3"><i class="bi bi-info-circle me-2"></i>Non-Inventory Product</h5>
-                                <p class="small text-muted mb-3">This product will be available in:</p>
+                                <h5 class="fw-bold text-primary mb-3"><i class="bi bi-info-circle me-2"></i><?= t('Non-Inventory Product') ?></h5>
+                                <p class="small text-muted mb-3"><?= t('This product will be available in:') ?></p>
                                 <ul class="list-unstyled small">
-                                    <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i>Sales Orders</li>
-                                    <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i>Invoices</li>
-                                    <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i>POS</li>
-                                    <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i>Budget</li>
-                                    <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i>Warehouse / GRN</li>
-                                    <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i>Delivery Notes</li>
-                                    <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i>Stock Tracking</li>
+                                    <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i><?= t('Sales Orders') ?></li>
+                                    <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i><?= t('Invoices') ?></li>
+                                    <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i><?= t('POS') ?></li>
+                                    <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i><?= t('Budget') ?></li>
+                                    <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i><?= t('Warehouse / GRN') ?></li>
+                                    <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i><?= t('Delivery Notes') ?></li>
+                                    <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i><?= t('Stock Tracking') ?></li>
                                 </ul>
                             </div>
                         </div>
@@ -644,23 +644,23 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
 
                         <div class="row g-3 mb-4 p-3 bg-white rounded-3 shadow-sm border border-primary border-opacity-10">
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small text-success">Selling Price <span class="text-danger">*</span></label>
+                                <label class="form-label fw-bold small text-success"><?= t('Selling Price') ?> <span class="text-danger">*</span></label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text border-0 bg-success text-white">TZS</span>
                                     <input type="number" class="form-control border-0 bg-light fw-bold text-success" name="selling_price" id="svc_sell" value="0.00" step="0.01" required onkeyup="calcSvcMargin()" onchange="calcSvcMargin()">
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small text-muted">Cost Price (Auto-Sum)</label>
+                                <label class="form-label fw-bold small text-muted"><?= t('Cost Price (Auto-Sum)') ?></label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text border-0 bg-light">TZS</span>
                                     <input type="number" class="form-control border-0 bg-secondary bg-opacity-10 fw-bold" name="cost_price" id="svc_cost" value="0.00" step="0.01" readonly>
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small">Tax Rate</label>
+                                <label class="form-label fw-bold small"><?= t('Tax Rate') ?></label>
                                 <select class="form-select form-select-sm border-0 bg-light" name="tax_id" id="svc_tax_id">
-                                    <option value="">No Tax</option>
+                                    <option value=""><?= t('No Tax') ?></option>
                                     <?php foreach ($tax_rates as $tax): ?>
                                     <option value="<?= $tax['rate_id'] ?>"><?= htmlspecialchars($tax['rate_name']) ?> (<?= $tax['rate_percentage'] ?>%)</option>
                                     <?php endforeach; ?>
@@ -669,18 +669,18 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <div class="col-12 mt-3 pt-3 border-top">
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold small">Select Project (Optional)</label>
+                                        <label class="form-label fw-bold small"><?= t('Select Project (Optional)') ?></label>
                                         <select class="form-select form-select-sm fw-bold shadow-sm border border-secondary border-opacity-25" name="project_id" id="svc_project_id" onchange="filterWarehouses(this.value, 'svc_warehouse_id')">
-                                            <option value="">Select Project</option>
+                                            <option value=""><?= t('Select Project') ?></option>
                                             <?php foreach ($projects as $p): ?>
                                             <option value="<?= $p['project_id'] ?>"><?= htmlspecialchars($p['project_name']) ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold small">Select Warehouse <span class="text-danger">*</span></label>
+                                        <label class="form-label fw-bold small"><?= t('Select Warehouse') ?> <span class="text-danger">*</span></label>
                                         <select class="form-select form-select-sm fw-bold text-primary shadow-sm border border-primary border-opacity-25" name="warehouse_id" id="svc_warehouse_id" onchange="refreshAllComponentCosts()">
-                                            <option value="">Select Warehouse</option>
+                                            <option value=""><?= t('Select Warehouse') ?></option>
                                             <?php foreach ($warehouses as $w): ?>
                                             <option value="<?= $w['warehouse_id'] ?>"><?= htmlspecialchars($w['warehouse_name']) ?></option>
                                             <?php endforeach; ?>
@@ -694,11 +694,11 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <table class="table table-hover align-middle mb-0" id="svcComponentTable">
                                 <thead class="bg-dark text-white text-center">
                                     <tr class="small">
-                                        <th style="width: 60px;">S/NO</th>
-                                        <th class="ps-3" style="width: 45%;">Materials Description</th>
-                                        <th style="width: 15%;">Unit</th>
-                                        <th style="width: 15%;">Qty per Unit</th>
-                                        <th style="width: 15%;">Action</th>
+                                        <th style="width: 60px;"><?= t('S/NO') ?></th>
+                                        <th class="ps-3" style="width: 45%;"><?= t('Materials Description') ?></th>
+                                        <th style="width: 15%;"><?= t('Unit') ?></th>
+                                        <th style="width: 15%;"><?= t('Qty per Unit') ?></th>
+                                        <th style="width: 15%;"><?= t('Action') ?></th>
                                     </tr>
                                 </thead>
                                 <tbody id="svcComponentBody">
@@ -708,7 +708,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                     <tr>
                                         <td colspan="5" class="ps-3 py-3">
                                             <button type="button" class="btn btn-sm btn-outline-primary fw-bold px-3 shadow-sm" onclick="addSvcComponentRow()">
-                                                <i class="bi bi-plus-circle me-1"></i> Add Material Component
+                                                <i class="bi bi-plus-circle me-1"></i> <?= t('Add Material Component') ?>
                                             </button>
                                         </td>
                                     </tr>
@@ -719,13 +719,13 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                 </div>
 
                 <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
                     <div class="ms-auto d-flex gap-2">
                         <button type="button" class="btn btn-outline-primary" onclick="saveSvcAddAnother()">
-                            Save &amp; Add Another
+                            <?= t('Save & Add Another') ?>
                         </button>
                         <button type="submit" class="btn btn-primary px-4 fw-bold">
-                            <i class="bi bi-check-circle me-1"></i> Create Product
+                            <i class="bi bi-check-circle me-1"></i> <?= t('Create Product') ?>
                         </button>
                     </div>
                 </div>
@@ -740,8 +740,8 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title fw-bold">
-                    <i class="bi bi-pencil-square me-2"></i> Edit Non-Inventory Product
-                    <span class="badge bg-white bg-opacity-25 text-white ms-2 small">Non-Inventory</span>
+                    <i class="bi bi-pencil-square me-2"></i> <?= t('Edit Non-Inventory Product') ?>
+                    <span class="badge bg-white bg-opacity-25 text-white ms-2 small"><?= t('Non-Inventory') ?></span>
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -758,10 +758,10 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                     <!-- ── NAVIGATION HEADERS ────────────────────────────────── -->
                     <div class="d-flex gap-4 mb-4 border-bottom pb-2 px-1">
                         <h6 class="fw-bold cursor-pointer mb-0 pb-2" id="svc_edit_tab1" onclick="toggleSvcEditStep(1)" style="color: #0d6efd; border-bottom: 2px solid #0d6efd; transition: all 0.3s; cursor: pointer;">
-                            <i class="bi bi-info-circle me-2"></i>Product Identity
+                            <i class="bi bi-info-circle me-2"></i><?= t('Product Identity') ?>
                         </h6>
                         <h6 class="fw-bold cursor-pointer mb-0 pb-2" id="svc_edit_tab2" onclick="toggleSvcEditStep(2)" style="color: #000; transition: all 0.3s; cursor: pointer;">
-                            <i class="bi bi-cash-stack me-2"></i>Pricing & Planning
+                            <i class="bi bi-cash-stack me-2"></i><?= t('Pricing & Planning') ?>
                         </h6>
                     </div>
 
@@ -771,51 +771,51 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <div class="col-md-8">
                                 <div class="row g-3">
                                     <div class="col-12">
-                                        <label class="form-label fw-bold small">Non-Inventory Product Name <span class="text-danger">*</span></label>
+                                        <label class="form-label fw-bold small"><?= t('Non-Inventory Product Name') ?> <span class="text-danger">*</span></label>
                                         <textarea class="form-control form-control-lg bg-light border-0 shadow-sm"
                                             name="product_name" id="edit_svc_name" required rows="2"></textarea>
                                     </div>
                                     <div class="col-12">
-                                        <label class="form-label fw-bold small">Description</label>
+                                        <label class="form-label fw-bold small"><?= t('Description') ?></label>
                                         <textarea class="form-control bg-light border-0" name="description" id="edit_svc_desc" rows="2"></textarea>
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label fw-bold small text-primary">Item Code</label>
+                                        <label class="form-label fw-bold small text-primary"><?= t('Item Code') ?></label>
                                         <input type="text" class="form-control form-control-sm border-0 bg-secondary bg-opacity-10 fw-bold text-muted" name="contract_item_no" id="edit_svc_contract_no" readonly>
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label fw-bold small text-primary">Unit</label>
+                                        <label class="form-label fw-bold small text-primary"><?= t('Unit') ?></label>
                                         <div id="edit_svc_unit_container">
                                             <select class="form-select form-select-sm fw-bold border border-secondary border-opacity-25" name="unit" id="edit_svc_unit" onchange="checkOtherUnit(this, 'edit_svc_unit_container')">
-                                                <option value="job">Job</option>
-                                                <option value="pcs">Pieces</option>
-                                                <option value="set">Set</option>
-                                                <option value="box">Box</option>
-                                                <option value="ltr">Litre</option>
-                                                <option value="kg">Kg</option>
-                                                <option value="other">Other (specify)</option>
+                                                <option value="job"><?= t('Job') ?></option>
+                                                <option value="pcs"><?= t('Pieces') ?></option>
+                                                <option value="set"><?= t('Set') ?></option>
+                                                <option value="box"><?= t('Box') ?></option>
+                                                <option value="ltr"><?= t('Litre') ?></option>
+                                                <option value="kg"><?= t('Kg') ?></option>
+                                                <option value="other"><?= t('Other (specify)') ?></option>
                                             </select>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label fw-bold small text-primary">Qty</label>
-                                        <input type="number" class="form-control form-control-sm border-0 bg-secondary bg-opacity-10 fw-bold" 
+                                        <label class="form-label fw-bold small text-primary"><?= t('Qty') ?></label>
+                                        <input type="number" class="form-control form-control-sm border-0 bg-secondary bg-opacity-10 fw-bold"
                                             name="assembly_quantity" id="edit_svc_assembly_qty" value="1" readonly>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <div class="p-4 bg-primary bg-opacity-10 rounded-4 h-100 border border-primary border-opacity-10">
-                                    <h5 class="fw-bold text-primary mb-3"><i class="bi bi-info-circle me-2"></i>Non-Inventory Product</h5>
-                                    <p class="small text-muted mb-3">This product will be available in:</p>
+                                    <h5 class="fw-bold text-primary mb-3"><i class="bi bi-info-circle me-2"></i><?= t('Non-Inventory Product') ?></h5>
+                                    <p class="small text-muted mb-3"><?= t('This product will be available in:') ?></p>
                                     <ul class="list-unstyled small">
-                                        <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i>Sales Orders</li>
-                                        <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i>Invoices</li>
-                                        <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i>POS</li>
-                                        <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i>Budget</li>
-                                        <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i>Warehouse / GRN</li>
-                                        <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i>Delivery Notes</li>
-                                        <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i>Stock Tracking</li>
+                                        <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i><?= t('Sales Orders') ?></li>
+                                        <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i><?= t('Invoices') ?></li>
+                                        <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i><?= t('POS') ?></li>
+                                        <li class="mb-2 d-flex align-items-center"><i class="bi bi-check-circle-fill text-success me-3"></i><?= t('Budget') ?></li>
+                                        <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i><?= t('Warehouse / GRN') ?></li>
+                                        <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i><?= t('Delivery Notes') ?></li>
+                                        <li class="mb-2 d-flex align-items-center text-muted"><i class="bi bi-x-circle-fill text-danger me-3"></i><?= t('Stock Tracking') ?></li>
                                     </ul>
                                 </div>
                             </div>
@@ -827,23 +827,23 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
 
                         <div class="row g-3 mb-4 p-3 bg-white rounded-3 shadow-sm border border-primary border-opacity-10">
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small text-success">Selling Price <span class="text-danger">*</span></label>
+                                <label class="form-label fw-bold small text-success"><?= t('Selling Price') ?> <span class="text-danger">*</span></label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text border-0 bg-success text-white">TZS</span>
                                     <input type="number" class="form-control border-0 bg-light fw-bold text-success" name="selling_price" id="edit_svc_sell" step="0.01" required onkeyup="calcSvcMarginEdit()" onchange="calcSvcMarginEdit()">
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small text-muted">Cost Price (Auto-Sum)</label>
+                                <label class="form-label fw-bold small text-muted"><?= t('Cost Price (Auto-Sum)') ?></label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text border-0 bg-light">TZS</span>
                                     <input type="number" class="form-control border-0 bg-secondary bg-opacity-10 fw-bold" name="cost_price" id="edit_svc_cost" step="0.01" readonly>
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold small">Tax Rate</label>
+                                <label class="form-label fw-bold small"><?= t('Tax Rate') ?></label>
                                 <select class="form-select form-select-sm border-0 bg-light" name="tax_id" id="edit_svc_tax">
-                                    <option value="">No Tax</option>
+                                    <option value=""><?= t('No Tax') ?></option>
                                     <?php foreach ($tax_rates as $tax): ?>
                                     <option value="<?= $tax['rate_id'] ?>"><?= htmlspecialchars($tax['rate_name']) ?> (<?= $tax['rate_percentage'] ?>%)</option>
                                     <?php endforeach; ?>
@@ -852,18 +852,18 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <div class="col-12 mt-3 pt-3 border-top">
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold small">Select Project (Optional)</label>
+                                        <label class="form-label fw-bold small"><?= t('Select Project (Optional)') ?></label>
                                         <select class="form-select form-select-sm fw-bold shadow-sm border border-secondary border-opacity-25" name="project_id" id="edit_svc_project_id" onchange="filterWarehouses(this.value, 'edit_svc_warehouse_id')">
-                                            <option value="">Select Project</option>
+                                            <option value=""><?= t('Select Project') ?></option>
                                             <?php foreach ($projects as $p): ?>
                                             <option value="<?= $p['project_id'] ?>"><?= htmlspecialchars($p['project_name']) ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label fw-bold small">Select Warehouse <span class="text-danger">*</span></label>
+                                        <label class="form-label fw-bold small"><?= t('Select Warehouse') ?> <span class="text-danger">*</span></label>
                                         <select class="form-select form-select-sm fw-bold text-primary shadow-sm border border-primary border-opacity-25" name="warehouse_id" id="edit_svc_warehouse_id" onchange="refreshAllComponentCostsEdit()">
-                                            <option value="">Select Warehouse</option>
+                                            <option value=""><?= t('Select Warehouse') ?></option>
                                             <?php foreach ($warehouses as $w): ?>
                                             <option value="<?= $w['warehouse_id'] ?>"><?= htmlspecialchars($w['warehouse_name']) ?></option>
                                             <?php endforeach; ?>
@@ -877,11 +877,11 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             <table class="table table-hover align-middle mb-0" id="editSvcComponentTable">
                                 <thead class="bg-dark text-white text-center">
                                     <tr class="small">
-                                        <th style="width: 60px;">S/NO</th>
-                                        <th class="ps-3" style="width: 45%;">Materials Description</th>
-                                        <th style="width: 15%;">Unit</th>
-                                        <th style="width: 15%;">Qty per Unit</th>
-                                        <th style="width: 15%;">Action</th>
+                                        <th style="width: 60px;"><?= t('S/NO') ?></th>
+                                        <th class="ps-3" style="width: 45%;"><?= t('Materials Description') ?></th>
+                                        <th style="width: 15%;"><?= t('Unit') ?></th>
+                                        <th style="width: 15%;"><?= t('Qty per Unit') ?></th>
+                                        <th style="width: 15%;"><?= t('Action') ?></th>
                                     </tr>
                                 </thead>
                                 <tbody id="editSvcComponentBody">
@@ -891,7 +891,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                     <tr>
                                         <td colspan="5" class="ps-3 py-3">
                                             <button type="button" class="btn btn-sm btn-outline-primary fw-bold px-3 shadow-sm" onclick="addSvcComponentRowEdit()">
-                                                <i class="bi bi-plus-circle me-1"></i> Add Material Component
+                                                <i class="bi bi-plus-circle me-1"></i> <?= t('Add Material Component') ?>
                                             </button>
                                         </td>
                                     </tr>
@@ -902,9 +902,9 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                 </div>
 
                 <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
                     <button type="submit" class="btn btn-primary px-4 fw-bold">
-                        <i class="bi bi-check-circle me-1"></i> Save Changes
+                        <i class="bi bi-check-circle me-1"></i> <?= t('Save Changes') ?>
                     </button>
                 </div>
             </form>
@@ -987,11 +987,51 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
 <script>
 const SVC_APP_URL = '<?= rtrim(getUrl(''), '/') ?>';
 const ALL_WAREHOUSES = <?= json_encode($warehouses) ?>;
+const SVC_I18N = <?= json_encode([
+    'select_warehouse' => t('Select Warehouse'),
+    'please_select_warehouse_first' => t('Please select a warehouse first'),
+    'searching' => t('Searching...'),
+    'no_sku' => t('No SKU'),
+    'stock_label' => t('Stock:'),
+    'no_products_in_warehouse' => t('No products found in this warehouse'),
+    'enter_unit' => t('Enter unit...'),
+    'job' => t('Job'), 'pieces' => t('Pieces'), 'set' => t('Set'), 'box' => t('Box'),
+    'litre' => t('Litre'), 'kg' => t('Kg'), 'other_specify' => t('Other (specify)'),
+    'missing_field' => t('Missing Field'),
+    'service_product_name' => t('Service/Product Name'),
+    'enter_field_before_saving' => t('Please enter the %s before saving.'),
+    'saving' => t('Saving...'),
+    'product_created' => t('Product Created!'),
+    'product_added' => t('Product added successfully.'),
+    'error_saving_product' => t('Error saving product.'),
+    'server_error_colon' => t('Server error:'),
+    'saving_changes' => t('Saving Changes...'),
+    'updated' => t('Updated!'),
+    'product_updated_msg' => t('Product updated successfully.'),
+    'error_updating_product' => t('Error updating product.'),
+    'server_error_retry' => t('Server error. Please try again.'),
+    'delete_nip_title' => t('Delete Non-Inventory Product?'),
+    'delete_nip_confirm' => t('Are you sure you want to delete %s?'),
+    'delete_nip_warning' => t('This action cannot be undone and may affect transaction history if this product was sold.'),
+    'yes_delete' => t('Yes, Delete'),
+    'deleted' => t('Deleted!'),
+    'error' => t('Error'),
+    'filter_table' => t('Filter table...'),
+    'show_menu' => t('Show _MENU_'),
+    'no_nip_found' => t('No non-inventory products found.'),
+    'showing_items_info' => t('Showing _START_ to _END_ of _TOTAL_ items'),
+    'no_items_to_show' => t('No items to show'),
+    'filtered_from_max' => t('(filtered from _MAX_ total)'),
+    'all_categories' => t('All Categories'),
+    'profit_label' => t('Profit:'),
+    'search_product' => t('Search product...'),
+    'cancel' => t('Cancel'),
+], JSON_UNESCAPED_UNICODE) ?>;
 
 function filterWarehouses(projectId, targetId) {
     const select = document.getElementById(targetId);
     const currentValue = select.value;
-    select.innerHTML = '<option value="">Select Warehouse</option>';
+    select.innerHTML = `<option value="">${SVC_I18N.select_warehouse}</option>`;
     
     ALL_WAREHOUSES.forEach(w => {
         if (projectId) {
@@ -1022,8 +1062,8 @@ function checkOtherUnit(select, containerId) {
         const container = document.getElementById(containerId);
         container.innerHTML = `
             <div class="input-group input-group-sm">
-                <input type="text" class="form-control fw-bold border border-secondary border-opacity-25" 
-                    name="unit" placeholder="Enter unit..." autofocus required>
+                <input type="text" class="form-control fw-bold border border-secondary border-opacity-25"
+                    name="unit" placeholder="${SVC_I18N.enter_unit}" autofocus required>
                 <button class="btn btn-outline-secondary" type="button" onclick="resetUnitSelect('${containerId}')">
                     <i class="bi bi-x-lg"></i>
                 </button>
@@ -1039,15 +1079,15 @@ function resetUnitSelect(containerId) {
     const onchange = `checkOtherUnit(this, '${containerId}')`;
     
     container.innerHTML = `
-        <select class="form-select form-select-sm fw-bold border border-secondary border-opacity-25" 
+        <select class="form-select form-select-sm fw-bold border border-secondary border-opacity-25"
             name="unit" id="${selectId}" onchange="${onchange}">
-            <option value="job">Job</option>
-            <option value="pcs">Pieces</option>
-            <option value="set">Set</option>
-            <option value="box">Box</option>
-            <option value="ltr">Litre</option>
-            <option value="kg">Kg</option>
-            <option value="other">Other (specify)</option>
+            <option value="job">${SVC_I18N.job}</option>
+            <option value="pcs">${SVC_I18N.pieces}</option>
+            <option value="set">${SVC_I18N.set}</option>
+            <option value="box">${SVC_I18N.box}</option>
+            <option value="ltr">${SVC_I18N.litre}</option>
+            <option value="kg">${SVC_I18N.kg}</option>
+            <option value="other">${SVC_I18N.other_specify}</option>
         </select>
     `;
 }
@@ -1086,7 +1126,7 @@ function addSvcComponentRow(data = null) {
         <td class="ps-3 text-center">
             <div class="input-group">
                 <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-                <input type="text" class="form-control border-start-0 ps-0" placeholder="Search product..." 
+                <input type="text" class="form-control border-start-0 ps-0" placeholder="${SVC_I18N.search_product}"
                     onkeyup="searchInventoryProduct(this, ${index})" onclick="searchInventoryProduct(this, ${index})" value="${data ? data.product_name : ''}">
                 <input type="hidden" name="components[${index}][product_id]" value="${data ? data.product_id : ''}" id="comp-id-${index}">
             </div>
@@ -1133,14 +1173,14 @@ function searchInventoryProduct(input, index) {
     const warehouseId = document.getElementById('svc_warehouse_id').value;
 
     if (!warehouseId) {
-        resultsDiv.innerHTML = '<div class="p-2 text-danger small"><i class="bi bi-exclamation-triangle me-1"></i> Please select a warehouse first</div>';
+        resultsDiv.innerHTML = `<div class="p-2 text-danger small"><i class="bi bi-exclamation-triangle me-1"></i> ${SVC_I18N.please_select_warehouse_first}</div>`;
         resultsDiv.classList.remove('d-none');
         resultsDiv.style.width = "330px";
         return;
     }
 
-    resultsDiv.style.width = "450px"; 
-    resultsDiv.innerHTML = '<div class="p-3 text-muted small"><div class="spinner-border spinner-border-sm me-2 text-primary" role="status"></div>Searching...</div>';
+    resultsDiv.style.width = "450px";
+    resultsDiv.innerHTML = `<div class="p-3 text-muted small"><div class="spinner-border spinner-border-sm me-2 text-primary" role="status"></div>${SVC_I18N.searching}</div>`;
     resultsDiv.classList.remove('d-none');
 
     fetch(`${SVC_APP_URL}/api/account/get_products.php?search=${encodeURIComponent(query)}&warehouse_id=${warehouseId}&is_service=0&active_only=1&limit=10`)
@@ -1153,17 +1193,17 @@ function searchInventoryProduct(input, index) {
                         ${products.map(prod => {
                             const price = parseFloat(prod.cost_price) || parseFloat(prod.purchase_price) || parseFloat(prod.selling_price) || 0;
                             return `
-                                <button type="button" class="list-group-item list-group-item-action p-2 border-bottom" 
+                                <button type="button" class="list-group-item list-group-item-action p-2 border-bottom"
                                     onclick='selectSvcInventoryProduct(${index}, ${JSON.stringify(prod).replace(/'/g, "&#39;")})'>
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div style="flex: 1; min-width: 0;">
                                             <div class="fw-bold text-dark text-truncate" style="font-size: 13px;">${prod.product_name}</div>
                                             <div class="text-muted small text-truncate" style="font-size: 11px;">
-                                                <i class="bi bi-upc-scan me-1"></i>${prod.sku || 'No SKU'}
+                                                <i class="bi bi-upc-scan me-1"></i>${prod.sku || SVC_I18N.no_sku}
                                             </div>
                                         </div>
                                         <div class="text-end ms-2" style="white-space: nowrap;">
-                                            <span class="badge bg-light text-dark border mb-1 d-block" style="font-size: 10px;">Stock: ${parseFloat(prod.current_stock) || 0}</span>
+                                            <span class="badge bg-light text-dark border mb-1 d-block" style="font-size: 10px;">${SVC_I18N.stock_label} ${parseFloat(prod.current_stock) || 0}</span>
                                             <span class="fw-bold text-primary d-block" style="font-size: 12px;">TZS ${price.toLocaleString()}</span>
                                         </div>
                                     </div>
@@ -1174,7 +1214,7 @@ function searchInventoryProduct(input, index) {
                 `;
                 resultsDiv.classList.remove('d-none');
             } else {
-                resultsDiv.innerHTML = '<div class="p-3 text-muted small"><i class="bi bi-info-circle me-1"></i> No products found in this warehouse</div>';
+                resultsDiv.innerHTML = `<div class="p-3 text-muted small"><i class="bi bi-info-circle me-1"></i> ${SVC_I18N.no_products_in_warehouse}</div>`;
                 resultsDiv.classList.remove('d-none');
             }
         });
@@ -1244,7 +1284,7 @@ function addSvcComponentRowEdit(data = null) {
         <td class="ps-3 text-center">
             <div class="input-group">
                 <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-                <input type="text" class="form-control border-start-0 ps-0" placeholder="Search product..." 
+                <input type="text" class="form-control border-start-0 ps-0" placeholder="${SVC_I18N.search_product}"
                     onkeyup="searchInventoryProductEdit(this, ${index})" onclick="searchInventoryProductEdit(this, ${index})" value="${data ? data.product_name : ''}">
                 <input type="hidden" name="components[${index}][product_id]" value="${data ? data.product_id : ''}" id="edit-comp-id-${index}">
             </div>
@@ -1368,21 +1408,21 @@ function searchInventoryProductEdit(input, index) {
     const warehouseId = document.getElementById('edit_svc_warehouse_id').value;
 
     if (!warehouseId) {
-        resultsDiv.innerHTML = '<div class="p-2 text-danger small"><i class="bi bi-exclamation-triangle me-1"></i> Please select a warehouse first</div>';
+        resultsDiv.innerHTML = `<div class="p-2 text-danger small"><i class="bi bi-exclamation-triangle me-1"></i> ${SVC_I18N.please_select_warehouse_first}</div>`;
         resultsDiv.classList.remove('d-none');
         resultsDiv.style.width = "330px";
         return;
     }
 
-    /* 
+    /*
     if (query.length < 2) {
         resultsDiv.classList.add('d-none');
         return;
     }
     */
 
-    resultsDiv.style.width = "450px"; 
-    resultsDiv.innerHTML = '<div class="p-3 text-muted small"><div class="spinner-border spinner-border-sm me-2 text-primary" role="status"></div>Searching...</div>';
+    resultsDiv.style.width = "450px";
+    resultsDiv.innerHTML = `<div class="p-3 text-muted small"><div class="spinner-border spinner-border-sm me-2 text-primary" role="status"></div>${SVC_I18N.searching}</div>`;
     resultsDiv.classList.remove('d-none');
 
     fetch(`${SVC_APP_URL}/api/account/get_products.php?search=${encodeURIComponent(query)}&warehouse_id=${warehouseId}&is_service=0&active_only=1&limit=10`)
@@ -1395,17 +1435,17 @@ function searchInventoryProductEdit(input, index) {
                         ${products.map(prod => {
                             const price = parseFloat(prod.cost_price) || parseFloat(prod.purchase_price) || parseFloat(prod.selling_price) || 0;
                             return `
-                                <button type="button" class="list-group-item list-group-item-action p-2 border-bottom" 
+                                <button type="button" class="list-group-item list-group-item-action p-2 border-bottom"
                                     onclick='selectSvcInventoryProductEdit(${index}, ${JSON.stringify(prod).replace(/'/g, "&#39;")})'>
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div style="flex: 1; min-width: 0;">
                                             <div class="fw-bold text-dark text-truncate" style="font-size: 13px;">${prod.product_name}</div>
                                             <div class="text-muted small text-truncate" style="font-size: 11px;">
-                                                <i class="bi bi-upc-scan me-1"></i>${prod.sku || 'No SKU'}
+                                                <i class="bi bi-upc-scan me-1"></i>${prod.sku || SVC_I18N.no_sku}
                                             </div>
                                         </div>
                                         <div class="text-end ms-2" style="white-space: nowrap;">
-                                            <span class="badge bg-light text-dark border mb-1 d-block" style="font-size: 10px;">Stock: ${parseFloat(prod.current_stock) || 0}</span>
+                                            <span class="badge bg-light text-dark border mb-1 d-block" style="font-size: 10px;">${SVC_I18N.stock_label} ${parseFloat(prod.current_stock) || 0}</span>
                                             <span class="fw-bold text-primary d-block" style="font-size: 12px;">TZS ${price.toLocaleString()}</span>
                                         </div>
                                     </div>
@@ -1416,7 +1456,7 @@ function searchInventoryProductEdit(input, index) {
                 `;
                 resultsDiv.classList.remove('d-none');
             } else {
-                resultsDiv.innerHTML = '<div class="p-3 text-muted small"><i class="bi bi-info-circle me-1"></i> No products found in this warehouse</div>';
+                resultsDiv.innerHTML = `<div class="p-3 text-muted small"><i class="bi bi-info-circle me-1"></i> ${SVC_I18N.no_products_in_warehouse}</div>`;
                 resultsDiv.classList.remove('d-none');
             }
         });
@@ -1513,7 +1553,7 @@ function calcSvcMargin() {
     const profit = sell - cost;
     const margin = cost > 0 ? ((profit / cost) * 100).toFixed(2) : (sell > 0 ? '100.00' : '0.00');
     document.getElementById('svc_margin_badge').textContent = margin + '%';
-    document.getElementById('svc_profit_badge').textContent = 'Profit: TZS ' + profit.toLocaleString();
+    document.getElementById('svc_profit_badge').textContent = SVC_I18N.profit_label + ' TZS ' + profit.toLocaleString();
 }
 
 function calcSvcMarginEdit() {
@@ -1522,7 +1562,7 @@ function calcSvcMarginEdit() {
     const profit = sell - cost;
     const margin = cost > 0 ? ((profit / cost) * 100).toFixed(2) : (sell > 0 ? '100.00' : '0.00');
     document.getElementById('edit_svc_margin_badge').textContent = margin + '%';
-    document.getElementById('edit_svc_profit_badge').textContent = 'Profit: TZS ' + profit.toLocaleString();
+    document.getElementById('edit_svc_profit_badge').textContent = SVC_I18N.profit_label + ' TZS ' + profit.toLocaleString();
 }
 
 function submitSvcForm(addAnother) {
@@ -1533,20 +1573,20 @@ function submitSvcForm(addAnother) {
         toggleSvcAddStep(1);
         Swal.fire({
             icon: 'warning',
-            title: 'Missing Field',
-            text: 'Please enter the Service/Product Name before saving.',
+            title: SVC_I18N.missing_field,
+            text: SVC_I18N.enter_field_before_saving.replace('%s', SVC_I18N.service_product_name),
             confirmButtonColor: '#ffc107'
         });
         return;
     }
-    Swal.fire({ title:'Saving...', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
+    Swal.fire({ title: SVC_I18N.saving, allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
 
     const data = new FormData(form);
     fetch(`${SVC_APP_URL}/api/create_nip_product.php`, { method:'POST', body:data })
     .then(r => r.json())
     .then(res => {
         if (res.success) {
-            Swal.fire({ icon:'success', title:'Product Created!', text:res.message || 'Product added successfully.', confirmButtonColor:'#0d6efd' })
+            Swal.fire({ icon:'success', title: SVC_I18N.product_created, text: res.message || SVC_I18N.product_added, confirmButtonColor:'#0d6efd' })
             .then(() => {
                 if (addAnother) {
                     bootstrap.Modal.getInstance(document.getElementById('addServiceModal')).hide();
@@ -1557,13 +1597,13 @@ function submitSvcForm(addAnother) {
             });
         } else {
             Swal.close();
-            msgEl.innerHTML = '<div class="alert alert-danger py-2"><i class="bi bi-exclamation-circle me-2"></i>' + (res.message || 'Error saving product.') + '</div>';
+            msgEl.innerHTML = '<div class="alert alert-danger py-2"><i class="bi bi-exclamation-circle me-2"></i>' + (res.message || SVC_I18N.error_saving_product) + '</div>';
         }
     })
     .catch((err) => {
         Swal.close();
         console.error('Create Error:', err);
-        msgEl.innerHTML = '<div class="alert alert-danger py-2">Server error: ' + err.message + '</div>';
+        msgEl.innerHTML = '<div class="alert alert-danger py-2">' + SVC_I18N.server_error_colon + ' ' + err.message + '</div>';
     });
 }
 
@@ -1572,23 +1612,23 @@ document.getElementById('editSvcForm').addEventListener('submit', function(e) {
     const form = this;
     const msgEl = document.getElementById('edit-svc-message');
     
-    Swal.fire({ title:'Saving Changes...', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
+    Swal.fire({ title: SVC_I18N.saving_changes, allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
 
     const data = new FormData(form);
     fetch(`${SVC_APP_URL}/api/update_nip_product.php`, { method:'POST', body:data })
     .then(r => r.json())
     .then(res => {
         if (res.success) {
-            Swal.fire({ icon:'success', title:'Updated!', text:res.message || 'Product updated successfully.', confirmButtonColor:'#0d6efd' })
+            Swal.fire({ icon:'success', title: SVC_I18N.updated, text: res.message || SVC_I18N.product_updated_msg, confirmButtonColor:'#0d6efd' })
             .then(() => location.reload());
         } else {
             Swal.close();
-            msgEl.innerHTML = '<div class="alert alert-danger py-2"><i class="bi bi-exclamation-circle me-2"></i>' + (res.message || 'Error updating product.') + '</div>';
+            msgEl.innerHTML = '<div class="alert alert-danger py-2"><i class="bi bi-exclamation-circle me-2"></i>' + (res.message || SVC_I18N.error_updating_product) + '</div>';
         }
     })
     .catch(() => {
         Swal.close();
-        msgEl.innerHTML = '<div class="alert alert-danger py-2">Server error. Please try again.</div>';
+        msgEl.innerHTML = '<div class="alert alert-danger py-2">' + SVC_I18N.server_error_retry + '</div>';
     });
 });
 
@@ -1601,15 +1641,15 @@ document.getElementById('addServiceForm').addEventListener('submit', function(e)
 
 function deleteSvc(id, name) {
     Swal.fire({
-        title: 'Delete Non-Inventory Product?',
-        html: `Are you sure you want to delete <strong>${name}</strong>?<br><small class="text-danger">This action cannot be undone and may affect transaction history if this product was sold.</small>`,
+        title: SVC_I18N.delete_nip_title,
+        html: `${SVC_I18N.delete_nip_confirm.replace('%s', '<strong>' + name + '</strong>')}<br><small class="text-danger">${SVC_I18N.delete_nip_warning}</small>`,
         icon: 'warning', showCancelButton: true,
-        confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, Delete'
+        confirmButtonColor: '#dc3545', confirmButtonText: SVC_I18N.yes_delete, cancelButtonText: SVC_I18N.cancel
     }).then(r => {
         if (!r.isConfirmed) return;
         $.post(`${SVC_APP_URL}/api/delete_product.php`, { product_id: id }, function(res) {
-            if (res.success) { Swal.fire({icon:'success',title:'Deleted!',timer:1200,showConfirmButton:false}).then(()=>location.reload()); }
-            else { Swal.fire({icon:'error',title:'Error',text:res.message}); }
+            if (res.success) { Swal.fire({icon:'success',title: SVC_I18N.deleted,timer:1200,showConfirmButton:false}).then(()=>location.reload()); }
+            else { Swal.fire({icon:'error',title: SVC_I18N.error,text:res.message}); }
         }, 'json');
     });
 }
@@ -1677,12 +1717,12 @@ $(function () {
             dom: '<"d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2"lf>rt<"d-flex justify-content-between align-items-center mt-2 px-1 flex-wrap gap-2"ip>',
             language: {
                 search: '',
-                searchPlaceholder: 'Filter table...',
-                lengthMenu: 'Show _MENU_',
-                emptyTable: 'No non-inventory products found.',
-                info: 'Showing _START_ to _END_ of _TOTAL_ items',
-                infoEmpty: 'No items to show',
-                infoFiltered: '(filtered from _MAX_ total)',
+                searchPlaceholder: SVC_I18N.filter_table,
+                lengthMenu: SVC_I18N.show_menu,
+                emptyTable: SVC_I18N.no_nip_found,
+                info: SVC_I18N.showing_items_info,
+                infoEmpty: SVC_I18N.no_items_to_show,
+                infoFiltered: SVC_I18N.filtered_from_max,
                 paginate: { first: '«', last: '»', next: '›', previous: '‹' }
             }
         });
@@ -1697,7 +1737,7 @@ $(function () {
     if ($('#svcCategoryFilter').length && !$('#svcCategoryFilter').hasClass('select2-hidden-accessible')) {
         $('#svcCategoryFilter').select2({
             theme: 'bootstrap-5',
-            placeholder: 'All Categories',
+            placeholder: SVC_I18N.all_categories,
             allowClear: true,
             width: '100%'
         });
