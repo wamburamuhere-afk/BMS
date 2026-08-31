@@ -1,5 +1,49 @@
 # BMS Changelog
 
+## 2026-08-31 (feature) — Multi-tenancy Phase 6: Superadmin tenant panel
+
+**Files (new):** `core/tenant_admin.php`, `app/superadmin/tenants.php`,
+`app/superadmin/tenant_view.php`, `actions/superadmin_tenant_action.php`,
+`tests/test_tenant_admin_panel_cli.php`
+**Files (changed):** `app/superadmin/index.php`, `scripts/setup_control_db.php`,
+`changelog.md`, `ternant.md`
+
+Platform operators can now list, inspect, suspend, reactivate and delete tenants.
+
+The invariant every operation preserves is **one tenant at a time**: suspending or deleting a
+company has no effect whatsoever on any other tenant. Each operation touches exactly one registry
+row and — for delete — exactly one database and one MySQL user, all named from that tenant's own
+stored columns, never computed from an id or pattern-matched. The tests verify this the honest
+way: after every operation they check the *other* tenant still connects.
+
+- `core/tenant_admin.php` — `suspendTenant()`, `activateTenant()`, `deleteTenant()`, plus listing
+  and stats. Suspension destroys nothing; it flips a flag the connection layer reads live, so the
+  tenant is locked out on the very next request and reactivation restores service immediately.
+  `getTenant()` deliberately **never selects** `db_password_encrypted` — no panel page has any
+  reason to hold a tenant's database password, so it never enters page scope at all.
+- Delete is irreversible and treated as such: it demands the company name typed exactly (verified
+  server-side against the stored value, so the dialog is a courtesy rather than the guard), drops
+  the database and the MySQL user, blanks the stored credentials, and **keeps the registry row**
+  marked `deleted` so the subdomain stays claimed and the audit trail still has something to point
+  at. A deleted tenant cannot be reactivated — its database is gone, so flipping a flag would only
+  produce a tenant that fails at connection time.
+- `tenant_admin_log` (new control table) records who did what to which tenant, with the operator's
+  email **denormalised** so the record of who deleted a company survives that operator's own
+  account being removed.
+- `app/superadmin/tenants.php` / `tenant_view.php` — DataTable list with the gear-dropdown action
+  menu and mobile card view per `.claude/ui-constants.md`, and a detail page with lifecycle
+  controls and history. Neither ever opens a tenant database, so no company's business data can
+  appear in the panel. `index.php` is now a guarded redirect to the panel.
+
+**Verified — 51/51.** Suspend/activate/delete each confirmed to leave the other tenant fully
+operational; delete confirmed to really drop both the database and the MySQL user; all four wrong
+confirmation strings refused; every action attributed in the log; the pages render without PHP
+errors, emit no encrypted credential, and return a flat "Not found" from a tenant's own subdomain.
+All six multi-tenancy suites pass together (**335 assertions**) leaving nothing behind.
+
+*(Fixed in the test itself: an assertion written as `$a['key'] ?? '' === ''` parses as
+`?? ('' === '')` and passed vacuously — it now reads the raw column.)*
+
 ## 2026-08-31 (feature) — Multi-tenancy Phase 5: Self-registration
 
 **Files (new):** `core/tenant_registration.php`, `ajax/check_subdomain_availability.php`,

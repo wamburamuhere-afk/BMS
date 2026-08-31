@@ -380,7 +380,7 @@ Update this table the moment each phase merges — this is what lets any session
 | 3 — Connection Routing Layer | ✅ done (2026-08-31) — ships OFF; see conventions §9 to enable | `feat/tenant-03-connection-routing` (stacked on Phase 2) |
 | 4 — Authentication Rework | ✅ done (2026-08-31) | `feat/tenant-04-auth-rework` (stacked on Phase 3) |
 | 5 — Self-Registration Flow | ✅ done (2026-08-31) | `feat/tenant-05-self-registration` |
-| 6 — Superadmin Tenant Panel | ⏳ pending | `feat/tenant-06-superadmin-panel` |
+| 6 — Superadmin Tenant Panel | ✅ done (2026-08-31) | `feat/tenant-06-superadmin-panel` |
 | 7 — Migrate Existing Data to Tenant #1 | ⏳ pending | `feat/tenant-07-migrate-tenant-one` |
 | 8 — Migration Runner + Deploy Pipeline | ⏳ pending | `feat/tenant-08-migration-runner` |
 | 9 — Security Hardening + Isolation Testing | ⏳ pending | `feat/tenant-09-isolation-hardening` |
