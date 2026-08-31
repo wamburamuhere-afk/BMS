@@ -289,19 +289,29 @@ Revert `config.php`'s tenant-resolution short-circuit back to hardcoded `bms`/ro
 **Branch:** `feat/tenant-08-migration-runner`
 **Risk:** 🟠 Medium
 
+> ⚠️ **Revised same-day, after §10's production incident** (a deploy migration
+> for the optional, not-yet-live control database halted the entire deploy —
+> see `docs/MULTI_TENANCY_CONVENTIONS.md` §10 and the 2026-08-31 hotfix in
+> `changelog.md`). Wiring this phase's runner into `deploy.yml` today, with
+> **zero real tenants** (Phase 7 hasn't run), would repeat that exact mistake
+> for no benefit. **Deploy-pipeline wiring is deferred to Phase 7**, when real
+> tenants exist to migrate — and even then, its failure must never be allowed
+> to abort the main application's deploy. Full reasoning in conventions §11.
+
 ### What ships
 
 | File | Purpose |
 |---|---|
-| Table `schema_migrations` (new, created inside **every** tenant DB by the schema template) | `migration_name, applied_at` — tracks what's been run per tenant, going forward. |
-| `core/tenant_migration_runner.php` (new) | Loops every **active** tenant in `bms_control.tenants`, connects with its own credentials, applies any migration file under `migrations/tenant/` not yet recorded in that tenant's `schema_migrations`, stops on first failure for that tenant and logs it (mirrors `script_stop: true` semantics from `deploy.yml`, per tenant). |
-| `migrations/tenant/` (new folder) | **From this point forward**, all new schema changes go here as clean, idempotent, per-tenant migrations — replacing the old ad-hoc `migrations/` pattern for anything that must apply to every tenant. |
-| `.github/workflows/deploy.yml` (updated) | After code deploy, run `php core/tenant_migration_runner.php` — applies pending migrations across **all** tenant databases, chained with `&&` so a failure halts the deploy per this repo's standing rule. |
+| Table `schema_migrations` (in **every** tenant DB, via the schema template) | `migration_name, applied_at` — tracks what's been run per tenant. |
+| `core/tenant_migration_bootstrap.php` (new) | What `roots.php` is to an app migration: connects `$pdo` to whichever tenant the runner is currently processing, via `TENANT_MIGRATION_DB_*` env vars (never argv — a password on the command line is visible to anyone who can `ps` the host). |
+| `core/tenant_migration_runner.php` (new) | Loops every tenant with a live database (`status != 'deleted'`) in `bms_control.tenants`, applies any migration file under `migrations/tenant/` not yet recorded in that tenant's `schema_migrations`. ⚠️ **Revised:** a broken migration stops **only that tenant's** remaining migrations for the run — every other tenant still receives its migrations normally. See conventions §11 for why this reads differently from the acceptance gate below. |
+| `migrations/tenant/` (new folder, + `README.md`) | **From this point forward**, all new schema changes that must reach every tenant go here. |
+| ~~`.github/workflows/deploy.yml` (updated)~~ | **Deferred to Phase 7** — see the note above. |
 
 ### Acceptance gate
 
-- A new dummy migration dropped into `migrations/tenant/` gets applied to every existing tenant DB (Tenant #1 + any test tenants) on the next runner execution, and only once (idempotent).
-- A deliberately broken migration halts the runner and is clearly logged with which tenant failed — deploy pipeline stops, doesn't silently continue to other tenants in an inconsistent state per repo convention (fail loud, not partial-silent).
+- A new dummy migration dropped into `migrations/tenant/` gets applied to every existing tenant DB on the next runner execution, and only once (idempotent). ✅ Executed for real in `tests/test_tenant_migration_runner_cli.php`.
+- A deliberately broken migration is clearly logged with which tenant failed and fails loud (console, `migrations/tenant_deploy.log`, `tenant_migration_log`) — ~~deploy pipeline stops, doesn't silently continue to other tenants~~ **revised:** stops only that tenant's sequence; every unaffected tenant still receives the same migrations in the same run, proven with a genuine divergence (the identical file fails against one tenant's pre-existing state and succeeds against another's).
 
 ### Rollback
 
@@ -382,6 +392,6 @@ Update this table the moment each phase merges — this is what lets any session
 | 5 — Self-Registration Flow | ✅ done (2026-08-31) | `feat/tenant-05-self-registration` |
 | 6 — Superadmin Tenant Panel | ✅ done (2026-08-31) | `feat/tenant-06-superadmin-panel` |
 | 7 — Migrate Existing Data to Tenant #1 | ⏳ pending | `feat/tenant-07-migrate-tenant-one` |
-| 8 — Migration Runner + Deploy Pipeline | ⏳ pending | `feat/tenant-08-migration-runner` |
+| 8 — Migration Runner + Deploy Pipeline | ✅ done (2026-08-31) — deploy.yml wiring deferred to Phase 7 | `feat/tenant-08-migration-runner` |
 | 9 — Security Hardening + Isolation Testing | ⏳ pending | `feat/tenant-09-isolation-hardening` |
 | 10 — Full Regression + Go-Live | ⏳ pending | `feat/tenant-10-go-live` |
