@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-08-31 (infrastructure) — Multi-tenancy Phase 0: Pre-flight & conventions
+
+**Files (new):** `docs/MULTI_TENANCY_CONVENTIONS.md`, `schema/tenant_schema_template.sql`
+**Files (changed):** `.gitignore`, `ternant.md`
+
+Phase 0 of the database-per-tenant rollout planned in `ternant.md`. Documentation and
+groundwork only — **no runtime behaviour changes**; no existing PHP file was touched.
+
+- `docs/MULTI_TENANCY_CONVENTIONS.md` — the naming/secret/infrastructure contract every later
+  phase codes against: tenant DB `bms_t{id}` and MySQL user `bms_u{id}` keyed on the numeric
+  tenant id (with Tenant #1 keeping the name `bms`), the reserved-subdomain list and subdomain
+  format rule, `TENANT_CRED_KEY` handling, the wildcard DNS/vhost prerequisite, and how to
+  regenerate the schema template.
+- `schema/tenant_schema_template.sql` — schema-only snapshot of production (306 `CREATE TABLE`,
+  3 views, 58 FKs, **0 `INSERT`**) that Phase 2 will cast every new tenant database from.
+  `DEFINER=` clauses stripped (the dump named `bejundas@localhost`, a user that will not exist
+  on a tenant); `SQL SECURITY INVOKER` retained on all 3 views so none can execute with elevated
+  privileges. Verified to contain zero cross-schema references.
+- `.gitignore` — added `!schema/tenant_schema_template.sql`. The blanket `*.sql` backup rule
+  would otherwise have silently excluded the template, so Phase 2's provisioner would have
+  worked locally and failed on production with a missing file. Also added
+  `includes/tenant_cred_key.php` (the per-environment master key, never committed).
+- `TENANT_CRED_KEY` generated: 32 bytes, stored outside git, verified to round-trip
+  AES-256-GCM and to reject a tampered ciphertext.
+- Full production backup taken to `C:\wamp64\bms_backups\` (outside the repo and webroot) and
+  verified by restoring into a throwaway database — row counts match production exactly and the
+  posted ledger balances at 37,301,977,829.49 on both sides.
+
+**Two corrections to `ternant.md`, found by inspecting the repo rather than trusting the plan:**
+`includes/config.php` is gitignored and has never been tracked, so Phase 3 cannot ship a
+"rewritten config.php" — the routing logic will instead live in a new tracked
+`core/tenant_bootstrap.php` that the per-environment config requires. And the `*.sql` exception
+above. Both are recorded in the conventions doc.
+
 ## 2026-08-29 (feature) — UI language translation: Non-Inventory Products CRUD (final module)
 
 **Files (changed):** `app/bms/product/services.php`, `lang/sw.php`

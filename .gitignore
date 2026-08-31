@@ -27,6 +27,12 @@ backups/*
 *.sql.gz
 *.sql.zip
 
+# EXCEPTION: the multi-tenant schema template is source, not a backup. Every new
+# tenant database is built from this file, so it MUST be version-controlled and
+# deployed — the blanket *.sql rule above would otherwise silently exclude it.
+# It is schema-only (zero INSERT statements); no business data ever lives here.
+!schema/tenant_schema_template.sql
+
 # -----------------------------------------------
 # LOG FILES
 # -----------------------------------------------
@@ -90,3 +96,8 @@ scratch/
 
 # AI Assistant per-environment encryption secret (never commit)
 includes/ai_app_secret.php
+
+# Multi-tenant master key. Encrypts every tenant's DB password at rest in
+# bms_control.tenants. Never commit; never regenerate (that would orphan every
+# stored tenant credential). Production may supply it as $TENANT_CRED_KEY instead.
+includes/tenant_cred_key.php
