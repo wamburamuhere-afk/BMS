@@ -196,16 +196,20 @@ function svBadge(string $status): string
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-const CSRF_TOKEN = '<?= csrf_token() ?>';
+// Named SA_CSRF_TOKEN, not CSRF_TOKEN: header.php is the canonical
+// declarer of the latter, and tests/test_csrf_token_redeclaration_cli.php
+// forbids any page under app/ from shadowing it. These pages never include
+// header.php, but keeping the invariant absolute is safer than exempting them.
+const SA_CSRF_TOKEN = '<?= csrf_token() ?>';
 const TENANT_ID  = <?= (int)($tenant['id'] ?? 0) ?>;
 const TENANT_NAME = <?= json_encode((string)($tenant['company_name'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
-$.ajaxSetup({ headers: { 'X-CSRF-Token': CSRF_TOKEN } });
+$.ajaxSetup({ headers: { 'X-CSRF-Token': SA_CSRF_TOKEN } });
 
 function postAction(data, title, redirect) {
     $.ajax({
         url: '/actions/superadmin_tenant_action.php',
         method: 'POST', dataType: 'json',
-        data: Object.assign({ _csrf: CSRF_TOKEN, tenant_id: TENANT_ID }, data)
+        data: Object.assign({ _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID }, data)
     }).done(function (res) {
         if (res && res.success) {
             Swal.fire({ icon: 'success', title: title, text: res.message, timer: 1800, showConfirmButton: false });
