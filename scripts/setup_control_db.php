@@ -187,6 +187,31 @@ try {
     ");
     say('  · table registration_attempts ready');
 
+    // Who did what to which tenant. Suspending cuts a company off from its own
+    // system and deleting destroys its database permanently — irreversible acts
+    // against someone else's business data must be attributable to a named
+    // operator, not merely "the platform".
+    //
+    // superadmin_id has no FK and the operator's email is DENORMALISED into
+    // actor_email on purpose: the record of who deleted a tenant has to survive
+    // that operator's own account being removed later.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`tenant_admin_log` (
+            `id`            BIGINT AUTO_INCREMENT PRIMARY KEY,
+            `superadmin_id` INT          NULL,
+            `actor_email`   VARCHAR(191) NULL,
+            `tenant_id`     INT          NULL,
+            `subdomain`     VARCHAR(63)  NULL,
+            `action`        VARCHAR(32)  NOT NULL,
+            `detail`        VARCHAR(500) NULL,
+            `ip_address`    VARCHAR(45)  NULL,
+            `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY `idx_adminlog_tenant` (`tenant_id`),
+            KEY `idx_adminlog_created` (`created_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table tenant_admin_log ready');
+
     // Older installs created superadmins before the lockout columns existed.
     $saCols = $admin->query("
         SELECT column_name FROM information_schema.columns
