@@ -1,5 +1,51 @@
 # BMS Changelog
 
+## 2026-08-31 (infrastructure) — Multi-tenancy Phase 4: Authentication rework
+
+**Files (new):** `core/superadmin_auth.php`, `app/superadmin/login.php`,
+`app/superadmin/index.php`, `app/superadmin/logout.php`, `actions/superadmin_login.php`,
+`scripts/create_superadmin.php`, `migrations/2026_08_31_superadmin_login_hardening.php`,
+`tests/test_tenant_superadmin_auth_cli.php`
+**Files (changed):** `actions/login.php` (additive only), `changelog.md`, `ternant.md`
+
+Adds a platform-operator identity that is completely separate from tenant users, and pins each
+tenant session to the tenant it authenticated against.
+
+Tenant login needed almost no change: `actions/login.php` already authenticates against whatever
+`$pdo` the connection layer resolved, so Phase 3 made it tenant-aware for free. The only edits
+are additive — pin `$_SESSION['tenant_id']` to the resolved tenant, and clear any superadmin key
+— both guarded by `function_exists` so the file still works if multi-tenancy is reverted.
+
+Separation is enforced three ways: a **different store** (`bms_control.superadmins`, reachable
+only via `getControlPdo()` — no tenant database can mint an operator), a **different session
+key** (`superadmin_id`, never `user_id` — a tenant admin with `is_admin = 1` is not an operator),
+and a **different host** (the panel returns a flat 404 from any tenant subdomain, so a tenant
+cannot even discover it exists).
+
+- `core/superadmin_auth.php` — login, logout, guard, and 5-attempt/15-minute lockout per
+  `.claude/security.md` §20. Failures return one generic message so the platform's most valuable
+  credential is not an account-enumeration oracle. `currentSuperadmin()` re-reads the row each
+  request, so a deleted operator loses access immediately rather than at session expiry.
+- `app/superadmin/*` — sign-in and a read-only tenant overview, following
+  `.claude/ui-constants.md` (blue scale, Bootstrap Icons, sticky header, mobile card view).
+  Deliberately standalone: they never boot `roots.php`, which assumes a tenant user and database.
+  Phase 6 turns the overview into the lifecycle panel.
+- `scripts/create_superadmin.php` — CLI-only (and `scripts/` is HTTP-blocked by `.htaccess`)
+  tool to create the first operator, generating a strong password shown once. The table still
+  ships empty: no default account, no default password.
+
+**Bug found and fixed by the tests:** the lockout `UPDATE` set `failed_attempts` before computing
+`locked_until`, and MySQL evaluates assignments left to right — so `failed_attempts + 1` read the
+already-incremented value and accounts locked on the **4th** failure instead of the 5th. The
+assignments are now ordered so the lock lands on exactly the configured attempt, asserted
+step-by-step.
+
+**Verified — 53/53** in `tests/test_tenant_superadmin_auth_cli.php`, plus a full end-to-end login
+through a real provisioned tenant: correct credentials return `{"success":true}` with the session
+pinned to that tenant and the superadmin key cleared; a wrong password is rejected; and an unknown
+subdomain never reaches the login endpoint at all. All four multi-tenancy suites pass together
+(**234 assertions**) and leave no databases, MySQL users or registry rows behind.
+
 ## 2026-08-31 (infrastructure) — Multi-tenancy Phase 3: Connection routing (ships OFF)
 
 **Files (new):** `core/tenant_resolver.php`, `core/tenant_bootstrap.php`,
