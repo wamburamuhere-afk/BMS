@@ -1,5 +1,175 @@
 # BMS Changelog
 
+## 2026-08-31 (infrastructure) — Multi-tenancy Phase 4: Authentication rework
+
+**Files (new):** `core/superadmin_auth.php`, `app/superadmin/login.php`,
+`app/superadmin/index.php`, `app/superadmin/logout.php`, `actions/superadmin_login.php`,
+`scripts/create_superadmin.php`, `migrations/2026_08_31_superadmin_login_hardening.php`,
+`tests/test_tenant_superadmin_auth_cli.php`
+**Files (changed):** `actions/login.php` (additive only), `changelog.md`, `ternant.md`
+
+Adds a platform-operator identity that is completely separate from tenant users, and pins each
+tenant session to the tenant it authenticated against.
+
+Tenant login needed almost no change: `actions/login.php` already authenticates against whatever
+`$pdo` the connection layer resolved, so Phase 3 made it tenant-aware for free. The only edits
+are additive — pin `$_SESSION['tenant_id']` to the resolved tenant, and clear any superadmin key
+— both guarded by `function_exists` so the file still works if multi-tenancy is reverted.
+
+Separation is enforced three ways: a **different store** (`bms_control.superadmins`, reachable
+only via `getControlPdo()` — no tenant database can mint an operator), a **different session
+key** (`superadmin_id`, never `user_id` — a tenant admin with `is_admin = 1` is not an operator),
+and a **different host** (the panel returns a flat 404 from any tenant subdomain, so a tenant
+cannot even discover it exists).
+
+- `core/superadmin_auth.php` — login, logout, guard, and 5-attempt/15-minute lockout per
+  `.claude/security.md` §20. Failures return one generic message so the platform's most valuable
+  credential is not an account-enumeration oracle. `currentSuperadmin()` re-reads the row each
+  request, so a deleted operator loses access immediately rather than at session expiry.
+- `app/superadmin/*` — sign-in and a read-only tenant overview, following
+  `.claude/ui-constants.md` (blue scale, Bootstrap Icons, sticky header, mobile card view).
+  Deliberately standalone: they never boot `roots.php`, which assumes a tenant user and database.
+  Phase 6 turns the overview into the lifecycle panel.
+- `scripts/create_superadmin.php` — CLI-only (and `scripts/` is HTTP-blocked by `.htaccess`)
+  tool to create the first operator, generating a strong password shown once. The table still
+  ships empty: no default account, no default password.
+
+**Bug found and fixed by the tests:** the lockout `UPDATE` set `failed_attempts` before computing
+`locked_until`, and MySQL evaluates assignments left to right — so `failed_attempts + 1` read the
+already-incremented value and accounts locked on the **4th** failure instead of the 5th. The
+assignments are now ordered so the lock lands on exactly the configured attempt, asserted
+step-by-step.
+
+**Verified — 53/53** in `tests/test_tenant_superadmin_auth_cli.php`, plus a full end-to-end login
+through a real provisioned tenant: correct credentials return `{"success":true}` with the session
+pinned to that tenant and the superadmin key cleared; a wrong password is rejected; and an unknown
+subdomain never reaches the login endpoint at all. All four multi-tenancy suites pass together
+(**234 assertions**) and leave no databases, MySQL users or registry rows behind.
+
+## 2026-08-31 (infrastructure) — Multi-tenancy Phase 3: Connection routing (ships OFF)
+
+**Files (new):** `core/tenant_resolver.php`, `core/tenant_bootstrap.php`,
+`tests/test_tenant_routing_cli.php`
+**Files (changed):** `docs/MULTI_TENANCY_CONVENTIONS.md`, `ternant.md`,
+`tests/test_tenant_provisioning_cli.php`
+
+The phase that decides which database each request talks to. **It ships switched off:**
+with `TENANT_MODE` unset, `bmsConnectPdo()` connects using the `DB_*` constants exactly as
+before, so deploying this changes nothing. Enabling it takes three deliberate operator steps,
+documented in conventions §9. Turning it back off is unsetting one variable — no deploy.
+
+- `core/tenant_resolver.php` — answers *which tenant* and nothing else: no connections, no
+  sessions, no rendering. Keeping the contract this narrow is what makes the documented
+  fallback (company-code at login, if wildcard DNS proves unavailable) a change to one
+  function rather than a rewrite. `extractTenantSubdomain()` is pure and rejects IP literals,
+  multi-level hosts (`a.b.base` — otherwise `evil.kampunia` could pose as a neighbour),
+  foreign domains and reserved labels.
+- `core/tenant_bootstrap.php` — produces the request's `$pdo`. **It never guesses:** an
+  unknown subdomain 404s rather than falling back to the main database (which would hand one
+  company's data to anyone who invented a hostname); an unreachable control database 503s for
+  the same reason; suspended/deleted tenants are stopped without any connection at all.
+- **Cross-tenant session guard** moved from `header.php` (where `ternant.md` put it) into the
+  bootstrap: 565 files include `config.php` while far fewer include `header.php`, and a guard
+  that misses the API surface is not a guard.
+- `includes/config.php` is **not** modified — it is gitignored and per-environment, so the
+  one-time edit is an operator step (conventions §9), which also drops its trailing `?>`.
+
+**Verified — `tests/test_tenant_routing_cli.php`, 57/57**, running the real bootstrap in real
+subprocesses with simulated hosts rather than asserting about source. Proves: `TENANT_MODE`
+unset is a genuine no-op; each subdomain reaches its own database; an unknown subdomain never
+connects anywhere; **suspending one tenant leaves the other and the main site untouched**; a
+session carrying another tenant's id is destroyed rather than honoured; and error pages leak
+no credentials, DSNs or SQL state.
+
+*Three bugs found by these tests, all fixed:* the resolver's CLI guard short-circuited on the
+*parameter* being null before ever reading `$_SERVER['HTTP_HOST']`, so a tenant could never
+resolve; the test probe was silently truncated by a literal `?>` inside a `//` comment; and the
+Phase 2 suite's "force a failure" step relied on `information_schema`'s cached `AUTO_INCREMENT`,
+which goes stale — it could pass vacuously and leaked a database and MySQL user when it did.
+All three suites are now self-cleaning, confirmed by checking for stray databases, MySQL users
+and registry rows after full runs. Phases 1–3 total **181 assertions**.
+
+## 2026-08-31 (infrastructure) — Multi-tenancy Phase 2: Provisioning engine
+
+**Files (new):** `core/tenant_provisioner.php`, `schema/tenant_seed_defaults.sql`,
+`tests/test_tenant_provisioning_cli.php`
+**Files (changed):** `.gitignore`, `docs/MULTI_TENANCY_CONVENTIONS.md`, `ternant.md`
+
+`provisionTenant()` creates a complete isolated tenant — its own database, its own MySQL user,
+the full schema, defaults, and an owner account — and **never leaves a half-created tenant
+behind**. Still not reachable from the UI; Phase 5 adds the signup form.
+
+- `core/tenant_provisioner.php` — validation (subdomain format + 60 reserved names), CSPRNG
+  24-char DB password, `CREATE DATABASE`/`CREATE USER`/`GRANT` scoped to that one database,
+  schema + seed application, owner account bound to the Admin role (looked up by name, not a
+  hardcoded id), and a final check that the tenant's *own* credentials actually work — so a
+  bad GRANT surfaces during provisioning rather than at the tenant's first login.
+- `schema/tenant_seed_defaults.sql` — reviewed, sanitized defaults. **Excludes sub-ledger
+  accounts:** 90 of the 195 accounts in the source database are per-customer/per-supplier
+  ledgers carrying real counterparty names, so seeding them would have published Tenant #1's
+  customer list to every company that signs up. Only the 105 structural accounts ship. Also
+  excludes `users` and `system_settings` (the latter carries the encrypted AI API key).
+- `.gitignore` — exception broadened to `!schema/*.sql`.
+
+**Deviations from `ternant.md`, both deliberate:** the plan ordered "CREATE DATABASE bms_t{id}"
+before "INSERT the tenants row", which cannot work — the id in the name comes from that row's
+AUTO_INCREMENT. The row is now reserved first and finalised last; a failed attempt deletes it
+without rewinding AUTO_INCREMENT, so retries can never collide with orphaned debris. And the
+provisioner applies a reviewed static seed file rather than reading Tenant #1's live database
+at runtime, so new signups can't drift with one tenant's data.
+
+**Verified:** `tests/test_tenant_provisioning_cli.php` provisions two real tenants and passes
+**67/67**. It proves the isolation promise directly — tenant A's MySQL user cannot reach tenant
+B's database, the main `bms` database, or the control database, and its live connection cannot
+cross-query them by qualified name either. It also forces a genuine mid-provisioning failure by
+occupying the next tenant's database name, and confirms complete rollback: no orphaned database,
+no orphaned MySQL user, no orphaned registry row, the failure recorded in the audit log, and the
+pre-existing database the guard refused to use left intact. No password appears in the log.
+Teardown verified to leave nothing behind.
+
+*(Fixed during development: the rollback originally dropped the database it had just refused to
+overwrite. It now tracks what this call actually created and destroys only that.)*
+
+## 2026-08-31 (infrastructure) — Multi-tenancy Phase 1: Control database & tenant registry
+
+**Files (new):** `core/control_db.php`, `core/tenant_crypto.php`,
+`migrations/2026_08_31_control_db_foundation.php`, `tests/test_tenant_control_db_cli.php`
+
+Creates `bms_control` — the registry that knows which tenants exist, where their databases
+live, and how to authenticate to them. It holds no business data. **Nothing reads these tables
+yet** (Phase 3 wires up routing), so deploying this changes no application behaviour.
+
+- `migrations/2026_08_31_control_db_foundation.php` — creates the database and three tables,
+  fully idempotent. `tenants` (registry; `subdomain` UNIQUE, `status` indexed),
+  `superadmins` (platform operators, separate from every tenant's `users` table), and
+  `tenant_provisioning_log` (audit trail). Uses the app's `$pdo` rather than `getControlPdo()`
+  because it creates the very database that function connects to. If the app's MySQL user lacks
+  `CREATE`, it fails loudly and prints the exact SQL a DBA needs.
+- `core/control_db.php` — `getControlPdo()`, the only function permitted to hold its own
+  connection settings; everything else is data-driven from a tenant row. Credentials come from
+  `CONTROL_DB_*` env vars, falling back to the app's own credentials for zero-config local work.
+  Stricter than the legacy connection: real prepared statements, exceptions, assoc fetches.
+  `controlDbReady()` checks the registry is readable, not merely that the server answered.
+- `core/tenant_crypto.php` — AES-256-GCM for tenant DB passwords, deliberately separate from
+  `core/crypto.php`. That file's `aiAppSecret()` auto-generates a key on first use, which is
+  right for a disposable API key and catastrophic here: minting a new key would orphan every
+  stored tenant credential at once. This file therefore **never** generates a key — a missing
+  or malformed one throws immediately. The distinct `tenc:v1:` prefix keeps the two key domains
+  from ever being confused.
+
+Design decisions worth knowing: `tenants.db_name` is a stored column, never computed from the
+id, because Tenant #1 keeps the legacy name `bms`. `subdomain` stays UNIQUE even for deleted
+tenants so a new signup cannot inherit a dead company's subdomain and its stale links.
+`tenant_provisioning_log.tenant_id` is nullable with no FK so the record of *why* a signup
+failed survives Phase 2's rollback. `superadmins` ships empty — a default account with known
+credentials would be a backdoor into every tenant.
+
+**Verified:** migration run twice (second run a clean no-op); `tests/test_tenant_control_db_cli.php`
+passes **57/57** assertions covering schema shape, crypto round-trip, tamper rejection, key-domain
+separation, and a real write→read→decrypt of a tenant row (rolled back). The malformed-key path
+was confirmed to throw. The app still boots unchanged, and `controlDbName()` is undefined after
+`roots.php` alone — proof the application has no coupling to the control DB.
+
 ## 2026-08-31 (infrastructure) — Multi-tenancy Phase 0: Pre-flight & conventions
 
 **Files (new):** `docs/MULTI_TENANCY_CONVENTIONS.md`, `schema/tenant_schema_template.sql`

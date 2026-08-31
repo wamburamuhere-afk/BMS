@@ -52,6 +52,11 @@ affecting any other tenant.
 ## Master safety net (every phase)
 
 1. Fork from `develop`. No stacking unless a phase explicitly says so.
+   *Phase 1 stacks on Phase 0* — a justified exception: Phase 1 consumes
+   `TENANT_CRED_KEY`, and Phase 0's `.gitignore` rule is what stops that key file
+   from being committable. Branching Phase 1 off plain `develop` was tried and
+   showed `includes/tenant_cred_key.php` as an untracked, addable file. Later
+   phases fork from `develop` again once Phase 0/1 merge.
 2. `php -l` clean on every changed/new file before commit.
 3. **Smoke test live** (not just static checks) before opening a PR — this repo's standing rule: lint-green ≠ works.
 4. Every phase that touches login/connection logic must be tested with **two simultaneous tenants** (prove isolation, not just "it works for one").
@@ -370,10 +375,10 @@ Update this table the moment each phase merges — this is what lets any session
 | Phase | Status | Branch |
 |---|---|---|
 | 0 — Pre-flight & Conventions | ✅ done (2026-08-31) | `feat/tenant-00-preflight` |
-| 1 — Control Database | ⏳ pending | `feat/tenant-01-control-db` |
-| 2 — Schema Template + Provisioning Engine | ⏳ pending | `feat/tenant-02-provisioning-engine` |
-| 3 — Connection Routing Layer | ⏳ pending | `feat/tenant-03-connection-routing` |
-| 4 — Authentication Rework | ⏳ pending | `feat/tenant-04-auth-rework` |
+| 1 — Control Database | ✅ done (2026-08-31) | `feat/tenant-01-control-db` (stacked on Phase 0) |
+| 2 — Schema Template + Provisioning Engine | ✅ done (2026-08-31) | `feat/tenant-02-provisioning-engine` (stacked on Phase 1) |
+| 3 — Connection Routing Layer | ✅ done (2026-08-31) — ships OFF; see conventions §9 to enable | `feat/tenant-03-connection-routing` (stacked on Phase 2) |
+| 4 — Authentication Rework | ✅ done (2026-08-31) | `feat/tenant-04-auth-rework` (stacked on Phase 3) |
 | 5 — Self-Registration Flow | ⏳ pending | `feat/tenant-05-self-registration` |
 | 6 — Superadmin Tenant Panel | ⏳ pending | `feat/tenant-06-superadmin-panel` |
 | 7 — Migrate Existing Data to Tenant #1 | ⏳ pending | `feat/tenant-07-migrate-tenant-one` |
