@@ -377,7 +377,7 @@ Update this table the moment each phase merges — this is what lets any session
 | 0 — Pre-flight & Conventions | ✅ done (2026-08-31) | `feat/tenant-00-preflight` |
 | 1 — Control Database | ✅ done (2026-08-31) | `feat/tenant-01-control-db` (stacked on Phase 0) |
 | 2 — Schema Template + Provisioning Engine | ✅ done (2026-08-31) | `feat/tenant-02-provisioning-engine` (stacked on Phase 1) |
-| 3 — Connection Routing Layer | ⏳ pending | `feat/tenant-03-connection-routing` |
+| 3 — Connection Routing Layer | ✅ done (2026-08-31) — ships OFF; see conventions §9 to enable | `feat/tenant-03-connection-routing` (stacked on Phase 2) |
 | 4 — Authentication Rework | ⏳ pending | `feat/tenant-04-auth-rework` |
 | 5 — Self-Registration Flow | ⏳ pending | `feat/tenant-05-self-registration` |
 | 6 — Superadmin Tenant Panel | ⏳ pending | `feat/tenant-06-superadmin-panel` |

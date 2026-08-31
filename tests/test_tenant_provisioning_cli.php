@@ -223,20 +223,38 @@ try {
     // Occupy the exact database name the next tenant will be given, so
     // provisioning fails AFTER the registry row is inserted. This is the real
     // late-failure path, not a simulated one.
-    $nextId = (int)$cpdo->query("
-        SELECT AUTO_INCREMENT FROM information_schema.tables
-        WHERE table_schema = " . $cpdo->quote(controlDbName()) . " AND table_name = 'tenants'
-    ")->fetchColumn();
+    // Work out the next id EXACTLY. information_schema caches AUTO_INCREMENT and
+    // goes stale after repeated inserts/deletes, which would make the squat below
+    // miss its target and let provisioning succeed — the test would then pass
+    // vacuously while proving nothing about rollback. Inserting a throwaway row
+    // and deleting it is exact: AUTO_INCREMENT never rewinds on delete.
+    $cpdo->prepare("
+        INSERT INTO tenants (company_name, subdomain, db_host, db_name, db_username,
+                             db_password_encrypted, status, owner_email)
+        VALUES ('probe', ?, 'localhost', '', '', '', 'trial', 'probe@example.test')
+    ")->execute(['ptestprobe' . $sfx]);
+    $probeId = (int)$cpdo->lastInsertId();
+    $cpdo->prepare("DELETE FROM tenants WHERE id = ?")->execute([$probeId]);
+    $nextId  = $probeId + 1;
     $squatDb = 'bms_t' . $nextId;
     $admin->exec("DROP DATABASE IF EXISTS `$squatDb`");
     $admin->exec("CREATE DATABASE `$squatDb`");
     $admin->exec("CREATE TABLE `$squatDb`.`precious` (id INT)");
     $admin->exec("INSERT INTO `$squatDb`.`precious` VALUES (42)");
+    $created['databases'][] = $squatDb;   // so an early failure still cleans it up
 
     $subF = 'ptestf' . $sfx;
     $before = (int)$cpdo->query("SELECT COUNT(*) FROM tenants")->fetchColumn();
     $f = provisionTenant('Doomed Ltd', $subF, "owner@$subF.test", 'Password!123');
 
+    // If the squat ever misses and provisioning unexpectedly SUCCEEDS, the tenant
+    // it created must still be torn down — otherwise a failing test leaks a real
+    // database and MySQL user onto the server.
+    if ($f['ok']) {
+        $created['tenants'][]   = $f['tenant_id'];
+        $created['databases'][] = $f['db_name'];
+        $created['users'][]     = $f['db_username'];
+    }
     ok($f['ok'] === false, 'provisioning failed as forced');
     ok((int)$cpdo->query("SELECT COUNT(*) FROM tenants")->fetchColumn() === $before,
         'NO orphaned registry row left behind');

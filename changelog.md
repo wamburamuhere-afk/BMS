@@ -1,5 +1,48 @@
 # BMS Changelog
 
+## 2026-08-31 (infrastructure) — Multi-tenancy Phase 3: Connection routing (ships OFF)
+
+**Files (new):** `core/tenant_resolver.php`, `core/tenant_bootstrap.php`,
+`tests/test_tenant_routing_cli.php`
+**Files (changed):** `docs/MULTI_TENANCY_CONVENTIONS.md`, `ternant.md`,
+`tests/test_tenant_provisioning_cli.php`
+
+The phase that decides which database each request talks to. **It ships switched off:**
+with `TENANT_MODE` unset, `bmsConnectPdo()` connects using the `DB_*` constants exactly as
+before, so deploying this changes nothing. Enabling it takes three deliberate operator steps,
+documented in conventions §9. Turning it back off is unsetting one variable — no deploy.
+
+- `core/tenant_resolver.php` — answers *which tenant* and nothing else: no connections, no
+  sessions, no rendering. Keeping the contract this narrow is what makes the documented
+  fallback (company-code at login, if wildcard DNS proves unavailable) a change to one
+  function rather than a rewrite. `extractTenantSubdomain()` is pure and rejects IP literals,
+  multi-level hosts (`a.b.base` — otherwise `evil.kampunia` could pose as a neighbour),
+  foreign domains and reserved labels.
+- `core/tenant_bootstrap.php` — produces the request's `$pdo`. **It never guesses:** an
+  unknown subdomain 404s rather than falling back to the main database (which would hand one
+  company's data to anyone who invented a hostname); an unreachable control database 503s for
+  the same reason; suspended/deleted tenants are stopped without any connection at all.
+- **Cross-tenant session guard** moved from `header.php` (where `ternant.md` put it) into the
+  bootstrap: 565 files include `config.php` while far fewer include `header.php`, and a guard
+  that misses the API surface is not a guard.
+- `includes/config.php` is **not** modified — it is gitignored and per-environment, so the
+  one-time edit is an operator step (conventions §9), which also drops its trailing `?>`.
+
+**Verified — `tests/test_tenant_routing_cli.php`, 57/57**, running the real bootstrap in real
+subprocesses with simulated hosts rather than asserting about source. Proves: `TENANT_MODE`
+unset is a genuine no-op; each subdomain reaches its own database; an unknown subdomain never
+connects anywhere; **suspending one tenant leaves the other and the main site untouched**; a
+session carrying another tenant's id is destroyed rather than honoured; and error pages leak
+no credentials, DSNs or SQL state.
+
+*Three bugs found by these tests, all fixed:* the resolver's CLI guard short-circuited on the
+*parameter* being null before ever reading `$_SERVER['HTTP_HOST']`, so a tenant could never
+resolve; the test probe was silently truncated by a literal `?>` inside a `//` comment; and the
+Phase 2 suite's "force a failure" step relied on `information_schema`'s cached `AUTO_INCREMENT`,
+which goes stale — it could pass vacuously and leaked a database and MySQL user when it did.
+All three suites are now self-cleaning, confirmed by checking for stray databases, MySQL users
+and registry rows after full runs. Phases 1–3 total **181 assertions**.
+
 ## 2026-08-31 (infrastructure) — Multi-tenancy Phase 2: Provisioning engine
 
 **Files (new):** `core/tenant_provisioner.php`, `schema/tenant_seed_defaults.sql`,
