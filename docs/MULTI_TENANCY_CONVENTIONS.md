@@ -442,3 +442,104 @@ surface is not a guard.
 
 Unset `TENANT_MODE`. The next request connects via the `DB_*` constants again.
 No code change, no deploy — which is the rollback path for the riskiest phase.
+
+---
+
+## 10. Platform-infrastructure schema does not live in `migrations/`
+
+**A real production incident, 2026-08-31.** `bms_control` was originally created
+by a deploy migration. Production's application MySQL user has no `CREATE
+DATABASE` privilege, so the migration exited 1 and `script_stop: true` —
+correctly, per the repo's own rule — halted the **entire deploy**, including the
+second production host, which never received that release.
+
+The migration was wrong to exist, not the guard that stopped it. `bms_control`
+is platform infrastructure — a registry of which companies exist — not tenant
+schema. Nothing in the running application reads it until multi-tenancy is
+switched on. An optional, disabled subsystem must never be able to veto a
+release for the entire fleet.
+
+**The fix:** `scripts/setup_control_db.php` — CLI-only, idempotent, run by hand
+as **Step 0** of turning multi-tenancy on (§9 above). It creates the database
+and every control table (`tenants`, `superadmins`, `tenant_provisioning_log`,
+`registration_attempts`, `tenant_admin_log`, `tenant_migration_log`), adds
+columns an older install might predate, and verifies itself through
+`getControlPdo()` rather than assuming success. If the MySQL user cannot create
+the database, it prints the exact `CREATE DATABASE` / `GRANT` for the DBA and
+exits — the operator's problem to fix, never the deploy pipeline's.
+
+**The rule going forward:** anything that is platform infrastructure rather than
+either the main application's schema or a tenant's schema belongs in
+`scripts/`, run by an operator, never in `migrations/`. If you are about to add
+a migration that a fresh, not-yet-configured environment could plausibly fail
+to run, ask first whether it belongs here instead.
+
+---
+
+## 11. Per-tenant migrations *(Phase 8)*
+
+From Phase 8 onward, a schema change that must reach **every tenant database**
+goes in `migrations/tenant/`, applied by `core/tenant_migration_runner.php`
+rather than the app's own `migrations/runner.php` (which only ever touches the
+single main application database). The full filename/structure convention is
+documented in `migrations/tenant/README.md` — read it before writing one.
+
+```bash
+php core/tenant_migration_runner.php                 # every live tenant
+php core/tenant_migration_runner.php --tenant=7       # one tenant only
+php core/tenant_migration_runner.php --dry-run        # report only, change nothing
+```
+
+### Not wired into `deploy.yml` yet — deliberately
+
+`ternant.md`'s original Phase 8 plan wires this into `deploy.yml`. Building it
+the same day §10's incident happened, with **zero real tenants yet** (Phase 7
+has not run), would risk repeating that exact mistake for no benefit: an
+optional step with nothing to do, added to a pipeline that has already proven
+it can take down both production hosts when a step like this misbehaves.
+
+Wiring happens **alongside Phase 7**, once tenants genuinely exist to migrate —
+and even then, its own failure must never be allowed to abort the main
+application's deploy (see below). Until then, run it by hand or from a separate
+cron; it is entirely safe to run with zero tenants (a documented no-op) or never
+run at all.
+
+### One tenant's failure never blocks another tenant's migration
+
+`ternant.md`'s "what ships" table for this phase says a broken migration "stops
+on first failure for **that tenant**". Its acceptance-gate wording separately
+says the run "stops" without qualifying which scope — read literally, those two
+sentences disagree with each other.
+
+This codebase already has a governing answer, enforced by every other phase:
+**one tenant's problem must never affect another tenant.** Phase 6's own tests
+assert exactly this for suspend and delete. Halting every tenant's migration run
+because one company's database happened to have already-conflicting state would
+break that guarantee for no good reason — and would repeat §10's mistake at
+tenant scale instead of platform scale.
+
+So: a migration that fails for tenant A stops **only that tenant's** remaining
+migrations for this run (an inconsistent partial state within one tenant is
+still worse than stopping there) and is logged loudly — to the console, to
+`migrations/tenant_deploy.log`, and to the `tenant_migration_log` control table
+— while every other tenant keeps receiving its migrations normally.
+`tests/test_tenant_migration_runner_cli.php` proves this with a real divergence:
+the same migration file genuinely fails against one tenant's pre-existing state
+and genuinely succeeds against another's, in the same run.
+
+### How a migration file gets its connection
+
+`core/tenant_migration_bootstrap.php` is what `roots.php` is to an app
+migration — except it connects to whichever tenant
+`core/tenant_migration_runner.php` is currently processing, using
+`TENANT_MIGRATION_DB_*` environment variables the runner sets before spawning
+each subprocess. Never `argv` — a password on the command line is visible to
+anyone who can run `ps` on the host for the process's lifetime; an environment
+variable is only readable by the same user via `/proc`, the same exposure every
+other secret in this deploy already accepts.
+
+**The one rule that matters most**, also in the README: a file under
+`migrations/tenant/` must never `require_once roots.php` or
+`includes/config.php` — doing so reconnects `$pdo` to the main `bms` database
+mid-migration, silently running every later statement against the wrong
+database.
