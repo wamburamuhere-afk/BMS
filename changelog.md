@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-08-31 (feature) — Restore "New company? Register here" on login.php, host-aware
+
+**Files (changed):** `login.php`, `tests/test_tenant_registration_cli.php`
+
+Product decision (reversing part of Phase 5): existing-company staff always sign in through
+`login.php` with credentials their own admin assigns under Settings > Users — that never changes.
+But the platform's company-signup link belongs back on that same page, worded unambiguously as
+**"New company? Register here"** rather than a generic "Don't have an account?", so it reads as a
+clearly different action from signing in.
+
+The wording alone isn't enough, though: a bare relative `register.php` link breaks once real
+tenant subdomains are live. `register.php` deliberately 404s when visited from a tenant's own
+subdomain (a company's own staff must not spin up a rival tenant from inside their own login
+page), so if `login.php` is itself being viewed on `kampunia.bms.co.tz`, a relative link resolves
+to `kampunia.bms.co.tz/register.php` — which 404s on click. `login.php` now resolves the tenant
+for the current request and builds the href accordingly: a plain relative link when multi-tenancy
+is off or this is the root domain, and an absolute link back to the root domain when viewed from
+inside a tenant. Guarded by `is_file()`/`function_exists()` so it degrades to the old relative
+link if the multi-tenancy layer is ever reverted.
+
+**Verified — rendered for real** (not just asserted from source) in all three host scenarios via
+`tests/test_tenant_registration_cli.php` §9 (54/54 in that suite): `TENANT_MODE` off (today's
+production state) → relative link; multi-tenancy on, viewed on the root domain → still relative;
+viewed from a tenant's own subdomain → absolute link to the root domain, confirmed to differ from
+the relative form that would 404 there. Also checked in a real browser locally, matching the
+"Registration is not available on this installation" state already visible on the live demo site.
+All seven multi-tenancy suites still pass together (**375 assertions**).
+
 ## 2026-08-31 (fix) — Rename superadmin CSRF constant (unblocks Phase 6 CI)
 
 **Files (changed):** `app/superadmin/tenants.php`, `app/superadmin/tenant_view.php`

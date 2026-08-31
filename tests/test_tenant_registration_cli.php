@@ -232,10 +232,45 @@ try {
         }
     }
 
-    section('9. The login page no longer links to the dead register.php');
-    $loginSrc = file_get_contents("$root/login.php");
-    ok(strpos($loginSrc, 'href="register.php"') === false,
-        'login.php no longer links to register.php (it fatal-errored on every click)');
+    section('9. login.php offers a clearly-labelled, host-aware "New company?" link');
+    // Product decision: staff of an EXISTING company always sign in through
+    // login.php with credentials their own admin assigned — that never
+    // changes. This link is for a DIFFERENT action (creating a brand-new
+    // company), which is why it must read as "New company? Register here",
+    // never "Don't have an account?" — the two must not be confusable.
+    ok(strpos(file_get_contents("$root/login.php"), 'New company?') !== false,
+        'login.php uses the unambiguous "New company?" wording, not "Don\'t have an account?"');
+
+    $renderLogin = function (string $host, array $env = []): ?string {
+        global $root;
+        $probe = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'bms_login_render_' . bin2hex(random_bytes(4)) . '.php';
+        file_put_contents($probe, "<?php\n"
+            . "ini_set('session.save_path', sys_get_temp_dir());\n"
+            . "\$_SERVER['HTTP_HOST'] = " . var_export($host, true) . ";\n"
+            . "chdir(" . var_export($root, true) . ");\n"
+            . "ob_start(); require " . var_export("$root/login.php", true) . "; echo ob_get_clean();\n");
+        foreach ($env as $k => $v) putenv("$k=$v");
+        $out = (string)shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($probe) . ' 2>&1');
+        foreach ($env as $k => $v) putenv($k);
+        @unlink($probe);
+        return preg_match('/New company\?\s*<a href="([^"]*)"/', $out, $m) ? html_entity_decode($m[1]) : null;
+    };
+
+    ok($renderLogin('anything.example.com') === 'register.php',
+        'TENANT_MODE off (current production state): plain relative link, same host');
+
+    $link = withTenancy(fn() => $renderLogin('bms.local', ['TENANT_MODE' => 'on', 'TENANT_BASE_DOMAIN' => 'bms.local']));
+    ok($link === 'register.php', 'multi-tenancy on, viewed on the ROOT domain: still a plain relative link');
+
+    // The critical case: viewed from the TENANT'S OWN subdomain, a bare
+    // relative link would resolve to that tenant's own host and 404 (register.php
+    // refuses to render for an existing tenant by design) — it must instead be
+    // an absolute link back to the root domain.
+    $tenantLink = withTenancy(fn() => $renderLogin("$sub.bms.local", ['TENANT_MODE' => 'on', 'TENANT_BASE_DOMAIN' => 'bms.local']));
+    ok($tenantLink === 'http://bms.local/register.php',
+        "viewed from the tenant's OWN subdomain: absolute link to the root domain ($tenantLink)");
+    ok($tenantLink !== 'register.php',
+        'and specifically NOT the bare relative link, which would 404 on this host');
 
 } catch (Throwable $e) {
     $fail++;

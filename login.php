@@ -16,6 +16,38 @@ if (isset($_SESSION['user_id'])) {
 $company_logo = get_setting('company_logo', '');
 $company_name = get_setting('company_name', 'Business Management System');
 
+// ── Multi-tenancy: "New company? Register here" ────────────────────────────
+// All staff — including tenant admins — sign in through this SAME page and get
+// their credentials assigned by their own admin (Settings > Users). This link
+// is for a DIFFERENT action entirely: creating a brand-new company/tenant. It
+// must read unambiguously as that, never as "create a user account here" —
+// hence the explicit "New company?" wording rather than a generic
+// "Don't have an account?".
+//
+// The href cannot always be a bare relative 'register.php'. register.php
+// deliberately 404s when visited from a TENANT's own subdomain (a company's
+// own staff must not be able to spin up a rival tenant from inside their own
+// login page) — it only renders on the platform's root/marketing domain. So
+// when this login page is itself being viewed on a tenant's subdomain, the
+// link has to point at the root domain explicitly, or it would 404 on click.
+// Guarded by is_file()/function_exists() so this degrades to the old relative
+// link if the multi-tenancy layer is ever reverted.
+$registerUrl = 'register.php';
+$tenantResolverFile = __DIR__ . '/core/tenant_resolver.php';
+if (is_file($tenantResolverFile)) {
+    require_once $tenantResolverFile;
+    if (function_exists('resolveTenantFromRequest')) {
+        $__r = resolveTenantFromRequest();
+        if (($__r['status'] ?? '') === 'found') {
+            $base = function_exists('tenantBaseDomain') ? tenantBaseDomain() : null;
+            if ($base) {
+                $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $registerUrl = $scheme . '://' . $base . '/register.php';
+            }
+        }
+    }
+}
+
 // Build proper logo URL
 if ($company_logo && strpos($company_logo, 'http') !== 0) {
     $company_logo = '/' . ltrim($company_logo, '/');
@@ -204,19 +236,24 @@ if ($company_logo && strpos($company_logo, 'http') !== 0) {
                 
                 <button type="submit" class="btn btn-primary w-100 btn-login">Login</button>
 
+                <div class="divider">
+                    <span class="divider-text">OR</span>
+                </div>
+
                 <!--
-                  The "Don't have an account? Register here" link was removed.
-
-                  It pointed at register.php, which was 30 lines of dead code from
-                  the initial commit that required '../includes/db.php' — a file
-                  that has never existed — so every click produced a fatal error.
-
-                  It was also the wrong idea: BMS users do not self-register.
-                  Accounts are created by an administrator under Settings > Users,
-                  with a role and permissions. register.php is now the COMPANY
-                  signup page for the multi-tenant platform, which belongs on the
-                  marketing root domain, not on a company's own login screen.
+                  Staff of an EXISTING company never use this — they sign in
+                  above with credentials their own admin assigned under
+                  Settings > Users. This is for creating a BRAND-NEW company,
+                  which is why the wording says "New company?" rather than
+                  "Don't have an account?" — the two must never read as the
+                  same action. $registerUrl is computed above: a bare relative
+                  link on the root domain / single-tenant mode, or an absolute
+                  link to the root domain when this page is being viewed on a
+                  tenant's own subdomain (register.php 404s there by design).
                 -->
+                <p class="text-center mb-0">New company?
+                    <a href="<?= safe_output($registerUrl, 'register.php') ?>" style="color: var(--primary-color);">Register here</a>
+                </p>
             </form>
             
             <div class="footer-links">
