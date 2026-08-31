@@ -27,11 +27,16 @@ backups/*
 *.sql.gz
 *.sql.zip
 
-# EXCEPTION: the multi-tenant schema template is source, not a backup. Every new
-# tenant database is built from this file, so it MUST be version-controlled and
-# deployed — the blanket *.sql rule above would otherwise silently exclude it.
-# It is schema-only (zero INSERT statements); no business data ever lives here.
-!schema/tenant_schema_template.sql
+# EXCEPTION: schema/ holds multi-tenant SOURCE, not backups. Every new tenant
+# database is built from these files, so they MUST be version-controlled and
+# deployed — the blanket *.sql rule above would otherwise silently exclude them,
+# and provisioning would work locally then fail on production with a missing file.
+#
+# Nothing containing business data may be placed in schema/. The two files here
+# are the schema-only template (zero INSERTs) and a reviewed defaults seed
+# (taxonomy, permission catalogue, and the STRUCTURAL chart of accounts only —
+# no sub-ledger accounts, which carry real counterparty names).
+!schema/*.sql
 
 # -----------------------------------------------
 # LOG FILES

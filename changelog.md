@@ -1,5 +1,46 @@
 # BMS Changelog
 
+## 2026-08-31 (infrastructure) — Multi-tenancy Phase 2: Provisioning engine
+
+**Files (new):** `core/tenant_provisioner.php`, `schema/tenant_seed_defaults.sql`,
+`tests/test_tenant_provisioning_cli.php`
+**Files (changed):** `.gitignore`, `docs/MULTI_TENANCY_CONVENTIONS.md`, `ternant.md`
+
+`provisionTenant()` creates a complete isolated tenant — its own database, its own MySQL user,
+the full schema, defaults, and an owner account — and **never leaves a half-created tenant
+behind**. Still not reachable from the UI; Phase 5 adds the signup form.
+
+- `core/tenant_provisioner.php` — validation (subdomain format + 60 reserved names), CSPRNG
+  24-char DB password, `CREATE DATABASE`/`CREATE USER`/`GRANT` scoped to that one database,
+  schema + seed application, owner account bound to the Admin role (looked up by name, not a
+  hardcoded id), and a final check that the tenant's *own* credentials actually work — so a
+  bad GRANT surfaces during provisioning rather than at the tenant's first login.
+- `schema/tenant_seed_defaults.sql` — reviewed, sanitized defaults. **Excludes sub-ledger
+  accounts:** 90 of the 195 accounts in the source database are per-customer/per-supplier
+  ledgers carrying real counterparty names, so seeding them would have published Tenant #1's
+  customer list to every company that signs up. Only the 105 structural accounts ship. Also
+  excludes `users` and `system_settings` (the latter carries the encrypted AI API key).
+- `.gitignore` — exception broadened to `!schema/*.sql`.
+
+**Deviations from `ternant.md`, both deliberate:** the plan ordered "CREATE DATABASE bms_t{id}"
+before "INSERT the tenants row", which cannot work — the id in the name comes from that row's
+AUTO_INCREMENT. The row is now reserved first and finalised last; a failed attempt deletes it
+without rewinding AUTO_INCREMENT, so retries can never collide with orphaned debris. And the
+provisioner applies a reviewed static seed file rather than reading Tenant #1's live database
+at runtime, so new signups can't drift with one tenant's data.
+
+**Verified:** `tests/test_tenant_provisioning_cli.php` provisions two real tenants and passes
+**67/67**. It proves the isolation promise directly — tenant A's MySQL user cannot reach tenant
+B's database, the main `bms` database, or the control database, and its live connection cannot
+cross-query them by qualified name either. It also forces a genuine mid-provisioning failure by
+occupying the next tenant's database name, and confirms complete rollback: no orphaned database,
+no orphaned MySQL user, no orphaned registry row, the failure recorded in the audit log, and the
+pre-existing database the guard refused to use left intact. No password appears in the log.
+Teardown verified to leave nothing behind.
+
+*(Fixed during development: the rollback originally dropped the database it had just refused to
+overwrite. It now tracks what this call actually created and destroys only that.)*
+
 ## 2026-08-31 (infrastructure) — Multi-tenancy Phase 1: Control database & tenant registry
 
 **Files (new):** `core/control_db.php`, `core/tenant_crypto.php`,

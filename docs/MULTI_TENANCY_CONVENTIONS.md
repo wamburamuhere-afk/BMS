@@ -253,3 +253,64 @@ was added, and verified with `git check-ignore` and `git add --dry-run`.
 infrastructure to-do and must be confirmed with the hosting provider **before
 Phase 3 merges**. It is the one Phase 0 item that cannot be completed from the
 codebase.
+
+---
+
+## 8. The defaults seed file *(added in Phase 2)*
+
+`schema/tenant_seed_defaults.sql` is applied immediately after the schema
+template. It is what makes a provisioned tenant *usable* rather than merely
+present: without it a new company has 306 empty tables, no chart of accounts and
+no permissions, so its owner could not do anything.
+
+### What is in it, and why each table earns its place
+
+| Table | Rows | Why |
+|---|---|---|
+| `account_types`, `account_categories` | 8 + 8 | Accounting taxonomy. Generic. |
+| `accounts` | 105 | Chart of accounts — **structural accounts only**. |
+| `permissions` | 156 | The application's permission catalogue. |
+| `roles`, `role_permissions` | 8 + 600 | So the owner account has working access. |
+
+### What is deliberately excluded — read this before regenerating
+
+- **Sub-ledger accounts (`is_subledger = 1`).** This is the one that matters. In
+  the source database **90 of the 195 accounts are per-customer and
+  per-supplier sub-ledgers carrying real counterparty names** — "Tanzania
+  Government", "MASUDI", "John Doe". Seeding them would publish Tenant #1's
+  entire customer list into every company that signs up. Only the 105 structural
+  accounts are included; they were verified to form a self-contained tree with
+  no dangling `parent_account_id`.
+- **`users`.** Every tenant's owner account is created fresh by the provisioner.
+- **`system_settings`.** Mixes harmless platform defaults with company identity
+  *and secrets* — including the encrypted AI provider API key. Because that key
+  is encrypted with a per-environment secret shared across databases on the same
+  server, copying the row would hand one tenant's credential to every later
+  signup.
+- **Every transactional table.** `journal_entries`, invoices, payments and the
+  rest stay empty. A new tenant starts with a zero ledger.
+
+The file also ends with two defensive statements that run regardless of how it
+was generated: it zeroes every `opening_balance`/`current_balance`, and it
+deletes any `is_subledger = 1` row. So a future regeneration that forgets the
+filter still cannot leak counterparty names.
+
+### Regenerating it
+
+```bash
+COMMON="-uroot --no-create-info --complete-insert --skip-extended-insert \
+  --skip-add-locks --skip-disable-keys --skip-comments --no-tablespaces \
+  --set-gtid-purged=OFF --default-character-set=utf8mb4"
+
+mysqldump $COMMON bms account_types account_categories permissions roles role_permissions > /tmp/seed_a.sql
+mysqldump $COMMON --where="is_subledger = 0" bms accounts                                  > /tmp/seed_b.sql
+```
+
+Then reassemble with the header, the `SET FOREIGN_KEY_CHECKS = 0` wrapper and the
+sanitisation footer, keeping the existing file's structure. **Before committing,
+re-verify:** zero `INSERT INTO \`users\``, zero `INSERT INTO \`system_settings\``,
+zero `CUST-`/`SUPP-` account codes, and no real customer names.
+
+`tests/test_tenant_provisioning_cli.php` asserts all of this against a freshly
+provisioned tenant, so a bad regeneration fails the suite rather than reaching
+production.
