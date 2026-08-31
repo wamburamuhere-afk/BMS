@@ -161,6 +161,32 @@ try {
     ");
     say('  · table tenant_provisioning_log ready');
 
+    // Signup audit trail AND the ledger the rate limiter counts. Self-registration
+    // is a public, unauthenticated endpoint that creates a MySQL database on every
+    // success; without this table there is nothing to throttle against, which is
+    // the difference between a signup form and a resource-exhaustion amplifier.
+    //
+    // Separate from tenant_provisioning_log: that records the STEPS of a
+    // provisioning run, this records ATTEMPTS to register — including the ones
+    // rejected before provisioning starts, which is exactly what a limiter counts.
+    // No FK to tenants: most rows are failures that never produced a tenant, and
+    // successful ones must outlive a tenant being deleted.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`registration_attempts` (
+            `id`         BIGINT AUTO_INCREMENT PRIMARY KEY,
+            `ip_address` VARCHAR(45)  NOT NULL,
+            `email`      VARCHAR(191) NULL,
+            `subdomain`  VARCHAR(63)  NULL,
+            `outcome`    ENUM('success','rejected','failed','throttled') NOT NULL,
+            `reason`     VARCHAR(255) NULL,
+            `tenant_id`  INT          NULL,
+            `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY `idx_regattempt_ip_time` (`ip_address`, `created_at`),
+            KEY `idx_regattempt_time` (`created_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table registration_attempts ready');
+
     // Older installs created superadmins before the lockout columns existed.
     $saCols = $admin->query("
         SELECT column_name FROM information_schema.columns
