@@ -325,6 +325,37 @@ exactly as the application always has. Deploying Phase 3 is a no-op until an
 operator does all three steps below. This is deliberate: the highest-risk phase
 should be separable from the moment its risk begins.
 
+> **Why these are operator steps, not deploy steps.** The control database was
+> originally created by a deploy migration. On 2026-08-31 that failed on
+> production: the application's MySQL user (`user_bjp`) has no `CREATE DATABASE`
+> privilege, the migration exited 1, and `script_stop: true` correctly halted the
+> **entire deploy** — including the second host, which never got the release. A
+> subsystem that is switched off and that nothing reads must never be able to
+> block unrelated deploys. `bms_control` is platform infrastructure, not tenant
+> schema, so building it now belongs here with the other deliberate steps.
+
+### Step 0 — create the control database
+
+```bash
+php scripts/setup_control_db.php            # idempotent; safe to re-run
+php scripts/setup_control_db.php --check    # report only, changes nothing
+```
+
+If the application's MySQL user cannot create databases, the script prints the
+exact SQL for the DBA and stops:
+
+```sql
+CREATE DATABASE `bms_control` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+GRANT ALL PRIVILEGES ON `bms_control`.* TO '<app_user>'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+Then create the first platform operator (the table ships empty by design):
+
+```bash
+php scripts/create_superadmin.php --email=you@example.com --name="Your Name"
+```
+
 ### Step 1 — environment variables (production)
 
 | Variable | Value | Notes |

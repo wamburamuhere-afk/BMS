@@ -129,7 +129,7 @@ if (!function_exists('getControlPdo')) {
             throw new RuntimeException(
                 'Cannot connect to control database "' . $s['name'] . '" on ' . $s['host']
                 . ' as user "' . $s['user'] . '" (credentials from ' . $s['source'] . '). '
-                . 'Has migrations/2026_08_31_control_db_foundation.php been run? '
+                . 'Has scripts/setup_control_db.php been run? '
                 . 'Underlying error: ' . $e->getMessage()
             );
         }
