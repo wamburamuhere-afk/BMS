@@ -201,8 +201,12 @@ function tenantActionMenu(array $t): string
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-const CSRF_TOKEN = '<?= csrf_token() ?>';
-$.ajaxSetup({ headers: { 'X-CSRF-Token': CSRF_TOKEN } });
+// Named SA_CSRF_TOKEN, not CSRF_TOKEN: header.php is the canonical
+// declarer of the latter, and tests/test_csrf_token_redeclaration_cli.php
+// forbids any page under app/ from shadowing it. These pages never include
+// header.php, but keeping the invariant absolute is safer than exempting them.
+const SA_CSRF_TOKEN = '<?= csrf_token() ?>';
+$.ajaxSetup({ headers: { 'X-CSRF-Token': SA_CSRF_TOKEN } });
 
 let table = null;
 if (document.getElementById('tenantTable')) {
@@ -223,7 +227,7 @@ function postAction(data, successTitle) {
         url: '/actions/superadmin_tenant_action.php',
         method: 'POST',
         dataType: 'json',
-        data: Object.assign({ _csrf: CSRF_TOKEN }, data)
+        data: Object.assign({ _csrf: SA_CSRF_TOKEN }, data)
     }).done(function (res) {
         if (res && res.success) {
             Swal.fire({ icon: 'success', title: successTitle, text: res.message,
