@@ -1,5 +1,45 @@
 # BMS Changelog
 
+## 2026-08-31 (infrastructure) — Multi-tenancy Phase 1: Control database & tenant registry
+
+**Files (new):** `core/control_db.php`, `core/tenant_crypto.php`,
+`migrations/2026_08_31_control_db_foundation.php`, `tests/test_tenant_control_db_cli.php`
+
+Creates `bms_control` — the registry that knows which tenants exist, where their databases
+live, and how to authenticate to them. It holds no business data. **Nothing reads these tables
+yet** (Phase 3 wires up routing), so deploying this changes no application behaviour.
+
+- `migrations/2026_08_31_control_db_foundation.php` — creates the database and three tables,
+  fully idempotent. `tenants` (registry; `subdomain` UNIQUE, `status` indexed),
+  `superadmins` (platform operators, separate from every tenant's `users` table), and
+  `tenant_provisioning_log` (audit trail). Uses the app's `$pdo` rather than `getControlPdo()`
+  because it creates the very database that function connects to. If the app's MySQL user lacks
+  `CREATE`, it fails loudly and prints the exact SQL a DBA needs.
+- `core/control_db.php` — `getControlPdo()`, the only function permitted to hold its own
+  connection settings; everything else is data-driven from a tenant row. Credentials come from
+  `CONTROL_DB_*` env vars, falling back to the app's own credentials for zero-config local work.
+  Stricter than the legacy connection: real prepared statements, exceptions, assoc fetches.
+  `controlDbReady()` checks the registry is readable, not merely that the server answered.
+- `core/tenant_crypto.php` — AES-256-GCM for tenant DB passwords, deliberately separate from
+  `core/crypto.php`. That file's `aiAppSecret()` auto-generates a key on first use, which is
+  right for a disposable API key and catastrophic here: minting a new key would orphan every
+  stored tenant credential at once. This file therefore **never** generates a key — a missing
+  or malformed one throws immediately. The distinct `tenc:v1:` prefix keeps the two key domains
+  from ever being confused.
+
+Design decisions worth knowing: `tenants.db_name` is a stored column, never computed from the
+id, because Tenant #1 keeps the legacy name `bms`. `subdomain` stays UNIQUE even for deleted
+tenants so a new signup cannot inherit a dead company's subdomain and its stale links.
+`tenant_provisioning_log.tenant_id` is nullable with no FK so the record of *why* a signup
+failed survives Phase 2's rollback. `superadmins` ships empty — a default account with known
+credentials would be a backdoor into every tenant.
+
+**Verified:** migration run twice (second run a clean no-op); `tests/test_tenant_control_db_cli.php`
+passes **57/57** assertions covering schema shape, crypto round-trip, tamper rejection, key-domain
+separation, and a real write→read→decrypt of a tenant row (rolled back). The malformed-key path
+was confirmed to throw. The app still boots unchanged, and `controlDbName()` is undefined after
+`roots.php` alone — proof the application has no coupling to the control DB.
+
 ## 2026-08-31 (infrastructure) — Multi-tenancy Phase 0: Pre-flight & conventions
 
 **Files (new):** `docs/MULTI_TENANCY_CONVENTIONS.md`, `schema/tenant_schema_template.sql`
