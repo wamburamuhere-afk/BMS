@@ -203,12 +203,20 @@ if ($company_logo && strpos($company_logo, 'http') !== 0) {
                 </div>
                 
                 <button type="submit" class="btn btn-primary w-100 btn-login">Login</button>
-                
-                <div class="divider">
-                    <span class="divider-text">OR</span>
-                </div>
-                
-                <p class="text-center">Don't have an account? <a href="register.php" style="color: var(--primary-color);">Register here</a></p>
+
+                <!--
+                  The "Don't have an account? Register here" link was removed.
+
+                  It pointed at register.php, which was 30 lines of dead code from
+                  the initial commit that required '../includes/db.php' — a file
+                  that has never existed — so every click produced a fatal error.
+
+                  It was also the wrong idea: BMS users do not self-register.
+                  Accounts are created by an administrator under Settings > Users,
+                  with a role and permissions. register.php is now the COMPANY
+                  signup page for the multi-tenant platform, which belongs on the
+                  marketing root domain, not on a company's own login screen.
+                -->
             </form>
             
             <div class="footer-links">

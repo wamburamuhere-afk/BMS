@@ -1,5 +1,50 @@
 # BMS Changelog
 
+## 2026-08-31 (feature) — Multi-tenancy Phase 5: Self-registration
+
+**Files (new):** `core/tenant_registration.php`, `ajax/check_subdomain_availability.php`,
+`actions/register_tenant.php`, `tests/test_tenant_registration_cli.php`
+**Files (changed):** `register.php` (replaced), `login.php`, `scripts/setup_control_db.php`,
+`changelog.md`, `ternant.md`
+
+A company can now sign up and get its own isolated system in one step: fill the form, watch a
+"Setting up your account…" state while the database is built, then land on its own subdomain's
+login page.
+
+- `register.php` — public signup with live subdomain availability, matching
+  `.claude/ui-constants.md`. **Replaces 30 lines of dead code** from the initial commit that
+  self-identified as `// ajax/register.php` and required `'../includes/db.php'`, a file that has
+  never existed — so every request to it fatal-errored.
+- `login.php` — removed the *"Don't have an account? Register here"* link that pointed at it.
+  It was broken for every user who clicked it, and self-signup was never right on a tenant's
+  login page: BMS accounts are created by an administrator under Settings > Users.
+- `core/tenant_registration.php` — the policy layer, kept separate from the provisioner so that
+  trusted internal callers don't inherit limits meant for anonymous traffic.
+- `ajax/check_subdomain_availability.php` — format and reserved-word checks before any database
+  work, so it stays cheap under keystroke-rate traffic, and returns only a boolean and a
+  message — never an existing tenant's company name, owner or status.
+
+**Rate limiting is the headline.** This is a public, unauthenticated endpoint that creates a
+MySQL database and user on every success — unthrottled, a short loop fills the server. Limits are
+3 attempts per IP per hour, 6 per day, and 40 successes per hour globally (the last catches a
+distributed flood). **Rejections count too**, so a script probing subdomains is stopped even
+though it never reaches a success. A CSS-hidden honeypot field catches naive bots and refuses them
+with the same wording a person sees, never hinting the trap exists.
+
+Signup also **fails closed**: it refuses unless multi-tenancy is on, a base domain is configured,
+and `TENANT_CRED_KEY` is present — provisioning a tenant nobody can reach, or whose credentials
+couldn't be stored encrypted, would create real databases that are pure liability. An
+`TENANT_SELF_REGISTRATION=off` kill switch closes it independently.
+
+Following the hotfix below, the new `registration_attempts` table is created by
+`scripts/setup_control_db.php` rather than a deploy migration, for the same reason.
+
+**Verified — 50/50**, including a real signup that produces a working tenant whose owner
+password verifies, with the seeded chart of accounts and no leaked customer names; the throttle
+actually blocking after 3 attempts while a different IP is unaffected; and no internal detail
+(`bms_t`, `SQLSTATE`, `PDO`) in any user-facing message. All five multi-tenancy suites pass
+together (**284 assertions**), leaving no databases, users or rows behind.
+
 ## 2026-08-31 (hotfix) — Multi-tenancy: take control-DB setup out of the deploy pipeline
 
 **Files (new):** `scripts/setup_control_db.php`
