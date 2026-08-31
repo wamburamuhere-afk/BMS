@@ -103,7 +103,7 @@ Nothing runtime changes in this phase — revert is just deleting the new files.
 
 | File | Purpose |
 |---|---|
-| `migrations/2026_08_31_control_db_foundation.php` (new) | Creates the `bms_control` database and its tables (idempotent — `CREATE DATABASE IF NOT EXISTS`, `CREATE TABLE IF NOT EXISTS`). |
+| `scripts/setup_control_db.php` (new, CLI) | Creates the `bms_control` database and its tables, idempotently. ⚠️ **Revised after a real production failure (2026-08-31):** this was a deploy migration, and production's app user lacks `CREATE DATABASE`, so `script_stop: true` halted the ENTIRE deploy over an optional, not-yet-enabled subsystem. The control DB is platform infrastructure, not tenant schema — it is now an operator step alongside the other §9 steps. |
 | Table: `tenants` | `id, company_name, subdomain (unique), db_host, db_name, db_username, db_password_encrypted, status ENUM('active','suspended','trial','deleted'), plan, owner_email, created_at, activated_at, suspended_at` |
 | Table: `superadmins` | `id, name, email (unique), password_hash, created_at` — completely separate from any tenant's `users` table. |
 | Table: `tenant_provisioning_log` | `id, tenant_id, step, status, message, created_at` — audit trail of each provisioning attempt (for debugging failed signups). |
@@ -113,8 +113,8 @@ Nothing runtime changes in this phase — revert is just deleting the new files.
 ### Acceptance gate
 
 ```bash
-php migrations/2026_08_31_control_db_foundation.php   # bms_control + 3 tables created
-php migrations/2026_08_31_control_db_foundation.php   # second run is a no-op (idempotent)
+php scripts/setup_control_db.php     # bms_control + 3 tables created
+php scripts/setup_control_db.php     # second run is a no-op (idempotent)
 php -r 'require "core/tenant_crypto.php";
         $c = encryptTenantSecret("test123");
         var_dump(decryptTenantSecret($c) === "test123");'   # must print true

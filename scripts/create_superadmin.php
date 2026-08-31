@@ -37,7 +37,7 @@ try {
     $pdo = getControlPdo();
 } catch (Throwable $e) {
     bail("Cannot reach the control database.\n         " . $e->getMessage()
-       . "\n         Has migrations/2026_08_31_control_db_foundation.php been run?");
+       . "\n         Run: php scripts/setup_control_db.php");
 }
 
 // The hardening columns are required for the lockout logic in core/superadmin_auth.php.
@@ -47,7 +47,7 @@ $cols = $pdo->query("
 ")->fetchAll(PDO::FETCH_COLUMN);
 foreach (['failed_attempts', 'locked_until', 'last_login'] as $need) {
     if (!in_array($need, $cols, true)) {
-        bail("superadmins.$need is missing.\n         Run: php migrations/2026_08_31_superadmin_login_hardening.php");
+        bail("superadmins.$need is missing.\n         Run: php scripts/setup_control_db.php");
     }
 }
 
