@@ -43,6 +43,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['first_name'] = $user['first_name'] ?? '';
         $_SESSION['last_name'] = $user['last_name'] ?? '';
 
+        // ── Multi-tenancy ───────────────────────────────────────────────────
+        // Pin the session to the tenant this login actually authenticated
+        // against, so core/tenant_bootstrap.php can reject the cookie if it is
+        // ever replayed against a different tenant's subdomain. Null in
+        // single-tenant mode, where the key is simply absent and the guard is
+        // a no-op. Guarded by function_exists so this file keeps working if the
+        // multi-tenancy layer is reverted.
+        if (function_exists('bmsCurrentTenantId')) {
+            $__tenantId = bmsCurrentTenantId();
+            if ($__tenantId !== null) {
+                $_SESSION['tenant_id'] = $__tenantId;
+            }
+        }
+
+        // A platform operator session must never coexist with a tenant login in
+        // the same browser session — whichever is established last wins.
+        unset($_SESSION['superadmin_id']);
+
         // Load permissions
         if (function_exists('loadUserPermissions')) {
             loadUserPermissions($_SESSION['role_id']);
