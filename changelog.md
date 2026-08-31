@@ -1,5 +1,41 @@
 # BMS Changelog
 
+## 2026-08-31 (hotfix) — Multi-tenancy: take control-DB setup out of the deploy pipeline
+
+**Files (new):** `scripts/setup_control_db.php`
+**Files (removed):** `migrations/2026_08_31_control_db_foundation.php`,
+`migrations/2026_08_31_superadmin_login_hardening.php`
+**Files (changed):** `core/control_db.php`, `scripts/create_superadmin.php`,
+`docs/MULTI_TENANCY_CONVENTIONS.md`, `ternant.md`
+
+**Fixes a broken production deploy.** The `develop` → `main` merge (PR #1745) deployed the code
+fine, then `migrations/runner.php` hit `2026_08_31_control_db_foundation.php`, which tried to
+`CREATE DATABASE bms_control`. Production's application user `user_bjp` has no `CREATE` privilege,
+so the migration exited 1 and — correctly, per `script_stop: true` — halted the **entire deploy**.
+`demo.bjptechnologies.co.tz` never received the release at all.
+
+The live sites were never at risk: the code deployed before the migration ran, and with
+`TENANT_MODE` unset the whole multi-tenancy layer is inert. But the pipeline was left red, which
+would have blocked every future deploy of unrelated work.
+
+**The migration was wrong to exist.** `bms_control` is platform infrastructure — a registry of
+which companies exist — not tenant schema. Nothing reads it until multi-tenancy is switched on,
+and it needs a privilege a hardened application user has no reason to hold. Making it a deploy
+migration meant an optional, disabled subsystem could veto every release.
+
+- `scripts/setup_control_db.php` (new, CLI-only, HTTP-blocked via `scripts/`) — creates the
+  database and all three tables idempotently, adds the superadmin lockout columns if an older
+  install lacks them, verifies itself through `getControlPdo()`, and prints the exact DBA `GRANT`
+  if it cannot create the database. `--check` reports without changing anything.
+- Both control-DB migrations deleted. Neither had ever recorded a success anywhere, so no
+  migration history is orphaned — the runner simply has nothing pending.
+- Setup is now **Step 0** of the enable-multi-tenancy procedure in conventions §9, alongside the
+  environment variables, the `config.php` edit and DNS.
+
+**Verified:** dropped `bms_control` entirely and rebuilt it from scratch with the script; all four
+multi-tenancy suites still pass (**234 assertions**); and `php migrations/runner.php` now reports
+`SUCCESS — all migrations complete` with nothing pending, which is what unblocks the deploy.
+
 ## 2026-08-31 (infrastructure) — Multi-tenancy Phase 4: Authentication rework
 
 **Files (new):** `core/superadmin_auth.php`, `app/superadmin/login.php`,
