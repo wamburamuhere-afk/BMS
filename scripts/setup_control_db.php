@@ -212,6 +212,26 @@ try {
     ");
     say('  · table tenant_admin_log ready');
 
+    // Audit trail for core/tenant_migration_runner.php (Phase 8). Separate from
+    // tenant_provisioning_log (provisioning steps) and tenant_admin_log
+    // (operator lifecycle actions) — this one is ongoing schema-drift history,
+    // written every time migrations/tenant/ is applied across the fleet.
+    // No FK: a tenant can be deleted long after its migration history matters.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`tenant_migration_log` (
+            `id`             BIGINT AUTO_INCREMENT PRIMARY KEY,
+            `tenant_id`      INT          NULL,
+            `subdomain`      VARCHAR(63)  NULL,
+            `migration_name` VARCHAR(191) NOT NULL,
+            `status`         ENUM('ok','failed') NOT NULL,
+            `message`        TEXT         NULL,
+            `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY `idx_migrationlog_tenant` (`tenant_id`),
+            KEY `idx_migrationlog_created` (`created_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table tenant_migration_log ready');
+
     // Older installs created superadmins before the lockout columns existed.
     $saCols = $admin->query("
         SELECT column_name FROM information_schema.columns

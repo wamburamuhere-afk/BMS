@@ -1,5 +1,71 @@
 # BMS Changelog
 
+## 2026-08-31 (fix) — Rename superadmin CSRF constant (unblocks Phase 6 CI)
+
+**Files (changed):** `app/superadmin/tenants.php`, `app/superadmin/tenant_view.php`
+
+CI's PHP Lint Check failed on the Phase 6 PR: `tests/test_csrf_token_redeclaration_cli.php`
+enforces that `header.php` is the sole declarer of `const CSRF_TOKEN` — a page under `app/` that
+redeclares it throws a JS SyntaxError and aborts the page's script. Both new superadmin pages
+declared their own `const CSRF_TOKEN`. Neither includes `header.php` (they're standalone by
+design), so there was no actual runtime clash, but weakening a security-adjacent guard to carve
+out an exception is worse than not colliding with the name it protects. Renamed to
+`SA_CSRF_TOKEN` in both files and their AJAX calls. Guard now 10/10 (was 9 passed / 2 failed);
+all six multi-tenancy suites still pass (335 assertions).
+
+## 2026-08-31 (feature) — Multi-tenancy Phase 8: Per-tenant migration runner
+
+**Files (new):** `core/tenant_migration_bootstrap.php`, `core/tenant_migration_runner.php`,
+`migrations/tenant/README.md`, `tests/test_tenant_migration_runner_cli.php`
+**Files (changed):** `schema/tenant_schema_template.sql`, `scripts/setup_control_db.php`,
+`docs/MULTI_TENANCY_CONVENTIONS.md`, `ternant.md`
+
+`migrations/tenant/` is now the place for schema changes that must reach every tenant database,
+applied by `core/tenant_migration_runner.php` rather than the app's own `migrations/runner.php`
+(which only ever touches the single main application database).
+
+**Deploy-pipeline wiring is deferred to Phase 7 — deliberately.** `ternant.md`'s plan wired this
+into `deploy.yml` today. Building that the same day the control-DB hotfix (below) happened, with
+**zero real tenants** yet (Phase 7 hasn't run), would repeat that exact mistake for no benefit: an
+optional step with nothing to do, added to a pipeline that already proved it can take down both
+production hosts when a step like this misbehaves. It runs standalone until Phase 7 gives it real
+tenants — `php core/tenant_migration_runner.php`, safe to run with zero tenants (a documented
+no-op) or not run at all.
+
+**One tenant's failure never blocks another tenant's migration**, which is a second deliberate
+deviation from `ternant.md`'s acceptance-gate wording. This codebase's governing rule — enforced
+by every phase since Phase 6's suspend/delete — is that one tenant's problem must never affect
+another's; halting every tenant's run because one company's database had already-conflicting
+state would break that guarantee for no reason. A migration that fails for one tenant stops only
+that tenant's remaining migrations for the run (a half-migrated tenant is still worse than
+stopping there) and is logged loudly — console, `migrations/tenant_deploy.log`, and the new
+`tenant_migration_log` control table — while every other tenant keeps receiving its migrations
+normally.
+
+- `core/tenant_migration_bootstrap.php` — what `roots.php` is to an app migration, except it
+  connects to whichever tenant the runner is currently on, via `TENANT_MIGRATION_DB_*`
+  environment variables the runner sets before spawning each subprocess. Never argv — a
+  password on the command line is visible to anyone who can `ps` the host. Refuses to run
+  without those variables (so a migration file can never be invoked directly by mistake) and
+  refuses to target a platform database even if pointed at one.
+- `core/tenant_migration_runner.php` — each (tenant, file) pair runs as an isolated subprocess,
+  exactly like the app's own `migrations/runner.php`, so one migration's `exit(1)` can never kill
+  the runner's own process. Supports `--tenant=<id>` (retry one tenant) and `--dry-run` (report
+  without changing anything). Gracefully reports "nothing to do" — never an error — when the
+  control database isn't set up, there are no live tenants, or there are no migration files yet.
+- `schema/tenant_schema_template.sql` — hand-added `schema_migrations` table (not part of the
+  mysqldump), so every newly provisioned tenant already has it.
+
+**Verified — 36/36**, executed as this is ternant.md's own acceptance gate: a real dummy migration
+dropped into `migrations/tenant/`, applied to two real provisioned tenants, confirmed idempotent
+on a second run. `--dry-run` confirmed to change nothing. Most importantly, a genuine divergence
+scenario — the identical migration file made to fail against one tenant's pre-existing state
+while the other tenant has no such conflict — confirmed the failing tenant stops there and is
+recorded in `tenant_migration_log`, while the unaffected tenant receives the same migration
+successfully in the same run. No credential appears in a normal failure's error text or its
+logged message. All seven multi-tenancy suites pass together (**371 assertions**), leaving no
+databases, users, rows or dropped migration files behind.
+
 ## 2026-08-31 (feature) — Multi-tenancy Phase 6: Superadmin tenant panel
 
 **Files (new):** `core/tenant_admin.php`, `app/superadmin/tenants.php`,

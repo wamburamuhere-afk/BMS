@@ -8305,6 +8305,22 @@ CREATE TABLE `workflow_steps` (
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
+--
+-- Table structure for table `schema_migrations`
+--
+-- HAND-ADDED, not part of the mysqldump above (multi-tenancy Phase 8,
+-- 2026-08-31). Tracks which files under migrations/tenant/ have been applied
+-- to THIS tenant database. core/tenant_migration_runner.php reads and writes
+-- it; migration files never touch it directly.
+--
+CREATE TABLE IF NOT EXISTS `schema_migrations` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `migration_name` varchar(191) NOT NULL,
+  `applied_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_schema_migrations_name` (`migration_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
