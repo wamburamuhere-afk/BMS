@@ -1,0 +1,235 @@
+# BMS Multi-Tenancy — Architecture Reference
+
+*How the database-per-tenant system actually works. Written for the session,
+developer or operator who arrives with no prior context.*
+
+Companion documents:
+
+| Document | Role |
+|---|---|
+| `ternant.md` | The 11-phase implementation **plan** and its phase tracker. Historical. |
+| `docs/MULTI_TENANCY_CONVENTIONS.md` | The binding **contract**: naming, secrets, operator steps, per-tenant migrations. Read before changing anything. |
+| **this file** | The **architecture** as built. Start here. |
+
+---
+
+## 1. The model in one paragraph
+
+Every company that registers gets its **own physically separate MySQL database**
+(`bms_t{id}`) with **its own MySQL user** (`bms_u{id}`), and is reached at its
+own subdomain (`kampunia.bms.bjptechnologies.co.tz`). A small **control
+database** (`bms_control`) knows which tenants exist and how to connect to each.
+Isolation is enforced by MySQL grants, not by application `WHERE` clauses — a
+bug in PHP cannot leak one company's ledger into another's, because the
+connection literally cannot see the other database.
+
+---
+
+## 2. The three moving parts
+
+```
+                    ┌─────────────────────────────┐
+   request  ──────► │  core/tenant_resolver.php   │  which tenant is this host?
+   Host: kampunia.  └──────────────┬──────────────┘
+   bms.example.tz                  │ subdomain
+                                   ▼
+                    ┌─────────────────────────────┐
+                    │  bms_control.tenants        │  registry: db_name, db_user,
+                    │  (the CONTROL database)     │  encrypted password, status
+                    └──────────────┬──────────────┘
+                                   │ credentials
+                                   ▼
+                    ┌─────────────────────────────┐
+                    │  core/tenant_bootstrap.php  │  returns the $pdo the whole
+                    │  bmsConnectPdo()            │  app runs on
+                    └──────────────┬──────────────┘
+                                   ▼
+                    ┌─────────────────────────────┐
+                    │  bms_t7  (the TENANT db)    │  310 tables, this company only
+                    └─────────────────────────────┘
+```
+
+**`includes/config.php` is per-environment and untracked.** It defines the
+`DB_*` constants and then calls `bmsConnectPdo()`. This is why the routing logic
+lives in the tracked `core/tenant_bootstrap.php` and not in `config.php` — a
+rewrite of an untracked file could never reach production through git.
+
+---
+
+## 3. The control database
+
+Fixed name `bms_control` (overridable per environment with `CONTROL_DB_NAME` —
+demo uses `demo_control` so its test tenants never mix with production's).
+It holds **no business data**, so none of `.claude/reporting-source.md`'s
+reporting rules apply to it.
+
+| Table | What it is |
+|---|---|
+| `tenants` | The registry. One row per company: `subdomain`, `db_name`, `db_username`, `db_password_encrypted`, `status`, `owner_email`. |
+| `superadmins` | Platform operators. Ships **empty** — created explicitly with `scripts/create_superadmin.php`. |
+| `tenant_provisioning_log` | Step-by-step audit of every signup attempt. **The single fastest diagnostic in this subsystem** when a registration fails. |
+| `registration_attempts` | Rate-limiting for the public signup endpoint (3 per IP per hour). |
+| `tenant_admin_log` | Who suspended/deleted which tenant, and when. No FK — the record outlives both parties. |
+| `tenant_migration_log` | Per-tenant migration outcomes. |
+
+It is created by `php scripts/setup_control_db.php` — **an operator step, never
+a deploy migration.** (A deploy migration for it once halted an entire
+production deploy: the app's MySQL user lacks `CREATE DATABASE`, the migration
+exited 1, and `script_stop: true` correctly stopped everything — including the
+second host. Platform infrastructure must never be able to veto a release.)
+
+---
+
+## 4. What happens on every request
+
+`bmsConnectPdo()` in `core/tenant_bootstrap.php` resolves exactly one of these:
+
+| Resolution | Meaning | Result |
+|---|---|---|
+| `disabled` | `TENANT_MODE` is not `on` | The legacy single-tenant connection. Nothing changes. |
+| `none` | Root domain, a reserved label, CLI, an IP | The main application database — these are the platform's own surfaces. |
+| `unknown` | Looks like a tenant address, but no such tenant | **Stops the request (404).** Never falls back — otherwise inventing a hostname would serve the main database. |
+| `found` + suspended/deleted | Tenant exists, gate closed | 403 / 410. Scoped to that tenant alone. |
+| `found` + active/trial | A live tenant | Connects as `bms_u{id}` to `bms_t{id}`. |
+
+Two things worth knowing:
+
+- **The base domain can never be a tenant.** `extractTenantSubdomain()` returns
+  `null` for the base domain itself, so `bms.example.tz` always takes the legacy
+  path. A tenant always lives on a label in front of it.
+- **The cross-tenant session guard lives here, not in `header.php`.** 565 files
+  include `config.php`; far fewer include `header.php`. A guard that misses the
+  API surface is not a guard. A session carrying another tenant's id is
+  destroyed and the request refused.
+
+---
+
+## 5. How a new company is created
+
+`core/tenant_provisioner.php` → `provisionTenant()`, driven by the public
+endpoint in `core/tenant_registration.php`.
+
+1. Validate (subdomain format, reserved labels, email, password, honeypot, throttle).
+2. **Reserve the registry row first** — the database name needs the `id` that only
+   the row's `AUTO_INCREMENT` can produce. (The plan originally had this backwards.)
+3. `CREATE DATABASE bms_t{id}`, load `schema/tenant_schema_template.sql`.
+4. Load `schema/tenant_seed_defaults.sql` — chart of accounts, account types and
+   categories, roles, permissions, role-permission mappings.
+5. `CREATE USER bms_u{id}` + `GRANT ALL ON bms_t{id}.*` — **that database only**.
+6. Create the owner user from the signup form.
+7. **Reconnect as the tenant's own credentials and verify** — if the GRANT were
+   wrong, the failure would otherwise surface at the customer's first login.
+8. Finalise the registry row, storing the password encrypted (`tenc:v1:…`).
+
+Any failure rolls the whole thing back: database, user and registry row.
+
+**Provisioning uses its own MySQL account (`bms_prov`), not the app's.** Creating
+databases and granting privileges needs `WITH GRANT OPTION`; the everyday app
+user must never have that, or an app-user compromise would break isolation
+outright — the entire point of the project.
+
+---
+
+## 6. Adding a schema change that must reach every tenant
+
+Put it in **`migrations/tenant/`** (not `migrations/`, which only ever touches
+the single main application database). Read `migrations/tenant/README.md` first.
+
+```bash
+php core/tenant_migration_runner.php              # every live tenant
+php core/tenant_migration_runner.php --tenant=7   # one tenant (retry/debug)
+php core/tenant_migration_runner.php --dry-run    # report only
+```
+
+It runs automatically on deploy, last per host, guarded so **a tenant-side
+failure can never abort the release**. One tenant's failed migration stops only
+that tenant's sequence; every other tenant still receives its migrations.
+
+**The one rule that matters most:** a file under `migrations/tenant/` must never
+`require` `roots.php` or `includes/config.php` — that would reconnect `$pdo` to
+the main database mid-migration and silently run every later statement against
+the wrong database. Use `core/tenant_migration_bootstrap.php`.
+
+---
+
+## 7. Environment variables
+
+These must be **real server-level variables** (Apache `SetEnv` in each vhost).
+`putenv()` inside `config.php` covers CLI only — `register.php` is standalone and
+never loads `config.php`, which is exactly how self-registration once shipped
+silently broken.
+
+| Variable | Purpose |
+|---|---|
+| `TENANT_MODE` | `on` enables everything. Anything else = single-tenant. |
+| `TENANT_BASE_DOMAIN` | The domain subdomains hang off. Without it nothing resolves. |
+| `TENANT_CRED_KEY` | 64 hex chars. Decrypts tenant credentials. Falls back to `includes/tenant_cred_key.php`. |
+| `CONTROL_DB_NAME` | Override the control database name (demo uses `demo_control`). |
+| `CONTROL_DB_USER` / `_PASS` | The control connection's own account. Unset = falls back to the app's credentials. |
+
+Turning it **off** is unsetting `TENANT_MODE` — no deploy required.
+
+---
+
+## 8. The test suites, and what each is actually for
+
+```bash
+php tests/test_tenant_control_db_cli.php        # registry shape, crypto, no backdoor account
+php tests/test_tenant_provisioning_cli.php      # the provisioning engine + rollback
+php tests/test_tenant_routing_cli.php           # hostname → database resolution
+php tests/test_tenant_registration_cli.php      # the public signup endpoint, failing closed
+php tests/test_tenant_superadmin_auth_cli.php   # platform operator auth
+php tests/test_tenant_admin_panel_cli.php       # suspend/delete affect ONE tenant
+php tests/test_tenant_migration_runner_cli.php  # per-tenant migrations + isolation of failures
+php tests/test_tenant_isolation_cli.php         # ← the isolation PROMISE. Re-run before every release.
+php tests/test_tenant_module_smoke_cli.php      # ← does the APP work inside a tenant database?
+```
+
+The last two carry the weight:
+
+- **`test_tenant_isolation_cli.php`** is adversarial — it holds one tenant's
+  credentials and tries to reach another's data. It contains two deliberate
+  anti-vacuity guards (a positive control, and a helper validated against a real
+  leak). **Do not remove them**; without them a broken connection would make
+  every "refused" assertion pass.
+- **`test_tenant_module_smoke_cli.php`** covers the one risk no other suite
+  touches: a table or column that exists in the application database but never
+  made it into the schema template would break that module for **every new
+  customer** while working perfectly for the original company.
+
+**Writing a new tenant test?** Any probe that spawns a subprocess must be
+*hermetic*. `config.php` `putenv()`s the machine's own `TENANT_MODE` /
+`TENANT_BASE_DOMAIN` and will silently overwrite what your test set — and the
+parent test process loads `config.php` too, so inheriting the parent's
+environment is not neutral either. Copy the pattern in the existing probes.
+
+---
+
+## 9. Known gaps
+
+| Gap | Status |
+|---|---|
+| Tenant #1 (the original company) is not yet a registered tenant | Phase 7 — its data is still served by the legacy fallback on the base domain. Cost of leaving it: schema changes must be written twice. |
+| `bms_control_app` least-privilege control user | Operator step, conventions §12. The capability ships; the production user is not created. |
+| Wildcard TLS certificates do not auto-renew | `certbot --manual`, DNS-01. **Expire 2026-11-30.** Needs a calendar reminder or an auth hook. |
+| `bms_t{id}` / `bms_u{id}` prefix is hardcoded | In `tenant_provisioner.php`. Demo works around it with `AUTO_INCREMENT = 9000`. Making it configurable is the proper fix. |
+
+---
+
+## 10. When something breaks
+
+**Read `tenant_provisioning_log` first.** It records `step`, `status` and
+`message` per provisioning step and is by far the fastest way to find out what
+actually happened — the customer-facing message ("We could not finish setting up
+your account") deliberately says nothing useful.
+
+Other recurring ones:
+
+- *"Registration is not available on this installation"* → `TENANT_MODE` is not
+  reaching the web layer. Check the vhost `SetEnv`, not `config.php`.
+- *"Registration failed. Please try again."* in the browser → stale CSRF token on
+  a long-open page, or a non-JSON response. Hard-refresh first.
+- Repeat signups silently blocked → the 3/IP/hour throttle.
+  `DELETE FROM registration_attempts` in that environment's control database.
+- Superadmin panel 404s → once tenancy is genuinely on, it lives at
+  `superadmin.<host>/app/superadmin/login.php`, not the plain domain.
