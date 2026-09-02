@@ -68,7 +68,10 @@ function svBadge(string $status): string
             <small class="text-muted">Signed in as <?= safe_output($me['name'] ?? '', '') ?></small>
         </div>
     </div>
-    <a href="logout.php" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
+    <div class="d-flex gap-2">
+        <a href="profile.php" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-gear me-1"></i> My Account</a>
+        <a href="logout.php" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
+    </div>
 </div>
 
 <div class="container-fluid p-3">

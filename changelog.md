@@ -1,5 +1,55 @@
 # BMS Changelog
 
+## 2026-09-02 (feat) — Superadmin can change their own credentials and register a company from the panel
+
+**Files (added):** `app/superadmin/profile.php`, `app/superadmin/tenant_new.php`,
+`actions/superadmin_profile_action.php`, `actions/superadmin_create_tenant.php`,
+`tests/test_superadmin_selfservice_cli.php`, `superadmin_control_plan.md`
+**Files (changed):** `core/superadmin_auth.php`, `core/tenant_admin.php`,
+`app/superadmin/tenants.php`, `app/superadmin/tenant_view.php`
+
+Two capabilities a platform operator did not have. Changing a superadmin password previously meant
+running `scripts/create_superadmin.php` or editing SQL by hand, and a company could only be created
+through the *public* self-registration form — so an operator could not onboard a customer while
+public signup was switched off, which is exactly when they most need to.
+
+**Credentials (`app/superadmin/profile.php`).** Name, email and password, each requiring the
+**current password** — including the name/email form, because email *is* a login credential here and
+a hijacked open session must not be able to move the account to another address. The endpoint takes
+no "which superadmin" parameter: the id always comes from the session, so it can only ever modify
+the caller's own account. On a password change the session id is regenerated (closing any session
+fixated beforehand) while the operator stays signed in, and a stale lockout is lifted since they
+have just proved possession. `superadminPasswordError()` deliberately reuses the *same* rule as
+tenant signup — two password rules in one codebase is how one of them silently rots.
+
+**Registration (`app/superadmin/tenant_new.php`).** Calls the same `provisionTenant()` the public
+path uses — a second provisioning implementation would drift, and the one that drifts is always the
+one that creates a subtly broken tenant. `createTenantAsOperator()` keeps **every** validation rule
+(company name, subdomain format, reserved labels, availability, email, password strength and
+confirmation) and drops only the three anti-abuse controls that are wrong for an authenticated
+operator: the honeypot, the 3-per-IP-per-hour throttle (which would lock an operator out of their
+own panel while onboarding several customers), and the `selfRegistrationOpen()` master switch.
+Proven in test: a company can be created **while public signup is off**. Live subdomain availability
+check, and every creation attributed in `tenant_admin_log`.
+
+**A real defect the tests caught.** `currentSuperadmin()` memoised the operator row in a
+function-level `static`, so after an operator changed their own email, `tenant_admin_log` kept
+attributing their later actions *in the same request* to the OLD address. Per-request caching made
+the production impact nil, but an audit trail that records a stale identity is worse than one that
+costs a query. The cache is now invalidatable via `forgetCurrentSuperadmin()`, called after both
+credential changes. Caching semantics (including negative caching of deleted accounts) are unchanged.
+
+**Verified by executing the real runtime path,** not just lint: both pages render at
+`superadmin.<base-domain>` with no PHP errors, return a flat `Not found` from a tenant's own
+hostname, and the real action endpoints were exercised end to end — a bad CSRF token refused with
+`Invalid CSRF token`, a wrong current password refused, a valid password change succeeding with the
+old password no longer verifying, and a real company created, audited and cleaned up.
+52 new assertions; 393 across the seven superadmin/tenant suites, 0 failures.
+
+`superadmin_control_plan.md` records the full six-phase plan this is the first two phases of. The
+remaining phases — per-tenant feature switching for Projects, POS, HR, AI Assistant and
+E-Signatures — are **not** implemented here and are still open for discussion.
+
 ## 2026-09-02 (test) — Phase 10: module regression against a fresh tenant, architecture reference, and a real test-pollution bug
 
 **Files (added):** `tests/test_tenant_module_smoke_cli.php`, `docs/MULTI_TENANCY.md`
