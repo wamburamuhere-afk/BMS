@@ -560,3 +560,67 @@ other secret in this deploy already accepts.
 `includes/config.php` — doing so reconnects `$pdo` to the main `bms` database
 mid-migration, silently running every later statement against the wrong
 database.
+
+---
+
+## 12. Isolation proof + least-privilege control user *(Phase 9)*
+
+### The isolation suite is the acceptance gate
+
+`tests/test_tenant_isolation_cli.php` (48 assertions) is the proof that the
+product's central promise to customers holds. It is deliberately adversarial:
+it provisions two real tenants, then takes the position of someone holding one
+tenant's credentials and trying to reach the other's data.
+
+```bash
+php tests/test_tenant_isolation_cli.php     # re-run before every release
+```
+
+What it establishes, in order: separate databases/users/passwords; tenant A's
+MySQL credentials refused on B's database for read, write, `USE`, `DROP` and
+`GRANT`; B invisible even to `SHOW DATABASES`; the control registry, the
+superadmin table and `mysql.user` all unreadable by a tenant; no `PROCESS`
+privilege, so one tenant cannot watch another's queries; the same primary key
+present in both companies returning each one's own row; the real bootstrap
+routing each hostname to its own database; a session pinned to one tenant
+refused on another's hostname; each ledger balancing independently, with a
+posting into A leaving B's totals completely unmoved; and no plaintext tenant
+password in the registry or any of the three control log tables.
+
+**Two anti-vacuity guards are part of the suite, and must not be removed.**
+Every "refused" assertion would also pass if the connection were simply broken,
+so section 2 carries a **positive control** proving the same connection can
+freely create, write and read inside its *own* database — the refusals are
+targeted, not blanket. The helper itself was separately validated against a
+deliberately over-privileged user granted `` `bms_t%`.* ``: it reported the leak
+on every path, confirming a real regression would fail the suite loudly rather
+than slip through.
+
+### Least-privilege control-database user — an OPERATOR step
+
+`getControlPdo()` falls back to the application's own MySQL credentials when
+`CONTROL_DB_USER` is unset. That is correct for local development and wrong for
+production: the control database holds **every tenant's encrypted credentials**,
+so it should have its own account that can do nothing else.
+
+Which user is in play is an environment fact, not a property of the code — so
+the suite **asserts the capability and reports the posture** rather than failing
+a developer's machine for using root. (Asserting "never root" would repeat the
+mistake of the old "superadmins ships empty" check, which failed on every
+working install.) The suite prints the exact SQL when it sees a privileged user:
+
+```sql
+CREATE USER 'bms_control_app'@'localhost' IDENTIFIED BY '<strong-password>';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `bms_control`.* TO 'bms_control_app'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+Then set `CONTROL_DB_USER` / `CONTROL_DB_PASS` in each vhost alongside the other
+tenancy variables (§9 Step 1). Note `demo` overrides `CONTROL_DB_NAME`, so grant
+against that host's own control database name.
+
+**Do not confuse this with `bms_prov`.** Provisioning genuinely needs
+`ALL PRIVILEGES … WITH GRANT OPTION` because tenant database names are not known
+in advance; `bms_control_app` is the everyday reader/writer of the registry and
+needs none of that. Keeping them separate is the point: an app-user compromise
+must not carry the ability to grant itself into another tenant.

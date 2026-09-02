@@ -1,5 +1,51 @@
 # BMS Changelog
 
+## 2026-09-02 (security) — Phase 9: prove tenant isolation, audit credentials, document the least-privilege control user
+
+**Files (added):** `tests/test_tenant_isolation_cli.php`
+**Files (changed):** `docs/MULTI_TENANCY_CONVENTIONS.md`, `ternant.md`
+
+Multi-tenancy's central promise to customers — one company's data is unreachable from another's —
+had no automated proof. Every other suite tests that a feature works; this one tests that the
+promise is true. **48 assertions, 0 failures.**
+
+The suite is deliberately adversarial: it provisions two real tenants, then takes the position of
+someone holding one tenant's credentials and trying to reach the other's data. It establishes, in
+order: separate databases, MySQL users and passwords; tenant A's credentials refused on B's database
+for read, write, `USE`, `DROP` and `GRANT`; B invisible even to A's `SHOW DATABASES`; the control
+registry (which holds *every* tenant's encrypted credentials), the superadmin table and `mysql.user`
+all unreadable by a tenant; no `PROCESS` privilege, so one tenant cannot watch another's queries go
+by; **the same primary key deliberately present in both companies**, with id-guessing returning each
+one's own row; the real bootstrap routing each hostname to its own database, and an invented
+hostname opening none; a session pinned to one tenant refused on another's hostname while that
+tenant's own session still works; each ledger balancing independently, with a real posting into A
+leaving B's totals completely unmoved; and no plaintext database password in the registry or any of
+the three control log tables — closing the audit that `tenant_provisioner.php` had flagged in a
+comment as *"audited in Phase 9"*.
+
+**Two anti-vacuity guards, because a green isolation suite that tests nothing is worse than none.**
+Every "refused" assertion would also pass if the connection were simply broken, so section 2 carries
+a **positive control** proving the same connection can freely create, write and read inside its
+*own* database — the refusals are targeted, not blanket. Separately, the `refused()` helper was
+validated against a deliberately over-privileged throwaway user granted `` `bms_t%`.* ``: it
+reported the leak on every path and `SHOW DATABASES` exposed the neighbour, confirming a real
+regression fails the suite loudly. That probe user never touched the real tenant accounts and was
+dropped and verified gone.
+
+**Control-database least-privilege user — capability shipped, production step still outstanding.**
+`getControlPdo()` falls back to the app's own credentials when `CONTROL_DB_USER` is unset: right for
+local development, wrong for production, where the registry holding every tenant's credentials
+should have an account that can do nothing else. Which user an environment uses is not a property of
+the code, and a hard "never root" assertion would fail every developer's machine — the same mistake
+the old "superadmins ships empty" check made. So the suite asserts the **capability** (a dedicated
+user can be supplied purely by `CONTROL_DB_USER`/`CONTROL_DB_PASS`, no file edit) and *reports* the
+live posture, printing the exact `CREATE USER`/`GRANT` SQL when it sees a privileged account.
+Creating `bms_control_app` on demo and bms remains an operator step; documented as conventions §12,
+which also explains why it must stay separate from the `bms_prov` provisioning account.
+
+Runs leave nothing behind — verified afterwards that no orphaned registry rows, tenant databases or
+MySQL users remain.
+
 ## 2026-09-02 (feat) — Wire the tenant migration runner into deploy, and lint tenant migrations in CI
 
 **Files (changed):** `.github/workflows/deploy.yml`, `core/tenant_migration_runner.php`,
@@ -38,6 +84,7 @@ both passes on the current tree and actually blocks a deliberately broken tenant
 Docs corrected in the same commit: the runner's own docblock, conventions §11, and `ternant.md`'s
 Phase 8 note and tracker all said the wiring was deliberately absent. Note this shipped
 **independently of the rest of Phase 7** — registering Tenant #1 is still pending.
+
 
 ## 2026-09-02 (test) — Make the multi-tenancy suites hermetic; stop asserting live DB state
 
