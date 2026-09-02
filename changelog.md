@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-09-02 (feature) — Keep `.php` out of the address bar for pages
+
+**Files (changed):** `.htaccess`, `roots.php`
+
+Pages reached through the router already show clean URLs (`/login`, `/dashboard`). Pages that
+exist as real files on disk did not: Apache served `register.php` and `app/superadmin/*.php`
+directly, so the extension stayed visible and the router's own `.php` → clean-URL redirect
+(already present in `handleRoute()`) never got a chance to run, because `.htaccess` only hands a
+request to `index.php` when the file does **not** exist.
+
+Two changes close that gap. `.htaccess` now routes a **GET** for any `.php` page through
+`index.php` first, and `handleRoute()`'s existing redirect was extended: besides mapped routes it
+now also 301s a `.php` URL whose file exists on disk, because the literal-file fallback further
+down already serves the extension-less form (`/register` was already working — only the redirect
+was missing).
+
+**Deliberately excluded, so nothing that calls a URL with its extension breaks:** every POST, and
+the whole `api/`, `ajax/` and `actions/` trees — those are called with `.php` on purpose by forms
+and AJAX. `index.php` itself is excluded too, so there is no rewrite loop.
+
+**Verified live on the local server** (not asserted from source): `/register.php`, `/login.php`,
+`/app/dashboard.php`, `/unauthorized.php` and `/app/superadmin/login.php` each return 301 to their
+clean URL, which then renders (superadmin checked on its reserved subdomain, returning its real
+"Platform Sign In" page). `GET` and `POST` on `actions/login.php`, `api/*` and `ajax/*` return
+their normal responses with no redirect, and `/index.php` still resolves without looping.
+
 ## 2026-08-31 (feature) — Restore "New company? Register here" on login.php, host-aware
 
 **Files (changed):** `login.php`, `tests/test_tenant_registration_cli.php`
