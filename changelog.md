@@ -1,5 +1,66 @@
 # BMS Changelog
 
+## 2026-09-02 (test) — Phase 10: module regression against a fresh tenant, architecture reference, and a real test-pollution bug
+
+**Files (added):** `tests/test_tenant_module_smoke_cli.php`, `docs/MULTI_TENANCY.md`
+**Files (changed):** `tests/test_tenant_migration_runner_cli.php`, `ternant.md`
+
+### The bug this phase found — tests were writing into real tenant databases
+
+`tests/test_tenant_migration_runner_cli.php` calls `runTenantMigrations()` with **no tenant filter**
+four times. That is correct — applying to every live tenant is the behaviour under test — but its
+teardown only dropped *its own* two throwaway tenants. So its scratch migrations were also applied
+to whatever **real** tenants existed on the machine, creating `p8test_marker` / `p8dry_marker` tables
+inside their databases and writing rows into their `schema_migrations`.
+
+Found by diffing a tenant's schema against the application database during this phase's regression
+pass, and confirmed: both local tenants carried both marker tables and three stray
+`schema_migrations` rows. On a host with real customers — demo has real test tenants, production
+will — running the suite would pollute live customer databases. Worse, the stray `schema_migrations`
+rows would make a **later, genuine** migration of the same name appear "already applied" and be
+silently skipped.
+
+Fixed with a `cleanBystanderTenants()` teardown that walks every live tenant, drops the marker
+tables, and deletes only the uniquely-named `9999_99_99_p8%` rows. Everything the suite creates is
+uniquely named, so the cleanup is exact rather than guesswork. Verified: suite still 36/0, and the
+pre-existing pollution in both local tenants is now gone.
+
+### Module regression against a genuinely fresh tenant
+
+`tests/test_tenant_module_smoke_cli.php` (43 assertions) covers the one risk no other tenant suite
+touches. Every other suite proves the *plumbing* — routing, provisioning, isolation. None prove the
+**application** works once `$pdo` points at `bms_t{id}`. A tenant database is not a copy of
+production: it is built from `schema/tenant_schema_template.sql` plus the defaults seed, so a table
+or column that exists in the application database but never reached the template would break that
+module for **every new customer** while working perfectly for the original company.
+
+It asserts full table parity against the application database, column parity on every module table,
+usable seeded defaults (105 accounts, 8 roles, 156 permissions, 600 role-permission mappings), that
+the owner account created at signup can actually authenticate and is stored hashed, that all four
+statutory reports run and reconcile, that all ten module groups (GL, Sales, Purchasing, Inventory,
+POS, HR, Payroll, CRM, Projects, Access control) read cleanly, and a real GL round-trip — post a
+balanced entry, see it reach the Trial Balance with the Balance Sheet still balancing.
+
+Both parity checks were proven non-vacuous against a deliberately deficient database: 307 missing
+tables and a dropped column were each detected and would fail the suite.
+
+**Deviation from the plan, stated plainly:** Phase 10 specified regression against Tenant #1 **and**
+a fresh tenant side by side. Tenant #1 does not exist (Phase 7 pending), so the comparison is made
+against the application database instead — the same comparison in substance. The "full *manual*
+regression across every module" half remains genuinely outstanding.
+
+### Architecture reference + go-live checklist
+
+`docs/MULTI_TENANCY.md` documents the system as built for whoever arrives with no context: the
+model, the control DB schema, what happens on every request, the provisioning flow, adding a
+per-tenant migration, environment variables, what each of the nine test suites is for, known gaps,
+and troubleshooting. The go-live checklist in `ternant.md` is now scored against reality — 5 of 8
+items done; the outstanding three are Tenant #1 rotation (Phase 7), the `bms_control_app`
+least-privilege user, and **wildcard certificate renewal, which expires 2026-11-30**.
+
+All nine tenant suites: **468 pass, 0 fail.** Runs leave no orphaned registry rows, databases, MySQL
+users or marker tables behind.
+
 ## 2026-09-02 (security) — Phase 9: prove tenant isolation, audit credentials, document the least-privilege control user
 
 **Files (added):** `tests/test_tenant_isolation_cli.php`
