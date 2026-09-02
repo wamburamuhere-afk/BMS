@@ -83,8 +83,16 @@ if (!function_exists('currentSuperadmin')) {
         $id = superadminId();
         if ($id === null) return null;
 
-        static $cache = [];
-        if (array_key_exists($id, $cache)) return $cache[$id];
+        // Backed by a global rather than a function-level `static` purely so it
+        // can be invalidated — see forgetCurrentSuperadmin(). Negative results
+        // are cached too (array_key_exists, not isset), so a deleted account
+        // does not re-query on every call within a request.
+        if (!isset($GLOBALS['__bms_sa_cache']) || !is_array($GLOBALS['__bms_sa_cache'])) {
+            $GLOBALS['__bms_sa_cache'] = [];
+        }
+        if (array_key_exists($id, $GLOBALS['__bms_sa_cache'])) {
+            return $GLOBALS['__bms_sa_cache'][$id];
+        }
 
         try {
             $st = getControlPdo()->prepare(
@@ -94,16 +102,32 @@ if (!function_exists('currentSuperadmin')) {
             $row = $st->fetch();
         } catch (Throwable $e) {
             error_log('currentSuperadmin: ' . $e->getMessage());
-            return $cache[$id] = null;
+            return $GLOBALS['__bms_sa_cache'][$id] = null;
         }
 
         if (!$row) {
             // The account is gone — drop the session rather than leaving a
             // half-authenticated request running.
             superadminLogout();
-            return $cache[$id] = null;
+            return $GLOBALS['__bms_sa_cache'][$id] = null;
         }
-        return $cache[$id] = $row;
+        return $GLOBALS['__bms_sa_cache'][$id] = $row;
+    }
+}
+
+if (!function_exists('forgetCurrentSuperadmin')) {
+    /**
+     * Drop the memoised operator row so the next currentSuperadmin() re-reads it.
+     *
+     * Exists because of a real defect this codebase's own test caught: after an
+     * operator changed their own email, tenant_admin_log kept attributing their
+     * subsequent actions to the OLD address for the rest of that request, because
+     * the row had already been memoised. An audit trail that records a stale
+     * identity is worse than one that costs an extra query.
+     */
+    function forgetCurrentSuperadmin(): void
+    {
+        $GLOBALS['__bms_sa_cache'] = [];
     }
 }
 
@@ -254,5 +278,158 @@ if (!function_exists('superadminLoginUrl')) {
     function superadminLoginUrl(): string
     {
         return '/app/superadmin/login.php';
+    }
+}
+
+// ─── Self-service account management ────────────────────────────────────────
+// Added 2026-09-02. Before this, the only way to change a superadmin's password
+// was scripts/create_superadmin.php or raw SQL — an operator could not rotate
+// their own credential from inside the panel they administer the platform with.
+
+if (!function_exists('superadminPasswordError')) {
+    /**
+     * The one place the superadmin password rule is expressed.
+     *
+     * Deliberately identical to the tenant-signup rule in
+     * core/tenant_registration.php (.claude/security.md §20): 8+ characters,
+     * at least one letter and one digit. A platform operator's credential must
+     * never be weaker than the customers' — and two different rules in one
+     * codebase is how one of them silently rots.
+     */
+    function superadminPasswordError(string $pw, string $confirm): ?string
+    {
+        if (strlen($pw) < 8 || !preg_match('/[A-Za-z]/', $pw) || !preg_match('/\d/', $pw)) {
+            return 'Password must be at least 8 characters and include a letter and a number.';
+        }
+        if ($confirm !== $pw) {
+            return 'The two passwords do not match.';
+        }
+        return null;
+    }
+}
+
+if (!function_exists('updateSuperadminProfile')) {
+    /**
+     * Change a superadmin's own name and/or email.
+     *
+     * @return array{ok:bool, error:?string}
+     *
+     * The current password is required even for a name change. Email IS a login
+     * credential here, so changing it is a credential change; requiring the
+     * password means a hijacked, still-open session cannot quietly move the
+     * account to an attacker's address and lock the real operator out.
+     */
+    function updateSuperadminProfile(int $id, string $name, string $email, string $currentPassword): array
+    {
+        $name  = trim($name);
+        $email = strtolower(trim($email));
+
+        if ($name === '' || mb_strlen($name) < 2) {
+            return ['ok' => false, 'error' => 'Please enter your name.'];
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['ok' => false, 'error' => 'Please enter a valid email address.'];
+        }
+
+        try {
+            $pdo = getControlPdo();
+        } catch (Throwable $e) {
+            error_log('updateSuperadminProfile: control DB unreachable: ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'The account directory is unavailable. Please try again shortly.'];
+        }
+
+        $st = $pdo->prepare("SELECT * FROM superadmins WHERE id = ? LIMIT 1");
+        $st->execute([$id]);
+        $sa = $st->fetch();
+        if (!$sa) {
+            return ['ok' => false, 'error' => 'Your account no longer exists.'];
+        }
+
+        if (!password_verify($currentPassword, (string)$sa['password_hash'])) {
+            return ['ok' => false, 'error' => 'Your current password is incorrect.'];
+        }
+
+        // Uniqueness is enforced here AND by the table's unique index; this
+        // check exists to return a usable message rather than a 23000 error.
+        $dup = $pdo->prepare("SELECT 1 FROM superadmins WHERE email = ? AND id <> ? LIMIT 1");
+        $dup->execute([$email, $id]);
+        if ($dup->fetchColumn()) {
+            return ['ok' => false, 'error' => 'Another operator already uses that email address.'];
+        }
+
+        try {
+            $pdo->prepare("UPDATE superadmins SET name = ?, email = ? WHERE id = ?")
+                ->execute([$name, $email, $id]);
+        } catch (Throwable $e) {
+            error_log('updateSuperadminProfile: ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'The change could not be saved.'];
+        }
+
+        // The operator row is memoised per request; without this, anything later
+        // in the SAME request — notably tenant_admin_log's attribution — would
+        // still record the old name and email.
+        forgetCurrentSuperadmin();
+
+        return ['ok' => true, 'error' => null];
+    }
+}
+
+if (!function_exists('changeSuperadminPassword')) {
+    /**
+     * Change a superadmin's own password.
+     *
+     * @return array{ok:bool, error:?string}
+     *
+     * On success the session ID is regenerated. A password change is exactly the
+     * moment to close any session fixated before it, and the operator stays
+     * signed in on this device rather than being bounced to the login page.
+     */
+    function changeSuperadminPassword(int $id, string $current, string $new, string $confirm): array
+    {
+        if ($current === '' || $new === '') {
+            return ['ok' => false, 'error' => 'Please fill in every field.'];
+        }
+        if ($err = superadminPasswordError($new, $confirm)) {
+            return ['ok' => false, 'error' => $err];
+        }
+
+        try {
+            $pdo = getControlPdo();
+        } catch (Throwable $e) {
+            error_log('changeSuperadminPassword: control DB unreachable: ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'The account directory is unavailable. Please try again shortly.'];
+        }
+
+        $st = $pdo->prepare("SELECT * FROM superadmins WHERE id = ? LIMIT 1");
+        $st->execute([$id]);
+        $sa = $st->fetch();
+        if (!$sa) {
+            return ['ok' => false, 'error' => 'Your account no longer exists.'];
+        }
+
+        if (!password_verify($current, (string)$sa['password_hash'])) {
+            return ['ok' => false, 'error' => 'Your current password is incorrect.'];
+        }
+        if (password_verify($new, (string)$sa['password_hash'])) {
+            return ['ok' => false, 'error' => 'The new password must be different from the current one.'];
+        }
+
+        try {
+            // failed_attempts / locked_until are cleared: the operator has just
+            // proved possession of the current password, so an earlier lockout
+            // counter is stale and would only lock out the legitimate owner.
+            $pdo->prepare("UPDATE superadmins SET password_hash = ?, failed_attempts = 0, locked_until = NULL WHERE id = ?")
+                ->execute([password_hash($new, PASSWORD_DEFAULT), $id]);
+        } catch (Throwable $e) {
+            error_log('changeSuperadminPassword: ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'The change could not be saved.'];
+        }
+
+        if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
+            session_regenerate_id(true);
+        }
+        forgetCurrentSuperadmin();
+
+        return ['ok' => true, 'error' => null];
     }
 }
