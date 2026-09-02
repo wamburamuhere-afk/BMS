@@ -39,10 +39,51 @@ $made = ['tenants' => [], 'databases' => [], 'users' => []];
 $tenantDir = dirname(__DIR__) . '/migrations/tenant';
 $droppedFiles = [];
 
+/**
+ * Undo what this suite did to tenants it does NOT own.
+ *
+ * runTenantMigrations() with no filter deliberately applies to EVERY live
+ * tenant — that is the behaviour under test. The consequence is that this
+ * suite's throwaway migrations also land in whatever real tenants happen to
+ * exist on the machine, and dropping this suite's own two databases does not
+ * undo that. Left unfixed, running these tests on a host with real customers
+ * creates p8*_marker tables inside their databases and writes rows into their
+ * schema_migrations — which would also make a LATER real migration of the same
+ * name silently appear "already applied".
+ *
+ * Everything this suite creates is uniquely named (9999_99_99_p8*_<sfx>.php,
+ * p8*_marker), so cleanup can be exact rather than guesswork.
+ */
+function cleanBystanderTenants(): void
+{
+    require_once dirname(__DIR__) . '/core/tenant_crypto.php';
+    try {
+        $rows = getControlPdo()
+            ->query("SELECT * FROM tenants WHERE status != 'deleted' AND subdomain NOT LIKE 'migtest%'")
+            ->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) { return; }
+
+    foreach ($rows as $t) {
+        try {
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) continue;
+            $p = new PDO(
+                "mysql:host={$t['db_host']};dbname={$t['db_name']};charset=utf8mb4",
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+            );
+            $p->exec("DROP TABLE IF EXISTS `p8test_marker`");
+            $p->exec("DROP TABLE IF EXISTS `p8dry_marker`");
+            $p->exec("DELETE FROM `schema_migrations` WHERE migration_name LIKE '9999\\_99\\_99\\_p8%'");
+        } catch (Throwable $e) { /* unreachable tenant — never break teardown */ }
+    }
+}
+
 function teardown(): void
 {
     global $made, $droppedFiles;
     foreach ($droppedFiles as $f) { if (is_file($f)) @unlink($f); }
+    cleanBystanderTenants();
     try {
         $c = getControlPdo();
         $c->exec("DELETE FROM tenant_migration_log WHERE subdomain LIKE 'migtest%'");
