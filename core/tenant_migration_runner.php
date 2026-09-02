@@ -9,14 +9,18 @@
  *   php core/tenant_migration_runner.php --tenant=7       # one tenant only (retry/debug)
  *   php core/tenant_migration_runner.php --dry-run        # report what WOULD run
  *
- * NOT WIRED INTO deploy.yml (deliberately, as of Phase 8 — 2026-08-31).
- * ternant.md's original plan called for a deploy.yml step here. Building this
- * today, right after the control-database migration broke the production
- * deploy for an optional, not-yet-live subsystem (see the 2026-08-31 hotfix in
- * changelog.md), would repeat exactly that mistake for zero benefit: Phase 7
- * has not run, so there are zero real tenants for this to migrate. Wiring
- * happens alongside Phase 7, once tenants actually exist to migrate.
- * Until then this runs standalone — by hand, or from a separate cron.
+ * WIRED INTO deploy.yml AS OF 2026-09-02 — and it may never abort a deploy.
+ * It runs last per host, guarded with `|| echo`, so a tenant-side failure warns
+ * loudly while the release still lands on every host. That guard is the whole
+ * point: on 2026-08-31 a migration for the optional, not-yet-live control
+ * database exited 1, `script_stop: true` correctly halted everything, and the
+ * second host never received the release (see the hotfix in changelog.md).
+ * A per-tenant subsystem must never be able to veto the platform's deploy.
+ *
+ * Safe on a host with no multi-tenancy: with no control database, or no files
+ * under migrations/tenant/, it reports "Nothing to do" and exits 0. Both no-op
+ * paths were verified before the wiring went in. It still runs standalone by
+ * hand or from cron exactly as before.
  *
  * ISOLATION, NOT A GLOBAL SCRIPT_STOP. ternant.md's "what ships" table says
  * a broken migration "stops on first failure for THAT TENANT" — but its

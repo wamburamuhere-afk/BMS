@@ -1,5 +1,44 @@
 # BMS Changelog
 
+## 2026-09-02 (feat) — Wire the tenant migration runner into deploy, and lint tenant migrations in CI
+
+**Files (changed):** `.github/workflows/deploy.yml`, `core/tenant_migration_runner.php`,
+`docs/MULTI_TENANCY_CONVENTIONS.md`, `ternant.md`
+
+`core/tenant_migration_runner.php` shipped in Phase 8 but was never invoked by the deploy — wiring
+was deliberately deferred because that was the same day a control-database migration halted the
+entire production deploy (§10). Real tenants now exist, so the gap has teeth: the moment a file
+landed in `migrations/tenant/`, it would have reached **zero** tenant databases until someone SSHed
+in and ran the command by hand. The directory currently holds only `README.md`, so nothing was
+missed — the gap was found before it cost anything.
+
+**The runner now runs last per host, guarded so it can never abort a deploy:**
+
+```bash
+php migrations/runner.php; php core/tenant_migration_runner.php || echo "⚠️  TENANT MIGRATIONS REPORTED FAILURES on $h …"
+```
+
+A tenant-side failure warns loudly in the job log and the release still lands on **both** hosts.
+A failure in the app's own `migrations/runner.php` still aborts the deploy, exactly as before —
+that guarantee is unchanged. Both behaviours were proven with stubbed failures under the same
+`set -e` the workflow uses, rather than assumed: a failing tenant step let both hosts finish, and a
+failing app step still exited non-zero. `script_stop: true` is untouched.
+
+**Safe on a host with no multi-tenancy.** Verified by running the real runner two ways before
+wiring it in: with no files under `migrations/tenant/`, and against a non-existent control database.
+Both print "Nothing to do" and exit 0 (`controlDbReady()` catches `Throwable`). The log it writes,
+`migrations/tenant_deploy.log`, is already covered by `.gitignore`'s `*.log`, so `git reset --hard`
+does not fight it.
+
+**CI now lints `migrations/tenant/*.php` too.** The "Check migration files are valid PHP" step
+globbed only `migrations/*.php`, which is not recursive — so files that this change now applies
+automatically to *every tenant database* had never been syntax-checked. Confirmed the extended glob
+both passes on the current tree and actually blocks a deliberately broken tenant migration.
+
+Docs corrected in the same commit: the runner's own docblock, conventions §11, and `ternant.md`'s
+Phase 8 note and tracker all said the wiring was deliberately absent. Note this shipped
+**independently of the rest of Phase 7** — registering Tenant #1 is still pending.
+
 ## 2026-09-02 (test) — Make the multi-tenancy suites hermetic; stop asserting live DB state
 
 **Files (changed):** `tests/test_tenant_routing_cli.php`, `tests/test_tenant_registration_cli.php`,

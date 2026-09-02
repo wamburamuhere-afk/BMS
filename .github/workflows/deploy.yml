@@ -112,7 +112,13 @@ jobs:
         run: |
           echo "Checking migration files..."
           ERRORS=0
-          for f in migrations/*.php; do
+          # migrations/tenant/ is included deliberately: those files are applied
+          # to EVERY tenant database by core/tenant_migration_runner.php during
+          # deploy, and that step is guarded with `|| echo` so it cannot abort the
+          # release. A parse error there would therefore reach every tenant
+          # unchecked at deploy time. The glob is not recursive, so the second
+          # pattern is required — `migrations/*.php` alone never matched them.
+          for f in migrations/*.php migrations/tenant/*.php; do
             [ -f "$f" ] || continue
             OUTPUT=$(php -l "$f" 2>&1)
             if echo "$OUTPUT" | grep -qE "^(Parse error|Fatal error)"; then
@@ -187,11 +193,29 @@ jobs:
           # backup_restore.php's mkdir() self-heal never fires (the dir already
           # exists) and "Generate Backup" fails with "Cannot open file for
           # writing" — reproduced on bms.bjptechnologies.co.tz on 2026-08-31.
+          #
+          # TENANT MIGRATIONS RUN LAST, AND MAY NEVER ABORT THE DEPLOY.
+          # `php core/tenant_migration_runner.php` applies migrations/tenant/ to
+          # each tenant database. It is deliberately the last step per host and is
+          # guarded with `|| echo`, so a tenant-side failure warns loudly but the
+          # release still lands — including on the second host.
+          #
+          # This is not caution for its own sake. On 2026-08-31 a migration for the
+          # optional, not-yet-live control database exited 1, `script_stop: true`
+          # correctly halted everything, and the second host never received the
+          # release. A per-tenant subsystem must never be able to veto the whole
+          # platform's deploy. See docs/MULTI_TENANCY_CONVENTIONS.md §10 and §11.
+          #
+          # It is safe on a host that has no multi-tenancy at all: with no control
+          # database, or no files under migrations/tenant/, the runner reports
+          # "Nothing to do" and exits 0. Both no-op paths were verified before this
+          # was wired in. The runner also isolates tenants from each other — one
+          # tenant's failed migration stops only that tenant's sequence.
           script: |
             set -e
             HOSTS="bms.bjptechnologies.co.tz demo.bjptechnologies.co.tz"
             UPLOAD_DIRS="parties/customers parties/suppliers parties/sub_contractors system/backups hr/employees hr/leaves procurement/purchase_returns procurement/delivery_notes products projects/inspections projects/scopes projects/contracts projects/reports finance/grn finance/vouchers finance/purchase_orders finance/invoices finance/petty_cash finance/customer_lpos loans signatures documents document_library document_templates compliance inspections tenders/submissions tenders/evaluation tenders/awards petty_cash purchase_orders"
-            for h in $HOSTS; do echo "────── Deploying to $h ──────"; cd "/var/www/$h/public_html"; git fetch origin main; git reset --hard origin/main; for d in $UPLOAD_DIRS; do sudo mkdir -p "uploads/$d"; done; sudo chmod -R 777 uploads/ 2>/dev/null || true; sudo chmod -R 777 backups/ 2>/dev/null || true; php migrations/runner.php; done
+            for h in $HOSTS; do echo "────── Deploying to $h ──────"; cd "/var/www/$h/public_html"; git fetch origin main; git reset --hard origin/main; for d in $UPLOAD_DIRS; do sudo mkdir -p "uploads/$d"; done; sudo chmod -R 777 uploads/ 2>/dev/null || true; sudo chmod -R 777 backups/ 2>/dev/null || true; php migrations/runner.php; php core/tenant_migration_runner.php || echo "⚠️  TENANT MIGRATIONS REPORTED FAILURES on $h — the app deploy still succeeded. Inspect migrations/tenant_deploy.log and the tenant_migration_log table, then re-run: php core/tenant_migration_runner.php --tenant=<id>"; done
             echo "BMS deployed at $(date)"
             echo "Deploy check: OK"
 
