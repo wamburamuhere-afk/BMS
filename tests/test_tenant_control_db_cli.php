@@ -10,7 +10,7 @@
  *   - tenant crypto round-trips, rejects tampering, never leaks plaintext
  *   - the two key domains (AI vs tenant) cannot decrypt each other
  *   - the master key is NEVER auto-generated
- *   - superadmins ships EMPTY (no default backdoor account)
+ *   - nothing that creates the control DB ever seeds a superadmin (no backdoor)
  *   - a real tenant row can be written, read back and decrypted end-to-end
  *
  * Every write is rolled back. Exit 0 = pass.
@@ -154,8 +154,22 @@ try {
         'a missing key throws loudly rather than degrading');
 
     section('6. No default backdoor account');
-    $sa = (int)$cpdo->query("SELECT COUNT(*) FROM superadmins")->fetchColumn();
-    ok($sa === 0, "superadmins ships empty (found $sa) — no shipped credentials into every tenant");
+    // The claim being tested is about what the setup SHIPS, not about this
+    // machine's current state. Counting live rows conflated the two: it went
+    // red the moment an installation legitimately created its first operator,
+    // which production, demo and local development have all now done. An
+    // assertion that fails on every working install is not a safety net — it
+    // trains you to ignore a red suite.
+    //
+    // So assert the property that must hold forever instead: nothing that
+    // creates the control database ever seeds an account into it, and minting
+    // an operator stays a deliberate, separately-run step.
+    $setupSrc = src($root, 'scripts/setup_control_db.php');
+    ok($setupSrc !== '', 'scripts/setup_control_db.php is present');
+    ok(!preg_match('/INSERT\s+(?:IGNORE\s+)?INTO\s+[`\'"]?\w*[`\'"]?\.?[`\'"]?superadmins/i', $setupSrc),
+        'the control-DB setup script never seeds a superadmin (no shipped credentials)');
+    ok(is_file("$root/scripts/create_superadmin.php"),
+        'creating the first operator is a separate, explicit, operator-run script');
 
     section('7. End-to-end: write, read back, decrypt a real tenant row');
     $cpdo->beginTransaction();
