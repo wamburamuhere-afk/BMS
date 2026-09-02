@@ -101,6 +101,30 @@ function renderPage(string $relPath, ?int $superadminId, string $query = '', arr
         . "\$_SERVER['HTTP_HOST'] = getenv('P_HOST') ?: 'localhost';\n"
         . "\$_SERVER['REQUEST_METHOD'] = 'GET';\n"
         . "parse_str(" . var_export($query, true) . ", \$_GET);\n"
+        // HERMETIC ENV — do not remove; see the full note in
+        // tests/test_tenant_routing_cli.php. Two separate sources of pollution
+        // have to be shut out here, and inheriting either one makes this suite
+        // test something other than what it claims:
+        //
+        //   1. includes/config.php putenv()s THIS MACHINE's tenancy settings.
+        //   2. The parent test process loads config.php too, so its own
+        //      environment is already polluted before it spawns anything —
+        //      meaning "inherit whatever the parent has" is not neutral either.
+        //
+        // With TENANT_MODE forced on, assertSuperadminHost() demands the host be
+        // superadmin.<that machine's base domain>, exits 'Not found', and every
+        // page renders empty — which also makes section 11 below pass for
+        // entirely the wrong reason.
+        //
+        // So the child's tenancy environment is exactly what THIS CASE declared
+        // and nothing else. The page pulls config.php in via require_once, so
+        // loading it here first makes that later include a no-op.
+        . "\$tenancy = " . var_export([
+            'TENANT_MODE'        => $env['TENANT_MODE']        ?? null,
+            'TENANT_BASE_DOMAIN' => $env['TENANT_BASE_DOMAIN'] ?? null,
+        ], true) . ";\n"
+        . "require_once '" . str_replace('\\', '/', $root) . "/includes/config.php';\n"
+        . "foreach (\$tenancy as \$k => \$v) { if (\$v === null) { putenv(\$k); } else { putenv(\"\$k=\$v\"); } }\n"
         . "require '" . str_replace('\\', '/', $root) . "/$relPath';\n");
     foreach ($env as $k => $v) putenv("$k=$v");
     $out = (string)shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($probe) . ' 2>&1');

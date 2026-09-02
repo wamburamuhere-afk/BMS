@@ -1,5 +1,50 @@
 # BMS Changelog
 
+## 2026-09-02 (test) — Make the multi-tenancy suites hermetic; stop asserting live DB state
+
+**Files (changed):** `tests/test_tenant_routing_cli.php`, `tests/test_tenant_registration_cli.php`,
+`tests/test_tenant_admin_panel_cli.php`, `tests/test_tenant_control_db_cli.php`
+
+The seven tenant suites stood at **353 pass / 22 fail**. All 22 were harness bugs — no product
+defect was involved — but they made the suite useless as a safety net, including the one assertion
+that would catch a real cross-tenant data leak (*"an unknown subdomain NEVER connects to the main
+database"*). They went red on 2026-09-02 when local WAMP was configured as a tenant test bed, and
+nothing announced it. Now **377 pass / 0 fail**.
+
+**Cause A (21 failures across three suites) — `includes/config.php` leaking into probes.** Each
+suite spawns subprocesses that load `config.php`, which is per-environment, untracked, and on any
+machine with multi-tenancy switched on calls `putenv()` for `TENANT_MODE` / `TENANT_BASE_DOMAIN`.
+That silently overwrote whatever the test case had just set: test hosts under `bms.local` stopped
+matching the machine's `dev.bms.local`, resolved to `none`, and fell back to the main database — so
+assertions passed or failed for reasons unrelated to the code under test. Proven directly, not
+inferred: a probe printed `BEFORE:[bms.local]` / `AFTER:[dev.bms.local]` across the `require`.
+
+Fixed by pre-loading `config.php` inside each probe (every include of it is `require_once`, so the
+later one becomes a no-op) and re-asserting the intended values in the seam this creates.
+
+**A second, distinct source of the same pollution, found only because the first fix did not work.**
+In `test_tenant_admin_panel_cli.php` the *parent* test process loads `config.php` too, so its own
+environment was already polluted before it spawned anything — snapshot-and-restore faithfully
+restored the pollution. With `TENANT_MODE` forced on, `assertSuperadminHost()` demanded the host be
+`superadmin.<that machine's base domain>`, exited `Not found`, and every page rendered empty. That
+probe now takes its tenancy environment *only* from what the case declares, inheriting nothing.
+Consequence worth noting: section 11 (*"panel is invisible from a tenant subdomain"*) had been
+passing for the wrong reason — it received `Not found` from a host mismatch and never exercised the
+tenant guard at all. It now tests what it claims.
+
+**Cause B (1 failure) — an assertion that fails on every working installation.**
+`test_tenant_control_db_cli.php` ran `SELECT COUNT(*) FROM superadmins` and asserted `0`. The intent
+(stated in its own docstring) is that the setup *ships* no backdoor account — a property of the
+code, not of a live install's current state. As written it went red the moment any environment
+legitimately created its first operator, which production, demo and local development have all now
+done. Replaced with the property that must hold forever: nothing that creates the control database
+seeds an account into it, and minting an operator stays a separate, explicit, operator-run script.
+The new guard was checked against five realistic seed forms (backticks, schema-qualified names,
+`INSERT IGNORE`, embedded newlines) and two innocent statements, so it is not vacuous.
+
+**Test-only change — no production code touched.** Verified afterwards that the runs leave no
+orphaned tenant rows, databases or MySQL users behind.
+
 ## 2026-09-02 (feature) — Keep `.php` out of the address bar for pages
 
 **Files (changed):** `.htaccess`, `roots.php`
