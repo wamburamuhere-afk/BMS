@@ -335,12 +335,23 @@ Revert `config.php`'s tenant-resolution short-circuit back to hardcoded `bms`/ro
 |---|---|
 | `tests/test_tenant_isolation_cli.php` (new) | Provisions two throwaway tenants, creates distinct data in each (e.g. an invoice), then asserts: Tenant A's session/connection can under no code path read Tenant B's row — by id-guessing, by direct object reference on any known page pattern, or by session/cookie tampering across subdomains. |
 | Per-tenant ledger check | Extend the isolation test to run `assertLedgerBalanced()` independently against each tenant DB. |
-| Control DB user hardening | `getControlPdo()` uses its own least-privilege MySQL user (only the 3 control tables), never `root`. |
+| Control DB user hardening | `getControlPdo()` uses its own least-privilege MySQL user (only the 3 control tables), never `root`. ⚠️ **Partially done — the code capability ships, the production user is an OPERATOR step.** Which MySQL user an environment uses is not a property of the code, and a hard "never root" assertion would fail every developer's machine (the same mistake the old "superadmins ships empty" check made). The suite therefore asserts the capability — a dedicated user can be supplied purely by `CONTROL_DB_USER`/`CONTROL_DB_PASS`, no file edit — and *reports* the live posture, printing the exact `CREATE USER`/`GRANT` SQL when it sees a privileged account. Creating `bms_control_app` on demo and bms is still outstanding; see conventions §12. |
 | Credential audit | Confirm no tenant DB password is ever logged in plaintext (check `tenant_provisioning_log`, error logs, activity logs). |
 
 ### Acceptance gate
 
 `php tests/test_tenant_isolation_cli.php` — every isolation assertion passes. This test becomes part of the permanent suite (like `tests/test_project_scope_cli.php`) and should be re-run before every future release.
+
+✅ **Met 2026-09-02 — 48 assertions, 0 failures.** The suite provisions two real
+tenants, proves the isolation claim from an attacker's position, and removes them
+(verified: no orphaned registry rows, databases or MySQL users).
+
+**Two anti-vacuity guards are load-bearing — do not remove them.** Every "refused"
+assertion would also pass if the connection were simply broken, so section 2 carries
+a **positive control** proving the same connection can freely create, write and read
+inside its *own* database. Separately, the `refused()` helper was validated against a
+deliberately over-privileged user granted `` `bms_t%`.* ``: it reported the leak on
+every path, so a real regression fails loudly rather than slipping through green.
 
 ### Rollback
 
@@ -355,16 +366,50 @@ N/A — this phase only adds tests and tightens permissions; nothing to roll bac
 
 ### What ships
 
-- Full manual + automated regression across every major module (Accounting/GL, HR, POS, CRM, Sales, Purchasing, Payroll, Reports) run against Tenant #1 **and** a fresh self-registered test tenant side by side.
-- `docs/MULTI_TENANCY.md` (new) — architecture reference for future sessions: control DB schema, provisioning flow, how tenant resolution works, how to add a new per-tenant migration.
-- Changelog entries for all 10 phases consolidated.
-- Go-live checklist:
-  - [ ] DNS wildcard live and verified.
-  - [ ] `TENANT_CRED_KEY` present in production environment (not in repo).
-  - [ ] Tenant #1 credentials rotated off `root`.
-  - [ ] Superadmin account created in `bms_control.superadmins`.
-  - [ ] Isolation test suite green.
-  - [ ] Deploy pipeline's tenant migration runner tested against a staging tenant.
+- ✅ **Automated regression across every major module, against a genuinely fresh
+  tenant** — `tests/test_tenant_module_smoke_cli.php` (43 assertions). Covers the
+  one risk no other suite touches: a table or column present in the application
+  database but missing from `schema/tenant_schema_template.sql` would break that
+  module for **every new customer** while working perfectly for the original
+  company. It asserts full table parity, column parity on every module table,
+  usable seeded defaults (105 accounts, 8 roles, 156 permissions, 600 mappings),
+  that the owner created at signup can actually authenticate, that all four
+  statutory reports run and reconcile, that all ten module groups read cleanly,
+  and a real GL round-trip (post → Trial Balance → Balance Sheet still balances).
+
+  > **Deviation from the plan, stated plainly:** this was specified as running
+  > against Tenant #1 **and** a fresh tenant side by side. Tenant #1 does not
+  > exist — Phase 7 is still pending — so the comparison is made against the
+  > **application database** instead. That is the same comparison in substance:
+  > the established schema versus what a new customer is actually given. The
+  > "manual regression across every module" half remains genuinely outstanding;
+  > this automates the part that is worth automating and re-runs forever.
+
+- ✅ `docs/MULTI_TENANCY.md` — architecture reference for future sessions: the
+  model, the control DB schema, what happens on every request, the provisioning
+  flow, how to add a per-tenant migration, environment variables, what each test
+  suite is for, known gaps, and a troubleshooting section.
+- ✅ Changelog entries recorded per phase as each merged (rather than
+  consolidated retrospectively, which would have duplicated existing history).
+- Go-live checklist — **live status:**
+  - [x] DNS wildcard live and verified — `*.bms.` and `*.demo.`, real wildcard
+        certs on the app server, verified end-to-end with `openssl s_client`.
+  - [x] `TENANT_CRED_KEY` present in production (vhost `SetEnv` +
+        `includes/tenant_cred_key.php`), never in the repo. Independently
+        generated per host.
+  - [ ] **Tenant #1 credentials rotated** — blocked on Phase 7. Note the original
+        premise ("off `root`") never applied: production has always used
+        `user_bjp`, not root.
+  - [x] Superadmin accounts created on both demo and bms.
+  - [x] Isolation test suite green — 48 assertions (Phase 9).
+  - [x] Tenant migration runner wired into `deploy.yml`, guarded so it can never
+        abort a release; both no-op paths verified. **Not yet exercised against a
+        real tenant on a server** — `migrations/tenant/` currently holds no
+        migration files, so the first real run will be the first true test.
+  - [ ] **`bms_control_app` least-privilege control user** created on demo and bms
+        (conventions §12) — capability ships, operator step outstanding.
+  - [ ] **Wildcard certificate renewal** — `certbot --manual`, no auto-renew,
+        **expires 2026-11-30 on both hosts.** Needs a calendar reminder.
 
 ### Rollback
 
@@ -398,5 +443,5 @@ Update this table the moment each phase merges — this is what lets any session
 | 6 — Superadmin Tenant Panel | ✅ done (2026-08-31) | `feat/tenant-06-superadmin-panel` |
 | 7 — Migrate Existing Data to Tenant #1 | ⏳ pending | `feat/tenant-07-migrate-tenant-one` |
 | 8 — Migration Runner + Deploy Pipeline | ✅ done — runner 2026-08-31, `deploy.yml` wiring + CI lint 2026-09-02 | `feat/tenant-08-migration-runner`, `feat/tenant-deploy-wiring` |
-| 9 — Security Hardening + Isolation Testing | ⏳ pending | `feat/tenant-09-isolation-hardening` |
-| 10 — Full Regression + Go-Live | ⏳ pending | `feat/tenant-10-go-live` |
+| 9 — Security Hardening + Isolation Testing | ✅ done (2026-09-02) — 48 assertions green; control-DB least-privilege user remains an operator step (conventions §12) | `feat/tenant-09-isolation-hardening` |
+| 10 — Full Regression + Go-Live | ✅ done (2026-09-02) — 43-assertion module smoke vs a fresh tenant, `docs/MULTI_TENANCY.md`, go-live checklist scored. Manual per-module regression + the Tenant-#1 half remain, both blocked on Phase 7 | `feat/tenant-10-go-live` |
