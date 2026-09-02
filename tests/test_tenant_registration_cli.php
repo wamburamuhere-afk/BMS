@@ -248,6 +248,17 @@ try {
             . "ini_set('session.save_path', sys_get_temp_dir());\n"
             . "\$_SERVER['HTTP_HOST'] = " . var_export($host, true) . ";\n"
             . "chdir(" . var_export($root, true) . ");\n"
+            // HERMETIC ENV — do not remove; see the full note in
+            // tests/test_tenant_routing_cli.php. includes/config.php putenv()s
+            // this machine's own tenancy settings, which would overwrite what
+            // this case just asked for and silently test the wrong thing.
+            // login.php pulls config.php in via require_once, so loading it
+            // HERE first turns that later include into a no-op — and gives us
+            // the seam to put the harness's values back in between.
+            . "\$want = [];\n"
+            . "foreach (['TENANT_MODE','TENANT_BASE_DOMAIN'] as \$k) { \$v = getenv(\$k); \$want[\$k] = (\$v === false) ? null : \$v; }\n"
+            . "require_once " . var_export("$root/includes/config.php", true) . ";\n"
+            . "foreach (\$want as \$k => \$v) { if (\$v === null) { putenv(\$k); } else { putenv(\"\$k=\$v\"); } }\n"
             . "ob_start(); require " . var_export("$root/login.php", true) . "; echo ob_get_clean();\n");
         foreach ($env as $k => $v) putenv("$k=$v");
         $out = (string)shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($probe) . ' 2>&1');

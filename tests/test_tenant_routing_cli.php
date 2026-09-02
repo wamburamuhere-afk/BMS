@@ -119,7 +119,35 @@ if (($argv[2] ?? '') !== '') {
     $_SESSION['tenant_id'] = (int)$argv[2];
 }
 
+// HERMETIC ENV — do not remove. includes/config.php is per-environment and
+// untracked, and on any machine where multi-tenancy has been switched on it
+// calls putenv() for TENANT_MODE / TENANT_BASE_DOMAIN so that CLI scripts
+// inherit that machine's tenancy settings. That is correct for the application
+// and wrong for this probe: it silently OVERWRITES whatever the test case just
+// set, so a tenant host stops matching the base domain, resolves to 'none' and
+// falls back to the main database — making assertions pass or fail for reasons
+// that have nothing to do with the code under test.
+//
+// This is not hypothetical: it turned 21 assertions across three suites red on
+// 2026-09-02 when local WAMP was configured as a tenant test bed, including
+// "an unknown subdomain NEVER connects to the main database" — the one
+// assertion that would catch a real cross-tenant leak.
+//
+// So: snapshot what the harness asked for, let config.php define DB_* (it also
+// builds its own $pdo, which we discard), then put the harness's values back
+// before anything resolves a tenant.
+$want = [];
+foreach (['TENANT_MODE', 'TENANT_BASE_DOMAIN'] as $k) {
+    $v = getenv($k);
+    $want[$k] = ($v === false) ? null : $v;
+}
+
 require $root . '/includes/config.php';          // defines DB_* (and its own legacy $pdo)
+
+foreach ($want as $k => $v) {
+    if ($v === null) { putenv($k); } else { putenv("$k=$v"); }
+}
+
 require $root . '/core/tenant_bootstrap.php';
 $pdo = bmsConnectPdo();
 echo 'DB:' . $pdo->query('SELECT DATABASE()')->fetchColumn();
