@@ -490,19 +490,36 @@ php core/tenant_migration_runner.php --tenant=7       # one tenant only
 php core/tenant_migration_runner.php --dry-run        # report only, change nothing
 ```
 
-### Not wired into `deploy.yml` yet — deliberately
+### Wired into `deploy.yml` — 2026-09-02
 
-`ternant.md`'s original Phase 8 plan wires this into `deploy.yml`. Building it
-the same day §10's incident happened, with **zero real tenants yet** (Phase 7
-has not run), would risk repeating that exact mistake for no benefit: an
-optional step with nothing to do, added to a pipeline that has already proven
-it can take down both production hosts when a step like this misbehaves.
+Deferred from Phase 8 on purpose (the same day §10's incident happened, with zero
+real tenants, adding an optional step to a pipeline that had just proven it could
+take down both hosts). Real tenants now exist, so it is wired in — under one
+non-negotiable rule: **its failure must never abort the deploy.**
 
-Wiring happens **alongside Phase 7**, once tenants genuinely exist to migrate —
-and even then, its own failure must never be allowed to abort the main
-application's deploy (see below). Until then, run it by hand or from a separate
-cron; it is entirely safe to run with zero tenants (a documented no-op) or never
-run at all.
+It runs **last per host**, guarded with `|| echo`:
+
+```bash
+php migrations/runner.php; php core/tenant_migration_runner.php || echo "⚠️  TENANT MIGRATIONS REPORTED FAILURES on $h …"
+```
+
+A tenant-side failure therefore warns loudly in the job log and leaves the
+release in place — on **both** hosts. A failure in the *app's* own
+`migrations/runner.php` still aborts the deploy exactly as before; that guarantee
+is unchanged, and both behaviours were verified with stubbed failures under the
+same `set -e` before the change shipped.
+
+Two supporting details:
+
+- **Safe on a host with no multi-tenancy.** No control database, or no files
+  under `migrations/tenant/`, means "Nothing to do" and exit 0. Both no-op paths
+  were run and confirmed before wiring.
+- **CI now lints `migrations/tenant/*.php` too.** The "Check migration files are
+  valid PHP" step globbed only `migrations/*.php`, which is not recursive — so
+  files that are about to be applied to *every tenant database* were never
+  syntax-checked. The glob now covers both directories.
+
+It still runs standalone by hand or from cron, unchanged.
 
 ### One tenant's failure never blocks another tenant's migration
 
