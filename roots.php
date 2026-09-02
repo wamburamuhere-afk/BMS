@@ -1941,16 +1941,29 @@ function handleRoute() {
         $clean_uri = trim(substr($clean_uri, strlen($base_path)), '/');
     }
 
-    // NEW: Automatic redirect for .php extensions to clean URLs
-    // Only for GET requests to avoid breaking form submissions/API posts
-    // Skip for API and AJAX paths
-    if ($_SERVER['REQUEST_METHOD'] === 'GET' && str_ends_with($clean_uri, '.php') && 
-        !str_starts_with($clean_uri, 'api/') && !str_starts_with($clean_uri, 'ajax/')) {
-        
+    // Automatic redirect for .php extensions to clean URLs.
+    // GET only, so form submissions and API/AJAX posts are never touched.
+    // api/, ajax/ and actions/ are skipped: those are called with their
+    // extension on purpose and a redirect would break the caller.
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && str_ends_with($clean_uri, '.php') &&
+        !str_starts_with($clean_uri, 'api/') && !str_starts_with($clean_uri, 'ajax/') &&
+        !str_starts_with($clean_uri, 'actions/')) {
+
         $clean_version = substr($clean_uri, 0, -4);
-        // If there's a mapped route for the clean version, redirect to it
+
+        // Mapped route: send the visitor to its clean URL.
         if (isset($routes[$clean_version])) {
             header("Location: " . getUrl($clean_version), true, 301);
+            exit();
+        }
+
+        // Unmapped page that exists on disk (register.php, app/superadmin/*.php).
+        // The literal-file fallback further down already serves the
+        // extension-less form, so redirecting there is safe.
+        if (is_file(ROOT_DIR . '/' . $clean_uri)) {
+            $target = rtrim(getBasePath(), '/') . '/' . $clean_version;
+            $qs     = $_SERVER['QUERY_STRING'] ?? '';
+            header('Location: ' . $target . ($qs !== '' ? '?' . $qs : ''), true, 301);
             exit();
         }
     }

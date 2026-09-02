@@ -90,7 +90,7 @@ on the Phase 10 checklist.
 
 ## 3. Infrastructure prerequisite — wildcard DNS + vhost
 
-Tenant resolution is **subdomain-based** (`kampuniA.bms.co.tz`). Phase 3 cannot
+Tenant resolution is **subdomain-based** (`kampuniA.bms.bjptechnologies.co.tz`). Phase 3 cannot
 be tested end-to-end without this, so it must be confirmed with the hosting
 provider **before Phase 3 merges**.
 
@@ -361,7 +361,7 @@ php scripts/create_superadmin.php --email=you@example.com --name="Your Name"
 | Variable | Value | Notes |
 |---|---|---|
 | `TENANT_MODE` | `on` | Anything else, including unset, means single-tenant. |
-| `TENANT_BASE_DOMAIN` | e.g. `bms.co.tz` | Required. Without it no host ever resolves to a tenant. |
+| `TENANT_BASE_DOMAIN` | `bms.bjptechnologies.co.tz` | Required. Without it no host ever resolves to a tenant. |
 | `TENANT_CRED_KEY` | 64 hex chars | From Phase 0. Without it tenants cannot be decrypted. |
 
 ### Step 2 — edit `includes/config.php` on each environment

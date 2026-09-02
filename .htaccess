@@ -9,6 +9,17 @@ RewriteBase /
 RewriteRule ^migrations/status\.php$ - [L]
 RewriteRule ^(scripts|tests|cron|migrations)(/|$) - [F,L]
 
+# ── Clean URLs: keep .php out of the address bar ────────────────────────────
+# A GET for a real .php page is handed to the router, which 301-redirects it to
+# the extension-less URL (see handleRoute() in roots.php). Without this, Apache
+# serves such files directly and the router never gets a chance to redirect.
+# Excluded on purpose: POST requests, and the api/, ajax/ and actions/ trees —
+# those are called with the extension by forms and AJAX, and must not move.
+RewriteCond %{REQUEST_METHOD} =GET
+RewriteCond %{REQUEST_URI} !^/(api|ajax|actions)/ [NC]
+RewriteCond %{REQUEST_URI} !/index\.php$ [NC]
+RewriteRule \.php$ index.php [QSA,L]
+
 # Allow direct access to real files only
 RewriteCond %{REQUEST_FILENAME} !-f
 
