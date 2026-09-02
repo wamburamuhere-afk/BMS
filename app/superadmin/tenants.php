@@ -67,7 +67,10 @@ function saBadge(string $status): string
             <small class="text-muted">Signed in as <?= safe_output($me['name'] ?? '', '') ?></small>
         </div>
     </div>
-    <a href="logout.php" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
+    <div class="d-flex gap-2">
+        <a href="profile.php" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-gear me-1"></i> My Account</a>
+        <a href="logout.php" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
+    </div>
 </div>
 
 <div class="container-fluid p-3">
@@ -94,13 +97,23 @@ function saBadge(string $status): string
 
     <div class="d-flex align-items-center justify-content-between mb-2">
         <h6 class="mb-0"><i class="bi bi-building text-primary me-1"></i> Tenants (<?= (int)($stats['total'] ?? 0) ?>)</h6>
-        <input type="search" id="tblSearch" class="form-control form-control-sm w-auto" placeholder="Search…">
+        <div class="d-flex gap-2">
+            <input type="search" id="tblSearch" class="form-control form-control-sm w-auto" placeholder="Search…">
+            <a href="tenant_new.php" class="btn btn-sm btn-primary text-nowrap">
+                <i class="bi bi-plus-circle me-1"></i> New company
+            </a>
+        </div>
     </div>
 
     <?php if (!$tenants && !$dbError): ?>
         <div class="text-center text-muted py-5">
             <i class="bi bi-inbox fs-1 d-block mb-2"></i>
             No tenants registered yet.
+            <div class="mt-3">
+                <a href="tenant_new.php" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-circle me-1"></i> Register the first company
+                </a>
+            </div>
         </div>
     <?php else: ?>
 
