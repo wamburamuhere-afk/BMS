@@ -292,11 +292,16 @@ Revert `config.php`'s tenant-resolution short-circuit back to hardcoded `bms`/ro
 > ⚠️ **Revised same-day, after §10's production incident** (a deploy migration
 > for the optional, not-yet-live control database halted the entire deploy —
 > see `docs/MULTI_TENANCY_CONVENTIONS.md` §10 and the 2026-08-31 hotfix in
-> `changelog.md`). Wiring this phase's runner into `deploy.yml` today, with
-> **zero real tenants** (Phase 7 hasn't run), would repeat that exact mistake
-> for no benefit. **Deploy-pipeline wiring is deferred to Phase 7**, when real
-> tenants exist to migrate — and even then, its failure must never be allowed
-> to abort the main application's deploy. Full reasoning in conventions §11.
+> `changelog.md`). Wiring this phase's runner into `deploy.yml` that day, with
+> **zero real tenants**, would have repeated that exact mistake for no benefit,
+> so it was deferred.
+>
+> ✅ **Wiring completed 2026-09-02**, now that real tenants exist — under the
+> rule stated then: its failure must never abort the main application's deploy.
+> It runs last per host, guarded with `|| echo`. A failure in the app's own
+> `migrations/runner.php` still aborts the deploy, unchanged. Note this shipped
+> **independently of the rest of Phase 7** — registering Tenant #1 is still
+> pending. Full reasoning and the verification performed in conventions §11.
 
 ### What ships
 
@@ -306,7 +311,7 @@ Revert `config.php`'s tenant-resolution short-circuit back to hardcoded `bms`/ro
 | `core/tenant_migration_bootstrap.php` (new) | What `roots.php` is to an app migration: connects `$pdo` to whichever tenant the runner is currently processing, via `TENANT_MIGRATION_DB_*` env vars (never argv — a password on the command line is visible to anyone who can `ps` the host). |
 | `core/tenant_migration_runner.php` (new) | Loops every tenant with a live database (`status != 'deleted'`) in `bms_control.tenants`, applies any migration file under `migrations/tenant/` not yet recorded in that tenant's `schema_migrations`. ⚠️ **Revised:** a broken migration stops **only that tenant's** remaining migrations for the run — every other tenant still receives its migrations normally. See conventions §11 for why this reads differently from the acceptance gate below. |
 | `migrations/tenant/` (new folder, + `README.md`) | **From this point forward**, all new schema changes that must reach every tenant go here. |
-| ~~`.github/workflows/deploy.yml` (updated)~~ | **Deferred to Phase 7** — see the note above. |
+| `.github/workflows/deploy.yml` (updated) | ✅ **Wired 2026-09-02.** Runs last per host, guarded with `\|\| echo` so a tenant-side failure warns loudly but never aborts the release on either host. The same commit extended the CI migration lint to `migrations/tenant/*.php`, which the non-recursive `migrations/*.php` glob had never covered. |
 
 ### Acceptance gate
 
@@ -392,6 +397,6 @@ Update this table the moment each phase merges — this is what lets any session
 | 5 — Self-Registration Flow | ✅ done (2026-08-31) | `feat/tenant-05-self-registration` |
 | 6 — Superadmin Tenant Panel | ✅ done (2026-08-31) | `feat/tenant-06-superadmin-panel` |
 | 7 — Migrate Existing Data to Tenant #1 | ⏳ pending | `feat/tenant-07-migrate-tenant-one` |
-| 8 — Migration Runner + Deploy Pipeline | ✅ done (2026-08-31) — deploy.yml wiring deferred to Phase 7 | `feat/tenant-08-migration-runner` |
+| 8 — Migration Runner + Deploy Pipeline | ✅ done — runner 2026-08-31, `deploy.yml` wiring + CI lint 2026-09-02 | `feat/tenant-08-migration-runner`, `feat/tenant-deploy-wiring` |
 | 9 — Security Hardening + Isolation Testing | ⏳ pending | `feat/tenant-09-isolation-hardening` |
 | 10 — Full Regression + Go-Live | ⏳ pending | `feat/tenant-10-go-live` |
