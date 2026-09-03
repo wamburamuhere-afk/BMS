@@ -187,9 +187,18 @@ switch ($action) {
 
         // Safety net: snapshot the CURRENT state before overwriting it, so a
         // bad restore is recoverable. Failure to snapshot aborts the restore.
+        $preRestorePath = $backupsDir . 'pre_restore_' . date('Y-m-d_H-i-s') . '.sql';
         try {
-            bms_write_dump($pdo, $backupsDir . 'pre_restore_' . date('Y-m-d_H-i-s') . '.sql');
+            bms_write_dump($pdo, $preRestorePath);
         } catch (Exception $e) {
+            // Delete the half-written file. bms_write_dump() streams row by row,
+            // so a failure partway leaves a TRUNCATED dump on disk — and a
+            // truncated dump is the most dangerous artefact this system can
+            // produce: it lists in the UI like any other restore point, and
+            // restoring it silently loses everything past the cut. Observed for
+            // real as pre_restore_2026-09-03_09-49-54.sql, which survived a
+            // failed snapshot and sat in the backup list looking valid.
+            if (is_file($preRestorePath)) @unlink($preRestorePath);
             echo json_encode(['success' => false, 'message' => 'Aborted — could not create a pre-restore safety backup: ' . $e->getMessage()]);
             break;
         }
@@ -290,9 +299,18 @@ switch ($action) {
         }
 
         // Safety net: snapshot the current state before the uploaded restore.
+        $preRestorePath = $backupsDir . 'pre_restore_' . date('Y-m-d_H-i-s') . '.sql';
         try {
-            bms_write_dump($pdo, $backupsDir . 'pre_restore_' . date('Y-m-d_H-i-s') . '.sql');
+            bms_write_dump($pdo, $preRestorePath);
         } catch (Exception $e) {
+            // Delete the half-written file. bms_write_dump() streams row by row,
+            // so a failure partway leaves a TRUNCATED dump on disk — and a
+            // truncated dump is the most dangerous artefact this system can
+            // produce: it lists in the UI like any other restore point, and
+            // restoring it silently loses everything past the cut. Observed for
+            // real as pre_restore_2026-09-03_09-49-54.sql, which survived a
+            // failed snapshot and sat in the backup list looking valid.
+            if (is_file($preRestorePath)) @unlink($preRestorePath);
             echo json_encode(['success' => false, 'message' => 'Aborted — could not create a pre-restore safety backup: ' . $e->getMessage()]);
             break;
         }
