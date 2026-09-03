@@ -94,15 +94,17 @@ if ($dup_check->fetchColumn()) {
 // Attachment handling
 $attachment_path = null;
 if (isset($_FILES['attachment_file']) && $_FILES['attachment_file']['error'] == 0) {
-    $upload_dir = __DIR__ . '/../../uploads/projects/' . ($project_id ?: 'general') . '/budgets/';
-    if (!is_dir($upload_dir)) {
-        mkdir($upload_dir, 0777, true);
-    }
+    // bmsUploadsDir()/bmsUploadsRel() — the written path and the STORED path
+    // must come from the same pair, or the row points at a file that isn't
+    // there. On the legacy install both are unprefixed, exactly as before.
+    require_once __DIR__ . '/../../core/tenant_bootstrap.php';
+    $upload_sub = 'projects/' . ($project_id ?: 'general') . '/budgets';
+    $upload_dir = bmsUploadsDir($upload_sub);   // creates the dir + its .htaccess guard
     $file_ext = pathinfo($_FILES['attachment_file']['name'], PATHINFO_EXTENSION);
     $file_name = 'budget_' . time() . '_' . uniqid() . '.' . $file_ext;
     $target_file = $upload_dir . $file_name;
     if (move_uploaded_file($_FILES['attachment_file']['tmp_name'], $target_file)) {
-        $attachment_path = 'uploads/projects/' . ($project_id ?: 'general') . '/budgets/' . $file_name;
+        $attachment_path = bmsUploadsRel($upload_sub) . $file_name;
     }
 }
 

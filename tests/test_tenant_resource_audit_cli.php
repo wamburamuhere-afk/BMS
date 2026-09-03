@@ -139,8 +139,8 @@ foreach ($files as $abs) {
 // tenant cannot enumerate another's). Frozen here so it cannot grow.
 $baseline = [
     'connection'  => 0,
-    'uploads_fs'  => 67,
-    'uploads_rel' => 56,
+    'uploads_fs'  => 58,   // batch 1 (finance: api/account, api/petty_cash) converted 67 → 58
+    'uploads_rel' => 50,   //                                                        56 → 50
     'backups'     => 0,
     'db_name'     => 1,
 ];
@@ -168,6 +168,39 @@ foreach ($baseline as $key => $max) {
         echo "      \033[33m↓ debt reduced — lower the baseline for '$key' to $n in this PR.\033[0m\n";
     }
 }
+
+section('Converted files pair the two accessors correctly');
+
+// THE MISTAKE THIS SWEEP CAN MAKE. bmsUploadsDir() says where the file is
+// WRITTEN; bmsUploadsRel() says what gets STORED in the database. If a file
+// calls them with different arguments, the upload succeeds, the row is saved,
+// and the file is simply never found again — silently, and only for tenants.
+// So: within one file, the set of arguments passed to each must match.
+$mismatched = [];
+$converted  = 0;
+foreach ($files as $abs) {
+    $rel = ltrim(str_replace(str_replace('\\', '/', $root), '', $abs), '/');
+    // Skip the file that DEFINES these — `function bmsUploadsDir(string $sub = '')`
+    // is a signature, not a call site, and would always look mismatched.
+    if (in_array($rel, $exemptFiles, true)) continue;
+    $src = codeOnly((string)@file_get_contents($abs));
+    if (strpos($src, 'bmsUploadsRel(') === false && strpos($src, 'bmsUploadsDir(') === false) continue;
+    $converted++;
+
+    preg_match_all('/bmsUploadsDir\(\s*([^)]*)\)/', $src, $mD);
+    preg_match_all('/bmsUploadsRel\(\s*([^)]*)\)/', $src, $mR);
+    $dirArgs = array_unique(array_map('trim', $mD[1]));
+    $relArgs = array_unique(array_map('trim', $mR[1]));
+
+    // A file may legitimately write without storing (cleanup, reads), but if it
+    // stores a path it must also write to that same place.
+    if ($relArgs && array_diff($relArgs, $dirArgs)) {
+        $mismatched[] = $rel . '  stores[' . implode('|', $relArgs) . '] writes[' . implode('|', $dirArgs) . ']';
+    }
+}
+ok($converted > 0, "$converted file(s) use the uploads accessors");
+ok(empty($mismatched), 'every file stores the path it writes to');
+foreach ($mismatched as $m) echo "        \033[31m$m\033[0m\n";
 
 section('The sanctioned accessors exist and behave');
 
@@ -213,8 +246,40 @@ if (is_file($g)) @unlink($g);
 @rmdir(rtrim($absPath, '/'));
 @rmdir(dirname(rtrim($absPath, '/')));
 
+// THE SAFETY CLAIM OF THE WHOLE SWEEP: on the existing install, every converted
+// call site must resolve to byte-for-byte the path the literal used to produce.
+// If this holds, converting a file cannot change behaviour for the current
+// company — only tenants, which have no files yet.
+unset($GLOBALS['__bms_tenant'], $GLOBALS['__bms_tenant_pw']);
+$batch1Subs = [
+    'finance/invoices', 'finance/vouchers', 'finance/purchase_orders',
+    'finance/petty_cash', 'projects/general/budgets', 'projects/7/vouchers',
+];
+$allMatch = true;
+foreach ($batch1Subs as $sub) {
+    $viaHelper = str_replace('\\', '/', bmsUploadsDir($sub));
+    // ROOT_DIR when the app defines it; this test loads config.php rather than
+    // roots.php, and bmsUploadsDir() falls back to the same repo root.
+    $base = defined('ROOT_DIR') ? ROOT_DIR : $root;
+    $oldLiteral = str_replace('\\', '/', $base . '/uploads/' . $sub . '/');
+    if ($viaHelper !== $oldLiteral) {
+        $allMatch = false;
+        echo "        \033[31m$sub: helper='$viaHelper' literal='$oldLiteral'\033[0m\n";
+    }
+    // Clean up anything this assertion just created.
+    $g = rtrim($viaHelper, '/') . '/.htaccess';
+    if (is_file($g)) @unlink($g);
+    @rmdir(rtrim($viaHelper, '/'));
+}
+ok($allMatch, 'every converted path is byte-identical to the old literal on the legacy install');
+
 // The legacy install must NEVER get a prefix — that is what keeps every path
 // already in document_library valid without moving a single file.
+$GLOBALS['__bms_tenant'] = [
+    'id' => 9002, 'subdomain' => 'demo9002', 'db_host' => DB_SERVER,
+    'db_name' => DB_NAME, 'db_username' => DB_USERNAME,
+    'db_password_encrypted' => '', 'status' => 'active',
+];
 $GLOBALS['__bms_tenant']['db_name'] = DB_NAME;
 ok(bmsTenantPathPrefix() === '',
    'the legacy tenant (db_name === DB_NAME) stays unprefixed — no stored path is invalidated');

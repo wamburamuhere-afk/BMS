@@ -1,5 +1,44 @@
 # BMS Changelog
 
+## 2026-09-03 (fix) — Uploads isolation, batch 1: finance (api/account, api/petty_cash)
+
+**Files (changed):** `api/account/add_budget.php`, `api/account/update_budget.php`,
+`api/account/record_payment.php`, `api/account/record_voucher_payment.php`,
+`api/account/save_voucher.php`, `api/account/save_purchase_order.php`,
+`api/petty_cash/save_transaction.php`, `api/petty_cash/delete_transaction.php`,
+`api/petty_cash/get_attachment.php`, `tests/test_tenant_resource_audit_cli.php`
+
+First batch of the uploads sweep. Every tenant subdomain is served from one webroot, so a literal
+`uploads/…` path is shared by all of them. These nine files now use `bmsUploadsDir()` for the path
+they **write** to and `bmsUploadsRel()` for the path they **store**.
+
+Ratchet moved: absolute uploads paths **67 → 58**, stored uploads paths **56 → 50**. Done by module
+rather than in one sweep, so any breakage is traceable to a small diff.
+
+**Behaviour on the existing install is unchanged, and the test proves it** rather than asserting it:
+for every path this batch touches, `bmsUploadsDir($sub)` is compared byte-for-byte against the
+literal it replaced. The prefix is empty for the legacy install, so only tenants — which have no
+files yet — see any difference.
+
+**New structural check: "every file stores the path it writes to."** This is the one mistake the
+sweep can make. `bmsUploadsDir()` says where a file is written, `bmsUploadsRel()` says what goes in
+the database; call them with different arguments and the upload succeeds, the row saves, and the
+file is simply never found again — silently, and only for tenants. The audit now extracts both
+argument sets per file and fails on any mismatch.
+
+**Pre-existing bug fixed in passing.** `api/petty_cash/get_attachment.php` read from
+`uploads/petty_cash/` while `save_transaction.php` and `delete_transaction.php` both used
+`uploads/finance/petty_cash/`. Receipts were written to one directory and looked for in another, so
+**every petty cash attachment 404'd**. All three now resolve through the same accessor. Fixed rather
+than faithfully preserved, since it was the very line being converted.
+
+`mkdir($dir, 0777, true)` blocks were dropped where they became dead code — `bmsUploadsDir()`
+creates the directory at 0755 and installs the deny-executables `.htaccess` from
+`.claude/security.md` §19, which the old inline `mkdir` never did.
+
+Remaining: 58 + 50 call sites across `api/` (33), `api/operations` (8), `api/document` (7),
+`app/`, `ajax/`, `actions/`, `core/`.
+
 ## 2026-09-03 (fix) — Tenant resource audit: a ratchet that blocks this class of bug, and the two backup routes the first fix missed
 
 **Files (added):** `tests/test_tenant_resource_audit_cli.php`
