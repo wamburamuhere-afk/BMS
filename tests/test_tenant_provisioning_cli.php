@@ -149,6 +149,43 @@ try {
     ok((int)$ta->query("SELECT COUNT(*) FROM role_permissions")->fetchColumn() > 0, 'role permissions seeded');
     ok((int)$ta->query("SELECT COUNT(*) FROM journal_entries")->fetchColumn() === 0, 'ledger starts empty');
 
+    section('4b. Company Profile seeded from what was typed at signup');
+    // The registration form's company_name must end up in THIS tenant's own
+    // system_settings — company_profile.php reads only that table, so without
+    // this every new tenant saw the placeholder "My Company" instead.
+    $seededName = $ta->query("SELECT setting_value FROM system_settings WHERE setting_key = 'company_name'")->fetchColumn();
+    ok($seededName === 'Alpha Traders Ltd', "company_name seeded from signup (got '$seededName')");
+
+    $subC = 'ptestc' . $sfx;
+    $c = provisionTenant('Charlie Freight Co', $subC, "owner@$subC.test", 'OwnerPassC!123', [
+        'physical_address' => 'Moshi-Kilimanjaro',
+        'postal_address'   => 'P.O. Box 999, Moshi',
+    ]);
+    ok($c['ok'] === true, 'tenant C provisioned (with physical/postal address)');
+    if ($c['ok']) {
+        $created['tenants'][]   = $c['tenant_id'];
+        $created['databases'][] = $c['db_name'];
+        $created['users'][]     = $c['db_username'];
+
+        $rowC = $cpdo->prepare("SELECT db_password_encrypted FROM tenants WHERE id = ?");
+        $rowC->execute([$c['tenant_id']]);
+        $pwC = decryptTenantSecret((string)$rowC->fetchColumn());
+        $tc  = new PDO("mysql:host=$host;dbname={$c['db_name']};charset=utf8mb4", $c['db_username'], $pwC,
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+
+        $settings = $tc->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key LIKE 'company_%address'")
+            ->fetchAll(PDO::FETCH_KEY_PAIR);
+        ok(($settings['company_physical_address'] ?? null) === 'Moshi-Kilimanjaro', 'physical address seeded');
+        ok(($settings['company_postal_address'] ?? null) === 'P.O. Box 999, Moshi', 'postal address seeded');
+
+        // No logo was offered — the optional step must not have left a stray
+        // company_logo row or thrown in a way that failed provisioning.
+        $noLogo = $tc->query("SELECT COUNT(*) FROM system_settings WHERE setting_key = 'company_logo'")->fetchColumn();
+        ok((int)$noLogo === 0, 'no company_logo row written when no logo was uploaded');
+    } else {
+        echo "  provisioning error: {$c['error']}\n";
+    }
+
     section('5. Tenant A owner account');
     $owner = $ta->query("SELECT * FROM users")->fetchAll(PDO::FETCH_ASSOC);
     ok(count($owner) === 1, 'exactly one user exists');
