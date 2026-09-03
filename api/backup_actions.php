@@ -90,6 +90,28 @@ function restoreFromFile($filepath) {
     $sql = file_get_contents($filepath);
     if ($sql === false) throw new Exception("Cannot read backup file.");
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Upgrade legacy dumps in memory before restoring them.
+    //
+    // Every dump written before 2026-09-03 uses `INSERT INTO t VALUES(...)`
+    // with no column list, which supplies a value for GENERATED columns. MySQL
+    // rejects those rows, and because multi_query STOPS at the first failing
+    // statement, every table after the first offender is silently skipped — the
+    // restore reports "1 error" while having loaded only part of the database.
+    // Fixing the writer cannot help files already on disk, so they are fixed
+    // here. Also strips the DEFINER from CREATE VIEW, which otherwise makes
+    // MySQL demand SYSTEM_USER when a tenant restores a dump written by another
+    // account. Both observed live on 2026-09-03.
+    // ─────────────────────────────────────────────────────────────────────────
+    $upgrade = bms_upgrade_legacy_dump($sql);
+    if ($upgrade['rows'] > 0 || $upgrade['sql'] !== $sql) {
+        error_log('restoreFromFile: upgraded legacy dump ' . basename($filepath)
+            . ' — rewrote ' . $upgrade['rows'] . ' row(s) across '
+            . (count($upgrade['tables']) ?: 0) . ' table(s): '
+            . implode(', ', $upgrade['tables']));
+        $sql = $upgrade['sql'];
+    }
+
     // Guarantee every CREATE TABLE is preceded by DROP TABLE IF EXISTS.
     // Old backups created before the current fix did not include this line,
     // causing "table already exists" errors on restore.
