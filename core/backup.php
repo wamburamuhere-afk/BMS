@@ -108,7 +108,7 @@ if (!function_exists('bms_write_dump')) {
                     $createView = $cv['Create View'] ?? ($cv['Create view'] ?? null);
                     if ($createView) {
                         fwrite($handle, "\nDROP VIEW IF EXISTS $vq;\n");
-                        fwrite($handle, $createView . ";\n\n");
+                        fwrite($handle, bms_portable_view_sql($createView) . ";\n\n");
                     }
                 } catch (Throwable $e) {
                     // A view referencing a missing/renamed table — skip it
@@ -123,6 +123,179 @@ if (!function_exists('bms_write_dump')) {
             if (is_resource($handle)) fclose($handle);
             throw $e instanceof Exception ? $e : new Exception($e->getMessage());
         }
+    }
+
+    /**
+     * Make a CREATE VIEW statement portable between MySQL accounts.
+     *
+     * SHOW CREATE VIEW embeds the account that owns the view:
+     *     CREATE ALGORITHM=UNDEFINED DEFINER=`bejundas`@`localhost` SQL SECURITY … VIEW …
+     *
+     * Restoring that as a DIFFERENT user — a tenant's `bms_u{id}`, or `bms_u1`
+     * after the Tenant #1 cutover — makes MySQL demand SYSTEM_USER and refuse:
+     *     "Access denied; you need (at least one of) the SYSTEM_USER privilege(s)"
+     * Observed on 2026-09-03 restoring into bms_t9002.
+     *
+     * A dump is a portable artefact; it must not carry the identity of whoever
+     * happened to create it. Dropping DEFINER makes the restoring account the
+     * definer, and SQL SECURITY INVOKER means the view runs with the rights of
+     * whoever queries it — which is what a per-tenant database wants anyway.
+     */
+    function bms_portable_view_sql(string $createView): string
+    {
+        $sql = preg_replace('/\s+DEFINER\s*=\s*`(?:[^`]|``)*`@`(?:[^`]|``)*`/i', '', $createView);
+        $sql = preg_replace('/\s+DEFINER\s*=\s*CURRENT_USER\b/i', '', $sql);
+        $sql = preg_replace('/\bSQL\s+SECURITY\s+DEFINER\b/i', 'SQL SECURITY INVOKER', $sql);
+        return $sql;
+    }
+
+    /**
+     * Upgrade a LEGACY dump so it can actually be restored.
+     *
+     * Dumps written before 2026-09-03 used `INSERT INTO t VALUES(...)` with no
+     * column list, supplying a value for every GENERATED column. MySQL rejects
+     * those rows (ERROR 3105) and, because mysqli::multi_query stops at the
+     * first failing statement, EVERY TABLE AFTER THE FIRST OFFENDER IS SKIPPED.
+     * A restore therefore appears to "complete with 1 error" while having
+     * silently loaded only part of the database — which is exactly how a
+     * recovery on 2026-09-03 stopped at product_stocks, 211 of 303 tables in.
+     *
+     * Fixing the writer does not help files already on disk: every backup taken
+     * before that date is affected. This converts them in memory, so an old file
+     * restores correctly instead of truncating the database.
+     *
+     * It reads the dump's OWN `CREATE TABLE` statements to learn which columns
+     * are generated — no database access, so it works on any file from any
+     * server. Statements it does not recognise are passed through untouched.
+     *
+     * @return array{sql:string, tables:string[], rows:int}
+     *         tables = tables whose INSERTs were rewritten.
+     */
+    function bms_upgrade_legacy_dump(string $sql): array
+    {
+        $lines    = preg_split("/\r\n|\n|\r/", $sql);
+        $out      = [];
+        $columns  = [];      // table => ordered column names
+        $generated= [];      // table => [ordinal => true]
+        $touched  = [];
+        $rewritten= 0;
+
+        $curTable = null;    // table whose CREATE TABLE block we are inside
+
+        foreach ($lines as $line) {
+            // ── inside a CREATE TABLE block: collect the column order ────────
+            if ($curTable !== null) {
+                $trimmed = ltrim($line);
+                if ($trimmed !== '' && $trimmed[0] === ')') {
+                    $curTable = null;                    // end of the block
+                } elseif (preg_match('/^`((?:[^`]|``)*)`\s+(.*)$/', $trimmed, $m)) {
+                    $col = str_replace('``', '`', $m[1]);
+                    $idx = count($columns[$curTable]);
+                    $columns[$curTable][] = $col;
+                    if (preg_match('/\bGENERATED\s+ALWAYS\s+AS\b/i', $m[2])) {
+                        $generated[$curTable][$idx] = true;
+                    }
+                }
+                $out[] = $line;
+                continue;
+            }
+
+            // ── start of a CREATE TABLE block ────────────────────────────────
+            if (preg_match('/^\s*CREATE\s+TABLE\s+`((?:[^`]|``)*)`/i', $line, $m)) {
+                $curTable = str_replace('``', '`', $m[1]);
+                $columns[$curTable]   = [];
+                $generated[$curTable] = [];
+                $out[] = $line;
+                continue;
+            }
+
+            // ── a legacy INSERT with no column list ──────────────────────────
+            if (preg_match('/^INSERT INTO `((?:[^`]|``)*)` VALUES\((.*)\);\s*$/', $line, $m)) {
+                $tbl = str_replace('``', '`', $m[1]);
+                if (!empty($generated[$tbl])) {
+                    $vals = bms_split_sql_values($m[2]);
+                    $cols = $columns[$tbl];
+                    // Only rewrite when the row really matches the table shape;
+                    // anything else is passed through rather than guessed at.
+                    if ($vals !== null && count($vals) === count($cols)) {
+                        $keepCols = [];
+                        $keepVals = [];
+                        foreach ($cols as $i => $c) {
+                            if (isset($generated[$tbl][$i])) continue;
+                            $keepCols[] = '`' . str_replace('`', '``', $c) . '`';
+                            $keepVals[] = $vals[$i];
+                        }
+                        $out[] = 'INSERT INTO `' . str_replace('`', '``', $tbl) . '` ('
+                               . implode(',', $keepCols) . ') VALUES('
+                               . implode(',', $keepVals) . ');';
+                        $touched[$tbl] = true;
+                        $rewritten++;
+                        continue;
+                    }
+                }
+            }
+
+            // ── a CREATE VIEW carrying someone else's DEFINER ────────────────
+            if (preg_match('/^\s*CREATE\s+(ALGORITHM|DEFINER|SQL SECURITY|OR REPLACE|VIEW)/i', $line)
+                && stripos($line, ' VIEW ') !== false) {
+                $out[] = bms_portable_view_sql($line);
+                continue;
+            }
+
+            $out[] = $line;
+        }
+
+        return [
+            'sql'    => implode("\n", $out),
+            'tables' => array_keys($touched),
+            'rows'   => $rewritten,
+        ];
+    }
+
+    /**
+     * Split the inside of `VALUES(...)` into its individual value expressions.
+     *
+     * Commas inside quoted strings are not separators, and a quote may be
+     * escaped either by a backslash or by doubling. Getting this wrong would
+     * silently corrupt data, so it returns NULL when the input does not parse
+     * cleanly and the caller passes the line through untouched instead.
+     *
+     * @return string[]|null
+     */
+    function bms_split_sql_values(string $s): ?array
+    {
+        $vals = [];
+        $buf  = '';
+        $len  = strlen($s);
+        $inStr = false;
+        $depth = 0;                       // parentheses, e.g. a function call
+
+        for ($i = 0; $i < $len; $i++) {
+            $ch = $s[$i];
+
+            if ($inStr) {
+                $buf .= $ch;
+                if ($ch === '\\') {                       // backslash escape
+                    if ($i + 1 < $len) { $buf .= $s[++$i]; }
+                    else return null;                     // dangling escape
+                } elseif ($ch === "'") {
+                    if ($i + 1 < $len && $s[$i + 1] === "'") { $buf .= $s[++$i]; }  // '' escape
+                    else $inStr = false;
+                }
+                continue;
+            }
+
+            if ($ch === "'")            { $inStr = true;  $buf .= $ch; continue; }
+            if ($ch === '(')            { $depth++;       $buf .= $ch; continue; }
+            if ($ch === ')')            { $depth--;       $buf .= $ch; continue; }
+            if ($ch === ',' && $depth === 0) { $vals[] = $buf; $buf = ''; continue; }
+
+            $buf .= $ch;
+        }
+
+        if ($inStr || $depth !== 0) return null;          // unbalanced — do not guess
+        $vals[] = $buf;
+        return $vals;
     }
 
     /**

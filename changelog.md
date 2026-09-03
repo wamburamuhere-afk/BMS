@@ -1,5 +1,59 @@
 # BMS Changelog
 
+## 2026-09-03 (fix) — Every backup taken before today was unrestorable; restores now repair them automatically
+
+**Files (changed):** `core/backup.php`, `api/backup_actions.php`
+**Files (added):** `tests/test_legacy_dump_restore_cli.php`, `scripts/check_legacy_dump.php`
+
+Found by restoring on the live demo host after this morning's fix deployed. Fixing
+`bms_write_dump()` made **new** dumps correct; it did nothing for the files already on disk, and
+every one of them is affected. Checked against the real backups on this machine: **7 of 7 need
+repair.**
+
+**Why it is worse than "one error".** A legacy dump carries `INSERT INTO t VALUES(...)` with no
+column list, so it supplies a value for GENERATED columns. MySQL rejects those rows, and
+`mysqli::multi_query` **stops at the first failing statement** — so every table *after* the first
+offender is never executed. Those tables are not left empty either: they keep whatever they held
+before, so the database ends up part restored, part stale, while the operator is told only
+"Restore completed with 1 error(s)". That is how the 2026-09-03 recovery stopped at
+`product_stocks` with 211 of 303 tables loaded, and why restoring `auto_backup_2026-08-31` still
+failed afterwards.
+
+`bms_upgrade_legacy_dump()` converts such a file **in memory** at restore time, so old backups now
+restore correctly and the file on disk is never modified. It reads the dump's own `CREATE TABLE`
+statements to learn which columns are generated, so it needs no database access and works on a file
+from any server.
+
+**The value splitter refuses to guess.** Splitting `VALUES(...)` means handling commas inside
+strings, backslash escapes, doubled quotes and nested function calls. `bms_split_sql_values()`
+returns **NULL** on anything it cannot parse cleanly, and the caller passes that line through
+untouched — silently rewriting a row it did not understand would corrupt data, which is worse than
+the bug being fixed.
+
+**Second defect, same root, found in the same log.** `SHOW CREATE VIEW` embeds
+`DEFINER=account@localhost`. Restoring such a dump as a *different* MySQL user — a tenant's
+`bms_u{id}`, or `bms_u1` after the Tenant #1 cutover — makes MySQL demand `SYSTEM_USER` and refuse:
+
+```
+Access denied; you need (at least one of) the SYSTEM_USER privilege(s) for this operation
+```
+
+Observed restoring into `bms_t9002`. A dump is a portable artefact and must not carry the identity
+of whoever created it, so `bms_portable_view_sql()` strips `DEFINER` and turns
+`SQL SECURITY DEFINER` into `INVOKER`. **This would also have broken Phase 7 of the multi-tenancy
+rollout**, where the application moves onto a new MySQL account.
+
+**`scripts/check_legacy_dump.php`** reports what a dump needs without connecting to MySQL, and flags
+a **truncated** file (no `SET FOREIGN_KEY_CHECKS=1;` end marker) — restoring one of those silently
+loses everything past the cut, which is why the demo recovery checked the last line before trusting
+the file.
+
+**Tests (26 assertions).** Builds a legacy dump against a real throwaway database, proves it fails
+and truncates — including a **marker row planted after the dump was taken that survives the failed
+restore**, demonstrating the stale-data divergence — then proves the upgraded dump restores
+completely, recomputes the generated column, and preserves commas, quotes, doubled quotes,
+backslashes, tabs and newlines byte-for-byte.
+
 ## 2026-09-03 (fix) — Uploads isolation, batch 1: finance (api/account, api/petty_cash)
 
 **Files (changed):** `api/account/add_budget.php`, `api/account/update_budget.php`,
