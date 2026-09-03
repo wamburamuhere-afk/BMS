@@ -35,6 +35,22 @@
  *   bmsConnectPdo(): PDO          → the connection for this request
  *   bmsCurrentTenant(): ?array    → resolved tenant row, or null in single-tenant mode
  *   bmsCurrentTenantId(): ?int
+ *   bmsCurrentDbConfig(): array   → host/user/pass/name THIS request owns
+ *   bmsCurrentDbName(): string    → the database name THIS request owns
+ *   bmsTenantPathPrefix(): string → '' for the legacy install, 't{id}/' otherwise
+ *   bmsBackupDir(): string        → the backup directory THIS request owns
+ *
+ * THE RULE THESE ACCESSORS EXIST TO ENFORCE (added 2026-09-03 after an
+ * incident — see tenant_isolation_plan.md):
+ *
+ *     Application code must never name a database or a directory.
+ *     It asks the request which one it is on.
+ *
+ * `DB_NAME` and `ROOT_DIR` are global and reachable from anywhere, so being
+ * tenant-aware used to be optional — and optional means eventually forgotten.
+ * api/backup_actions.php built its own mysqli from the DB_* constants, so a
+ * tenant's Restore wrote over the MAIN database and destroyed it. Use these
+ * accessors; never re-derive a database or path from the constants.
  */
 
 require_once __DIR__ . '/tenant_resolver.php';
@@ -230,6 +246,10 @@ if (!function_exists('bmsConnectPdo')) {
         }
 
         $GLOBALS['__bms_tenant'] = $tenant;
+        // Cache the plaintext for bmsCurrentDbConfig() so callers that need
+        // credentials (the mysqli-based dump/restore path) never decrypt twice.
+        // Request-scoped only — never written anywhere.
+        $GLOBALS['__bms_tenant_pw'] = $password;
         if (session_status() === PHP_SESSION_ACTIVE) {
             // Pin the session to this tenant so the guard above has something to
             // compare against on the next request.
@@ -237,5 +257,125 @@ if (!function_exists('bmsConnectPdo')) {
         }
 
         return $pdo;
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// RESOURCE ACCESSORS — "which database / which directory does this request own?"
+// ═════════════════════════════════════════════════════════════════════════════
+
+if (!function_exists('bmsCurrentDbConfig')) {
+    /**
+     * Connection details for the database THIS request owns.
+     *
+     * Exists because some code legitimately needs *credentials* rather than the
+     * PDO handle — restoring a dump needs mysqli's multi_query, which PDO cannot
+     * do cleanly. Such code used to read the DB_* constants, which are the MAIN
+     * database on every tenant's request. That is what destroyed a database.
+     *
+     * @return array{host:string,user:string,pass:string,name:string}
+     * @throws RuntimeException if a tenant's credentials cannot be decrypted —
+     *         never silently falls back to the main database.
+     */
+    function bmsCurrentDbConfig(): array
+    {
+        $t = bmsCurrentTenant();
+
+        if ($t === null) {
+            // Single-tenant, CLI, or a platform host — the legacy connection.
+            if (!defined('DB_SERVER') || !defined('DB_NAME')) {
+                throw new RuntimeException('bmsCurrentDbConfig(): DB_* constants are not defined.');
+            }
+            return [
+                'host' => DB_SERVER,
+                'user' => defined('DB_USERNAME') ? DB_USERNAME : '',
+                'pass' => defined('DB_PASSWORD') ? DB_PASSWORD : '',
+                'name' => DB_NAME,
+            ];
+        }
+
+        $pass = $GLOBALS['__bms_tenant_pw'] ?? null;
+        if ($pass === null) {
+            $pass = decryptTenantSecret((string)($t['db_password_encrypted'] ?? ''));
+        }
+        if ($pass === null) {
+            throw new RuntimeException(
+                'bmsCurrentDbConfig(): cannot decrypt credentials for tenant ' . ($t['id'] ?? '?')
+                . ' — check TENANT_CRED_KEY.'
+            );
+        }
+
+        return [
+            'host' => (string)$t['db_host'],
+            'user' => (string)$t['db_username'],
+            'pass' => (string)$pass,
+            'name' => (string)$t['db_name'],
+        ];
+    }
+}
+
+if (!function_exists('bmsCurrentDbName')) {
+    /** The database name this request owns. Use instead of reading DB_NAME. */
+    function bmsCurrentDbName(): string
+    {
+        $t = bmsCurrentTenant();
+        if ($t !== null) return (string)$t['db_name'];
+        return defined('DB_NAME') ? (string)DB_NAME : '';
+    }
+}
+
+if (!function_exists('bmsTenantPathPrefix')) {
+    /**
+     * Sub-path this request's files live under, '' or 't{id}/'.
+     *
+     * Returns '' for the LEGACY install — the tenant whose db_name is the
+     * environment's own DB_NAME. That tenant *is* the original single-tenant
+     * site, so its files already live at the unprefixed paths recorded in
+     * document_library, and moving them would invalidate every stored path.
+     * Only tenants provisioned into their own database get a prefix. Each host
+     * judges against its own DB_NAME, so demo and production stay independent.
+     */
+    function bmsTenantPathPrefix(): string
+    {
+        $t = bmsCurrentTenant();
+        if ($t === null) return '';
+        if (defined('DB_NAME') && (string)$t['db_name'] === (string)DB_NAME) return '';
+        return 't' . (int)$t['id'] . '/';
+    }
+}
+
+if (!function_exists('bmsEnsureDirGuard')) {
+    /**
+     * Create $dir if needed and drop a deny-all .htaccess in it.
+     *
+     * Database dumps must never be fetchable over HTTP, and a directory created
+     * at runtime would otherwise inherit no protection at all.
+     */
+    function bmsEnsureDirGuard(string $dir): void
+    {
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        $ht = rtrim($dir, '/\\') . '/.htaccess';
+        if (!is_file($ht)) {
+            @file_put_contents($ht, "Require all denied\nDeny from all\nOptions -Indexes\n");
+        }
+    }
+}
+
+if (!function_exists('bmsBackupDir')) {
+    /**
+     * The backup directory THIS request owns, with a trailing slash.
+     *
+     * Every tenant subdomain is served from one webroot, so ROOT_DIR is
+     * identical for all of them: a shared backups/ meant any tenant could list
+     * and download every other tenant's full database dump. Each tenant now
+     * gets its own subdirectory; the legacy install keeps the unprefixed path
+     * so its existing dumps stay exactly where they are.
+     */
+    function bmsBackupDir(): string
+    {
+        $base = (defined('ROOT_DIR') ? ROOT_DIR : dirname(__DIR__)) . '/backups/';
+        $dir  = $base . bmsTenantPathPrefix();
+        bmsEnsureDirGuard($dir);
+        return $dir;
     }
 }

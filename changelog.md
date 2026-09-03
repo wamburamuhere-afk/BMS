@@ -1,5 +1,60 @@
 # BMS Changelog
 
+## 2026-09-03 (fix) — A tenant's Restore destroyed the main database; and the backups it made could not be restored
+
+**Files (changed):** `core/tenant_bootstrap.php`, `core/backup.php`, `api/backup_actions.php`,
+`app/constant/settings/backup_restore.php`
+**Files (added):** `tests/test_backup_isolation_cli.php`, `tenant_isolation_plan.md`
+
+Not a hardening exercise. On **2026-09-02** tenant #9002 (`mufindipower`) opened Backup & Restore on
+the demo host, pressed Restore, and the demo company's database `bejundas_main` was dropped and
+overwritten with the tenant's own data — 26 MB of records down to a single user row. Recovered from
+the 31 August dump. The same code is deployed on the app host, where the only thing that prevented
+the same outcome is that it has no tenants registered yet. Full evidence, timeline and recovery
+record in `tenant_isolation_plan.md`.
+
+**Cause.** `restoreFromFile()` built its connection with
+`new mysqli(DB_SERVER, DB_USERNAME, DB_PASSWORD, DB_NAME)`. The *dump* side correctly used the
+tenant's `$pdo`, but the *restore* side read the constants — which on every tenant request name the
+main database. Because each `CREATE TABLE` in a dump is preceded by `DROP TABLE IF EXISTS`, the
+result was destruction rather than pollution.
+
+The deeper cause is that `DB_NAME` and `ROOT_DIR` are global and reachable from anywhere, so being
+tenant-aware was *optional*. `core/tenant_bootstrap.php` now publishes the accessors that make it
+mandatory — **application code must never name a database or a directory; it asks the request which
+one it is on**: `bmsCurrentDbConfig()`, `bmsCurrentDbName()`, `bmsTenantPathPrefix()`,
+`bmsBackupDir()`. `bmsCurrentDbConfig()` returns *credentials*, not a PDO handle, because the
+dump/restore path genuinely needs mysqli's `multi_query`; it throws rather than ever falling back to
+the main database.
+
+**The backups could not be restored either** — found while recovering demo, and true long before
+multi-tenancy. `bms_write_dump()` wrote `INSERT INTO t VALUES(...)` with no column list, supplying a
+value for every GENERATED column. MySQL rejects those rows (`ERROR 3105`) and `mysql < dump.sql`
+*aborts* there: the first recovery attempt stopped at `product_stocks`, 211 of 303 tables in, and
+this is why the two in-app recovery attempts on the morning of 3 September also failed. Dumps now
+carry an explicit column list and omit generated columns, which MySQL recomputes on insert.
+
+**Shared backup directory.** Every tenant subdomain is served from one webroot, so `ROOT_DIR` is
+identical for all of them: `backups/` was common and the settings page listed it with a bare
+`glob()`. Any tenant could see and download every other tenant's full database dump. Each tenant now
+gets its own guarded directory. The **legacy install keeps the unprefixed path** — detected as
+`db_name === DB_NAME`, so no file moves and no stored `document_library` path is invalidated.
+
+**Also:** the restore's result-drain loop was `while (more_results() && next_result())`, which
+silently discards the error that stopped a restore — a failing `next_result()` exits the loop before
+anything reads `$mysqli->error`. Each result is now checked explicitly, including the failing one.
+
+**Tests (`tests/test_backup_isolation_cli.php`, 31 assertions).** Proves the dump→restore round trip
+against a real throwaway database containing a STORED generated column, shaped like the
+`product_stocks` table that actually broke — including that the generated value recomputes correctly
+and that quotes, backslashes and newlines survive. It carries a **negative control**: it builds a
+dump the old way and asserts MySQL still rejects it. An assertion never seen failing is not evidence.
+The source guards match against comment-stripped code, so the comment documenting the old line
+cannot masquerade as the old line.
+
+**Operational note.** `api/backup_actions.php` is currently `chmod 000` on both hosts as containment.
+The deploy's `git reset --hard` restores the file and its permissions along with this fix.
+
 ## 2026-09-02 (feat) — Superadmin can change their own credentials and register a company from the panel
 
 **Files (added):** `app/superadmin/profile.php`, `app/superadmin/tenant_new.php`,

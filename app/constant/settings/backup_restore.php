@@ -18,8 +18,13 @@ if (!isAdmin()) {
     exit();
 }
 
-$backupsDir = __DIR__ . '/../../../backups/';
-if (!is_dir($backupsDir)) mkdir($backupsDir, 0755, true);
+// bmsBackupDir(), never a literal path: every tenant subdomain is served from
+// the SAME webroot, so a hardcoded backups/ is shared by all of them — the
+// glob() further down would list, and the download route would serve, every
+// other tenant's full database dump. MUST stay in step with the identical call
+// in api/backup_actions.php so create/list/download/restore/delete agree.
+require_once __DIR__ . '/../../../core/tenant_bootstrap.php';
+$backupsDir = bmsBackupDir();
 
 $autoBackupNotice = '';
 
@@ -52,7 +57,10 @@ function getDatabaseSize($pdo) {
     try {
         $stmt = $pdo->prepare("SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS size_mb
             FROM information_schema.TABLES WHERE table_schema = ? GROUP BY table_schema");
-        $stmt->execute([DB_NAME]);
+        // bmsCurrentDbName(), not DB_NAME — on a tenant request the constant is
+        // the MAIN database, so this reported someone else's size (and, for a
+        // least-privileged tenant user, simply zero).
+        $stmt->execute([bmsCurrentDbName()]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ? $result['size_mb'] : 0;
     } catch (Exception $e) { return 0; }
