@@ -71,7 +71,10 @@ try {
 
     // Remove the receipt file once the row is gone.
     if (!empty($tx['receipt_file'])) {
-        $path = __DIR__ . '/../../uploads/finance/petty_cash/' . $tx['receipt_file'];
+        // bmsUploadsDir — the delete must look in the SAME directory the save
+        // wrote to, which on a tenant request is that tenant's own.
+        require_once __DIR__ . '/../../core/tenant_bootstrap.php';
+        $path = bmsUploadsDir('finance/petty_cash') . basename($tx['receipt_file']);
         if (is_file($path)) @unlink($path);
     }
 

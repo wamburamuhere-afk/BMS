@@ -67,13 +67,16 @@ try {
     // Handle attachment upload
     $attachment_path = null;
     if (isset($_FILES['attachment_file']) && $_FILES['attachment_file']['error'] == 0) {
+        // Written path and STORED path must come from the same pair — see
+        // core/tenant_bootstrap.php. Unprefixed on the legacy install.
+        require_once __DIR__ . '/../../core/tenant_bootstrap.php';
         $proj_folder = $voucher['project_id'] ?: 'general';
-        $upload_dir  = __DIR__ . "/../../uploads/projects/$proj_folder/vouchers/";
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+        $upload_sub  = "projects/$proj_folder/vouchers";
+        $upload_dir  = bmsUploadsDir($upload_sub);   // creates dir + .htaccess guard
         $file_ext  = pathinfo($_FILES['attachment_file']['name'], PATHINFO_EXTENSION);
         $file_name = 'vpay_' . time() . '_' . uniqid() . '.' . $file_ext;
         if (move_uploaded_file($_FILES['attachment_file']['tmp_name'], $upload_dir . $file_name)) {
-            $attachment_path = "uploads/projects/$proj_folder/vouchers/$file_name";
+            $attachment_path = bmsUploadsRel($upload_sub) . $file_name;
             registerFileInLibrary($pdo, $attachment_path, $_FILES['attachment_file']['name'],
                 $_FILES['attachment_file']['size'], 'Payment Proof - Voucher #' . $voucher_id,
                 'voucher,payment,finance', $_SESSION['user_id']);

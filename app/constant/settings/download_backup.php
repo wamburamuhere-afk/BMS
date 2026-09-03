@@ -16,9 +16,32 @@ if (!canView('backup_restore')) {
     exit();
 }
 
+require_once __DIR__ . '/../../../includes/config.php';
+require_once __DIR__ . '/../../../core/tenant_bootstrap.php';
+
 if (isset($_GET['file'])) {
     $filename = basename($_GET['file']); // Prevent directory traversal
-    $filepath = __DIR__ . '/../../../backups/' . $filename;
+
+    // bmsBackupDir(), never the shared backups/ path.
+    //
+    // Every tenant subdomain is served from ONE webroot, so this route used to
+    // read the directory every tenant shares — and dump filenames are entirely
+    // predictable (`bms_backup_YYYY-MM-DD_HH-MM-SS.sql`). Scoping the *listing*
+    // is not enough on its own when the fetch route will still serve anything
+    // named: any tenant could have downloaded the main company's full database
+    // dump by guessing a timestamp.
+    $dir      = bmsBackupDir();
+    $filepath = $dir . $filename;
+
+    // basename() stops ../ traversal; this stops a symlink planted inside the
+    // directory from pointing anywhere else.
+    $realDir  = realpath($dir);
+    $realFile = realpath($filepath);
+    if ($realDir === false || $realFile === false
+        || strncmp($realFile, $realDir, strlen($realDir)) !== 0) {
+        http_response_code(404);
+        die("File not found.");
+    }
 
     if (file_exists($filepath) && is_file($filepath)) {
         // Clear headers to avoid conflicts

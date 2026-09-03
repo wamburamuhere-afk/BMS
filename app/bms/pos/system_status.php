@@ -44,26 +44,18 @@ foreach ($possible_db as $path) {
     }
 }
 
-// Manual Fallback if file not found
+// No connection? Fail loudly — never invent one.
+//
+// This used to fall back to a hardcoded `mysql:dbname=bms` as root with an
+// empty password. On a tenant subdomain that silently pointed a page at the
+// MAIN database as a superuser, which is the same class of defect that dropped
+// a production database on 2026-09-02 (see tenant_isolation_plan.md). A page
+// that cannot get the connection the request resolved must stop, not guess.
 if (!$db_connected && !isset($pdo)) {
-    try {
-        $host = 'localhost';
-        $db   = 'bms';
-        $user = 'root';
-        $pass = '';
-        $charset = 'utf8mb4';
-
-        $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
-        $options = [
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES   => false,
-        ];
-        $pdo = new PDO($dsn, $user, $pass, $options);
-        $db_connected = true;
-    } catch (\PDOException $e) {
-        die("❌ DB Connection Failed: " . $e->getMessage() . "\nPlease check your database settings.");
-    }
+    http_response_code(500);
+    die("❌ No database connection available for this request.\n"
+      . "This page must be reached through the application (includes/config.php),\n"
+      . "which resolves the correct database for the current site.");
 }
 
 // Force text plain for easy reading

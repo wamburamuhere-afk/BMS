@@ -56,13 +56,45 @@ if (!function_exists('bms_write_dump')) {
                 fwrite($handle, "\nDROP TABLE IF EXISTS $tq;\n");
                 fwrite($handle, $create[1] . ";\n\n");
 
-                $rows = $pdo->query("SELECT * FROM $tq");
+                // Column list, EXCLUDING generated columns.
+                //
+                // This used to be `SELECT *` + `INSERT INTO t VALUES(...)` with
+                // no column list, which supplies a value for every GENERATED
+                // column. MySQL rejects those rows outright:
+                //   ERROR 3105: The value specified for generated column … is
+                //   not allowed
+                // and a plain `mysql < dump.sql` ABORTS there, leaving the
+                // database half-restored. That is not a theoretical risk — on
+                // 2026-09-03 it stopped a recovery at product_stocks, 211 of 303
+                // tables in. A backup whose output cannot be restored is not a
+                // backup. See tenant_isolation_plan.md, "Leak C".
+                //
+                // SHOW COLUMNS is used rather than information_schema so this
+                // needs no privilege beyond what the dump already requires.
+                $cols = [];
+                $cstmt = $pdo->query("SHOW COLUMNS FROM $tq");
+                while ($c = $cstmt->fetch(PDO::FETCH_ASSOC)) {
+                    // Extra is 'STORED GENERATED' / 'VIRTUAL GENERATED' for
+                    // generated columns; MySQL recomputes them on insert.
+                    if (stripos((string)($c['Extra'] ?? ''), 'GENERATED') !== false) continue;
+                    $cols[] = (string)$c['Field'];
+                }
+
+                // Every column generated — nothing to insert, the rows rebuild
+                // themselves. (Not possible in practice, but never emit an
+                // `INSERT ... () VALUES ()`.)
+                if (!$cols) { fwrite($handle, "\n"); continue; }
+
+                $colSql  = '`' . implode('`,`', $cols) . '`';
+                $colList = '(' . $colSql . ')';
+
+                $rows = $pdo->query("SELECT $colSql FROM $tq");
                 while ($row = $rows->fetch(PDO::FETCH_ASSOC)) {
                     $values = array_map(
                         fn($v) => is_null($v) ? 'NULL' : $pdo->quote($v),
                         $row
                     );
-                    fwrite($handle, "INSERT INTO $tq VALUES(" . implode(',', $values) . ");\n");
+                    fwrite($handle, "INSERT INTO $tq $colList VALUES(" . implode(',', $values) . ");\n");
                 }
                 fwrite($handle, "\n");
             }
