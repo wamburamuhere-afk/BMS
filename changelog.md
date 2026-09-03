@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-09-03 (fix) — Company Profile now starts filled in with what was typed at registration
+
+**Files (changed):** `register.php`, `actions/register_tenant.php`, `core/tenant_registration.php`, `core/tenant_provisioner.php`, `tests/test_tenant_provisioning_cli.php`
+
+Root cause: `provisionTenant()` never wrote `company_name` (or anything else) into the new
+tenant's own `system_settings` table — `schema/tenant_seed_defaults.sql` deliberately excludes
+`system_settings` (it mixes in secrets), so every new tenant landed on Company Profile showing the
+hardcoded placeholder "My Company", even though the owner had just typed their real company name
+on the registration form.
+
+Added logo upload, physical address and postal address fields to the registration form (same
+fields Company Profile already has — nothing added there). New `seedTenantCompanyProfile()` in
+`core/tenant_provisioner.php` writes `company_name`, `company_physical_address`,
+`company_postal_address` and (if uploaded) `company_logo` into the freshly provisioned tenant's
+`system_settings` right after the tenant is verified working — as a best-effort step that cannot
+roll back an otherwise fully-provisioned tenant. Logo storage mirrors company_profile.php's own
+upload handling exactly (same directory, same `company_logo.<ext>` filename) so that page finds it
+with no change on its side. Registration form's AJAX submit switched from `serialize()` to
+`FormData` to carry the file. Added CLI assertions proving the seeded values land in the correct
+tenant's own database; both `test_tenant_provisioning_cli.php` (72/72) and
+`test_tenant_registration_cli.php` (54/54) pass.
+
+Known pre-existing caveat, out of scope here: `company_profile.php`'s logo path
+(`uploads/system/logo/company_logo.<ext>`) is not tenant-prefixed, unlike `bmsUploadsDir()`
+elsewhere in the app — every tenant's uploaded logo physically shares the same file on disk, so the
+most recent upload (via registration or the Company Profile page) is what every tenant sees. Not
+introduced by this change; flagged for a follow-up.
+
 ## 2026-09-03 (fix) — Every backup taken before today was unrestorable; restores now repair them automatically
 
 **Files (changed):** `core/backup.php`, `api/backup_actions.php`

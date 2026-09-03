@@ -191,13 +191,61 @@ if (!function_exists('destroyTenantResources')) {
     }
 }
 
+if (!function_exists('seedTenantCompanyProfile')) {
+    /**
+     * Write what the owner typed at signup into the new tenant's OWN
+     * system_settings — the exact keys app/constant/settings/company_profile.php
+     * already reads (company_name, company_physical_address,
+     * company_postal_address, company_logo). Without this, every new tenant
+     * landed on Company Profile with the placeholder "My Company" even though
+     * they had just typed their real name at registration.
+     *
+     * Logo storage deliberately mirrors company_profile.php's own upload
+     * handling (same directory, same 'company_logo.<ext>' filename) so that
+     * page finds the file with no change on its side.
+     */
+    function seedTenantCompanyProfile(PDO $tpdo, string $companyName, array $extra): void
+    {
+        $values = ['company_name' => $companyName];
+
+        if (($extra['physical_address'] ?? '') !== '') {
+            $values['company_physical_address'] = $extra['physical_address'];
+        }
+        if (($extra['postal_address'] ?? '') !== '') {
+            $values['company_postal_address'] = $extra['postal_address'];
+        }
+
+        $tmpPath = $extra['logo_tmp_path'] ?? null;
+        $ext     = $extra['logo_extension'] ?? null;
+        if ($tmpPath && $ext && is_uploaded_file($tmpPath)) {
+            $uploadDir = __DIR__ . '/../uploads/system/logo/';
+            if (!is_dir($uploadDir)) @mkdir($uploadDir, 0777, true);
+            $target = $uploadDir . 'company_logo.' . $ext;
+            if (move_uploaded_file($tmpPath, $target)) {
+                $values['company_logo'] = 'uploads/system/logo/company_logo.' . $ext;
+            }
+        }
+
+        $stmt = $tpdo->prepare("
+            INSERT INTO system_settings (setting_key, setting_value, setting_group, is_public)
+            VALUES (?, ?, 'company', 1)
+            ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)
+        ");
+        foreach ($values as $key => $value) {
+            $stmt->execute([$key, $value]);
+        }
+    }
+}
+
 if (!function_exists('provisionTenant')) {
     /**
      * Create a fully working tenant.
      *
      * @param array $opts  'status' => 'active'|'trial' (default 'active'),
      *                     'plan'   => string|null,
-     *                     'owner_first_name', 'owner_last_name' => string
+     *                     'owner_first_name', 'owner_last_name' => string,
+     *                     'physical_address', 'postal_address' => string,
+     *                     'logo_tmp_path', 'logo_extension' => string|null
      * @return array{ok:bool, tenant_id:?int, subdomain:string, db_name:?string,
      *                db_username:?string, error:?string, steps:array}
      */
@@ -421,6 +469,25 @@ if (!function_exists('provisionTenant')) {
             ]);
             $step('finalise_registry', 'ok');
             logProvisioningStep($tenantId, $subdomain, 'finalise_registry', 'ok');
+
+            // ── 9.5 Seed the owner's Company Profile from what they typed ────
+            // Best-effort and after finalisation on purpose: the tenant is
+            // already fully created and verified working (step 8), so a
+            // hiccup writing these optional fields must not tear the whole
+            // tenant down. The owner can always fill them in later.
+            try {
+                seedTenantCompanyProfile($tpdo, $companyName, [
+                    'physical_address' => $opts['physical_address'] ?? '',
+                    'postal_address'   => $opts['postal_address'] ?? '',
+                    'logo_tmp_path'    => $opts['logo_tmp_path'] ?? null,
+                    'logo_extension'   => $opts['logo_extension'] ?? null,
+                ]);
+                $step('seed_company_profile', 'ok');
+                logProvisioningStep($tenantId, $subdomain, 'seed_company_profile', 'ok');
+            } catch (Throwable $e) {
+                $step('seed_company_profile', 'failed', $e->getMessage());
+                logProvisioningStep($tenantId, $subdomain, 'seed_company_profile', 'failed', $e->getMessage());
+            }
 
             $result['ok'] = true;
             logProvisioningStep($tenantId, $subdomain, 'complete', 'ok');
