@@ -184,6 +184,43 @@ restore read from its dump and wrote to main, so it should be untouched).
 are the fix for a defect with a confirmed destructive occurrence, and they take
 priority over everything else in this document.
 
+### ✅ RESOLVED — 2026-09-03
+
+**Verified in production, not in a test.** After the fix deployed, tenant #9002
+ran Restore again on their own subdomain. `bejundas_main` was untouched:
+
+| Check | Result |
+|---|---|
+| Demo main database | 12 users · 89 products · 72 product_stocks · 347 journal entries · 46 customers · 53 invoices |
+| Ledger | Dr 110,290,921,165.02 = Cr 110,290,921,165.02 — **diff 0** |
+| Tenant restore | Lands in `bms_t9002`, never in `bejundas_main` |
+
+**Three further defects surfaced while recovering, all fixed (PR #1773):**
+
+1. **Every pre-2026-09-03 backup was unrestorable.** Fixing the writer did
+   nothing for files already on disk. Worse than it sounds: `multi_query` stops
+   at the first failing statement, so every table *after* the first offender is
+   never executed — and those tables keep their previous contents rather than
+   being emptied. A restore therefore leaves the database part restored, part
+   stale, while reporting only "1 error". `bms_upgrade_legacy_dump()` now repairs
+   such files in memory at restore time.
+2. **Dumps were not portable between MySQL accounts.** `SHOW CREATE VIEW` embeds
+   `DEFINER=account@localhost`, so restoring as a tenant's `bms_u{id}` fails with
+   *"you need the SYSTEM_USER privilege"*. **This would also have broken step 8**,
+   where the app moves onto `bms_u1`. Now stripped at dump time.
+3. **A failed pre-restore snapshot was left on disk, truncated.** Found by
+   `scripts/check_legacy_dump.php` as `pre_restore_2026-09-03_09-49-54.sql`. A
+   truncated dump lists in the UI like any valid restore point and silently loses
+   everything past the cut — and it was created during a recovery, exactly when
+   an operator reaches for the nearest restore point. Both restore paths now
+   delete the partial file.
+
+**Lesson worth keeping:** Phase 9 proved isolation at the MySQL grant layer and
+stopped there. Every defect above lived one layer up, in application code that
+bypassed `$pdo` or wrote a file the database never knew about. A green isolation
+suite is not evidence that the application respects tenancy — which is why
+`tests/test_tenant_resource_audit_cli.php` now exists.
+
 ---
 
 ## Step 1 — Resource accessors
