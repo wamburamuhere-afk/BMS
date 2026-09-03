@@ -224,6 +224,31 @@ ok(stripos($portable, 'DEFINER=') === false, 'DEFINER is stripped from CREATE VI
 ok(stripos($portable, 'SQL SECURITY INVOKER') !== false, 'SQL SECURITY DEFINER becomes INVOKER');
 ok(stripos($portable, 'VIEW `v`') !== false, 'the view itself is otherwise unchanged');
 
+// ═══════════════════════════════════════════════════════════════════════════
+section('5b. A truncated dump is detectable, and never left behind');
+// ═══════════════════════════════════════════════════════════════════════════
+
+// A dump that stopped mid-write is the most dangerous artefact this system can
+// produce: it lists in the UI like any valid restore point, and restoring it
+// silently loses everything past the cut. Observed for real as
+// pre_restore_2026-09-03_09-49-54.sql, which survived a failed snapshot and sat
+// in the backup list looking usable.
+$tmpFull  = sys_get_temp_dir() . '/bms_trunc_full_' . getmypid() . '.sql';
+bms_write_dump($p, $tmpFull);
+$full = file_get_contents($tmpFull);
+@unlink($tmpFull);
+
+$hasMarker = str_contains(substr($full, -200), 'SET FOREIGN_KEY_CHECKS=1;');
+ok($hasMarker, 'a complete dump ends with the SET FOREIGN_KEY_CHECKS=1; marker');
+$cut = substr($full, 0, (int)(strlen($full) * 0.6));
+ok(!str_contains(substr($cut, -200), 'SET FOREIGN_KEY_CHECKS=1;'),
+   'a truncated dump lacks it — which is how scripts/check_legacy_dump.php spots one');
+
+// And the restore path must not create such a file in the first place.
+$apiSrc = file_get_contents("$root/api/backup_actions.php");
+ok(substr_count($apiSrc, 'unlink($preRestorePath)') === 2,
+   'both restore paths delete a half-written pre-restore snapshot instead of leaving it on disk');
+
 // Real views from this database must come out portable too.
 $views = $p->query("SHOW FULL TABLES WHERE Table_type = 'VIEW'")->fetchAll(PDO::FETCH_NUM);
 $tmp = sys_get_temp_dir() . '/bms_legacy_view_' . getmypid() . '.sql';
