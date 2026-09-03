@@ -63,7 +63,7 @@ $baseDom = tenantBaseDomain();
 
     <div id="formError" class="alert alert-danger d-none" role="alert"></div>
 
-    <form id="registerForm" autocomplete="off" novalidate>
+    <form id="registerForm" autocomplete="off" novalidate enctype="multipart/form-data">
         <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
 
         <!-- Honeypot. Left blank by humans; bots fill it and are refused. -->
@@ -75,6 +75,30 @@ $baseDom = tenantBaseDomain();
         <div class="mb-3">
             <label for="company_name" class="form-label">Company name</label>
             <input type="text" class="form-control" id="company_name" name="company_name" maxlength="191" required autofocus>
+            <div class="form-text">This fills in your Company Profile automatically — you won't need to retype it.</div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Company logo <span class="text-muted">(optional)</span></label>
+            <div class="d-flex align-items-center gap-3">
+                <div class="bg-light rounded-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 64px; height: 64px; overflow: hidden; border: 2px dashed #dee2e6;">
+                    <img id="logoPreview" src="" alt="" class="d-none img-fluid" style="max-height: 100%; width: auto;">
+                    <i id="logoPlaceholder" class="bi bi-image text-muted fs-4"></i>
+                </div>
+                <input type="file" class="form-control" id="company_logo" name="company_logo" accept="image/png,image/jpeg,image/gif">
+            </div>
+            <div class="form-text">PNG, JPG or GIF. Max 2MB. You can also add this later.</div>
+        </div>
+
+        <div class="row g-2 mb-3">
+            <div class="col-md-6">
+                <label for="company_physical_address" class="form-label">Physical address <span class="text-muted">(optional)</span></label>
+                <input type="text" class="form-control" id="company_physical_address" name="company_physical_address" maxlength="255" placeholder="e.g. Moshi-Kilimanjaro">
+            </div>
+            <div class="col-md-6">
+                <label for="company_postal_address" class="form-label">Postal address <span class="text-muted">(optional)</span></label>
+                <input type="text" class="form-control" id="company_postal_address" name="company_postal_address" maxlength="255" placeholder="e.g. P.O. Box 123, Machame">
+            </div>
         </div>
 
         <div class="mb-1">
@@ -172,6 +196,17 @@ function checkSubdomain() {
         });
 }
 
+// Logo preview: purely cosmetic, the file itself travels with the form.
+$('#company_logo').on('change', function () {
+    const file = this.files && this.files[0];
+    const $img = $('#logoPreview');
+    const $ph  = $('#logoPlaceholder');
+    if (!file) { $img.addClass('d-none').attr('src', ''); $ph.removeClass('d-none'); return; }
+    const reader = new FileReader();
+    reader.onload = function (e) { $img.attr('src', e.target.result).removeClass('d-none'); $ph.addClass('d-none'); };
+    reader.readAsDataURL(file);
+});
+
 $('#registerForm').on('submit', function (e) {
     e.preventDefault();
     $('#formError').addClass('d-none').text('');
@@ -181,6 +216,7 @@ $('#registerForm').on('submit', function (e) {
         return;
     }
 
+    const formEl = this;
     $('#registerForm').addClass('d-none');
     $('#settingUp').removeClass('d-none');
 
@@ -188,7 +224,9 @@ $('#registerForm').on('submit', function (e) {
         url: '/actions/register_tenant.php',
         method: 'POST',
         dataType: 'json',
-        data: $(this).serialize(),
+        data: new FormData(formEl),
+        contentType: false,
+        processData: false,
         timeout: 120000,                 // provisioning builds ~300 tables
         success: function (res) {
             if (res && res.success) {

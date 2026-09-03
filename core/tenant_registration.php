@@ -156,7 +156,9 @@ if (!function_exists('registerTenant')) {
      * The public signup entry point: gate, throttle, validate, provision, record.
      *
      * @param array  $in  company_name, subdomain, owner_email, owner_password,
-     *                    owner_first_name, owner_last_name, website (honeypot)
+     *                    owner_first_name, owner_last_name, company_physical_address,
+     *                    company_postal_address, logo_tmp_path, logo_extension,
+     *                    website (honeypot)
      * @return array{ok:bool, error:?string, tenant_id:?int, subdomain:?string, login_url:?string}
      */
     function registerTenant(array $in, string $ip): array
@@ -216,9 +218,13 @@ if (!function_exists('registerTenant')) {
         // provisionTenant() guarantees all-or-nothing: on failure there is no
         // orphaned database, MySQL user or registry row to clean up here.
         $r = provisionTenant($company, $sub, $email, $pw, [
-            'status'           => 'active',      // so the owner can sign in immediately
-            'owner_first_name' => trim((string)($in['owner_first_name'] ?? '')),
-            'owner_last_name'  => trim((string)($in['owner_last_name'] ?? '')),
+            'status'            => 'active',      // so the owner can sign in immediately
+            'owner_first_name'  => trim((string)($in['owner_first_name'] ?? '')),
+            'owner_last_name'   => trim((string)($in['owner_last_name'] ?? '')),
+            'physical_address'  => trim((string)($in['company_physical_address'] ?? '')),
+            'postal_address'    => trim((string)($in['company_postal_address'] ?? '')),
+            'logo_tmp_path'     => $in['logo_tmp_path'] ?? null,
+            'logo_extension'    => $in['logo_extension'] ?? null,
         ]);
 
         if (!$r['ok']) {
