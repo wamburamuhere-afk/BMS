@@ -1,5 +1,155 @@
 # BMS Changelog
 
+## 2026-09-03 (fix) — Uploads isolation, batch 1: finance (api/account, api/petty_cash)
+
+**Files (changed):** `api/account/add_budget.php`, `api/account/update_budget.php`,
+`api/account/record_payment.php`, `api/account/record_voucher_payment.php`,
+`api/account/save_voucher.php`, `api/account/save_purchase_order.php`,
+`api/petty_cash/save_transaction.php`, `api/petty_cash/delete_transaction.php`,
+`api/petty_cash/get_attachment.php`, `tests/test_tenant_resource_audit_cli.php`
+
+First batch of the uploads sweep. Every tenant subdomain is served from one webroot, so a literal
+`uploads/…` path is shared by all of them. These nine files now use `bmsUploadsDir()` for the path
+they **write** to and `bmsUploadsRel()` for the path they **store**.
+
+Ratchet moved: absolute uploads paths **67 → 58**, stored uploads paths **56 → 50**. Done by module
+rather than in one sweep, so any breakage is traceable to a small diff.
+
+**Behaviour on the existing install is unchanged, and the test proves it** rather than asserting it:
+for every path this batch touches, `bmsUploadsDir($sub)` is compared byte-for-byte against the
+literal it replaced. The prefix is empty for the legacy install, so only tenants — which have no
+files yet — see any difference.
+
+**New structural check: "every file stores the path it writes to."** This is the one mistake the
+sweep can make. `bmsUploadsDir()` says where a file is written, `bmsUploadsRel()` says what goes in
+the database; call them with different arguments and the upload succeeds, the row saves, and the
+file is simply never found again — silently, and only for tenants. The audit now extracts both
+argument sets per file and fails on any mismatch.
+
+**Pre-existing bug fixed in passing.** `api/petty_cash/get_attachment.php` read from
+`uploads/petty_cash/` while `save_transaction.php` and `delete_transaction.php` both used
+`uploads/finance/petty_cash/`. Receipts were written to one directory and looked for in another, so
+**every petty cash attachment 404'd**. All three now resolve through the same accessor. Fixed rather
+than faithfully preserved, since it was the very line being converted.
+
+`mkdir($dir, 0777, true)` blocks were dropped where they became dead code — `bmsUploadsDir()`
+creates the directory at 0755 and installs the deny-executables `.htaccess` from
+`.claude/security.md` §19, which the old inline `mkdir` never did.
+
+Remaining: 58 + 50 call sites across `api/` (33), `api/operations` (8), `api/document` (7),
+`app/`, `ajax/`, `actions/`, `core/`.
+
+## 2026-09-03 (fix) — Tenant resource audit: a ratchet that blocks this class of bug, and the two backup routes the first fix missed
+
+**Files (added):** `tests/test_tenant_resource_audit_cli.php`
+**Files (changed):** `core/tenant_bootstrap.php`, `app/constant/settings/download_backup.php`,
+`cron/auto_backup.php`, `app/bms/pos/system_status.php`, `api/backup_actions.php`
+**Files (deleted):** `app/bms/pos/fix_database.php`
+
+Follows the same-day fix for the destroyed database. That change closed three known call sites; this
+one adds the check that finds them automatically — and it immediately found two the first pass had
+missed, which is the whole argument for having it.
+
+**`app/constant/settings/download_backup.php` still read the shared directory.** Scoping the
+*listing* is worthless while the *fetch* route serves anything it is named, and dump filenames are
+entirely predictable (`bms_backup_YYYY-MM-DD_HH-MM-SS.sql`). Any tenant could have downloaded the
+main company's full database dump by guessing a timestamp. Now uses `bmsBackupDir()` plus a
+`realpath()` containment check — `basename()` stops `../`, but not a symlink planted in the
+directory. **`cron/auto_backup.php`** wrote to the shared path too.
+
+**`app/bms/pos/fix_database.php` deleted.** Web-reachable, **no authentication check of any kind**,
+ran DDL, and fell back to `mysql:dbname=bms` as `root` with an empty password. Its own header said
+`SAVE AS:` — a one-off that shipped by accident. Nothing references it; the only mentions are two
+scratch audits that already list it as known-bad. **`app/bms/pos/system_status.php`** had the same
+root fallback: on a tenant subdomain it silently pointed a page at the main database as a superuser.
+It now fails loudly instead — a page that cannot get the request's connection must stop, not guess.
+
+**The ratchet (`tests/test_tenant_resource_audit_cli.php`, 22 assertions).** Same shape as
+`test_project_scope_cli.php`: it counts the places that still name a database or directory for
+themselves and fails if the count goes **up**. Existing offenders are grandfathered, new ones are
+blocked, and the pre-push hook picks it up automatically because it matches `tests/test_*_cli.php`.
+Escape hatch is `// tenant-audit: skip — <reason>`, used once, for the `multi_query` restore that
+genuinely needs mysqli and already takes every value from `bmsCurrentDbConfig()`. Comments are
+stripped before matching, so a comment *about* a bad pattern is not counted *as* one.
+
+Baselines at this commit — **connection 0** and **backups 0**, the two that caused the incident,
+must stay at zero:
+
+| Debt | Count |
+|---|---|
+| files building their own DB connection | **0** |
+| files building a backups path | **0** |
+| files reading `DB_NAME` directly | 1 |
+| files building an absolute uploads path | 67 |
+| files hardcoding a stored `uploads/` path | 56 |
+
+**New accessors:** `bmsUploadsDir($sub)` (absolute, write here) and `bmsUploadsRel($sub)` (relative,
+store this). They are always used as a pair — the test asserts `bmsUploadsDir()` ends with exactly
+`bmsUploadsRel()`, because a stored path that disagrees with the written path means the file lands
+where nothing ever reads it. Directories are created on demand with the deny-executables `.htaccess`
+from `.claude/security.md` §19.
+
+**Not done in this commit:** the 67+56 uploads call sites are still unconverted, so the filesystem
+remains shared. That is a quota and path-handling problem rather than the direct leak the backup
+directory was — uploaded files are named `bin2hex(random_bytes(16))` and indexed in each tenant's
+own database, so one tenant cannot enumerate another's. The ratchet freezes the debt so it cannot
+grow while the sweep is done separately.
+
+## 2026-09-03 (fix) — A tenant's Restore destroyed the main database; and the backups it made could not be restored
+
+**Files (changed):** `core/tenant_bootstrap.php`, `core/backup.php`, `api/backup_actions.php`,
+`app/constant/settings/backup_restore.php`
+**Files (added):** `tests/test_backup_isolation_cli.php`, `tenant_isolation_plan.md`
+
+Not a hardening exercise. On **2026-09-02** tenant #9002 (`mufindipower`) opened Backup & Restore on
+the demo host, pressed Restore, and the demo company's database `bejundas_main` was dropped and
+overwritten with the tenant's own data — 26 MB of records down to a single user row. Recovered from
+the 31 August dump. The same code is deployed on the app host, where the only thing that prevented
+the same outcome is that it has no tenants registered yet. Full evidence, timeline and recovery
+record in `tenant_isolation_plan.md`.
+
+**Cause.** `restoreFromFile()` built its connection with
+`new mysqli(DB_SERVER, DB_USERNAME, DB_PASSWORD, DB_NAME)`. The *dump* side correctly used the
+tenant's `$pdo`, but the *restore* side read the constants — which on every tenant request name the
+main database. Because each `CREATE TABLE` in a dump is preceded by `DROP TABLE IF EXISTS`, the
+result was destruction rather than pollution.
+
+The deeper cause is that `DB_NAME` and `ROOT_DIR` are global and reachable from anywhere, so being
+tenant-aware was *optional*. `core/tenant_bootstrap.php` now publishes the accessors that make it
+mandatory — **application code must never name a database or a directory; it asks the request which
+one it is on**: `bmsCurrentDbConfig()`, `bmsCurrentDbName()`, `bmsTenantPathPrefix()`,
+`bmsBackupDir()`. `bmsCurrentDbConfig()` returns *credentials*, not a PDO handle, because the
+dump/restore path genuinely needs mysqli's `multi_query`; it throws rather than ever falling back to
+the main database.
+
+**The backups could not be restored either** — found while recovering demo, and true long before
+multi-tenancy. `bms_write_dump()` wrote `INSERT INTO t VALUES(...)` with no column list, supplying a
+value for every GENERATED column. MySQL rejects those rows (`ERROR 3105`) and `mysql < dump.sql`
+*aborts* there: the first recovery attempt stopped at `product_stocks`, 211 of 303 tables in, and
+this is why the two in-app recovery attempts on the morning of 3 September also failed. Dumps now
+carry an explicit column list and omit generated columns, which MySQL recomputes on insert.
+
+**Shared backup directory.** Every tenant subdomain is served from one webroot, so `ROOT_DIR` is
+identical for all of them: `backups/` was common and the settings page listed it with a bare
+`glob()`. Any tenant could see and download every other tenant's full database dump. Each tenant now
+gets its own guarded directory. The **legacy install keeps the unprefixed path** — detected as
+`db_name === DB_NAME`, so no file moves and no stored `document_library` path is invalidated.
+
+**Also:** the restore's result-drain loop was `while (more_results() && next_result())`, which
+silently discards the error that stopped a restore — a failing `next_result()` exits the loop before
+anything reads `$mysqli->error`. Each result is now checked explicitly, including the failing one.
+
+**Tests (`tests/test_backup_isolation_cli.php`, 31 assertions).** Proves the dump→restore round trip
+against a real throwaway database containing a STORED generated column, shaped like the
+`product_stocks` table that actually broke — including that the generated value recomputes correctly
+and that quotes, backslashes and newlines survive. It carries a **negative control**: it builds a
+dump the old way and asserts MySQL still rejects it. An assertion never seen failing is not evidence.
+The source guards match against comment-stripped code, so the comment documenting the old line
+cannot masquerade as the old line.
+
+**Operational note.** `api/backup_actions.php` is currently `chmod 000` on both hosts as containment.
+The deploy's `git reset --hard` restores the file and its permissions along with this fix.
+
 ## 2026-09-02 (feat) — Superadmin can change their own credentials and register a company from the panel
 
 **Files (added):** `app/superadmin/profile.php`, `app/superadmin/tenant_new.php`,

@@ -40,8 +40,12 @@ if (!$isCli) {
 }
 
 $retentionDays = 7;
-$backupsDir = ROOT_DIR . '/backups/';
-if (!is_dir($backupsDir)) @mkdir($backupsDir, 0755, true);
+// bmsBackupDir() rather than the shared literal. This cron runs from the CLI,
+// where no tenant is resolved, so it returns the unprefixed path exactly as
+// before — the call is what keeps it correct if this is ever invoked in a
+// tenant context, and what stops the audit from flagging a genuine offender.
+require_once __DIR__ . '/../core/tenant_bootstrap.php';
+$backupsDir = bmsBackupDir();
 $logFile = __DIR__ . '/backup.log';
 
 function bms_cron_log(string $logFile, string $msg): void {

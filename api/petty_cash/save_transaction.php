@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/payment_source.php';   // postPettyCashLedger / reversePettyCashLedger
 require_once __DIR__ . '/../../core/money_guard.php';      // accountFundsWarning (I3 warn-but-allow)
 require_once __DIR__ . '/../../core/bank_register.php';    // recordBankTransaction / reverseBankTransaction
+require_once __DIR__ . '/../../core/tenant_bootstrap.php'; // bmsUploadsDir — never a literal uploads path
 
 ini_set('display_errors', 0);
 error_reporting(0);
@@ -65,7 +66,7 @@ try {
     if (isset($_FILES['receipt_file']) && $_FILES['receipt_file']['error'] === UPLOAD_ERR_OK) {
         $allowed_mime = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
         $max_size     = 5 * 1024 * 1024; // 5 MB
-        $upload_dir   = __DIR__ . '/../../uploads/finance/petty_cash/';
+        $upload_dir   = bmsUploadsDir('finance/petty_cash');
 
         $file_mime = mime_content_type($_FILES['receipt_file']['tmp_name']);
         $file_size = $_FILES['receipt_file']['size'];
@@ -136,7 +137,7 @@ try {
             $old_file = $oldStmt->fetchColumn();
 
             if ($old_file) {
-                $old_path = __DIR__ . '/../../uploads/finance/petty_cash/' . $old_file;
+                $old_path = bmsUploadsDir('finance/petty_cash') . $old_file;
                 if (file_exists($old_path)) {
                     @unlink($old_path);
                 }
@@ -145,7 +146,7 @@ try {
             // Rename temp file to final name
             $ext            = strtolower(pathinfo($receipt_file, PATHINFO_EXTENSION));
             $final_filename = $transaction_id . '_' . time() . '.' . $ext;
-            $upload_dir     = __DIR__ . '/../../uploads/finance/petty_cash/';
+            $upload_dir     = bmsUploadsDir('finance/petty_cash');
             @rename($upload_dir . $receipt_file, $upload_dir . $final_filename);
             $receipt_file   = $final_filename;
             $temp_path      = null;
@@ -211,7 +212,7 @@ try {
         if ($receipt_file) {
             $ext            = strtolower(pathinfo($receipt_file, PATHINFO_EXTENSION));
             $final_filename = $new_id . '_' . time() . '.' . $ext;
-            $upload_dir     = __DIR__ . '/../../uploads/finance/petty_cash/';
+            $upload_dir     = bmsUploadsDir('finance/petty_cash');
             @rename($upload_dir . $receipt_file, $upload_dir . $final_filename);
             $temp_path = null;
 

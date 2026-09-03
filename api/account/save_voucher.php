@@ -59,14 +59,14 @@ try {
     // Handle File Upload
     $attachment_path = $_POST['existing_attachment'] ?? null;
     if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] == 0) {
-        $upload_dir = __DIR__ . '/../../uploads/finance/vouchers/';
-        if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0777, true);
-        }
+        // Written path and STORED path must come from the same pair — see
+        // core/tenant_bootstrap.php. Unprefixed on the legacy install.
+        require_once __DIR__ . '/../../core/tenant_bootstrap.php';
+        $upload_dir = bmsUploadsDir('finance/vouchers');   // creates dir + .htaccess guard
         $file_ext = pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION);
         $file_name = 'pv_' . time() . '_' . uniqid() . '.' . $file_ext;
         if (move_uploaded_file($_FILES['attachment']['tmp_name'], $upload_dir . $file_name)) {
-            $attachment_path = 'uploads/finance/vouchers/' . $file_name;
+            $attachment_path = bmsUploadsRel('finance/vouchers') . $file_name;
             registerFileInLibrary($pdo, $attachment_path, $_FILES['attachment']['name'], $_FILES['attachment']['size'], 'Payment Voucher Attachment', 'voucher,finance', $_SESSION['user_id']);
         }
     }

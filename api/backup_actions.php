@@ -28,10 +28,15 @@ csrf_check();
 // Single source of truth for the backup directory. MUST match the path used
 // by app/constant/settings/backup_restore.php (table + auto-backup) and
 // api/download_backup.php so create/list/download/restore/delete all operate
-// on the same files. Direct HTTP access is blocked by backups/.htaccess —
+// on the same files. Direct HTTP access is blocked by a deny-all .htaccess —
 // downloads are served via PHP readfile() in the gated download routes.
-$backupsDir = ROOT_DIR . '/backups/';
-if (!is_dir($backupsDir)) mkdir($backupsDir, 0755, true);
+//
+// bmsBackupDir() rather than ROOT_DIR . '/backups/': every tenant subdomain is
+// served from the SAME webroot, so the literal path is shared by all of them —
+// any tenant could list and download every other tenant's full database dump.
+// The legacy install keeps the unprefixed path; tenants get their own.
+require_once __DIR__ . '/../core/tenant_bootstrap.php';
+$backupsDir = bmsBackupDir();
 
 $action = $_POST['action'] ?? '';
 
@@ -52,7 +57,31 @@ function restoreFromFile($filepath) {
     // are collected as errors rather than thrown as uncatchable exceptions.
     mysqli_report(MYSQLI_REPORT_OFF);
 
-    $mysqli = new mysqli(DB_SERVER, DB_USERNAME, DB_PASSWORD, DB_NAME);
+    // ─────────────────────────────────────────────────────────────────────────
+    // THE DATABASE THIS REQUEST OWNS — never the DB_* constants.
+    //
+    // This line used to read:
+    //     new mysqli(DB_SERVER, DB_USERNAME, DB_PASSWORD, DB_NAME)
+    // The dump above is correctly written from the tenant's own $pdo, but the
+    // restore connected to the MAIN database. So a tenant pressing Restore
+    // dumped THEIR data and wrote it over the MAIN company's database — and
+    // because every CREATE TABLE below is preceded by DROP TABLE IF EXISTS,
+    // it destroyed it rather than merely polluting it.
+    //
+    // That is not hypothetical: on 2026-09-02 tenant #9002 did exactly this and
+    // wiped the demo host's `bejundas_main`. Recovered from a 31-Aug dump.
+    // See tenant_isolation_plan.md, "INCIDENT".
+    //
+    // mysqli (not $pdo) is genuinely required here for multi_query, so what is
+    // needed is credentials — which is precisely what bmsCurrentDbConfig()
+    // exists to hand out. It throws rather than falling back.
+    // ─────────────────────────────────────────────────────────────────────────
+    $db = bmsCurrentDbConfig();
+
+    // tenant-audit: skip — this mysqli is REQUIRED (PDO cannot multi_query a
+    // dump) and is correct: every value comes from bmsCurrentDbConfig(), i.e.
+    // the database this request owns, never the DB_* constants.
+    $mysqli = new mysqli($db['host'], $db['user'], $db['pass'], $db['name']);
     if ($mysqli->connect_error) {
         throw new Exception("DB connection failed: " . $mysqli->connect_error);
     }
@@ -75,11 +104,22 @@ function restoreFromFile($filepath) {
         $errors[] = $mysqli->error;
     }
 
-    // Drain all result sets — required after multi_query
+    // Drain all result sets — required after multi_query.
+    //
+    // The loop below used to be `while ($mysqli->more_results() && $mysqli->next_result())`,
+    // which SILENTLY LOSES the error that stopped the restore: a failing
+    // next_result() returns false and exits the loop before anything reads
+    // $mysqli->error. A restore could therefore abort halfway and report
+    // nothing. Each result is now checked explicitly, including the failing one.
     do {
         if ($result = $mysqli->store_result()) $result->free();
         if ($mysqli->errno) $errors[] = $mysqli->error;
-    } while ($mysqli->more_results() && $mysqli->next_result());
+        if (!$mysqli->more_results()) break;
+        if (!$mysqli->next_result()) {
+            if ($mysqli->errno) $errors[] = $mysqli->error;
+            break;
+        }
+    } while (true);
 
     $mysqli->close();
     return $errors;

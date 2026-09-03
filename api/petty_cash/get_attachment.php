@@ -28,7 +28,13 @@ if (!$receipt_file) {
     die("No attachment found for this transaction.");
 }
 
-$file_path = __DIR__ . '/../../uploads/petty_cash/' . basename($receipt_file);
+// PRE-EXISTING BUG, fixed here: this read `uploads/petty_cash/` while
+// save_transaction.php and delete_transaction.php both use
+// `uploads/finance/petty_cash/`. Receipts were written to one directory and
+// looked for in another, so every attachment 404'd. The three now agree, via
+// the same accessor — which is also what keeps them agreeing per tenant.
+require_once __DIR__ . '/../../core/tenant_bootstrap.php';
+$file_path = bmsUploadsDir('finance/petty_cash') . basename($receipt_file);
 
 if (!file_exists($file_path)) {
     http_response_code(404);

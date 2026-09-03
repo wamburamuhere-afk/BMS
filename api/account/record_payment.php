@@ -156,8 +156,10 @@ try {
 
     // Handle Attachments (Sprint 3)
     if (isset($_FILES['attachments']) && !empty($_FILES['attachments']['name'][0])) {
-        $upload_dir = __DIR__ . '/../../uploads/finance/invoices/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+        // Written path and STORED path must come from the same pair — see
+        // core/tenant_bootstrap.php. Unprefixed on the legacy install.
+        require_once __DIR__ . '/../../core/tenant_bootstrap.php';
+        $upload_dir = bmsUploadsDir('finance/invoices');   // creates dir + .htaccess guard
 
         $attachment_names = $_POST['attachment_names'] ?? [];
 
@@ -169,7 +171,7 @@ try {
 
                 // Professional naming: PAY_{ID}_{TIMESTAMP}_{INDEX}.ext
                 $file_name = 'PAY_' . $payment_id . '_' . time() . '_' . $i . '.' . $extension;
-                $file_path = 'uploads/finance/invoices/' . $file_name;
+                $file_path = bmsUploadsRel('finance/invoices') . $file_name;
                 $dest_path = $upload_dir . $file_name;
 
                 if (move_uploaded_file($tmp_name, $dest_path)) {
