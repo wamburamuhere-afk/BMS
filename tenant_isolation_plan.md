@@ -283,6 +283,41 @@ not the emergency step 3 is.
 **No read-path fallback is needed:** Tenant #1's prefix is `''`, so its existing
 `document_library` paths resolve unchanged, and new tenants have no legacy rows.
 
+### The full sweep — 70 files, done in batches
+
+Measured 2026-09-03. `W` = builds a filesystem path (needs `bmsUploadsDir()`),
+`S` = stores a path in the database (needs `bmsUploadsRel()`). A file marked
+**WS** needs *both, with the same argument* — that is the pairing the audit
+checks, and the only way this sweep can silently break something.
+
+| Batch | Scope | Files | Status |
+|---|---|---|---|
+| **1** | Finance — `api/account` (6), `api/petty_cash` (3) | 9 | ✅ done (PR #1771) |
+| **2** | Documents & signatures — `api/document` (7), `ajax/save_drawn_signature` | 8 | ⏳ |
+| **3** | Operations & projects — `api/operations` (8), `app/bms/operations/inspection_view`, `actions/upload_attachments` | 10 | ⏳ |
+| **4** | HR — employees, leave, lifecycle, candidates, trips, training certs, `core/employee_extra_documents` | 14 | ⏳ |
+| **5** | Parties & procurement — customers, suppliers, sub-contractors, contracts, GRN, purchase returns, RFQ, DN helper, received invoices, `api/customer/save_lpo` | 16 | ⏳ |
+| **6** | Products, tenders, settings, misc — products, compliance, document templates, tender pages, profile, company profile, system settings, document library, customer documents, `core/note_attachments` | 13 | ⏳ |
+
+**Remaining after batch 1: 61 files** — 58 that write a path, 50 that store one.
+
+Three shapes appear, and they need different treatment:
+
+- **WS (write + store)** — the common case. Both helpers, same argument.
+- **W‑ only** — download/delete routes (`download_employee_document.php`,
+  `delete_inspection_attachment.php`, …). These *read* a file whose name came
+  from the tenant's own database row, so they need `bmsUploadsDir()` to look in
+  the right directory. Getting this wrong is how a tenant reads a file that is
+  not theirs, so these deserve more care than their small diffs suggest.
+- **‑S only** — display pages that render a stored path
+  (`document_library.php`, `inspection_view.php`, `customer_documents.php`).
+  These must use `bmsUploadsRel()` for anything they construct, and must
+  otherwise trust the stored value rather than rebuilding it.
+
+**Definition of done for step 4:** `uploads_fs` and `uploads_rel` both at **0**
+in `tests/test_tenant_resource_audit_cli.php`, with every remaining case either
+converted or carrying `// tenant-audit: skip — <reason>`.
+
 **Gate:** a file uploaded on tenant A lands under `uploads/t{A}/…`; tenant #1's
 uploads still land in `uploads/…`; every pre-existing tenant-#1 document still
 opens.
