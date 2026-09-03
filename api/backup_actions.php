@@ -78,6 +78,9 @@ function restoreFromFile($filepath) {
     // ─────────────────────────────────────────────────────────────────────────
     $db = bmsCurrentDbConfig();
 
+    // tenant-audit: skip — this mysqli is REQUIRED (PDO cannot multi_query a
+    // dump) and is correct: every value comes from bmsCurrentDbConfig(), i.e.
+    // the database this request owns, never the DB_* constants.
     $mysqli = new mysqli($db['host'], $db['user'], $db['pass'], $db['name']);
     if ($mysqli->connect_error) {
         throw new Exception("DB connection failed: " . $mysqli->connect_error);

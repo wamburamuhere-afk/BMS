@@ -413,8 +413,8 @@ Update the moment each step merges — this is what lets any session resume.
 | 1 — Resource accessors | ⏳ pending | `feat/tenant-resource-accessors` |
 | 2 — Connection bypasses + Leak C | ⏳ pending | `feat/tenant-fix-conn-bypass` |
 | 3 — Backup isolation | ⏳ pending | `feat/tenant-backup-isolation` |
-| 4 — Uploads isolation | ⏳ pending | `feat/tenant-uploads-isolation` |
-| 5 — Regression guard | ⏳ pending | `feat/tenant-audit-guard` |
+| 4 — Uploads isolation | 🟡 foundation only — `bmsUploadsDir()`/`bmsUploadsRel()` exist and are tested; **67 + 56 call sites still unconverted**, debt frozen by the step-5 ratchet | `feat/tenant-uploads-and-guard` |
+| 5 — Regression guard | ✅ done (2026-09-03) — `tests/test_tenant_resource_audit_cli.php`, 22 assertions; found 2 call sites step 3 had missed | `feat/tenant-uploads-and-guard` |
 | 6 — Root-domain alias | ⏳ pending | `feat/tenant-root-alias` |
 | 7 — Platform surfaces | ⏳ pending | `feat/tenant-platform-host` |
 | 8 — Register Tenant #1 | ⏳ pending | `feat/tenant-07-migrate-tenant-one` |

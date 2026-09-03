@@ -1,5 +1,61 @@
 # BMS Changelog
 
+## 2026-09-03 (fix) — Tenant resource audit: a ratchet that blocks this class of bug, and the two backup routes the first fix missed
+
+**Files (added):** `tests/test_tenant_resource_audit_cli.php`
+**Files (changed):** `core/tenant_bootstrap.php`, `app/constant/settings/download_backup.php`,
+`cron/auto_backup.php`, `app/bms/pos/system_status.php`, `api/backup_actions.php`
+**Files (deleted):** `app/bms/pos/fix_database.php`
+
+Follows the same-day fix for the destroyed database. That change closed three known call sites; this
+one adds the check that finds them automatically — and it immediately found two the first pass had
+missed, which is the whole argument for having it.
+
+**`app/constant/settings/download_backup.php` still read the shared directory.** Scoping the
+*listing* is worthless while the *fetch* route serves anything it is named, and dump filenames are
+entirely predictable (`bms_backup_YYYY-MM-DD_HH-MM-SS.sql`). Any tenant could have downloaded the
+main company's full database dump by guessing a timestamp. Now uses `bmsBackupDir()` plus a
+`realpath()` containment check — `basename()` stops `../`, but not a symlink planted in the
+directory. **`cron/auto_backup.php`** wrote to the shared path too.
+
+**`app/bms/pos/fix_database.php` deleted.** Web-reachable, **no authentication check of any kind**,
+ran DDL, and fell back to `mysql:dbname=bms` as `root` with an empty password. Its own header said
+`SAVE AS:` — a one-off that shipped by accident. Nothing references it; the only mentions are two
+scratch audits that already list it as known-bad. **`app/bms/pos/system_status.php`** had the same
+root fallback: on a tenant subdomain it silently pointed a page at the main database as a superuser.
+It now fails loudly instead — a page that cannot get the request's connection must stop, not guess.
+
+**The ratchet (`tests/test_tenant_resource_audit_cli.php`, 22 assertions).** Same shape as
+`test_project_scope_cli.php`: it counts the places that still name a database or directory for
+themselves and fails if the count goes **up**. Existing offenders are grandfathered, new ones are
+blocked, and the pre-push hook picks it up automatically because it matches `tests/test_*_cli.php`.
+Escape hatch is `// tenant-audit: skip — <reason>`, used once, for the `multi_query` restore that
+genuinely needs mysqli and already takes every value from `bmsCurrentDbConfig()`. Comments are
+stripped before matching, so a comment *about* a bad pattern is not counted *as* one.
+
+Baselines at this commit — **connection 0** and **backups 0**, the two that caused the incident,
+must stay at zero:
+
+| Debt | Count |
+|---|---|
+| files building their own DB connection | **0** |
+| files building a backups path | **0** |
+| files reading `DB_NAME` directly | 1 |
+| files building an absolute uploads path | 67 |
+| files hardcoding a stored `uploads/` path | 56 |
+
+**New accessors:** `bmsUploadsDir($sub)` (absolute, write here) and `bmsUploadsRel($sub)` (relative,
+store this). They are always used as a pair — the test asserts `bmsUploadsDir()` ends with exactly
+`bmsUploadsRel()`, because a stored path that disagrees with the written path means the file lands
+where nothing ever reads it. Directories are created on demand with the deny-executables `.htaccess`
+from `.claude/security.md` §19.
+
+**Not done in this commit:** the 67+56 uploads call sites are still unconverted, so the filesystem
+remains shared. That is a quota and path-handling problem rather than the direct leak the backup
+directory was — uploaded files are named `bin2hex(random_bytes(16))` and indexed in each tenant's
+own database, so one tenant cannot enumerate another's. The ratchet freezes the debt so it cannot
+grow while the sweep is done separately.
+
 ## 2026-09-03 (fix) — A tenant's Restore destroyed the main database; and the backups it made could not be restored
 
 **Files (changed):** `core/tenant_bootstrap.php`, `core/backup.php`, `api/backup_actions.php`,

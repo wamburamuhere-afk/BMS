@@ -361,6 +361,68 @@ if (!function_exists('bmsEnsureDirGuard')) {
     }
 }
 
+if (!function_exists('bmsUploadsRel')) {
+    /**
+     * Web/DB-relative uploads path for THIS request, e.g. 'uploads/contracts/'
+     * or 'uploads/t9002/contracts/'.
+     *
+     * This is the value that gets STORED (document_library.file_path, and the
+     * *_path columns on individual records), so it must carry the tenant
+     * prefix — otherwise two tenants' rows point at the same file on disk.
+     *
+     * Always paired with bmsUploadsDir() for the same $sub: the stored path and
+     * the written path must agree, or the file is written somewhere nothing
+     * ever reads. Returns a trailing slash when $sub is given.
+     */
+    function bmsUploadsRel(string $sub = ''): string
+    {
+        $sub  = trim(str_replace('\\', '/', $sub), '/');
+        $path = 'uploads/' . bmsTenantPathPrefix();
+        return $sub === '' ? $path : $path . $sub . '/';
+    }
+}
+
+if (!function_exists('bmsUploadsDir')) {
+    /**
+     * Absolute filesystem directory for THIS request's uploads, created on
+     * demand with the standard deny-executables guard (.claude/security.md §19).
+     *
+     * The legacy install keeps the unprefixed path, so every path already in
+     * document_library stays valid and no file has to move. Only tenants
+     * provisioned into their own database get a prefix — and they have no
+     * existing files, so this can never invalidate stored data.
+     */
+    function bmsUploadsDir(string $sub = ''): string
+    {
+        $base = (defined('ROOT_DIR') ? ROOT_DIR : dirname(__DIR__)) . '/';
+        $dir  = $base . bmsUploadsRel($sub);
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        bmsEnsureUploadGuard($dir);
+        return $dir;
+    }
+}
+
+if (!function_exists('bmsEnsureUploadGuard')) {
+    /**
+     * Drop the standard "no executables here" .htaccess into an uploads
+     * directory. A directory created at runtime would otherwise inherit no
+     * protection, which is how an uploaded .php becomes a shell.
+     * Mirrors the policy in .claude/security.md §19.
+     */
+    function bmsEnsureUploadGuard(string $dir): void
+    {
+        $ht = rtrim($dir, '/\\') . '/.htaccess';
+        if (is_file($ht)) return;
+        @file_put_contents($ht,
+            "<FilesMatch \"\\.(php|php5|phtml|pl|py|jsp|asp|sh|cgi)$\">\n"
+          . "    Require all denied\n"
+          . "</FilesMatch>\n"
+          . "Options -ExecCGI\n"
+          . "RemoveHandler .php .phtml .php5\n"
+          . "RemoveType .php .phtml .php5\n");
+    }
+}
+
 if (!function_exists('bmsBackupDir')) {
     /**
      * The backup directory THIS request owns, with a trailing slash.
