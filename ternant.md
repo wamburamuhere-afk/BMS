@@ -628,6 +628,24 @@ no `tenant_features` rows and no platform-disabled feature left behind.
 - Every toggle, both per-tenant and platform-wide, produces exactly one `tenant_admin_log` row naming the actor, the tenant (or platform), the feature, and the direction.
 - The panel never lets an operator remove `dashboard`/`customers`/`user_roles`/`system_settings` or any other base page_key — these aren't in the registry at all, so there's nothing to toggle, but the UI still gets an explicit test proving the base set can't appear.
 
+Met 2026-09-03 - `tests/test_feature_panel_cli.php`, 49 assertions, 0 failures.
+Both pages were also rendered for real (not merely linted): `features.php` produced 40 switches
+across its table and mobile-card views, `tenant_view.php?id=85` produced 11, both with every
+module label present and no PHP notice in the output; with `tenders` removed platform-wide the
+tenant page rendered its switch `disabled` behind a "Removed platform-wide" badge, exactly as the
+reason column is meant to explain.
+
+**Two harness bugs were caught by disbelieving a green run — worth recording.**
+The first version of section 6 built its subprocess with `php -r`, which hit a parse error on
+Windows quoting; the endpoint never ran, so all four "refuses..." assertions passed against
+*nothing*. The rewrite runs the real action file in a worker, treats `Parse error`/`Fatal error`
+in the output as **not** a refusal, and — the part that actually matters — asserts a **positive
+control first**: an authenticated operator saving successfully through the very same harness.
+That control immediately failed twice more, once because the panel answers only on
+`superadmin.<base>` (never `localhost`), and once because Windows `escapeshellarg()` strips the
+double quotes out of JSON and was silently delivering an empty `$_POST`. All three would have
+shipped as green assertions that tested nothing.
+
 **Rollback:** `git revert <sha>` — 11.A/11.B remain correct with no UI to drive them; a tenant's entitlement state simply becomes un-editable until this is restored.
 
 ---
@@ -676,5 +694,5 @@ Update this table the moment each phase merges — this is what lets any session
 | 10 — Full Regression + Go-Live | ✅ done (2026-09-02) — 43-assertion module smoke vs a fresh tenant, `docs/MULTI_TENANCY.md`, go-live checklist scored. Manual per-module regression + the Tenant-#1 half remain, both blocked on Phase 7 | `feat/tenant-10-go-live` |
 | 11.A — Feature Registry & Control-DB Schema | ✅ done (2026-09-03) — 61 assertions green; verified on the real request path against two live tenants | `feat/tenant-11a-feature-registry` |
 | 11.B — Enforcement (5 layers) | ✅ done (2026-09-03) — 39 assertions green + 6 regression suites clean; verified against two live tenants | `feat/tenant-11b-enforcement` |
-| 11.C — Superadmin Feature-Control UI | ⏳ pending | `feat/tenant-11c-control-ui` |
+| 11.C - Superadmin Feature-Control UI | done (2026-09-03) - 49 assertions green; both pages rendered and verified, not just linted | `feat/tenant-11c-control-ui` |
 | 11.D — Tests, Docs, Regression | ⏳ pending | `feat/tenant-11d-tests-docs` |

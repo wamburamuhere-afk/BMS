@@ -1,5 +1,48 @@
 # BMS Changelog
 
+## 2026-09-03 (feat) - Phase 11.C: superadmin panel for granting and revoking modules
+
+**Files (added):** `app/superadmin/features.php`, `actions/superadmin_tenant_features.php`, `actions/superadmin_platform_features.php`, `tests/test_feature_panel_cli.php`
+**Files (changed):** `core/tenant_admin.php`, `app/superadmin/tenant_view.php`, `app/superadmin/tenants.php`, `ternant.md`
+
+The control surface for Phases 11.A/11.B. A tenant's page gains a **Modules** panel - one switch
+per feature area, each showing the effective state and, next to it, *why* it is in that state,
+because "off" has three different causes an operator needs to tell apart: removed platform-wide,
+denied to this tenant, or simply off by default. A new **Modules (platform-wide)** page carries the
+two decisions that are not about one company: `is_available` (remove a module from every tenant at
+once, overriding even a tenant it was specifically granted to) and `default_enabled` (what a newly
+registered company starts with), each stating its blast radius - "in use by N live tenants" - before
+anything is applied.
+
+`setTenantFeatures()` **deletes** an override row whose requested value already equals the platform
+default rather than writing it. Absence of a row means "follow the default", so a tenant left alone
+keeps following that default if it later changes; writing the redundant row would silently pin them
+forever. There is a test for exactly that: changing the platform default moves a defaulted tenant
+with it. Only genuine changes are logged, so an operator opening the panel and pressing Save writes
+no audit noise. Every real change lands in the existing `tenant_admin_log` with actor, tenant,
+module and direction - no new audit infrastructure was needed.
+
+Both endpoints mirror `actions/superadmin_tenant_action.php` exactly: superadmin host, signed-in
+operator, POST only, CSRF. They are kept separate from each other on purpose - one affects a single
+company and the other affects all of them, and sharing an endpoint would put one careless parameter
+between those two blast radii.
+
+**Tests (49 assertions)**, plus both pages rendered for real: `features.php` produced 40 switches,
+`tenant_view.php?id=85` produced 11, and with a module removed platform-wide the tenant page
+rendered its switch disabled behind a "Removed platform-wide" badge.
+
+**Two harness bugs caught by disbelieving a green run.** Section 6 first built its subprocess with
+`php -r`, which hit a Windows quoting parse error: the endpoint never ran, so all four "refuses..."
+assertions passed against nothing. The rewrite runs the real action file in a worker, treats a
+crashed worker as **not** a refusal, and asserts a **positive control first** - an authenticated
+operator saving successfully through the same harness. That control then failed twice more, once
+because the panel answers only on `superadmin.<base>` and never `localhost`, and once because
+Windows `escapeshellarg()` strips the quotes out of JSON and was delivering an empty `$_POST`. All
+three would otherwise have shipped as green assertions testing nothing.
+
+Both live tenants end with no entitlement rows and no module removed platform-wide, so this still
+ships with zero behaviour change until an operator deliberately switches something off.
+
 ## 2026-09-03 (feat) — Phase 11.B: feature entitlements are now enforced, in five layers
 
 **Files (added):** `tests/test_feature_gating_cli.php`

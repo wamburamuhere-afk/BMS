@@ -249,6 +249,211 @@ if (!function_exists('tenantAdminLog')) {
     }
 }
 
+if (!function_exists('tenantFeatureMatrix')) {
+    /**
+     * Every switchable feature with this tenant's effective state and, crucially,
+     * WHY it is in that state.
+     *
+     * The panel shows the reason because "off" has three different causes and an
+     * operator staring at a switch needs to know which one they are looking at:
+     * the platform removed it for everyone, this tenant was explicitly denied it,
+     * or it simply defaults off and nobody has said otherwise.
+     *
+     * Reads the control database only — like every other function in this file,
+     * it never opens the tenant's own database.
+     */
+    function tenantFeatureMatrix(int $tenantId): array
+    {
+        $st = getControlPdo()->prepare("
+            SELECT f.feature_key, f.label, f.description, f.is_available, f.default_enabled,
+                   f.sort_order, tf.is_enabled
+            FROM features f
+            LEFT JOIN tenant_features tf
+                   ON tf.feature_key = f.feature_key AND tf.tenant_id = ?
+            ORDER BY f.sort_order, f.feature_key
+        ");
+        $st->execute([$tenantId]);
+
+        $out = [];
+        foreach ($st->fetchAll() as $r) {
+            $available = (int)$r['is_available'] === 1;
+            $default   = (int)$r['default_enabled'] === 1;
+            $override  = $r['is_enabled'] === null ? null : ((int)$r['is_enabled'] === 1);
+            $effective = $available && ($override ?? $default);
+
+            if (!$available)             { $reason = 'Removed platform-wide'; }
+            elseif ($override === true)  { $reason = 'Granted to this tenant'; }
+            elseif ($override === false) { $reason = 'Denied to this tenant'; }
+            else                         { $reason = $default ? 'On by default' : 'Off by default'; }
+
+            $out[] = [
+                'key'             => (string)$r['feature_key'],
+                'label'           => (string)$r['label'],
+                'description'     => $r['description'] !== null ? (string)$r['description'] : null,
+                'available'       => $available,
+                'default_enabled' => $default,
+                'override'        => $override,
+                'effective'       => $effective,
+                'reason'          => $reason,
+            ];
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('setTenantFeatures')) {
+    /**
+     * Write this tenant's feature overrides.
+     *
+     * $desired maps feature_key => bool. A key whose requested state already
+     * equals the platform default has its override row DELETED rather than
+     * written: absence of a row means "follow the default", so a tenant left at
+     * the defaults keeps following them if those defaults later change. Writing
+     * a redundant row would silently pin them.
+     *
+     * Only keys that actually changed are logged, so the audit trail records
+     * decisions rather than every time someone opened the panel and hit Save.
+     *
+     * @return array{ok:bool, error:?string, changed:int}
+     */
+    function setTenantFeatures(int $tenantId, array $desired): array
+    {
+        $t = getTenant($tenantId);
+        if (!$t) return ['ok' => false, 'error' => 'Tenant not found.', 'changed' => 0];
+        if ($t['status'] === 'deleted') {
+            return ['ok' => false, 'error' => 'This tenant has been deleted.', 'changed' => 0];
+        }
+
+        $pdo     = getControlPdo();
+        $current = [];
+        foreach (tenantFeatureMatrix($tenantId) as $row) $current[$row['key']] = $row;
+
+        $enabled  = [];
+        $disabled = [];
+
+        foreach ($desired as $key => $want) {
+            $key = (string)$key;
+            if (!isset($current[$key])) continue;      // unknown key — ignore, never invent one
+            $want = (bool)$want;
+            $row  = $current[$key];
+            $was  = $row['effective'];                 // effective state BEFORE this change
+
+            if ($want === $row['default_enabled']) {
+                $pdo->prepare("DELETE FROM tenant_features WHERE tenant_id = ? AND feature_key = ?")
+                    ->execute([$tenantId, $key]);
+            } else {
+                $pdo->prepare("
+                    INSERT INTO tenant_features (tenant_id, feature_key, is_enabled, updated_by)
+                    VALUES (?,?,?,?)
+                    ON DUPLICATE KEY UPDATE is_enabled = VALUES(is_enabled),
+                                            updated_by = VALUES(updated_by),
+                                            updated_at = CURRENT_TIMESTAMP
+                ")->execute([$tenantId, $key, $want ? 1 : 0, currentSuperadmin()['id'] ?? null]);
+            }
+
+            // A platform-removed feature cannot become effective, whatever we wrote.
+            $nowEffective = $row['available'] && $want;
+            if ($nowEffective !== $was) {
+                if ($nowEffective) { $enabled[] = $key; } else { $disabled[] = $key; }
+            }
+        }
+
+        $changed = count($enabled) + count($disabled);
+        if ($changed > 0) {
+            $detail = trim(
+                ($enabled  ? 'enabled: '  . implode(',', $enabled)  . ' ' : '') .
+                ($disabled ? 'disabled: ' . implode(',', $disabled)       : '')
+            );
+            logTenantAdminAction($tenantId, $t['subdomain'], 'update_features', $detail);
+        }
+
+        return ['ok' => true, 'error' => null, 'changed' => $changed];
+    }
+}
+
+if (!function_exists('platformFeatures')) {
+    /**
+     * The platform-wide catalogue, with how many live tenants each feature is
+     * currently effective for — so removing one states the blast radius instead
+     * of leaving the operator to guess.
+     */
+    function platformFeatures(): array
+    {
+        $pdo  = getControlPdo();
+        $live = (int)$pdo->query("SELECT COUNT(*) FROM tenants WHERE status IN ('active','trial')")
+                         ->fetchColumn();
+
+        $rows = $pdo->query("
+            SELECT f.feature_key, f.label, f.description, f.is_available, f.default_enabled, f.sort_order,
+                   (SELECT COUNT(*) FROM tenant_features tf
+                     JOIN tenants t ON t.id = tf.tenant_id AND t.status IN ('active','trial')
+                    WHERE tf.feature_key = f.feature_key AND tf.is_enabled = 1) AS explicit_on,
+                   (SELECT COUNT(*) FROM tenant_features tf
+                     JOIN tenants t ON t.id = tf.tenant_id AND t.status IN ('active','trial')
+                    WHERE tf.feature_key = f.feature_key AND tf.is_enabled = 0) AS explicit_off
+            FROM features f
+            ORDER BY f.sort_order, f.feature_key
+        ")->fetchAll();
+
+        foreach ($rows as &$r) {
+            $on  = (int)$r['explicit_on'];
+            $off = (int)$r['explicit_off'];
+            // Tenants with no row follow the default; the rest are counted above.
+            $r['tenants_using'] = (int)$r['is_available'] === 0
+                ? 0
+                : ($on + ((int)$r['default_enabled'] === 1 ? max(0, $live - $on - $off) : 0));
+            $r['tenants_live']  = $live;
+        }
+        unset($r);
+
+        return $rows;
+    }
+}
+
+if (!function_exists('setPlatformFeature')) {
+    /**
+     * Change one feature platform-wide.
+     *
+     * `is_available = 0` removes it for EVERY tenant regardless of that tenant's
+     * own override — that asymmetry is the whole reason the column exists, and
+     * tenantFeatureMatrix() reports it as the reason so nobody has to work out
+     * why a tenant's own "on" is not taking effect.
+     *
+     * @return array{ok:bool, error:?string}
+     */
+    function setPlatformFeature(string $featureKey, ?bool $available, ?bool $defaultEnabled): array
+    {
+        $pdo = getControlPdo();
+        $st  = $pdo->prepare("SELECT feature_key, label, is_available, default_enabled FROM features WHERE feature_key = ?");
+        $st->execute([$featureKey]);
+        $row = $st->fetch();
+        if (!$row) return ['ok' => false, 'error' => 'No such feature.'];
+
+        $newAvail   = $available      === null ? (int)$row['is_available']    : ($available ? 1 : 0);
+        $newDefault = $defaultEnabled === null ? (int)$row['default_enabled'] : ($defaultEnabled ? 1 : 0);
+
+        if ($newAvail === (int)$row['is_available'] && $newDefault === (int)$row['default_enabled']) {
+            return ['ok' => true, 'error' => null];   // nothing to do, nothing to log
+        }
+
+        $pdo->prepare("UPDATE features SET is_available = ?, default_enabled = ? WHERE feature_key = ?")
+            ->execute([$newAvail, $newDefault, $featureKey]);
+
+        $bits = [];
+        if ($newAvail !== (int)$row['is_available']) {
+            $bits[] = $newAvail ? 'restored platform-wide' : 'REMOVED platform-wide';
+        }
+        if ($newDefault !== (int)$row['default_enabled']) {
+            $bits[] = 'new-tenant default ' . ($newDefault ? 'on' : 'off');
+        }
+
+        // tenant_id null: a platform decision, not an action against one company.
+        logTenantAdminAction(null, null, 'platform_feature', $featureKey . ': ' . implode('; ', $bits));
+
+        return ['ok' => true, 'error' => null];
+    }
+}
+
 if (!function_exists('operatorTenantLoginUrl')) {
     /** Absolute sign-in URL for a tenant's own subdomain. */
     function operatorTenantLoginUrl(string $subdomain): string
