@@ -41,6 +41,8 @@
  */
 
 require_once __DIR__ . '/tenant_bootstrap.php';
+require_once __DIR__ . '/control_db.php';
+require_once __DIR__ . '/tenant_crypto.php';
 
 if (!function_exists('tenantUserLimit')) {
     /** Max ACTIVE staff accounts this tenant may have, or null = unlimited. */
@@ -187,6 +189,62 @@ if (!function_exists('tenantWithinStorageLimit')) {
         $limitBytes = tenantStorageLimitBytes();
         if ($limitBytes === null) return true;
         return (tenantStorageUsedBytes($pdo) + $incomingBytes) <= $limitBytes;
+    }
+}
+
+if (!function_exists('tenantUsageSnapshotFor')) {
+    /**
+     * THE ONE DELIBERATE, NARROW EXCEPTION to "the superadmin panel never opens
+     * a tenant's own database" (app/superadmin/tenant_view.php's own docblock,
+     * and section 10 of tests/test_tenant_superadmin_auth_cli.php).
+     *
+     * Every other superadmin function reads only the control database. This one
+     * cannot: `tenantActiveUserCount()`/`tenantStorageUsedBytes()` count rows
+     * that, by the whole point of database-per-tenant, exist ONLY inside that
+     * tenant's own database. Showing "how close to the limit is this company"
+     * is impossible without asking that database, at least briefly.
+     *
+     * The exception is kept as narrow as the invariant it bends allows:
+     *   - Returns exactly two integers. Never a row, a name, a file, anything
+     *     that is this company's actual business content.
+     *   - Called ON DEMAND, from one explicit action endpoint
+     *     (actions/superadmin_tenant_usage.php) — never automatically on
+     *     tenant_view.php's normal page load. The page that promises not to
+     *     connect still doesn't; a separate, explicit click does.
+     *   - Read-only: SELECT COUNT / SELECT SUM only, via the exact same
+     *     functions 12.A already tested against real data — no new query logic
+     *     introduced at this trust boundary.
+     *   - Fails to null on any error (wrong/rotated credentials, tenant mid-
+     *     deletion, connection refused) rather than surfacing a raw exception
+     *     that could leak connection details to the panel.
+     *
+     * @return array{active_users:int, storage_used_bytes:int}|null
+     */
+    function tenantUsageSnapshotFor(int $tenantId): ?array
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT * FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] === 'deleted') return null;
+
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) return null;
+
+            $tPdo = new PDO(
+                'mysql:host=' . $t['db_host'] . ';dbname=' . $t['db_name'] . ';charset=utf8mb4',
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+            );
+
+            return [
+                'active_users'       => tenantActiveUserCount($tPdo),
+                'storage_used_bytes' => tenantStorageUsedBytes($tPdo),
+            ];
+        } catch (Throwable $e) {
+            error_log('tenantUsageSnapshotFor(' . $tenantId . '): ' . $e->getMessage());
+            return null;
+        }
     }
 }
 

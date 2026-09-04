@@ -835,6 +835,29 @@ posting 17, e-signatures 56, external signature 35, LPO 105, compliance delete 1
 - The write is refused from a tenant host and without a superadmin session — same assertions Phase 11.C's endpoint tests already run, applied to this endpoint.
 - One `tenant_admin_log` row per genuine change, naming the tenant, the old and new values, and the actor.
 
+**A real design tension, resolved deliberately rather than glossed over.** `tenant_view.php`'s own
+docblock promises it "never connects to the tenant's own database" - but *current* usage (active
+user count, bytes stored) exists ONLY inside that database, by the whole premise of database-per-
+tenant. Resolved as a single, narrow, explicitly-documented exception:
+`tenantUsageSnapshotFor()` (`core/tenant_quotas.php`) returns exactly two integers, never a row or
+any business content; it is reached ONLY on an explicit "Check current usage" click via its own
+separate endpoint (`actions/superadmin_tenant_usage.php`), never automatically on page load; and it
+is read-only, reusing the exact functions 12.A already tested against real data rather than new query
+logic at this trust boundary. `tenant_view.php` itself still never connects to a tenant's own
+database - the promise in its docblock is unbroken; the one thing that does cross that line is a
+separate file that says exactly why.
+
+Met 2026-09-04 - `tests/test_quota_panel_cli.php`, 34 assertions, 0 failures. Proves the exception is
+as narrow as claimed: seeded a document literally named "secret business document" and asserted the
+word "secret" and every filename never appear anywhere in the usage endpoint's response - only
+`active_users`/`storage_used_bytes`/`storage_used_mb` ever leave it, verified against the exact JSON
+key set, not just "no error." Also proves the two endpoints are genuinely independent (reading usage
+changes neither the stored limits nor the tenant's own data), the seat/storage validation (a limit of
+0 rejected, identical values write no audit noise), and the card renders pre-filled with the real
+stored values with no PHP error. Regression: panel 49, superadmin URLs 63, tenant quotas 28, quota
+enforcement 16, tenant admin panel 51, superadmin auth 53 - all clean. Both live tenants confirmed
+unlimited after; no orphaned test tenants.
+
 **Rollback:** `git revert <sha>` — 12.A/12.B remain correct with no UI to drive them.
 
 ---
@@ -887,5 +910,5 @@ Update this table the moment each phase merges — this is what lets any session
 | 11.D - Tests, Docs, Regression | done (2026-09-03) - smoke suite 43 -> 62 assertions; role grid filtered; docs section 7b | `feat/tenant-11d-tests-docs` |
 | 12.A — Quota Schema, Resolution & Undercount Fix | ✅ done (2026-09-04) — 28 assertions green; verified against a real provisioned tenant with a real file on disk | `feat/tenant-12a-quota-schema` |
 | 12.B — Enforcement (add_user.php + 56 upload handlers) | ✅ done (2026-09-04) — 16 new assertions + full regression clean; every guarded call site verified by an automated audit | `feat/tenant-12b-quota-enforcement` |
-| 12.C — Superadmin Usage & Limits UI | ⏳ pending | `feat/tenant-12c-quota-ui` |
+| 12.C — Superadmin Usage & Limits UI | ✅ done (2026-09-04) — 34 assertions green; the database-crossing exception proven narrow, not just present | `feat/tenant-12c-quota-ui` |
 | 12.D — Tests, Docs, Regression | ⏳ pending | `feat/tenant-12d-quota-tests-docs` |

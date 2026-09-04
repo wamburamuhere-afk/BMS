@@ -1,5 +1,41 @@
 # BMS Changelog
 
+## 2026-09-04 (feat) - Phase 12.C: superadmin panel for setting quotas and checking usage
+
+**Files (added):** `actions/superadmin_tenant_quotas.php`, `actions/superadmin_tenant_usage.php`, `tests/test_quota_panel_cli.php`
+**Files (changed):** `core/tenant_admin.php`, `core/tenant_quotas.php`, `app/superadmin/tenant_view.php`, `ternant.md`
+
+The control surface for 12.A/12.B. A tenant's page gains a "Usage & Limits" card: two inputs
+(max active users, max storage in MB, blank = unlimited) with a Save button, plus a separate
+"Check current usage" button.
+
+**A real design tension, resolved deliberately.** `tenant_view.php`'s own docblock promises it never
+connects to a tenant's own database - but current usage exists only inside that database, by the
+whole premise of database-per-tenant. Resolved as one narrow, explicitly-documented exception:
+`tenantUsageSnapshotFor()` returns exactly two integers, never a row or any business content; reached
+only on the explicit "Check current usage" click, via its own separate endpoint
+(`actions/superadmin_tenant_usage.php`) kept apart from the limits-writing one so the one code path
+that crosses this boundary is easy to find and audit; and read-only, reusing 12.A's already-tested
+counting functions rather than new query logic at this trust boundary. `tenant_view.php` itself still
+never connects to a tenant's own database - proven, not just claimed: the test suite seeds a document
+literally named "secret business document" and asserts the word never appears anywhere in the usage
+response, nor does any filename - only the three declared numeric keys ever leave it.
+
+`setTenantQuotas()` validates (a limit of 0 is rejected; blank means unlimited) and, like
+`setTenantFeatures()` before it, logs only genuine changes to the existing `tenant_admin_log` -
+saving identical values twice writes no audit noise.
+
+**Tests (34 assertions).** A positive control proves an authenticated operator can genuinely save
+through the endpoint before any refusal is asserted; the endpoint refuses without a session, on GET,
+on bad CSRF, and from a tenant host; the panel renders the card pre-filled with real stored values;
+`tenantUsageSnapshotFor()` returns exact numbers against real seeded rows (2 active users, exactly
+2097152 bytes); and the two endpoints are proven genuinely independent - reading usage changes
+neither the stored limits nor the tenant's own data.
+
+Regression: panel 49, superadmin URLs 63, tenant quotas 28, quota enforcement 16, tenant admin panel
+51, superadmin auth 53 - all clean. Both live tenants confirmed unlimited after; no orphaned test
+tenants.
+
 ## 2026-09-04 (feat) - Phase 12.B: usage quotas enforced — add_user.php and 56 upload handlers
 
 **Files (added):** `tests/test_quota_enforcement_cli.php`
