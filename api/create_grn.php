@@ -271,6 +271,7 @@ try {
                 $file_path = 'uploads/finance/grn/' . $file_name;
                 $dest_path = $upload_dir . $file_name;
 
+                assertUploadWithinQuota($pdo, (int)$_FILES['attachments']['size'][$i]);
                 if (move_uploaded_file($tmp_name, $dest_path)) {
                     $doc_name = !empty($attachment_names[$i]) ? $attachment_names[$i] : $original_name;
                     

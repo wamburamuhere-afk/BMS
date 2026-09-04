@@ -81,6 +81,7 @@ try {
     // Leading slash kept to match save_drawn_signature.php and existing signature rows
     $dbPath   = '/uploads/signatures/' . $userId . '/' . $filename;
 
+    assertUploadWithinQuota($pdo, (int)$file['size']);
     if (!move_uploaded_file($file['tmp_name'], $filepath)) {
         throw new Exception('Failed to store the uploaded signature.');
     }

@@ -270,6 +270,7 @@ try {
                 $file_path = bmsUploadsRel('finance/purchase_orders') . $file_name;
                 $dest_path = $upload_dir . $file_name;
 
+                assertUploadWithinQuota($pdo, (int)$_FILES['attachments']['size'][$i]);
                 if (!@move_uploaded_file($tmp_name, $dest_path)) {
                     throw new Exception("Failed to save attachment \"{$original_name}\". The uploads directory may not be writable on the server.");
                 }

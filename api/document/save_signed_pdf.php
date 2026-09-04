@@ -126,6 +126,8 @@ try {
     $db_path   = 'uploads/documents/' . $filename;
     $full_path = $upload_dir . $filename;
 
+    global $pdo;
+    assertUploadWithinQuota($pdo, (int)$file['size']);
     if (!move_uploaded_file($file['tmp_name'], $full_path)) {
         echo json_encode(['success' => false, 'message' => 'Failed to save signed PDF']);
         exit;

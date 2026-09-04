@@ -74,6 +74,7 @@ try {
         if (!in_array($ext, $allowed)) throw new Exception('Invalid file type. Only PDF, JPG, PNG allowed.');
         if ($_FILES['attachment']['size'] > 10 * 1024 * 1024) throw new Exception('File too large. Max 10MB.');
         $filename = 'RET_' . time() . '_' . uniqid() . '.' . $ext;
+        assertUploadWithinQuota($pdo, (int)$_FILES['attachment']['size']);
         if (!move_uploaded_file($_FILES['attachment']['tmp_name'], $uploadDir . $filename)) {
             throw new Exception('Failed to upload attachment.');
         }

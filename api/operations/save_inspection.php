@@ -138,6 +138,7 @@ try {
                 if ($_FILES['attachments']['size'][$idx] > $max_size) continue;
                 $stored = uniqid() . '_' . preg_replace('/[^a-zA-Z0-9\._-]/', '_', $orig_name);
                 $display_name = trim($attach_names[$idx] ?? '') ?: $orig_name;
+                assertUploadWithinQuota($pdo, (int)$_FILES['attachments']['size'][$idx]);
                 if (move_uploaded_file($_FILES['attachments']['tmp_name'][$idx], $upload_dir . $stored)) {
                     $att_stmt->execute([$new_id, $stored, $orig_name, $display_name, $ext, $_FILES['attachments']['size'][$idx], $_SESSION['user_id']]);
                 }

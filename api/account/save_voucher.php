@@ -65,6 +65,7 @@ try {
         $upload_dir = bmsUploadsDir('finance/vouchers');   // creates dir + .htaccess guard
         $file_ext = pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION);
         $file_name = 'pv_' . time() . '_' . uniqid() . '.' . $file_ext;
+        assertUploadWithinQuota($pdo, (int)$_FILES['attachment']['size']);
         if (move_uploaded_file($_FILES['attachment']['tmp_name'], $upload_dir . $file_name)) {
             $attachment_path = bmsUploadsRel('finance/vouchers') . $file_name;
             registerFileInLibrary($pdo, $attachment_path, $_FILES['attachment']['name'], $_FILES['attachment']['size'], 'Payment Voucher Attachment', 'voucher,finance', $_SESSION['user_id']);

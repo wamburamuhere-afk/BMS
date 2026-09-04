@@ -776,6 +776,44 @@ tenant admin panel 51, control DB 59 - all clean.
 - Every one of the 56 files is confirmed present with the new line via a CLI grep-based assertion — so a future edit that accidentally removes the check is caught the same way Phase 11's registry test catches a missing page_key.
 - With `max_users`/`max_storage_mb` both `NULL` (today's default for every real tenant): every one of the above continues to succeed exactly as before — zero behaviour change is a tested assertion, not a claim.
 
+Met 2026-09-04. Two suites: `tests/test_quota_enforcement_cli.php` (16 assertions, new) proves
+enforcement itself — a real seat-limit refusal through the real `add_user.php` page (and success
+again once the limit is raised), and three real upload handlers in three different feature areas
+(Document Templates, Compliance, Employee Documents/HR) each genuinely refusing a real request once
+the tenant is over its storage limit, with a non-vacuous positive control confirming the same
+handler genuinely writes a row when unlimited. It also runs a permanent, automated version of the
+manual audit performed while wiring this phase: every `move_uploaded_file()` call in the codebase is
+confirmed guarded within 3 lines by `assertUploadWithinQuota()`, except the four found-and-named
+exclusions (`backup_actions.php`'s restore path; three overwritten branding/avatar singletons) — so
+a future upload handler that skips the check fails this suite, not silently.
+
+**56 files actually contain `move_uploaded_file()` — one more than the 56 estimated in §12.1, because
+counting missed nothing: the same 49 `api/` + 7 `app/` split held, confirmed again mechanically
+rather than by re-trusting the earlier manual count.** 63 call sites across those 56 files (several
+files have more than one — `process_edit_customer.php` alone has 5) are now guarded. `roots.php`
+gained one `require_once` for `core/tenant_quotas.php`, giving every one of the 56 files access to
+`assertUploadWithinQuota()` for free — the same choke-point principle Phase 11 used for `canView()` —
+so none of the 56 needed its own new `require` line, only its one-line call before
+`move_uploaded_file()`.
+
+**One real bug caught by an honest positive control, not a green run trusted at face value.** The
+first version of the HR handler test failed — not because enforcement was wrong, but because the
+synthetic test file's content didn't pass the handler's own real magic-byte MIME check
+(`.claude/security.md` §19 step 2), a check that happens BEFORE the quota gate. Fixed by giving the
+fixture real `%PDF-1.4` magic bytes rather than loosening the assertion — the failure was the test
+being insufficiently realistic, not the code being wrong.
+
+Full regression, run clean and isolated (an earlier batched run showed a transient failure on
+`test_tenant_admin_panel_cli` caused by contention with a prior suite's still-finishing cleanup under
+a 2-minute shell timeout; re-run alone it passed all 51 — recorded here because a session picking
+this up later should not mistake that for a real regression): feature registry 61, gating 43, panel
+49, superadmin URLs 63, tenant quotas 28, quota enforcement 16, tenant routing 57, tenant admin panel
+51, superadmin auth 53, tenant isolation 48, tenant module smoke 62. Targeted business-logic
+regression across every module area touched by the 56-file sweep — employee documents 26, GRN
+posting 17, e-signatures 56, external signature 35, LPO 105, compliance delete 15, document expiry
+50 — all clean. No orphaned test tenants; both live tenants (`relivertec`, `mufindipower`) confirmed
+`max_users`/`max_storage_mb` still `NULL` after the full run.
+
 **Rollback:** `git revert <sha>` per file is possible but coarse; the branch reverts as one unit. No data migration to unwind — the quota columns stay inert without this phase's checks reading them meaningfully.
 
 ---
@@ -848,6 +886,6 @@ Update this table the moment each phase merges — this is what lets any session
 | 11.C - Superadmin Feature-Control UI | done (2026-09-03) - 49 assertions green; both pages rendered and verified, not just linted | `feat/tenant-11c-control-ui` |
 | 11.D - Tests, Docs, Regression | done (2026-09-03) - smoke suite 43 -> 62 assertions; role grid filtered; docs section 7b | `feat/tenant-11d-tests-docs` |
 | 12.A — Quota Schema, Resolution & Undercount Fix | ✅ done (2026-09-04) — 28 assertions green; verified against a real provisioned tenant with a real file on disk | `feat/tenant-12a-quota-schema` |
-| 12.B — Enforcement (add_user.php + 56 upload handlers) | ⏳ pending | `feat/tenant-12b-quota-enforcement` |
+| 12.B — Enforcement (add_user.php + 56 upload handlers) | ✅ done (2026-09-04) — 16 new assertions + full regression clean; every guarded call site verified by an automated audit | `feat/tenant-12b-quota-enforcement` |
 | 12.C — Superadmin Usage & Limits UI | ⏳ pending | `feat/tenant-12c-quota-ui` |
 | 12.D — Tests, Docs, Regression | ⏳ pending | `feat/tenant-12d-quota-tests-docs` |

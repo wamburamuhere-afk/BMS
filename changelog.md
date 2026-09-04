@@ -1,5 +1,52 @@
 # BMS Changelog
 
+## 2026-09-04 (feat) - Phase 12.B: usage quotas enforced — add_user.php and 56 upload handlers
+
+**Files (added):** `tests/test_quota_enforcement_cli.php`
+**Files (changed):** `roots.php`, `app/constant/settings/add_user.php`, `core/tenant_quotas.php`, and 51 upload handlers across `api/` and `app/`
+
+Turns on what Phase 12.A shipped inert. A seat limit or storage limit set on a tenant is now
+actually enforced, at the exact two places found while designing this: `add_user.php` (the only
+place a staff account is ever created) and every genuine file upload in the application.
+
+`roots.php` gained one `require_once` for `core/tenant_quotas.php` - the same choke-point principle
+Phase 11 used for `canView()` - so every one of the 56 files that call `move_uploaded_file()` got
+`assertUploadWithinQuota()` for free and needed only its one-line call, not a new `require` each.
+`add_user.php` gained the seat check inside its existing validation block, with a new top-level alert
+matching how it already surfaces a database error.
+
+**56 files, 63 call sites** (several files upload more than one kind of file -
+`process_edit_customer.php` alone has 5), mapped precisely before any edit: every `$_FILES` key,
+every array-indexed loop variable, every already-extracted `$file`/`$tmp_name` local, and one
+function (`received_invoices.php::handleAttachmentUpload()`) that needed a `global $pdo;` it didn't
+have before. Four handlers deliberately excluded, by name, with reasons stated in code:
+`backup_actions.php`'s restore path (blocking disaster recovery over a quota would cause real harm)
+and the three overwritten branding/avatar singletons (`system_settings.php`, `company_profile.php`,
+`profile.php`) that don't accumulate the way business records do.
+
+**A permanent, automated version of the manual audit**, not just a one-time hand check: the new test
+suite scans every `.php` file under `api/` and `app/` for `move_uploaded_file()` and asserts a guard
+sits within 3 lines above it, with the same 4 exclusions named and checked - so a future upload
+handler that skips the check fails a test, rather than shipping a silent gap the way the five
+missing `file_size` columns did before Phase 12.A found them.
+
+**One real bug caught by an honest positive control.** The first version of the HR-handler
+end-to-end test failed - not because enforcement was wrong, but because the synthetic upload's fake
+content didn't pass that handler's own real magic-byte MIME check, which runs before the quota gate.
+Fixed by giving the test file real `%PDF-1.4` bytes, not by loosening what the test asserted.
+
+**Tests (16 assertions).** A real seat-limit refusal through the real `add_user.php` page, and
+success again once the limit is raised. Three real upload handlers in three different feature areas
+(Document Templates, Compliance, Employee Documents) each genuinely refuse a real request while over
+the storage limit, and write no row - with a non-vacuous positive control proving the *same* handler
+genuinely writes a row when unlimited, not merely that it wasn't refused.
+
+Full regression across every suite touching this surface - feature registry, gating, panel,
+superadmin URLs, both quota suites, every tenancy suite, plus targeted business-logic regression
+across employee documents, GRN posting, e-signatures (internal and external-token flow), LPO,
+compliance, and document expiry - all clean. Both live tenants confirmed unlimited before and after;
+no orphaned test tenants.
+
 ## 2026-09-04 (feat) - Phase 12.A: usage-quota schema, resolution helpers, and closing a real undercount
 
 **Files (added):** `core/tenant_quotas.php`, `migrations/tenant/2026_09_04_backfill_file_size_columns.php`, `tests/test_tenant_quotas_cli.php`

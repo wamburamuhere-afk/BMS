@@ -189,3 +189,33 @@ if (!function_exists('tenantWithinStorageLimit')) {
         return (tenantStorageUsedBytes($pdo) + $incomingBytes) <= $limitBytes;
     }
 }
+
+if (!function_exists('assertUploadWithinQuota')) {
+    /**
+     * The one function every upload handler calls (Phase 12.B) — sits at the
+     * exact point `.claude/security.md` §19's own 5-step pattern already sits,
+     * right before `move_uploaded_file()`. Refuses and ends the request when
+     * accepting $incomingBytes more would push the tenant over its storage
+     * limit; a no-op otherwise, including when no tenant is resolved at all
+     * (single-tenant/legacy) or the tenant is unlimited.
+     *
+     * Response shape matches the four checks already standard in every upload
+     * handler (extension, MIME, size, filename) — a plain JSON body with a
+     * 422, not a bespoke shape a caller would have to special-case.
+     */
+    function assertUploadWithinQuota(PDO $pdo, int $incomingBytes): void
+    {
+        if (!function_exists('bmsCurrentTenant') || bmsCurrentTenant() === null) return;
+        if (tenantWithinStorageLimit($pdo, $incomingBytes)) return;
+
+        if (!headers_sent()) {
+            http_response_code(422);
+            header('Content-Type: application/json');
+        }
+        echo json_encode([
+            'success' => false,
+            'message' => 'Storage limit exceeded. Please delete files or ask the platform to raise your limit.',
+        ]);
+        exit;
+    }
+}

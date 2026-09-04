@@ -56,6 +56,7 @@ try {
     $safe_name = bin2hex(random_bytes(16)) . '.' . $ext;
     $target_dir = __DIR__ . '/../uploads/training_certs/';
     if (!is_dir($target_dir)) mkdir($target_dir, 0755, true);
+    assertUploadWithinQuota($pdo, (int)$_FILES['file']['size']);
     if (!move_uploaded_file($_FILES['file']['tmp_name'], $target_dir . $safe_name)) throw new Exception('Upload failed');
     $file_rel = 'uploads/training_certs/' . $safe_name;
 

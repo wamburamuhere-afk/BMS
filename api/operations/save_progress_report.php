@@ -90,6 +90,7 @@ try {
             if (!in_array($file_ext, $allowed_ext)) continue;
             if ($files['size'][$i] > 20 * 1024 * 1024) continue;
             $filename = 'report_' . $project_id . '_' . date('Ymd') . '_' . uniqid() . '.' . $file_ext;
+            assertUploadWithinQuota($pdo, (int)$files['size'][$i]);
             if (!move_uploaded_file($files['tmp_name'][$i], $upload_dir . $filename)) continue;
             $att_name = !empty($names[$i]) ? trim($names[$i]) : ($files['name'][$i]);
             $file_path = 'uploads/projects/reports/' . $filename;

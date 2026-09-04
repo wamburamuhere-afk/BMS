@@ -49,6 +49,7 @@ try {
     // Path for DB relative to app root
     $db_path = 'uploads/documents/' . $filename;
 
+    assertUploadWithinQuota($pdo, (int)$file['size']);
     if (!move_uploaded_file($file['tmp_name'], $target_path)) {
         throw new Exception("Failed to upload file to storage. Current dir: " . __DIR__);
     }
