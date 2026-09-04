@@ -248,6 +248,66 @@ try {
         ok($bs2['balanced'] === true, 'the Balance Sheet still balances after a real posting');
     }
 
+    // ── A fresh tenant under a RESTRICTED subscription (Phase 11) ───────────
+    // Everything above ran with every module granted, which is the state every
+    // tenant is in today. This section proves the other half: that a company
+    // sold only part of the platform still gets a working system — its ledger,
+    // its reports and its own role administration all intact — rather than a
+    // half-broken one.
+    section('A tenant with only part of the platform');
+
+    require_once __DIR__ . '/../core/feature_registry.php';
+
+    $newTenantId = (int)($r['tenant_id'] ?? 0);
+    if (!$newTenantId) {
+        note('no provisioned tenant id available; skipping the restricted-subscription checks');
+    } else {
+        $c = getControlPdo();
+        $c->prepare("DELETE FROM tenant_features WHERE tenant_id = ?")->execute([$newTenantId]);
+
+        // Sold "warehouses + sales + procurement only" — the exact shape asked for.
+        $granted = ['sales', 'procurement', 'warehouses'];
+        foreach (allFeatureKeys() as $k) {
+            if (!in_array($k, $granted, true)) {
+                $c->prepare("INSERT INTO tenant_features (tenant_id, feature_key, is_enabled) VALUES (?,?,0)")
+                  ->execute([$newTenantId, $k]);
+            }
+        }
+
+        bmsPrimeTenantFeatures((int)$newTenantId);
+
+        ok(tenantModuleAllowsPage('warehouses') === true,  'a granted module is reachable');
+        ok(tenantModuleAllowsPage('sales_orders') === true, 'a granted module\'s pages are reachable');
+        ok(tenantModuleAllowsPage('pos') === false,         'an ungranted module is not');
+        ok(tenantModuleAllowsPage('payroll') === false,     'nor is HR');
+
+        // The point of the base set: a restricted company must still be able to
+        // invoice, see its own accounts and administer its own staff.
+        foreach (['dashboard', 'invoices', 'customers', 'chart_of_accounts',
+                  'trial_balance', 'balance_sheet', 'users', 'user_roles'] as $baseKey) {
+            ok(tenantModuleAllowsPage($baseKey) === true, "base capability '$baseKey' survives a restricted plan");
+        }
+
+        // And the statutory reports must still run and reconcile for that tenant.
+        $tb3 = glTrialBalance($tPdo, $today);
+        ok(is_array($tb3), 'the Trial Balance still runs under a restricted plan');
+        $bs3 = glBalanceSheet($tPdo, $today);
+        ok($bs3['balanced'] === true, 'the Balance Sheet still balances under a restricted plan');
+
+        // The role screen must offer only what the plan includes (11.D).
+        $rolePerms = $tPdo->query("SELECT page_key FROM permissions WHERE COALESCE(is_hidden,0) = 0")
+                          ->fetchAll(PDO::FETCH_COLUMN);
+        $offered = array_values(array_filter($rolePerms, 'tenantModuleAllowsPage'));
+        ok(!in_array('pos', $offered, true),      'the role screen stops offering POS permissions');
+        ok(!in_array('payroll', $offered, true),  'the role screen stops offering payroll permissions');
+        ok(in_array('warehouses', $offered, true),'the role screen still offers granted modules');
+        ok(in_array('invoices', $offered, true),  'the role screen still offers base capabilities');
+
+        $c->prepare("DELETE FROM tenant_features WHERE tenant_id = ?")->execute([$newTenantId]);
+        bmsPrimeTenantFeatures(null);
+        ok(tenantModuleAllowsPage('pos') === true, 'clearing the restrictions restores full access');
+    }
+
 } catch (Throwable $e) {
     $fail++;
     echo "\n\033[31mFATAL: " . $e->getMessage() . "\033[0m\n";

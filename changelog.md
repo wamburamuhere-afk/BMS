@@ -1,5 +1,233 @@
 # BMS Changelog
 
+## 2026-09-04 (fix) - Phase 11 follow-up: the feature gate missed api/ on subdirectory installs
+
+**Files (changed):** `core/feature_registry.php`, `tests/test_feature_gating_cli.php`
+
+Found by a post-implementation gap hunt, not by a failing test - the suites were green because
+every one of them exercised the root-install path.
+
+`bmsFeatureBlockingPath()` matched the registry's path prefixes (`api/pos/`, `api/payroll/`, ...)
+against `REQUEST_URI` as given. Production serves each tenant at its own subdomain root, so that
+arrives as `/api/pos/sale.php` and matched. On an install under a subdirectory it arrives as
+`/bms/api/pos/sale.php`, matched **nothing**, and layer 4 silently gated **nothing** - proven
+directly: with POS disabled for tenant 85, `/api/pos/sale.php` returned the 404 and
+`/bms/api/pos/sale.php` sailed through.
+
+That mattered more than it looks. Layer 4 is the **only** layer covering `api/`, `ajax/` and
+`actions/` - they are deliberately excluded from the router - so on any non-root install the
+endpoints of a switched-off module stayed reachable. Pages were still refused by layers 1 and 3,
+and any API following the house template still refused via `canX()`; the exposure was APIs that
+skip that check, which is the exact reason layer 4 exists.
+
+The path is now resolved by trying it as given and then each suffix starting one segment later, so
+a subdirectory install resolves identically to a root one, at any depth. Over-matching is safe in
+the only direction that matters: a suffix blocks only when its owning feature is switched OFF, so
+the worst case is a 404 for a URL that merely looks like a disabled module's path.
+
+Four assertions added (39 -> 43): the subdirectory form of an api path, the same at arbitrary
+depth, and two proving it does not over-block - HR under the same prefix still passes, and
+`app/bms/pos/payroll.php` is still not owned by POS.
+
+**Also verified during the same pass, and left alone:** `test_project_scope_cli` (1/15) and
+`test_scope_enforcement_cli` (1 of 34, `warehouse_view.php` has no scope gate) fail identically on
+`develop` without any of Phase 11 - checked in a clean worktree. They are pre-existing and out of
+scope here.
+
+## 2026-09-03 (feat) - Phase 11.D: restricted-plan regression, role-grid filtering, docs
+
+**Files (changed):** `app/constant/settings/user_roles.php`, `tests/test_tenant_module_smoke_cli.php`, `docs/MULTI_TENANCY.md`, `ternant.md`
+
+Closes Phase 11.
+
+**The role screen no longer offers what the plan does not include.** `user_roles.php` built its
+permission grid from every non-hidden row in `permissions`, so an administrator of a company
+without Tenders still saw - and could tick - "Tenders: View/Create/Edit/Delete" for a staff member
+who would then walk straight into a 404. Not a security hole (`canView()` refuses either way), but
+a confusing one that generates support tickets. The grid now runs through the same
+`tenantModuleAllowsPage()` gate as everything else, and the two counters above it report what is
+actually assignable rather than the raw catalogue totals. Single-tenant installs see no change -
+the gate returns true for every page when no tenant is resolved.
+
+**The Phase 10 smoke suite now covers the other half of the story: 43 -> 62 assertions.** It
+already proved a freshly provisioned tenant works with everything granted, which is the state every
+tenant is in today. It now also drives that same fresh tenant under a deliberately restricted
+subscription - `warehouses` + `sales` + `procurement` only - and proves the result is a working
+system rather than a half-broken one: granted modules reachable, ungranted ones refused, every base
+capability (`dashboard`, `invoices`, `customers`, `chart_of_accounts`, `trial_balance`,
+`balance_sheet`, `users`, `user_roles`) intact, the Trial Balance and Balance Sheet still running
+and reconciling, and the role grid offering exactly what was sold.
+
+**`docs/MULTI_TENANCY.md` gained section 7b**: the two axes and why entitlement is checked before
+every `isAdmin()` bypass, the effective-state rule in one sentence, why an override equal to the
+default is deleted rather than written, the five enforcement layers, how to add a new feature
+(registry entry + re-run the setup script; no enforcement code changes), what is never switchable,
+the mixed-directory trap, and how to operate the panel. The three new suites are listed alongside
+the existing ones.
+
+Phase 11 complete. Final state: **0 `tenant_features` rows and 0 features removed platform-wide**,
+so the whole feature ships inert - every tenant keeps exactly the access it has today until an
+operator deliberately switches something off.
+
+## 2026-09-03 (feat) - Phase 11.C: superadmin panel for granting and revoking modules
+
+**Files (added):** `app/superadmin/features.php`, `actions/superadmin_tenant_features.php`, `actions/superadmin_platform_features.php`, `tests/test_feature_panel_cli.php`
+**Files (changed):** `core/tenant_admin.php`, `app/superadmin/tenant_view.php`, `app/superadmin/tenants.php`, `ternant.md`
+
+The control surface for Phases 11.A/11.B. A tenant's page gains a **Modules** panel - one switch
+per feature area, each showing the effective state and, next to it, *why* it is in that state,
+because "off" has three different causes an operator needs to tell apart: removed platform-wide,
+denied to this tenant, or simply off by default. A new **Modules (platform-wide)** page carries the
+two decisions that are not about one company: `is_available` (remove a module from every tenant at
+once, overriding even a tenant it was specifically granted to) and `default_enabled` (what a newly
+registered company starts with), each stating its blast radius - "in use by N live tenants" - before
+anything is applied.
+
+`setTenantFeatures()` **deletes** an override row whose requested value already equals the platform
+default rather than writing it. Absence of a row means "follow the default", so a tenant left alone
+keeps following that default if it later changes; writing the redundant row would silently pin them
+forever. There is a test for exactly that: changing the platform default moves a defaulted tenant
+with it. Only genuine changes are logged, so an operator opening the panel and pressing Save writes
+no audit noise. Every real change lands in the existing `tenant_admin_log` with actor, tenant,
+module and direction - no new audit infrastructure was needed.
+
+Both endpoints mirror `actions/superadmin_tenant_action.php` exactly: superadmin host, signed-in
+operator, POST only, CSRF. They are kept separate from each other on purpose - one affects a single
+company and the other affects all of them, and sharing an endpoint would put one careless parameter
+between those two blast radii.
+
+**Tests (49 assertions)**, plus both pages rendered for real: `features.php` produced 40 switches,
+`tenant_view.php?id=85` produced 11, and with a module removed platform-wide the tenant page
+rendered its switch disabled behind a "Removed platform-wide" badge.
+
+**Two harness bugs caught by disbelieving a green run.** Section 6 first built its subprocess with
+`php -r`, which hit a Windows quoting parse error: the endpoint never ran, so all four "refuses..."
+assertions passed against nothing. The rewrite runs the real action file in a worker, treats a
+crashed worker as **not** a refusal, and asserts a **positive control first** - an authenticated
+operator saving successfully through the same harness. That control then failed twice more, once
+because the panel answers only on `superadmin.<base>` and never `localhost`, and once because
+Windows `escapeshellarg()` strips the quotes out of JSON and was delivering an empty `$_POST`. All
+three would otherwise have shipped as green assertions testing nothing.
+
+Both live tenants end with no entitlement rows and no module removed platform-wide, so this still
+ships with zero behaviour change until an operator deliberately switches something off.
+
+## 2026-09-03 (feat) — Phase 11.B: feature entitlements are now enforced, in five layers
+
+**Files (added):** `tests/test_feature_gating_cli.php`
+**Files (changed):** `core/permissions.php`, `core/security_helpers.php`, `core/feature_registry.php`, `core/tenant_bootstrap.php`, `roots.php`, `sign_document.php`, `ternant.md`
+
+Phase 11.A shipped the entitlement data enforcing nothing. This turns it on. A feature the
+platform has not granted a tenant is now off for **everyone in that company, its own admin
+included**, and off for VIEW, CREATE, EDIT, DELETE and every workflow verb — not view alone.
+
+**Layer 1 — `core/permissions.php`.** `canView()`, `canCreate()`, `canEdit()`, `canDelete()`,
+`canReview()`, `canApprove()`, `canSubmit()`, `canReject()` and `hasAnyPermission()` each gained
+the same first line, placed **above** the `isAdmin()` early return. That ordering is the entire
+point: a tenant's own administrator bypasses `role_permissions` completely, so an entitlement
+checked after that bypass would gate nobody who matters. One edit covers the 129 `canView()` calls
+that build the nav in `header.php`, so disabled modules leave the menu with no per-item sweep.
+
+**Layer 2 — `core/security_helpers.php`.** `enforcePageOrAdmin()` had the identical bypass on its
+own first line; the gate now runs ahead of it. Nothing calls this helper today, but its docblock
+invites new pages to adopt it, which would have quietly reopened the hole.
+
+**Layer 3 — `roots.php::handleRoute()`.** Both dispatch paths (mapped route, literal file) are
+gated, so a page that forgets its own `autoEnforcePermission()` call is still refused. The check
+runs on the route key *and* the resolved file, because a route name is not always the page_key.
+
+**Layer 4 — `core/tenant_bootstrap.php`.** `api/`, `ajax/` and `actions/` are deliberately excluded
+from the router, so a router-only gate would leave every AJAX endpoint of a switched-off module
+wide open. They all reach `includes/config.php` for their `$pdo`, so the guard runs there, keyed on
+`REQUEST_URI` — not `SCRIPT_NAME`, which is `/index.php` on a routed request and would gate nothing.
+
+**Layer 5 — `sign_document.php`.** The one door no session-based check can guard: an external
+signer arrives with an emailed token and no login, so nothing ever calls `canView()` for them.
+Checked explicitly.
+
+Refusals are **404, never 403** — a 403 confirms the module exists and is merely switched off for
+you. JSON body for api/ajax callers so a `fetch()` gets something parseable; the status is 404
+either way.
+
+**Tests (39 assertions).** Each request runs in its own subprocess with `HTTP_HOST`/`REQUEST_URI`
+set, so the real config → `bmsConnectPdo()` → guard path executes rather than a re-implementation.
+With POS disabled for `relivertec` (tenant 85): all seven capability verbs false for that tenant's
+own admin while `payroll` and `invoices` stayed available to the same admin; `/pos` and a direct hit
+on `app/bms/pos/pos.php` both 404; `api/pos/` 404 with a JSON body; `api/payroll/` unaffected
+(the mixed-directory trap); `sign_document.php` closed and reopened with the flag;
+`mufindipower` (tenant 86) untouched throughout; platform `is_available = 0` beat a tenant override.
+
+**Anti-vacuity guard, load-bearing.** Every "refused" assertion would also pass if the worker had
+merely crashed, so `blocked()` demands both the absence of the worker's success marker and a real
+404 body. Confirmed by hand: a blocked call returns exactly `{"success":false,"message":"Not
+found"}` and logs `feature gate: blocked /api/pos/sale.php — feature "pos" is not enabled for
+tenant 85`, and the same URL passes the instant the feature is re-enabled.
+
+`bmsFeatureGuardPath()` intentionally does not test `PHP_SAPI`. The question that matters is
+"was a tenant resolved for this request?" — real CLI resolves none and is never gated, while a test
+simulating a request is, which is what makes this layer testable at all.
+
+**Regression:** `test_tenant_routing_cli` 57, `test_tenant_admin_panel_cli` 51,
+`test_tenant_superadmin_auth_cli` 53, `test_tenant_isolation_cli` 48, `test_tenant_module_smoke_cli`
+43, `test_feature_registry_cli` 61 — all 0 failures. Both live tenants end with no entitlement rows,
+so this still ships with **zero behaviour change** until someone deliberately switches something off.
+
+## 2026-09-03 (feat) — Phase 11.A: per-tenant feature entitlements, data layer only
+
+**Files (added):** `core/feature_registry.php`, `tests/test_feature_registry_cli.php`
+**Files (changed):** `scripts/setup_control_db.php`, `core/tenant_bootstrap.php`, `ternant.md`, `superadmin_control_plan.md`
+
+First slice of `ternant.md` Phase 11 — letting the superadmin grant or revoke whole feature
+areas (POS, Projects, Tenders, Warehouses, Procurement, Sales, HR, Assets, AI Assistant,
+E-Signatures) per tenant. **This slice enforces nothing**: it ships the catalogue, the per-request
+resolution and the public API, and is read by no gate yet. Phase 11.B is where
+`canView()/canCreate()/canEdit()/canDelete()` start calling it, ahead of their `isAdmin()` bypass.
+
+Two control tables in `bms_control` (created by `scripts/setup_control_db.php`, never a
+`migrations/` file — platform infrastructure must never be able to veto a release, conventions
+§10): `features` (the platform-wide catalogue, `is_available` + `default_enabled`) and
+`tenant_features` (per-tenant override; **no row means "use the default"**, which is why
+provisioning needed no change at all — a new company inherits the defaults by having nothing
+written for it). Entitlements live in the control DB and not in any tenant database because a
+tenant's own admin bypasses that database's permission system entirely via `isAdmin()`; a flag the
+tenant can flip is not a flag.
+
+`core/tenant_bootstrap.php` resolves the effective set once per request, the moment the tenant row
+is resolved, on the control connection already open — then every later check is an array lookup.
+It **fails open**: if the control tables are missing or briefly unreachable, every feature reports
+enabled, because locking every tenant out of every module over an infrastructure hiccup is far
+worse than briefly serving a module someone had switched off.
+
+**A landmine caught before it shipped.** The earlier draft plan proposed gating POS by the path
+`app/bms/pos/`. That directory holds **47 files of which only 5 are POS** — the rest is the entire
+HR module (payroll, employees, leaves, org chart, recruitment). Using it would have switched **HR
+off whenever POS was switched off**. `app/bms/operations/` mixes Projects with Assets and
+`app/bms/stock/` mixes Warehouses with always-on inventory the same way. The registry now lists
+files where a directory is mixed, states the rule in its own docblock, and a test asserts
+`app/bms/pos/payroll.php` is not owned by `pos`.
+
+The registry is curated in code, deliberately **not** derived from `permissions.module_name`: that
+column is a human-facing label for grouping checkboxes on `user_roles.php`, it is inconsistent
+(`Inventory` vs `Inventory & Products`, `Settings` vs `System Settings`) and has no POS / Tenders /
+Warehouses / Projects split. A cosmetic rename must never silently change what is gated.
+
+**Tests (61 assertions).** Every registry `page_key` is checked to exist in the real `permissions`
+table (156 rows) — a registry naming a key that does not exist would gate nothing, silently. Covers
+the full resolution matrix, the OR rule for `dn` (owned by both Sales and Procurement), the
+always-on base set (dashboard, customers, invoices, ledger, users, roles), and fail-open behaviour.
+Verified additionally on the **real request path**: a simulated request to
+`relivertec.dev.bms.local` resolved tenant 85 onto `bms_t85` and primed all 10 entitlements ON;
+one `pos` override then turned POS off for that tenant while HR stayed on and tenant 86 was
+completely unaffected. The temporary override was removed — neither live tenant carries any
+entitlement row, so this ships with **zero behaviour change** until someone deliberately switches
+something off.
+
+**Deviation from the plan, stated plainly:** the draft claimed entitlements could ride the tenant
+row for "zero additional queries per request". They cannot — `resolveTenantFromRequest()` returns
+one row and joining ten feature rows onto it would change that function's shape for every caller.
+It is **one** small indexed read of a ten-row table per tenant request instead, and the acceptance
+gate was corrected to say so rather than the number being quietly missed.
+
 ## 2026-09-03 (fix) — Company Profile now starts filled in with what was typed at registration
 
 **Files (changed):** `register.php`, `actions/register_tenant.php`, `core/tenant_registration.php`, `core/tenant_provisioner.php`, `tests/test_tenant_provisioning_cli.php`

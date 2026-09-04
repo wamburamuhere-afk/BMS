@@ -232,6 +232,68 @@ try {
     ");
     say('  · table tenant_migration_log ready');
 
+    // ── Feature entitlements (ternant.md Phase 11) ──────────────────────────
+    // The catalogue of switchable feature areas, platform-wide. Lives HERE and
+    // not in a tenant database because a tenant's own admin bypasses that
+    // database's permission system entirely (isAdmin()) and can reach its rows.
+    // A flag the tenant can flip is not a flag. Phase 9 proved tenants cannot
+    // reach this database.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`features` (
+            `feature_key`     VARCHAR(64)  NOT NULL,
+            `label`           VARCHAR(100) NOT NULL,
+            `description`     VARCHAR(255) NULL,
+            `is_available`    TINYINT(1)   NOT NULL DEFAULT 1,
+            `default_enabled` TINYINT(1)   NOT NULL DEFAULT 1,
+            `sort_order`      INT          NOT NULL DEFAULT 0,
+            PRIMARY KEY (`feature_key`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table features ready');
+
+    // Per-tenant override. NO row means "use features.default_enabled", which is
+    // why provisioning a tenant needs no change at all: a new company inherits
+    // the platform defaults by having nothing written for it.
+    //
+    // updated_by has no FK and is not denormalised away for the same reason
+    // tenant_admin_log keeps actor_email: the record of who revoked a company's
+    // module must survive that operator's own account being deleted.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`tenant_features` (
+            `tenant_id`   INT         NOT NULL,
+            `feature_key` VARCHAR(64) NOT NULL,
+            `is_enabled`  TINYINT(1)  NOT NULL,
+            `updated_at`  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_by`  INT         NULL,
+            PRIMARY KEY (`tenant_id`, `feature_key`),
+            KEY `idx_tenantfeat_feature` (`feature_key`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table tenant_features ready');
+
+    // Seed the catalogue from the code registry — the one source of truth for
+    // which features exist (core/feature_registry.php). INSERT IGNORE, so an
+    // operator's own is_available/default_enabled edits are never overwritten by
+    // re-running this script; only genuinely new keys are added.
+    require_once __DIR__ . '/../core/feature_registry.php';
+    $seed = $admin->prepare("
+        INSERT IGNORE INTO `{$controlDb}`.`features`
+            (`feature_key`, `label`, `description`, `is_available`, `default_enabled`, `sort_order`)
+        VALUES (?,?,?,1,?,?)
+    ");
+    $added = 0;
+    foreach (bmsFeatureRegistry() as $key => $def) {
+        $seed->execute([
+            $key,
+            $def['label'],
+            $def['description'] ?? null,
+            !empty($def['default']) ? 1 : 0,
+            (int)($def['sort_order'] ?? 0),
+        ]);
+        $added += $seed->rowCount();
+    }
+    say('  · features catalogue seeded' . ($added ? " ({$added} new)" : ' (no new keys)'));
+
     // Older installs created superadmins before the lockout columns existed.
     $saCols = $admin->query("
         SELECT column_name FROM information_schema.columns

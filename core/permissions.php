@@ -18,6 +18,18 @@ require_once __DIR__ . '/security_helpers.php';
 // Phase A ships the helpers but does NOT change any SELECT yet.
 require_once __DIR__ . '/project_scope.php';
 
+// Auto-load the feature registry (ternant.md Phase 11). Third axis of access
+// control, and the FIRST one checked: the role system answers "what verbs?",
+// project scope answers "which rows?", and this answers "does this company's
+// subscription include this module at all?".
+//
+// It is checked BEFORE isAdmin() in every canX() below, deliberately. A tenant's
+// own administrator bypasses role_permissions entirely; if entitlement were
+// checked after that bypass, a company could hand itself a module the platform
+// never granted it. Entitlement data lives in the control database, which
+// tenants cannot read or write (proven in Phase 9).
+require_once __DIR__ . '/feature_registry.php';
+
 /**
  * Load user permissions into session
  * 
@@ -73,6 +85,14 @@ function loadUserPermissions($roleId)
  */
 function canView($pageKey)
 {
+    // Entitlement first — before the admin bypass. A module the tenant's plan
+    // does not include is off for EVERYONE in that company, its own admin
+    // included. View off means create/edit/delete/workflow off too: every
+    // function below carries this same line for that reason.
+    if (function_exists('tenantModuleAllowsPage') && !tenantModuleAllowsPage($pageKey)) {
+        return false;
+    }
+
     // Admin always has access
     if (isAdmin()) {
         return true;
@@ -89,6 +109,14 @@ function canView($pageKey)
  */
 function canCreate($pageKey)
 {
+    // Entitlement first — before the admin bypass. A module the tenant's plan
+    // does not include is off for EVERYONE in that company, its own admin
+    // included. View off means create/edit/delete/workflow off too: every
+    // function below carries this same line for that reason.
+    if (function_exists('tenantModuleAllowsPage') && !tenantModuleAllowsPage($pageKey)) {
+        return false;
+    }
+
     // Admin always has access
     if (isAdmin()) {
         return true;
@@ -105,6 +133,14 @@ function canCreate($pageKey)
  */
 function canEdit($pageKey)
 {
+    // Entitlement first — before the admin bypass. A module the tenant's plan
+    // does not include is off for EVERYONE in that company, its own admin
+    // included. View off means create/edit/delete/workflow off too: every
+    // function below carries this same line for that reason.
+    if (function_exists('tenantModuleAllowsPage') && !tenantModuleAllowsPage($pageKey)) {
+        return false;
+    }
+
     // Admin always has access
     if (isAdmin()) {
         return true;
@@ -121,6 +157,14 @@ function canEdit($pageKey)
  */
 function canDelete($pageKey)
 {
+    // Entitlement first — before the admin bypass. A module the tenant's plan
+    // does not include is off for EVERYONE in that company, its own admin
+    // included. View off means create/edit/delete/workflow off too: every
+    // function below carries this same line for that reason.
+    if (function_exists('tenantModuleAllowsPage') && !tenantModuleAllowsPage($pageKey)) {
+        return false;
+    }
+
     // Admin always has access
     if (isAdmin()) {
         return true;
@@ -137,6 +181,14 @@ function canDelete($pageKey)
  */
 function canReview($pageKey)
 {
+    // Entitlement first — before the admin bypass. A module the tenant's plan
+    // does not include is off for EVERYONE in that company, its own admin
+    // included. View off means create/edit/delete/workflow off too: every
+    // function below carries this same line for that reason.
+    if (function_exists('tenantModuleAllowsPage') && !tenantModuleAllowsPage($pageKey)) {
+        return false;
+    }
+
     // Admin always has access
     if (isAdmin()) {
         return true;
@@ -153,6 +205,14 @@ function canReview($pageKey)
  */
 function canApprove($pageKey)
 {
+    // Entitlement first — before the admin bypass. A module the tenant's plan
+    // does not include is off for EVERYONE in that company, its own admin
+    // included. View off means create/edit/delete/workflow off too: every
+    // function below carries this same line for that reason.
+    if (function_exists('tenantModuleAllowsPage') && !tenantModuleAllowsPage($pageKey)) {
+        return false;
+    }
+
     // Admin always has access
     if (isAdmin()) {
         return true;
@@ -172,6 +232,14 @@ function canApprove($pageKey)
  */
 function canSubmit($pageKey)
 {
+    // Entitlement first — before the admin bypass. A module the tenant's plan
+    // does not include is off for EVERYONE in that company, its own admin
+    // included. View off means create/edit/delete/workflow off too: every
+    // function below carries this same line for that reason.
+    if (function_exists('tenantModuleAllowsPage') && !tenantModuleAllowsPage($pageKey)) {
+        return false;
+    }
+
     if (isAdmin()) {
         return true;
     }
@@ -191,6 +259,14 @@ function canSubmit($pageKey)
  */
 function canReject($pageKey)
 {
+    // Entitlement first — before the admin bypass. A module the tenant's plan
+    // does not include is off for EVERYONE in that company, its own admin
+    // included. View off means create/edit/delete/workflow off too: every
+    // function below carries this same line for that reason.
+    if (function_exists('tenantModuleAllowsPage') && !tenantModuleAllowsPage($pageKey)) {
+        return false;
+    }
+
     if (isAdmin()) {
         return true;
     }
@@ -206,6 +282,14 @@ function canReject($pageKey)
  */
 function hasAnyPermission($pageKey)
 {
+    // Entitlement first — before the admin bypass. A module the tenant's plan
+    // does not include is off for EVERYONE in that company, its own admin
+    // included. View off means create/edit/delete/workflow off too: every
+    // function below carries this same line for that reason.
+    if (function_exists('tenantModuleAllowsPage') && !tenantModuleAllowsPage($pageKey)) {
+        return false;
+    }
+
     // Admin always has access
     if (isAdmin()) {
         return true;

@@ -1972,6 +1972,20 @@ function handleRoute() {
     if (isset($routes[$clean_uri])) {
         $file = $routes[$clean_uri];
         if (file_exists($file)) {
+            // Feature gate (ternant.md Phase 11, layer 3). The belt-and-braces
+            // net: a page that forgets its own autoEnforcePermission() call is
+            // still refused here, because the router sees every clean URL.
+            // Checked on the route key AND the file, since a route name is not
+            // always the page_key.
+            if (function_exists('bmsFeatureGuardPath')) {
+                if (function_exists('tenantModuleAllowsPage')
+                    && is_array($GLOBALS['__bms_features'] ?? null)
+                    && !tenantModuleAllowsPage($clean_uri)) {
+                    $owners = featureForPageKey($clean_uri);
+                    bmsFeatureHalt($owners[0] ?? $clean_uri);
+                }
+                bmsFeatureGuardPath($file);
+            }
             require_once $file;
             return true;
         } else {
@@ -1996,6 +2010,9 @@ function handleRoute() {
     ];
     foreach ($possible_files as $f) {
         if (file_exists($f) && is_file($f)) {
+            // Same gate for a file reached directly by path rather than by a
+            // mapped route — the case that made hiding nav items insufficient.
+            if (function_exists('bmsFeatureGuardPath')) bmsFeatureGuardPath($f);
             require_once $f;
             return true;
         }
