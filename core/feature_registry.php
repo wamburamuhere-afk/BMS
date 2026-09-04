@@ -371,8 +371,26 @@ if (!function_exists('bmsFeatureBlockingPath')) {
             }
         }
 
-        $owner = featureForPath($rel);
-        if ($owner !== null && !tenantFeatureEnabled($owner)) return $owner;
+        // Try the path as given, then each suffix starting one segment later, so
+        // a SUBDIRECTORY install resolves the same as a root one. Production
+        // serves each tenant at its own subdomain root, where REQUEST_URI is
+        // '/api/pos/x.php' — but on an install under '/bms/' it arrives as
+        // '/bms/api/pos/x.php', matched no registry prefix, and this layer
+        // silently gated nothing. Layer 4 is the ONLY layer covering api/ and
+        // ajax/, so losing it there loses those endpoints entirely.
+        //
+        // Over-matching is safe in the one direction that matters: a suffix only
+        // ever blocks when its owning feature is switched OFF, so the worst case
+        // is a 404 for a URL that merely looks like a disabled module's path.
+        $parts = explode('/', $rel);
+        $limit = min(count($parts), 5);
+        for ($i = 0; $i < $limit; $i++) {
+            $candidate = implode('/', array_slice($parts, $i));
+            $owner     = featureForPath($candidate);
+            if ($owner !== null) {
+                return tenantFeatureEnabled($owner) ? null : $owner;
+            }
+        }
 
         if (function_exists('getPagePermissionMapping')) {
             $map     = getPagePermissionMapping();

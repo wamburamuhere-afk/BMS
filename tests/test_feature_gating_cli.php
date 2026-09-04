@@ -212,6 +212,25 @@ ok('api/pos_session.php is refused', blocked($r), substr($r['out'], 0, 200));
 $r = req($hostA, '/api/payroll/run.php', 'features');
 ok('api/payroll/ (HR) still passes with POS off', str_contains($r['out'], 'PASSED_LAYER4'), substr($r['out'], 0, 200));
 
+// A SUBDIRECTORY install. Production serves each tenant at its own subdomain
+// root, so REQUEST_URI is '/api/pos/x.php' — but under '/bms/' it arrives as
+// '/bms/api/pos/x.php', which matched no registry prefix and silently gated
+// NOTHING. Layer 4 is the only layer covering api/ and ajax/, so that lost those
+// endpoints entirely on any non-root install.
+$r = req($hostA, '/bms/api/pos/sale.php', 'features');
+ok('a subdirectory install still gates api/pos/', blocked($r), substr($r['out'], 0, 200));
+
+$r = req($hostA, '/erp/subdir/api/pos_session.php', 'features');
+ok('  ...at any depth', blocked($r), substr($r['out'], 0, 200));
+
+$r = req($hostA, '/bms/api/payroll/run.php', 'features');
+ok('  ...without over-blocking HR under the same prefix',
+   str_contains($r['out'], 'PASSED_LAYER4'), substr($r['out'], 0, 200));
+
+$r = req($hostA, '/bms/app/bms/pos/payroll.php', 'features');
+ok('  ...and the app/bms/pos/ directory trap still holds under a prefix',
+   str_contains($r['out'], 'PASSED_LAYER4'), substr($r['out'], 0, 200));
+
 // ─────────────────────────────────────────────────────────────────────────────
 section('5. Layer 5 — the public e-signature door');
 

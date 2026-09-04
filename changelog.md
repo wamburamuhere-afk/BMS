@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-09-04 (fix) - Phase 11 follow-up: the feature gate missed api/ on subdirectory installs
+
+**Files (changed):** `core/feature_registry.php`, `tests/test_feature_gating_cli.php`
+
+Found by a post-implementation gap hunt, not by a failing test - the suites were green because
+every one of them exercised the root-install path.
+
+`bmsFeatureBlockingPath()` matched the registry's path prefixes (`api/pos/`, `api/payroll/`, ...)
+against `REQUEST_URI` as given. Production serves each tenant at its own subdomain root, so that
+arrives as `/api/pos/sale.php` and matched. On an install under a subdirectory it arrives as
+`/bms/api/pos/sale.php`, matched **nothing**, and layer 4 silently gated **nothing** - proven
+directly: with POS disabled for tenant 85, `/api/pos/sale.php` returned the 404 and
+`/bms/api/pos/sale.php` sailed through.
+
+That mattered more than it looks. Layer 4 is the **only** layer covering `api/`, `ajax/` and
+`actions/` - they are deliberately excluded from the router - so on any non-root install the
+endpoints of a switched-off module stayed reachable. Pages were still refused by layers 1 and 3,
+and any API following the house template still refused via `canX()`; the exposure was APIs that
+skip that check, which is the exact reason layer 4 exists.
+
+The path is now resolved by trying it as given and then each suffix starting one segment later, so
+a subdirectory install resolves identically to a root one, at any depth. Over-matching is safe in
+the only direction that matters: a suffix blocks only when its owning feature is switched OFF, so
+the worst case is a 404 for a URL that merely looks like a disabled module's path.
+
+Four assertions added (39 -> 43): the subdirectory form of an api path, the same at arbitrary
+depth, and two proving it does not over-block - HR under the same prefix still passes, and
+`app/bms/pos/payroll.php` is still not owned by POS.
+
+**Also verified during the same pass, and left alone:** `test_project_scope_cli` (1/15) and
+`test_scope_enforcement_cli` (1 of 34, `warehouse_view.php` has no scope gate) fail identically on
+`develop` without any of Phase 11 - checked in a clean worktree. They are pre-existing and out of
+scope here.
+
 ## 2026-09-03 (feat) - Phase 11.D: restricted-plan regression, role-grid filtering, docs
 
 **Files (changed):** `app/constant/settings/user_roles.php`, `tests/test_tenant_module_smoke_cli.php`, `docs/MULTI_TENANCY.md`, `ternant.md`
