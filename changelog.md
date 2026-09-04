@@ -1,5 +1,86 @@
 # BMS Changelog
 
+## 2026-09-04 (feat) - Phase 12.A: usage-quota schema, resolution helpers, and closing a real undercount
+
+**Files (added):** `core/tenant_quotas.php`, `migrations/tenant/2026_09_04_backfill_file_size_columns.php`, `tests/test_tenant_quotas_cli.php`
+**Files (changed):** `scripts/setup_control_db.php`, `core/tenant_admin.php`, `ternant.md`
+
+First slice of `ternant.md` Phase 12 - letting the superadmin cap how many active staff accounts and
+how much upload storage one tenant may use. **This slice enforces nothing**: it ships the schema,
+the live-recompute resolution, and the fix for a real gap found while designing it. Phase 12.B is
+where `add_user.php` and the upload handlers start calling it.
+
+Two nullable columns on `tenants` (`max_users`, `max_storage_mb` - `NULL` = unlimited, never a magic
+`-1`), added via `scripts/setup_control_db.php`'s existing guarded-`ALTER` pattern, the same one
+already used for `superadmins`' lockout columns. No change was needed to how a request reaches these
+values: `tenant_resolver.php` already runs `SELECT * FROM tenants`, so the two new columns arrive in
+`bmsCurrentTenant()` the moment they exist in the schema - confirmed by reading the query, not
+assumed.
+
+`core/tenant_quotas.php` sums storage as **17 independent queries**, not one `UNION ALL`, each in its
+own `try`/`catch`: a single unioned statement fails as one unit the moment any member table has a
+problem, which would take the whole total down with it the day a future migration drops or renames
+one. Independent queries are the only way "one bad term degrades to zero" is actually true, and
+that's exactly what Phase 12.A's acceptance gate proves - dropping `rfq_attachments` mid-test on a
+real tenant lowered the live sum by precisely its share without throwing.
+
+**A real undercount, closed, not documented as a known gap.** Parsing every `CREATE TABLE` in
+`schema/tenant_schema_template.sql` for a genuine `file_size` column (not name-matching
+"attachment"/"document") found 17 tables that track it correctly and 5 - `customer_attachments`,
+`document_templates`, `project_scope_documents`, `user_signatures`, `compliance_records` - that store
+a file but never recorded its size. Left alone, every tenant's storage total would have undercounted
+forever, silently. The new per-tenant migration adds the column to all five and best-effort backfills
+existing rows from the file still on disk; a row whose file is gone is left at `0` rather than
+failing the migration for every tenant behind it.
+
+**Tests (28 assertions)**, against a real provisioned throwaway tenant, not fixtures: a real
+4321-byte file on disk was backfilled to its exact size and a row with a missing file was correctly
+left at 0; storage summed exactly right across three real tables in three different feature areas;
+the user-limit boundary was proven both directions - 3 active + 1 seeded-inactive reads as exactly 3,
+refuses a 4th at the limit, and deactivating one active user immediately frees the seat.
+
+Regression: feature registry 61, panel 49, superadmin URLs 63, tenant admin panel 51, control DB 59 -
+all clean. Both live tenants (`relivertec`, `mufindipower`) confirmed unlimited before and after, so
+this ships with **zero behaviour change** until a superadmin sets a real number.
+
+## 2026-09-04 (docs/plan) - Phase 12 planned: tenant usage quotas (users + storage)
+
+**Files (changed):** `ternant.md`
+
+No code yet - this records the scouting and design that will drive Phase 12 (`ternant.md`), the
+same discipline Phase 11 used: read the real code before writing a plan against it.
+
+Confirmed exactly two places ever create a `users` row (`tenant_provisioner.php` for the signup
+owner, `add_user.php` for every staff account after it - a single real enforcement point), and that
+`users.is_active` already gives a "free a seat" release valve via the existing activate/deactivate
+toggle.
+
+Confirmed storage is a harder problem than entitlements were: there is no shared upload function in
+BMS to hook into (every one of **56** files - 49 under `api/`, 7 under `app/`, counted by grep, not
+estimated - re-implements `.claude/security.md` §19's 5-step pattern independently). Parsed every
+`CREATE TABLE` in `schema/tenant_schema_template.sql` for a real `file_size` column rather than
+name-matching "attachment"/"document": **17 tables** track it correctly, and **5** (`customer_
+attachments`, `document_templates`, `project_scope_documents`, `user_signatures`,
+`compliance_records`) store a file but never recorded its size - the plan closes that undercount in
+12.A rather than accepting it as a known gap.
+
+Chased down what looked like a possible cross-tenant issue: most upload handlers write to a flat,
+shared `uploads/<entity>/` path rather than the tenant-prefixed one `bmsUploadsDir()` provides. Every
+filename is `bin2hex(random_bytes(16))`, so collision isn't practically possible - not a leak. The
+real consequence is narrower: a disk scan can't attribute bytes to one tenant, so storage has to be
+measured from each tenant's own database instead, which - because BMS is database-per-tenant -
+comes out correctly scoped for free.
+
+Confirmed choice from conversation: storage is recomputed live at the moment of each check, not
+tracked with a maintained running counter, because an upload attempt is rare enough that the extra
+query cost doesn't matter, and a live sum can never silently drift the way a counter can the day one
+of 56+ call sites forgets to update it.
+
+`ternant.md` now has Phase 12 in four sub-phases (12.A schema + the undercount fix, 12.B enforcement
+at the two real choke points, 12.C superadmin UI, 12.D tests/docs), in the same
+Branch/Risk/What-ships/Acceptance-gate/Rollback format as every other phase, with the Phase overview
+and Phase tracker tables updated to match. Nothing has been built yet.
+
 ## 2026-09-04 (fix) - Superadmin panel: readable URLs, and it no longer breaks before setup
 
 **Files (added):** `tests/test_superadmin_urls_cli.php`

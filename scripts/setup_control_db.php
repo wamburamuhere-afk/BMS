@@ -294,6 +294,25 @@ try {
     }
     say('  · features catalogue seeded' . ($added ? " ({$added} new)" : ' (no new keys)'));
 
+    // Usage quotas (ternant.md Phase 12). NULL means unlimited — deliberately not
+    // a magic -1, so "no limit set" and "a real number" can never be confused.
+    // Two plain columns on `tenants`, not a second features/tenant_features-shaped
+    // pair of tables: unlike entitlements this isn't an extensible catalogue of
+    // independent toggles, it's two numbers per tenant.
+    $tCols = $admin->query("
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = " . $admin->quote($controlDb) . " AND table_name = 'tenants'
+    ")->fetchAll(PDO::FETCH_COLUMN);
+    foreach ([
+        'max_users'      => "ADD COLUMN `max_users` INT NULL AFTER `plan`",
+        'max_storage_mb' => "ADD COLUMN `max_storage_mb` INT NULL AFTER `max_users`",
+    ] as $col => $clause) {
+        if (!in_array($col, $tCols, true)) {
+            $admin->exec("ALTER TABLE `{$controlDb}`.`tenants` {$clause}");
+            say("  + tenants.{$col} added");
+        }
+    }
+
     // Older installs created superadmins before the lockout columns existed.
     $saCols = $admin->query("
         SELECT column_name FROM information_schema.columns

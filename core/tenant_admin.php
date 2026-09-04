@@ -60,7 +60,8 @@ if (!function_exists('listTenants')) {
     function listTenants(?string $status = null): array
     {
         $sql = "SELECT id, company_name, subdomain, db_name, db_username, db_host,
-                       status, plan, owner_email, created_at, activated_at, suspended_at
+                       status, plan, owner_email, max_users, max_storage_mb,
+                       created_at, activated_at, suspended_at
                 FROM tenants";
         $args = [];
         if ($status !== null && $status !== '') {
@@ -85,7 +86,8 @@ if (!function_exists('getTenant')) {
     {
         $st = getControlPdo()->prepare("
             SELECT id, company_name, subdomain, db_name, db_username, db_host,
-                   status, plan, owner_email, created_at, activated_at, suspended_at
+                   status, plan, owner_email, max_users, max_storage_mb,
+                       created_at, activated_at, suspended_at
             FROM tenants WHERE id = ? LIMIT 1
         ");
         $st->execute([$id]);
