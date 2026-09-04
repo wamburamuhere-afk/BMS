@@ -75,6 +75,7 @@ try {
         $upload_dir  = bmsUploadsDir($upload_sub);   // creates dir + .htaccess guard
         $file_ext  = pathinfo($_FILES['attachment_file']['name'], PATHINFO_EXTENSION);
         $file_name = 'vpay_' . time() . '_' . uniqid() . '.' . $file_ext;
+        assertUploadWithinQuota($pdo, (int)$_FILES['attachment_file']['size']);
         if (move_uploaded_file($_FILES['attachment_file']['tmp_name'], $upload_dir . $file_name)) {
             $attachment_path = bmsUploadsRel($upload_sub) . $file_name;
             registerFileInLibrary($pdo, $attachment_path, $_FILES['attachment_file']['name'],

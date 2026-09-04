@@ -188,6 +188,47 @@ function svBadge(string $status): string
             </div>
         </div>
 
+        <?php if ($tenant['status'] !== 'deleted'): ?>
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span><i class="bi bi-speedometer text-primary me-1"></i> Usage &amp; Limits</span>
+                    <button class="btn btn-sm btn-outline-primary" onclick="checkUsage()" id="btnCheckUsage">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Check current usage
+                    </button>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Caps how many active staff accounts and how much uploaded storage this company
+                        may use. Leave a field blank for unlimited. "Current usage" is read on demand —
+                        it is not kept on this page automatically.
+                    </p>
+
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Max active users</label>
+                            <input type="text" inputmode="numeric" class="form-control" id="f-max-users"
+                                   placeholder="Unlimited"
+                                   value="<?= $tenant['max_users'] !== null ? (int)$tenant['max_users'] : '' ?>">
+                            <div class="form-text" id="usage-users">Current usage not checked yet.</div>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Max storage (MB)</label>
+                            <input type="text" inputmode="numeric" class="form-control" id="f-max-storage"
+                                   placeholder="Unlimited"
+                                   value="<?= $tenant['max_storage_mb'] !== null ? (int)$tenant['max_storage_mb'] : '' ?>">
+                            <div class="form-text" id="usage-storage">Current usage not checked yet.</div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary mt-3" onclick="saveQuotas()" id="btnSaveQuotas">
+                        <i class="bi bi-save me-1"></i> Save limits
+                    </button>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <?php if ($featuresSetup): ?>
         <div class="col-12">
             <div class="card detail-card">
@@ -386,6 +427,61 @@ function saveFeatures() {
         }).always(function () {
             btn.prop('disabled', false).html(orig);
         });
+    });
+}
+
+function saveQuotas() {
+    const maxUsers   = $('#f-max-users').val().trim();
+    const maxStorage = $('#f-max-storage').val().trim();
+
+    const btn  = $('#btnSaveQuotas');
+    const orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+
+    $.ajax({
+        url: '/actions/superadmin_tenant_quotas.php',
+        method: 'POST', dataType: 'json',
+        data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, max_users: maxUsers, max_storage_mb: maxStorage }
+    }).done(function (res) {
+        if (res && res.success) {
+            Swal.fire({ icon: 'success', title: 'Saved', text: res.message, timer: 2200, showConfirmButton: false });
+        } else {
+            Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not save.' });
+        }
+    }).fail(function (xhr) {
+        let msg = 'Could not save.';
+        try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+        Swal.fire({ icon: 'error', title: 'Error', text: msg });
+    }).always(function () {
+        btn.prop('disabled', false).html(orig);
+    });
+}
+
+function checkUsage() {
+    // On demand, deliberately — see tenantUsageSnapshotFor()'s docblock for why
+    // this is the one thing on this page that briefly opens the tenant's own
+    // database, and why it only ever happens on this explicit click.
+    const btn  = $('#btnCheckUsage');
+    const orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Checking...');
+
+    $.ajax({
+        url: '/actions/superadmin_tenant_usage.php',
+        method: 'POST', dataType: 'json',
+        data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID }
+    }).done(function (res) {
+        if (res && res.success) {
+            $('#usage-users').text(res.active_users + ' active user' + (res.active_users === 1 ? '' : 's') + ' right now.');
+            $('#usage-storage').text(res.storage_used_mb + ' MB used right now.');
+        } else {
+            Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not read current usage.' });
+        }
+    }).fail(function (xhr) {
+        let msg = 'Could not read current usage.';
+        try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+        Swal.fire({ icon: 'error', title: 'Error', text: msg });
+    }).always(function () {
+        btn.prop('disabled', false).html(orig);
     });
 }
 

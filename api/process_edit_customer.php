@@ -152,7 +152,7 @@ try {
         $ext = pathinfo($_FILES['customer_photo']['name'], PATHINFO_EXTENSION);
         $filename = 'photo_' . $customerId . '_' . time() . '.' . $ext;
         $target_path = $upload_dir . $filename;
-        
+        assertUploadWithinQuota($pdo, (int)$_FILES['customer_photo']['size']);
         if (move_uploaded_file($_FILES['customer_photo']['tmp_name'], $target_path)) {
             $data['photo_path'] = 'uploads/parties/customers/' . $filename;
             registerFileInLibrary($pdo, $data['photo_path'], $_FILES['customer_photo']['name'], $_FILES['customer_photo']['size'], 'Customer Photo: ' . $data['customer_name'], 'customer,photo', $_SESSION['user_id']);
@@ -166,7 +166,7 @@ try {
         $ext = pathinfo($_FILES['logo']['name'], PATHINFO_EXTENSION);
         $filename = 'logo_' . $customerId . '_' . time() . '.' . $ext;
         $target_path = $upload_dir . $filename;
-        
+        assertUploadWithinQuota($pdo, (int)$_FILES['logo']['size']);
         if (move_uploaded_file($_FILES['logo']['tmp_name'], $target_path)) {
             $data['logo_path'] = 'uploads/parties/customers/' . $filename;
             registerFileInLibrary($pdo, $data['logo_path'], $_FILES['logo']['name'], $_FILES['logo']['size'], 'Customer Logo: ' . $data['customer_name'], 'customer,logo', $_SESSION['user_id']);
@@ -180,7 +180,7 @@ try {
         $ext = pathinfo($_FILES['id_attachment']['name'], PATHINFO_EXTENSION);
         $filename = 'id_' . $customerId . '_' . time() . '.' . $ext;
         $target_path = $upload_dir . $filename;
-        
+        assertUploadWithinQuota($pdo, (int)$_FILES['id_attachment']['size']);
         if (move_uploaded_file($_FILES['id_attachment']['tmp_name'], $target_path)) {
             $data['id_attachment_path'] = 'uploads/parties/customers/' . $filename;
             registerFileInLibrary($pdo, $data['id_attachment_path'], $_FILES['id_attachment']['name'], $_FILES['id_attachment']['size'], 'Customer ID: ' . $data['customer_name'], 'customer,id,identity', $_SESSION['user_id']);
@@ -203,7 +203,7 @@ try {
             $ext = pathinfo($_FILES[$slot]['name'], PATHINFO_EXTENSION);
             $filename = $slot . '_' . $customerId . '_' . time() . '.' . $ext;
             $target_path = $upload_dir . $filename;
-            
+            assertUploadWithinQuota($pdo, (int)$_FILES[$slot]['size']);
             if (move_uploaded_file($_FILES[$slot]['tmp_name'], $target_path)) {
                 $data[$slot . '_path'] = 'uploads/parties/customers/' . $filename;
                 $docName = ucwords(str_replace(['_', 'cert'], [' ', ' Certificate'], $slot)) . ': ' . $data['customer_name'];
@@ -229,7 +229,7 @@ try {
             $ext = pathinfo($_FILES[$fileKey]['name'], PATHINFO_EXTENSION);
             $filename = "other_{$i}_" . $customerId . '_' . time() . '.' . $ext;
             $target_path = $upload_dir . $filename;
-            
+            assertUploadWithinQuota($pdo, (int)$_FILES[$fileKey]['size']);
             if (move_uploaded_file($_FILES[$fileKey]['tmp_name'], $target_path)) {
                 $data["other_attachment_{$i}_path"] = 'uploads/parties/customers/' . $filename;
                 $docLabel = $_POST[$labelKey] ?? "Additional Attachment {$i}";

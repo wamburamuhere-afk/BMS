@@ -8,6 +8,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../includes/config.php';
 require_once __DIR__ . '/../../../core/permissions.php';
+require_once __DIR__ . '/../../../core/tenant_quotas.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -106,6 +107,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors['role_id'] = 'Invalid role selected';
     }
 
+    // Phase 12.B — plan-level seat limit, checked ahead of the password fields
+    // so a company that's full finds out before typing a password twice.
+    // No-op with no tenant resolved (single-tenant/legacy) or an unlimited plan.
+    if (!tenantWithinUserLimit($pdo)) {
+        $errors['limit'] = 'You have reached your plan\'s user limit. Deactivate an existing '
+            . 'user to free a seat, or ask the platform to raise your limit.';
+    }
+
     if (empty($password)) {
         $errors['password'] = 'Password is required';
     } elseif (strlen($password) < 8) {
@@ -174,6 +183,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <?php if (!empty($errors['database'])): ?>
         <div class="alert alert-danger"><?= $errors['database'] ?></div>
+    <?php endif; ?>
+
+    <?php if (!empty($errors['limit'])): ?>
+        <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i><?= safe_output($errors['limit'], '') ?></div>
     <?php endif; ?>
 
     <div class="card">

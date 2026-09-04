@@ -187,6 +187,7 @@ function handleCustomerDocumentUpload($pdo, $customer_id, $post_data, $files) {
         $filename = uniqid() . '_' . preg_replace('/[^a-zA-Z0-9\.]/', '_', $file['name']);
         $target_path = $upload_dir . $filename;
 
+        assertUploadWithinQuota($pdo, (int)$file['size']);
         if (!move_uploaded_file($file['tmp_name'], $target_path)) {
             throw new Exception("Failed to upload file");
         }

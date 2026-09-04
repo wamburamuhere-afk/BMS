@@ -184,7 +184,7 @@ if (isset($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
     $ext = pathinfo($_FILES['logo']['name'], PATHINFO_EXTENSION);
     $filename = 'logo_' . $supplier_id . '_' . time() . '.' . $ext;
     $target_path = $upload_dir . $filename;
-    
+    assertUploadWithinQuota($pdo, (int)$_FILES['logo']['size']);
     if (move_uploaded_file($_FILES['logo']['tmp_name'], $target_path)) {
         $logo_path = 'uploads/parties/suppliers/' . $filename;
         $logo_updated = true;

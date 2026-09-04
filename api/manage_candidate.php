@@ -47,6 +47,7 @@ try {
                 $safe = bin2hex(random_bytes(16)) . '.' . $ext;
                 $dir = __DIR__ . '/../uploads/candidate_cvs/';
                 if (!is_dir($dir)) mkdir($dir, 0755, true);
+                assertUploadWithinQuota($pdo, (int)$_FILES['cv']['size']);
                 if (!move_uploaded_file($_FILES['cv']['tmp_name'], $dir . $safe)) throw new Exception('Upload failed');
                 $cv_path = 'uploads/candidate_cvs/' . $safe;
                 $cv_name = $_FILES['cv']['name'];

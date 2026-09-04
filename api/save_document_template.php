@@ -43,6 +43,7 @@ try {
         $filename = time() . '_' . basename($_FILES['template_file']['name']);
         $targetPath = $uploadDir . $filename;
 
+        assertUploadWithinQuota($pdo, (int)$_FILES['template_file']['size']);
         if (move_uploaded_file($_FILES['template_file']['tmp_name'], $targetPath)) {
             $filePath = 'uploads/document_templates/' . $filename;
             $fileType = pathinfo($filename, PATHINFO_EXTENSION);

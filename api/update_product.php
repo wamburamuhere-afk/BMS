@@ -67,6 +67,7 @@ try {
         }
         
         // Move uploaded file
+        assertUploadWithinQuota($pdo, (int)$_FILES['product_image']['size']);
         if (move_uploaded_file($_FILES['product_image']['tmp_name'], $upload_path)) {
             $image_url = 'uploads/products/' . $unique_filename;
             

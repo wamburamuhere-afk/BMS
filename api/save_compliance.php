@@ -46,6 +46,7 @@ try {
         $filename = time() . '_' . $safeBase . ($ext !== '' ? '.' . $ext : '');
         $targetPath = $uploadDir . $filename;
 
+        assertUploadWithinQuota($pdo, (int)$_FILES['doc_file']['size']);
         if (move_uploaded_file($_FILES['doc_file']['tmp_name'], $targetPath)) {
             $filePath = '/uploads/compliance/' . $filename;
             registerFileInLibrary($pdo, ltrim($filePath, '/'), $_FILES['doc_file']['name'], $_FILES['doc_file']['size'], 'Compliance Document - ' . $title, 'compliance', $userId ?? 0);

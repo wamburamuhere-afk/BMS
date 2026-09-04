@@ -1,5 +1,221 @@
 # BMS Changelog
 
+## 2026-09-04 (fix) - Phase 12 gap hunt: reactivating a user was a second, unguarded seat-limit bypass
+
+**Files (changed):** `ajax/toggle_user.php`, `tests/test_quota_enforcement_cli.php`, `tests/test_login_history_cli.php`, `ternant.md`
+
+Found by a post-implementation gap hunt, not by a failing test - same discipline as the Phase 11
+hunt that found the subdirectory routing gap.
+
+`add_user.php` is the only place a NEW staff account is ever created, and Phase 12.B gated it
+correctly. But `ajax/toggle_user.php` **reactivates an existing deactivated account**, which raises
+the active-user count exactly the same way, through a completely different file that had no idea the
+quota existed. A tenant sitting at its limit, with any previously-deactivated user available, could
+reactivate them and exceed `max_users` with nothing stopping it.
+
+Fixed with the same shape used everywhere else in this phase: `tenantWithinUserLimit($pdo)` checked
+before a genuine `0 -> 1` transition. Deliberately scoped tight - a redundant re-click of an
+already-active row is not gated (it isn't really an activation), and deactivating is never gated at
+all, since it only ever frees a seat and gating it would make the limit impossible to recover from.
+
+**A second, smaller thing found in the same file while fixing the first.** All six of
+`toggle_user.php`'s `require` statements used bare relative paths (`require '../roots.php'`) instead
+of this codebase's `__DIR__`-based convention. That depends on the process's working directory rather
+than the file's own location - it happened to work under a normal web request, and broke the very
+test written to prove the seat-limit fix, which is exactly how it surfaced. All six now use
+`__DIR__`, matching every other file touched this phase. One assertion in
+`test_login_history_cli.php` asserted the old literal require string; updated to match the more
+robust form, not weakened.
+
+**Tests.** `test_quota_enforcement_cli.php` gained a new section proving the fix against a real
+tenant: refused at the limit with the row staying inactive, succeeds once the limit is raised,
+deactivation never blocked (22 assertions total, 0 failures). `test_login_history_cli.php`: 227
+assertions, 0 failures (was 226 passing + 1 now-stale assertion). No orphaned test tenants; both live
+tenants confirmed unlimited after.
+
+## 2026-09-04 (docs) - Phase 12.D: docs, final consolidated regression — Phase 12 complete
+
+**Files (changed):** `docs/MULTI_TENANCY.md`, `ternant.md`
+
+Closes Phase 12.
+
+`docs/MULTI_TENANCY.md` gained section 7c: the two quota columns, why storage is a live sum of 17
+independent queries rather than a maintained counter, the exact table list with instructions for
+adding a new one in the same PR, the two enforcement choke points (`add_user.php`; `roots.php`'s one
+`require_once` giving all 56 upload handlers `assertUploadWithinQuota()` for free), the four named
+exclusions, and the narrow database-crossing exception for checking current usage with a pointer to
+the test that proves it stays narrow. The three new suites are listed alongside the existing ones.
+
+**Full and final regression, every suite from this phase and Phase 11 run clean in one consolidated
+pass: 796 assertions across 17 suites, 0 failures.** No orphaned test tenants; both live tenants
+(`relivertec`, `mufindipower`) confirmed `max_users`/`max_storage_mb` still `NULL`, 0 features removed
+platform-wide, 0 `tenant_features` override rows — Phases 11 and 12 together ship with zero behaviour
+change for either real tenant until an operator deliberately configures one.
+
+## 2026-09-04 (feat) - Phase 12.C: superadmin panel for setting quotas and checking usage
+
+**Files (added):** `actions/superadmin_tenant_quotas.php`, `actions/superadmin_tenant_usage.php`, `tests/test_quota_panel_cli.php`
+**Files (changed):** `core/tenant_admin.php`, `core/tenant_quotas.php`, `app/superadmin/tenant_view.php`, `ternant.md`
+
+The control surface for 12.A/12.B. A tenant's page gains a "Usage & Limits" card: two inputs
+(max active users, max storage in MB, blank = unlimited) with a Save button, plus a separate
+"Check current usage" button.
+
+**A real design tension, resolved deliberately.** `tenant_view.php`'s own docblock promises it never
+connects to a tenant's own database - but current usage exists only inside that database, by the
+whole premise of database-per-tenant. Resolved as one narrow, explicitly-documented exception:
+`tenantUsageSnapshotFor()` returns exactly two integers, never a row or any business content; reached
+only on the explicit "Check current usage" click, via its own separate endpoint
+(`actions/superadmin_tenant_usage.php`) kept apart from the limits-writing one so the one code path
+that crosses this boundary is easy to find and audit; and read-only, reusing 12.A's already-tested
+counting functions rather than new query logic at this trust boundary. `tenant_view.php` itself still
+never connects to a tenant's own database - proven, not just claimed: the test suite seeds a document
+literally named "secret business document" and asserts the word never appears anywhere in the usage
+response, nor does any filename - only the three declared numeric keys ever leave it.
+
+`setTenantQuotas()` validates (a limit of 0 is rejected; blank means unlimited) and, like
+`setTenantFeatures()` before it, logs only genuine changes to the existing `tenant_admin_log` -
+saving identical values twice writes no audit noise.
+
+**Tests (34 assertions).** A positive control proves an authenticated operator can genuinely save
+through the endpoint before any refusal is asserted; the endpoint refuses without a session, on GET,
+on bad CSRF, and from a tenant host; the panel renders the card pre-filled with real stored values;
+`tenantUsageSnapshotFor()` returns exact numbers against real seeded rows (2 active users, exactly
+2097152 bytes); and the two endpoints are proven genuinely independent - reading usage changes
+neither the stored limits nor the tenant's own data.
+
+Regression: panel 49, superadmin URLs 63, tenant quotas 28, quota enforcement 16, tenant admin panel
+51, superadmin auth 53 - all clean. Both live tenants confirmed unlimited after; no orphaned test
+tenants.
+
+## 2026-09-04 (feat) - Phase 12.B: usage quotas enforced — add_user.php and 56 upload handlers
+
+**Files (added):** `tests/test_quota_enforcement_cli.php`
+**Files (changed):** `roots.php`, `app/constant/settings/add_user.php`, `core/tenant_quotas.php`, and 51 upload handlers across `api/` and `app/`
+
+Turns on what Phase 12.A shipped inert. A seat limit or storage limit set on a tenant is now
+actually enforced, at the exact two places found while designing this: `add_user.php` (the only
+place a staff account is ever created) and every genuine file upload in the application.
+
+`roots.php` gained one `require_once` for `core/tenant_quotas.php` - the same choke-point principle
+Phase 11 used for `canView()` - so every one of the 56 files that call `move_uploaded_file()` got
+`assertUploadWithinQuota()` for free and needed only its one-line call, not a new `require` each.
+`add_user.php` gained the seat check inside its existing validation block, with a new top-level alert
+matching how it already surfaces a database error.
+
+**56 files, 63 call sites** (several files upload more than one kind of file -
+`process_edit_customer.php` alone has 5), mapped precisely before any edit: every `$_FILES` key,
+every array-indexed loop variable, every already-extracted `$file`/`$tmp_name` local, and one
+function (`received_invoices.php::handleAttachmentUpload()`) that needed a `global $pdo;` it didn't
+have before. Four handlers deliberately excluded, by name, with reasons stated in code:
+`backup_actions.php`'s restore path (blocking disaster recovery over a quota would cause real harm)
+and the three overwritten branding/avatar singletons (`system_settings.php`, `company_profile.php`,
+`profile.php`) that don't accumulate the way business records do.
+
+**A permanent, automated version of the manual audit**, not just a one-time hand check: the new test
+suite scans every `.php` file under `api/` and `app/` for `move_uploaded_file()` and asserts a guard
+sits within 3 lines above it, with the same 4 exclusions named and checked - so a future upload
+handler that skips the check fails a test, rather than shipping a silent gap the way the five
+missing `file_size` columns did before Phase 12.A found them.
+
+**One real bug caught by an honest positive control.** The first version of the HR-handler
+end-to-end test failed - not because enforcement was wrong, but because the synthetic upload's fake
+content didn't pass that handler's own real magic-byte MIME check, which runs before the quota gate.
+Fixed by giving the test file real `%PDF-1.4` bytes, not by loosening what the test asserted.
+
+**Tests (16 assertions).** A real seat-limit refusal through the real `add_user.php` page, and
+success again once the limit is raised. Three real upload handlers in three different feature areas
+(Document Templates, Compliance, Employee Documents) each genuinely refuse a real request while over
+the storage limit, and write no row - with a non-vacuous positive control proving the *same* handler
+genuinely writes a row when unlimited, not merely that it wasn't refused.
+
+Full regression across every suite touching this surface - feature registry, gating, panel,
+superadmin URLs, both quota suites, every tenancy suite, plus targeted business-logic regression
+across employee documents, GRN posting, e-signatures (internal and external-token flow), LPO,
+compliance, and document expiry - all clean. Both live tenants confirmed unlimited before and after;
+no orphaned test tenants.
+
+## 2026-09-04 (feat) - Phase 12.A: usage-quota schema, resolution helpers, and closing a real undercount
+
+**Files (added):** `core/tenant_quotas.php`, `migrations/tenant/2026_09_04_backfill_file_size_columns.php`, `tests/test_tenant_quotas_cli.php`
+**Files (changed):** `scripts/setup_control_db.php`, `core/tenant_admin.php`, `ternant.md`
+
+First slice of `ternant.md` Phase 12 - letting the superadmin cap how many active staff accounts and
+how much upload storage one tenant may use. **This slice enforces nothing**: it ships the schema,
+the live-recompute resolution, and the fix for a real gap found while designing it. Phase 12.B is
+where `add_user.php` and the upload handlers start calling it.
+
+Two nullable columns on `tenants` (`max_users`, `max_storage_mb` - `NULL` = unlimited, never a magic
+`-1`), added via `scripts/setup_control_db.php`'s existing guarded-`ALTER` pattern, the same one
+already used for `superadmins`' lockout columns. No change was needed to how a request reaches these
+values: `tenant_resolver.php` already runs `SELECT * FROM tenants`, so the two new columns arrive in
+`bmsCurrentTenant()` the moment they exist in the schema - confirmed by reading the query, not
+assumed.
+
+`core/tenant_quotas.php` sums storage as **17 independent queries**, not one `UNION ALL`, each in its
+own `try`/`catch`: a single unioned statement fails as one unit the moment any member table has a
+problem, which would take the whole total down with it the day a future migration drops or renames
+one. Independent queries are the only way "one bad term degrades to zero" is actually true, and
+that's exactly what Phase 12.A's acceptance gate proves - dropping `rfq_attachments` mid-test on a
+real tenant lowered the live sum by precisely its share without throwing.
+
+**A real undercount, closed, not documented as a known gap.** Parsing every `CREATE TABLE` in
+`schema/tenant_schema_template.sql` for a genuine `file_size` column (not name-matching
+"attachment"/"document") found 17 tables that track it correctly and 5 - `customer_attachments`,
+`document_templates`, `project_scope_documents`, `user_signatures`, `compliance_records` - that store
+a file but never recorded its size. Left alone, every tenant's storage total would have undercounted
+forever, silently. The new per-tenant migration adds the column to all five and best-effort backfills
+existing rows from the file still on disk; a row whose file is gone is left at `0` rather than
+failing the migration for every tenant behind it.
+
+**Tests (28 assertions)**, against a real provisioned throwaway tenant, not fixtures: a real
+4321-byte file on disk was backfilled to its exact size and a row with a missing file was correctly
+left at 0; storage summed exactly right across three real tables in three different feature areas;
+the user-limit boundary was proven both directions - 3 active + 1 seeded-inactive reads as exactly 3,
+refuses a 4th at the limit, and deactivating one active user immediately frees the seat.
+
+Regression: feature registry 61, panel 49, superadmin URLs 63, tenant admin panel 51, control DB 59 -
+all clean. Both live tenants (`relivertec`, `mufindipower`) confirmed unlimited before and after, so
+this ships with **zero behaviour change** until a superadmin sets a real number.
+
+## 2026-09-04 (docs/plan) - Phase 12 planned: tenant usage quotas (users + storage)
+
+**Files (changed):** `ternant.md`
+
+No code yet - this records the scouting and design that will drive Phase 12 (`ternant.md`), the
+same discipline Phase 11 used: read the real code before writing a plan against it.
+
+Confirmed exactly two places ever create a `users` row (`tenant_provisioner.php` for the signup
+owner, `add_user.php` for every staff account after it - a single real enforcement point), and that
+`users.is_active` already gives a "free a seat" release valve via the existing activate/deactivate
+toggle.
+
+Confirmed storage is a harder problem than entitlements were: there is no shared upload function in
+BMS to hook into (every one of **56** files - 49 under `api/`, 7 under `app/`, counted by grep, not
+estimated - re-implements `.claude/security.md` §19's 5-step pattern independently). Parsed every
+`CREATE TABLE` in `schema/tenant_schema_template.sql` for a real `file_size` column rather than
+name-matching "attachment"/"document": **17 tables** track it correctly, and **5** (`customer_
+attachments`, `document_templates`, `project_scope_documents`, `user_signatures`,
+`compliance_records`) store a file but never recorded its size - the plan closes that undercount in
+12.A rather than accepting it as a known gap.
+
+Chased down what looked like a possible cross-tenant issue: most upload handlers write to a flat,
+shared `uploads/<entity>/` path rather than the tenant-prefixed one `bmsUploadsDir()` provides. Every
+filename is `bin2hex(random_bytes(16))`, so collision isn't practically possible - not a leak. The
+real consequence is narrower: a disk scan can't attribute bytes to one tenant, so storage has to be
+measured from each tenant's own database instead, which - because BMS is database-per-tenant -
+comes out correctly scoped for free.
+
+Confirmed choice from conversation: storage is recomputed live at the moment of each check, not
+tracked with a maintained running counter, because an upload attempt is rare enough that the extra
+query cost doesn't matter, and a live sum can never silently drift the way a counter can the day one
+of 56+ call sites forgets to update it.
+
+`ternant.md` now has Phase 12 in four sub-phases (12.A schema + the undercount fix, 12.B enforcement
+at the two real choke points, 12.C superadmin UI, 12.D tests/docs), in the same
+Branch/Risk/What-ships/Acceptance-gate/Rollback format as every other phase, with the Phase overview
+and Phase tracker tables updated to match. Nothing has been built yet.
+
 ## 2026-09-04 (fix) - Superadmin panel: readable URLs, and it no longer breaks before setup
 
 **Files (added):** `tests/test_superadmin_urls_cli.php`

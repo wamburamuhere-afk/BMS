@@ -86,6 +86,7 @@ try {
             $safe = bin2hex(random_bytes(16)) . '.' . $ext;
             $dir = __DIR__ . '/../uploads/trips/';
             if (!is_dir($dir)) mkdir($dir, 0755, true);
+            assertUploadWithinQuota($pdo, (int)$_FILES['attachment']['size']);
             if (!move_uploaded_file($_FILES['attachment']['tmp_name'], $dir . $safe)) throw new Exception('Upload failed');
             $attachment_path = 'uploads/trips/' . $safe;
         }

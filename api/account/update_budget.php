@@ -95,6 +95,7 @@ try {
         $file_ext = pathinfo($_FILES['attachment_file']['name'], PATHINFO_EXTENSION);
         $file_name = 'budget_' . time() . '_' . uniqid() . '.' . $file_ext;
         $target_file = $upload_dir . $file_name;
+        assertUploadWithinQuota($pdo, (int)$_FILES['attachment_file']['size']);
         if (move_uploaded_file($_FILES['attachment_file']['tmp_name'], $target_file)) {
             $attachment_path = bmsUploadsRel($upload_sub) . $file_name;
         }

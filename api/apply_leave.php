@@ -94,6 +94,7 @@ try {
         }
         $file_ext = pathinfo($_FILES['document']['name'], PATHINFO_EXTENSION);
         $file_name = $reference_number . '.' . $file_ext;
+        assertUploadWithinQuota($pdo, (int)$_FILES['document']['size']);
         if (move_uploaded_file($_FILES['document']['tmp_name'], $upload_dir . $file_name)) {
             $document_path = 'uploads/hr/leaves/' . $file_name;
             registerFileInLibrary($pdo, $document_path, $_FILES['document']['name'], $_FILES['document']['size'], 'Leave Application Document - ' . $reference_number, 'leave,hr', $_SESSION['user_id']);

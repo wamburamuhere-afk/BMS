@@ -426,7 +426,7 @@ ok(preg_match('/is_active.*!==\s*1.*\n.*\n.*exit;/s', $loginPhpContent) === 1 ||
    'the is_active check exits before a session is ever created for a blocked account');
 
 $toggleUserContent = file_get_contents($root . '/ajax/toggle_user.php');
-ok(str_contains($toggleUserContent, "require_once '../core/session_tracker.php'"),
+ok(str_contains($toggleUserContent, "require_once __DIR__ . '/../core/session_tracker.php'"),
    'toggle_user.php now loads session_tracker.php to end live sessions');
 ok(str_contains($toggleUserContent, 'revokeUserSession('),
    'deactivating now force-ends the account\'s open session(s) immediately, not just on their next login attempt');

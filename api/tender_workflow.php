@@ -69,6 +69,7 @@ try {
 
             if (isset($_FILES['sub_doc_tzs']) && $_FILES['sub_doc_tzs']['error'] === UPLOAD_ERR_OK) {
                 $fname = time() . '_tzs_' . $_FILES['sub_doc_tzs']['name'];
+                assertUploadWithinQuota($pdo, (int)$_FILES['sub_doc_tzs']['size']);
                 move_uploaded_file($_FILES['sub_doc_tzs']['tmp_name'], $upload_dir . $fname);
                 $doc_tzs = 'uploads/tenders/submissions/' . $fname;
                 registerFileInLibrary($pdo, $doc_tzs, $_FILES['sub_doc_tzs']['name'], $_FILES['sub_doc_tzs']['size'], 'Tender Submission (TZS) - Tender #' . $tender_id, 'tender,submission,tzs', $user_id);
@@ -76,6 +77,7 @@ try {
 
             if (isset($_FILES['sub_doc_usd']) && $_FILES['sub_doc_usd']['error'] === UPLOAD_ERR_OK) {
                 $fname = time() . '_usd_' . $_FILES['sub_doc_usd']['name'];
+                assertUploadWithinQuota($pdo, (int)$_FILES['sub_doc_usd']['size']);
                 move_uploaded_file($_FILES['sub_doc_usd']['tmp_name'], $upload_dir . $fname);
                 $doc_usd = 'uploads/tenders/submissions/' . $fname;
                 registerFileInLibrary($pdo, $doc_usd, $_FILES['sub_doc_usd']['name'], $_FILES['sub_doc_usd']['size'], 'Tender Submission (USD) - Tender #' . $tender_id, 'tender,submission,usd', $user_id);
@@ -143,6 +145,7 @@ try {
                 $upload_dir = ROOT_DIR . '/uploads/tenders/evaluation/';
                 if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
                 $file_name = time() . '_' . $_FILES['post_qual_document']['name'];
+                assertUploadWithinQuota($pdo, (int)$_FILES['post_qual_document']['size']);
                 move_uploaded_file($_FILES['post_qual_document']['tmp_name'], $upload_dir . $file_name);
                 $file_path = 'uploads/tenders/evaluation/' . $file_name;
                 registerFileInLibrary($pdo, $file_path, $_FILES['post_qual_document']['name'], $_FILES['post_qual_document']['size'], 'Post-Qualification Document - Tender #' . $tender_id, 'tender,post-qualification', $user_id);
@@ -198,7 +201,7 @@ try {
                     $file_ext = pathinfo($_FILES['award_letter_document']['name'], PATHINFO_EXTENSION);
                     $file_name = 'award_' . $tender_id . '_' . time() . '.' . $file_ext;
                     $award_letter = 'uploads/tenders/awards/' . $file_name;
-                    
+                    assertUploadWithinQuota($pdo, (int)$_FILES['award_letter_document']['size']);
                     move_uploaded_file($_FILES['award_letter_document']['tmp_name'], $upload_dir . $file_name);
                     registerFileInLibrary($pdo, $award_letter, $_FILES['award_letter_document']['name'], $_FILES['award_letter_document']['size'], 'Award Letter - Tender #' . $tender_id, 'tender,award-letter', $user_id);
                 }

@@ -141,7 +141,7 @@ try {
         $ext = pathinfo($_FILES['logo']['name'], PATHINFO_EXTENSION);
         $filename = 'logo_' . $customerId . '_' . time() . '.' . $ext;
         $target_path = $upload_dir . $filename;
-        
+        assertUploadWithinQuota($pdo, (int)$_FILES['logo']['size']);
         if (move_uploaded_file($_FILES['logo']['tmp_name'], $target_path)) {
             $logo_path = 'uploads/parties/customers/' . $filename;
             $pdo->prepare("UPDATE customers SET logo_path = ? WHERE customer_id = ?")->execute([$logo_path, $customerId]);
