@@ -1,5 +1,42 @@
 # BMS Changelog
 
+## 2026-09-04 (feat) - Superadmin panel: shared header + real dashboard
+
+**Files (added):** `app/superadmin/dashboard.php`, `core/superadmin_ui.php`
+**Files (changed):** `app/superadmin/tenants.php`, `app/superadmin/features.php`, `app/superadmin/profile.php`, `app/superadmin/tenant_new.php`, `app/superadmin/tenant_view.php`, `app/superadmin/index.php`, `core/superadmin_auth.php`
+
+Every panel page repeated its own plain white toolbar - five near-identical copies already drifting
+from each other, nothing like the tenant-side `header.php`'s branded two-bar header. Extracted a
+shared `renderSuperadminHeader()` (`core/superadmin_ui.php`) matching that same look - blue branding
+bar, dark nav (Dashboard / Tenants / Modules / + New Company), avatar dropdown - and applied it to
+all six panel pages in one place instead of six.
+
+`index.php` redirected straight to the tenant list; there was no actual dashboard. Added
+`app/superadmin/dashboard.php` as the real landing page: fleet stat cards, a tenant-growth chart and
+a module-adoption chart (Chart.js, single-hue bars per the dataviz method - a status-mix doughnut was
+deliberately skipped, since four headline numbers belong in stat tiles, not a chart), a "System
+requires attention" feed, a Quick Actions grid, and Recent Platform Activity from the audit log.
+
+**The attention feed reads only the control database**, same invariant every other panel page holds
+(never opens a tenant's own database - `tenantUsageSnapshotFor()` stays a one-tenant, on-demand,
+explicit-click operation, never looped over the fleet). It surfaces: a tenant's migration still
+failing (filtered to migration files that still exist under `migrations/tenant/`, so a cleaned-up CLI
+test fixture never shows as permanent noise - checked directly against the live log, which currently
+holds dozens of throwaway `9999_99_99_p8*` rows from the migration-runner test suite, none of which
+now appear), recent provisioning failures, trials open 14+ days, tenants suspended 14+ days,
+deletions that left cleanup debris (`delete_partial`), and signup-throttling spikes. Each category is
+its own try/catch, so one missing/broken table costs only that category, never the page.
+
+**Added `dashboard` to `superadminRouteMap()`** so `/dashboard` resolves through the real router like
+every other panel route, and `saUrl('dashboard')` works both on and off the panel host.
+
+**Tests.** `test_superadmin_urls_cli.php` (66 assertions), `test_tenant_superadmin_auth_cli.php` (53),
+`test_superadmin_selfservice_cli.php` (52) all still pass unchanged - 171 total, 0 failures. A
+router-level smoke test (real `handleRoute()`, real session, real control-DB data) confirmed every
+route returns 200 with no PHP fatals/warnings/notices and the expected markup, then was deleted. Also
+rendered in a real browser to check the header, nav highlighting, both chart types, and both the
+"attention" and "all clear" states visually.
+
 ## 2026-09-04 (fix) - Phase 12 gap hunt: reactivating a user was a second, unguarded seat-limit bypass
 
 **Files (changed):** `ajax/toggle_user.php`, `tests/test_quota_enforcement_cli.php`, `tests/test_login_history_cli.php`, `ternant.md`
