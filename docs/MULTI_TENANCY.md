@@ -171,6 +171,91 @@ Turning it **off** is unsetting `TENANT_MODE` — no deploy required.
 
 ---
 
+## 7b. Feature entitlements — selling part of the platform
+
+*(ternant.md Phase 11. Ships inert: every feature is granted to every tenant until
+an operator switches something off, so nothing changed the day it merged.)*
+
+### The two axes, and why entitlement is checked first
+
+| Axis | Question | Where it lives | Who decides |
+|---|---|---|---|
+| **Entitlement** | Does this company's subscription include this module at all? | `bms_control` — `features`, `tenant_features` | The platform |
+| **Permission** | Which of the things this company HAS may this user touch? | The tenant's own DB — `role_permissions` | The tenant's own admin |
+
+Entitlement is evaluated **before every `isAdmin()` bypass**. This is not a style
+preference: `canView()` returns `true` immediately for a tenant administrator, so
+an entitlement checked after that line would gate nobody who matters. The data
+lives in the control database for the same reason — a flag the tenant can reach
+is not a flag, and Phase 9 already proved tenants cannot read it.
+
+**Off means off.** `VIEW`, `CREATE`, `EDIT`, `DELETE` and every workflow verb
+(`canSubmit`/`canApprove`/`canReject`) refuse together. There is no state in which
+a module is invisible but still writable.
+
+### Effective state
+
+> A feature is on for a tenant when `features.is_available = 1`
+> **AND** (that tenant's `tenant_features.is_enabled`, or `features.default_enabled`
+> when the tenant has no row).
+
+No row means "follow the default", so `setTenantFeatures()` **deletes** an override
+that merely restates the default instead of writing it. A tenant left alone keeps
+following the default if that default later changes; a redundant row would pin them
+forever.
+
+### The five enforcement layers
+
+| Layer | File | What it catches |
+|---|---|---|
+| 1 | `core/permissions.php` | The 129 `canView()` calls that build the nav, plus every page and API that calls any `canX()` — one edit, no per-page sweep |
+| 2 | `core/security_helpers.php` | `enforcePageOrAdmin()`, which has its own admin bypass |
+| 3 | `roots.php::handleRoute()` | Every clean URL, including a page that forgot its own `autoEnforcePermission()` call |
+| 4 | `core/tenant_bootstrap.php` | `api/`, `ajax/`, `actions/` — excluded from the router, so nothing else reaches them |
+| 5 | `sign_document.php` | The public, unauthenticated token link, which has no session to gate |
+
+Refusals are **404, never 403** — a 403 confirms the module exists and is merely
+switched off for you.
+
+### Adding a new switchable feature
+
+1. Add an entry to `bmsFeatureRegistry()` in `core/feature_registry.php` —
+   `label`, `description`, `default`, `sort_order`, `page_keys`, `paths`.
+2. Run `php scripts/setup_control_db.php` (idempotent; `INSERT IGNORE`, so an
+   operator's own `is_available`/`default_enabled` edits are never overwritten).
+3. Nothing else. No enforcement code changes — every layer reads the registry.
+
+**The registry is curated in code on purpose.** `permissions.module_name` looks
+like it would do the job and must not be used: it is a UI label for grouping
+checkboxes on `user_roles.php`, it is inconsistent (`Inventory` vs
+`Inventory & Products`), and it has no POS/Tenders/Warehouses/Projects split. A
+cosmetic rename must never silently change what is gated. The empty `modules`
+table is that same idea abandoned halfway; leave it alone.
+
+**⚠ Directory names lie.** `app/bms/pos/` holds 47 files of which only 5 are POS —
+the rest is the entire HR module. Declaring `app/bms/pos/` as the POS path would
+switch HR off with POS. `app/bms/operations/` mixes Projects with Assets;
+`app/bms/stock/` mixes Warehouses with always-on inventory. **Where a directory is
+mixed, list files, never the directory.**
+
+### What is never switchable
+
+Page keys absent from every registry entry are always reachable: `dashboard`,
+`customers`, `products`, all Finance, all Reports, CRM, Documents (except
+`e_signatures`), Settings and System Settings. A company must always be able to
+invoice, read its own ledger and administer its own staff, whatever it was sold.
+
+### Operating it
+
+`superadmin.<base>/tenant_view.php?id=N` → **Modules** for one company;
+`superadmin.<base>/features.php` for platform-wide availability and the
+new-tenant defaults. Every change is written to `tenant_admin_log`
+(`update_features` / `platform_feature`) with actor, tenant, module and direction.
+Changes take effect on that tenant's **next request** — the resolution is
+per-request, not cached in a session.
+
+---
+
 ## 8. The test suites, and what each is actually for
 
 ```bash
@@ -183,6 +268,9 @@ php tests/test_tenant_admin_panel_cli.php       # suspend/delete affect ONE tena
 php tests/test_tenant_migration_runner_cli.php  # per-tenant migrations + isolation of failures
 php tests/test_tenant_isolation_cli.php         # ← the isolation PROMISE. Re-run before every release.
 php tests/test_tenant_module_smoke_cli.php      # ← does the APP work inside a tenant database?
+php tests/test_feature_registry_cli.php         # the entitlement catalogue + resolution matrix
+php tests/test_feature_gating_cli.php           # ← the five enforcement layers, incl. against a tenant's OWN admin
+php tests/test_feature_panel_cli.php            # the superadmin control surface + its endpoints
 ```
 
 The last two carry the weight:

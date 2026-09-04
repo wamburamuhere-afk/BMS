@@ -19,9 +19,16 @@ $tenant = null;
 $log    = [];
 $error  = null;
 
+$features = [];
+
 try {
     $tenant = $id > 0 ? getTenant($id) : null;
-    if ($tenant) $log = tenantAdminLog($id, 50);
+    if ($tenant) {
+        $log = tenantAdminLog($id, 50);
+        // Which feature areas this company's subscription includes (Phase 11).
+        // Control-database only — still nothing here opens the tenant's own DB.
+        if ($tenant['status'] !== 'deleted') $features = tenantFeatureMatrix($id);
+    }
 } catch (Throwable $e) {
     error_log('superadmin tenant_view: ' . $e->getMessage());
     $error = 'The tenant registry could not be read.';
@@ -52,6 +59,8 @@ function svBadge(string $status): string
 <style>
     body { background: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     .page-header { position: sticky; top: 0; z-index: 1020; background: #fff; border-bottom: 1px solid #e9ecef; }
+    .feature-row { background: #e7f0ff; border: 1px solid #b6ccfe; }
+    .feature-row .form-check-input:disabled { opacity: .45; }
     .detail-card { border: 1px solid #b6ccfe; border-radius: 8px; }
     .detail-card .card-header { background: #e7f0ff; border-bottom: 1px solid #b6ccfe; font-weight: 600; }
     dt { font-weight: 500; color: #6c757d; font-size: .875rem; }
@@ -164,6 +173,69 @@ function svBadge(string $status): string
             </div>
         </div>
 
+        <?php if ($features): ?>
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span><i class="bi bi-grid text-primary me-1"></i> Modules</span>
+                    <button class="btn btn-sm btn-primary" onclick="saveFeatures()" id="btnSaveFeatures">
+                        <i class="bi bi-save me-1"></i> Save modules
+                    </button>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        What this company's subscription includes. Switching a module off hides it
+                        completely — from the menu, from direct links and from its API — for
+                        <strong>every user in this company, including their own administrator</strong>.
+                        Their data is never deleted; switching it back on restores access unchanged.
+                        No other tenant is affected.
+                    </p>
+
+                    <div class="row g-2">
+                    <?php foreach ($features as $f): ?>
+                        <div class="col-12 col-md-6">
+                            <div class="feature-row d-flex align-items-start gap-2 p-2 rounded">
+                                <div class="form-check form-switch mt-1">
+                                    <input class="form-check-input feature-switch" type="checkbox"
+                                           role="switch"
+                                           id="f_<?= safe_output($f['key'], '') ?>"
+                                           data-key="<?= safe_output($f['key'], '') ?>"
+                                           <?= $f['effective'] ? 'checked' : '' ?>
+                                           <?= $f['available'] ? '' : 'disabled' ?>>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <label class="form-check-label fw-semibold" for="f_<?= safe_output($f['key'], '') ?>">
+                                        <?= safe_output($f['label'], '') ?>
+                                    </label>
+                                    <div class="text-muted" style="font-size:.78rem">
+                                        <?= safe_output($f['description'] ?? '', '') ?>
+                                    </div>
+                                    <div style="font-size:.72rem">
+                                        <?php if (!$f['available']): ?>
+                                            <span class="badge" style="background:#6c757d;color:#fff">
+                                                <?= safe_output($f['reason'], '') ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="text-muted"><?= safe_output($f['reason'], '') ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                    </div>
+
+                    <div class="small text-muted mt-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        A module marked <em>Removed platform-wide</em> cannot be switched on here —
+                        change that on the <a href="features.php">Modules (platform)</a> page, which
+                        affects every tenant at once.
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <div class="col-12">
             <div class="card detail-card">
                 <div class="card-header"><i class="bi bi-clock-history text-primary me-1"></i> History</div>
@@ -224,6 +296,60 @@ function postAction(data, title, redirect) {
         let msg = 'Action failed.';
         try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
         Swal.fire({ icon: 'error', title: 'Error', text: msg });
+    });
+}
+
+function saveFeatures() {
+    // Every switch is posted, not just the changed ones, so an unchecked box
+    // arrives as an explicit 0 rather than simply being absent. Disabled
+    // switches (removed platform-wide) are posted as-is; the server ignores a
+    // request to enable something the platform has withdrawn.
+    const features = {};
+    document.querySelectorAll('.feature-switch').forEach(function (el) {
+        features[el.dataset.key] = el.checked ? 1 : 0;
+    });
+
+    const off = Array.from(document.querySelectorAll('.feature-switch'))
+        .filter(function (el) { return !el.checked && !el.disabled; })
+        .map(function (el) { return el.closest('.feature-row').querySelector('label').textContent.trim(); });
+
+    Swal.fire({
+        title: 'Save module access?',
+        html: off.length
+            ? 'These will be hidden from <strong>every user</strong> in this company, its own '
+              + 'administrator included:<br><br><strong>' + off.map(function (t) {
+                  return $('<div>').text(t).html();
+                }).join('<br>') + '</strong><br><br>No data is deleted.'
+            : 'This company will have access to every module.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#0d6efd',
+        confirmButtonText: 'Save'
+    }).then(function (r) {
+        if (!r.isConfirmed) return;
+
+        const btn  = $('#btnSaveFeatures');
+        const orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+
+        $.ajax({
+            url: '/actions/superadmin_tenant_features.php',
+            method: 'POST', dataType: 'json',
+            data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, features: features }
+        }).done(function (res) {
+            if (res && res.success) {
+                Swal.fire({ icon: 'success', title: 'Saved', text: res.message, timer: 2400, showConfirmButton: false });
+                setTimeout(function () { window.location.reload(); }, 2400);
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not save.' });
+            }
+        }).fail(function (xhr) {
+            let msg = 'Could not save.';
+            try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+            Swal.fire({ icon: 'error', title: 'Error', text: msg });
+        }).always(function () {
+            btn.prop('disabled', false).html(orig);
+        });
     });
 }
 

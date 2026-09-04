@@ -68,6 +68,7 @@ function saBadge(string $status): string
         </div>
     </div>
     <div class="d-flex gap-2">
+        <a href="features.php" class="btn btn-sm btn-outline-primary"><i class="bi bi-grid me-1"></i> Modules</a>
         <a href="profile.php" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-gear me-1"></i> My Account</a>
         <a href="logout.php" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
     </div>

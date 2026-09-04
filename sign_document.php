@@ -13,6 +13,15 @@
  */
 require_once __DIR__ . '/roots.php';
 
+// Feature gate (ternant.md Phase 11, layer 5). Explicit here because this page
+// is the one door no session-based check can guard: an external signer arrives
+// with no login at all, so nothing above ever calls canView() for them. If the
+// tenant's plan does not include e-signatures, the emailed link must be a dead
+// end — 404, revealing nothing about whether the document exists.
+if (function_exists('tenantFeatureEnabled') && !tenantFeatureEnabled('esignature')) {
+    bmsFeatureHalt('esignature');
+}
+
 $token = trim((string)($_GET['token'] ?? ''));
 $state = 'invalid'; // invalid | already_signed | ready
 $signature = null;

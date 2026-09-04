@@ -85,6 +85,15 @@ if (!function_exists('enforcePageOrAdmin')) {
      */
     function enforcePageOrAdmin(string $pageKey): void
     {
+        // Entitlement is checked BEFORE the admin bypass below (ternant.md
+        // Phase 11). The bypass on the next line is exactly why: a tenant's own
+        // administrator would otherwise walk straight into a module the platform
+        // never granted their company. 404 rather than 403 — see bmsFeatureHalt().
+        if (function_exists('tenantModuleAllowsPage') && !tenantModuleAllowsPage($pageKey)) {
+            $owners = function_exists('featureForPageKey') ? featureForPageKey($pageKey) : [];
+            bmsFeatureHalt($owners[0] ?? $pageKey);
+        }
+
         // Admin bypass — never changes, even if the DB row is missing.
         if (function_exists('isAdmin') && isAdmin()) return;
 

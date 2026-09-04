@@ -1,3 +1,12 @@
+> **Superseded 2026-09-03.** This research is now folded into `ternant.md`
+> **Phase 11 — Tenant Feature / Module Entitlements**, after re-verifying every
+> finding against the code as it stood that day (one, #3, was found stale —
+> `pos.php` already enforces its own permission), and extending the registry
+> with `tenders`, `warehouses`, `procurement` and `sales` as independently
+> grantable features per an explicit follow-up request. Track and update
+> `ternant.md` going forward — not this file, so the plan doesn't fork in two
+> directions. Kept here for the original investigation's detail and reasoning.
+
 # BMS — Superadmin Control Plane: Implementation Plan (2026-09-02)
 
 **Goal.** Give the platform superadmin real operational control, not partial:
