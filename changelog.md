@@ -1,5 +1,61 @@
 # BMS Changelog
 
+## 2026-09-03 (feat) — Phase 11.A: per-tenant feature entitlements, data layer only
+
+**Files (added):** `core/feature_registry.php`, `tests/test_feature_registry_cli.php`
+**Files (changed):** `scripts/setup_control_db.php`, `core/tenant_bootstrap.php`, `ternant.md`, `superadmin_control_plan.md`
+
+First slice of `ternant.md` Phase 11 — letting the superadmin grant or revoke whole feature
+areas (POS, Projects, Tenders, Warehouses, Procurement, Sales, HR, Assets, AI Assistant,
+E-Signatures) per tenant. **This slice enforces nothing**: it ships the catalogue, the per-request
+resolution and the public API, and is read by no gate yet. Phase 11.B is where
+`canView()/canCreate()/canEdit()/canDelete()` start calling it, ahead of their `isAdmin()` bypass.
+
+Two control tables in `bms_control` (created by `scripts/setup_control_db.php`, never a
+`migrations/` file — platform infrastructure must never be able to veto a release, conventions
+§10): `features` (the platform-wide catalogue, `is_available` + `default_enabled`) and
+`tenant_features` (per-tenant override; **no row means "use the default"**, which is why
+provisioning needed no change at all — a new company inherits the defaults by having nothing
+written for it). Entitlements live in the control DB and not in any tenant database because a
+tenant's own admin bypasses that database's permission system entirely via `isAdmin()`; a flag the
+tenant can flip is not a flag.
+
+`core/tenant_bootstrap.php` resolves the effective set once per request, the moment the tenant row
+is resolved, on the control connection already open — then every later check is an array lookup.
+It **fails open**: if the control tables are missing or briefly unreachable, every feature reports
+enabled, because locking every tenant out of every module over an infrastructure hiccup is far
+worse than briefly serving a module someone had switched off.
+
+**A landmine caught before it shipped.** The earlier draft plan proposed gating POS by the path
+`app/bms/pos/`. That directory holds **47 files of which only 5 are POS** — the rest is the entire
+HR module (payroll, employees, leaves, org chart, recruitment). Using it would have switched **HR
+off whenever POS was switched off**. `app/bms/operations/` mixes Projects with Assets and
+`app/bms/stock/` mixes Warehouses with always-on inventory the same way. The registry now lists
+files where a directory is mixed, states the rule in its own docblock, and a test asserts
+`app/bms/pos/payroll.php` is not owned by `pos`.
+
+The registry is curated in code, deliberately **not** derived from `permissions.module_name`: that
+column is a human-facing label for grouping checkboxes on `user_roles.php`, it is inconsistent
+(`Inventory` vs `Inventory & Products`, `Settings` vs `System Settings`) and has no POS / Tenders /
+Warehouses / Projects split. A cosmetic rename must never silently change what is gated.
+
+**Tests (61 assertions).** Every registry `page_key` is checked to exist in the real `permissions`
+table (156 rows) — a registry naming a key that does not exist would gate nothing, silently. Covers
+the full resolution matrix, the OR rule for `dn` (owned by both Sales and Procurement), the
+always-on base set (dashboard, customers, invoices, ledger, users, roles), and fail-open behaviour.
+Verified additionally on the **real request path**: a simulated request to
+`relivertec.dev.bms.local` resolved tenant 85 onto `bms_t85` and primed all 10 entitlements ON;
+one `pos` override then turned POS off for that tenant while HR stayed on and tenant 86 was
+completely unaffected. The temporary override was removed — neither live tenant carries any
+entitlement row, so this ships with **zero behaviour change** until someone deliberately switches
+something off.
+
+**Deviation from the plan, stated plainly:** the draft claimed entitlements could ride the tenant
+row for "zero additional queries per request". They cannot — `resolveTenantFromRequest()` returns
+one row and joining ten feature rows onto it would change that function's shape for every caller.
+It is **one** small indexed read of a ten-row table per tenant request instead, and the acceptance
+gate was corrected to say so rather than the number being quietly missed.
+
 ## 2026-09-03 (fix) — Company Profile now starts filled in with what was typed at registration
 
 **Files (changed):** `register.php`, `actions/register_tenant.php`, `core/tenant_registration.php`, `core/tenant_provisioner.php`, `tests/test_tenant_provisioning_cli.php`
