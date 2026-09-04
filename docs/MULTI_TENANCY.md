@@ -256,6 +256,105 @@ per-request, not cached in a session.
 
 ---
 
+## 7c. Usage quotas — capping seats and storage
+
+*(ternant.md Phase 12. Ships inert: `NULL` = unlimited, and every tenant is
+unlimited until an operator sets a real number, so nothing changed the day it
+merged.)*
+
+### The two numbers
+
+Two nullable columns on `tenants` (control DB): `max_users`, `max_storage_mb`.
+`NULL` means unlimited — never a magic `-1`. Not a `features`/`tenant_features`-
+shaped pair of tables: a quota isn't an open-ended catalogue of independent
+toggles, it's two numbers per tenant, so it gets two columns.
+
+No plumbing was needed to reach them from a request: `tenant_resolver.php`
+already runs `SELECT * FROM tenants`, so both columns arrive inside
+`bmsCurrentTenant()` the moment they exist in the schema.
+
+### Why storage is measured live, not with a running counter
+
+An upload attempt is rare — nothing like a per-request cost — so recomputing
+the total on the spot is cheap enough to not matter. A live sum can never
+drift out of sync; a maintained counter can, silently, the day one of the
+50+ upload call sites forgets to update it. Correctness was chosen over a
+speed nobody needs here.
+
+The sum is **17 independent queries**, one per table, each in its own
+`try`/`catch` — not one `UNION ALL`. A unioned statement fails as a single
+unit the moment any member table has a problem; independent queries are the
+only way "a table that's later dropped or renamed degrades to zero" is
+actually true, rather than taking the whole total down with it.
+
+### The 17 tables
+
+`core/tenant_quotas.php`'s `TENANT_STORAGE_TABLES()` — confirmed by parsing
+every `CREATE TABLE` in `schema/tenant_schema_template.sql` for a genuine
+`file_size` column, not by name-matching "attachment"/"document":
+
+```
+documents, employee_documents, purchase_order_attachments, rfq_attachments,
+do_attachments, delivery_attachments, sales_return_attachments,
+credit_note_attachments, debit_note_attachments, customer_lpo_attachments,
+purchase_receipt_attachments, collateral_attachments, compliance_documents,
+inspection_attachments, loan_documents, payment_attachments,
+project_progress_report_attachments, customer_attachments, document_templates,
+project_scope_documents, user_signatures, compliance_records
+```
+
+**Adding a new table that stores files?** Give it a `file_size INT` column at
+build time (`.claude/security.md` §19 already requires this for every upload)
+and add its name to `TENANT_STORAGE_TABLES()` in the same PR — reviewable in a
+diff, the same discipline as the feature registry's `page_keys`.
+
+### Enforcement — two real choke points, found by reading the code, not guessed
+
+- **Seats**: exactly one place ever creates a staff account —
+  `app/constant/settings/add_user.php`. The check sits inside its existing
+  validation block, counting only `is_active = 1` users — `users.php`'s
+  existing activate/deactivate toggle is the "free a seat" release valve.
+- **Storage**: there is no shared upload function in BMS to hook into — every
+  one of **56 files** (49 under `api/`, 7 under `app/`) re-implements
+  `.claude/security.md` §19's 5-step pattern independently. `roots.php` gained
+  one `require_once core/tenant_quotas.php`, so all 56 got
+  `assertUploadWithinQuota()` for free and needed only their one-line call —
+  the same choke-point principle §7b used for `canView()`, applied to a
+  codebase area that had no existing choke point to extend.
+
+Four handlers are deliberately excluded, by name, in
+`tests/test_quota_enforcement_cli.php` (which also runs a permanent automated
+scan proving every *other* `move_uploaded_file()` call is guarded):
+`api/backup_actions.php`'s restore path (blocking disaster recovery over a
+quota would cause real harm) and three overwritten branding/avatar singletons
+(`system_settings.php`, `company_profile.php`, `profile.php`) that don't
+accumulate the way business records do.
+
+### Checking current usage — the one narrow exception to a stated invariant
+
+`app/superadmin/tenant_view.php`'s own docblock promises it never opens a
+tenant's own database. Current usage exists *only* inside that database — the
+whole premise of database-per-tenant — so showing it needs one deliberate,
+narrow exception: `tenantUsageSnapshotFor()` (`core/tenant_quotas.php`)
+returns exactly two integers, never a row or any business content; reached
+only via the "Check current usage" button — never automatically on page
+load — through its own separate endpoint
+(`actions/superadmin_tenant_usage.php`), kept apart from the limits-writing
+one so the single code path that crosses this boundary stays easy to find and
+audit. `tenant_view.php` itself still never connects to a tenant's own
+database — the promise is unbroken; one clearly-labelled neighbour does the
+one necessary crossing.
+
+### Operating it
+
+`superadmin.<base>/tenants/view?id=N` → **Usage & Limits**: set
+`max_users`/`max_storage_mb` (blank = unlimited), or click **Check current
+usage** for the live count/sum. Every limit change is written to
+`tenant_admin_log` (`update_quotas`) with the old value, the new value and the
+actor. Takes effect on that tenant's **next request**, same as entitlements.
+
+---
+
 ## 8. The test suites, and what each is actually for
 
 ```bash
@@ -271,6 +370,10 @@ php tests/test_tenant_module_smoke_cli.php      # ← does the APP work inside a
 php tests/test_feature_registry_cli.php         # the entitlement catalogue + resolution matrix
 php tests/test_feature_gating_cli.php           # ← the five enforcement layers, incl. against a tenant's OWN admin
 php tests/test_feature_panel_cli.php            # the superadmin control surface + its endpoints
+php tests/test_superadmin_urls_cli.php          # the panel's short URLs, and that a tenant host is never hijacked
+php tests/test_tenant_quotas_cli.php            # quota schema, resolution, the 5-table undercount fix
+php tests/test_quota_enforcement_cli.php        # ← add_user.php + all 56 upload handlers, permanently audited
+php tests/test_quota_panel_cli.php              # the usage/limits panel + the narrow database-crossing exception
 ```
 
 The last two carry the weight:

@@ -872,6 +872,24 @@ unlimited after; no orphaned test tenants.
 - New short section in `docs/MULTI_TENANCY.md`, matching §7b's structure: the two numbers, why storage is measured live rather than cached, the 17-table list, and how to add a new file-storing table to it (the same "reviewed in a PR diff" discipline as the feature registry).
 - Changelog entry once 12.A-12.D are merged.
 
+Met 2026-09-04. `docs/MULTI_TENANCY.md` gained section 7c covering all of it: the two columns, why
+storage is a live sum of 17 independent queries rather than a maintained counter, the exact table
+list with instructions for adding a new one, the two enforcement choke points, the four named
+exclusions, and the narrow database-crossing exception for checking current usage — with a pointer to
+the test that proves it stays narrow. The three new suites are listed alongside the existing ones.
+
+**Full and final regression, every suite in this phase and Phase 11 run clean in one consolidated
+pass: 796 assertions across 17 suites, 0 failures** — feature registry 61, gating 43, panel 49,
+superadmin URLs 63, tenant quotas 28, quota enforcement 16, quota panel 34, tenant routing 57, tenant
+admin panel 51, superadmin auth 53, tenant isolation 48, tenant module smoke 62, CSRF redeclaration
+10, tenant control DB 59, tenant provisioning 72, tenant registration 54, tenant migration runner 36
+(the last one exercises 12.A's own backfill migration through the real runner, not just directly).
+No orphaned test tenants; both live tenants confirmed `max_users`/`max_storage_mb` still `NULL`,
+0 features removed platform-wide, 0 `tenant_features` override rows — Phases 11 and 12 together ship
+with **zero behaviour change** for either real tenant until an operator deliberately configures one.
+
+Phase 12 complete.
+
 **Rollback:** Standard `git revert`; documentation + test additions carry no runtime risk.
 
 ---
@@ -911,4 +929,4 @@ Update this table the moment each phase merges — this is what lets any session
 | 12.A — Quota Schema, Resolution & Undercount Fix | ✅ done (2026-09-04) — 28 assertions green; verified against a real provisioned tenant with a real file on disk | `feat/tenant-12a-quota-schema` |
 | 12.B — Enforcement (add_user.php + 56 upload handlers) | ✅ done (2026-09-04) — 16 new assertions + full regression clean; every guarded call site verified by an automated audit | `feat/tenant-12b-quota-enforcement` |
 | 12.C — Superadmin Usage & Limits UI | ✅ done (2026-09-04) — 34 assertions green; the database-crossing exception proven narrow, not just present | `feat/tenant-12c-quota-ui` |
-| 12.D — Tests, Docs, Regression | ⏳ pending | `feat/tenant-12d-quota-tests-docs` |
+| 12.D — Tests, Docs, Regression | ✅ done (2026-09-04) — 796 assertions across 17 suites in one final consolidated pass, 0 failures | `feat/tenant-12d-quota-tests-docs` |

@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-09-04 (docs) - Phase 12.D: docs, final consolidated regression — Phase 12 complete
+
+**Files (changed):** `docs/MULTI_TENANCY.md`, `ternant.md`
+
+Closes Phase 12.
+
+`docs/MULTI_TENANCY.md` gained section 7c: the two quota columns, why storage is a live sum of 17
+independent queries rather than a maintained counter, the exact table list with instructions for
+adding a new one in the same PR, the two enforcement choke points (`add_user.php`; `roots.php`'s one
+`require_once` giving all 56 upload handlers `assertUploadWithinQuota()` for free), the four named
+exclusions, and the narrow database-crossing exception for checking current usage with a pointer to
+the test that proves it stays narrow. The three new suites are listed alongside the existing ones.
+
+**Full and final regression, every suite from this phase and Phase 11 run clean in one consolidated
+pass: 796 assertions across 17 suites, 0 failures.** No orphaned test tenants; both live tenants
+(`relivertec`, `mufindipower`) confirmed `max_users`/`max_storage_mb` still `NULL`, 0 features removed
+platform-wide, 0 `tenant_features` override rows — Phases 11 and 12 together ship with zero behaviour
+change for either real tenant until an operator deliberately configures one.
+
 ## 2026-09-04 (feat) - Phase 12.C: superadmin panel for setting quotas and checking usage
 
 **Files (added):** `actions/superadmin_tenant_quotas.php`, `actions/superadmin_tenant_usage.php`, `tests/test_quota_panel_cli.php`
