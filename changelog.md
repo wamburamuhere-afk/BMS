@@ -1,5 +1,58 @@
 # BMS Changelog
 
+## 2026-09-04 (fix) - Superadmin panel: readable URLs, and it no longer breaks before setup
+
+**Files (added):** `tests/test_superadmin_urls_cli.php`
+**Files (changed):** `core/superadmin_auth.php`, `roots.php`, `core/feature_registry.php`, `app/superadmin/*.php`
+
+Two problems, both reported from the live demo.
+
+### 1. "The module catalogue could not be read." - and a page that broke with it
+
+Phase 11 shipped code that reads two new control-database tables. The control database is created
+by an **operator step**, never by a deploy migration (a control-DB migration once halted an entire
+release on a host whose app user lacks `CREATE`), so those tables do not exist on a host until
+`php scripts/setup_control_db.php` is re-run there. Demo had the code and not the tables.
+
+`features.php` reported that as a generic failure the operator could not act on. Worse, and not
+reported yet: **`tenant_view.php` read the entitlement matrix inside the same `try` that loads the
+tenant**, so the missing table took down the whole page - identity, Lifecycle, Suspend/Activate/
+Delete, History - behind "The tenant registry could not be read." A module panel that cannot load
+must cost the operator the module panel and nothing else; entitlements are now read in their own
+block, and both pages show what to run instead of an error. New `featureTablesReady()` tells the
+two states apart. The application itself was never affected: `bmsPrimeTenantFeatures()` already
+fails open, so a host without the tables simply grants every module.
+
+### 2. The panel's URLs leaked the repository layout
+
+`superadmin.demo.…/app/superadmin/tenants` is now `superadmin.demo.…/tenants`, and likewise
+`/features`, `/profile`, `/tenants/new`, `/tenants/view?id=N`, `/login`, `/logout`. The panel owns
+its own hostname, so it can own that hostname's root.
+
+Uses the app's existing mechanism rather than a new one: `.htaccess` already routes everything
+through `handleRoute()`, so the panel gets a small route map resolved there. It is **host-scoped**,
+which is not incidental - `$routes` already maps `profile`, `login` and `logout` to TENANT pages,
+and claiming those words globally would have replaced every company's own profile page with the
+platform panel. They resolve only on the superadmin hostname, which no tenant can reach. The legacy
+`/app/superadmin/...` path now 301s to the short form, so the old address stops appearing in the
+address bar. `saUrl()` returns the short URL on the panel host and the literal file path anywhere
+else, so single-tenant and local installs are unchanged.
+
+The redirect **target** is computed by `superadminShortUrlFor()` rather than inline, because a CLI
+test can observe a 301 status but not the `Location` header - leaving it inline would have left the
+important half of that redirect untested.
+
+The public company-registration form needed no change: `/register` was already short.
+
+**Tests (63 assertions)** in `tests/test_superadmin_urls_cli.php`: the map covers every panel page
+in both directions, every short URL resolves through the real `handleRoute()`, every rendered page
+links short, the legacy path 301s to the right target, no panel file emits a hardcoded `*.php`
+href - and, the assertion that matters most, a **tenant host is not hijacked**: `/profile` there is
+still that company's own page and `/tenants` is not a route at all.
+
+Regression: feature registry 61, gating 43, panel 49, tenant routing 57, admin panel 51, superadmin
+auth 53 - all 0 failures.
+
 ## 2026-09-04 (fix) - Phase 11 follow-up: the feature gate missed api/ on subdirectory installs
 
 **Files (changed):** `core/feature_registry.php`, `tests/test_feature_gating_cli.php`

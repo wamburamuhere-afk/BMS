@@ -46,9 +46,9 @@ $base = function_exists('tenantBaseDomain') ? (tenantBaseDomain() ?? '') : '';
         </div>
     </div>
     <div class="d-flex gap-2">
-        <a href="tenants.php" class="btn btn-sm btn-outline-primary"><i class="bi bi-building me-1"></i> Tenants</a>
-        <a href="profile.php" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-gear me-1"></i> My Account</a>
-        <a href="logout.php" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
+        <a href="<?= saUrl('tenants') ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-building me-1"></i> Tenants</a>
+        <a href="<?= saUrl('profile') ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-gear me-1"></i> My Account</a>
+        <a href="<?= saUrl('logout') ?>" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
     </div>
 </div>
 
@@ -130,7 +130,7 @@ $base = function_exists('tenantBaseDomain') ? (tenantBaseDomain() ?? '') : '';
                             <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-check-circle me-1"></i> Create company
                             </button>
-                            <a href="tenants.php" class="btn btn-secondary">Cancel</a>
+                            <a href="<?= saUrl('tenants') ?>" class="btn btn-secondary">Cancel</a>
                         </div>
                     </form>
 
@@ -207,7 +207,7 @@ $('#newTenantForm').on('submit', function (e) {
                            + $('<div>').text(url).html() + '</a>' : ''),
                 confirmButtonColor: '#0d6efd',
                 confirmButtonText: 'Back to tenants'
-            }).then(function () { window.location.href = 'tenants.php'; });
+            }).then(function () { window.location.href = '<?= saUrl('tenants') ?>'; });
         } else {
             Swal.fire({ icon: 'error', title: 'Could not create the company',
                         text: (res && res.message) || 'Something went wrong.' });
