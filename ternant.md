@@ -658,7 +658,22 @@ shipped as green assertions that tested nothing.
 - Extend `tests/test_tenant_module_smoke_cli.php` (Phase 10) to run once with every feature on (today's behaviour, unchanged) and once with a deliberately mixed set (e.g. only `warehouses` + `sales` + `procurement`, everything else off) — proving the fresh-tenant baseline still fully works either way.
 - Extend `app/constant/settings/user_roles.php`'s permission grid (line 229's `permissions` query) to exclude page_keys whose owning feature(s) are all disabled for the current tenant — so a tenant's own Admin never sees, and can never grant a staff member, a permission checkbox for a module their subscription doesn't include. This was flagged directly in conversation as the concrete symptom of *not* doing this: an Admin grants "Tenders" to staff, the checkbox exists, the staff member still hits Unauthorized — confusing, not a security hole, but sloppy.
 - New section in `docs/MULTI_TENANCY.md`: the entitlement model, the registry format, how to add a new feature key, and the five enforcement layers with a one-line "what it catches" each.
-- Consolidated changelog entry per this repo's standing rule, once 11.A–11.D are all merged.
+- Consolidated changelog entry per this repo's standing rule, once 11.A-11.D are all merged.
+
+Met 2026-09-03. `tests/test_tenant_module_smoke_cli.php` went from 43 to **62 assertions**:
+a freshly provisioned tenant is now also driven under a deliberately restricted subscription
+(`warehouses` + `sales` + `procurement` only, everything else revoked) and proves it is still a
+working system - granted modules reachable, ungranted ones not, and every base capability
+(`dashboard`, `invoices`, `customers`, `chart_of_accounts`, `trial_balance`, `balance_sheet`,
+`users`, `user_roles`) intact, with the Trial Balance and Balance Sheet still running and
+reconciling. `user_roles.php` now filters its permission grid through the same gate, with the
+two counters above it corrected to match what is actually assignable, so an admin can no longer
+tick a permission for a module their plan does not include and leave a staff member walking into
+a 404. `docs/MULTI_TENANCY.md` gained section 7b covering both axes, the effective-state rule,
+the five layers, how to add a feature, the mixed-directory trap and how to operate the panel.
+
+Final state after the full run: **0 `tenant_features` rows, 0 features removed platform-wide** -
+the feature ships inert, exactly as intended.
 
 **Rollback:** Standard `git revert`; documentation + test additions carry no runtime risk.
 
@@ -695,4 +710,4 @@ Update this table the moment each phase merges — this is what lets any session
 | 11.A — Feature Registry & Control-DB Schema | ✅ done (2026-09-03) — 61 assertions green; verified on the real request path against two live tenants | `feat/tenant-11a-feature-registry` |
 | 11.B — Enforcement (5 layers) | ✅ done (2026-09-03) — 39 assertions green + 6 regression suites clean; verified against two live tenants | `feat/tenant-11b-enforcement` |
 | 11.C - Superadmin Feature-Control UI | done (2026-09-03) - 49 assertions green; both pages rendered and verified, not just linted | `feat/tenant-11c-control-ui` |
-| 11.D — Tests, Docs, Regression | ⏳ pending | `feat/tenant-11d-tests-docs` |
+| 11.D - Tests, Docs, Regression | done (2026-09-03) - smoke suite 43 -> 62 assertions; role grid filtered; docs section 7b | `feat/tenant-11d-tests-docs` |

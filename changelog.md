@@ -1,5 +1,40 @@
 # BMS Changelog
 
+## 2026-09-03 (feat) - Phase 11.D: restricted-plan regression, role-grid filtering, docs
+
+**Files (changed):** `app/constant/settings/user_roles.php`, `tests/test_tenant_module_smoke_cli.php`, `docs/MULTI_TENANCY.md`, `ternant.md`
+
+Closes Phase 11.
+
+**The role screen no longer offers what the plan does not include.** `user_roles.php` built its
+permission grid from every non-hidden row in `permissions`, so an administrator of a company
+without Tenders still saw - and could tick - "Tenders: View/Create/Edit/Delete" for a staff member
+who would then walk straight into a 404. Not a security hole (`canView()` refuses either way), but
+a confusing one that generates support tickets. The grid now runs through the same
+`tenantModuleAllowsPage()` gate as everything else, and the two counters above it report what is
+actually assignable rather than the raw catalogue totals. Single-tenant installs see no change -
+the gate returns true for every page when no tenant is resolved.
+
+**The Phase 10 smoke suite now covers the other half of the story: 43 -> 62 assertions.** It
+already proved a freshly provisioned tenant works with everything granted, which is the state every
+tenant is in today. It now also drives that same fresh tenant under a deliberately restricted
+subscription - `warehouses` + `sales` + `procurement` only - and proves the result is a working
+system rather than a half-broken one: granted modules reachable, ungranted ones refused, every base
+capability (`dashboard`, `invoices`, `customers`, `chart_of_accounts`, `trial_balance`,
+`balance_sheet`, `users`, `user_roles`) intact, the Trial Balance and Balance Sheet still running
+and reconciling, and the role grid offering exactly what was sold.
+
+**`docs/MULTI_TENANCY.md` gained section 7b**: the two axes and why entitlement is checked before
+every `isAdmin()` bypass, the effective-state rule in one sentence, why an override equal to the
+default is deleted rather than written, the five enforcement layers, how to add a new feature
+(registry entry + re-run the setup script; no enforcement code changes), what is never switchable,
+the mixed-directory trap, and how to operate the panel. The three new suites are listed alongside
+the existing ones.
+
+Phase 11 complete. Final state: **0 `tenant_features` rows and 0 features removed platform-wide**,
+so the whole feature ships inert - every tenant keeps exactly the access it has today until an
+operator deliberately switches something off.
+
 ## 2026-09-03 (feat) - Phase 11.C: superadmin panel for granting and revoking modules
 
 **Files (added):** `app/superadmin/features.php`, `actions/superadmin_tenant_features.php`, `actions/superadmin_platform_features.php`, `tests/test_feature_panel_cli.php`

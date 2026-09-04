@@ -234,6 +234,18 @@ $permissions_stmt = $pdo->query("
 ");
 $permissions = $permissions_stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Drop permissions for modules this company's subscription does not include
+// (ternant.md Phase 11). Without this, an administrator would still see — and be
+// able to tick — "Tenders: View/Create/Edit/Delete" for a module the platform has
+// not granted them, and the staff member they granted it to would then walk into
+// a 404. Not a security hole (canView() refuses either way), but a confusing one
+// that generates support tickets. tenantModuleAllowsPage() returns true for every
+// page when no tenant is resolved, so single-tenant installs see no change.
+$permissions = array_values(array_filter($permissions, static function (array $p): bool {
+    return !function_exists('tenantModuleAllowsPage')
+        || tenantModuleAllowsPage((string)$p['page_key']);
+}));
+
 // Group permissions by module
 $permissions_by_module = [];
 foreach ($permissions as $permission) {
@@ -263,6 +275,12 @@ $stats_stmt = $pdo->query("
         (SELECT COUNT(DISTINCT module_name) FROM permissions) as total_modules
 ");
 $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
+
+// The two counters above are raw catalogue totals; report what this company can
+// actually assign instead, so the number on screen matches the checkboxes below
+// it once entitlement filtering has removed a module.
+$stats['total_permissions'] = count($permissions);
+$stats['total_modules']     = count($permissions_by_module);
 
 // Helper function for role badge colors
 function getRoleBadgeColor($role_name) {
