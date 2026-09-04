@@ -319,6 +319,7 @@ if (!function_exists('superadminRouteMap')) {
         $d = dirname(__DIR__) . '/app/superadmin/';
         return [
             ''             => $d . 'index.php',
+            'dashboard'    => $d . 'dashboard.php',
             'tenants'      => $d . 'tenants.php',
             'tenants/new'  => $d . 'tenant_new.php',
             'tenants/view' => $d . 'tenant_view.php',

@@ -11,6 +11,7 @@
  * is a login credential here, so changing it is a credential change.
  */
 require_once __DIR__ . '/../../core/tenant_admin.php';
+require_once __DIR__ . '/../../core/superadmin_ui.php';
 require_once __DIR__ . '/../../helpers.php';
 
 requireSuperadmin();
@@ -28,26 +29,13 @@ $me = currentSuperadmin();
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <style>
     body { background: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    .page-header { position: sticky; top: 0; z-index: 1020; background: #fff; border-bottom: 1px solid #e9ecef; }
     .panel-card { border: 1px solid #b6ccfe; border-radius: 8px; }
     .panel-card .card-header { background: #e7f0ff; border-bottom: 1px solid #b6ccfe; font-weight: 600; }
 </style>
 </head>
 <body>
 
-<div class="page-header px-3 py-2 d-flex align-items-center justify-content-between">
-    <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-shield-lock-fill text-primary fs-4"></i>
-        <div>
-            <div class="fw-bold">Platform Administration</div>
-            <small class="text-muted">Signed in as <?= safe_output($me['name'] ?? '', '') ?></small>
-        </div>
-    </div>
-    <div class="d-flex gap-2">
-        <a href="<?= saUrl('tenants') ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-building me-1"></i> Tenants</a>
-        <a href="<?= saUrl('logout') ?>" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
-    </div>
-</div>
+<?php renderSuperadminHeader('profile', $me); ?>
 
 <div class="container-fluid p-3">
     <h6 class="mb-3"><i class="bi bi-person-gear text-primary me-1"></i> My Account</h6>

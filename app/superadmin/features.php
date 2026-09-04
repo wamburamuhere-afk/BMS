@@ -16,6 +16,7 @@
  * tenant's own database.
  */
 require_once __DIR__ . '/../../core/tenant_admin.php';
+require_once __DIR__ . '/../../core/superadmin_ui.php';
 require_once __DIR__ . '/../../helpers.php';
 
 requireSuperadmin();
@@ -52,7 +53,6 @@ try {
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <style>
     body { background: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    .page-header { position: sticky; top: 0; z-index: 1020; background: #fff; border-bottom: 1px solid #e9ecef; }
     .detail-card { border: 1px solid #b6ccfe; border-radius: 8px; }
     .detail-card .card-header { background: #e7f0ff; border-bottom: 1px solid #b6ccfe; font-weight: 600; }
     @media (max-width: 767px) { #tableWrap { display: none; } }
@@ -61,21 +61,13 @@ try {
 </head>
 <body>
 
-<div class="page-header px-3 py-2 d-flex align-items-center justify-content-between">
-    <div class="d-flex align-items-center gap-2">
-        <a href="<?= saUrl('tenants') ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-left"></i></a>
-        <div>
-            <div class="fw-bold">Modules (platform-wide)</div>
-            <small class="text-muted">Signed in as <?= safe_output($me['name'] ?? '', '') ?></small>
-        </div>
-    </div>
-    <div class="d-flex gap-2">
-        <a href="<?= saUrl('profile') ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-gear me-1"></i> My Account</a>
-        <a href="<?= saUrl('logout') ?>" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
-    </div>
-</div>
+<?php renderSuperadminHeader('features', $me); ?>
 
 <div class="container-fluid p-3">
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <a href="<?= saUrl('tenants') ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-left"></i></a>
+        <h5 class="mb-0 fw-bold"><i class="bi bi-grid text-primary me-1"></i> Modules <span class="text-muted small fw-normal">— platform-wide</span></h5>
+    </div>
 
 <?php if ($error): ?>
     <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i><?= safe_output($error, '') ?></div>

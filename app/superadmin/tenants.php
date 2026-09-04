@@ -7,6 +7,7 @@
  * not look inside them.
  */
 require_once __DIR__ . '/../../core/tenant_admin.php';
+require_once __DIR__ . '/../../core/superadmin_ui.php';
 require_once __DIR__ . '/../../helpers.php';
 
 requireSuperadmin();
@@ -50,7 +51,6 @@ function saBadge(string $status): string
 <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
 <style>
     body { background: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    .page-header { position: sticky; top: 0; z-index: 1020; background: #fff; border-bottom: 1px solid #e9ecef; }
     .stat-card { background: #e7f0ff; border: 1px solid #b6ccfe; border-radius: 8px; }
     .stat-card .value { font-size: 1.75rem; font-weight: 600; }
     @media (max-width: 767px) { #tableWrap { display: none; } }
@@ -59,20 +59,7 @@ function saBadge(string $status): string
 </head>
 <body>
 
-<div class="page-header px-3 py-2 d-flex align-items-center justify-content-between">
-    <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-shield-lock-fill text-primary fs-4"></i>
-        <div>
-            <div class="fw-bold">Platform Administration</div>
-            <small class="text-muted">Signed in as <?= safe_output($me['name'] ?? '', '') ?></small>
-        </div>
-    </div>
-    <div class="d-flex gap-2">
-        <a href="<?= saUrl('features') ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-grid me-1"></i> Modules</a>
-        <a href="<?= saUrl('profile') ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-gear me-1"></i> My Account</a>
-        <a href="<?= saUrl('logout') ?>" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
-    </div>
-</div>
+<?php renderSuperadminHeader('tenants', $me); ?>
 
 <div class="container-fluid p-3">
 
