@@ -3,8 +3,8 @@
  * app/superadmin/index.php — the platform panel's entry point.
  *
  * Phase 4 shipped a read-only overview here. Phase 6 replaced it with the full
- * lifecycle panel in tenants.php, so this is now just the front door: it applies
- * the guard, then forwards.
+ * lifecycle panel in tenants.php. This phase adds a real dashboard.php, so this
+ * is once again just the front door: it applies the guard, then forwards there.
  *
  * Kept as a redirect rather than deleted because it is the stable landing
  * address — actions/superadmin_login.php points here, and it is the URL
@@ -14,5 +14,5 @@ require_once __DIR__ . '/../../core/superadmin_auth.php';
 
 requireSuperadmin();                 // 404 from a tenant host; redirect if signed out
 
-header('Location: ' . saUrl('tenants'));
+header('Location: ' . saUrl('dashboard'));
 exit;
