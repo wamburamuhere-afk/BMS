@@ -57,6 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
             $upload_dir = ROOT_DIR . '/uploads/tenders/';
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
             $filename = bin2hex(random_bytes(16)) . '.' . $file_ext;
+            assertUploadWithinQuota($pdo, (int)$_FILES['tender_document']['size']);
             if (move_uploaded_file($tmp_name, $upload_dir . $filename)) {
                 $document_path = 'uploads/tenders/' . $filename;
                 registerFileInLibrary($pdo, $document_path, $_FILES['tender_document']['name'], $_FILES['tender_document']['size'], 'Tender Document (Updated) - ' . ($tender_no ?? 'N/A'), 'tender,document', $_SESSION['user_id']);

@@ -152,6 +152,7 @@ try {
             if ($_FILES['attach_files']['size'][$i] > 10 * 1024 * 1024) continue;
             $safe  = bin2hex(random_bytes(16)) . '.' . $ext;
             $label = trim($_POST['attach_names'][$i] ?? '') ?: $fname;
+            assertUploadWithinQuota($pdo, (int)$_FILES['attach_files']['size'][$i]);
             if (!move_uploaded_file($_FILES['attach_files']['tmp_name'][$i], $target_dir . $safe)) continue;
             $aStmt->execute([$lpo_id, 'uploads/finance/customer_lpos/' . $safe, $label, $_FILES['attach_files']['size'][$i], $_SESSION['user_id']]);
         }

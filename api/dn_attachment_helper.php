@@ -99,6 +99,7 @@ if (!function_exists('dn_save_attachments')) {
             $safe = bin2hex(random_bytes(16)) . '.' . $ext;
             $target = $dir . $safe;
             // 5. Store under uploads/ (folder has .htaccess execution guard)
+            assertUploadWithinQuota($pdo, (int)$file['size']);
             if (!move_uploaded_file($file['tmp_name'], $target)) {
                 throw new Exception("Failed to store uploaded file '{$file['name']}'.");
             }

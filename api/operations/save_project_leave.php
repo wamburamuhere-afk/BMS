@@ -71,6 +71,7 @@ try {
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
         $ext       = strtolower(pathinfo($_FILES['document']['name'], PATHINFO_EXTENSION));
         $file_name = 'leave_' . $employee_id . '_' . date('Ymd_His') . '.' . $ext;
+        assertUploadWithinQuota($pdo, (int)$_FILES['document']['size']);
         if (move_uploaded_file($_FILES['document']['tmp_name'], $upload_dir . $file_name)) {
             $document_path = 'uploads/hr/leaves/' . $file_name;
         }

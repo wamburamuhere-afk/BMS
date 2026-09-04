@@ -38,6 +38,7 @@ try {
     $file_path = 'uploads/projects/scopes/' . $new_name;
     $dest = $upload_dir . $new_name;
 
+    assertUploadWithinQuota($pdo, (int)$file['size']);
     if (!move_uploaded_file($file['tmp_name'], $dest)) {
         throw new Exception('Failed to move uploaded file');
     }

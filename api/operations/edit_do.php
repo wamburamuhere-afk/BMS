@@ -129,6 +129,7 @@ try {
 
             $safe_name = bin2hex(random_bytes(16)) . '.' . $ext;
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            assertUploadWithinQuota($pdo, (int)$existing_files['size'][$att_id]);
             if (!move_uploaded_file($existing_files['tmp_name'][$att_id], $upload_dir . $safe_name)) continue;
 
             $prevFull = __DIR__ . '/../../' . $prev['file_path'];
@@ -161,6 +162,7 @@ try {
 
             $safe_name = bin2hex(random_bytes(16)) . '.' . $ext;
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            assertUploadWithinQuota($pdo, (int)$att_files['size'][$i]);
             if (!move_uploaded_file($att_files['tmp_name'][$i], $upload_dir . $safe_name)) continue;
 
             $file_path = 'uploads/procurement/delivery_orders/' . $safe_name;

@@ -1132,6 +1132,7 @@ echo json_encode(['success' => false, 'message' => 'Unknown action']);
 
 // ── File upload helper ─────────────────────────────────────────────────────
 function handleAttachmentUpload(): array {
+    global $pdo;   // needed for assertUploadWithinQuota() below — not otherwise used in this function
     $file        = $_FILES['attachment'];
     $allowed_ext = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'];
     $allowed_mime= [
@@ -1171,6 +1172,7 @@ function handleAttachmentUpload(): array {
         );
     }
 
+    assertUploadWithinQuota($pdo, (int)$file['size']);
     if (!move_uploaded_file($file['tmp_name'], $upload_dir . $safe_name)) {
         return ['success' => false, 'message' => 'Upload failed — could not save file'];
     }

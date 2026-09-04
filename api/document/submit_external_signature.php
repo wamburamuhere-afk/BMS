@@ -72,6 +72,7 @@ try {
     $safe_name = bin2hex(random_bytes(16)) . '_signed.pdf';
     $db_path   = 'uploads/documents/' . $safe_name;
     $target    = $upload_dir . $safe_name;
+    assertUploadWithinQuota($pdo, (int)$file['size']);
     if (!move_uploaded_file($file['tmp_name'], $target)) {
         throw new Exception('Failed to save the signed PDF');
     }

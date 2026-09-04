@@ -1,7 +1,7 @@
 <?php
-require_once '../roots.php';
-require_once '../includes/config.php';
-require_once '../helpers.php';
+require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../helpers.php';
 
 header('Content-Type: application/json');
 
@@ -13,7 +13,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 // Check admin permissions
-require_once '../core/permissions.php';
+require_once __DIR__ . '/../core/permissions.php';
 if (!isAdmin()) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Permission denied']);
@@ -45,6 +45,17 @@ try {
     $oldStatusStmt->execute([$user_id]);
     $old_status = $oldStatusStmt->fetchColumn();
 
+    // Phase 12.B closed the seat limit at add_user.php — the only place a NEW
+    // account is created. Reactivating an already-existing account raises the
+    // active count exactly the same way, and add_user.php's check cannot see
+    // this path at all. Only a genuine 0 -> 1 transition counts: re-activating
+    // an already-active row (redundant click) must never be blocked by its own
+    // future self.
+    if ($new_status === 1 && (int)$old_status === 0 && !tenantWithinUserLimit($pdo)) {
+        throw new Exception("You have reached your plan's user limit. Deactivate a different "
+            . "user to free a seat, or ask the platform to raise your limit.");
+    }
+
     // Update user status
     $stmt = $pdo->prepare("UPDATE users SET is_active = ? WHERE user_id = ?");
     $result = $stmt->execute([$new_status, $user_id]);
@@ -54,7 +65,7 @@ try {
     // whatever session they're using RIGHT NOW too, the same way Login
     // History's own "End Session" admin action does.
     if ($result && $new_status === 0) {
-        require_once '../core/session_tracker.php';
+        require_once __DIR__ . '/../core/session_tracker.php';
         $openRows = $pdo->prepare("SELECT id FROM user_sessions WHERE user_id = ? AND logout_at IS NULL");
         $openRows->execute([$user_id]);
         foreach ($openRows->fetchAll(PDO::FETCH_COLUMN) as $openId) {
@@ -68,7 +79,7 @@ try {
     // over the phone/in person shouldn't have to relay manually.
     if ($result && $new_status === 1 && (int) $old_status === 0) {
         try {
-            require_once '../core/notify.php';
+            require_once __DIR__ . '/../core/notify.php';
             $target = $pdo->prepare("SELECT username, email, first_name FROM users WHERE user_id = ?");
             $target->execute([$user_id]);
             $t = $target->fetch(PDO::FETCH_ASSOC);

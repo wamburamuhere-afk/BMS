@@ -65,6 +65,7 @@ if (isset($_FILES['contract_file']) && $_FILES['contract_file']['error'] === UPL
         exit;
     }
 
+    assertUploadWithinQuota($pdo, (int)$_FILES['contract_file']['size']);
     if (move_uploaded_file($_FILES['contract_file']['tmp_name'], $target_file)) {
         $contract_attachment = 'uploads/projects/contracts/' . $file_name;
     } else {

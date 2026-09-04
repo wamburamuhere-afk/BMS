@@ -98,6 +98,7 @@ try {
         $temp_filename = 'tmp_' . uniqid() . '.' . $ext;
         $temp_path     = $upload_dir . $temp_filename;
 
+        assertUploadWithinQuota($pdo, (int)$_FILES['receipt_file']['size']);
         if (!move_uploaded_file($_FILES['receipt_file']['tmp_name'], $temp_path)) {
             throw new Exception("File upload failed. Please try again.");
         }

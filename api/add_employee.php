@@ -103,6 +103,7 @@ try {
             throw new Exception("Profile photo must be under 2MB.");
         }
         $photo_filename = 'photo_' . bin2hex(random_bytes(8)) . '.' . $photo_ext;
+        assertUploadWithinQuota($pdo, (int)$_FILES['photo_file']['size']);
         if (!move_uploaded_file($_FILES['photo_file']['tmp_name'], $upload_dir . $photo_filename)) {
             throw new Exception("Failed to upload profile photo.");
         }
@@ -129,7 +130,7 @@ try {
                 $file_extension = pathinfo($_FILES[$inputName]['name'], PATHINFO_EXTENSION);
                 $file_name = $key . '_' . preg_replace('/[^A-Za-z0-9\-]/', '', $_POST['employee_number']) . '_' . time() . '.' . $file_extension;
                 $target_path = $upload_dir . $file_name;
-                
+                assertUploadWithinQuota($pdo, (int)$_FILES[$inputName]['size']);
                 if (move_uploaded_file($_FILES[$inputName]['tmp_name'], $target_path)) {
                     $doc_rel_path = 'uploads/hr/employees/' . $file_name;
                     $documents[$key] = $doc_rel_path;

@@ -95,6 +95,7 @@ try {
         $safe_name = bin2hex(random_bytes(16)) . '.' . $ext;
         $target_dir = __DIR__ . '/../uploads/contracts/';
         if (!is_dir($target_dir)) mkdir($target_dir, 0755, true);
+        assertUploadWithinQuota($pdo, (int)$_FILES['attachment']['size']);
         if (!move_uploaded_file($_FILES['attachment']['tmp_name'], $target_dir . $safe_name)) {
             throw new Exception('Attachment upload failed');
         }

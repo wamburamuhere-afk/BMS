@@ -176,7 +176,7 @@ try {
                     $extension = pathinfo($_FILES['attachments']['name'][$i], PATHINFO_EXTENSION);
                     $file_name = 'GRN_UP_' . $receipt_id . '_' . $att_id . '_' . time() . '.' . $extension;
                     $file_path = 'uploads/finance/grn/' . $file_name;
-                    
+                    assertUploadWithinQuota($pdo, (int)$_FILES['attachments']['size'][$i]);
                     if (move_uploaded_file($_FILES['attachments']['tmp_name'][$i], $upload_dir . $file_name)) {
                         // Delete old file
                         $stmtOldPath = $pdo->prepare("SELECT file_path FROM purchase_receipt_attachments WHERE attachment_id = ?");
@@ -204,7 +204,7 @@ try {
                     $extension = pathinfo($_FILES['attachments']['name'][$i], PATHINFO_EXTENSION);
                     $file_name = 'GRN_NEW_' . $receipt_id . '_' . time() . '_' . $i . '.' . $extension;
                     $file_path = 'uploads/finance/grn/' . $file_name;
-
+                    assertUploadWithinQuota($pdo, (int)$_FILES['attachments']['size'][$i]);
                     if (move_uploaded_file($_FILES['attachments']['tmp_name'][$i], $upload_dir . $file_name)) {
                         $pdo->prepare("
                             INSERT INTO purchase_receipt_attachments (

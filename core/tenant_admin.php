@@ -60,7 +60,8 @@ if (!function_exists('listTenants')) {
     function listTenants(?string $status = null): array
     {
         $sql = "SELECT id, company_name, subdomain, db_name, db_username, db_host,
-                       status, plan, owner_email, created_at, activated_at, suspended_at
+                       status, plan, owner_email, max_users, max_storage_mb,
+                       created_at, activated_at, suspended_at
                 FROM tenants";
         $args = [];
         if ($status !== null && $status !== '') {
@@ -85,7 +86,8 @@ if (!function_exists('getTenant')) {
     {
         $st = getControlPdo()->prepare("
             SELECT id, company_name, subdomain, db_name, db_username, db_host,
-                   status, plan, owner_email, created_at, activated_at, suspended_at
+                   status, plan, owner_email, max_users, max_storage_mb,
+                       created_at, activated_at, suspended_at
             FROM tenants WHERE id = ? LIMIT 1
         ");
         $st->execute([$id]);
@@ -451,6 +453,51 @@ if (!function_exists('setPlatformFeature')) {
         logTenantAdminAction(null, null, 'platform_feature', $featureKey . ': ' . implode('; ', $bits));
 
         return ['ok' => true, 'error' => null];
+    }
+}
+
+if (!function_exists('setTenantQuotas')) {
+    /**
+     * Set (or clear) one tenant's seat and storage limits.
+     *
+     * $maxUsers / $maxStorageMb: null = unlimited. Only genuinely changed
+     * values are logged, matching setTenantFeatures()'s discipline — an
+     * operator opening this panel and clicking Save with nothing changed
+     * writes no audit noise.
+     *
+     * @return array{ok:bool, error:?string, changed:bool}
+     */
+    function setTenantQuotas(int $tenantId, ?int $maxUsers, ?int $maxStorageMb): array
+    {
+        $t = getTenant($tenantId);
+        if (!$t) return ['ok' => false, 'error' => 'Tenant not found.', 'changed' => false];
+        if ($t['status'] === 'deleted') {
+            return ['ok' => false, 'error' => 'This tenant has been deleted.', 'changed' => false];
+        }
+
+        if ($maxUsers !== null && $maxUsers < 1) {
+            return ['ok' => false, 'error' => 'The user limit must be at least 1, or left blank for unlimited.', 'changed' => false];
+        }
+        if ($maxStorageMb !== null && $maxStorageMb < 1) {
+            return ['ok' => false, 'error' => 'The storage limit must be at least 1 MB, or left blank for unlimited.', 'changed' => false];
+        }
+
+        $before = $t['max_users'] === null ? 'unlimited' : (string)$t['max_users'];
+        $beforeStorage = $t['max_storage_mb'] === null ? 'unlimited' : (string)$t['max_storage_mb'] . 'MB';
+        $after = $maxUsers === null ? 'unlimited' : (string)$maxUsers;
+        $afterStorage = $maxStorageMb === null ? 'unlimited' : (string)$maxStorageMb . 'MB';
+
+        $changed = ($before !== $after) || ($beforeStorage !== $afterStorage);
+
+        getControlPdo()->prepare("UPDATE tenants SET max_users = ?, max_storage_mb = ? WHERE id = ?")
+            ->execute([$maxUsers, $maxStorageMb, $tenantId]);
+
+        if ($changed) {
+            logTenantAdminAction($tenantId, $t['subdomain'], 'update_quotas',
+                "users: {$before} -> {$after}; storage: {$beforeStorage} -> {$afterStorage}");
+        }
+
+        return ['ok' => true, 'error' => null, 'changed' => $changed];
     }
 }
 
