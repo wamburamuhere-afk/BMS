@@ -1,5 +1,65 @@
 # BMS Changelog
 
+## 2026-09-03 (feat) — Phase 11.B: feature entitlements are now enforced, in five layers
+
+**Files (added):** `tests/test_feature_gating_cli.php`
+**Files (changed):** `core/permissions.php`, `core/security_helpers.php`, `core/feature_registry.php`, `core/tenant_bootstrap.php`, `roots.php`, `sign_document.php`, `ternant.md`
+
+Phase 11.A shipped the entitlement data enforcing nothing. This turns it on. A feature the
+platform has not granted a tenant is now off for **everyone in that company, its own admin
+included**, and off for VIEW, CREATE, EDIT, DELETE and every workflow verb — not view alone.
+
+**Layer 1 — `core/permissions.php`.** `canView()`, `canCreate()`, `canEdit()`, `canDelete()`,
+`canReview()`, `canApprove()`, `canSubmit()`, `canReject()` and `hasAnyPermission()` each gained
+the same first line, placed **above** the `isAdmin()` early return. That ordering is the entire
+point: a tenant's own administrator bypasses `role_permissions` completely, so an entitlement
+checked after that bypass would gate nobody who matters. One edit covers the 129 `canView()` calls
+that build the nav in `header.php`, so disabled modules leave the menu with no per-item sweep.
+
+**Layer 2 — `core/security_helpers.php`.** `enforcePageOrAdmin()` had the identical bypass on its
+own first line; the gate now runs ahead of it. Nothing calls this helper today, but its docblock
+invites new pages to adopt it, which would have quietly reopened the hole.
+
+**Layer 3 — `roots.php::handleRoute()`.** Both dispatch paths (mapped route, literal file) are
+gated, so a page that forgets its own `autoEnforcePermission()` call is still refused. The check
+runs on the route key *and* the resolved file, because a route name is not always the page_key.
+
+**Layer 4 — `core/tenant_bootstrap.php`.** `api/`, `ajax/` and `actions/` are deliberately excluded
+from the router, so a router-only gate would leave every AJAX endpoint of a switched-off module
+wide open. They all reach `includes/config.php` for their `$pdo`, so the guard runs there, keyed on
+`REQUEST_URI` — not `SCRIPT_NAME`, which is `/index.php` on a routed request and would gate nothing.
+
+**Layer 5 — `sign_document.php`.** The one door no session-based check can guard: an external
+signer arrives with an emailed token and no login, so nothing ever calls `canView()` for them.
+Checked explicitly.
+
+Refusals are **404, never 403** — a 403 confirms the module exists and is merely switched off for
+you. JSON body for api/ajax callers so a `fetch()` gets something parseable; the status is 404
+either way.
+
+**Tests (39 assertions).** Each request runs in its own subprocess with `HTTP_HOST`/`REQUEST_URI`
+set, so the real config → `bmsConnectPdo()` → guard path executes rather than a re-implementation.
+With POS disabled for `relivertec` (tenant 85): all seven capability verbs false for that tenant's
+own admin while `payroll` and `invoices` stayed available to the same admin; `/pos` and a direct hit
+on `app/bms/pos/pos.php` both 404; `api/pos/` 404 with a JSON body; `api/payroll/` unaffected
+(the mixed-directory trap); `sign_document.php` closed and reopened with the flag;
+`mufindipower` (tenant 86) untouched throughout; platform `is_available = 0` beat a tenant override.
+
+**Anti-vacuity guard, load-bearing.** Every "refused" assertion would also pass if the worker had
+merely crashed, so `blocked()` demands both the absence of the worker's success marker and a real
+404 body. Confirmed by hand: a blocked call returns exactly `{"success":false,"message":"Not
+found"}` and logs `feature gate: blocked /api/pos/sale.php — feature "pos" is not enabled for
+tenant 85`, and the same URL passes the instant the feature is re-enabled.
+
+`bmsFeatureGuardPath()` intentionally does not test `PHP_SAPI`. The question that matters is
+"was a tenant resolved for this request?" — real CLI resolves none and is never gated, while a test
+simulating a request is, which is what makes this layer testable at all.
+
+**Regression:** `test_tenant_routing_cli` 57, `test_tenant_admin_panel_cli` 51,
+`test_tenant_superadmin_auth_cli` 53, `test_tenant_isolation_cli` 48, `test_tenant_module_smoke_cli`
+43, `test_feature_registry_cli` 61 — all 0 failures. Both live tenants end with no entitlement rows,
+so this still ships with **zero behaviour change** until someone deliberately switches something off.
+
 ## 2026-09-03 (feat) — Phase 11.A: per-tenant feature entitlements, data layer only
 
 **Files (added):** `core/feature_registry.php`, `tests/test_feature_registry_cli.php`

@@ -575,6 +575,36 @@ neither real tenant carries any entitlement row.
 - **Every other feature stays completely unaffected** for that same tenant, and a second tenant with `pos` enabled is completely unaffected — the same one-tenant-at-a-time invariant Phases 6 and 9 already enforce.
 - With `TENANT_MODE` off: every one of the above checks instead confirms full access — nothing in this phase is allowed to change single-tenant behaviour.
 
+✅ **Met 2026-09-03 — `tests/test_feature_gating_cli.php`, 39 assertions, 0 failures.**
+Every request is simulated in its own subprocess with `HTTP_HOST`/`REQUEST_URI` set, so the
+real `includes/config.php` → `bmsConnectPdo()` → guard path executes rather than a
+re-implementation of it. Proven with POS disabled for `relivertec` (tenant 85):
+`canView`/`canCreate`/`canEdit`/`canDelete`/`canSubmit`/`canApprove`/`hasAnyPermission`
+all false **for that tenant's own admin** (`$_SESSION['is_admin'] = true`), while `payroll`
+and `invoices` stayed fully available to that same admin; `/pos` and a direct hit on
+`app/bms/pos/pos.php` both 404; `api/pos/` and `api/pos_session.php` 404 with a JSON body;
+`api/payroll/` unaffected; `sign_document.php` closed with e-signatures off and open again
+once re-enabled; `mufindipower` (tenant 86) unaffected throughout; a non-tenant host never
+gated. Platform `is_available = 0` was confirmed to beat a tenant override of 1.
+
+**Anti-vacuity guard — load-bearing, do not remove.** Every "refused" assertion would also
+pass if the worker had simply crashed, so `blocked()` requires BOTH the absence of the
+worker's own success marker AND a real 404 body. Verified by hand besides: a blocked call
+returns exactly `{"success":false,"message":"Not found"}` and logs
+`feature gate: blocked /api/pos/sale.php — feature "pos" is not enabled for tenant 85`,
+and the identical URL returns the pass marker the moment the feature is re-enabled.
+
+**Regression, same day:** `test_tenant_routing_cli` 57, `test_tenant_admin_panel_cli` 51,
+`test_tenant_superadmin_auth_cli` 53, `test_tenant_isolation_cli` 48,
+`test_tenant_module_smoke_cli` 43, `test_feature_registry_cli` 61 — all 0 failures, with
+no `tenant_features` rows and no platform-disabled feature left behind.
+
+> **Note on the `PHP_SAPI` check.** `bmsFeatureGuardPath()` deliberately does **not** ask
+> "is this CLI?". It asks "was a tenant resolved for this request?", which is the question
+> that actually matters: real CLI (migrations, cron, the suites) resolves no tenant and is
+> never gated, while a test that simulates a request by setting `HTTP_HOST` **is** gated —
+> which is the only reason this layer is testable at all.
+
 **Rollback:** `git revert <sha>` — no data migration to unwind; the control-DB rows from 11.A stay inert without this phase reading them.
 
 ---
@@ -645,6 +675,6 @@ Update this table the moment each phase merges — this is what lets any session
 | 9 — Security Hardening + Isolation Testing | ✅ done (2026-09-02) — 48 assertions green; control-DB least-privilege user remains an operator step (conventions §12) | `feat/tenant-09-isolation-hardening` |
 | 10 — Full Regression + Go-Live | ✅ done (2026-09-02) — 43-assertion module smoke vs a fresh tenant, `docs/MULTI_TENANCY.md`, go-live checklist scored. Manual per-module regression + the Tenant-#1 half remain, both blocked on Phase 7 | `feat/tenant-10-go-live` |
 | 11.A — Feature Registry & Control-DB Schema | ✅ done (2026-09-03) — 61 assertions green; verified on the real request path against two live tenants | `feat/tenant-11a-feature-registry` |
-| 11.B — Enforcement (5 layers) | ⏳ pending | `feat/tenant-11b-enforcement` |
+| 11.B — Enforcement (5 layers) | ✅ done (2026-09-03) — 39 assertions green + 6 regression suites clean; verified against two live tenants | `feat/tenant-11b-enforcement` |
 | 11.C — Superadmin Feature-Control UI | ⏳ pending | `feat/tenant-11c-control-ui` |
 | 11.D — Tests, Docs, Regression | ⏳ pending | `feat/tenant-11d-tests-docs` |

@@ -258,6 +258,20 @@ if (!function_exists('bmsConnectPdo')) {
         // resolved here — once — so every later check is an array lookup rather
         // than a query. Fails open if the control tables are not present yet.
         bmsPrimeTenantFeatures((int)$tenant['id']);
+
+        // Feature gate (ternant.md Phase 11, layer 4) — the ONLY layer that
+        // reaches api/, ajax/ and actions/. Those are deliberately excluded from
+        // handleRoute(), so a router-only gate would leave every AJAX endpoint of
+        // a switched-off module wide open. This runs here because every one of
+        // those entry points reaches includes/config.php to get its $pdo, and
+        // this function is what config.php calls.
+        //
+        // Guarded on REQUEST_URI, not SCRIPT_NAME: a routed request has
+        // SCRIPT_NAME=/index.php, which owns nothing and would gate nothing.
+        if (isset($_SERVER['REQUEST_URI'])) {
+            $reqPath = strtok((string)$_SERVER['REQUEST_URI'], '?');
+            bmsFeatureGuardPath((string)$reqPath);
+        }
         // Cache the plaintext for bmsCurrentDbConfig() so callers that need
         // credentials (the mysqli-based dump/restore path) never decrypt twice.
         // Request-scoped only — never written anywhere.

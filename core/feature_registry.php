@@ -344,6 +344,113 @@ if (!function_exists('tenantFeatureEnabled')) {
     }
 }
 
+if (!function_exists('bmsFeatureBlockingPath')) {
+    /**
+     * Which feature BLOCKS this file/request path, or null if nothing does.
+     *
+     * Two independent lookups, because neither covers everything on its own:
+     *   1. the registry's own `paths` — the only thing that reaches api/ and
+     *      ajax/ endpoints, which the router never sees;
+     *   2. the file's basename through getPagePermissionMapping() — the
+     *      filename→page_key map that already covers ~150 application pages, so
+     *      a gated page does not need its path spelled out here as well.
+     *
+     * Lookup 2 is skipped when core/permissions.php has not been loaded (the
+     * bootstrap guard runs long before it), which is exactly why lookup 1 exists.
+     */
+    function bmsFeatureBlockingPath(string $path): ?string
+    {
+        $rel = ltrim(str_replace('\\', '/', $path), '/');
+
+        // Absolute paths (the router hands us ROOT_DIR-prefixed files) reduced
+        // to repo-relative so the registry's prefixes match.
+        if (defined('ROOT_DIR')) {
+            $root = rtrim(str_replace('\\', '/', ROOT_DIR), '/') . '/';
+            if (strncmp($rel, ltrim($root, '/'), strlen(ltrim($root, '/'))) === 0) {
+                $rel = substr($rel, strlen(ltrim($root, '/')));
+            }
+        }
+
+        $owner = featureForPath($rel);
+        if ($owner !== null && !tenantFeatureEnabled($owner)) return $owner;
+
+        if (function_exists('getPagePermissionMapping')) {
+            $map     = getPagePermissionMapping();
+            $base    = basename($rel);
+            $pageKey = $map[$base] ?? null;
+            if ($pageKey !== null && !tenantModuleAllowsPage($pageKey)) {
+                $owners = featureForPageKey($pageKey);
+                return $owners[0] ?? 'unknown';
+            }
+        }
+
+        return null;
+    }
+}
+
+if (!function_exists('bmsFeatureHalt')) {
+    /**
+     * End a request for a feature this tenant does not have.
+     *
+     * 404, never 403: a 403 confirms the module exists and is merely switched
+     * off for you, which is information the platform has no reason to give out.
+     * Matches how assertSuperadminHost() already behaves.
+     *
+     * JSON for api/ajax callers so a fetch() gets a parseable body rather than a
+     * page of HTML — the status code is what the acceptance gate asserts, and it
+     * is 404 either way.
+     */
+    function bmsFeatureHalt(string $featureKey): void
+    {
+        error_log('feature gate: blocked ' . ($_SERVER['REQUEST_URI'] ?? '?')
+            . ' — feature "' . $featureKey . '" is not enabled for tenant '
+            . (function_exists('bmsCurrentTenantId') ? (string)bmsCurrentTenantId() : '?'));
+
+        $uri    = ltrim(str_replace('\\', '/', (string)($_SERVER['REQUEST_URI'] ?? '')), '/');
+        $isData = str_contains($uri, 'api/') || str_contains($uri, 'ajax/')
+            || str_contains((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json')
+            || strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest';
+
+        if (!headers_sent()) {
+            http_response_code(404);
+            header('Cache-Control: no-store');
+            if ($isData) header('Content-Type: application/json');
+        }
+
+        if ($isData) {
+            echo json_encode(['success' => false, 'message' => 'Not found']);
+            exit;
+        }
+
+        if (function_exists('bmsTenantHalt')) {
+            bmsTenantHalt(404, 'Not found', 'The page you asked for is not available.');
+        }
+        echo 'Not found';
+        exit;
+    }
+}
+
+if (!function_exists('bmsFeatureGuardPath')) {
+    /**
+     * The guard every layer calls: 404 the request if its path belongs to a
+     * feature this tenant does not have. A no-op when nothing is gated, when no
+     * tenant is resolved, and on CLI.
+     */
+    function bmsFeatureGuardPath(string $path): void
+    {
+        // No SAPI check on purpose. "Is this CLI?" is the wrong question — the
+        // right one is "was a tenant resolved for this request?", and the line
+        // below asks exactly that. Real CLI (migrations, cron, the test suites)
+        // resolves no tenant and so is never gated, while a test that simulates
+        // a request by setting HTTP_HOST *is* gated, which is what makes this
+        // layer testable at all.
+        if (!is_array($GLOBALS['__bms_features'] ?? null)) return;   // no tenant → everything on
+
+        $blocked = bmsFeatureBlockingPath($path);
+        if ($blocked !== null) bmsFeatureHalt($blocked);
+    }
+}
+
 if (!function_exists('tenantModuleAllowsPage')) {
     /**
      * The question the permission layer asks: may this request's tenant reach
