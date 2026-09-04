@@ -15,7 +15,7 @@ assertSuperadminHost();
 superadminSessionReady();
 
 if (isSuperadminLoggedIn()) {
-    header('Location: index.php');
+    header('Location: ' . saUrl(''));
     exit;
 }
 ?>
@@ -107,7 +107,7 @@ $('#superadminLoginForm').on('submit', function (e) {
         data: $(this).serialize(),
         success: function (res) {
             if (res && res.success) {
-                window.location.href = 'index.php';
+                window.location.href = '<?= saUrl('') ?>';
             } else {
                 $('#loginError').removeClass('d-none').text((res && res.message) || 'Sign in failed.');
                 $('#password').val('').focus();

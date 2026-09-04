@@ -12,5 +12,5 @@ require_once __DIR__ . '/../../core/superadmin_auth.php';
 assertSuperadminHost();
 superadminLogout();
 
-header('Location: login.php');
+header('Location: ' . saUrl('login'));
 exit;

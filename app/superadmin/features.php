@@ -23,9 +23,19 @@ requireSuperadmin();
 $me       = currentSuperadmin();
 $features = [];
 $error    = null;
+$setup    = false;   // true = the control tables do not exist on this host yet
 
 try {
-    $features = platformFeatures();
+    // Distinguish "not set up here yet" from "something is actually wrong".
+    // The control database is created by an operator step and never by a deploy
+    // migration, so this page WILL be reached on a host where Phase 11's tables
+    // do not exist. Reporting that as a generic read failure leaves the operator
+    // with nothing to act on, which is exactly what happened on demo.
+    if (!featureTablesReady()) {
+        $setup = true;
+    } else {
+        $features = platformFeatures();
+    }
 } catch (Throwable $e) {
     error_log('superadmin features: ' . $e->getMessage());
     $error = 'The module catalogue could not be read.';
@@ -53,15 +63,15 @@ try {
 
 <div class="page-header px-3 py-2 d-flex align-items-center justify-content-between">
     <div class="d-flex align-items-center gap-2">
-        <a href="tenants.php" class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-left"></i></a>
+        <a href="<?= saUrl('tenants') ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-left"></i></a>
         <div>
             <div class="fw-bold">Modules (platform-wide)</div>
             <small class="text-muted">Signed in as <?= safe_output($me['name'] ?? '', '') ?></small>
         </div>
     </div>
     <div class="d-flex gap-2">
-        <a href="profile.php" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-gear me-1"></i> My Account</a>
-        <a href="logout.php" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
+        <a href="<?= saUrl('profile') ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-gear me-1"></i> My Account</a>
+        <a href="<?= saUrl('logout') ?>" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
     </div>
 </div>
 
@@ -69,6 +79,24 @@ try {
 
 <?php if ($error): ?>
     <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i><?= safe_output($error, '') ?></div>
+<?php elseif ($setup): ?>
+    <div class="card detail-card">
+        <div class="card-header"><i class="bi bi-tools text-primary me-1"></i> One setup step remains on this server</div>
+        <div class="card-body">
+            <p>Module control is not set up on this server yet, so there is nothing to show here.</p>
+            <p class="text-muted small">
+                The control database is created by an operator step, never by a deploy migration —
+                a control-database migration once halted an entire release on a host whose
+                application user lacks <code>CREATE</code>. Its new tables therefore do not appear
+                on their own. Run this once on this host, then reload this page:
+            </p>
+            <pre class="p-3 rounded mb-3" style="background:#e7f0ff;border:1px solid #b6ccfe"><code>php scripts/setup_control_db.php</code></pre>
+            <p class="text-muted small mb-0">
+                It is idempotent, so running it again is always safe. Until it is run nothing is
+                broken: every tenant simply has access to every module, exactly as before.
+            </p>
+        </div>
+    </div>
 <?php elseif (!$features): ?>
     <div class="text-center text-muted py-5">
         <i class="bi bi-inbox fs-1 d-block mb-2"></i>

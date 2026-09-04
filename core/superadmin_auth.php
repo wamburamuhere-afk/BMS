@@ -277,7 +277,113 @@ if (!function_exists('requireSuperadmin')) {
 if (!function_exists('superadminLoginUrl')) {
     function superadminLoginUrl(): string
     {
-        return '/app/superadmin/login.php';
+        return saUrl('login');
+    }
+}
+
+// ─── Short, host-scoped panel URLs ──────────────────────────────────────────
+// The panel lives on its own hostname, so it can own the root of that hostname:
+// superadmin.example.tz/tenants rather than
+// superadmin.example.tz/app/superadmin/tenants.php. The long form leaked the
+// repository layout into the address bar for no benefit.
+//
+// These routes are HOST-SCOPED and that is not incidental. `$routes` in roots.php
+// already maps 'profile', 'login' and 'logout' to TENANT pages; claiming those
+// words globally would hijack them for every company. They are resolved only when
+// the request is actually on the superadmin host, which no tenant can reach.
+
+if (!function_exists('isSuperadminHost')) {
+    /**
+     * Is THIS request on the superadmin hostname?
+     *
+     * False with multi-tenancy off: a single-tenant install has no hostname to
+     * scope to, so the panel keeps its literal /app/superadmin/... paths there
+     * and nothing about local development changes.
+     */
+    function isSuperadminHost(): bool
+    {
+        if (!function_exists('tenantModeEnabled') || !tenantModeEnabled()) return false;
+
+        $base = tenantBaseDomain();
+        if ($base === null || $base === '') return false;
+
+        $host = strtolower(explode(':', (string)($_SERVER['HTTP_HOST'] ?? ''))[0]);
+        return $host === superadminHostLabel() . '.' . $base;
+    }
+}
+
+if (!function_exists('superadminRouteMap')) {
+    /** Short URL → the file that serves it. The single source for both directions. */
+    function superadminRouteMap(): array
+    {
+        $d = dirname(__DIR__) . '/app/superadmin/';
+        return [
+            ''             => $d . 'index.php',
+            'tenants'      => $d . 'tenants.php',
+            'tenants/new'  => $d . 'tenant_new.php',
+            'tenants/view' => $d . 'tenant_view.php',
+            'features'     => $d . 'features.php',
+            'profile'      => $d . 'profile.php',
+            'login'        => $d . 'login.php',
+            'logout'       => $d . 'logout.php',
+        ];
+    }
+}
+
+if (!function_exists('superadminShortUrlFor')) {
+    /**
+     * The short URL a legacy /app/superadmin/... path should redirect to, or null
+     * if the path is not a panel page.
+     *
+     * Pulled out of handleRoute() so it can be asserted directly: a CLI test can
+     * observe a 301 status but not the Location header, which would have left the
+     * most important half of that redirect — where it actually points — untested.
+     *
+     * @param string $cleanUri path with no leading slash, e.g. 'app/superadmin/tenants.php'
+     */
+    function superadminShortUrlFor(string $cleanUri): ?string
+    {
+        $prefix = 'app/superadmin/';
+        if (!str_starts_with($cleanUri, $prefix)) return null;
+
+        $leaf = substr($cleanUri, strlen($prefix));
+        if (str_ends_with($leaf, '.php')) $leaf = substr($leaf, 0, -4);
+        if ($leaf === '') return null;
+
+        foreach (superadminRouteMap() as $key => $file) {
+            if (basename($file, '.php') === $leaf) return '/' . $key;
+        }
+        return null;
+    }
+}
+
+if (!function_exists('saUrl')) {
+    /**
+     * A link to a panel page: '/tenants' on the superadmin host, and the literal
+     * '/app/superadmin/tenants.php' anywhere the short routes are not active, so
+     * single-tenant and local installs keep working unchanged.
+     *
+     * @param string $key a key of superadminRouteMap(), optionally with a query
+     *                    string ('tenants/view?id=7')
+     */
+    function saUrl(string $key): string
+    {
+        $key   = ltrim($key, '/');
+        $qs    = '';
+        if (($p = strpos($key, '?')) !== false) {
+            $qs  = substr($key, $p);
+            $key = substr($key, 0, $p);
+        }
+
+        if (isSuperadminHost()) {
+            return '/' . $key . $qs;
+        }
+
+        $map  = superadminRouteMap();
+        $file = $map[$key] ?? null;
+        if ($file === null) return '/' . $key . $qs;
+
+        return '/app/superadmin/' . basename($file) . $qs;
     }
 }
 

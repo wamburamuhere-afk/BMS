@@ -19,19 +19,34 @@ $tenant = null;
 $log    = [];
 $error  = null;
 
-$features = [];
+$features      = [];
+$featuresSetup = false;   // true = tables not created on this host yet
 
 try {
     $tenant = $id > 0 ? getTenant($id) : null;
-    if ($tenant) {
-        $log = tenantAdminLog($id, 50);
-        // Which feature areas this company's subscription includes (Phase 11).
-        // Control-database only — still nothing here opens the tenant's own DB.
-        if ($tenant['status'] !== 'deleted') $features = tenantFeatureMatrix($id);
-    }
+    if ($tenant) $log = tenantAdminLog($id, 50);
 } catch (Throwable $e) {
     error_log('superadmin tenant_view: ' . $e->getMessage());
     $error = 'The tenant registry could not be read.';
+}
+
+// Entitlements are read SEPARATELY and never inside the block above. They were,
+// and it was wrong: on a host where scripts/setup_control_db.php had not been
+// re-run since Phase 11, the missing `features` table threw, and this whole page
+// — identity, lifecycle, Suspend/Activate/Delete, history — collapsed into
+// "The tenant registry could not be read." A module panel that cannot load must
+// cost the operator the module panel, nothing else.
+if ($tenant && $tenant['status'] !== 'deleted') {
+    try {
+        if (featureTablesReady()) {
+            $features = tenantFeatureMatrix($id);
+        } else {
+            $featuresSetup = true;
+        }
+    } catch (Throwable $e) {
+        error_log('superadmin tenant_view (features): ' . $e->getMessage());
+        $featuresSetup = true;
+    }
 }
 
 function svBadge(string $status): string
@@ -71,15 +86,15 @@ function svBadge(string $status): string
 
 <div class="page-header px-3 py-2 d-flex align-items-center justify-content-between">
     <div class="d-flex align-items-center gap-2">
-        <a href="tenants.php" class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-left"></i></a>
+        <a href="<?= saUrl('tenants') ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-left"></i></a>
         <div>
             <div class="fw-bold">Tenant details</div>
             <small class="text-muted">Signed in as <?= safe_output($me['name'] ?? '', '') ?></small>
         </div>
     </div>
     <div class="d-flex gap-2">
-        <a href="profile.php" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-gear me-1"></i> My Account</a>
-        <a href="logout.php" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
+        <a href="<?= saUrl('profile') ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-gear me-1"></i> My Account</a>
+        <a href="<?= saUrl('logout') ?>" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
     </div>
 </div>
 
@@ -91,7 +106,7 @@ function svBadge(string $status): string
     <div class="text-center text-muted py-5">
         <i class="bi bi-question-circle fs-1 d-block mb-2"></i>
         No such tenant.
-        <div class="mt-3"><a href="tenants.php" class="btn btn-sm btn-primary">Back to tenants</a></div>
+        <div class="mt-3"><a href="<?= saUrl('tenants') ?>" class="btn btn-sm btn-primary">Back to tenants</a></div>
     </div>
 <?php else: ?>
 
@@ -173,6 +188,27 @@ function svBadge(string $status): string
             </div>
         </div>
 
+        <?php if ($featuresSetup): ?>
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header"><i class="bi bi-grid text-primary me-1"></i> Modules</div>
+                <div class="card-body">
+                    <p class="mb-2">Module control is not set up on this server yet.</p>
+                    <p class="text-muted small mb-0">
+                        The control database is created by an operator step, never by a deploy
+                        migration, so its new tables do not appear on their own. Run this once on
+                        this host and reload:
+                    </p>
+                    <pre class="mt-2 mb-0 p-2 rounded" style="background:#e7f0ff;border:1px solid #b6ccfe"><code>php scripts/setup_control_db.php</code></pre>
+                    <p class="text-muted small mt-2 mb-0">
+                        Nothing is broken in the meantime — until it is run, every tenant simply has
+                        access to every module, exactly as before.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <?php if ($features): ?>
         <div class="col-12">
             <div class="card detail-card">
@@ -228,7 +264,7 @@ function svBadge(string $status): string
                     <div class="small text-muted mt-3">
                         <i class="bi bi-info-circle me-1"></i>
                         A module marked <em>Removed platform-wide</em> cannot be switched on here —
-                        change that on the <a href="features.php">Modules (platform)</a> page, which
+                        change that on the <a href="<?= saUrl('features') ?>">Modules (platform)</a> page, which
                         affects every tenant at once.
                     </div>
                 </div>

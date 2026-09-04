@@ -14,5 +14,5 @@ require_once __DIR__ . '/../../core/superadmin_auth.php';
 
 requireSuperadmin();                 // 404 from a tenant host; redirect if signed out
 
-header('Location: tenants.php');
+header('Location: ' . saUrl('tenants'));
 exit;
