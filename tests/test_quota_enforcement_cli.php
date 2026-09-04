@@ -205,7 +205,38 @@ ok('  ...active user count is now 2', $countAfterRoom === 2, "count=$countAfterR
 $c->prepare("UPDATE tenants SET max_users = NULL WHERE id = ?")->execute([$tenantId]);
 
 // ─────────────────────────────────────────────────────────────────────────────
-section('4. Three real upload handlers, three different feature areas');
+section('4. ajax/toggle_user.php — reactivation is a second seat-limit bypass, gap found and closed');
+
+// Found during the post-implementation gap hunt: add_user.php is the only
+// place a NEW account is created, but reactivating an EXISTING deactivated
+// one raises the active count exactly the same way, through a completely
+// different file that had no idea the quota existed.
+$newstaff2Id = (int)$pdo->query("SELECT user_id FROM users WHERE username = 'newstaff2'")->fetchColumn();
+$pdo->exec("UPDATE users SET is_active = 0 WHERE user_id = $newstaff2Id");   // back down to 1 active (the owner)
+$c->prepare("UPDATE tenants SET max_users = 1 WHERE id = ?")->execute([$tenantId]);
+
+$rt1 = req($host, 'ajax/toggle_user.php', ['user_id' => (string)$newstaff2Id, 'action' => 'activate']);
+ok('POSITIVE CONTROL: the worker really ran (no crash)', !crashed($rt1), substr($rt1, -300));
+ok('at the seat limit, reactivating is refused', str_contains($rt1, '"success":false')
+   && str_contains($rt1, "user limit"), substr($rt1, -300));
+$activeAfterRefusal = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE is_active = 1")->fetchColumn();
+ok('  ...and the row stays inactive', $activeAfterRefusal === 1, "active=$activeAfterRefusal");
+
+$c->prepare("UPDATE tenants SET max_users = 2 WHERE id = ?")->execute([$tenantId]);
+$rt2 = req($host, 'ajax/toggle_user.php', ['user_id' => (string)$newstaff2Id, 'action' => 'activate']);
+ok('  ...and DOES reactivate once the limit is raised', str_contains($rt2, '"success":true'), substr($rt2, -300));
+$activeAfterRoom = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE is_active = 1")->fetchColumn();
+ok('  ...active count is 2 again', $activeAfterRoom === 2, "active=$activeAfterRoom");
+
+// Deactivating must NEVER be blocked by this check — it only ever frees a
+// seat, so gating it would make the limit impossible to recover from.
+$rt3 = req($host, 'ajax/toggle_user.php', ['user_id' => (string)$newstaff2Id, 'action' => 'deactivate']);
+ok('deactivating is never blocked, even at the limit', str_contains($rt3, '"success":true'), substr($rt3, -300));
+
+$c->prepare("UPDATE tenants SET max_users = NULL WHERE id = ?")->execute([$tenantId]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+section('5. Three real upload handlers, three different feature areas');
 
 // Force the tenant deep over its storage limit so ANY new upload is refused —
 // isolates the assertion to "does the guard fire", not "is the arithmetic
@@ -247,7 +278,7 @@ $after = (int)$pdo->query("SELECT COUNT(*) FROM employee_documents")->fetchColum
 ok('  ...and writes no row', $after === $before, "before=$before after=$after");
 
 // ─────────────────────────────────────────────────────────────────────────────
-section('5. Unlimited (today\'s default for every real tenant) refuses nothing');
+section('6. Unlimited (today\'s default for every real tenant) refuses nothing');
 
 $c->prepare("UPDATE tenants SET max_storage_mb = NULL WHERE id = ?")->execute([$tenantId]);
 $before = (int)$pdo->query("SELECT COUNT(*) FROM document_templates")->fetchColumn();

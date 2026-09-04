@@ -1,5 +1,38 @@
 # BMS Changelog
 
+## 2026-09-04 (fix) - Phase 12 gap hunt: reactivating a user was a second, unguarded seat-limit bypass
+
+**Files (changed):** `ajax/toggle_user.php`, `tests/test_quota_enforcement_cli.php`, `tests/test_login_history_cli.php`, `ternant.md`
+
+Found by a post-implementation gap hunt, not by a failing test - same discipline as the Phase 11
+hunt that found the subdirectory routing gap.
+
+`add_user.php` is the only place a NEW staff account is ever created, and Phase 12.B gated it
+correctly. But `ajax/toggle_user.php` **reactivates an existing deactivated account**, which raises
+the active-user count exactly the same way, through a completely different file that had no idea the
+quota existed. A tenant sitting at its limit, with any previously-deactivated user available, could
+reactivate them and exceed `max_users` with nothing stopping it.
+
+Fixed with the same shape used everywhere else in this phase: `tenantWithinUserLimit($pdo)` checked
+before a genuine `0 -> 1` transition. Deliberately scoped tight - a redundant re-click of an
+already-active row is not gated (it isn't really an activation), and deactivating is never gated at
+all, since it only ever frees a seat and gating it would make the limit impossible to recover from.
+
+**A second, smaller thing found in the same file while fixing the first.** All six of
+`toggle_user.php`'s `require` statements used bare relative paths (`require '../roots.php'`) instead
+of this codebase's `__DIR__`-based convention. That depends on the process's working directory rather
+than the file's own location - it happened to work under a normal web request, and broke the very
+test written to prove the seat-limit fix, which is exactly how it surfaced. All six now use
+`__DIR__`, matching every other file touched this phase. One assertion in
+`test_login_history_cli.php` asserted the old literal require string; updated to match the more
+robust form, not weakened.
+
+**Tests.** `test_quota_enforcement_cli.php` gained a new section proving the fix against a real
+tenant: refused at the limit with the row staying inactive, succeeds once the limit is raised,
+deactivation never blocked (22 assertions total, 0 failures). `test_login_history_cli.php`: 227
+assertions, 0 failures (was 226 passing + 1 now-stale assertion). No orphaned test tenants; both live
+tenants confirmed unlimited after.
+
 ## 2026-09-04 (docs) - Phase 12.D: docs, final consolidated regression — Phase 12 complete
 
 **Files (changed):** `docs/MULTI_TENANCY.md`, `ternant.md`

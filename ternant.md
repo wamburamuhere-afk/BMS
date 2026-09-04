@@ -890,6 +890,33 @@ with **zero behaviour change** for either real tenant until an operator delibera
 
 Phase 12 complete.
 
+### Post-implementation gap hunt (2026-09-04) — a real bypass found and closed
+
+Same discipline as Phase 11's post-implementation hunt, which found the subdirectory routing gap.
+This one found a second seat-limit bypass: **`add_user.php` is the only place a NEW account is
+created, but `ajax/toggle_user.php` reactivates an EXISTING deactivated one, raising the active
+count exactly the same way — through a file that had no idea the quota existed.** A tenant at its
+limit with any previously-deactivated user could reactivate them and exceed `max_users` completely
+unblocked.
+
+Fixed with the same one-line pattern as everywhere else: `tenantWithinUserLimit($pdo)` checked before
+a genuine `0 -> 1` transition (never on a redundant re-click of an already-active row, and never on
+deactivation, which must always be allowed since it only ever frees a seat).
+
+**Found and fixed in the same pass:** `ajax/toggle_user.php` resolved all of its includes with bare
+relative paths (`require '../roots.php'`) instead of this codebase's `__DIR__`-based convention,
+which depends on the process's working directory rather than the file's own location. It happened to
+work under normal web requests but broke the very test written to prove the fix, which is exactly how
+it was caught. All six requires in the file now use `__DIR__`, matching every other file touched in
+this phase. `tests/test_login_history_cli.php` had one assertion asserting the old literal string —
+updated to match, not weakened.
+
+`tests/test_quota_enforcement_cli.php` gained a new section (6 assertions) proving the fix against a
+real tenant: refused at the limit, the row stays inactive, succeeds once the limit is raised,
+deactivation is never blocked. Full suite: 22 assertions, 0 failures.
+`tests/test_login_history_cli.php`: 227 assertions, 0 failures (was 226 + 1 stale assertion).
+No orphaned test tenants; both live tenants confirmed unlimited after.
+
 **Rollback:** Standard `git revert`; documentation + test additions carry no runtime risk.
 
 ---
