@@ -318,6 +318,36 @@ if (!function_exists('bmsPrimeTenantFeatures')) {
     }
 }
 
+if (!function_exists('featureTablesReady')) {
+    /**
+     * Has `scripts/setup_control_db.php` been run since the entitlement tables
+     * were added?
+     *
+     * This is a real state, not a defensive nicety. The control database is
+     * PLATFORM infrastructure and is deliberately created by an operator script,
+     * never by a deploy migration — a control-DB migration once failed on a host
+     * whose app user lacks CREATE, and `script_stop: true` correctly halted the
+     * entire release. So code that reads `features` can and does land on a host
+     * where the table does not exist yet, and the panel must say which it is
+     * rather than reporting a generic failure the operator cannot act on.
+     *
+     * The application itself does not need this: bmsPrimeTenantFeatures() already
+     * fails open, so a host without the tables simply grants everything.
+     */
+    function featureTablesReady(): bool
+    {
+        static $ready = null;
+        if ($ready !== null) return $ready;
+        try {
+            getControlPdo()->query('SELECT 1 FROM features LIMIT 1');
+            $ready = true;
+        } catch (Throwable $e) {
+            $ready = false;
+        }
+        return $ready;
+    }
+}
+
 if (!function_exists('tenantFeatures')) {
     /**
      * This request's effective feature map, ['pos' => true, 'hr' => false, ...].

@@ -1941,6 +1941,34 @@ function handleRoute() {
         $clean_uri = trim(substr($clean_uri, strlen($base_path)), '/');
     }
 
+    // ── Superadmin panel: short, host-scoped URLs ───────────────────────────
+    // Resolved BEFORE the generic rules below, for two reasons: the long
+    // /app/superadmin/... form must be redirected away rather than merely
+    // working, and 'profile'/'login'/'logout' are already tenant routes in
+    // $routes — claiming them globally would hijack them for every company.
+    // Scoped to the superadmin hostname, which no tenant can reach.
+    require_once ROOT_DIR . '/core/superadmin_auth.php';
+    if (isSuperadminHost()) {
+        $saMap = superadminRouteMap();
+
+        // The old address stops appearing in the address bar: /app/superadmin/x,
+        // with or without .php, becomes /x once and for all. The target is
+        // computed by superadminShortUrlFor() rather than inline, so a test can
+        // assert WHERE it points — a CLI test can see a 301 status but not the
+        // Location header, which would leave the important half unverified.
+        $short = superadminShortUrlFor($clean_uri);
+        if ($short !== null) {
+            $qs = $_SERVER['QUERY_STRING'] ?? '';
+            header('Location: ' . $short . ($qs !== '' ? '?' . $qs : ''), true, 301);
+            exit();
+        }
+
+        if (isset($saMap[$clean_uri]) && is_file($saMap[$clean_uri])) {
+            require_once $saMap[$clean_uri];
+            return true;
+        }
+    }
+
     // Automatic redirect for .php extensions to clean URLs.
     // GET only, so form submissions and API/AJAX posts are never touched.
     // api/, ajax/ and actions/ are skipped: those are called with their

@@ -44,8 +44,8 @@ $me = currentSuperadmin();
         </div>
     </div>
     <div class="d-flex gap-2">
-        <a href="tenants.php" class="btn btn-sm btn-outline-primary"><i class="bi bi-building me-1"></i> Tenants</a>
-        <a href="logout.php" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
+        <a href="<?= saUrl('tenants') ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-building me-1"></i> Tenants</a>
+        <a href="<?= saUrl('logout') ?>" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
     </div>
 </div>
 

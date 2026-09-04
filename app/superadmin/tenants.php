@@ -68,9 +68,9 @@ function saBadge(string $status): string
         </div>
     </div>
     <div class="d-flex gap-2">
-        <a href="features.php" class="btn btn-sm btn-outline-primary"><i class="bi bi-grid me-1"></i> Modules</a>
-        <a href="profile.php" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-gear me-1"></i> My Account</a>
-        <a href="logout.php" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
+        <a href="<?= saUrl('features') ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-grid me-1"></i> Modules</a>
+        <a href="<?= saUrl('profile') ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-gear me-1"></i> My Account</a>
+        <a href="<?= saUrl('logout') ?>" class="btn btn-sm btn-secondary"><i class="bi bi-box-arrow-right me-1"></i> Sign out</a>
     </div>
 </div>
 
@@ -100,7 +100,7 @@ function saBadge(string $status): string
         <h6 class="mb-0"><i class="bi bi-building text-primary me-1"></i> Tenants (<?= (int)($stats['total'] ?? 0) ?>)</h6>
         <div class="d-flex gap-2">
             <input type="search" id="tblSearch" class="form-control form-control-sm w-auto" placeholder="Search…">
-            <a href="tenant_new.php" class="btn btn-sm btn-primary text-nowrap">
+            <a href="<?= saUrl('tenants/new') ?>" class="btn btn-sm btn-primary text-nowrap">
                 <i class="bi bi-plus-circle me-1"></i> New company
             </a>
         </div>
@@ -111,7 +111,7 @@ function saBadge(string $status): string
             <i class="bi bi-inbox fs-1 d-block mb-2"></i>
             No tenants registered yet.
             <div class="mt-3">
-                <a href="tenant_new.php" class="btn btn-primary btn-sm">
+                <a href="<?= saUrl('tenants/new') ?>" class="btn btn-primary btn-sm">
                     <i class="bi bi-plus-circle me-1"></i> Register the first company
                 </a>
             </div>
@@ -157,7 +157,7 @@ function saBadge(string $status): string
                 <div class="card-footer bg-white border-top p-0">
                     <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
                         <a class="btn btn-sm btn-outline-primary" style="flex:1;padding:3px 4px;font-size:.72rem"
-                           href="tenant_view.php?id=<?= (int)$t['id'] ?>"><i class="bi bi-eye"></i></a>
+                           href="<?= saUrl('tenants/view') ?>?id=<?= (int)$t['id'] ?>"><i class="bi bi-eye"></i></a>
                         <?php if ($t['status'] === 'suspended'): ?>
                         <button class="btn btn-sm btn-outline-primary" style="flex:1;padding:3px 4px;font-size:.72rem"
                                 onclick="doActivate(<?= (int)$t['id'] ?>)"><i class="bi bi-play-circle"></i></button>
@@ -181,7 +181,7 @@ function tenantActionMenu(array $t): string
 {
     $id   = (int)$t['id'];
     $name = htmlspecialchars((string)$t['company_name'], ENT_QUOTES, 'UTF-8');
-    $items  = '<li><a class="dropdown-item py-2 rounded" href="tenant_view.php?id=' . $id . '">'
+    $items  = '<li><a class="dropdown-item py-2 rounded" href="' . saUrl('tenants/view') . '?id=' . $id . '">'
             . '<i class="bi bi-eye text-primary me-2"></i> View</a></li>';
 
     if ($t['status'] === 'deleted') {
