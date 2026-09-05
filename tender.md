@@ -354,7 +354,60 @@ Implemented on branch `feat/tender-professional-upgrade`. What shipped:
   the existing letterhead/signature/audit-footer machinery — see §2 row 4 and §3.
 - **API:** `api/tender_form_of_tender.php` — `SAVE_LETTER`, `REDRAFT`.
 
-### Phase E — Tender → Project linkage hardening ☐
+### Phase E — Tender → Project linkage hardening ☑ DONE (2026-09-05)
+Implemented on branch `feat/tender-professional-upgrade`. All six §2.1 gaps
+closed and proven by a single end-to-end test running the real function —
+not a re-derivation of its logic:
+- Migration `migrations/2026_09_05_tender_award_project_link.php` — adds
+  `projects.tender_id` (nullable, **UNIQUE** — the actual DB-level
+  enforcement of gap #4, proven in the test by a raw bypass-the-PHP-guard
+  duplicate INSERT that the database itself rejects), `projects.budget_currency`,
+  and the `project_boq_bills`/`project_boq_items` carry-over tables (real
+  copies, not references — the tender's BOQ stays frozen as submitted
+  evidence). Mirrored into `schema/tenant_schema_template.sql`.
+- `core/tender_award.php` — `awardTenderToProject()`, pulled out of
+  `api/tender_workflow.php`'s `DECISION` case so all six gaps live in one
+  testable place. Follows the same `$ownTxn` convention as
+  `core/code_generator.php::nextCode()` (checks `$pdo->inTransaction()`
+  before managing its own transaction) — deliberate, so a caller already
+  inside a transaction (this phase's own CLI test) can compose it cleanly.
+  - **Gap #1** (traceability): `tender_id` set on the new project.
+  - **Gap #2** (budget promise): `budget` actually set from `tender_sum` —
+    `tenders.php:458`'s promise to the user is now true.
+  - **Gap #3** (team access): loops `tender_staff`, resolves each
+    `employee_id` to a `users.user_id` via `users.employee_id`, inserts
+    `user_projects` rows — silently skips staff with no login rather than
+    erroring. `project_manager` (a plain string field, no FK) is seeded from
+    whichever staff member's `role_position` reads like a lead
+    (`LIKE '%lead%'/'%manager%'/'%coordinator%'`), falling back to the first
+    staff member assigned.
+  - **Gap #4** (idempotency): checks `tenders.status` isn't already `AWARDED`
+    before doing anything, PLUS the UNIQUE key backstops it at the DB level.
+  - **Gap #5** (currency): `budget_currency` set from the tender's actual
+    `currency` field (`'USD'` if that's what was submitted, else `'TZS'`) —
+    not assumed.
+  - **Gap #6** (BOQ/Materials carry-over): copies `tender_boq_bills`/`items`
+    into the new `project_boq_*` tables; per §3's linkage rule, seeds a
+    `nip_material_lists` row from `tender_materials` — a line with a
+    `product_id` references that product directly, a free-text line creates a
+    new NIP `products` row first (`is_service=1`, `track_inventory=0`,
+    `contract_item_no` via `nextCode($pdo,'NIP')` — the exact convention
+    `api/create_nip_product.php` already uses).
+- `api/tender_workflow.php`'s `DECISION` case is now a thin wrapper: handles
+  the award-letter file upload (upload-specific, stays inline), then calls
+  `awardTenderToProject()` and returns its `project_id`/`project_name`.
+- UI: `tenders.php`'s award success dialog now shows a **"View Project"**
+  button linking straight to `project_view?id=`, not just a toast (closes the
+  "no redirect/visibility after award" note from §2.1); `tender_view.php`
+  shows a green "AWARDED — Project created: [name] → View Project" banner
+  once a linked project exists, via the new `projects.tender_id` back-reference.
+- Test: `tests/test_tender_award_project_link_cli.php` — **35/35 assertions**,
+  built a real tender with BOQ, Materials (one linked product, one free-text),
+  and two `tender_staff` (one with a login, one without), then ran the actual
+  `awardTenderToProject()` and checked every gap's real output — including
+  attempting a raw duplicate `INSERT` after the fact to prove the UNIQUE key
+  itself rejects it, not just the PHP-level guard. Phases A–D re-run clean
+  (24/17/20/22). Clean 302 → `/login` on both modified pages, unauthenticated.
 Closes all six gaps traced in §2.1. Every sub-item below maps 1:1 to a numbered
 gap there — check them off individually, this phase should not be marked ☑
 until all six are actually addressed, not just the schema change.
@@ -461,15 +514,14 @@ that phase touched; after all phases, one real end-to-end test.
 | B | Materials Schedule | ☑ Done | 2026-09-05 |
 | C | Compliance checklist | ☑ Done | 2026-09-05 |
 | D | Form of Tender auto-draft | ☑ Done | 2026-09-05 |
-| E | Tender → Project linkage hardening | ☐ Not started | — |
+| E | Tender → Project linkage hardening | ☑ Done | 2026-09-05 |
 | F | Print + NeST shortcut | ☐ Not started | — |
 | G | Permissions/registry/migration hygiene | ☐ Not started | — |
 | H | Tests | ☐ Not started | — |
 
-**Next action when resuming:** start Phase E (Tender → Project linkage
-hardening) — Phases A–D are done; see their write-ups above. This is the
-highest-value remaining phase (closes all six §2.1 gaps: traceability, the
-budget-promise bug, the winning-team access gap, idempotency, currency, and
-the BOQ/Materials carry-over — the latter two now have real data to carry,
-since Phases A and B exist). `_tender_nav.php` holds Details/Edit/BOQ/
-Materials/Checklist/Form of Tender.
+**Next action when resuming:** start Phase F (Print + NeST shortcut) — Phases
+A–E are all done, all six §2.1 gaps closed and proven. `_tender_nav.php` holds
+Details/Edit/BOQ/Materials/Checklist/Form of Tender; Phase F adds a
+"Preview & Print" tab bundling print views for BOQ/Materials/Checklist (Form
+of Tender already has its own PDF via `api/tender_form_of_tender.php?action=PRINT`,
+built in Phase D) plus the static NeST portal link.

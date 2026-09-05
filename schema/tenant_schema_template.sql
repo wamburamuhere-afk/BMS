@@ -5925,10 +5925,53 @@ CREATE TABLE `projects` (
   `progress_percent` decimal(10,2) DEFAULT '0.00',
   `project_manager` varchar(255) DEFAULT NULL,
   `description` text,
+  `tender_id` int DEFAULT NULL,
+  `budget_currency` varchar(3) NOT NULL DEFAULT 'TZS',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`project_id`)
+  PRIMARY KEY (`project_id`),
+  UNIQUE KEY `uniq_project_tender` (`tender_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `project_boq_bills`
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `project_boq_bills` (
+  `bill_id` int NOT NULL AUTO_INCREMENT,
+  `project_id` int NOT NULL,
+  `bill_title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Bill No. 1 - General',
+  `sort_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`bill_id`),
+  KEY `idx_pbb_project` (`project_id`),
+  CONSTRAINT `fk_pbb_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`project_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `project_boq_items`
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `project_boq_items` (
+  `item_id` int NOT NULL AUTO_INCREMENT,
+  `bill_id` int NOT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `unit` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `qty` decimal(12,3) NOT NULL DEFAULT '0.000',
+  `rate` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `amount` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `sort_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`item_id`),
+  KEY `idx_pbi_bill` (`bill_id`),
+  CONSTRAINT `fk_pbi_bill` FOREIGN KEY (`bill_id`) REFERENCES `project_boq_bills` (`bill_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

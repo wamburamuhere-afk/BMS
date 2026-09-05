@@ -1673,7 +1673,17 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
         success: function(res) {
             if (res.success) {
                 $(modalId).modal('hide');
-                Swal.fire('Success', res.message, 'success').then(() => reloadTenders());
+                // Award decision: the winning team needs a direct way to the
+                // project that was just created for it, not just a toast.
+                if (res.project_id) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Tender Awarded!',
+                        html: `${safeOutput(res.message)}<br><a href="<?= getUrl('project_view') ?>?id=${res.project_id}" class="btn btn-sm btn-primary mt-2"><i class="bi bi-arrow-right-circle"></i> View Project</a>`,
+                    }).then(() => reloadTenders());
+                } else {
+                    Swal.fire('Success', res.message, 'success').then(() => reloadTenders());
+                }
             } else {
                 Swal.fire('Error', res.message, 'error');
                 $btn.prop('disabled', false).text('Try Again');

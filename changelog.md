@@ -1,5 +1,38 @@
 # BMS Changelog
 
+## 2026-09-05 (feat) - tender.md Phase E: harden the AWARDED -> Project handoff (6 gaps closed)
+
+**Files (added):** `migrations/2026_09_05_tender_award_project_link.php`, `core/tender_award.php`,
+`tests/test_tender_award_project_link_cli.php`
+**Files (modified):** `schema/tenant_schema_template.sql`, `api/tender_workflow.php`,
+`app/bms/tenders/tenders.php`, `app/bms/tenders/tender_view.php`
+
+Fifth phase of the tender-module upgrade (`tender.md`). The AWARDED -> Project automation already
+existed but had six real gaps, all traced against actual code in `tender.md` §2.1 and now closed in
+one function (`core/tender_award.php::awardTenderToProject()`):
+
+1. **Traceability** — `projects.tender_id` (new, UNIQUE) so a project can be traced back to its tender.
+2. **A kept promise** — `tenders.php` told users the tender amount "will be tracked as the project
+   budget if awarded"; the code never actually set `budget`. It does now.
+3. **Team access** — the winning `tender_staff` are now given `user_projects` rows (resolved via
+   `users.employee_id`), so they can actually see the project BMS just created for them; staff with
+   no login are silently skipped rather than erroring.
+4. **Idempotency** — a status guard plus a UNIQUE key backstop (proven in the test by a raw INSERT
+   bypassing the PHP guard entirely, which the database itself rejects).
+5. **Currency** — `projects.budget_currency` is recorded from the tender's actual submission currency
+   instead of being silently assumed TZS.
+6. **BOQ/Materials carry-over** — the priced BOQ is copied (not referenced) into new
+   `project_boq_bills`/`items` tables; the Materials Schedule seeds a project NIP Material List per
+   `tender.md` §3's linkage rule, referencing already-catalogued products directly and creating new
+   NIP products (matching `api/create_nip_product.php`'s own convention) for free-text lines.
+
+`tenders.php`'s award success dialog now shows a "View Project" button instead of a bare toast;
+`tender_view.php` shows an "AWARDED — Project created" banner once a linked project exists.
+
+Verified with `tests/test_tender_award_project_link_cli.php` (35 assertions) exercising the real
+function end to end — built a tender with BOQ, Materials, and mixed-login staff, awarded it, and
+checked every gap's actual output, including the raw-INSERT bypass test. Phases A-D re-run clean.
+
 ## 2026-09-05 (feat) - tender.md Phase D: Form of Tender auto-draft, reusing the letterhead/PDF engine
 
 **Files (added):** `migrations/2026_09_05_tender_form_of_tender.php`, `core/tender_documents.php`,
