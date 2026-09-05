@@ -466,7 +466,31 @@ until all six are actually addressed, not just the schema change.
     person who just won the tender isn't left to go hunt for it in Projects
     (compounds gap #3 if they can't even see it there without this fix too).
 
-### Phase F — Print + NeST shortcut ☐
+### Phase F — Print + NeST shortcut ☑ DONE (2026-09-05)
+Implemented on branch `feat/tender-professional-upgrade`. What shipped:
+- `core/tender_documents.php` extended with `buildTenderBoqPrintHtml()`,
+  `buildTenderMaterialsPrintHtml()`, `buildTenderChecklistPrintHtml()` — plain
+  HTML tables (TCPDF's `writeHTML()` constraint, same reason
+  `document_letter_render.php` uses tables, not flexbox/grid).
+- `api/tender_print.php` — `PRINT_BOQ`, `PRINT_MATERIALS`, `PRINT_CHECKLIST`
+  (read-only GET, `canView('tenders')` gated). All three reuse
+  `generateLetterPdf()` — **no second PDF pipeline**, per §3's reuse-the-engine
+  decision; Form of Tender's own print action (Phase D) already did the same.
+- `app/bms/tenders/tender_print.php` — new page, the 7th and final tab
+  ("Preview & Print"), matching Facile's own last tab: buttons for all four
+  documents plus a static "Open NeST Portal" link to `nest.go.tz`.
+- Test: `tests/test_tender_print_cli.php` — 24/24 assertions: the three HTML
+  builders contain the real data passed in (item descriptions, totals, ready
+  counts), and — same proof style as Phase D — each of the three actually
+  produces a real, valid PDF end-to-end (`%PDF-` header, plausible size), not
+  just a string-content check. Phases A–E re-run clean (24/17/20/22/35 — 118
+  assertions total across the whole plan so far, zero regressions). Clean
+  302 → `/login` on the page, clean 401 on the print API, both unauthenticated.
+
+**All seven build phases (A–F, plus this makes the 6th delivered tab) are now
+done.** Only Phase G (permission/registry/migration hygiene — already mostly
+folded into each phase as it shipped) and Phase H (the final consolidated
+re-scout + end-to-end test) remain.
 - **UI:** a "Preview & Print" tab/section on the tender record mirroring Facile's,
   with buttons for BOQ, Materials Schedule, Checklist, Form of Tender — each
   routes to a small print view that either reuses `renderLetterHtml()` (for the
@@ -476,7 +500,16 @@ until all six are actually addressed, not just the schema change.
 - **Link:** a static "Open NeST Portal ↗" button linking to `https://nest.go.tz`
   in a new tab — trivial, no backend.
 
-### Phase G — Permissions, feature registry, migration hygiene ☐
+### Phase G — Permissions, feature registry, migration hygiene ☑ DONE (folded into A–F)
+Done incrementally as each phase shipped, not as a separate pass — verify by
+checking any single phase's write-up above, they all follow the same
+discipline: every new API checked `isAuthenticated()` + `canView`/`canEdit`/
+`canCreate('tenders')` + (for state-changing POSTs) `csrf_check()`;
+`core/feature_registry.php`'s `tenders` entry's `paths` array got the new
+API file appended in the same commit as that API was added; every schema
+change landed in both `migrations/2026_09_05_*.php` (run against the live
+`bms` DB) and `schema/tenant_schema_template.sql` in the same commit. No
+separate hygiene pass was needed because none of the six phases skipped it.
 - Confirm every new API file follows the CSRF + `canView`/`canEdit`('tenders')
   pattern from `.claude/templates.md` §9 — no new permission keys needed, this
   is all sub-data of the existing `tenders` page key.
@@ -515,13 +548,18 @@ that phase touched; after all phases, one real end-to-end test.
 | C | Compliance checklist | ☑ Done | 2026-09-05 |
 | D | Form of Tender auto-draft | ☑ Done | 2026-09-05 |
 | E | Tender → Project linkage hardening | ☑ Done | 2026-09-05 |
-| F | Print + NeST shortcut | ☐ Not started | — |
-| G | Permissions/registry/migration hygiene | ☐ Not started | — |
-| H | Tests | ☐ Not started | — |
+| F | Print + NeST shortcut | ☑ Done | 2026-09-05 |
+| G | Permissions/registry/migration hygiene | ☑ Done (folded into A–F) | 2026-09-05 |
+| H | Tests | ☐ Not started (per-phase tests done; final consolidated pass remains) | — |
 
-**Next action when resuming:** start Phase F (Print + NeST shortcut) — Phases
-A–E are all done, all six §2.1 gaps closed and proven. `_tender_nav.php` holds
-Details/Edit/BOQ/Materials/Checklist/Form of Tender; Phase F adds a
-"Preview & Print" tab bundling print views for BOQ/Materials/Checklist (Form
-of Tender already has its own PDF via `api/tender_form_of_tender.php?action=PRINT`,
-built in Phase D) plus the static NeST portal link.
+**Next action when resuming:** Phase H's final consolidated pass — re-scout
+the whole module end to end for anything missed across A–F (per this
+project's working agreement: re-scout before each phase, and a final
+create/save/end-to-end test after all phases), then the whole
+`feat/tender-professional-upgrade` branch is ready to push + PR into
+`develop`. Every phase already has its own passing CLI test
+(24+17+20+22+35+24 = 142 assertions total); Phase H's job is one more test
+that runs the full lifecycle in a single script (create tender -> price BOQ
+-> materials -> tick checklist -> draft Form of Tender -> print everything ->
+award -> assert the project exists with everything carried over) rather than
+each phase's slice of it in isolation.

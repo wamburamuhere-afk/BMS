@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-09-05 (feat) - tender.md Phase F: Preview & Print tab + NeST portal shortcut
+
+**Files (added):** `api/tender_print.php`, `app/bms/tenders/tender_print.php`, `tests/test_tender_print_cli.php`
+**Files (modified):** `core/tender_documents.php`, `roots.php`, `core/permissions.php`,
+`core/feature_registry.php`, `app/bms/tenders/_tender_nav.php`
+
+Sixth phase of the tender-module upgrade (`tender.md`) — and the last of the originally-scoped build
+phases (A-F). Adds the "Preview & Print" tab matching the reference product's own last tab: one-click
+PDF print for the Bills of Quantities, Materials Schedule, and Compliance Checklist (Form of Tender
+already had its own from Phase D), plus a static link to the NeST portal (nest.go.tz). All three reuse
+`generateLetterPdf()` — no second PDF pipeline — via new plain-HTML-table builders in
+`core/tender_documents.php` (TCPDF's `writeHTML()` only reliably renders tables, the same constraint
+the existing letter engine already works around).
+
+Verified with `tests/test_tender_print_cli.php` (24 assertions): the HTML builders contain the real
+data passed in, and each of the three document types is proven to produce an actual valid PDF
+end-to-end (not just string checks) the same way Phase D's Form of Tender pipeline was proven. Phases
+A-E re-run clean — 118 assertions total across the plan so far, zero regressions.
+
+Phases A-F (the full original build scope) are now complete. Phase G (permission/registry/migration
+hygiene) turned out to need no separate pass — every phase already carried that discipline as it
+shipped. Only Phase H's final consolidated re-scout + end-to-end test remains before this branch is
+ready to push and PR into develop.
+
 ## 2026-09-05 (feat) - tender.md Phase E: harden the AWARDED -> Project handoff (6 gaps closed)
 
 **Files (added):** `migrations/2026_09_05_tender_award_project_link.php`, `core/tender_award.php`,

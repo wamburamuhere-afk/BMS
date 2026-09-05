@@ -15,6 +15,7 @@ $tenderNavTabs = [
     'materials' => ['label' => 'Materials Schedule', 'icon' => 'bi-boxes',         'route' => 'tender_materials'],
     'checklist' => ['label' => 'Checklist',          'icon' => 'bi-check2-square', 'route' => 'tender_checklist'],
     'fot'  => ['label' => 'Form of Tender',           'icon' => 'bi-envelope-paper', 'route' => 'tender_form_of_tender'],
+    'print' => ['label' => 'Preview & Print',          'icon' => 'bi-printer',        'route' => 'tender_print'],
 ];
 ?>
 <div class="d-flex flex-wrap gap-2 mb-3 no-print">

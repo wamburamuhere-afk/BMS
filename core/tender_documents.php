@@ -54,3 +54,76 @@ if (!function_exists('tenderFormOfTenderSubject')) {
         return 'FORM OF TENDER — ' . ($tender['tender_no'] ?: '[Tender No.]');
     }
 }
+
+/**
+ * Phase F — Print & Preview. TCPDF's writeHTML() only reliably renders a
+ * table-based layout (same constraint core/document_letter_render.php
+ * already works around), so these build a plain HTML table per document
+ * rather than reusing the on-screen Bootstrap markup. Fed as 'content' into
+ * the same generateLetterPdf() the Form of Tender uses (core/tender_award.php's
+ * sibling reuse-the-engine decision, tender.md §3) — no second PDF pipeline.
+ */
+if (!function_exists('buildTenderBoqPrintHtml')) {
+    function buildTenderBoqPrintHtml(array $tender, array $bills, array $itemsByBill): string
+    {
+        $esc = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+        $html = '<h4>Bills of Quantities</h4>';
+        foreach ($bills as $bill) {
+            $items = $itemsByBill[$bill['bill_id']] ?? [];
+            $html .= '<p><strong>' . $esc($bill['bill_title']) . '</strong></p>';
+            $html .= '<table border="1" cellpadding="4" cellspacing="0" width="100%">';
+            $html .= '<tr style="background-color:#f0f0f0;"><th width="5%">#</th><th width="40%">Description</th><th width="10%">Unit</th><th width="12%">Qty</th><th width="15%">Rate</th><th width="18%">Amount</th></tr>';
+            foreach ($items as $i => $item) {
+                $html .= '<tr><td>' . ($i + 1) . '</td><td>' . $esc($item['description']) . '</td><td>' . $esc($item['unit']) . '</td>'
+                    . '<td align="right">' . number_format((float)$item['qty'], 3) . '</td><td align="right">' . number_format((float)$item['rate'], 2) . '</td>'
+                    . '<td align="right">' . number_format((float)$item['amount'], 2) . '</td></tr>';
+            }
+            $billTotal = array_sum(array_column($items, 'amount'));
+            $html .= '<tr><td colspan="5" align="right"><strong>Total — ' . $esc($bill['bill_title']) . '</strong></td><td align="right"><strong>' . number_format($billTotal, 2) . '</strong></td></tr>';
+            $html .= '</table><br>';
+        }
+        $subtotal = (float)($tender['boq_grand_total'] ?? 0);
+        $html .= '<table border="0" cellpadding="4" width="60%" align="right">';
+        $html .= '<tr><td>Contingency</td><td align="right">' . number_format((float)$tender['boq_contingency_percent'], 2) . '%</td></tr>';
+        $html .= '<tr><td>VAT</td><td align="right">' . number_format((float)$tender['boq_vat_percent'], 2) . '%</td></tr>';
+        $html .= '<tr><td><strong>GRAND TOTAL</strong></td><td align="right"><strong>TZS ' . number_format($subtotal, 2) . '</strong></td></tr>';
+        $html .= '</table>';
+        return $html;
+    }
+}
+
+if (!function_exists('buildTenderMaterialsPrintHtml')) {
+    function buildTenderMaterialsPrintHtml(array $materials): string
+    {
+        $esc = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+        $html = '<h4>Materials Schedule</h4>';
+        $html .= '<table border="1" cellpadding="4" cellspacing="0" width="100%">';
+        $html .= '<tr style="background-color:#f0f0f0;"><th width="5%">#</th><th width="30%">Material</th><th width="20%">Specification</th><th width="10%">Unit</th><th width="10%">Qty</th><th width="10%">Rate</th><th width="15%">Amount</th></tr>';
+        foreach ($materials as $i => $m) {
+            $html .= '<tr><td>' . ($i + 1) . '</td><td>' . $esc($m['material']) . '</td><td>' . $esc($m['specification']) . '</td><td>' . $esc($m['unit']) . '</td>'
+                . '<td align="right">' . number_format((float)$m['qty'], 3) . '</td><td align="right">' . number_format((float)$m['rate'], 2) . '</td>'
+                . '<td align="right">' . number_format((float)$m['amount'], 2) . '</td></tr>';
+        }
+        $total = array_sum(array_column($materials, 'amount'));
+        $html .= '<tr><td colspan="6" align="right"><strong>TOTAL</strong></td><td align="right"><strong>' . number_format($total, 2) . '</strong></td></tr>';
+        $html .= '</table>';
+        return $html;
+    }
+}
+
+if (!function_exists('buildTenderChecklistPrintHtml')) {
+    function buildTenderChecklistPrintHtml(array $items): string
+    {
+        $esc = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+        $ready = count(array_filter($items, fn($i) => (int)$i['is_ready'] === 1));
+        $html = '<h4>Tender Compliance Checklist (' . $ready . ' / ' . count($items) . ' ready)</h4>';
+        $html .= '<table border="1" cellpadding="4" cellspacing="0" width="100%">';
+        $html .= '<tr style="background-color:#f0f0f0;"><th width="10%">Ready?</th><th width="90%">Requirement</th></tr>';
+        foreach ($items as $item) {
+            $mark = $item['is_ready'] ? '&#9745;' : '&#9744;';
+            $html .= '<tr><td align="center">' . $mark . '</td><td>' . $esc($item['item_text']) . '</td></tr>';
+        }
+        $html .= '</table>';
+        return $html;
+    }
+}

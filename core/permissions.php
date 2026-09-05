@@ -537,6 +537,7 @@ function getPagePermissionMapping()
         'tender_materials.php' => 'tenders',
         'tender_checklist.php' => 'tenders',
         'tender_form_of_tender.php' => 'tenders',
+        'tender_print.php' => 'tenders',
 
         // Operations / HR
         'employees.php' => 'employees',
