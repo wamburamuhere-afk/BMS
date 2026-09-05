@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-09-05 (feat) - Modules (platform-wide) page gets a real DataTable
+
+**Files (changed):** `app/superadmin/features.php`
+
+The Modules catalogue at `/features` was a plain Bootstrap table — no search, no sort — unlike every
+other list page in the app (including this same panel's own `tenants.php`). Brought it in line: added
+the DataTables CDN assets, gave the desktop table an id, and wired up the exact same pattern already
+used on `tenants.php` on this panel — an external search input (`#modTblSearch`) bound via
+`table.search().draw()` rather than the DataTable's own built-in search box (`dom: 'rtip'`), sorting
+disabled on the two switch columns and the trailing count column (none are meaningful to re-sort by,
+and a mid-toggle re-sort would move the row out from under the operator's cursor). The mobile card
+view (a separate, pre-existing CSS-media-query block, same as `tenants.php`) is untouched.
+
+Verified by logging in through `dev.bms.local` with a disposable throwaway superadmin account and
+inspecting the actual rendered HTML: the DataTables CSS/JS tags, `#modulesTable` id, `#modTblSearch`
+input and the `DataTable(...)` init block are all present and correctly wired, and every toggle
+switch's `data-key`/`onchange="togglePlatform(this)"` survived the edit unchanged. Could not click
+through it in a live browser — the platform host needs its own subdomain, which requires a
+`hosts`-file entry outside this session's reach — but the rendered markup and script use the same
+DataTables version and initialization shape already live and working on `tenants.php` in production.
+
 ## 2026-09-05 (fix) - Superadmin login loop, take two: the root URL never checked the superadmin session
 
 **Files (changed):** `index.php`
