@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-09-05 (feat) - tender.md Phase C: PPRA compliance checklist for Tenders
+
+**Files (added):** `migrations/2026_09_05_tender_checklist.php`, `core/tender_checklist.php`,
+`api/tender_checklist.php`, `app/bms/tenders/tender_checklist.php`, `tests/test_tender_checklist_cli.php`
+**Files (modified):** `schema/tenant_schema_template.sql`, `roots.php`, `core/permissions.php`,
+`core/feature_registry.php`, `app/bms/tenders/_tender_nav.php`, `app/bms/tenders/tender_create.php`
+
+Third phase of the tender-module upgrade (`tender.md`). Adds the 19-item standard East African/PPRA
+submission checklist (Form of Tender, POA, Certificate of Incorporation, TIN, VAT cert, Tax Clearance,
+NeST registration, Bid Security, priced BOQ, work programme, audited financials, references, key
+personnel CVs, equipment schedule, litigation history, anti-bribery declaration, JV agreement, etc.)
+to every tender, with a live "X / N ready" counter. Standard items can be unticked but never deleted;
+only user-added custom items can be removed, so the counter always measures against the real standard.
+The migration backfilled all 17 pre-existing tenders (criteria-based, not hard-coded ids).
+
+Two checklist items ("Priced Bills of Quantities", "Materials Schedule & delivery plan") show a
+"View →" hint pulling live data from Phases A/B — deliberately a hint link, not silent auto-ticking,
+since flipping a box the user already unticked would be worse than not automating it.
+
+Verified with `tests/test_tender_checklist_cli.php` (20 assertions) plus Phase A (24/24) and Phase B
+(17/17) re-run clean, and a clean unauthenticated HTTP round-trip.
+
 ## 2026-09-05 (feat) - tender.md Phase B: Materials Schedule for Tenders (linked to the product catalogue)
 
 **Files (added):** `migrations/2026_09_05_tender_materials.php`, `api/tender_materials.php`,

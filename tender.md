@@ -253,7 +253,41 @@ Implemented on branch `feat/tender-professional-upgrade`. What shipped:
   existing NIPs) — picking an existing entry sets `product_id`; typing a new
   name leaves `product_id` null and just stores the text, per §3.
 
-### Phase C — PPRA Compliance Checklist ☐
+### Phase C — PPRA Compliance Checklist ☑ DONE (2026-09-05)
+Implemented on branch `feat/tender-professional-upgrade`. What shipped:
+- Migration `migrations/2026_09_05_tender_checklist.php` — creates
+  `tender_checklist_items` **and backfills the 19 standard items for every
+  pre-existing tender** (criteria-based `LEFT JOIN ... WHERE item_id IS NULL`,
+  not hard-coded ids, so it's safe to re-run and doesn't touch tenders that
+  already have a checklist). Ran live: backfilled 17 existing tenders.
+  Mirrored into `schema/tenant_schema_template.sql`.
+- `core/tender_checklist.php` — `tenderChecklistStandardItems()` (the 19
+  strings, single source of truth) and `seedTenderChecklist()`. Hooked into
+  `tender_create.php` right after the INSERT, so every new tender gets the
+  checklist automatically.
+- `api/tender_checklist.php` — `TOGGLE_ITEM`, `ADD_ITEM` (custom only),
+  `DELETE_ITEM` (refuses anything but `is_custom = 1` — the 19 standard items
+  can be unticked, never removed, so the ready-counter always measures
+  against the real standard, not a shrinking list).
+- `app/bms/tenders/tender_checklist.php` — new page, added as the 4th tab.
+  Counter is computed live (`COUNT(*)` / `SUM(is_ready)`), not hard-coded to
+  19, so it grows correctly when a custom item is added.
+- **Auto-tick, deliberately scoped down**: the original idea (auto-tick a box
+  when a matching document/BOQ/materials record exists) was simplified to a
+  **"View →" hint link**, not silent auto-toggling — shown only for "Priced
+  Bills of Quantities" (links to the BOQ tab, shows the current grand total)
+  and "Materials Schedule & delivery plan" (links to Materials, shows the line
+  count). Reasoning: silently flipping a checkbox the user already unticked
+  themselves would be worse than not automating it at all; a small handful of
+  the 19 items (TIN, VAT cert, Tax Clearance, CVs, litigation history, etc.)
+  have no existing BMS field to map to regardless, so full auto-detection was
+  never going to cover the list — a future phase could extend the hint map,
+  but should keep it as hints, never silent writes to `is_ready`.
+- Test: `tests/test_tender_checklist_cli.php` — 20/20 assertions (lint,
+  seeding produces exactly 19 unticked/non-custom rows, counter math, counter
+  denominator growing with a custom item, the standard-item delete guard,
+  cascade delete). Phases A (24/24) and B (17/17) re-run clean. Clean 302 →
+  `/login` over HTTP, unauthenticated.
 - **Schema:** `tender_checklist_items` (`item_id` PK, `tender_id` FK, `item_text`
   varchar(255), `is_ready` tinyint(1) default 0, `sort_order` int,
   `is_custom` tinyint(1) default 0 — distinguishes the 19 standard seeded items
@@ -391,15 +425,15 @@ that phase touched; after all phases, one real end-to-end test.
 |---|---|---|---|
 | A | BOQ engine | ☑ Done | 2026-09-05 |
 | B | Materials Schedule | ☑ Done | 2026-09-05 |
-| C | Compliance checklist | ☐ Not started | — |
+| C | Compliance checklist | ☑ Done | 2026-09-05 |
 | D | Form of Tender auto-draft | ☐ Not started | — |
 | E | Tender → Project linkage hardening | ☐ Not started | — |
 | F | Print + NeST shortcut | ☐ Not started | — |
 | G | Permissions/registry/migration hygiene | ☐ Not started | — |
 | H | Tests | ☐ Not started | — |
 
-**Next action when resuming:** start Phase C (PPRA Compliance Checklist) —
-Phases A and B are done; see their write-ups above for what exists to build on
-(`core/tender_boq.php`, `_tender_nav.php`'s tab pattern now holding Details/Edit/
-BOQ/Materials, the `tender_materials.product_id` linkage Phase E's carry-over
-will read).
+**Next action when resuming:** start Phase D (Form of Tender auto-draft) —
+Phases A, B and C are done; see their write-ups above. `_tender_nav.php` now
+holds Details/Edit/BOQ/Materials/Checklist — Phase D adds "Form of Tender" as
+its 6th tab, and should reuse `core/document_letter_render.php`'s
+`renderLetterHtml()` for the actual PDF per `tender.md` §2 row 4 and §3.

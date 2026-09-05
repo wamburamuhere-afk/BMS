@@ -7894,6 +7894,26 @@ CREATE TABLE `tender_materials` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `tender_checklist_items`
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `tender_checklist_items` (
+  `item_id` int NOT NULL AUTO_INCREMENT,
+  `tender_id` int NOT NULL,
+  `item_text` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `is_ready` tinyint(1) NOT NULL DEFAULT '0',
+  `is_custom` tinyint(1) NOT NULL DEFAULT '0',
+  `sort_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`item_id`),
+  KEY `idx_tci_tender` (`tender_id`),
+  CONSTRAINT `fk_tci_tender` FOREIGN KEY (`tender_id`) REFERENCES `tenders` (`tender_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `training_participants`
 --
 

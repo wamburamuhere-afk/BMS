@@ -2,6 +2,7 @@
 // File: app/bms/tenders/tender_create.php
 // scope-audit: skip — tender create/edit form; tenders reference customers (no direct project_id); deferred to Phase G-2
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/tender_checklist.php';
 
 autoEnforcePermission('tenders');
 
@@ -135,6 +136,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
         ]);
 
         $tender_id = $pdo->lastInsertId();
+
+        seedTenderChecklist($pdo, (int)$tender_id);
 
         logActivity($pdo, $_SESSION['user_id'], 'Create tender', "User created a new tender: $tender_no (ID $tender_id)");
 

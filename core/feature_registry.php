@@ -118,7 +118,7 @@ if (!function_exists('bmsFeatureRegistry')) {
                 'default'     => true,
                 'sort_order'  => 40,
                 'page_keys'   => ['tenders'],
-                'paths'       => ['app/bms/tenders/', 'api/tender_workflow.php', 'api/tender_boq.php', 'api/tender_materials.php'],
+                'paths'       => ['app/bms/tenders/', 'api/tender_workflow.php', 'api/tender_boq.php', 'api/tender_materials.php', 'api/tender_checklist.php'],
             ],
             'warehouses' => [
                 'label'       => 'Warehouses',
