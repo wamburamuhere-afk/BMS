@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-09-05 (fix) - Superadmin login loop: session desync on a control-DB read failure
+
+**Files (changed):** `core/superadmin_auth.php`
+**Files (test):** `tests/test_tenant_superadmin_auth_cli.php`
+
+Live symptom: `superadmin.demo.bjptechnologies.co.tz` gave `ERR_TOO_MANY_REDIRECTS` right after a
+successful login, every time. Root cause: `currentSuperadmin()` re-reads the operator's row from the
+control database on every request; when that query threw (control DB unreachable or erroring), the
+`catch` block returned `null` ("not logged in") but never cleared `$_SESSION['superadmin_id']` - unlike
+the sibling "row not found" branch two lines below it, which does. `login.php`'s own check
+(`isSuperadminLoggedIn()`) only reads that session key directly, so it kept seeing "already signed in"
+and redirecting to `/`, while `requireSuperadmin()` kept seeing "not logged in" (via the DB-backed
+check) and bouncing back to `/login` - an infinite loop between the two, deterministic for as long as
+the underlying DB read kept failing.
+
+Fixed by calling `superadminLogout()` in that `catch` branch too, so a control-DB failure now degrades
+to a clean, ordinary "signed out" state (session cleared, login form shown) instead of a redirect loop.
+
+Regression test added: section 11 of `tests/test_tenant_superadmin_auth_cli.php` forces
+`currentSuperadmin()` to fail (bogus `CONTROL_DB_USER`) against a live session and asserts the session
+is dropped by that same call. Verified the test fails without the fix and passes with it. Full suite:
+55/0 (was 53/0). `test_superadmin_selfservice_cli.php` (52/0) and `test_superadmin_urls_cli.php`
+(66/0) re-run clean as regression guards on the same file.
+
 ## 2026-09-04 (feat) - Superadmin panel: shared header + real dashboard
 
 **Files (added):** `app/superadmin/dashboard.php`, `core/superadmin_ui.php`
