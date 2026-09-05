@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-09-05 (fix) - tender.md Phase H: close the AWARDED-status bypass found in final re-scout
+
+**Files (modified):** `app/bms/tenders/tender_edit.php`, `app/bms/tenders/tender_create.php`
+**Files (added):** `tests/test_tender_end_to_end_cli.php`
+
+Final re-scout pass of the tender-module upgrade (`tender.md` Phase H) — the project's working
+agreement calls for re-scouting before/after multi-phase work, and a real end-to-end test at the end.
+Found two real gaps in `tender_edit.php`, a page none of Phases A-F had touched:
+
+1. **Critical:** the plain "Current Status" dropdown listed `AWARDED` as a normal option, saved via a
+   raw `UPDATE`. Selecting it there would silently skip every Phase E guarantee (no project created, no
+   budget, no team access, no BOQ/Materials carry-over) and then permanently block the real award
+   workflow afterward (it would see `status = AWARDED` and refuse as "already awarded," with no project
+   ever having been created — no recovery path in the UI). Fixed with a server-side guard blocking any
+   transition into or out of AWARDED outside the guarded Decision workflow, plus a client-side fix
+   (dropdown excludes AWARDED for a live tender; shown disabled with an explanation once actually awarded).
+2. Phase D's `bid_validity_days` column had no UI field to actually change it from the default of 90 —
+   added "Bid Validity (days)" to both `tender_create.php` and `tender_edit.php`.
+
+Added `tests/test_tender_end_to_end_cli.php` — the full real lifecycle in one script (create -> price
+BOQ -> materials -> checklist -> draft & save Form of Tender -> print all four documents -> award ->
+verify the project has everything -> confirm re-award is refused), plus a lint sweep of all 25
+tender-module files and an assertion the AWARDED-bypass fix is actually present. 24/24 assertions.
+
+**All seven tender-module test files now pass together: 166 assertions, 0 failures.** This closes out
+`tender.md`'s full A-H plan — Phases A-F build the features, Phase G's hygiene was folded into each as
+it shipped, Phase H's re-scout caught the two gaps above that only a fresh look at the whole module
+(not a phase in isolation) could surface.
+
 ## 2026-09-05 (feat) - tender.md Phase F: Preview & Print tab + NeST portal shortcut
 
 **Files (added):** `api/tender_print.php`, `app/bms/tenders/tender_print.php`, `tests/test_tender_print_cli.php`

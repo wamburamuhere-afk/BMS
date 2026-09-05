@@ -96,6 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
                 duration, discipline, tender_role,
                 publication_date, submission_deadline, tender_document,
                 currency, tender_sum, entrance_fee_tzs, entrance_fee_usd,
+                bid_validity_days,
                 status, created_by
             ) VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
@@ -103,6 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
                 ?, ?, ?,
                 ?, ?, ?,
                 ?, ?, ?, ?,
+                ?,
                 'PENDING', ?
             )
         ");
@@ -132,6 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
             $primary_amount,
             $entrance_fee_tzs,
             $entrance_fee_usd,
+            !empty($_POST['bid_validity_days']) ? intval($_POST['bid_validity_days']) : 90,
             $_SESSION['user_id']
         ]);
 
@@ -329,6 +332,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender create form', 'User accesse
                                 <div class="col-md-4">
                                     <label class="form-label fw-bold">Date of Invitation</label>
                                     <input type="date" class="form-control" name="publication_date">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Bid Validity (days)</label>
+                                    <input type="number" min="1" class="form-control" name="bid_validity_days" value="90" placeholder="90">
+                                    <small class="text-muted fst-italic">Used in the Form of Tender letter's validity paragraph.</small>
                                 </div>
 
                                 <div class="col-md-6">

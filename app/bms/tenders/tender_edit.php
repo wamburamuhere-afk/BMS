@@ -23,6 +23,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
         $current_tender = $stmt->fetch();
         if (!$current_tender) throw new Exception("Tender not found");
 
+        // Entering or leaving AWARDED must go through core/tender_award.php's
+        // awardTenderToProject() (Decision action on the Tenders list) — that
+        // is the only path that creates/links the project, sets its budget,
+        // gives the winning team access, and carries the BOQ/Materials over.
+        // A plain status-field save here would silently skip all of that
+        // (tender.md Sec 2.1) or, in reverse, leave an orphaned project
+        // pointing at a tender that no longer says AWARDED.
+        $requested_status = strtoupper(trim($_POST['status'] ?? ''));
+        $current_status = strtoupper($current_tender['status']);
+        if ($requested_status !== $current_status && ($requested_status === 'AWARDED' || $current_status === 'AWARDED')) {
+            throw new Exception("AWARDED status can only be set via the 'Decision' action on the Tenders list (it creates the linked project correctly) and cannot be changed here once awarded.");
+        }
+
         // Duplicate check
         $check = $pdo->prepare("SELECT COUNT(*) FROM tenders WHERE tender_no = ? AND tender_id != ?");
         $check->execute([$tender_no, $id]);
@@ -96,6 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
                 tender_document = ?,
                 currency = ?, tender_sum = ?,
                 entrance_fee_tzs = ?, entrance_fee_usd = ?,
+                bid_validity_days = ?,
                 status = ?,
                 updated_at = NOW()
             WHERE tender_id = ?
@@ -127,6 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
             $primary_amount,
             $entrance_fee_tzs,
             $entrance_fee_usd,
+            !empty($_POST['bid_validity_days']) ? intval($_POST['bid_validity_days']) : 90,
             $_POST['status'] ?? 'PENDING',
             $id
         ]);
@@ -369,6 +384,11 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
                                     <label class="form-label fw-bold">Date of Invitation</label>
                                     <input type="date" class="form-control" name="publication_date" value="<?= $tender['publication_date'] ?>">
                                 </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Bid Validity (days)</label>
+                                    <input type="number" min="1" class="form-control" name="bid_validity_days" value="<?= safe_output($tender['bid_validity_days'], '90') ?>">
+                                    <small class="text-muted fst-italic">Used in the Form of Tender letter's validity paragraph.</small>
+                                </div>
 
                                 <div class="col-md-4">
                                     <label class="form-label fw-bold">Discipline <span class="text-danger">*</span></label>
@@ -412,13 +432,22 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label fw-bold">Current Status <span class="text-danger">*</span></label>
-                                    <select class="form-select" name="status" required>
-                                        <?php 
-                                        $statuses = ['PENDING', 'INVITATION', 'SUBMISSION', 'OPENING', 'EVALUATION', 'POST-QUALIFICATION', 'NEGOTIATION', 'AWARDED', 'LOSS', 'END TENDER', 'cancelled'];
+                                    <?php $is_awarded = (strtoupper($tender['status']) === 'AWARDED'); ?>
+                                    <select class="form-select" name="status" required <?= $is_awarded ? 'disabled' : '' ?>>
+                                        <?php
+                                        // AWARDED is deliberately excluded here — it can only be reached via
+                                        // the guarded 'Decision' workflow action (creates the linked project),
+                                        // never through this plain field. See the matching server-side guard.
+                                        $statuses = ['PENDING', 'INVITATION', 'SUBMISSION', 'OPENING', 'EVALUATION', 'POST-QUALIFICATION', 'NEGOTIATION', 'LOSS', 'END TENDER', 'cancelled'];
+                                        if ($is_awarded) { $statuses = ['AWARDED']; }
                                         foreach($statuses as $st): ?>
                                             <option value="<?= $st ?>" <?= (strtoupper($tender['status']) === strtoupper($st)) ? 'selected' : '' ?>><?= strtoupper($st) ?></option>
                                         <?php endforeach; ?>
                                     </select>
+                                    <?php if ($is_awarded): ?>
+                                        <input type="hidden" name="status" value="AWARDED">
+                                        <small class="text-muted fst-italic">This tender has been awarded and its status is locked here — see the linked project on the Details tab.</small>
+                                    <?php endif; ?>
                                 </div>
 
                                 <div class="col-12">

@@ -521,7 +521,52 @@ separate hygiene pass was needed because none of the six phases skipped it.
   split per phase, session's judgment) **and** `schema/tenant_schema_template.sql`,
   per §3.
 
-### Phase H — Tests ☐
+### Phase H — Final re-scout + consolidated end-to-end test ☑ DONE (2026-09-05)
+Per this project's working agreement (re-scout before/after phases, write a
+real end-to-end test after all phases). Two genuine gaps were caught here
+that no individual phase's isolated test could have caught, because both
+involve a page nobody had touched since before Phase A started:
+
+1. **Critical — the AWARDED bypass.** `tender_edit.php`'s plain "Current
+   Status" dropdown listed `AWARDED` as a normal option, saved via a raw
+   `UPDATE tenders SET status = ?`. Selecting it there would silently skip
+   every single Phase E guarantee — no project, no budget, no team access, no
+   BOQ/Materials carry-over — AND leave the tender stuck: a later proper
+   award attempt via the Decision workflow would refuse it as "already
+   awarded" even though no project was ever created, with no recovery path in
+   the UI. Fixed both directions (entering AND leaving AWARDED are blocked
+   outside the guarded workflow) with a server-side guard in
+   `tender_edit.php`'s POST handler plus a client-side UX fix (the dropdown
+   excludes AWARDED entirely for a non-awarded tender; once awarded, the
+   field is shown disabled with an explanatory note and a hidden input so the
+   value still round-trips).
+2. **`bid_validity_days` had no UI.** Phase D added the column and used it in
+   the drafted letter, but never exposed a field to actually change it from
+   the DB default of 90 — added "Bid Validity (days)" to both
+   `tender_create.php` and `tender_edit.php`'s Tender Details section.
+
+Also swept for (and found none of): other code paths that INSERT INTO
+`tenders` bypassing the Phase C checklist seed (only `tender_create.php`
+does); a dangerous pre-existing `AWARD_RECORDS` case in
+`api/tender_workflow.php` that falls through into `DELETE` with no `break` —
+confirmed dead code (nothing calls that action anywhere), left alone as
+out-of-scope for this plan rather than fixed opportunistically.
+
+- Test: `tests/test_tender_end_to_end_cli.php` — **24/24 assertions**, the
+  full real lifecycle in one script (not each phase's slice of it): create
+  tender exactly the way `tender_create.php` does (checklist auto-seeds) ->
+  price a BOQ -> add a materials line -> tick 5 checklist items -> draft the
+  Form of Tender and confirm it reflects *this* tender's live BOQ total and
+  its own `bid_validity_days` (not stale/default values) -> print all four
+  documents to real valid PDFs -> award -> verify the project has the
+  correct `tender_id`, `budget`, `project_manager`, carried-over BOQ amount,
+  carried-over NIP material list, and `user_projects` access, AND that the
+  tender's own checklist is untouched afterward -> confirm re-awarding is
+  refused. Also re-lints all 25 tender-module files in one sweep and asserts
+  the AWARDED-bypass fix is actually present in the file.
+- **Full regression, all seven test files, one final run:** 24+17+20+22+35+24+24
+  = **166 assertions, 0 failures**, across `test_tender_{boq,materials,
+  checklist,form_of_tender,award_project_link,print,end_to_end}_cli.php`.
 Per this project's working agreement: after each phase, write a CLI test for what
 that phase touched; after all phases, one real end-to-end test.
 - Phase A: `tests/test_tender_boq_cli.php` — create tender, add 2 bills, add items,
@@ -550,16 +595,11 @@ that phase touched; after all phases, one real end-to-end test.
 | E | Tender → Project linkage hardening | ☑ Done | 2026-09-05 |
 | F | Print + NeST shortcut | ☑ Done | 2026-09-05 |
 | G | Permissions/registry/migration hygiene | ☑ Done (folded into A–F) | 2026-09-05 |
-| H | Tests | ☐ Not started (per-phase tests done; final consolidated pass remains) | — |
+| H | Final re-scout + end-to-end test | ☑ Done (found & fixed 2 real gaps) | 2026-09-05 |
 
-**Next action when resuming:** Phase H's final consolidated pass — re-scout
-the whole module end to end for anything missed across A–F (per this
-project's working agreement: re-scout before each phase, and a final
-create/save/end-to-end test after all phases), then the whole
-`feat/tender-professional-upgrade` branch is ready to push + PR into
-`develop`. Every phase already has its own passing CLI test
-(24+17+20+22+35+24 = 142 assertions total); Phase H's job is one more test
-that runs the full lifecycle in a single script (create tender -> price BOQ
--> materials -> tick checklist -> draft Form of Tender -> print everything ->
-award -> assert the project exists with everything carried over) rather than
-each phase's slice of it in isolation.
+**All phases (A–H) are done.** 166 assertions passing across 7 test files,
+zero regressions, two real cross-cutting gaps found and fixed during the
+Phase H re-scout (see above). The `feat/tender-professional-upgrade` branch
+is ready to push and PR into `develop`. Nothing left to resume — if a future
+session lands here, the next tender-module work is a genuinely new
+feature/fix, not a continuation of this plan.
