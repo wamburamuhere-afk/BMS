@@ -51,6 +51,7 @@ try {
 <title>Modules | Platform Administration</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
 <style>
     body { background: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     .detail-card { border: 1px solid #b6ccfe; border-radius: 8px; }
@@ -107,8 +108,12 @@ try {
                 an explicit answer either way. Per-tenant grants live on each tenant's own page.
             </p>
 
+            <div class="d-flex justify-content-end mb-2">
+                <input type="search" id="modTblSearch" class="form-control form-control-sm w-auto" placeholder="Search…">
+            </div>
+
             <div id="tableWrap" class="table-responsive">
-                <table class="table table-sm align-middle">
+                <table id="modulesTable" class="table table-sm align-middle" style="width:100%">
                     <thead>
                         <tr>
                             <th>Module</th>
@@ -203,12 +208,31 @@ try {
 
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 // Named SA_CSRF_TOKEN, not CSRF_TOKEN — see the note in tenants.php: no page
 // under app/ may shadow header.php's declaration of the latter.
 const SA_CSRF_TOKEN = '<?= csrf_token() ?>';
 $.ajaxSetup({ headers: { 'X-CSRF-Token': SA_CSRF_TOKEN } });
+
+// Same DataTable shape as tenants.php on this same panel: no built-in search
+// box (dom: 'rtip'), a plain external input wired to table.search() instead,
+// and sorting disabled on the two switch columns and the trailing count column
+// — none of those are meaningful to sort on, and a re-sort mid-toggle would
+// move the row out from under the operator's cursor.
+if (document.getElementById('modulesTable')) {
+    const modTable = $('#modulesTable').DataTable({
+        responsive: false,
+        pageLength: 25,
+        order: [[0, 'asc']],
+        dom: 'rtip',
+        columnDefs: [{ orderable: false, targets: [1, 2, 3] }],
+        language: { emptyTable: 'No modules found.', zeroRecords: 'No matching modules.' }
+    });
+    $('#modTblSearch').on('keyup', function () { modTable.search(this.value).draw(); });
+}
 
 function togglePlatform(el) {
     const key    = el.dataset.key;
