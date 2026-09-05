@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-09-05 (perf) - Tenant login slow-then-fast: missing project_id indexes in loadUserScope()
+
+**Files (added):** `migrations/2026_09_05_project_scope_indexes.php`
+
+Reported symptom: logging into a daily-use tenant account was slow, but a hard refresh right after
+was instant, and a lightly-used account never showed the delay at all. Traced to `loadUserScope()`
+(`core/project_scope.php`), called once per login session from `header.php`
+(`if (!isset($_SESSION['scope']))`) for every non-admin user - it derives accessible
+warehouses/suppliers/customers/employees with four UNION queries filtered by `project_id IN (...)`
+across `purchase_orders`, `purchase_receipts`, `deliveries`, `stock_movements`, `supplier_payments`
+(via `purchase_orders`), `invoices` and `sales_orders`.
+
+Checked live with `SHOW INDEX`: none of `purchase_orders`, `purchase_receipts`, `invoices`,
+`sales_orders` or `stock_movements` carried an index on `project_id` - every one of those branches
+was a full table scan. Confirmed with `EXPLAIN`: before the migration `purchase_orders` showed
+`type=ALL, key=NULL`; after, `type=range, key=ix_po_project`. Because the result is cached in
+`$_SESSION['scope']` for the rest of the session, the cost was paid exactly once per login - the
+"slow then instant on refresh" pattern - and an account with zero project assignments skipped all
+four queries entirely via the existing `if (!empty($projects))` guard, which is why it never showed
+the delay regardless of table size.
+
+Added five indexes (`ix_po_project`, `ix_pr_project`, `ix_sm_project`, `ix_inv_project`,
+`ix_so_project`), each guarded by a `SHOW INDEX` check so the file is safe to re-run - same shape as
+`2026_08_21_query_perf_indexes.php`. Pure `ALTER TABLE ... ADD KEY`; no query text, result set or
+business rule touched. Verified idempotent (second run reports every key "already exists, skipping").
+`test_project_scope_cli.php` and `test_warehouse_scope_cli.php` re-run with the SAME one pre-existing
+failure each (a data-truncation warning in an unrelated fixture, and a pre-existing scope-audit
+ceiling gap from other work) confirmed present with the indexes dropped too - neither caused by this
+change.
+
 ## 2026-09-05 (fix) - Superadmin login loop: session desync on a control-DB read failure
 
 **Files (changed):** `core/superadmin_auth.php`
