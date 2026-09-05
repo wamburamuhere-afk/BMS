@@ -1,5 +1,48 @@
 # BMS Changelog
 
+## 2026-09-05 (fix) - Superadmin login loop, take two: the root URL never checked the superadmin session
+
+**Files (changed):** `index.php`
+
+The previous session-desync fix (core/superadmin_auth.php, earlier today) turned out to be a real but
+partial fix — `ERR_TOO_MANY_REDIRECTS` on `superadmin.demo.bjptechnologies.co.tz` kept recurring every
+time, deterministically, right after login. Root cause, found by differential testing against
+production: `GET /tenants` and `GET /dashboard` worked perfectly with the exact same freshly-logged-in
+session, but `GET /` (the bare root) did not. Isolated to `index.php`'s special case for an empty
+`$clean_uri`:
+
+```php
+if (empty($clean_uri) || $clean_uri === 'index.php') {
+    if (isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) {
+        redirectTo('dashboard');
+    } else {
+        redirectTo('login');   // never reaches handleRoute() at all
+    }
+}
+```
+
+This never calls `handleRoute()` — the ONLY place `core/superadmin_auth.php`'s routing
+(`superadminRouteMap()['']` → `app/superadmin/index.php`) is dispatched from. It checks exclusively
+the *tenant* session key `$_SESSION['user_id']`. A superadmin session carries `superadmin_id`, never
+`user_id`, so visiting `/` always fell through to `redirectTo('login')` — regardless of whether the
+operator was actually logged in. `login.php`'s own check then saw `isSuperadminLoggedIn() === true`
+and sent the browser straight back to `/`. `/` → `/login` → `/` → ... forever. Every other superadmin
+route was unaffected only because `$clean_uri` is non-empty for them, which already took the
+`handleRoute()` branch.
+
+Fixed by checking `isSuperadminHost()` first inside the empty-`$clean_uri` branch and deferring to
+`handleRoute()` there, leaving the tenant-only `elseif` completely unchanged for every other host
+(tenant subdomains, the base domain, single-tenant/local installs — `isSuperadminHost()` returns
+`false` for all of them, so this is strictly additive for the one host that was broken).
+
+Verified live against `demo.bjptechnologies.co.tz` with a disposable throwaway superadmin account:
+before the fix, `GET /tenants` and `/dashboard` returned 200 with a freshly-authenticated session
+while `GET /` 302'd to `/login` every time (confirmed via the session file on disk — `superadmin_id`
+was correctly persisted server-side the whole time; only the root-URL route never checked it).
+Reproduced the exact loop with `curl -L`, then verified the fix locally end-to-end (real login POST
+through `dev.bms.local`, temporarily swapping in the fixed `index.php`, restored after): `GET /` now
+302s to `/dashboard` and the full chain resolves in one redirect, `http_code=200`.
+
 ## 2026-09-05 (ops) - Deploy now reloads Apache so PHP opcache never serves half-old code
 
 **Files (changed):** `.github/workflows/deploy.yml`
