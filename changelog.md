@@ -1,5 +1,145 @@
 # BMS Changelog
 
+## 2026-09-05 (feat) - Modules (platform-wide) page gets a real DataTable
+
+**Files (changed):** `app/superadmin/features.php`
+
+The Modules catalogue at `/features` was a plain Bootstrap table — no search, no sort — unlike every
+other list page in the app (including this same panel's own `tenants.php`). Brought it in line: added
+the DataTables CDN assets, gave the desktop table an id, and wired up the exact same pattern already
+used on `tenants.php` on this panel — an external search input (`#modTblSearch`) bound via
+`table.search().draw()` rather than the DataTable's own built-in search box (`dom: 'rtip'`), sorting
+disabled on the two switch columns and the trailing count column (none are meaningful to re-sort by,
+and a mid-toggle re-sort would move the row out from under the operator's cursor). The mobile card
+view (a separate, pre-existing CSS-media-query block, same as `tenants.php`) is untouched.
+
+Verified by logging in through `dev.bms.local` with a disposable throwaway superadmin account and
+inspecting the actual rendered HTML: the DataTables CSS/JS tags, `#modulesTable` id, `#modTblSearch`
+input and the `DataTable(...)` init block are all present and correctly wired, and every toggle
+switch's `data-key`/`onchange="togglePlatform(this)"` survived the edit unchanged. Could not click
+through it in a live browser — the platform host needs its own subdomain, which requires a
+`hosts`-file entry outside this session's reach — but the rendered markup and script use the same
+DataTables version and initialization shape already live and working on `tenants.php` in production.
+
+## 2026-09-05 (fix) - Superadmin login loop, take two: the root URL never checked the superadmin session
+
+**Files (changed):** `index.php`
+
+The previous session-desync fix (core/superadmin_auth.php, earlier today) turned out to be a real but
+partial fix — `ERR_TOO_MANY_REDIRECTS` on `superadmin.demo.bjptechnologies.co.tz` kept recurring every
+time, deterministically, right after login. Root cause, found by differential testing against
+production: `GET /tenants` and `GET /dashboard` worked perfectly with the exact same freshly-logged-in
+session, but `GET /` (the bare root) did not. Isolated to `index.php`'s special case for an empty
+`$clean_uri`:
+
+```php
+if (empty($clean_uri) || $clean_uri === 'index.php') {
+    if (isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) {
+        redirectTo('dashboard');
+    } else {
+        redirectTo('login');   // never reaches handleRoute() at all
+    }
+}
+```
+
+This never calls `handleRoute()` — the ONLY place `core/superadmin_auth.php`'s routing
+(`superadminRouteMap()['']` → `app/superadmin/index.php`) is dispatched from. It checks exclusively
+the *tenant* session key `$_SESSION['user_id']`. A superadmin session carries `superadmin_id`, never
+`user_id`, so visiting `/` always fell through to `redirectTo('login')` — regardless of whether the
+operator was actually logged in. `login.php`'s own check then saw `isSuperadminLoggedIn() === true`
+and sent the browser straight back to `/`. `/` → `/login` → `/` → ... forever. Every other superadmin
+route was unaffected only because `$clean_uri` is non-empty for them, which already took the
+`handleRoute()` branch.
+
+Fixed by checking `isSuperadminHost()` first inside the empty-`$clean_uri` branch and deferring to
+`handleRoute()` there, leaving the tenant-only `elseif` completely unchanged for every other host
+(tenant subdomains, the base domain, single-tenant/local installs — `isSuperadminHost()` returns
+`false` for all of them, so this is strictly additive for the one host that was broken).
+
+Verified live against `demo.bjptechnologies.co.tz` with a disposable throwaway superadmin account:
+before the fix, `GET /tenants` and `/dashboard` returned 200 with a freshly-authenticated session
+while `GET /` 302'd to `/login` every time (confirmed via the session file on disk — `superadmin_id`
+was correctly persisted server-side the whole time; only the root-URL route never checked it).
+Reproduced the exact loop with `curl -L`, then verified the fix locally end-to-end (real login POST
+through `dev.bms.local`, temporarily swapping in the fixed `index.php`, restored after): `GET /` now
+302s to `/dashboard` and the full chain resolves in one redirect, `http_code=200`.
+
+## 2026-09-05 (ops) - Deploy now reloads Apache so PHP opcache never serves half-old code
+
+**Files (changed):** `.github/workflows/deploy.yml`
+
+Reported symptom: after the superadmin login-loop fix (2026-09-05, see below) was deployed, the SAME
+user hitting the SAME URL on `demo.bjptechnologies.co.tz` sometimes got in cleanly and sometimes still
+hit the old redirect loop - no pattern, no code difference between attempts. Root cause: `deploy.yml`
+runs `git reset --hard origin/main` on each host but never restarts or reloads Apache, and never
+resets PHP's opcode cache. Opcache holds each Apache worker process's own already-compiled copy of a
+file until that worker is recycled - not until the file on disk changes. Right after a deploy, some
+worker processes have already been recycled and are running the new, fixed file; others are still
+alive from before the deploy and keep serving their stale, already-compiled old copy. Which worker
+answers a given request is effectively random, so the fix "worked" only on some requests until every
+worker eventually cycled through on its own.
+
+Added one line at the end of the deploy script (after both hosts are updated, once - both hosts share
+a single Apache instance on this server): `sudo systemctl reload apache2`, with a non-fatal `|| echo`
+guard so a reload failure can never veto a release, the same discipline already used for tenant
+migrations. `reload` (not `restart`) finishes in-flight requests and spawns fresh workers with the new
+code - no active connection is dropped. Verified the edited `deploy.yml` still parses as valid YAML
+and the CI's own "script_stop: true" self-check still passes.
+
+## 2026-09-05 (perf) - Tenant login slow-then-fast: missing project_id indexes in loadUserScope()
+
+**Files (added):** `migrations/2026_09_05_project_scope_indexes.php`
+
+Reported symptom: logging into a daily-use tenant account was slow, but a hard refresh right after
+was instant, and a lightly-used account never showed the delay at all. Traced to `loadUserScope()`
+(`core/project_scope.php`), called once per login session from `header.php`
+(`if (!isset($_SESSION['scope']))`) for every non-admin user - it derives accessible
+warehouses/suppliers/customers/employees with four UNION queries filtered by `project_id IN (...)`
+across `purchase_orders`, `purchase_receipts`, `deliveries`, `stock_movements`, `supplier_payments`
+(via `purchase_orders`), `invoices` and `sales_orders`.
+
+Checked live with `SHOW INDEX`: none of `purchase_orders`, `purchase_receipts`, `invoices`,
+`sales_orders` or `stock_movements` carried an index on `project_id` - every one of those branches
+was a full table scan. Confirmed with `EXPLAIN`: before the migration `purchase_orders` showed
+`type=ALL, key=NULL`; after, `type=range, key=ix_po_project`. Because the result is cached in
+`$_SESSION['scope']` for the rest of the session, the cost was paid exactly once per login - the
+"slow then instant on refresh" pattern - and an account with zero project assignments skipped all
+four queries entirely via the existing `if (!empty($projects))` guard, which is why it never showed
+the delay regardless of table size.
+
+Added five indexes (`ix_po_project`, `ix_pr_project`, `ix_sm_project`, `ix_inv_project`,
+`ix_so_project`), each guarded by a `SHOW INDEX` check so the file is safe to re-run - same shape as
+`2026_08_21_query_perf_indexes.php`. Pure `ALTER TABLE ... ADD KEY`; no query text, result set or
+business rule touched. Verified idempotent (second run reports every key "already exists, skipping").
+`test_project_scope_cli.php` and `test_warehouse_scope_cli.php` re-run with the SAME one pre-existing
+failure each (a data-truncation warning in an unrelated fixture, and a pre-existing scope-audit
+ceiling gap from other work) confirmed present with the indexes dropped too - neither caused by this
+change.
+
+## 2026-09-05 (fix) - Superadmin login loop: session desync on a control-DB read failure
+
+**Files (changed):** `core/superadmin_auth.php`
+**Files (test):** `tests/test_tenant_superadmin_auth_cli.php`
+
+Live symptom: `superadmin.demo.bjptechnologies.co.tz` gave `ERR_TOO_MANY_REDIRECTS` right after a
+successful login, every time. Root cause: `currentSuperadmin()` re-reads the operator's row from the
+control database on every request; when that query threw (control DB unreachable or erroring), the
+`catch` block returned `null` ("not logged in") but never cleared `$_SESSION['superadmin_id']` - unlike
+the sibling "row not found" branch two lines below it, which does. `login.php`'s own check
+(`isSuperadminLoggedIn()`) only reads that session key directly, so it kept seeing "already signed in"
+and redirecting to `/`, while `requireSuperadmin()` kept seeing "not logged in" (via the DB-backed
+check) and bouncing back to `/login` - an infinite loop between the two, deterministic for as long as
+the underlying DB read kept failing.
+
+Fixed by calling `superadminLogout()` in that `catch` branch too, so a control-DB failure now degrades
+to a clean, ordinary "signed out" state (session cleared, login form shown) instead of a redirect loop.
+
+Regression test added: section 11 of `tests/test_tenant_superadmin_auth_cli.php` forces
+`currentSuperadmin()` to fail (bogus `CONTROL_DB_USER`) against a live session and asserts the session
+is dropped by that same call. Verified the test fails without the fix and passes with it. Full suite:
+55/0 (was 53/0). `test_superadmin_selfservice_cli.php` (52/0) and `test_superadmin_urls_cli.php`
+(66/0) re-run clean as regression guards on the same file.
+
 ## 2026-09-04 (feat) - Superadmin panel: shared header + real dashboard
 
 **Files (added):** `app/superadmin/dashboard.php`, `core/superadmin_ui.php`
