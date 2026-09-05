@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-09-05 (ops) - Deploy now reloads Apache so PHP opcache never serves half-old code
+
+**Files (changed):** `.github/workflows/deploy.yml`
+
+Reported symptom: after the superadmin login-loop fix (2026-09-05, see below) was deployed, the SAME
+user hitting the SAME URL on `demo.bjptechnologies.co.tz` sometimes got in cleanly and sometimes still
+hit the old redirect loop - no pattern, no code difference between attempts. Root cause: `deploy.yml`
+runs `git reset --hard origin/main` on each host but never restarts or reloads Apache, and never
+resets PHP's opcode cache. Opcache holds each Apache worker process's own already-compiled copy of a
+file until that worker is recycled - not until the file on disk changes. Right after a deploy, some
+worker processes have already been recycled and are running the new, fixed file; others are still
+alive from before the deploy and keep serving their stale, already-compiled old copy. Which worker
+answers a given request is effectively random, so the fix "worked" only on some requests until every
+worker eventually cycled through on its own.
+
+Added one line at the end of the deploy script (after both hosts are updated, once - both hosts share
+a single Apache instance on this server): `sudo systemctl reload apache2`, with a non-fatal `|| echo`
+guard so a reload failure can never veto a release, the same discipline already used for tenant
+migrations. `reload` (not `restart`) finishes in-flight requests and spawns fresh workers with the new
+code - no active connection is dropped. Verified the edited `deploy.yml` still parses as valid YAML
+and the CI's own "script_stop: true" self-check still passes.
+
 ## 2026-09-05 (perf) - Tenant login slow-then-fast: missing project_id indexes in loadUserScope()
 
 **Files (added):** `migrations/2026_09_05_project_scope_indexes.php`

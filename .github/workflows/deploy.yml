@@ -211,11 +211,31 @@ jobs:
           # "Nothing to do" and exits 0. Both no-op paths were verified before this
           # was wired in. The runner also isolates tenants from each other — one
           # tenant's failed migration stops only that tenant's sequence.
+          #
+          # APACHE RELOAD, ONCE, AFTER BOTH HOSTS ARE UPDATED.
+          # `git reset --hard` updates the .php files on disk, but PHP's opcode
+          # cache serves each Apache worker process its own already-compiled copy
+          # of a file until that worker is recycled — not until the file changes.
+          # Without a reload, a deploy lands "half-applied" for a while: whichever
+          # worker happens to answer a given request decides whether the visitor
+          # gets the old or the new code, purely by chance. This is exactly what
+          # made the superadmin login-loop fix (2026-09-05) present as "works,
+          # then doesn't, then does" on demo.bjptechnologies.co.tz for the SAME
+          # user hitting the SAME URL — some workers had already picked up the
+          # fixed core/superadmin_auth.php, others were still serving the stale,
+          # already-compiled buggy version. `reload` (not `restart`) finishes
+          # in-flight requests and spawns fresh workers with the new code, so no
+          # active connection is dropped. Both hosts share one Apache instance on
+          # this server, so this runs once, outside the per-host loop, not twice.
+          # Never allowed to fail the deploy: a stale-opcache window is a
+          # transient staleness issue, not a correctness break, and must not be
+          # able to veto a release the same way tenant migrations must not.
           script: |
             set -e
             HOSTS="bms.bjptechnologies.co.tz demo.bjptechnologies.co.tz"
             UPLOAD_DIRS="parties/customers parties/suppliers parties/sub_contractors system/backups hr/employees hr/leaves procurement/purchase_returns procurement/delivery_notes products projects/inspections projects/scopes projects/contracts projects/reports finance/grn finance/vouchers finance/purchase_orders finance/invoices finance/petty_cash finance/customer_lpos loans signatures documents document_library document_templates compliance inspections tenders/submissions tenders/evaluation tenders/awards petty_cash purchase_orders"
             for h in $HOSTS; do echo "────── Deploying to $h ──────"; cd "/var/www/$h/public_html"; git fetch origin main; git reset --hard origin/main; for d in $UPLOAD_DIRS; do sudo mkdir -p "uploads/$d"; done; sudo chmod -R 777 uploads/ 2>/dev/null || true; sudo chmod -R 777 backups/ 2>/dev/null || true; php migrations/runner.php; php core/tenant_migration_runner.php || echo "⚠️  TENANT MIGRATIONS REPORTED FAILURES on $h — the app deploy still succeeded. Inspect migrations/tenant_deploy.log and the tenant_migration_log table, then re-run: php core/tenant_migration_runner.php --tenant=<id>"; done
+            sudo systemctl reload apache2 || echo "⚠️  Apache reload failed — some workers may keep serving pre-deploy PHP (stale opcache) until the next manual reload or worker recycle. Run: sudo systemctl reload apache2"
             echo "BMS deployed at $(date)"
             echo "Deploy check: OK"
 
