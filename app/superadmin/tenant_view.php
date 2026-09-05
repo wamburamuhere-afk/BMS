@@ -9,6 +9,7 @@
  */
 require_once __DIR__ . '/../../core/tenant_admin.php';
 require_once __DIR__ . '/../../core/superadmin_ui.php';
+require_once __DIR__ . '/../../core/plans.php';
 require_once __DIR__ . '/../../helpers.php';
 
 requireSuperadmin();
@@ -22,6 +23,10 @@ $error  = null;
 
 $features      = [];
 $featuresSetup = false;   // true = tables not created on this host yet
+
+$plans        = [];
+$plansSetup   = false;
+$currentPlan  = null;     // the plan matching this tenant's tenants.plan key, if any
 
 try {
     $tenant = $id > 0 ? getTenant($id) : null;
@@ -47,6 +52,20 @@ if ($tenant && $tenant['status'] !== 'deleted') {
     } catch (Throwable $e) {
         error_log('superadmin tenant_view (features): ' . $e->getMessage());
         $featuresSetup = true;
+    }
+
+    try {
+        if (planTablesReady()) {
+            $plans = listPlans(true);   // active only — a retired plan cannot be (re)applied
+            if (!empty($tenant['plan'])) {
+                $currentPlan = getPlanByKey((string)$tenant['plan']);
+            }
+        } else {
+            $plansSetup = true;
+        }
+    } catch (Throwable $e) {
+        error_log('superadmin tenant_view (plans): ' . $e->getMessage());
+        $plansSetup = true;
     }
 }
 
@@ -180,6 +199,50 @@ function svBadge(string $status): string
             </div>
         </div>
 
+        <?php if ($tenant['status'] !== 'deleted' && $plansSetup): ?>
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header"><i class="bi bi-box-seam text-primary me-1"></i> Plan</div>
+                <div class="card-body">
+                    <p class="mb-2">Plan management is not set up on this server yet.</p>
+                    <p class="text-muted small mb-0">Run this once on this host, then reload:</p>
+                    <pre class="mt-2 mb-0 p-2 rounded" style="background:#e7f0ff;border:1px solid #b6ccfe"><code>php scripts/setup_control_db.php</code></pre>
+                </div>
+            </div>
+        </div>
+        <?php elseif ($tenant['status'] !== 'deleted'): ?>
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header"><i class="bi bi-box-seam text-primary me-1"></i> Plan</div>
+                <div class="card-body">
+                    <p class="small mb-3">
+                        Current: <strong><?= $currentPlan ? safe_output($currentPlan['name'], '') : safe_output($tenant['plan'] ?? '', 'No plan assigned') ?></strong>
+                        <?php if (!empty($tenant['plan']) && !$currentPlan): ?>
+                            <span class="text-muted">(<?= safe_output($tenant['plan'], '') ?> — no longer exists or was set outside a plan)</span>
+                        <?php endif; ?>
+                    </p>
+                    <?php if (!$plans): ?>
+                        <p class="text-muted small mb-0">No plans created yet — <a href="<?= saUrl('plans') ?>">create one</a> to apply it here.</p>
+                    <?php else: ?>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <select class="form-select form-select-sm w-auto" id="f-apply-plan">
+                            <?php foreach ($plans as $p): ?>
+                            <option value="<?= (int)$p['id'] ?>" <?= $currentPlan && (int)$currentPlan['id'] === (int)$p['id'] ? 'selected' : '' ?>>
+                                <?= safe_output($p['name'], '') ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button class="btn btn-sm btn-primary" onclick="applyPlan()" id="btnApplyPlan">
+                            <i class="bi bi-check2-circle me-1"></i> Apply plan
+                        </button>
+                    </div>
+                    <div class="form-text">Sets this tenant's modules and quotas to match the selected plan immediately. It stays independently editable below afterward.</div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <?php if ($tenant['status'] !== 'deleted'): ?>
         <div class="col-12">
             <div class="card detail-card">
@@ -305,6 +368,34 @@ function svBadge(string $status): string
         </div>
         <?php endif; ?>
 
+        <?php if ($tenant['status'] !== 'deleted'): ?>
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span><i class="bi bi-people text-primary me-1"></i> Users</span>
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadUsers()" id="btnLoadUsers">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Load users
+                    </button>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Read-only — who has an account in this company, whether they're active, and when
+                        they last signed in. Loaded on demand, same as Current usage above; nothing here
+                        is kept automatically. For support triage only — not a way to manage this
+                        tenant's staff.
+                    </p>
+                    <div id="usersEmpty" class="text-muted small">Not loaded yet.</div>
+                    <div id="usersTableWrap" class="table-responsive d-none">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last login</th></tr></thead>
+                            <tbody id="usersTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <div class="col-12">
             <div class="card detail-card">
                 <div class="card-header"><i class="bi bi-clock-history text-primary me-1"></i> History</div>
@@ -348,6 +439,17 @@ const SA_CSRF_TOKEN = '<?= csrf_token() ?>';
 const TENANT_ID  = <?= (int)($tenant['id'] ?? 0) ?>;
 const TENANT_NAME = <?= json_encode((string)($tenant['company_name'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
 $.ajaxSetup({ headers: { 'X-CSRF-Token': SA_CSRF_TOKEN } });
+
+// This panel never includes footer.php (it is not a tenant page), so the
+// usual shared safeOutput() is not on this page — a local, equally minimal
+// equivalent for the one place here that renders server data into HTML
+// (loadUsers()).
+function safeOutput(v) {
+    if (v === null || v === undefined || v === '') return '';
+    return String(v).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+}
 
 function postAction(data, title, redirect) {
     $.ajax({
@@ -470,6 +572,86 @@ function checkUsage() {
         }
     }).fail(function (xhr) {
         let msg = 'Could not read current usage.';
+        try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+        Swal.fire({ icon: 'error', title: 'Error', text: msg });
+    }).always(function () {
+        btn.prop('disabled', false).html(orig);
+    });
+}
+
+function applyPlan() {
+    const planId = $('#f-apply-plan').val();
+    const planName = $('#f-apply-plan option:selected').text().trim();
+    Swal.fire({
+        title: 'Apply "' + planName + '" to ' + TENANT_NAME + '?',
+        text: 'This sets their modules and quotas to match the plan right now. They stay independently editable afterward.',
+        icon: 'question', showCancelButton: true, confirmButtonColor: '#0d6efd', confirmButtonText: 'Apply'
+    }).then(function (r) {
+        if (!r.isConfirmed) return;
+        const btn = $('#btnApplyPlan');
+        const orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Applying...');
+
+        $.ajax({
+            url: '/actions/superadmin_apply_plan.php', method: 'POST', dataType: 'json',
+            data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, plan_id: planId }
+        }).done(function (res) {
+            if (res && res.success) {
+                Swal.fire({ icon: 'success', title: 'Applied', text: res.message, timer: 2200, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not apply the plan.' });
+            }
+        }).fail(function (xhr) {
+            let msg = 'Could not apply the plan.';
+            try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+            Swal.fire({ icon: 'error', title: 'Error', text: msg });
+        }).always(function () { btn.prop('disabled', false).html(orig); });
+    });
+}
+
+function loadUsers() {
+    // On demand, deliberately — same discipline as checkUsage(): this is the
+    // one other thing on this page that briefly opens the tenant's own
+    // database, and only ever on this explicit click. See
+    // tenantUserDirectory()'s docblock.
+    const btn  = $('#btnLoadUsers');
+    const orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Loading...');
+
+    $.ajax({
+        url: '/actions/superadmin_tenant_users.php',
+        method: 'POST', dataType: 'json',
+        data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID }
+    }).done(function (res) {
+        if (res && res.success) {
+            if (!res.users.length) {
+                $('#usersEmpty').removeClass('d-none').text('No user accounts found.');
+                $('#usersTableWrap').addClass('d-none');
+                return;
+            }
+            let rows = '';
+            res.users.forEach(function (u) {
+                const statusBadge = u.is_active
+                    ? '<span class="badge" style="background:#0d6efd;color:#fff">Active</span>'
+                    : '<span class="badge" style="background:#6c757d;color:#fff">Inactive</span>';
+                const adminTag = u.is_admin ? ' <span class="text-muted" style="font-size:.72rem;">(admin)</span>' : '';
+                rows += '<tr>'
+                    + '<td>' + safeOutput(u.name) + adminTag + '</td>'
+                    + '<td>' + safeOutput(u.email) + '</td>'
+                    + '<td>' + safeOutput(u.role) + '</td>'
+                    + '<td>' + statusBadge + '</td>'
+                    + '<td>' + (u.last_login ? safeOutput(u.last_login) : '<span class="text-muted">never</span>') + '</td>'
+                    + '</tr>';
+            });
+            $('#usersTableBody').html(rows);
+            $('#usersTableWrap').removeClass('d-none');
+            $('#usersEmpty').addClass('d-none');
+        } else {
+            Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not read the user directory.' });
+        }
+    }).fail(function (xhr) {
+        let msg = 'Could not read the user directory.';
         try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
         Swal.fire({ icon: 'error', title: 'Error', text: msg });
     }).always(function () {

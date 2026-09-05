@@ -40,9 +40,13 @@ if (!function_exists('bms_email_wrap')) {
      * Wrap body HTML in a simple, email-client-safe branded template
      * (inline CSS only — no external assets, so it renders everywhere).
      */
-    function bms_email_wrap(string $title, string $bodyHtml): string
+    function bms_email_wrap(string $title, string $bodyHtml, ?string $brandOverride = null): string
     {
-        $company = function_exists('get_setting') ? (string) get_setting('company_name', 'BMS') : 'BMS';
+        // $brandOverride lets a caller with no tenant in context (the
+        // superadmin panel sending platform-originated mail) supply the brand
+        // name directly, since get_setting() reads a TENANT's system_settings
+        // and has nothing meaningful to return outside one.
+        $company = $brandOverride ?? (function_exists('get_setting') ? (string) get_setting('company_name', 'BMS') : 'BMS');
         $company = htmlspecialchars($company !== '' ? $company : 'BMS', ENT_QUOTES, 'UTF-8');
         $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
         $year = date('Y');
@@ -81,6 +85,7 @@ if (!function_exists('sendEmail')) {
      *      'alt_body'    => string   (plain-text alternative; auto-derived if omitted)
      *      'attachments' => array    (list of absolute file paths)
      *      'wrap'        => bool     (default true — apply bms_email_wrap)
+     *      'wrap_brand'  => string   (brand name for the wrapper when no tenant is in context — see bms_email_wrap())
      *      'smtp'        => array    (override saved SMTP config: host,port,username,password,encryption,from_email,from_name)
      *
      * @return bool True on success. On failure returns false (see mailer_last_error()).
@@ -160,7 +165,7 @@ if (!function_exists('sendEmail')) {
             }
 
             $wrap = $opts['wrap'] ?? true;
-            $body = $wrap ? bms_email_wrap($subject, $htmlBody) : $htmlBody;
+            $body = $wrap ? bms_email_wrap($subject, $htmlBody, $opts['wrap_brand'] ?? null) : $htmlBody;
 
             $mail->isHTML(true);
             $mail->Subject = $subject;
