@@ -199,6 +199,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
 <div class="container-fluid mt-4 mb-5">
     <div class="row">
         <div class="col-lg-8 mx-auto">
+            <?php $tenderNavActive = 'edit'; require __DIR__ . '/_tender_nav.php'; ?>
             <div class="card border-0 shadow-lg overflow-hidden" style="border-radius:15px;">
                 <div class="card-header bg-primary text-white p-4">
                     <h5 class="fw-bold mb-0 text-white"><i class="bi bi-pencil-square me-2"></i>Edit Tender: <?= safe_output($tender['tender_no']) ?></h5>

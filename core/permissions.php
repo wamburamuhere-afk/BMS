@@ -533,6 +533,7 @@ function getPagePermissionMapping()
         'tender_view.php' => 'tenders',
         'tender_create.php' => 'tenders',
         'tender_edit.php' => 'tenders',
+        'tender_boq.php' => 'tenders',
 
         // Operations / HR
         'employees.php' => 'employees',

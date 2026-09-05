@@ -7815,6 +7815,9 @@ CREATE TABLE `tenders` (
   `submission_document_tzs` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `submission_document_usd` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `award_date` date DEFAULT NULL,
+  `boq_contingency_percent` decimal(5,2) NOT NULL DEFAULT '0.00',
+  `boq_vat_percent` decimal(5,2) NOT NULL DEFAULT '18.00',
+  `boq_grand_total` decimal(18,2) NOT NULL DEFAULT '0.00',
   PRIMARY KEY (`tender_id`),
   KEY `customer_id` (`customer_id`),
   KEY `region_id` (`region_id`(250)),
@@ -7822,6 +7825,46 @@ CREATE TABLE `tenders` (
   KEY `council_id` (`council_id`(250)),
   KEY `ward_id` (`ward_id`(250))
 ) ENGINE=InnoDB AUTO_INCREMENT=28 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `tender_boq_bills`
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `tender_boq_bills` (
+  `bill_id` int NOT NULL AUTO_INCREMENT,
+  `tender_id` int NOT NULL,
+  `bill_title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Bill No. 1 - General',
+  `sort_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`bill_id`),
+  KEY `idx_tbb_tender` (`tender_id`),
+  CONSTRAINT `fk_tbb_tender` FOREIGN KEY (`tender_id`) REFERENCES `tenders` (`tender_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `tender_boq_items`
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `tender_boq_items` (
+  `item_id` int NOT NULL AUTO_INCREMENT,
+  `bill_id` int NOT NULL,
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `unit` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `qty` decimal(12,3) NOT NULL DEFAULT '0.000',
+  `rate` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `amount` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `sort_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`item_id`),
+  KEY `idx_tbi_bill` (`bill_id`),
+  CONSTRAINT `fk_tbi_bill` FOREIGN KEY (`bill_id`) REFERENCES `tender_boq_bills` (`bill_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

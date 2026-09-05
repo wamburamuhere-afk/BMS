@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-09-05 (feat) - tender.md Phase A: Bills of Quantities (BOQ) engine for Tenders
+
+**Files (added):** `migrations/2026_09_05_tender_boq.php`, `core/tender_boq.php`, `api/tender_boq.php`,
+`app/bms/tenders/tender_boq.php`, `app/bms/tenders/_tender_nav.php`, `tests/test_tender_boq_cli.php`
+**Files (modified):** `schema/tenant_schema_template.sql`, `roots.php`, `core/permissions.php`,
+`core/feature_registry.php`, `app/bms/tenders/tender_view.php`, `app/bms/tenders/tender_edit.php`,
+`app/bms/tenders/tenders.php`
+
+First phase of the tender-module professional upgrade (plan: `tender.md`, benchmarked against a
+competing product's Bidding & Tenders module). Adds a real Bills of Quantities engine — multiple
+named bill sections (`tender_boq_bills`) each holding priced line items (`tender_boq_items`), rolling
+into a Collection/Summary with contingency % and VAT % on `tenders` (`boq_contingency_percent`,
+`boq_vat_percent`, `boq_grand_total`). All grand-total math lives in one place
+(`core/tender_boq.php::recomputeTenderBoqTotal()`) so the server never trusts a client-submitted total.
+
+Previously a tender's bid amount was a single manually-typed number with nothing behind it. The BOQ
+now feeds the Financial Submission modal's amount field as a pre-fill (`tenders.php`'s
+`openSubmissionModal()`), not a silent overwrite — still fully editable, since `tender_amount_tzs`
+represents what was actually submitted, an explicit user action.
+
+Added a shared tab bar (`_tender_nav.php`, currently Details/Edit/BOQ) across the tender record pages
+so subsequent phases (Materials Schedule, Checklist, Form of Tender, Print) attach to the same nav
+instead of each inventing their own. Verified with `tests/test_tender_boq_cli.php` (24 assertions:
+schema, exact BOQ math, cascade-delete recompute, cross-tender write-guard) and a clean unauthenticated
+HTTP round-trip against the live vhost.
+
 ## 2026-09-05 (feat) - ternant.md Phase 7: register the existing production install as Tenant #1
 
 **Files (added):** `scripts/migrate_tenant_one.php`

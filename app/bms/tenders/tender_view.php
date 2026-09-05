@@ -79,6 +79,8 @@ $company_logo = getSetting('company_logo', '');
         </div>
     </div>
 
+    <?php $tenderNavActive = 'view'; require __DIR__ . '/_tender_nav.php'; ?>
+
     <!-- 1: Tender & Institution Information -->
     <div class="row g-4 mb-4">
         <div class="col-md-6">
