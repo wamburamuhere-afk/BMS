@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-09-05 (feat) - tender.md Phase B: Materials Schedule for Tenders (linked to the product catalogue)
+
+**Files (added):** `migrations/2026_09_05_tender_materials.php`, `api/tender_materials.php`,
+`app/bms/tenders/tender_materials.php`, `tests/test_tender_materials_cli.php`
+**Files (modified):** `schema/tenant_schema_template.sql`, `roots.php`, `core/permissions.php`,
+`core/feature_registry.php`, `app/bms/tenders/_tender_nav.php`
+
+Second phase of the tender-module upgrade (`tender.md`). Adds a Materials Schedule to each tender —
+a pre-award bid-costing estimate distinct from (but linked to) the existing NIP Material Lists used
+for post-award procurement. Each line optionally references an existing `products` row via a nullable
+`product_id` (`ON DELETE SET NULL`, not CASCADE, so the pricing line survives even if the catalogue
+item is later removed) — a Select2 field with AJAX search + free-text tagging, so a material can
+either point at something already catalogued or just be typed, per `tender.md` §3's explicit rule
+against duplicating the NIP concept. `product_id` is what Phase E's award carry-over will read to
+decide whether to link an existing product into the new project's material list or create one first.
+
+Verified with `tests/test_tender_materials_cli.php` (17 assertions: schema/FK presence, linked vs
+free-text amount math, the SET NULL behavior, cross-tender write guard) plus a re-run of Phase A's
+test (24/24, no regression) and a clean unauthenticated HTTP round-trip.
+
 ## 2026-09-05 (feat) - tender.md Phase A: Bills of Quantities (BOQ) engine for Tenders
 
 **Files (added):** `migrations/2026_09_05_tender_boq.php`, `core/tender_boq.php`, `api/tender_boq.php`,

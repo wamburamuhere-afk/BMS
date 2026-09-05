@@ -7868,6 +7868,32 @@ CREATE TABLE `tender_boq_items` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `tender_materials`
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `tender_materials` (
+  `material_id` int NOT NULL AUTO_INCREMENT,
+  `tender_id` int NOT NULL,
+  `product_id` int DEFAULT NULL,
+  `material` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `specification` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `unit` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `qty` decimal(12,3) NOT NULL DEFAULT '0.000',
+  `rate` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `amount` decimal(18,2) NOT NULL DEFAULT '0.00',
+  `sort_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`material_id`),
+  KEY `idx_tm_tender` (`tender_id`),
+  KEY `idx_tm_product` (`product_id`),
+  CONSTRAINT `fk_tm_tender` FOREIGN KEY (`tender_id`) REFERENCES `tenders` (`tender_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_tm_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`product_id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `training_participants`
 --
 

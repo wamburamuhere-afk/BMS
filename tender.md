@@ -217,7 +217,28 @@ for a future session to verify against rather than re-derive:
 - **Permission:** reuse the existing `tenders` page key — this is data on the same
   entity, not a new module.
 
-### Phase B — Materials Schedule ☐
+### Phase B — Materials Schedule ☑ DONE (2026-09-05)
+Implemented on branch `feat/tender-professional-upgrade`. What shipped:
+- Migration `migrations/2026_09_05_tender_materials.php` (run + idempotent) +
+  mirrored into `schema/tenant_schema_template.sql`, right after the BOQ tables.
+- `tender_materials` table with the §3-mandated nullable `product_id` FK
+  (`ON DELETE SET NULL` — deliberately not CASCADE, so the tender's pricing
+  record survives even if the catalogue product behind it is later deleted).
+- `api/tender_materials.php` — `ADD_ITEM`, `DELETE_ITEM`, `SAVE_MATERIALS`
+  (same cross-tender ownership guard pattern as Phase A's `SAVE_BOQ`), plus a
+  `SEARCH_PRODUCTS` read action powering the Select2 lookup.
+- `app/bms/tenders/tender_materials.php` — new page, added as a tab in
+  `_tender_nav.php`. The material-name field is a Select2 with `tags: true` +
+  AJAX search against `products` (including existing NIPs) — picking a real
+  catalogue hit sets a hidden `product_id`; typing a new name leaves it null
+  and just stores the text. This is the actual mechanism behind §3's
+  Materials/NIP linkage rule; Phase E's award carry-over reads `product_id`
+  off these rows to decide "reference the existing product" vs "create a new
+  NIP product first."
+- Test: `tests/test_tender_materials_cli.php` — 17/17 assertions (lint, schema
+  + FK presence, linked-vs-free-text math, the SET NULL behavior, cross-tender
+  guard). Phase A's test re-run clean alongside it (24/24, no regression).
+  Verified over HTTP: clean 302 → `/login` on the new page, unauthenticated.
 - **Schema:** `tender_materials` (`material_id` PK, `tender_id` FK, `product_id`
   int **nullable** FK → `products.product_id` (see §3's Materials/NIP linkage
   rule — this is the field that prevents duplicating the NIP concept), `material`
@@ -369,7 +390,7 @@ that phase touched; after all phases, one real end-to-end test.
 | Phase | Description | Status | Last touched |
 |---|---|---|---|
 | A | BOQ engine | ☑ Done | 2026-09-05 |
-| B | Materials Schedule | ☐ Not started | — |
+| B | Materials Schedule | ☑ Done | 2026-09-05 |
 | C | Compliance checklist | ☐ Not started | — |
 | D | Form of Tender auto-draft | ☐ Not started | — |
 | E | Tender → Project linkage hardening | ☐ Not started | — |
@@ -377,7 +398,8 @@ that phase touched; after all phases, one real end-to-end test.
 | G | Permissions/registry/migration hygiene | ☐ Not started | — |
 | H | Tests | ☐ Not started | — |
 
-**Next action when resuming:** start Phase B (Materials Schedule) — Phase A is
-done and merged-to-branch; see its write-up above for exactly what exists to
-build on (`core/tender_boq.php`, `_tender_nav.php`'s tab pattern, the
-`tender_boq` route).
+**Next action when resuming:** start Phase C (PPRA Compliance Checklist) —
+Phases A and B are done; see their write-ups above for what exists to build on
+(`core/tender_boq.php`, `_tender_nav.php`'s tab pattern now holding Details/Edit/
+BOQ/Materials, the `tender_materials.product_id` linkage Phase E's carry-over
+will read).
