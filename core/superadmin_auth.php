@@ -328,6 +328,7 @@ if (!function_exists('superadminRouteMap')) {
         return [
             ''             => $d . 'index.php',
             'dashboard'    => $d . 'dashboard.php',
+            'activity'     => $d . 'activity.php',
             'settings'     => $d . 'settings.php',
             'plans'        => $d . 'plans.php',
             'tenants'      => $d . 'tenants.php',
