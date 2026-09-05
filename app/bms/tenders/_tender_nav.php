@@ -14,6 +14,7 @@ $tenderNavTabs = [
     'boq'  => ['label' => 'Bills of Quantities', 'icon' => 'bi-receipt-cutoff',    'route' => 'tender_boq'],
     'materials' => ['label' => 'Materials Schedule', 'icon' => 'bi-boxes',         'route' => 'tender_materials'],
     'checklist' => ['label' => 'Checklist',          'icon' => 'bi-check2-square', 'route' => 'tender_checklist'],
+    'fot'  => ['label' => 'Form of Tender',           'icon' => 'bi-envelope-paper', 'route' => 'tender_form_of_tender'],
 ];
 ?>
 <div class="d-flex flex-wrap gap-2 mb-3 no-print">

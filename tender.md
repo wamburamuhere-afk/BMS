@@ -303,7 +303,41 @@ Implemented on branch `feat/tender-professional-upgrade`. What shipped:
   (only for `is_custom = 1` rows — the 19 standard items can't be deleted, only
   unchecked, so the count stays meaningful).
 
-### Phase D — Form of Tender auto-draft ☐
+### Phase D — Form of Tender auto-draft ☑ DONE (2026-09-05)
+Implemented on branch `feat/tender-professional-upgrade`. What shipped:
+- Migration `migrations/2026_09_05_tender_form_of_tender.php` adds
+  `tenders.form_of_tender_html` (mediumtext, null until first drafted/saved),
+  `form_of_tender_date`, and **`bid_validity_days` (int, default 90)** — this
+  last one wasn't in the original plan; discovered mid-implementation that
+  BMS's `tenders` table had no equivalent of Facile's "Bid Validity (days)"
+  field at all, and the letter genuinely needs it for the validity paragraph.
+  Mirrored into `schema/tenant_schema_template.sql`.
+- `core/tender_documents.php` — `draftFormOfTenderBodyHtml()` (the editable
+  body paragraphs only), `tenderFormOfTenderRecipientHtml()` and
+  `tenderFormOfTenderSubject()` (always deterministic from tender_no/
+  tender_description/procuring_entity_name — deliberately NOT part of the
+  editable draft, since Tender Details is already their canonical source;
+  cleaner than Facile's single flat textarea covering everything).
+- `api/tender_form_of_tender.php` — `SAVE_LETTER`, `REDRAFT` (regenerates and
+  overwrites, matching Facile's "Re-draft From Details"), and `PRINT` (a
+  read-only GET, no CSRF needed) which **reuses the existing
+  `core/document_letter_render.php` / `core/document_letter_pdf.php` engine**
+  per `tender.md` §2 row 4 and §3 — the Form of Tender gets company
+  letterhead, e-signature support and the audited "Printed by" footer for
+  free, none of which Facile's own print view has.
+- `app/bms/tenders/tender_form_of_tender.php` — new page (5th tab), Summernote
+  rich-text editor for the body, "Print / Save PDF" opens the PDF in a new tab.
+- Test: `tests/test_tender_form_of_tender_cli.php` — 22/22 assertions,
+  including an actual **end-to-end PDF generation** (not just string checks):
+  drafts a letter from a test tender + its BOQ total, feeds it through the
+  real `generateLetterPdf()`, and asserts a valid, non-trivial PDF file comes
+  out (`%PDF-` header, plausible size). This is the closest this session could
+  get to "does it actually work" without a logged-in browser session — the
+  PDF pipeline was proven end to end even though nobody looked at the
+  rendered page. Also asserts the "not yet priced" case is honest (says so
+  rather than claiming a fake TZS 0 figure). Phases A/B/C re-run clean
+  (24/17/20). Clean 302 → `/login` on the page and clean 401 on the PDF
+  endpoint, both unauthenticated.
 - **Schema:** `tenders.form_of_tender_html` (mediumtext, nullable) — stores the
   user's edited version once they've touched it, same "drafted until edited"
   behavior as Facile.
@@ -426,14 +460,16 @@ that phase touched; after all phases, one real end-to-end test.
 | A | BOQ engine | ☑ Done | 2026-09-05 |
 | B | Materials Schedule | ☑ Done | 2026-09-05 |
 | C | Compliance checklist | ☑ Done | 2026-09-05 |
-| D | Form of Tender auto-draft | ☐ Not started | — |
+| D | Form of Tender auto-draft | ☑ Done | 2026-09-05 |
 | E | Tender → Project linkage hardening | ☐ Not started | — |
 | F | Print + NeST shortcut | ☐ Not started | — |
 | G | Permissions/registry/migration hygiene | ☐ Not started | — |
 | H | Tests | ☐ Not started | — |
 
-**Next action when resuming:** start Phase D (Form of Tender auto-draft) —
-Phases A, B and C are done; see their write-ups above. `_tender_nav.php` now
-holds Details/Edit/BOQ/Materials/Checklist — Phase D adds "Form of Tender" as
-its 6th tab, and should reuse `core/document_letter_render.php`'s
-`renderLetterHtml()` for the actual PDF per `tender.md` §2 row 4 and §3.
+**Next action when resuming:** start Phase E (Tender → Project linkage
+hardening) — Phases A–D are done; see their write-ups above. This is the
+highest-value remaining phase (closes all six §2.1 gaps: traceability, the
+budget-promise bug, the winning-team access gap, idempotency, currency, and
+the BOQ/Materials carry-over — the latter two now have real data to carry,
+since Phases A and B exist). `_tender_nav.php` holds Details/Edit/BOQ/
+Materials/Checklist/Form of Tender.

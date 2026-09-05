@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-09-05 (feat) - tender.md Phase D: Form of Tender auto-draft, reusing the letterhead/PDF engine
+
+**Files (added):** `migrations/2026_09_05_tender_form_of_tender.php`, `core/tender_documents.php`,
+`api/tender_form_of_tender.php`, `app/bms/tenders/tender_form_of_tender.php`,
+`tests/test_tender_form_of_tender_cli.php`
+**Files (modified):** `schema/tenant_schema_template.sql`, `roots.php`, `core/permissions.php`,
+`core/feature_registry.php`, `app/bms/tenders/_tender_nav.php`
+
+Fourth phase of the tender-module upgrade (`tender.md`). Auto-drafts the PPRA-standard "Form of
+Tender" covering letter from the tender's own data (tender number, title, procuring entity, and
+Phase A's BOQ grand total) and a validity-period paragraph — which needed a new `bid_validity_days`
+column since `tenders` had no equivalent of the standard "Bid Validity (days)" field at all.
+Recipient/subject are deterministic (not separately editable) since Tender Details already owns that
+data; only the body is user-editable (Summernote), with a "Re-draft From Details" reset.
+
+Printing reuses the existing `core/document_letter_render.php`/`document_letter_pdf.php` engine
+instead of building a second PDF pipeline — the letter gets company letterhead, e-signature support
+and the audited footer for free.
+
+Verified with `tests/test_tender_form_of_tender_cli.php` (22 assertions), including an actual
+end-to-end PDF generation (drafts a letter, runs it through `generateLetterPdf()`, asserts a valid
+non-trivial PDF comes out) — the closest available proof this pipeline genuinely works without a
+logged-in browser session. Phases A/B/C re-run clean (24/17/20).
+
 ## 2026-09-05 (feat) - tender.md Phase C: PPRA compliance checklist for Tenders
 
 **Files (added):** `migrations/2026_09_05_tender_checklist.php`, `core/tender_checklist.php`,
