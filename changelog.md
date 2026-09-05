@@ -1,5 +1,43 @@
 # BMS Changelog
 
+## 2026-09-05 (feat) - Dashboard: 5 new monitoring metrics across 3 charts
+
+**Files (changed):** `app/superadmin/dashboard.php`
+
+User picked 5 of 6 researched candidate metrics (all except trial-to-active conversion) to add
+alongside the existing "new tenants per month" chart. Checked the actual control-DB schema first
+(`tenants` has no `deleted_at`; `plans` has no price column, so MRR/revenue is genuinely not possible
+yet) so every suggestion was grounded in real, queryable data before anything was built.
+
+Followed the dataviz skill's procedure throughout: picked the form before color, ran
+`validate_palette.js` on the categorical triple before shipping it (all hard gates pass; aqua's
+sub-3:1 light-surface contrast WARN is mitigated by the always-visible legend text, not color alone),
+kept every multi-series chart on one shared y-axis (no dual-axis charts), and split by scale/question
+into three focused charts rather than one crowded one:
+
+- **Growth & Retention** (extends the existing chart) — New (bar, up) and Churned (bar, shown BELOW
+  zero — reads as net change at a glance) share an axis since both are monthly tenant counts;
+  Suspended is a line overlay (a reversible, at-risk signal, deliberately a different mark type from
+  the hard add/remove bars). Y-axis and tooltip both show absolute values — churned is stored negative
+  purely for bar direction, never displayed as a negative customer count.
+- **Cumulative Tenants (Net)** — new chart, its own axis (a running total of ~30 vs. monthly deltas of
+  0-5 would flatten the bars if forced onto one scale). Deliberately NOT labelled "active tenants": a
+  suspended-but-undeleted tenant still counts as retained, since the schema keeps no historical
+  status-change record to reconstruct true point-in-time "active" counts — anchored to the tenant count
+  that already existed before the 12-month window, so month 1 reads as a real running total.
+  Single series, no legend (title already names it).
+- **Signup & Provisioning Health** — new chart, Failed provisioning attempts + Blocked/throttled
+  signups, grouped bars. A different question (platform friction/security) from tenant lifecycle, so a
+  separate chart rather than folded into Growth & Retention.
+
+Backend: one `saMonthlySeries()` helper replaces the previous one-off query, so every new metric is a
+single parameterised call; each wrapped in its own try/catch (a missing/broken table costs only that
+series, same discipline as the existing "requires attention" feed).
+
+Verified by rendering the actual page (disposable local superadmin account) and viewing it in a real
+browser: bars go the correct direction, axis/tooltip never show a negative count, legend and colors
+render as configured.
+
 ## 2026-09-05 (feat) - Modules (platform-wide) page gets a real DataTable
 
 **Files (changed):** `app/superadmin/features.php`
