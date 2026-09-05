@@ -1,5 +1,46 @@
 # BMS Changelog
 
+## 2026-09-05 (feat) - ternant.md Phase 7: register the existing production install as Tenant #1
+
+**Files (added):** `scripts/migrate_tenant_one.php`
+
+The last remaining phase of the multi-tenancy rollout. Registers the existing `bms` database as a
+`tenants` row and retires its root/blank-password connection in favour of a dedicated, database-scoped
+`bms_u{id}` MySQL user — the same three `CREATE USER`/`GRANT`/`FLUSH PRIVILEGES` statements
+`provisionTenant()` already uses for every other tenant, reusing `generateTenantDbPassword()`,
+`getProvisioningPdo()` and `encryptTenantSecret()` rather than re-implementing any of them.
+
+Deliberately does **not** rename/move the `bms` database (`docs/MULTI_TENANCY_CONVENTIONS.md` §1's
+documented exception), does **not** touch a single uploaded document (`bmsTenantPathPrefix()` already
+gives an empty prefix to any tenant whose `db_name` matches this install's own `DB_NAME`, which is
+exactly this row — verified empirically, not just reasoned: registered a local test tenant, called
+`bmsTenantPathPrefix()` against it, got `""`), and does **not** change how the site is reached (the
+bare production hostname resolves to `status: 'none'` in `resolveTenantFromRequest()` regardless of
+this row's existence — this script only changes what that fallback path connects *as*).
+
+Resumable by design: reserves the `tenants` row first, then creates the MySQL user, then verifies a
+real connection with it works, then finalises the row — same order as `provisionTenant()`'s own
+"reserve first, finalise last" discipline, for the identical reason (the username is derived from the
+row's own auto-increment id, so the row must exist first). Re-running after a partial failure resumes
+from the existing row instead of inserting a second one or refusing outright.
+
+Verified end-to-end locally against the local `bms` database (which shares the same `DB_NAME` shape as
+production): ran the script, confirmed idempotency on a second run ("Already done"), decrypted the
+stored password back to the exact generated plaintext, confirmed the upload-path prefix is genuinely
+empty, then cleaned up the test tenant row and MySQL user afterward.
+
+Also correcting a gap: the two dashboard follow-up PRs after the original 3-chart entry below
+(consolidating to one 6-line chart, then swapping the Activity/Module Adoption panels and colorizing
+the stat cards) shipped without their own changelog entries. Recorded together, retroactively, here:
+- **2026-09-05 (feat)** — Consolidated Growth & Retention / Cumulative Tenants (Net) / Signup &
+  Provisioning Health into one "Tenant Growth & Health" chart, all 6 metrics as lines on one shared
+  axis, per direct feedback that the 3-chart/bar version wasn't wanted.
+- **2026-09-05 (feat)** — Swapped Recent Platform Activity and Module Adoption panel positions,
+  colorized the 4 stat cards with the tenant dashboard's own bg-primary/success/warning/info
+  convention, and added a "View All" button + new `app/superadmin/activity.php` full activity log page
+  (DataTable over the last 500 `tenant_admin_log` rows) — `saTimeAgo()`/`saActionMeta()` moved into
+  `core/tenant_admin.php` so both views share one source.
+
 ## 2026-09-05 (feat) - Dashboard: 5 new monitoring metrics across 3 charts
 
 **Files (changed):** `app/superadmin/dashboard.php`
