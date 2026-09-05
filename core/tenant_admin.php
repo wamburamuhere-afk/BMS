@@ -680,3 +680,47 @@ if (!function_exists('tenantUserDirectory')) {
         }
     }
 }
+
+// ── Shared display helpers for tenant_admin_log ─────────────────────────────
+// Used by both the dashboard's Recent Platform Activity panel (last 12) and
+// the full Activity log page (up to 500) — one place, so the icon/color/label
+// for a given action can never drift between the two views.
+
+if (!function_exists('saTimeAgo')) {
+    function saTimeAgo(string $datetime): string
+    {
+        $diff = time() - strtotime($datetime);
+        if ($diff < 60)     return 'just now';
+        if ($diff < 3600)   { $m = (int)floor($diff / 60);    return $m . ($m > 1 ? ' minutes ago' : ' minute ago'); }
+        if ($diff < 86400)  { $h = (int)floor($diff / 3600);  return $h . ($h > 1 ? ' hours ago'   : ' hour ago'); }
+        if ($diff < 604800) { $d = (int)floor($diff / 86400); return $d . ($d > 1 ? ' days ago'    : ' day ago'); }
+        return date('d M Y', strtotime($datetime));
+    }
+}
+
+if (!function_exists('saActionMeta')) {
+    /** action => [icon, bootstrap color, human label] */
+    function saActionMeta(string $action): array
+    {
+        static $map = [
+            'create'               => ['bi-plus-circle',           'success',   'Created tenant'],
+            'create_failed'        => ['bi-x-circle',               'danger',    'Failed to create tenant'],
+            'suspend'               => ['bi-pause-circle',           'warning',   'Suspended tenant'],
+            'activate'              => ['bi-play-circle',            'primary',   'Activated tenant'],
+            'delete'                => ['bi-trash',                  'danger',    'Deleted tenant'],
+            'delete_refused'        => ['bi-shield-x',                'secondary', 'Delete refused (name mismatch)'],
+            'delete_partial'        => ['bi-exclamation-triangle',   'danger',    'Delete left cleanup debris'],
+            'update_features'       => ['bi-grid',                   'primary',   'Updated modules'],
+            'update_quotas'         => ['bi-speedometer',            'primary',   'Updated quotas'],
+            'platform_feature'      => ['bi-toggles',                'primary',   'Changed a platform-wide module'],
+            'sa_credential_change'  => ['bi-person-gear',            'secondary', 'Updated their own account'],
+            'plan_create'            => ['bi-box-seam',               'success',   'Created a plan'],
+            'plan_update'            => ['bi-box-seam',               'primary',   'Updated a plan'],
+            'plan_activate'          => ['bi-play-circle',            'primary',   'Restored a plan'],
+            'plan_deactivate'        => ['bi-pause-circle',           'secondary', 'Retired a plan'],
+            'apply_plan'             => ['bi-check2-circle',          'success',   'Applied a plan to tenant'],
+            'platform_settings'      => ['bi-gear-wide-connected',    'primary',   'Updated platform settings'],
+        ];
+        return $map[$action] ?? ['bi-activity', 'secondary', ucfirst(str_replace('_', ' ', $action))];
+    }
+}
