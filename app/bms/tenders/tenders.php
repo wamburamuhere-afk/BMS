@@ -1105,7 +1105,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
     let actionHtml = '';
     if (status === 'PENDING') actionHtml = `<li><a class="dropdown-item fw-bold text-success" href="#" onclick="openWorkflowModal('#approveModal', ${id}, '${no}')"><i class="bi bi-check2-circle"></i> Approve</a></li>`;
     else if (status === 'APPROVED') actionHtml = `<li><a class="dropdown-item fw-bold text-primary" href="#" onclick="openWorkflowModal('#feeModal', ${id}, '${no}')"><i class="bi bi-cash-stack"></i> Fees</a></li>`;
-    else if (status === 'INVITATION') actionHtml = `<li><a class="dropdown-item fw-bold text-primary" href="#" onclick="openSubmissionModal(${id}, '${no}')"><i class="bi bi-send"></i> Mark as Submission</a></li>`;
+    else if (status === 'INVITATION') actionHtml = `<li><a class="dropdown-item fw-bold text-primary" href="#" onclick="openSubmissionModal(${id}, '${no}', ${t.boq_grand_total || 0})"><i class="bi bi-send"></i> Mark as Submission</a></li>`;
     else if (status === 'SUBMISSION') actionHtml = `<li><a class="dropdown-item fw-bold text-primary" href="#" onclick="updateTenderStatus(${id}, 'OPENING', 'Opening')"><i class="bi bi-unlock"></i> Mark as Opening</a></li>`;
     else if (status === 'OPENING') actionHtml = `<li><a class="dropdown-item fw-bold text-primary" href="#" onclick="openEvaluationModal(${id}, '${no}', '${t.currency || 'Tshs'}', '${t.tender_amount_tzs || ''}', '${t.tender_amount_usd || ''}', '${t.submission_document_tzs || ''}', '${t.submission_document_usd || ''}')"><i class="bi bi-journal-check"></i> Mark as Evaluation</a></li>`;
     else if (status === 'EVALUATION') actionHtml = `<li><a class="dropdown-item fw-bold text-primary" href="#" onclick="openWorkflowModal('#postQualModal', ${id}, '${no}')"><i class="bi bi-award"></i> Post-Qualification</a></li>`;
@@ -1365,9 +1365,14 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
     $(modalId).modal('show');
  }
 
-  function openSubmissionModal(id, no) {
+  function openSubmissionModal(id, no, boqGrandTotal) {
     $('#submissionForm .tender-id-input').val(id);
     $('#submissionModal .tender-no-display').text(no);
+    // Pre-fill from the priced BOQ (if one exists) — still fully editable,
+    // the BOQ is the source of truth but never locks out a manual figure.
+    if (boqGrandTotal && parseFloat(boqGrandTotal) > 0 && !$('#sub_amount_tzs_input').val()) {
+        $('#sub_amount_tzs_input').val(parseFloat(boqGrandTotal).toFixed(2));
+    }
     $('#submissionModal').modal('show');
   }
 
@@ -1668,7 +1673,17 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
         success: function(res) {
             if (res.success) {
                 $(modalId).modal('hide');
-                Swal.fire('Success', res.message, 'success').then(() => reloadTenders());
+                // Award decision: the winning team needs a direct way to the
+                // project that was just created for it, not just a toast.
+                if (res.project_id) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Tender Awarded!',
+                        html: `${safeOutput(res.message)}<br><a href="<?= getUrl('project_view') ?>?id=${res.project_id}" class="btn btn-sm btn-primary mt-2"><i class="bi bi-arrow-right-circle"></i> View Project</a>`,
+                    }).then(() => reloadTenders());
+                } else {
+                    Swal.fire('Success', res.message, 'success').then(() => reloadTenders());
+                }
             } else {
                 Swal.fire('Error', res.message, 'error');
                 $btn.prop('disabled', false).text('Try Again');
