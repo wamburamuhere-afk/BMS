@@ -271,6 +271,64 @@ try {
     ");
     say('  · table tenant_features ready');
 
+    // ── Platform settings (ternant.md Phase "superadmin professional gap") ──
+    // The control database's only general-purpose settings store. Mirrors the
+    // tenant-side `system_settings` key/value shape (get_setting()/save_setting()
+    // in helpers.php) on purpose — same shape, same mental model, just scoped to
+    // the platform rather than one company. Starts empty; a platform with no
+    // email configured yet degrades to "platform mail disabled", never a fatal.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`platform_settings` (
+            `setting_key`   VARCHAR(64) NOT NULL,
+            `setting_value` TEXT        NULL,
+            `updated_at`    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            `updated_by`    INT         NULL,
+            PRIMARY KEY (`setting_key`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table platform_settings ready');
+
+    // ── Plans (superadmin professional-gap plan, Phase C) ────────────────────
+    // A reusable bundle: a name, a feature set, and quota limits — so an
+    // operator can apply "Starter"/"Pro" in one click instead of hand-setting
+    // every tenant's features and quotas individually. Deliberately NOT a new
+    // enforcement mechanism: applying a plan just calls the existing
+    // setTenantFeatures()/setTenantQuotas() (Phases 11/12) with the plan's
+    // values, so a tenant stays fully independently editable afterward — a
+    // plan is a starting point, not a rigid link. No tenants.plan_id FK: the
+    // existing tenants.plan VARCHAR is set to the plan's name at apply time,
+    // same denormalised-label convention as tenant_admin_log.actor_email — a
+    // later rename or retirement of the plan does not disturb tenants that
+    // already applied it.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`plans` (
+            `id`             INT AUTO_INCREMENT PRIMARY KEY,
+            `plan_key`       VARCHAR(64)  NOT NULL,
+            `name`           VARCHAR(100) NOT NULL,
+            `description`    VARCHAR(255) NULL,
+            `max_users`      INT          NULL,
+            `max_storage_mb` INT          NULL,
+            `is_active`      TINYINT(1)   NOT NULL DEFAULT 1,
+            `sort_order`     INT          NOT NULL DEFAULT 0,
+            `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY `uq_plans_key` (`plan_key`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table plans ready');
+
+    // Which features a plan includes. Absence = not included — applying a
+    // plan is a COMPLETE feature-set replacement (same semantics as
+    // tenant_features's own override rows), not an incremental grant.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`plan_features` (
+            `plan_id`     INT         NOT NULL,
+            `feature_key` VARCHAR(64) NOT NULL,
+            PRIMARY KEY (`plan_id`, `feature_key`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table plan_features ready');
+
     // Seed the catalogue from the code registry — the one source of truth for
     // which features exist (core/feature_registry.php). INSERT IGNORE, so an
     // operator's own is_available/default_enabled edits are never overwritten by

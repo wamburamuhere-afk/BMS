@@ -29,6 +29,49 @@
 
 require_once __DIR__ . '/control_db.php';
 require_once __DIR__ . '/tenant_crypto.php';
+require_once __DIR__ . '/tenant_resolver.php';
+
+if (!function_exists('sendTenantWelcomeEmail')) {
+    /**
+     * Best-effort welcome email to a brand-new tenant's owner: their sign-in
+     * link. A no-op (not an error) when platform email is not yet configured —
+     * see core/platform_settings.php's docblock for why platform-originated
+     * mail is deliberately separate from any tenant's own SMTP settings.
+     *
+     * Never throws — called from provisionTenant() AFTER the tenant already
+     * exists and is verified working (same discipline as
+     * seedTenantCompanyProfile()'s call site: a hiccup here must not tear the
+     * tenant down, since the important thing already succeeded).
+     */
+    function sendTenantWelcomeEmail(string $companyName, string $subdomain, string $ownerEmail): bool
+    {
+        require_once __DIR__ . '/platform_settings.php';
+        require_once __DIR__ . '/mailer.php';
+
+        $mailer = platformMailerOpts();
+        if (!$mailer['configured']) return false;   // nothing configured yet — not an error
+
+        $base = tenantBaseDomain();
+        if ($base === null || $base === '') return false;
+
+        $scheme   = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $loginUrl = $scheme . '://' . $subdomain . '.' . $base . '/login';
+        $platformName = getPlatformSetting('platform_name', 'BMS Platform');
+
+        $safeCompany = htmlspecialchars($companyName, ENT_QUOTES, 'UTF-8');
+        $safePlatform = htmlspecialchars($platformName, ENT_QUOTES, 'UTF-8');
+        $safeUrl = htmlspecialchars($loginUrl, ENT_QUOTES, 'UTF-8');
+
+        $subject = "Welcome to {$platformName} — {$companyName} is ready";
+        $body = "<p>Hello,</p>"
+              . "<p>Your company <strong>{$safeCompany}</strong> is now set up on {$safePlatform}.</p>"
+              . "<p><a href=\"{$safeUrl}\" style=\"display:inline-block;background:#0d6efd;color:#fff;"
+              . "padding:10px 20px;border-radius:6px;text-decoration:none;\">Sign in to your account</a></p>"
+              . "<p style=\"font-size:12px;color:#6c757d;\">Or copy this link: {$safeUrl}</p>";
+
+        return sendEmail($ownerEmail, $subject, $body, $mailer['opts']);
+    }
+}
 
 /**
  * Subdomains a tenant may not claim. Either already in use by infrastructure,
@@ -487,6 +530,22 @@ if (!function_exists('provisionTenant')) {
             } catch (Throwable $e) {
                 $step('seed_company_profile', 'failed', $e->getMessage());
                 logProvisioningStep($tenantId, $subdomain, 'seed_company_profile', 'failed', $e->getMessage());
+            }
+
+            // ── 9.6 Welcome email — best-effort, same discipline as 9.5 ──────
+            // tenant_provisioning_log.status is ENUM('started','ok','failed',
+            // 'rolled_back') — not sending because platform email simply isn't
+            // configured yet is a benign, expected outcome here, not a
+            // provisioning failure, so it logs 'ok' with the reason in the
+            // message rather than inventing an enum value the column doesn't have.
+            try {
+                $sent = sendTenantWelcomeEmail($companyName, $subdomain, $ownerEmail);
+                $step('welcome_email', 'ok', $sent ? 'sent' : 'skipped (platform email not configured)');
+                logProvisioningStep($tenantId, $subdomain, 'welcome_email', 'ok',
+                    $sent ? 'sent' : 'skipped (platform email not configured, or no base domain resolved)');
+            } catch (Throwable $e) {
+                $step('welcome_email', 'failed', $e->getMessage());
+                logProvisioningStep($tenantId, $subdomain, 'welcome_email', 'failed', $e->getMessage());
             }
 
             $result['ok'] = true;

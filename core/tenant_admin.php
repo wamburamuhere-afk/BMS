@@ -21,6 +21,7 @@
  *   activateTenant(int $id): array
  *   deleteTenant(int $id, string $typedName): array
  *   tenantAdminLog(?int $tenantId = null, int $limit = 50): array
+ *   tenantUserDirectory(int $tenantId): ?array
  */
 
 require_once __DIR__ . '/control_db.php';
@@ -601,5 +602,81 @@ if (!function_exists('createTenantAsOperator')) {
             // load the public signup flow just to format a URL.
             'login_url' => operatorTenantLoginUrl($sub),
         ];
+    }
+}
+
+if (!function_exists('tenantUserDirectory')) {
+    /**
+     * A read-only directory of one tenant's staff accounts: who they are,
+     * whether they're active, and when they last signed in. Nothing else.
+     *
+     * A SECOND deliberate, narrow exception to "the superadmin panel never
+     * opens a tenant's own database" — same shape and same justification as
+     * core/tenant_quotas.php's tenantUsageSnapshotFor(), which this function
+     * deliberately does NOT share a connection-opening helper with. Factoring
+     * that into a shared "open any tenant's DB" utility would make the
+     * exception MORE available platform-wide than it is today — exactly what
+     * that file's own docblock argues against ("kept as narrow as the
+     * invariant it bends allows... easy to find, audit, and — if it is ever
+     * misused — remove"). Two small, independently-auditable, side-by-side
+     * exceptions are safer than one shared gateway future code could lean on
+     * for something broader.
+     *
+     * Called ON DEMAND from one explicit action
+     * (actions/superadmin_tenant_users.php), never automatically on
+     * tenant_view.php's normal page load — same discipline as usage snapshots.
+     *
+     * Returns ONLY: id, name, email, role, admin flag, active flag, last
+     * login, created date. Never a password hash, phone number, avatar, or
+     * anything from any other table — this is an account directory, not a
+     * window into the tenant's business data.
+     *
+     * @return array<int,array{user_id:int,name:string,email:string,role:string,is_admin:bool,is_active:bool,last_login:?string,created_at:?string}>|null
+     */
+    function tenantUserDirectory(int $tenantId): ?array
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT * FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch();
+            if (!$t || $t['status'] === 'deleted') return null;
+
+            $pw = decryptTenantSecret((string)$t['db_password_encrypted']);
+            if ($pw === null) return null;
+
+            $tPdo = new PDO(
+                'mysql:host=' . $t['db_host'] . ';dbname=' . $t['db_name'] . ';charset=utf8mb4',
+                $t['db_username'], $pw,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5]
+            );
+
+            $rows = $tPdo->query("
+                SELECT user_id, first_name, last_name, username, email,
+                       COALESCE(NULLIF(role, ''), user_role) AS role,
+                       is_admin, is_active, last_login, created_at
+                FROM users
+                ORDER BY is_active DESC, first_name, last_name
+                LIMIT 500
+            ")->fetchAll(PDO::FETCH_ASSOC);
+
+            $out = [];
+            foreach ($rows as $r) {
+                $name = trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''));
+                $out[] = [
+                    'user_id'    => (int)$r['user_id'],
+                    'name'       => $name !== '' ? $name : (string)$r['username'],
+                    'email'      => (string)($r['email'] ?? ''),
+                    'role'       => (string)($r['role'] ?? ''),
+                    'is_admin'   => (bool)$r['is_admin'],
+                    'is_active'  => (bool)$r['is_active'],
+                    'last_login' => $r['last_login'] !== null ? (string)$r['last_login'] : null,
+                    'created_at' => $r['created_at'] !== null ? (string)$r['created_at'] : null,
+                ];
+            }
+            return $out;
+        } catch (Throwable $e) {
+            error_log('tenantUserDirectory(' . $tenantId . '): ' . $e->getMessage());
+            return null;
+        }
     }
 }

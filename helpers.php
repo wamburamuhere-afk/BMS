@@ -562,19 +562,26 @@ if (!function_exists('get_setting')) {
     function get_setting($key, $default = '') {
         global $pdo;
         static $settings_cache = null;
-        
+
         if ($settings_cache === null) {
             $settings_cache = [];
-            try {
-                $stmt = $pdo->query("SELECT setting_key, setting_value FROM system_settings");
-                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                    $settings_cache[$row['setting_key']] = $row['setting_value'];
+            // No tenant database connected in this process (e.g. the superadmin
+            // panel, which deliberately never opens one) — there is no
+            // system_settings to read. Fall through to $default rather than
+            // calling a method on null, which throws an uncaught Error (not an
+            // Exception) that the catch below cannot see.
+            if ($pdo instanceof PDO) {
+                try {
+                    $stmt = $pdo->query("SELECT setting_key, setting_value FROM system_settings");
+                    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                        $settings_cache[$row['setting_key']] = $row['setting_value'];
+                    }
+                } catch (Exception $e) {
+                    // Silently fail if table doesn't exist yet
                 }
-            } catch (Exception $e) {
-                // Silently fail if table doesn't exist yet
             }
         }
-        
+
         return $settings_cache[$key] ?? $default;
     }
 }

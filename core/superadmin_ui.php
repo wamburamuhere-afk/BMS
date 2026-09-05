@@ -92,6 +92,8 @@ if (!function_exists('renderSuperadminHeader')) {
                             $navItem('dashboard', saUrl('dashboard'), 'bi-speedometer2', 'Dashboard');
                             $navItem('tenants',   saUrl('tenants'),   'bi-building',     'Tenants');
                             $navItem('features',  saUrl('features'), 'bi-grid',         'Modules');
+                            $navItem('plans',     saUrl('plans'),    'bi-box-seam',     'Plans');
+                            $navItem('settings',  saUrl('settings'), 'bi-gear-wide-connected', 'Settings');
                             ?>
                             <li class="nav-item ms-lg-2 my-1">
                                 <a href="<?= saUrl('tenants/new') ?>" class="btn btn-sm btn-light text-primary fw-bold px-3">
