@@ -303,40 +303,9 @@ try {
     error_log('superadmin dashboard (recent log): ' . $e->getMessage());
 }
 
-function saTimeAgo(string $datetime): string
-{
-    $diff = time() - strtotime($datetime);
-    if ($diff < 60)     return 'just now';
-    if ($diff < 3600)   { $m = (int)floor($diff / 60);    return $m . ($m > 1 ? ' minutes ago' : ' minute ago'); }
-    if ($diff < 86400)  { $h = (int)floor($diff / 3600);  return $h . ($h > 1 ? ' hours ago'   : ' hour ago'); }
-    if ($diff < 604800) { $d = (int)floor($diff / 86400); return $d . ($d > 1 ? ' days ago'    : ' day ago'); }
-    return date('d M Y', strtotime($datetime));
-}
-
-/** action => [icon, bootstrap color, human label] */
-function saActionMeta(string $action): array
-{
-    static $map = [
-        'create'               => ['bi-plus-circle',           'success',   'Created tenant'],
-        'create_failed'        => ['bi-x-circle',               'danger',    'Failed to create tenant'],
-        'suspend'               => ['bi-pause-circle',           'warning',   'Suspended tenant'],
-        'activate'              => ['bi-play-circle',            'primary',   'Activated tenant'],
-        'delete'                => ['bi-trash',                  'danger',    'Deleted tenant'],
-        'delete_refused'        => ['bi-shield-x',                'secondary', 'Delete refused (name mismatch)'],
-        'delete_partial'        => ['bi-exclamation-triangle',   'danger',    'Delete left cleanup debris'],
-        'update_features'       => ['bi-grid',                   'primary',   'Updated modules'],
-        'update_quotas'         => ['bi-speedometer',            'primary',   'Updated quotas'],
-        'platform_feature'      => ['bi-toggles',                'primary',   'Changed a platform-wide module'],
-        'sa_credential_change'  => ['bi-person-gear',            'secondary', 'Updated their own account'],
-        'plan_create'            => ['bi-box-seam',               'success',   'Created a plan'],
-        'plan_update'            => ['bi-box-seam',               'primary',   'Updated a plan'],
-        'plan_activate'          => ['bi-play-circle',            'primary',   'Restored a plan'],
-        'plan_deactivate'        => ['bi-pause-circle',           'secondary', 'Retired a plan'],
-        'apply_plan'             => ['bi-check2-circle',          'success',   'Applied a plan to tenant'],
-        'platform_settings'      => ['bi-gear-wide-connected',    'primary',   'Updated platform settings'],
-    ];
-    return $map[$action] ?? ['bi-activity', 'secondary', ucfirst(str_replace('_', ' ', $action))];
-}
+// saTimeAgo() and saActionMeta() now live in core/tenant_admin.php, shared
+// with app/superadmin/activity.php's full log view — required at the top of
+// this file already.
 
 /** One attention-list item's detail line, per category shape. */
 function saAttentionItemHtml(string $key, array $it): string
@@ -397,8 +366,7 @@ $firstName = $firstName !== '' ? explode(' ', $firstName)[0] : 'Operator';
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <style>
     body { background: #f8f9fb; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    .stat-card { background: #e7f0ff; border: 1px solid #b6ccfe; border-radius: 8px; }
-    .stat-card .value { font-size: 1.75rem; font-weight: 600; }
+    .value { font-size: 1.75rem; font-weight: 600; }
     .btn-xs { padding: .1rem .3rem; font-size: .75rem; }
     .pulse-icon { animation: saPulse 2s infinite; }
     @keyframes saPulse { 0%,100% { opacity:1; } 50% { opacity:.55; } }
@@ -530,17 +498,20 @@ $firstName = $firstName !== '' ? explode(' ', $firstName)[0] : 'Operator';
         </div>
     </div>
 
-    <!-- Stat cards -->
+    <!-- Stat cards — same 4-color convention as the tenant dashboard's own
+         stat row (bg-primary/bg-success/bg-warning/bg-info in that order),
+         so each card reads as its own thing at a glance instead of four
+         identical blue boxes. -->
     <div class="row g-2 mb-4">
         <?php foreach ([
-            'active'    => ['Active', 'bi-check-circle'],
-            'trial'     => ['Trial', 'bi-hourglass-split'],
-            'suspended' => ['Suspended', 'bi-pause-circle'],
-            'deleted'   => ['Closed', 'bi-x-circle'],
-        ] as $key => [$label, $icon]): ?>
+            'active'    => ['Active',    'bi-check-circle',      'primary', 'text-white'],
+            'trial'     => ['Trial',     'bi-hourglass-split',   'success', 'text-white'],
+            'suspended' => ['Suspended', 'bi-pause-circle',      'warning', 'text-dark'],
+            'deleted'   => ['Closed',    'bi-x-circle',          'info',    'text-white'],
+        ] as $key => [$label, $icon, $variant, $textClass]): ?>
         <div class="col-6 col-md-3">
-            <div class="stat-card p-3">
-                <div class="text-muted small"><i class="bi <?= $icon ?> text-primary me-1"></i><?= $label ?></div>
+            <div class="card bg-<?= $variant ?> <?= $textClass ?> border-0 shadow-sm p-3">
+                <div class="small opacity-75"><i class="bi <?= $icon ?> me-1"></i><?= $label ?></div>
                 <div class="value"><?= (int)($stats[$key] ?? 0) ?></div>
             </div>
         </div>
@@ -565,54 +536,55 @@ $firstName = $firstName !== '' ? explode(' ', $firstName)[0] : 'Operator';
         </div>
         <div class="col-lg-5">
             <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-grid text-primary me-2"></i>Module Adoption</h6>
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 text-uppercase" style="font-size:.75rem;letter-spacing:.05em;font-weight:700;"><i class="bi bi-clock-history"></i> Recent Platform Activity</h6>
+                    <a href="<?= saUrl('activity') ?>" class="btn btn-sm btn-primary">View All</a>
                 </div>
-                <div class="card-body">
-                    <?php if ($featuresSetup): ?>
-                        <div class="text-center text-muted py-5"><i class="bi bi-tools fs-2 d-block mb-2"></i>Module control is not set up on this server yet.</div>
-                    <?php elseif (!$featureLabels): ?>
-                        <div class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No modules registered.</div>
-                    <?php else: ?>
-                        <div style="position:relative;height:<?= max(220, count($featureLabels) * 30) ?>px;">
-                            <canvas id="saFeatureChart"></canvas>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush" style="max-height:420px;overflow-y:auto;">
+                        <?php if ($recentLog): foreach ($recentLog as $l): [$icon, $color, $label] = saActionMeta((string)$l['action']); ?>
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between gap-2">
+                                <div class="d-flex align-items-start gap-2" style="min-width:0;">
+                                    <i class="bi <?= $icon ?> text-<?= $color ?> mt-1"></i>
+                                    <div style="min-width:0;">
+                                        <div class="small fw-semibold">
+                                            <?= safe_output($label, '') ?>
+                                            <?php if (!empty($l['subdomain'])): ?><span class="text-muted fw-normal">— <?= safe_output($l['subdomain'], '') ?></span><?php endif; ?>
+                                        </div>
+                                        <?php if (!empty($l['detail'])): ?>
+                                        <div class="text-muted text-truncate" style="font-size:.72rem;max-width:240px;"><?= safe_output($l['detail'], '') ?></div>
+                                        <?php endif; ?>
+                                        <div class="text-muted" style="font-size:.68rem;"><i class="bi bi-person-circle me-1"></i><?= safe_output($l['actor_email'] ?? '', 'system') ?></div>
+                                    </div>
+                                </div>
+                                <small class="text-muted text-nowrap"><?= saTimeAgo((string)$l['created_at']) ?></small>
+                            </div>
                         </div>
-                    <?php endif; ?>
+                        <?php endforeach; else: ?>
+                        <div class="text-center text-muted py-4"><i class="bi bi-activity fs-2 d-block mb-2"></i>No activity yet.</div>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Recent activity -->
+    <!-- Module adoption -->
     <div class="card border-0 shadow-sm">
-        <div class="card-header bg-light">
-            <h6 class="mb-0 text-uppercase" style="font-size:.75rem;letter-spacing:.05em;font-weight:700;"><i class="bi bi-clock-history"></i> Recent Platform Activity</h6>
+        <div class="card-header bg-white py-3">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-grid text-primary me-2"></i>Module Adoption</h6>
         </div>
-        <div class="card-body p-0">
-            <div class="list-group list-group-flush" style="max-height:420px;overflow-y:auto;">
-                <?php if ($recentLog): foreach ($recentLog as $l): [$icon, $color, $label] = saActionMeta((string)$l['action']); ?>
-                <div class="list-group-item">
-                    <div class="d-flex justify-content-between gap-2">
-                        <div class="d-flex align-items-start gap-2" style="min-width:0;">
-                            <i class="bi <?= $icon ?> text-<?= $color ?> mt-1"></i>
-                            <div style="min-width:0;">
-                                <div class="small fw-semibold">
-                                    <?= safe_output($label, '') ?>
-                                    <?php if (!empty($l['subdomain'])): ?><span class="text-muted fw-normal">— <?= safe_output($l['subdomain'], '') ?></span><?php endif; ?>
-                                </div>
-                                <?php if (!empty($l['detail'])): ?>
-                                <div class="text-muted text-truncate" style="font-size:.72rem;max-width:240px;"><?= safe_output($l['detail'], '') ?></div>
-                                <?php endif; ?>
-                                <div class="text-muted" style="font-size:.68rem;"><i class="bi bi-person-circle me-1"></i><?= safe_output($l['actor_email'] ?? '', 'system') ?></div>
-                            </div>
-                        </div>
-                        <small class="text-muted text-nowrap"><?= saTimeAgo((string)$l['created_at']) ?></small>
-                    </div>
+        <div class="card-body">
+            <?php if ($featuresSetup): ?>
+                <div class="text-center text-muted py-5"><i class="bi bi-tools fs-2 d-block mb-2"></i>Module control is not set up on this server yet.</div>
+            <?php elseif (!$featureLabels): ?>
+                <div class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No modules registered.</div>
+            <?php else: ?>
+                <div style="position:relative;height:<?= max(220, count($featureLabels) * 30) ?>px;">
+                    <canvas id="saFeatureChart"></canvas>
                 </div>
-                <?php endforeach; else: ?>
-                <div class="text-center text-muted py-4"><i class="bi bi-activity fs-2 d-block mb-2"></i>No activity yet.</div>
-                <?php endif; ?>
-            </div>
+            <?php endif; ?>
         </div>
     </div>
 
