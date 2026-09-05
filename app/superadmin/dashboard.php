@@ -30,26 +30,91 @@ try {
     $error = 'The tenant registry could not be read.';
 }
 
-// ── Growth: signups per month, last 12 months ───────────────────────────────
+// ── Monthly time-series helper, last 12 months ──────────────────────────────
+// Every growth/retention/health metric below has the same shape: "count of
+// rows from some event log, bucketed by month, last 12 months, zero-filled
+// for months with no rows". One helper, one query per metric, so a missing
+// table or column costs only that one series (never the whole dashboard) —
+// same discipline as the "requires attention" feed above it.
 $growthLabels = [];
-$growthData   = [];
-try {
-    $raw = [];
-    $st = getControlPdo()->query("
-        SELECT DATE_FORMAT(created_at, '%Y-%m') AS ym, COUNT(*) AS n
-        FROM tenants
-        WHERE created_at >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 11 MONTH)
-        GROUP BY ym
-    ");
-    foreach ($st as $r) { $raw[$r['ym']] = (int)$r['n']; }
-    for ($i = 11; $i >= 0; $i--) {
-        $ts = strtotime("-{$i} months");
-        $growthLabels[] = date('M', $ts);
-        $growthData[]   = $raw[date('Y-m', $ts)] ?? 0;
+for ($i = 11; $i >= 0; $i--) { $growthLabels[] = date('M', strtotime("-{$i} months")); }
+
+function saMonthlySeries(string $dateCol, string $table, string $where = '1=1'): array
+{
+    $data = array_fill(0, 12, 0);
+    try {
+        $st = getControlPdo()->query("
+            SELECT DATE_FORMAT($dateCol, '%Y-%m') AS ym, COUNT(*) AS n
+            FROM $table
+            WHERE ($where) AND $dateCol >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 11 MONTH)
+            GROUP BY ym
+        ");
+        $raw = [];
+        foreach ($st as $r) { $raw[$r['ym']] = (int)$r['n']; }
+        for ($i = 11; $i >= 0; $i--) {
+            $data[11 - $i] = $raw[date('Y-m', strtotime("-{$i} months"))] ?? 0;
+        }
+    } catch (Throwable $e) {
+        error_log("superadmin dashboard (monthly series $table): " . $e->getMessage());
     }
-} catch (Throwable $e) {
-    error_log('superadmin dashboard (growth): ' . $e->getMessage());
+    return $data;
 }
+
+// New signups per month.
+$growthData = saMonthlySeries('created_at', 'tenants');
+
+// Churned (deleted) per month — tenants carries no deleted_at, so this reads
+// the audit trail instead, which is also the more historically accurate
+// source: a tenant deleted and its slot reused would still show correctly
+// here, whereas a status column only ever holds the current state.
+$churnedData = saMonthlySeries('created_at', 'tenant_admin_log', "action = 'delete'");
+
+// Suspended per month — same reasoning: tenants.suspended_at only holds the
+// LATEST suspension, so a tenant suspended twice would undercount here if we
+// read the table directly instead of the log.
+$suspendedData = saMonthlySeries('created_at', 'tenant_admin_log', "action = 'suspend'");
+
+// Net cumulative tenants retained — running total of signups minus churn, up
+// to and including each month. Deliberately NOT "active tenants": a
+// suspended-but-not-deleted tenant still counts as retained here, since we
+// have no historical record of when a tenant was in which status (only the
+// CURRENT status and a created_at/suspended_at pair) — reconstructing a true
+// "active at time X" series would need status-change history this schema
+// does not keep. Labelled honestly on the chart for exactly that reason.
+$cumulativeData = [];
+$running = 0;
+for ($i = 0; $i < 12; $i++) {
+    $running += $growthData[$i] - $churnedData[$i];
+    $cumulativeData[] = $running;
+}
+// Anchor the running total to the tenants that already existed before this
+// 12-month window opened, so month 1 reads as "total so far", not "signups
+// this month" relabelled.
+try {
+    $before = (int)getControlPdo()->query("
+        SELECT COUNT(*) FROM tenants
+        WHERE created_at < DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 11 MONTH)
+    ")->fetchColumn();
+    $before -= (int)getControlPdo()->query("
+        SELECT COUNT(*) FROM tenant_admin_log
+        WHERE action = 'delete'
+          AND created_at < DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 11 MONTH)
+    ")->fetchColumn();
+    foreach ($cumulativeData as &$v) { $v += $before; }
+    unset($v);
+} catch (Throwable $e) {
+    error_log('superadmin dashboard (cumulative baseline): ' . $e->getMessage());
+}
+
+// Failed/rolled-back provisioning attempts per month — an onboarding-
+// reliability trend, distinct from the point-in-time list already shown in
+// the "requires attention" feed above.
+$failedProvisioningData = saMonthlySeries('created_at', 'tenant_provisioning_log', "status IN ('failed','rolled_back')");
+
+// Blocked signup attempts per month — same outcome filter already used by
+// the "requires attention" signup-abuse category, just trended monthly
+// instead of listed for the last 24 hours.
+$blockedSignupsData = saMonthlySeries('created_at', 'registration_attempts', "outcome IN ('rejected','throttled')");
 
 $newLast30 = 0;
 try {
@@ -483,11 +548,11 @@ $firstName = $firstName !== '' ? explode(' ', $firstName)[0] : 'Operator';
     </div>
 
     <!-- Charts -->
-    <div class="row g-3 mb-4">
+    <div class="row g-3 mb-3">
         <div class="col-lg-7">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-graph-up-arrow text-primary me-2"></i>Tenant Growth</h6>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-graph-up-arrow text-primary me-2"></i>Growth &amp; Retention</h6>
                     <span class="badge bg-primary-subtle text-primary"><?= (int)$newLast30 ?> new in last 30 days</span>
                 </div>
                 <div class="card-body">
@@ -512,6 +577,35 @@ $firstName = $firstName !== '' ? explode(' ', $firstName)[0] : 'Operator';
                             <canvas id="saFeatureChart"></canvas>
                         </div>
                     <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-steps text-primary me-2"></i>Cumulative Tenants (Net)</h6>
+                    <div class="text-muted" style="font-size:.72rem;">Signups minus churn, running total — not the same as "currently active" (a suspended tenant still counts as retained).</div>
+                </div>
+                <div class="card-body">
+                    <div style="position:relative;height:240px;">
+                        <canvas id="saCumulativeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-shield-exclamation text-primary me-2"></i>Signup &amp; Provisioning Health</h6>
+                    <div class="text-muted" style="font-size:.72rem;">Onboarding friction and blocked signup attempts, trended monthly.</div>
+                </div>
+                <div class="card-body">
+                    <div style="position:relative;height:240px;">
+                        <canvas id="saHealthChart"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -558,16 +652,98 @@ $firstName = $firstName !== '' ? explode(' ', $firstName)[0] : 'Operator';
 Chart.defaults.font.family = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
 Chart.defaults.color = '#898781';
 
+// Growth & Retention: New (bar, up) + Churned (bar, shown BELOW zero — the
+// standard "net change" reading, so a glance at bar direction alone already
+// says whether a month was net-positive) + Suspended (line — a reversible,
+// at-risk signal, deliberately a different mark type from the hard add/
+// remove counts it shares an axis with). Categorical slots 1/2/3 in fixed
+// order, per the palette's CVD-validated ordering — never reassigned if a
+// series is later hidden via the legend.
 new Chart(document.getElementById('saGrowthChart'), {
     type: 'bar',
     data: {
         labels: <?= json_encode($growthLabels) ?>,
+        datasets: [
+            {
+                type: 'bar',
+                label: 'New',
+                data: <?= json_encode($growthData) ?>,
+                backgroundColor: '#2a78d6',
+                borderRadius: 4,
+                maxBarThickness: 18,
+                order: 2
+            },
+            {
+                type: 'bar',
+                label: 'Churned',
+                data: <?= json_encode(array_map(fn($v) => -$v, $churnedData)) ?>,
+                backgroundColor: '#eb6834',
+                borderRadius: 4,
+                maxBarThickness: 18,
+                order: 2
+            },
+            {
+                type: 'line',
+                label: 'Suspended',
+                data: <?= json_encode($suspendedData) ?>,
+                borderColor: '#1baf7a',
+                backgroundColor: '#1baf7a',
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 5,
+                pointHoverBackgroundColor: '#1baf7a',
+                pointHoverBorderColor: '#fcfcfb',
+                pointHoverBorderWidth: 2,
+                tension: 0,
+                order: 1
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, color: '#52514e' } },
+            tooltip: {
+                backgroundColor: '#0b0b0b', padding: 10, cornerRadius: 6,
+                callbacks: {
+                    // Churned is stored negative purely for the below-zero bar
+                    // direction — the tooltip must never show a customer count
+                    // as a negative number.
+                    label: (ctx) => ctx.dataset.label + ': ' + Math.abs(ctx.parsed.y)
+                }
+            }
+        },
+        scales: {
+            x: { grid: { display: false }, ticks: { color: '#52514e' } },
+            y: {
+                ticks: { precision: 0, color: '#898781', callback: (v) => Math.abs(v) },
+                grid: { color: '#e1e0d9' }
+            }
+        }
+    }
+});
+
+// Cumulative Tenants (Net) — single series, no legend needed (the card title
+// already names it per the skill's "no legend for one" rule). Filled area
+// makes the running-total reading obvious at a glance.
+new Chart(document.getElementById('saCumulativeChart'), {
+    type: 'line',
+    data: {
+        labels: <?= json_encode($growthLabels) ?>,
         datasets: [{
-            label: 'New tenants',
-            data: <?= json_encode($growthData) ?>,
-            backgroundColor: '#2a78d6',
-            borderRadius: 4,
-            maxBarThickness: 22
+            label: 'Cumulative tenants (net)',
+            data: <?= json_encode($cumulativeData) ?>,
+            borderColor: '#2a78d6',
+            backgroundColor: 'rgba(42,120,214,0.12)',
+            borderWidth: 2,
+            fill: true,
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            pointHoverBackgroundColor: '#2a78d6',
+            pointHoverBorderColor: '#fcfcfb',
+            pointHoverBorderWidth: 2,
+            tension: 0.25
         }]
     },
     options: {
@@ -576,6 +752,45 @@ new Chart(document.getElementById('saGrowthChart'), {
         plugins: {
             legend: { display: false },
             tooltip: { backgroundColor: '#0b0b0b', padding: 10, cornerRadius: 6, displayColors: false }
+        },
+        scales: {
+            x: { grid: { display: false }, ticks: { color: '#52514e' } },
+            y: { beginAtZero: true, ticks: { precision: 0, color: '#898781' }, grid: { color: '#e1e0d9' } }
+        }
+    }
+});
+
+// Signup & Provisioning Health — two independent counters (onboarding
+// friction vs. blocked/abusive signups), grouped bars, restarting the
+// categorical order at slot 1/2 since these are a different pair of
+// entities from the Growth & Retention chart above.
+new Chart(document.getElementById('saHealthChart'), {
+    type: 'bar',
+    data: {
+        labels: <?= json_encode($growthLabels) ?>,
+        datasets: [
+            {
+                label: 'Failed provisioning',
+                data: <?= json_encode($failedProvisioningData) ?>,
+                backgroundColor: '#2a78d6',
+                borderRadius: 4,
+                maxBarThickness: 16
+            },
+            {
+                label: 'Blocked signups',
+                data: <?= json_encode($blockedSignupsData) ?>,
+                backgroundColor: '#eb6834',
+                borderRadius: 4,
+                maxBarThickness: 16
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, color: '#52514e' } },
+            tooltip: { backgroundColor: '#0b0b0b', padding: 10, cornerRadius: 6 }
         },
         scales: {
             x: { grid: { display: false }, ticks: { color: '#52514e' } },
