@@ -250,6 +250,38 @@ try {
             "$f does not boot the tenant application stack");
     }
 
+    section('11. A control-DB failure re-checking a session does not create a login loop (regression)');
+    // Reproduces the real bug: a live session (superadmin_id set) whose next
+    // currentSuperadmin() call cannot reach the control DB. Forced by pointing
+    // CONTROL_DB_USER at an account that cannot authenticate — getControlPdo()
+    // then throws inside the very try/catch this regression is about.
+    $probeErr = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'bms_sa_err_' . $sfx . '.php';
+    file_put_contents($probeErr, "<?php\n"
+        . "ini_set('session.save_path', sys_get_temp_dir());\n"
+        . "session_start();\n"
+        . "\$_SESSION['superadmin_id'] = 999999;\n"
+        . "require '" . str_replace('\\', '/', $root) . "/core/superadmin_auth.php';\n"
+        . "\$before = isSuperadminLoggedIn() ? 'LOGGED-IN' : 'LOGGED-OUT';\n"
+        . "\$me = currentSuperadmin();\n"
+        . "\$after = isSuperadminLoggedIn() ? 'LOGGED-IN' : 'LOGGED-OUT';\n"
+        . "echo (\$me === null ? 'NULL' : 'ROW') . '|' . \$before . '|' . \$after;\n");
+
+    $envBad = [
+        'CONTROL_DB_USER' => 'bms_sa_bogus_' . $sfx,
+        'CONTROL_DB_PASS' => 'x',
+        'CONTROL_DB_HOST' => 'localhost',
+    ];
+    $out = runHost($probeErr, '', $envBad);
+    @unlink($probeErr);
+
+    ok(strpos($out, 'NULL|LOGGED-IN|') !== false,
+        'a live session sees currentSuperadmin() fail (before the call it still looked logged in)');
+    ok(strpos($out, '|LOGGED-OUT') !== false,
+        'the SAME call that discovered the control-DB failure drops the session — '
+        . 'previously it stayed set, which is what made login.php keep sending the '
+        . 'visitor back to "/" while requireSuperadmin() kept bouncing them to /login '
+        . '(ERR_TOO_MANY_REDIRECTS)');
+
 } catch (Throwable $e) {
     $fail++;
     echo "\n\033[31mFATAL: " . $e->getMessage() . "\033[0m\n";
