@@ -548,15 +548,16 @@ $firstName = $firstName !== '' ? explode(' ', $firstName)[0] : 'Operator';
     </div>
 
     <!-- Charts -->
-    <div class="row g-3 mb-3">
+    <div class="row g-3 mb-4">
         <div class="col-lg-7">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-graph-up-arrow text-primary me-2"></i>Growth &amp; Retention</h6>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-graph-up-arrow text-primary me-2"></i>Tenant Growth &amp; Health</h6>
                     <span class="badge bg-primary-subtle text-primary"><?= (int)$newLast30 ?> new in last 30 days</span>
                 </div>
                 <div class="card-body">
-                    <div style="position:relative;height:280px;">
+                    <div class="text-muted mb-2" style="font-size:.72rem;">"Cumulative (Net)" is signups minus churn, running total — not the same as "currently active" (a suspended tenant still counts as retained), and its scale grows over time, so it will visually dominate the other five once the tenant base is large.</div>
+                    <div style="position:relative;height:320px;">
                         <canvas id="saGrowthChart"></canvas>
                     </div>
                 </div>
@@ -577,35 +578,6 @@ $firstName = $firstName !== '' ? explode(' ', $firstName)[0] : 'Operator';
                             <canvas id="saFeatureChart"></canvas>
                         </div>
                     <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-3 mb-4">
-        <div class="col-lg-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-steps text-primary me-2"></i>Cumulative Tenants (Net)</h6>
-                    <div class="text-muted" style="font-size:.72rem;">Signups minus churn, running total — not the same as "currently active" (a suspended tenant still counts as retained).</div>
-                </div>
-                <div class="card-body">
-                    <div style="position:relative;height:240px;">
-                        <canvas id="saCumulativeChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-shield-exclamation text-primary me-2"></i>Signup &amp; Provisioning Health</h6>
-                    <div class="text-muted" style="font-size:.72rem;">Onboarding friction and blocked signup attempts, trended monthly.</div>
-                </div>
-                <div class="card-body">
-                    <div style="position:relative;height:240px;">
-                        <canvas id="saHealthChart"></canvas>
-                    </div>
                 </div>
             </div>
         </div>
@@ -652,144 +624,44 @@ $firstName = $firstName !== '' ? explode(' ', $firstName)[0] : 'Operator';
 Chart.defaults.font.family = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
 Chart.defaults.color = '#898781';
 
-// Growth & Retention: New (bar, up) + Churned (bar, shown BELOW zero — the
-// standard "net change" reading, so a glance at bar direction alone already
-// says whether a month was net-positive) + Suspended (line — a reversible,
-// at-risk signal, deliberately a different mark type from the hard add/
-// remove counts it shares an axis with). Categorical slots 1/2/3 in fixed
-// order, per the palette's CVD-validated ordering — never reassigned if a
-// series is later hidden via the legend.
+// Tenant Growth & Health — all 6 metrics as lines on one shared axis, per
+// request. Categorical slots 1-6 in fixed order (blue/orange/aqua/yellow/
+// magenta/green), validated with validate_palette.js — all hard gates pass;
+// the three slots that sit under 3:1 contrast on the light surface (aqua,
+// yellow, magenta) rely on the always-visible legend text as their required
+// relief, never on hue alone. Known, accepted tradeoff: Cumulative (Net) is
+// a running total that grows over time and will visually dominate the other
+// five once the tenant base is large — flagged in the card's own subtitle
+// rather than hidden.
 new Chart(document.getElementById('saGrowthChart'), {
-    type: 'bar',
-    data: {
-        labels: <?= json_encode($growthLabels) ?>,
-        datasets: [
-            {
-                type: 'bar',
-                label: 'New',
-                data: <?= json_encode($growthData) ?>,
-                backgroundColor: '#2a78d6',
-                borderRadius: 4,
-                maxBarThickness: 18,
-                order: 2
-            },
-            {
-                type: 'bar',
-                label: 'Churned',
-                data: <?= json_encode(array_map(fn($v) => -$v, $churnedData)) ?>,
-                backgroundColor: '#eb6834',
-                borderRadius: 4,
-                maxBarThickness: 18,
-                order: 2
-            },
-            {
-                type: 'line',
-                label: 'Suspended',
-                data: <?= json_encode($suspendedData) ?>,
-                borderColor: '#1baf7a',
-                backgroundColor: '#1baf7a',
-                borderWidth: 2,
-                pointRadius: 0,
-                pointHoverRadius: 5,
-                pointHoverBackgroundColor: '#1baf7a',
-                pointHoverBorderColor: '#fcfcfb',
-                pointHoverBorderWidth: 2,
-                tension: 0,
-                order: 1
-            }
-        ]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, color: '#52514e' } },
-            tooltip: {
-                backgroundColor: '#0b0b0b', padding: 10, cornerRadius: 6,
-                callbacks: {
-                    // Churned is stored negative purely for the below-zero bar
-                    // direction — the tooltip must never show a customer count
-                    // as a negative number.
-                    label: (ctx) => ctx.dataset.label + ': ' + Math.abs(ctx.parsed.y)
-                }
-            }
-        },
-        scales: {
-            x: { grid: { display: false }, ticks: { color: '#52514e' } },
-            y: {
-                ticks: { precision: 0, color: '#898781', callback: (v) => Math.abs(v) },
-                grid: { color: '#e1e0d9' }
-            }
-        }
-    }
-});
-
-// Cumulative Tenants (Net) — single series, no legend needed (the card title
-// already names it per the skill's "no legend for one" rule). Filled area
-// makes the running-total reading obvious at a glance.
-new Chart(document.getElementById('saCumulativeChart'), {
     type: 'line',
     data: {
         labels: <?= json_encode($growthLabels) ?>,
-        datasets: [{
-            label: 'Cumulative tenants (net)',
-            data: <?= json_encode($cumulativeData) ?>,
-            borderColor: '#2a78d6',
-            backgroundColor: 'rgba(42,120,214,0.12)',
+        datasets: [
+            { label: 'New', data: <?= json_encode($growthData) ?>, borderColor: '#2a78d6' },
+            { label: 'Churned', data: <?= json_encode($churnedData) ?>, borderColor: '#eb6834' },
+            { label: 'Suspended', data: <?= json_encode($suspendedData) ?>, borderColor: '#1baf7a' },
+            { label: 'Cumulative (Net)', data: <?= json_encode($cumulativeData) ?>, borderColor: '#eda100' },
+            { label: 'Failed provisioning', data: <?= json_encode($failedProvisioningData) ?>, borderColor: '#e87ba4' },
+            { label: 'Blocked signups', data: <?= json_encode($blockedSignupsData) ?>, borderColor: '#008300' }
+        ].map((ds) => Object.assign(ds, {
+            backgroundColor: ds.borderColor,
             borderWidth: 2,
-            fill: true,
             pointRadius: 0,
             pointHoverRadius: 5,
-            pointHoverBackgroundColor: '#2a78d6',
+            pointHoverBackgroundColor: ds.borderColor,
             pointHoverBorderColor: '#fcfcfb',
             pointHoverBorderWidth: 2,
-            tension: 0.25
-        }]
+            tension: 0.2,
+            fill: false
+        }))
     },
     options: {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
         plugins: {
-            legend: { display: false },
-            tooltip: { backgroundColor: '#0b0b0b', padding: 10, cornerRadius: 6, displayColors: false }
-        },
-        scales: {
-            x: { grid: { display: false }, ticks: { color: '#52514e' } },
-            y: { beginAtZero: true, ticks: { precision: 0, color: '#898781' }, grid: { color: '#e1e0d9' } }
-        }
-    }
-});
-
-// Signup & Provisioning Health — two independent counters (onboarding
-// friction vs. blocked/abusive signups), grouped bars, restarting the
-// categorical order at slot 1/2 since these are a different pair of
-// entities from the Growth & Retention chart above.
-new Chart(document.getElementById('saHealthChart'), {
-    type: 'bar',
-    data: {
-        labels: <?= json_encode($growthLabels) ?>,
-        datasets: [
-            {
-                label: 'Failed provisioning',
-                data: <?= json_encode($failedProvisioningData) ?>,
-                backgroundColor: '#2a78d6',
-                borderRadius: 4,
-                maxBarThickness: 16
-            },
-            {
-                label: 'Blocked signups',
-                data: <?= json_encode($blockedSignupsData) ?>,
-                backgroundColor: '#eb6834',
-                borderRadius: 4,
-                maxBarThickness: 16
-            }
-        ]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, color: '#52514e' } },
+            legend: { display: true, position: 'top', align: 'start', labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, color: '#52514e' } },
             tooltip: { backgroundColor: '#0b0b0b', padding: 10, cornerRadius: 6 }
         },
         scales: {
