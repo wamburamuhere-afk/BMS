@@ -263,6 +263,12 @@ function saActionMeta(string $action): array
         'update_quotas'         => ['bi-speedometer',            'primary',   'Updated quotas'],
         'platform_feature'      => ['bi-toggles',                'primary',   'Changed a platform-wide module'],
         'sa_credential_change'  => ['bi-person-gear',            'secondary', 'Updated their own account'],
+        'plan_create'            => ['bi-box-seam',               'success',   'Created a plan'],
+        'plan_update'            => ['bi-box-seam',               'primary',   'Updated a plan'],
+        'plan_activate'          => ['bi-play-circle',            'primary',   'Restored a plan'],
+        'plan_deactivate'        => ['bi-pause-circle',           'secondary', 'Retired a plan'],
+        'apply_plan'             => ['bi-check2-circle',          'success',   'Applied a plan to tenant'],
+        'platform_settings'      => ['bi-gear-wide-connected',    'primary',   'Updated platform settings'],
     ];
     return $map[$action] ?? ['bi-activity', 'secondary', ucfirst(str_replace('_', ' ', $action))];
 }
@@ -351,23 +357,6 @@ $firstName = $firstName !== '' ? explode(' ', $firstName)[0] : 'Operator';
         </div>
     </div>
 
-    <!-- Stat cards -->
-    <div class="row g-2 mb-4">
-        <?php foreach ([
-            'active'    => ['Active', 'bi-check-circle'],
-            'trial'     => ['Trial', 'bi-hourglass-split'],
-            'suspended' => ['Suspended', 'bi-pause-circle'],
-            'deleted'   => ['Closed', 'bi-x-circle'],
-        ] as $key => [$label, $icon]): ?>
-        <div class="col-6 col-md-3">
-            <div class="stat-card p-3">
-                <div class="text-muted small"><i class="bi <?= $icon ?> text-primary me-1"></i><?= $label ?></div>
-                <div class="value"><?= (int)($stats[$key] ?? 0) ?></div>
-            </div>
-        </div>
-        <?php endforeach; ?>
-    </div>
-
     <!-- System requires attention -->
     <?php if ($attentionTotal > 0): ?>
     <div class="card border-0 shadow-sm overflow-hidden mb-4" style="background:linear-gradient(135deg,#fff9e6 0%,#fff 100%);border-left:5px solid #ffc107 !important;">
@@ -431,6 +420,68 @@ $firstName = $firstName !== '' ? explode(' ', $firstName)[0] : 'Operator';
     </div>
     <?php endif; ?>
 
+    <!-- Quick actions -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-light"><h6 class="mb-0"><i class="bi bi-lightning-charge text-primary me-1"></i> Quick Actions</h6></div>
+        <div class="card-body">
+            <div class="row row-cols-2 row-cols-lg-3 row-cols-xl-6 g-3">
+                <div class="col">
+                    <a href="<?= saUrl('tenants/new') ?>" class="btn btn-outline-primary w-100 h-100 py-3">
+                        <i class="bi bi-plus-circle display-6"></i>
+                        <div class="mt-2 fw-semibold">New Company</div>
+                    </a>
+                </div>
+                <div class="col">
+                    <a href="<?= saUrl('tenants') ?>" class="btn btn-outline-info w-100 h-100 py-3">
+                        <i class="bi bi-building display-6"></i>
+                        <div class="mt-2 fw-semibold">All Tenants</div>
+                    </a>
+                </div>
+                <div class="col">
+                    <a href="<?= saUrl('features') ?>" class="btn btn-outline-secondary w-100 h-100 py-3">
+                        <i class="bi bi-grid display-6"></i>
+                        <div class="mt-2 fw-semibold">Modules</div>
+                    </a>
+                </div>
+                <div class="col">
+                    <a href="<?= saUrl('plans') ?>" class="btn btn-outline-warning w-100 h-100 py-3">
+                        <i class="bi bi-box-seam display-6"></i>
+                        <div class="mt-2 fw-semibold">Plans</div>
+                    </a>
+                </div>
+                <div class="col">
+                    <a href="<?= saUrl('settings') ?>" class="btn btn-outline-success w-100 h-100 py-3">
+                        <i class="bi bi-gear-wide-connected display-6"></i>
+                        <div class="mt-2 fw-semibold">Platform Settings</div>
+                    </a>
+                </div>
+                <div class="col">
+                    <a href="<?= saUrl('profile') ?>" class="btn btn-outline-dark w-100 h-100 py-3">
+                        <i class="bi bi-person-gear display-6"></i>
+                        <div class="mt-2 fw-semibold">My Account</div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="row g-2 mb-4">
+        <?php foreach ([
+            'active'    => ['Active', 'bi-check-circle'],
+            'trial'     => ['Trial', 'bi-hourglass-split'],
+            'suspended' => ['Suspended', 'bi-pause-circle'],
+            'deleted'   => ['Closed', 'bi-x-circle'],
+        ] as $key => [$label, $icon]): ?>
+        <div class="col-6 col-md-3">
+            <div class="stat-card p-3">
+                <div class="text-muted small"><i class="bi <?= $icon ?> text-primary me-1"></i><?= $label ?></div>
+                <div class="value"><?= (int)($stats[$key] ?? 0) ?></div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+
     <!-- Charts -->
     <div class="row g-3 mb-4">
         <div class="col-lg-7">
@@ -466,73 +517,35 @@ $firstName = $firstName !== '' ? explode(' ', $firstName)[0] : 'Operator';
         </div>
     </div>
 
-    <!-- Quick actions + recent activity -->
-    <div class="row g-3">
-        <div class="col-lg-8">
-            <div class="card border-0 shadow-sm mb-3">
-                <div class="card-header bg-light"><h6 class="mb-0"><i class="bi bi-lightning-charge text-primary me-1"></i> Quick Actions</h6></div>
-                <div class="card-body">
-                    <div class="row row-cols-2 row-cols-lg-4 g-3">
-                        <div class="col">
-                            <a href="<?= saUrl('tenants/new') ?>" class="btn btn-outline-primary w-100 h-100 py-3">
-                                <i class="bi bi-plus-circle display-6"></i>
-                                <div class="mt-2 fw-semibold">New Company</div>
-                            </a>
-                        </div>
-                        <div class="col">
-                            <a href="<?= saUrl('tenants') ?>" class="btn btn-outline-info w-100 h-100 py-3">
-                                <i class="bi bi-building display-6"></i>
-                                <div class="mt-2 fw-semibold">All Tenants</div>
-                            </a>
-                        </div>
-                        <div class="col">
-                            <a href="<?= saUrl('features') ?>" class="btn btn-outline-secondary w-100 h-100 py-3">
-                                <i class="bi bi-grid display-6"></i>
-                                <div class="mt-2 fw-semibold">Modules</div>
-                            </a>
-                        </div>
-                        <div class="col">
-                            <a href="<?= saUrl('profile') ?>" class="btn btn-outline-dark w-100 h-100 py-3">
-                                <i class="bi bi-person-gear display-6"></i>
-                                <div class="mt-2 fw-semibold">My Account</div>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <!-- Recent activity -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-light">
+            <h6 class="mb-0 text-uppercase" style="font-size:.75rem;letter-spacing:.05em;font-weight:700;"><i class="bi bi-clock-history"></i> Recent Platform Activity</h6>
         </div>
-
-        <div class="col-lg-4">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-light">
-                    <h6 class="mb-0 text-uppercase" style="font-size:.75rem;letter-spacing:.05em;font-weight:700;"><i class="bi bi-clock-history"></i> Recent Platform Activity</h6>
-                </div>
-                <div class="card-body p-0">
-                    <div class="list-group list-group-flush" style="max-height:420px;overflow-y:auto;">
-                        <?php if ($recentLog): foreach ($recentLog as $l): [$icon, $color, $label] = saActionMeta((string)$l['action']); ?>
-                        <div class="list-group-item">
-                            <div class="d-flex justify-content-between gap-2">
-                                <div class="d-flex align-items-start gap-2" style="min-width:0;">
-                                    <i class="bi <?= $icon ?> text-<?= $color ?> mt-1"></i>
-                                    <div style="min-width:0;">
-                                        <div class="small fw-semibold">
-                                            <?= safe_output($label, '') ?>
-                                            <?php if (!empty($l['subdomain'])): ?><span class="text-muted fw-normal">— <?= safe_output($l['subdomain'], '') ?></span><?php endif; ?>
-                                        </div>
-                                        <?php if (!empty($l['detail'])): ?>
-                                        <div class="text-muted text-truncate" style="font-size:.72rem;max-width:240px;"><?= safe_output($l['detail'], '') ?></div>
-                                        <?php endif; ?>
-                                        <div class="text-muted" style="font-size:.68rem;"><i class="bi bi-person-circle me-1"></i><?= safe_output($l['actor_email'] ?? '', 'system') ?></div>
-                                    </div>
+        <div class="card-body p-0">
+            <div class="list-group list-group-flush" style="max-height:420px;overflow-y:auto;">
+                <?php if ($recentLog): foreach ($recentLog as $l): [$icon, $color, $label] = saActionMeta((string)$l['action']); ?>
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between gap-2">
+                        <div class="d-flex align-items-start gap-2" style="min-width:0;">
+                            <i class="bi <?= $icon ?> text-<?= $color ?> mt-1"></i>
+                            <div style="min-width:0;">
+                                <div class="small fw-semibold">
+                                    <?= safe_output($label, '') ?>
+                                    <?php if (!empty($l['subdomain'])): ?><span class="text-muted fw-normal">— <?= safe_output($l['subdomain'], '') ?></span><?php endif; ?>
                                 </div>
-                                <small class="text-muted text-nowrap"><?= saTimeAgo((string)$l['created_at']) ?></small>
+                                <?php if (!empty($l['detail'])): ?>
+                                <div class="text-muted text-truncate" style="font-size:.72rem;max-width:240px;"><?= safe_output($l['detail'], '') ?></div>
+                                <?php endif; ?>
+                                <div class="text-muted" style="font-size:.68rem;"><i class="bi bi-person-circle me-1"></i><?= safe_output($l['actor_email'] ?? '', 'system') ?></div>
                             </div>
                         </div>
-                        <?php endforeach; else: ?>
-                        <div class="text-center text-muted py-4"><i class="bi bi-activity fs-2 d-block mb-2"></i>No activity yet.</div>
-                        <?php endif; ?>
+                        <small class="text-muted text-nowrap"><?= saTimeAgo((string)$l['created_at']) ?></small>
                     </div>
                 </div>
+                <?php endforeach; else: ?>
+                <div class="text-center text-muted py-4"><i class="bi bi-activity fs-2 d-block mb-2"></i>No activity yet.</div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
