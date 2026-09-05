@@ -102,6 +102,14 @@ if (!function_exists('currentSuperadmin')) {
             $row = $st->fetch();
         } catch (Throwable $e) {
             error_log('currentSuperadmin: ' . $e->getMessage());
+            // Must drop the session, not just report "no row": leaving
+            // $_SESSION['superadmin_id'] set here made isSuperadminLoggedIn()
+            // (session-only) and this function (DB-backed) disagree — login.php
+            // kept sending an "already signed in" visitor to '/', which
+            // requireSuperadmin() kept bouncing back to /login on every one of
+            // these errors, an infinite loop the browser reports as
+            // ERR_TOO_MANY_REDIRECTS.
+            superadminLogout();
             return $GLOBALS['__bms_sa_cache'][$id] = null;
         }
 
