@@ -135,19 +135,29 @@ function initMaterialSelect2($el) {
                 results: (data.products || []).map(p => ({ id: p.product_id, text: p.product_name }))
             })
         }
-    }).on('select2:select', function (e) {
+    }).on('change', function () {
+        // Deliberately NOT select2:select/select2:unselect — confirmed live
+        // (browser click-through) that Select2 4.1.0-rc.0 does not fire
+        // select2:select at all when the chosen option is a newly-created
+        // tag (only when picking a real ajax-returned result), even though
+        // the value/display update correctly. `change` + `.select2('data')`
+        // is Select2's own documented robust pattern for exactly this
+        // inconsistency — it fires for every value change regardless of how
+        // the option originated.
         const row = $(this).closest('tr');
-        const data = e.params.data;
-        // A real catalogue hit has a numeric id from the DB; a free-typed tag's
-        // id equals its own text (Select2's default tag behaviour) — only the
-        // former is a real product_id.
-        const isCatalogueItem = data.id && String(parseInt(data.id, 10)) === String(data.id);
-        row.find('.material-product-id').val(isCatalogueItem ? data.id : '');
-        row.find('.material-name').val(data.text);
-    }).on('select2:unselect select2:clear', function () {
-        const row = $(this).closest('tr');
-        row.find('.material-product-id').val('');
-        row.find('.material-name').val('');
+        const selected = $(this).select2('data')[0];
+        if (!selected) {
+            row.find('.material-product-id').val('');
+            row.find('.material-name').val('');
+            return;
+        }
+        // A real catalogue hit has a numeric id from the DB and no newTag
+        // flag; a free-typed tag's id equals its own text (Select2's tag
+        // behaviour) and carries newTag === true — only the former is a
+        // real product_id.
+        const isCatalogueItem = !selected.newTag && selected.id && String(parseInt(selected.id, 10)) === String(selected.id);
+        row.find('.material-product-id').val(isCatalogueItem ? selected.id : '');
+        row.find('.material-name').val(selected.text);
     });
 }
 
@@ -179,8 +189,33 @@ function deleteMaterial(materialId) {
     }, 'json');
 }
 
+function syncMaterialHiddenFieldsFromSelect2() {
+    // Belt-and-suspenders: force every row's hidden fields to match its
+    // Select2's actual current selection right before submit, instead of
+    // relying solely on the 'change' handler having fired during
+    // interaction. Confirmed live (browser click-through) that Select2
+    // 4.1.0-rc.0 can leave a newly-created tag selected on screen without
+    // ever emitting select2:select/select2:unselect/change for it — this
+    // re-derives the truth from .select2('data') at the one moment that
+    // actually matters, so a missed event can never silently save a blank
+    // material name.
+    $('.material-select2').each(function () {
+        const row = $(this).closest('tr');
+        const selected = $(this).select2('data')[0];
+        if (!selected) {
+            row.find('.material-product-id').val('');
+            row.find('.material-name').val('');
+            return;
+        }
+        const isCatalogueItem = !selected.newTag && selected.id && String(parseInt(selected.id, 10)) === String(selected.id);
+        row.find('.material-product-id').val(isCatalogueItem ? selected.id : '');
+        row.find('.material-name').val(selected.text);
+    });
+}
+
 $('#materialsForm').on('submit', function (e) {
     e.preventDefault();
+    syncMaterialHiddenFieldsFromSelect2();
     const $btn = $(this).find('[type="submit"]');
     const orig = $btn.html();
     $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Saving...');

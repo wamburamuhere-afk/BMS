@@ -627,10 +627,43 @@ BOQ/Materials hint links pulling real cross-tab data, the Form of Tender
 draft correctly reflecting the just-saved BOQ total, real PDF generation for
 both the Form of Tender and BOQ print actions, and the Edit page's
 AWARDED-bypass fix (dropdown has no AWARDED option) all working exactly as
-designed. **Note:** this left real demonstration data on tender
-`TR/HGSAHJCFTY` (#27) in the live `bms` database — one BOQ bill/item, one
-materials line, one ticked checklist item — flagged to the user rather than
-silently deleted, since it's their live business data.
+designed. This left real demonstration data on tender `TR/HGSAHJCFTY` (#27)
+in the live `bms` database (one BOQ bill/item, one materials line, one
+ticked checklist item) — see the cleanup note below.
+
+**Post-PR fix #2 — the serious one: typed material names silently discarded.**
+Investigating the "N/A" fix's live behavior surfaced something far more
+serious: on the Materials Schedule page, **typing a brand-new material name
+and selecting it (Select2's `tags: true` flow) never actually saved the
+name** — the box visibly showed what you typed, but the underlying hidden
+field stayed empty, so the row saved with a blank material. Root-caused with
+certainty (a debug event listener recording zero events across a real,
+100%-genuine browser interaction — real click, real typing, real click to
+select): **Select2 4.1.0-rc.0 does not fire `select2:select`,
+`select2:selecting`, or even a plain `change` event when the selected option
+is a newly-created tag**, only when picking an existing ajax-returned
+catalogue item. The page's live-sync code was built entirely on
+`select2:select`, so a freely-typed material — the single most important
+field on the page — silently vanished.
+
+Fixed two ways, both in `app/bms/tenders/tender_materials.php`: (a) switched
+the live handler from `select2:select` to `change` (Select2's own documented
+more-robust event for exactly this inconsistency), and (b) added
+`syncMaterialHiddenFieldsFromSelect2()`, called immediately before the form
+serializes on submit, which re-derives every row's hidden fields from
+`.select2('data')` directly rather than trusting any incremental event fired
+during interaction — correct no matter what did or didn't fire while typing.
+Verified live end-to-end: reproduced the blank-save with a fresh tag,
+confirmed the sync function recovers it, submitted for real, and confirmed
+the correct name landed in the database. Regression assertions added to
+`tests/test_tender_materials_cli.php` — **175 assertions total across all 7
+suites now.**
+
+**Cleanup:** the demo data on tender `TR/HGSAHJCFTY` (#27) — the BOQ bill,
+materials line, and ticked checklist item — was deleted afterward, and
+`tenders.boq_grand_total`/`boq_contingency_percent`/`boq_vat_percent`/
+`form_of_tender_html`/`form_of_tender_date` reset to their pre-testing
+defaults. Confirmed clean: 0 BOQ bills, 0 materials, 0/19 checklist ready.
 
 Nothing left to resume — if a future session lands here, the next
 tender-module work is a genuinely new feature/fix, not a continuation of

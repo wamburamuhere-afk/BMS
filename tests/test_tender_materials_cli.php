@@ -65,6 +65,36 @@ try {
     ok(str_contains($pageSrc, "safe_output(\$item['unit'], '')"), "unit input uses an explicit empty default, not safe_output()'s 'N/A'");
 
     // ─────────────────────────────────────────────────────────────────────
+    section('1c. Regression — browser click-through caught: typed material name silently lost');
+    // ─────────────────────────────────────────────────────────────────────
+    // The most serious bug found this session. Live-confirmed (real browser,
+    // real typing, real clicks, no synthetic shortcuts) that Select2
+    // 4.1.0-rc.0 does not fire select2:select / select2:unselect / even a
+    // plain `change` event when the user selects a NEWLY-CREATED tag (as
+    // opposed to an existing ajax-returned catalogue item) — confirmed via a
+    // debug listener that recorded zero events across select2:select,
+    // select2:selecting, and change while the visible selection and
+    // `$el.val()` updated correctly. Relying on any of those events to sync
+    // the hidden product_id/material fields meant a freely-typed material
+    // name — the single most important field on this page — silently saved
+    // as an empty string. Fixed two ways: (a) switched the live-sync handler
+    // from select2:select to `change` (Select2's own documented more-robust
+    // pattern), AND (b) added syncMaterialHiddenFieldsFromSelect2(), which
+    // re-derives every row's hidden fields from `.select2('data')` right
+    // before the form serializes on submit — correct regardless of whether
+    // any incremental event fired during interaction. Verified live: a typed
+    // tag that left the hidden fields blank was correctly recovered by this
+    // submit-time sync and persisted to the database.
+    ok(!str_contains($pageSrc, "on('select2:select'"), "no longer relies on select2:select to sync hidden fields (confirmed not to fire for a new tag in this Select2 version)");
+    ok(str_contains($pageSrc, 'function syncMaterialHiddenFieldsFromSelect2'), 'submit-time force-sync function exists');
+    ok(str_contains($pageSrc, "select2('data')[0]"), "sync reads the Select2 instance's actual current data, not an event payload");
+    // The sync must run before the row's inputs are serialized for the AJAX
+    // POST, not after — assert the call site precedes the serialize() call.
+    $syncPos = strpos($pageSrc, 'syncMaterialHiddenFieldsFromSelect2();');
+    $serializePos = strpos($pageSrc, '$(this).serialize()');
+    ok($syncPos !== false && $serializePos !== false && $syncPos < $serializePos, 'the sync call happens before the form is serialized for submission');
+
+    // ─────────────────────────────────────────────────────────────────────
     section('2. Schema — table and FKs exist');
     // ─────────────────────────────────────────────────────────────────────
     $tables = $pdo->query("SHOW TABLES LIKE 'tender_materials'")->fetchAll(PDO::FETCH_COLUMN);
