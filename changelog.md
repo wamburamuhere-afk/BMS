@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-09-06 (docs) - ternant.md Phase 7 complete: multi-tenancy rollout finished (all 13 phases)
+
+**Files (changed):** `ternant.md`
+
+`scripts/migrate_tenant_one.php` (PR #1804) ran successfully on production `bms.bjptechnologies.co.tz`
+and was verified live: normal login and a walkthrough of core modules confirmed working after the
+`includes/config.php` credential swap (root/`user_bjp` -> the new database-scoped `bms_u3`) and an
+Apache reload. Corrections found while executing recorded in the plan itself: the real database name
+is `bejundas_bms_bjp` (the `bms` in the original plan text was always a placeholder), the tenant landed
+as id #3 (2 prior rows already existed), and a CLI-vs-Apache-`SetEnv` gotcha in `getProvisioningPdo()`'s
+credential sourcing — fixed by passing `CONTROL_DB_USER`/`CONTROL_DB_PASS` inline for that one
+invocation, with the script's own resumability meaning the failed first attempt cost nothing.
+
+Documented one important, deliberate limitation for future reference: Tenant #1 shows up in the
+superadmin Tenants list and can be edited for bookkeeping, but Suspend/feature-toggle/quota controls
+have no live effect on it, since the bare production hostname bypasses tenant resolution entirely
+(`bmsLegacyPdo()`, not the tenant-aware path) regardless of this row's existence. Real enforcement
+parity with other tenants would need a separate, larger step (moving it onto a real subdomain) —
+deliberately out of scope for this phase.
+
+**Marks all 13 phases (0-12) of the multi-tenancy rollout complete.**
+
 ## 2026-09-06 (feat) - tender.md: add distinct NeST Reference field, benchmarked against facile-fms.com
 
 **Files (new):** `migrations/2026_09_06_tender_nest_reference.php`, `tests/test_tender_nest_reference_cli.php`
