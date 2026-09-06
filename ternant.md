@@ -284,6 +284,44 @@ php scratch/test_provision_tenant.php --company="Test Co" --subdomain=testco --e
 
 Revert `config.php`'s tenant-resolution short-circuit back to hardcoded `bms`/root temporarily if something breaks mid-window — full backup from Phase 0 is the final safety net.
 
+### Completion note (2026-09-06)
+
+**Done and verified live** on `bms.bjptechnologies.co.tz` via `scripts/migrate_tenant_one.php`
+(PR #1804) — reusable, resumable operator script rather than hand-run SQL, reusing
+`generateTenantDbPassword()`/`getProvisioningPdo()`/`encryptTenantSecret()` from
+`core/tenant_provisioner.php` instead of reimplementing any of them.
+
+**Corrections to this plan found while executing it:**
+- The plan assumed `db_name = 'bms'` and `bms_u1`. The real production database is
+  `bejundas_bms_bjp` (not `bms` — that was always a placeholder in this doc), and the tenant
+  landed as **id #3** (this control DB already had 2 prior rows), so the actual credentials are
+  `bms_u3`. Confirms why the script reads `DB_NAME` rather than ever computing/assuming a name —
+  the placeholder in this plan would have been wrong to hardcode.
+- **CLI vs Apache environment gotcha, hit live:** the first run failed with "you need the CREATE
+  USER privilege" — `getProvisioningPdo()`'s admin credentials (`bms_prov`) are supplied via
+  `SetEnv CONTROL_DB_USER/CONTROL_DB_PASS` in the Apache vhost config, which a CLI SSH session
+  never inherits. Fixed by passing them inline for that one invocation:
+  `CONTROL_DB_USER=bms_prov CONTROL_DB_PASS='...' php scripts/migrate_tenant_one.php ...`. The
+  script's own resumability (reserve row → create user → verify → finalise) meant the failed
+  first attempt cost nothing — the retry picked up the same reserved row rather than duplicating it.
+
+**Important architectural point for anyone reading this later, not a bug:** this phase does
+**not** give the superadmin panel real enforcement power over Tenant #1. The bare production
+hostname resolves to `status: 'none'` in `resolveTenantFromRequest()` and is served via
+`bmsLegacyPdo()` regardless of this tenant row's existence — `bmsPrimeTenantFeatures()` is never
+called on that path. So Tenant #1 appears in the Tenants list and can be edited for bookkeeping
+(plan, quotas-as-records), but **Suspend, feature toggles and quota limits have no effect on the
+live site** while it's reached via the bare domain rather than a real tenant subdomain. Giving
+Tenant #1 genuine remote-control parity with every other tenant would need a separate, larger
+step (moving it onto an actual subdomain) — deliberately out of scope here to keep this phase
+low-risk.
+
+Verified: `bmsTenantPathPrefix()` returns `""` for this tenant (confirmed both by local test and
+by reading the code) — zero documents needed to move. Live login and a normal walkthrough of core
+modules confirmed working immediately after the `config.php` credential swap and an Apache reload.
+
+**With this, all 13 phases of the multi-tenancy rollout (0–12, this being the last) are complete.**
+
 ---
 
 ## Phase 8 — Multi-Tenant Migration Runner & Deploy Pipeline
@@ -945,7 +983,7 @@ Update this table the moment each phase merges — this is what lets any session
 | 4 — Authentication Rework | ✅ done (2026-08-31) | `feat/tenant-04-auth-rework` (stacked on Phase 3) |
 | 5 — Self-Registration Flow | ✅ done (2026-08-31) | `feat/tenant-05-self-registration` |
 | 6 — Superadmin Tenant Panel | ✅ done (2026-08-31) | `feat/tenant-06-superadmin-panel` |
-| 7 — Migrate Existing Data to Tenant #1 | ⏳ pending | `feat/tenant-07-migrate-tenant-one` |
+| 7 — Migrate Existing Data to Tenant #1 | ✅ done (2026-09-06) — verified live on production; see note below | `feat/tenant-07-migrate-tenant-one` |
 | 8 — Migration Runner + Deploy Pipeline | ✅ done — runner 2026-08-31, `deploy.yml` wiring + CI lint 2026-09-02 | `feat/tenant-08-migration-runner`, `feat/tenant-deploy-wiring` |
 | 9 — Security Hardening + Isolation Testing | ✅ done (2026-09-02) — 48 assertions green; control-DB least-privilege user remains an operator step (conventions §12) | `feat/tenant-09-isolation-hardening` |
 | 10 — Full Regression + Go-Live | ✅ done (2026-09-02) — 43-assertion module smoke vs a fresh tenant, `docs/MULTI_TENANCY.md`, go-live checklist scored. Manual per-module regression + the Tenant-#1 half remain, both blocked on Phase 7 | `feat/tenant-10-go-live` |
