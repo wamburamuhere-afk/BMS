@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-09-06 (feat) - tender.md: add distinct NeST Reference field, benchmarked against facile-fms.com
+
+**Files (new):** `migrations/2026_09_06_tender_nest_reference.php`, `tests/test_tender_nest_reference_cli.php`
+**Files (modified):** `app/bms/tenders/tender_create.php`, `app/bms/tenders/tender_edit.php`,
+`app/bms/tenders/tenders.php`, `app/bms/tenders/tender_view.php`
+
+Competitive audit of a reference tender module (Facile Financial Management, facile-fms.com demo) at
+the user's request, focused on its "Open NeST Portal" shortcut. Confirmed via direct JS inspection that
+their button — even after saving a NeST reference — is just `window.open('https://nest.go.tz')`, a
+plain external link with no real deep-link, because NeST (Tanzania's e-procurement portal) exposes no
+public per-tender URL API to third parties. BMS's existing button (`tender_print.php`) already does the
+same thing, so there was nothing to improve there. Everywhere else in their Bidding & Tenders module
+(BOQ/contingency/VAT, Materials Schedule, Form of Tender autodraft, 19-item compliance checklist),
+BMS already matches or exceeds it — real GL-integrated participation fee (see the entry above), a
+10-stage PPRA lifecycle vs. their flat 5 statuses, full AWARDED→Project handoff with BOQ/Materials
+carry-over, multi-currency bids, and staff/team tracking, none of which their module has.
+
+The one genuine, small gap: their Tender Details keeps `nest_reference` as its own field, separate from
+`tender_no` (the procuring entity's own advert number) — useful because the number NeST itself assigns
+once a tender is listed there can differ from the entity's own reference. Added: `tenders.nest_reference`
+column, capture on create/edit, a "NeST Ref" column on the tenders list (matching their Bids Register),
+and display on the tender detail view. Explicitly guarded against repeating the `safe_output()` 'N/A'-
+into-editable-field bug fixed 2026-09-05 (`tender_boq.php`/`tender_materials.php`) — the edit form passes
+an explicit empty-string default. 24 new assertions verifying schema, real insert/read round-trip
+(including the optional-NULL case), the list-query exposure, and the anti-regression guard; all 8
+existing tender-area suites re-run clean (219 assertions, 0 failures).
+
 ## 2026-09-06 (feat) - tender.md: participation fee is now a real GL payment (post_principle.md compliance)
 
 **Files (new):** `core/tender_fee.php`, `migrations/2026_09_06_tender_participation_fee_payment.php`,

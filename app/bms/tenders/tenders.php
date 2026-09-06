@@ -301,6 +301,7 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                         <tr class="text-nowrap">
                             <th class="ps-2 text-center" style="font-size:0.78rem;">S/NO</th>
                             <th style="font-size:0.82rem;">Tender NO</th>
+                            <th class="d-none d-md-table-cell" style="font-size:0.82rem;">NeST Ref</th>
                             <th style="font-size:0.82rem;">Procuring Entity</th>
                             <th class="d-none d-md-table-cell" style="font-size:0.82rem;">Acronym</th>
                             <th class="d-none d-md-table-cell" style="font-size:0.82rem;">Category</th>
@@ -1051,6 +1052,10 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                 render: (d, t, row, meta) => meta.row + meta.settings._iDisplayStart + 1
             },
             { data: 'tender_no', render: d => `<strong class="tender-no-text">${safeOutput(d)}</strong>` },
+            {
+                data: 'nest_reference', className: 'd-none d-md-table-cell',
+                render: d => d ? safeOutput(d) : '<span class="text-muted">—</span>'
+            },
             {
                 data: null,
                 render: (d, t, row) => `<span class="entity-text" title="${safeOutput(row.entity_name || row.procuring_entity_name)}">${safeOutput(row.entity_name || row.procuring_entity_name)}</span>`

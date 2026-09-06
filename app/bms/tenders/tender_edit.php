@@ -102,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
                 country = ?, region_id = ?, district_id = ?, 
                 council_id = ?, ward_id = ?, 
                 contact_number = ?, physical_address = ?, postal_address = ?,
-                tender_description = ?, tender_no = ?, tender_category = ?,
+                tender_description = ?, tender_no = ?, nest_reference = ?, tender_category = ?,
                 tender_sub_category = ?, tender_type = ?,
                 duration = ?, discipline = ?, tender_role = ?,
                 publication_date = ?, submission_deadline = ?, 
@@ -128,6 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_W
             $_POST['postal_address']   ?? null,
             $_POST['tender_description'] ?? null,
             $tender_no,
+            trim($_POST['nest_reference'] ?? '') ?: null,
             $category,
             $sub_category,
             $type,
@@ -309,6 +310,10 @@ logActivity($pdo, $_SESSION['user_id'], 'View tender edit form', "User accessed 
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Tender NO <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control" name="tender_no" value="<?= safe_output($tender['tender_no']) ?>" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">NeST Reference</label>
+                                    <input type="text" class="form-control" name="nest_reference" value="<?= safe_output($tender['nest_reference'], '') ?>" placeholder="reference on nest.go.tz, once listed">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Tender Category <span class="text-danger">*</span></label>
