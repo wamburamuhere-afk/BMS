@@ -78,10 +78,10 @@ $tenderNavActive = 'materials';
                                     <?php endif; ?>
                                 </select>
                                 <input type="hidden" name="items[<?= $mid ?>][product_id]" class="material-product-id" value="<?= (int)$item['product_id'] ?>">
-                                <input type="hidden" name="items[<?= $mid ?>][material]" class="material-name" value="<?= safe_output($item['material']) ?>">
+                                <input type="hidden" name="items[<?= $mid ?>][material]" class="material-name" value="<?= safe_output($item['material'], '') ?>">
                             </td>
-                            <td><input type="text" class="form-control form-control-sm" name="items[<?= $mid ?>][specification]" value="<?= safe_output($item['specification']) ?>" <?= $can_edit ? '' : 'readonly' ?>></td>
-                            <td><input type="text" class="form-control form-control-sm" name="items[<?= $mid ?>][unit]" value="<?= safe_output($item['unit']) ?>" <?= $can_edit ? '' : 'readonly' ?>></td>
+                            <td><input type="text" class="form-control form-control-sm" name="items[<?= $mid ?>][specification]" value="<?= safe_output($item['specification'], '') ?>" <?= $can_edit ? '' : 'readonly' ?>></td>
+                            <td><input type="text" class="form-control form-control-sm" name="items[<?= $mid ?>][unit]" value="<?= safe_output($item['unit'], '') ?>" <?= $can_edit ? '' : 'readonly' ?>></td>
                             <td><input type="number" step="0.001" class="form-control form-control-sm mat-qty" name="items[<?= $mid ?>][qty]" value="<?= safe_output($item['qty'], '0') ?>" <?= $can_edit ? '' : 'readonly' ?>></td>
                             <td><input type="number" step="0.01" class="form-control form-control-sm mat-rate" name="items[<?= $mid ?>][rate]" value="<?= safe_output($item['rate'], '0') ?>" <?= $can_edit ? '' : 'readonly' ?>></td>
                             <td class="text-end mat-amount fw-bold"><?= number_format((float)$item['amount'], 2) ?></td>

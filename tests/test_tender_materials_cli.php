@@ -52,6 +52,19 @@ try {
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    section('1b. Regression — browser click-through caught: empty specification/unit/material');
+    // ─────────────────────────────────────────────────────────────────────
+    // Same bug as Phase A's BOQ page: safe_output()'s default 'N/A' belongs
+    // in read-only display text, not an editable input's `value=`. A blank
+    // row's Specification/Unit boxes (and the hidden material-name field)
+    // showed the literal string "N/A", which would have been saved as real
+    // data if the row was left untouched.
+    $pageSrc = file_get_contents("$root/app/bms/tenders/tender_materials.php");
+    ok(str_contains($pageSrc, "safe_output(\$item['material'], '')"), "hidden material-name field uses an explicit empty default, not safe_output()'s 'N/A'");
+    ok(str_contains($pageSrc, "safe_output(\$item['specification'], '')"), "specification input uses an explicit empty default, not safe_output()'s 'N/A'");
+    ok(str_contains($pageSrc, "safe_output(\$item['unit'], '')"), "unit input uses an explicit empty default, not safe_output()'s 'N/A'");
+
+    // ─────────────────────────────────────────────────────────────────────
     section('2. Schema — table and FKs exist');
     // ─────────────────────────────────────────────────────────────────────
     $tables = $pdo->query("SHOW TABLES LIKE 'tender_materials'")->fetchAll(PDO::FETCH_COLUMN);

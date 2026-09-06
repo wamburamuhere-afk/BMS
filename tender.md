@@ -597,9 +597,41 @@ that phase touched; after all phases, one real end-to-end test.
 | G | Permissions/registry/migration hygiene | ☑ Done (folded into A–F) | 2026-09-05 |
 | H | Final re-scout + end-to-end test | ☑ Done (found & fixed 2 real gaps) | 2026-09-05 |
 
-**All phases (A–H) are done.** 166 assertions passing across 7 test files,
-zero regressions, two real cross-cutting gaps found and fixed during the
-Phase H re-scout (see above). The `feat/tender-professional-upgrade` branch
-is ready to push and PR into `develop`. Nothing left to resume — if a future
-session lands here, the next tender-module work is a genuinely new
-feature/fix, not a continuation of this plan.
+**All phases (A–H) are done, PR opened (#1806), and a real browser
+click-through was run against the live vhost** (logged in as an actual user —
+something no earlier phase could do, since this session had no BMS
+credentials until the user logged in themselves mid-review). The
+click-through found one more genuine bug that every CLI test had missed
+because it's invisible outside a rendered page:
+
+**Post-PR fix — "N/A" leaking into editable fields.** `tender_boq.php` and
+`tender_materials.php` used `safe_output($val)` (default `'N/A'`) to fill an
+`<input value="...">` for Description/Unit/Specification/the hidden
+material-name field. `safe_output()`'s `'N/A'` default is meant for
+**read-only display text** — used on an editable input, a blank row showed
+the literal string "N/A" sitting in the box, which would have been saved as
+real data if left untouched. Fixed by passing an explicit empty-string
+default (`safe_output($val, '')`) everywhere an editable field can
+legitimately be blank. Added regression assertions to both
+`tests/test_tender_boq_cli.php` and `tests/test_tender_materials_cli.php`
+(grep the page source for the fixed call shape) since this class of bug is
+invisible to a CLI test that never renders the actual HTML.
+
+**171 assertions passing across all 7 test files, zero regressions.** Pushed
+as a follow-up commit on the same branch/PR.
+
+Live click-through also positively confirmed, against the real logged-in
+vhost: the BOQ/Materials/Checklist tabs' live JS math, the Materials Select2
+free-text-tagging flow, the Checklist's live ready-counter AND its two
+BOQ/Materials hint links pulling real cross-tab data, the Form of Tender
+draft correctly reflecting the just-saved BOQ total, real PDF generation for
+both the Form of Tender and BOQ print actions, and the Edit page's
+AWARDED-bypass fix (dropdown has no AWARDED option) all working exactly as
+designed. **Note:** this left real demonstration data on tender
+`TR/HGSAHJCFTY` (#27) in the live `bms` database — one BOQ bill/item, one
+materials line, one ticked checklist item — flagged to the user rather than
+silently deleted, since it's their live business data.
+
+Nothing left to resume — if a future session lands here, the next
+tender-module work is a genuinely new feature/fix, not a continuation of
+this plan.

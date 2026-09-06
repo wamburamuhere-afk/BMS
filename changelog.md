@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-09-05 (fix) - tender.md: fix "N/A" leaking into editable BOQ/Materials fields, found via live browser click-through
+
+**Files (modified):** `app/bms/tenders/tender_boq.php`, `app/bms/tenders/tender_materials.php`,
+`tests/test_tender_boq_cli.php`, `tests/test_tender_materials_cli.php`
+
+After opening PR #1806, did a real logged-in browser click-through of every new tender tab against the
+live vhost (the user logged in; this session drove the clicks). Caught a bug no CLI test could see:
+`tender_boq.php`/`tender_materials.php` used `safe_output($val)` — whose default is the literal string
+`'N/A'`, meant for read-only display text — to fill editable `<input value="...">` attributes for a
+blank item's Description/Unit/Specification (and the Materials Select2's hidden material-name field).
+A new blank row showed "N/A" sitting in the box; left untouched, saving it would have persisted "N/A"
+as real data. Fixed by passing an explicit empty-string default everywhere an editable field can
+legitimately be blank, and added regression assertions to both CLI suites (grepping the page source
+for the fixed call shape) so this class of bug — invisible outside a rendered page — doesn't return
+silently. 171 assertions across all 7 suites, 0 failures.
+
+The same click-through positively verified, live: BOQ/Materials live JS math, the Materials Select2
+free-text-tagging flow, the Checklist's live counter and its BOQ/Materials hint links pulling real
+cross-tab data, the Form of Tender draft correctly reflecting the just-saved BOQ total, real PDF
+generation for two different print actions, and the Edit page's AWARDED-bypass fix — all confirmed
+working as designed. Leaves demonstration data on live tender TR/HGSAHJCFTY (#27): one BOQ item, one
+materials line, one ticked checklist item — noted for the user rather than deleted unasked.
+
 ## 2026-09-05 (fix) - tender.md Phase H: close the AWARDED-status bypass found in final re-scout
 
 **Files (modified):** `app/bms/tenders/tender_edit.php`, `app/bms/tenders/tender_create.php`
