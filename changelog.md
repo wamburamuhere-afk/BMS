@@ -1,5 +1,183 @@
 # BMS Changelog
 
+## 2026-09-05 (fix) - tender.md Phase H: close the AWARDED-status bypass found in final re-scout
+
+**Files (modified):** `app/bms/tenders/tender_edit.php`, `app/bms/tenders/tender_create.php`
+**Files (added):** `tests/test_tender_end_to_end_cli.php`
+
+Final re-scout pass of the tender-module upgrade (`tender.md` Phase H) — the project's working
+agreement calls for re-scouting before/after multi-phase work, and a real end-to-end test at the end.
+Found two real gaps in `tender_edit.php`, a page none of Phases A-F had touched:
+
+1. **Critical:** the plain "Current Status" dropdown listed `AWARDED` as a normal option, saved via a
+   raw `UPDATE`. Selecting it there would silently skip every Phase E guarantee (no project created, no
+   budget, no team access, no BOQ/Materials carry-over) and then permanently block the real award
+   workflow afterward (it would see `status = AWARDED` and refuse as "already awarded," with no project
+   ever having been created — no recovery path in the UI). Fixed with a server-side guard blocking any
+   transition into or out of AWARDED outside the guarded Decision workflow, plus a client-side fix
+   (dropdown excludes AWARDED for a live tender; shown disabled with an explanation once actually awarded).
+2. Phase D's `bid_validity_days` column had no UI field to actually change it from the default of 90 —
+   added "Bid Validity (days)" to both `tender_create.php` and `tender_edit.php`.
+
+Added `tests/test_tender_end_to_end_cli.php` — the full real lifecycle in one script (create -> price
+BOQ -> materials -> checklist -> draft & save Form of Tender -> print all four documents -> award ->
+verify the project has everything -> confirm re-award is refused), plus a lint sweep of all 25
+tender-module files and an assertion the AWARDED-bypass fix is actually present. 24/24 assertions.
+
+**All seven tender-module test files now pass together: 166 assertions, 0 failures.** This closes out
+`tender.md`'s full A-H plan — Phases A-F build the features, Phase G's hygiene was folded into each as
+it shipped, Phase H's re-scout caught the two gaps above that only a fresh look at the whole module
+(not a phase in isolation) could surface.
+
+## 2026-09-05 (feat) - tender.md Phase F: Preview & Print tab + NeST portal shortcut
+
+**Files (added):** `api/tender_print.php`, `app/bms/tenders/tender_print.php`, `tests/test_tender_print_cli.php`
+**Files (modified):** `core/tender_documents.php`, `roots.php`, `core/permissions.php`,
+`core/feature_registry.php`, `app/bms/tenders/_tender_nav.php`
+
+Sixth phase of the tender-module upgrade (`tender.md`) — and the last of the originally-scoped build
+phases (A-F). Adds the "Preview & Print" tab matching the reference product's own last tab: one-click
+PDF print for the Bills of Quantities, Materials Schedule, and Compliance Checklist (Form of Tender
+already had its own from Phase D), plus a static link to the NeST portal (nest.go.tz). All three reuse
+`generateLetterPdf()` — no second PDF pipeline — via new plain-HTML-table builders in
+`core/tender_documents.php` (TCPDF's `writeHTML()` only reliably renders tables, the same constraint
+the existing letter engine already works around).
+
+Verified with `tests/test_tender_print_cli.php` (24 assertions): the HTML builders contain the real
+data passed in, and each of the three document types is proven to produce an actual valid PDF
+end-to-end (not just string checks) the same way Phase D's Form of Tender pipeline was proven. Phases
+A-E re-run clean — 118 assertions total across the plan so far, zero regressions.
+
+Phases A-F (the full original build scope) are now complete. Phase G (permission/registry/migration
+hygiene) turned out to need no separate pass — every phase already carried that discipline as it
+shipped. Only Phase H's final consolidated re-scout + end-to-end test remains before this branch is
+ready to push and PR into develop.
+
+## 2026-09-05 (feat) - tender.md Phase E: harden the AWARDED -> Project handoff (6 gaps closed)
+
+**Files (added):** `migrations/2026_09_05_tender_award_project_link.php`, `core/tender_award.php`,
+`tests/test_tender_award_project_link_cli.php`
+**Files (modified):** `schema/tenant_schema_template.sql`, `api/tender_workflow.php`,
+`app/bms/tenders/tenders.php`, `app/bms/tenders/tender_view.php`
+
+Fifth phase of the tender-module upgrade (`tender.md`). The AWARDED -> Project automation already
+existed but had six real gaps, all traced against actual code in `tender.md` §2.1 and now closed in
+one function (`core/tender_award.php::awardTenderToProject()`):
+
+1. **Traceability** — `projects.tender_id` (new, UNIQUE) so a project can be traced back to its tender.
+2. **A kept promise** — `tenders.php` told users the tender amount "will be tracked as the project
+   budget if awarded"; the code never actually set `budget`. It does now.
+3. **Team access** — the winning `tender_staff` are now given `user_projects` rows (resolved via
+   `users.employee_id`), so they can actually see the project BMS just created for them; staff with
+   no login are silently skipped rather than erroring.
+4. **Idempotency** — a status guard plus a UNIQUE key backstop (proven in the test by a raw INSERT
+   bypassing the PHP guard entirely, which the database itself rejects).
+5. **Currency** — `projects.budget_currency` is recorded from the tender's actual submission currency
+   instead of being silently assumed TZS.
+6. **BOQ/Materials carry-over** — the priced BOQ is copied (not referenced) into new
+   `project_boq_bills`/`items` tables; the Materials Schedule seeds a project NIP Material List per
+   `tender.md` §3's linkage rule, referencing already-catalogued products directly and creating new
+   NIP products (matching `api/create_nip_product.php`'s own convention) for free-text lines.
+
+`tenders.php`'s award success dialog now shows a "View Project" button instead of a bare toast;
+`tender_view.php` shows an "AWARDED — Project created" banner once a linked project exists.
+
+Verified with `tests/test_tender_award_project_link_cli.php` (35 assertions) exercising the real
+function end to end — built a tender with BOQ, Materials, and mixed-login staff, awarded it, and
+checked every gap's actual output, including the raw-INSERT bypass test. Phases A-D re-run clean.
+
+## 2026-09-05 (feat) - tender.md Phase D: Form of Tender auto-draft, reusing the letterhead/PDF engine
+
+**Files (added):** `migrations/2026_09_05_tender_form_of_tender.php`, `core/tender_documents.php`,
+`api/tender_form_of_tender.php`, `app/bms/tenders/tender_form_of_tender.php`,
+`tests/test_tender_form_of_tender_cli.php`
+**Files (modified):** `schema/tenant_schema_template.sql`, `roots.php`, `core/permissions.php`,
+`core/feature_registry.php`, `app/bms/tenders/_tender_nav.php`
+
+Fourth phase of the tender-module upgrade (`tender.md`). Auto-drafts the PPRA-standard "Form of
+Tender" covering letter from the tender's own data (tender number, title, procuring entity, and
+Phase A's BOQ grand total) and a validity-period paragraph — which needed a new `bid_validity_days`
+column since `tenders` had no equivalent of the standard "Bid Validity (days)" field at all.
+Recipient/subject are deterministic (not separately editable) since Tender Details already owns that
+data; only the body is user-editable (Summernote), with a "Re-draft From Details" reset.
+
+Printing reuses the existing `core/document_letter_render.php`/`document_letter_pdf.php` engine
+instead of building a second PDF pipeline — the letter gets company letterhead, e-signature support
+and the audited footer for free.
+
+Verified with `tests/test_tender_form_of_tender_cli.php` (22 assertions), including an actual
+end-to-end PDF generation (drafts a letter, runs it through `generateLetterPdf()`, asserts a valid
+non-trivial PDF comes out) — the closest available proof this pipeline genuinely works without a
+logged-in browser session. Phases A/B/C re-run clean (24/17/20).
+
+## 2026-09-05 (feat) - tender.md Phase C: PPRA compliance checklist for Tenders
+
+**Files (added):** `migrations/2026_09_05_tender_checklist.php`, `core/tender_checklist.php`,
+`api/tender_checklist.php`, `app/bms/tenders/tender_checklist.php`, `tests/test_tender_checklist_cli.php`
+**Files (modified):** `schema/tenant_schema_template.sql`, `roots.php`, `core/permissions.php`,
+`core/feature_registry.php`, `app/bms/tenders/_tender_nav.php`, `app/bms/tenders/tender_create.php`
+
+Third phase of the tender-module upgrade (`tender.md`). Adds the 19-item standard East African/PPRA
+submission checklist (Form of Tender, POA, Certificate of Incorporation, TIN, VAT cert, Tax Clearance,
+NeST registration, Bid Security, priced BOQ, work programme, audited financials, references, key
+personnel CVs, equipment schedule, litigation history, anti-bribery declaration, JV agreement, etc.)
+to every tender, with a live "X / N ready" counter. Standard items can be unticked but never deleted;
+only user-added custom items can be removed, so the counter always measures against the real standard.
+The migration backfilled all 17 pre-existing tenders (criteria-based, not hard-coded ids).
+
+Two checklist items ("Priced Bills of Quantities", "Materials Schedule & delivery plan") show a
+"View →" hint pulling live data from Phases A/B — deliberately a hint link, not silent auto-ticking,
+since flipping a box the user already unticked would be worse than not automating it.
+
+Verified with `tests/test_tender_checklist_cli.php` (20 assertions) plus Phase A (24/24) and Phase B
+(17/17) re-run clean, and a clean unauthenticated HTTP round-trip.
+
+## 2026-09-05 (feat) - tender.md Phase B: Materials Schedule for Tenders (linked to the product catalogue)
+
+**Files (added):** `migrations/2026_09_05_tender_materials.php`, `api/tender_materials.php`,
+`app/bms/tenders/tender_materials.php`, `tests/test_tender_materials_cli.php`
+**Files (modified):** `schema/tenant_schema_template.sql`, `roots.php`, `core/permissions.php`,
+`core/feature_registry.php`, `app/bms/tenders/_tender_nav.php`
+
+Second phase of the tender-module upgrade (`tender.md`). Adds a Materials Schedule to each tender —
+a pre-award bid-costing estimate distinct from (but linked to) the existing NIP Material Lists used
+for post-award procurement. Each line optionally references an existing `products` row via a nullable
+`product_id` (`ON DELETE SET NULL`, not CASCADE, so the pricing line survives even if the catalogue
+item is later removed) — a Select2 field with AJAX search + free-text tagging, so a material can
+either point at something already catalogued or just be typed, per `tender.md` §3's explicit rule
+against duplicating the NIP concept. `product_id` is what Phase E's award carry-over will read to
+decide whether to link an existing product into the new project's material list or create one first.
+
+Verified with `tests/test_tender_materials_cli.php` (17 assertions: schema/FK presence, linked vs
+free-text amount math, the SET NULL behavior, cross-tender write guard) plus a re-run of Phase A's
+test (24/24, no regression) and a clean unauthenticated HTTP round-trip.
+
+## 2026-09-05 (feat) - tender.md Phase A: Bills of Quantities (BOQ) engine for Tenders
+
+**Files (added):** `migrations/2026_09_05_tender_boq.php`, `core/tender_boq.php`, `api/tender_boq.php`,
+`app/bms/tenders/tender_boq.php`, `app/bms/tenders/_tender_nav.php`, `tests/test_tender_boq_cli.php`
+**Files (modified):** `schema/tenant_schema_template.sql`, `roots.php`, `core/permissions.php`,
+`core/feature_registry.php`, `app/bms/tenders/tender_view.php`, `app/bms/tenders/tender_edit.php`,
+`app/bms/tenders/tenders.php`
+
+First phase of the tender-module professional upgrade (plan: `tender.md`, benchmarked against a
+competing product's Bidding & Tenders module). Adds a real Bills of Quantities engine — multiple
+named bill sections (`tender_boq_bills`) each holding priced line items (`tender_boq_items`), rolling
+into a Collection/Summary with contingency % and VAT % on `tenders` (`boq_contingency_percent`,
+`boq_vat_percent`, `boq_grand_total`). All grand-total math lives in one place
+(`core/tender_boq.php::recomputeTenderBoqTotal()`) so the server never trusts a client-submitted total.
+
+Previously a tender's bid amount was a single manually-typed number with nothing behind it. The BOQ
+now feeds the Financial Submission modal's amount field as a pre-fill (`tenders.php`'s
+`openSubmissionModal()`), not a silent overwrite — still fully editable, since `tender_amount_tzs`
+represents what was actually submitted, an explicit user action.
+
+Added a shared tab bar (`_tender_nav.php`, currently Details/Edit/BOQ) across the tender record pages
+so subsequent phases (Materials Schedule, Checklist, Form of Tender, Print) attach to the same nav
+instead of each inventing their own. Verified with `tests/test_tender_boq_cli.php` (24 assertions:
+schema, exact BOQ math, cascade-delete recompute, cross-tender write-guard) and a clean unauthenticated
+HTTP round-trip against the live vhost.
+
 ## 2026-09-05 (feat) - ternant.md Phase 7: register the existing production install as Tenant #1
 
 **Files (added):** `scripts/migrate_tenant_one.php`

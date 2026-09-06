@@ -186,62 +186,50 @@ try {
             $status = $_POST['status'] ?? '';
             $loss_reason = $_POST['loss_reason'] ?? null;
             $tender_sum = $_POST['tender_sum'] ?? null;
-            $award_letter = null;
 
             if ($status === 'LOSS') {
-                $status = 'LOSS';
                 $stmt = $pdo->prepare("UPDATE tenders SET status = 'END TENDER', loss_reason = ?, updated_at = NOW() WHERE tender_id = ?");
                 $stmt->execute([$loss_reason, $tender_id]);
-            } else {
-                // Optional Award Letter upload
-                if (isset($_FILES['award_letter_document']) && $_FILES['award_letter_document']['error'] === UPLOAD_ERR_OK) {
-                    $upload_dir = __DIR__ . '/../uploads/tenders/awards/';
-                    if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-                    
-                    $file_ext = pathinfo($_FILES['award_letter_document']['name'], PATHINFO_EXTENSION);
-                    $file_name = 'award_' . $tender_id . '_' . time() . '.' . $file_ext;
-                    $award_letter = 'uploads/tenders/awards/' . $file_name;
-                    assertUploadWithinQuota($pdo, (int)$_FILES['award_letter_document']['size']);
-                    move_uploaded_file($_FILES['award_letter_document']['tmp_name'], $upload_dir . $file_name);
-                    registerFileInLibrary($pdo, $award_letter, $_FILES['award_letter_document']['name'], $_FILES['award_letter_document']['size'], 'Award Letter - Tender #' . $tender_id, 'tender,award-letter', $user_id);
-                }
 
-                // Award the tender
-                $status = 'AWARDED';
-                $stmt = $pdo->prepare("UPDATE tenders SET status = 'AWARDED', tender_sum = ?, award_letter_document = ?, award_date = NOW(), updated_at = NOW() WHERE tender_id = ?");
-                $stmt->execute([$tender_sum, $award_letter, $tender_id]);
-
-                // AUTOMATICALLY Move to Projects
-                $tender = $pdo->prepare("SELECT t.*, c.customer_name FROM tenders t LEFT JOIN customers c ON t.customer_id = c.customer_id WHERE t.tender_id = ?");
-                $tender->execute([$tender_id]);
-                $t = $tender->fetch(PDO::FETCH_ASSOC);
-
-                if ($t) {
-                    // Fallback for contract attachment
-                    $contract_doc = $t['award_letter_document'] ?: ($t['submission_document_tzs'] ?: $t['submission_document_usd']);
-
-                    $proj_stmt = $pdo->prepare("INSERT INTO projects (project_name, contract_number, contract_sum, client_name, customer_id, start_date, status, description, contract_attachment, duration, discipline, role_position, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-                    $proj_name = $t['tender_description'] ?: ($t['tender_no'] . " Project");
-                    $proj_stmt->execute([
-                        $proj_name,
-                        $t['tender_no'],
-                        $t['tender_sum'],
-                        $t['customer_name'] ?: $t['procuring_entity_name'],
-                        $t['customer_id'],
-                        date('Y-m-d'),
-                        'planning',
-                        $t['tender_description'],
-                        $contract_doc,
-                        $t['duration']    ?? null,
-                        $t['discipline']  ?? null,
-                        $t['tender_role'] ?? null
-                    ]);
-                }
+                logActivity($pdo, $user_id, 'UPDATE', "[Tender Decision] Tender #$tender_id marked LOSS.");
+                echo json_encode(['success' => true, 'message' => 'Decision recorded.']);
+                break;
             }
 
-            logActivity($pdo, $user_id, 'UPDATE', "[Tender Decision] Decision made for tender #$tender_id: $status. Automatically moved to projects if awarded.");
+            // Optional Award Letter upload — kept here (file-upload specific,
+            // not part of the reusable award logic in core/tender_award.php).
+            $award_letter = null;
+            if (isset($_FILES['award_letter_document']) && $_FILES['award_letter_document']['error'] === UPLOAD_ERR_OK) {
+                $upload_dir = __DIR__ . '/../uploads/tenders/awards/';
+                if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
 
-            echo json_encode(['success' => true, 'message' => "Decision recorded and tender moved to Projects!"]);
+                $file_ext = pathinfo($_FILES['award_letter_document']['name'], PATHINFO_EXTENSION);
+                $file_name = 'award_' . $tender_id . '_' . time() . '.' . $file_ext;
+                $award_letter = 'uploads/tenders/awards/' . $file_name;
+                assertUploadWithinQuota($pdo, (int)$_FILES['award_letter_document']['size']);
+                move_uploaded_file($_FILES['award_letter_document']['tmp_name'], $upload_dir . $file_name);
+                registerFileInLibrary($pdo, $award_letter, $_FILES['award_letter_document']['name'], $_FILES['award_letter_document']['size'], 'Award Letter - Tender #' . $tender_id, 'tender,award-letter', $user_id);
+            }
+
+            require_once __DIR__ . '/../core/tender_award.php';
+            $result = awardTenderToProject($pdo, (int)$tender_id, (int)$user_id, [
+                'tender_sum' => $tender_sum,
+                'award_letter_document' => $award_letter,
+            ]);
+
+            if (!$result['success']) {
+                echo json_encode(['success' => false, 'message' => $result['message']]);
+                break;
+            }
+
+            logActivity($pdo, $user_id, 'UPDATE', "[Tender Decision] Tender #$tender_id AWARDED. Created project #{$result['project_id']} ({$result['project_name']}).");
+
+            echo json_encode([
+                'success' => true,
+                'message' => "Tender awarded and moved to Projects: {$result['project_name']}",
+                'project_id' => $result['project_id'],
+                'project_name' => $result['project_name'],
+            ]);
             break;
 
         case 'AWARD_RECORDS':
