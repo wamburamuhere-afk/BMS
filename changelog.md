@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-09-06 (fix) - tender.md: fix typed material names being silently discarded (Select2 event bug), clean up demo data
+
+**Files (modified):** `app/bms/tenders/tender_materials.php`, `tests/test_tender_materials_cli.php`
+
+Following up on the previous "N/A" fix's live browser session, found a more serious bug on the
+Materials Schedule page: typing a brand-new material name and selecting it (Select2's `tags: true`
+flow) never actually saved the name — the box visibly showed what was typed, but the row saved with
+a blank material. Root-caused with certainty via a debug event listener across a 100%-genuine browser
+interaction (real click, real typing, real click to select — no synthetic shortcuts): Select2
+4.1.0-rc.0 does not fire `select2:select`, `select2:selecting`, or even a plain `change` event when
+the selected option is a newly-created tag, only for an existing ajax-returned catalogue item. The
+page's live-sync code relied entirely on `select2:select`, so the most important field on the page
+could silently vanish.
+
+Fixed two ways: switched the live handler to `change` (Select2's own documented more-robust pattern),
+and added `syncMaterialHiddenFieldsFromSelect2()` — called immediately before the form serializes on
+submit, re-deriving every row's hidden fields from `.select2('data')` directly rather than trusting
+any incremental event. Verified live end-to-end: reproduced the blank-save, confirmed the sync
+recovers it, submitted for real, confirmed the correct name landed in the database. Regression
+assertions added; **175 assertions across all 7 tender test suites now, 0 failures.**
+
+Cleaned up the demo/test data this and the prior session's click-throughs left on live tender
+`TR/HGSAHJCFTY` (#27): removed the test BOQ bill/item and materials line, unticked the checklist item,
+and reset the tender's cached BOQ/letter fields to their pre-testing defaults. Confirmed clean via
+direct query (0 BOQ bills, 0 materials, 0/19 checklist ready).
+
 ## 2026-09-05 (fix) - tender.md: fix "N/A" leaking into editable BOQ/Materials fields, found via live browser click-through
 
 **Files (modified):** `app/bms/tenders/tender_boq.php`, `app/bms/tenders/tender_materials.php`,
