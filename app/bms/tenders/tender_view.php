@@ -147,6 +147,10 @@ $company_logo = getSetting('company_logo', '');
                             <td><?= safe_output($tender['tender_category']) ?> <?= $tender['tender_category_specify'] ? "({$tender['tender_category_specify']})" : '' ?></td>
                         </tr>
                         <tr>
+                            <th class="bg-light ps-3">NeST Reference</th>
+                            <td><?= safe_output($tender['nest_reference'] ?? null, '—') ?></td>
+                        </tr>
+                        <tr>
                             <th class="bg-light ps-3">Deadline</th>
                             <td class="text-danger fw-bold"><i class="bi bi-calendar-event me-1"></i><?= format_date($tender['submission_deadline'], 'd M Y, H:i') ?></td>
                         </tr>
