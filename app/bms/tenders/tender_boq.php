@@ -88,9 +88,9 @@ $tenderNavActive = 'boq';
                             <td><?= $i + 1 ?></td>
                             <td>
                                 <input type="hidden" name="items[<?= $itemId ?>][bill_id]" value="<?= $billId ?>">
-                                <input type="text" class="form-control form-control-sm" name="items[<?= $itemId ?>][description]" value="<?= safe_output($item['description']) ?>" <?= $can_edit ? '' : 'readonly' ?>>
+                                <input type="text" class="form-control form-control-sm" name="items[<?= $itemId ?>][description]" value="<?= safe_output($item['description'], '') ?>" <?= $can_edit ? '' : 'readonly' ?>>
                             </td>
-                            <td><input type="text" class="form-control form-control-sm" name="items[<?= $itemId ?>][unit]" value="<?= safe_output($item['unit']) ?>" <?= $can_edit ? '' : 'readonly' ?>></td>
+                            <td><input type="text" class="form-control form-control-sm" name="items[<?= $itemId ?>][unit]" value="<?= safe_output($item['unit'], '') ?>" <?= $can_edit ? '' : 'readonly' ?>></td>
                             <td><input type="number" step="0.001" class="form-control form-control-sm boq-qty" name="items[<?= $itemId ?>][qty]" value="<?= safe_output($item['qty'], '0') ?>" <?= $can_edit ? '' : 'readonly' ?>></td>
                             <td><input type="number" step="0.01" class="form-control form-control-sm boq-rate" name="items[<?= $itemId ?>][rate]" value="<?= safe_output($item['rate'], '0') ?>" <?= $can_edit ? '' : 'readonly' ?>></td>
                             <td class="text-end boq-amount fw-bold"><?= number_format((float)$item['amount'], 2) ?></td>

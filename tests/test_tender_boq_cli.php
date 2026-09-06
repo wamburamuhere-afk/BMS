@@ -56,6 +56,18 @@ try {
     ok(function_exists('recomputeTenderBoqTotal'), 'recomputeTenderBoqTotal() is defined');
 
     // ─────────────────────────────────────────────────────────────────────
+    section('1b. Regression — browser click-through caught: empty description/unit');
+    // ─────────────────────────────────────────────────────────────────────
+    // safe_output()'s default 'N/A' is meant for read-only DISPLAY text, not
+    // an editable input's `value=`. Using it there put the literal string
+    // "N/A" into a blank item's Description/Unit boxes — invisible in a CLI
+    // test, only caught by actually looking at the rendered page. If left
+    // untouched, saving the row would have persisted "N/A" as real data.
+    $pageSrc = file_get_contents("$root/app/bms/tenders/tender_boq.php");
+    ok(str_contains($pageSrc, "safe_output(\$item['description'], '')"), "description input uses an explicit empty default, not safe_output()'s 'N/A'");
+    ok(str_contains($pageSrc, "safe_output(\$item['unit'], '')"), "unit input uses an explicit empty default, not safe_output()'s 'N/A'");
+
+    // ─────────────────────────────────────────────────────────────────────
     section('2. Schema — tables and columns exist');
     // ─────────────────────────────────────────────────────────────────────
     $tables = $pdo->query("SHOW TABLES LIKE 'tender_boq_%'")->fetchAll(PDO::FETCH_COLUMN);
