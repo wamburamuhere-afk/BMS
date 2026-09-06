@@ -25,6 +25,12 @@ if (!$tender) {
     exit;
 }
 
+// Gap #1 (tender.md Sec 2.1) — the reverse link: once AWARDED, show where
+// the project this tender spawned actually lives.
+$linkedProjectStmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE tender_id = ?");
+$linkedProjectStmt->execute([$id]);
+$linkedProject = $linkedProjectStmt->fetch(PDO::FETCH_ASSOC);
+
 // Fallback logic for raw text location names (if join found nothing)
 $display_region   = $tender['region_name']   ?: ($tender['region_id']   ?: 'N/A');
 $display_district = $tender['district_name'] ?: ($tender['district_id'] ?: 'N/A');
@@ -78,6 +84,15 @@ $company_logo = getSetting('company_logo', '');
             <a href="<?= getUrl('tender_edit') ?>?id=<?= $id ?>" class="btn btn-sm btn-primary text-nowrap"><i class="bi bi-pencil"></i> <span class="d-none d-sm-inline">Edit Tender</span><span class="d-inline d-sm-none">Edit</span></a>
         </div>
     </div>
+
+    <?php $tenderNavActive = 'view'; require __DIR__ . '/_tender_nav.php'; ?>
+
+    <?php if ($linkedProject): ?>
+    <div class="alert alert-success d-flex align-items-center justify-content-between no-print">
+        <span><i class="bi bi-check-circle-fill me-2"></i>This tender was <strong>AWARDED</strong> — Project created: <strong><?= safe_output($linkedProject['project_name']) ?></strong></span>
+        <a href="<?= getUrl('project_view') ?>?id=<?= $linkedProject['project_id'] ?>" class="btn btn-sm btn-success text-nowrap"><i class="bi bi-arrow-right-circle"></i> View Project</a>
+    </div>
+    <?php endif; ?>
 
     <!-- 1: Tender & Institution Information -->
     <div class="row g-4 mb-4">
