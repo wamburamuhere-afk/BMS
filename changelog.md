@@ -1,5 +1,38 @@
 # BMS Changelog
 
+## 2026-09-06 (feat) - tender.md: participation fee is now a real GL payment (post_principle.md compliance)
+
+**Files (new):** `core/tender_fee.php`, `migrations/2026_09_06_tender_participation_fee_payment.php`,
+`tests/test_tender_participation_fee_cli.php`
+**Files (modified):** `api/tender_workflow.php`, `app/bms/tenders/tenders.php`
+
+Audited the tender module against `post_principle.md` and found the participation fee (RECORD_FEE)
+was a memo field only — an amount typed into `tenders.participation_fee_amount` with zero GL trace,
+no bank account, no "paid" concept. Every other financial event in the tender lifecycle (tender_sum,
+project budget at AWARDED) is correctly a pre-contractual estimate that should NOT hit the ledger; the
+participation fee is the one place real cash actually leaves the business, and it had no posting at all.
+
+Fixed by extracting `payTenderParticipationFee()` / `reverseTenderParticipationFee()` into
+`core/tender_fee.php` (same `$ownTxn` convention as `core/tender_award.php`), reusing the exact
+accrual-then-settle sequence `api/account/add_expense.php`'s Quick Expense (pay now) path already
+uses: `Dr Expense (via Accrued Expenses) / Cr the chosen Paid-From bank account`, posted under its own
+`tender_participation_fee` entity namespace (never collides with a real `expenses.expense_id`). A fee
+> 0 now requires naming both the expense account and the Paid-From bank account (mandatory, same
+validation as `add_expense.php`); a fee already paid+posted is locked against re-recording (mirrors
+the AWARDED idempotency guard in `tender_award.php`); deleting a tender with a paid fee reverses the
+accrual, the outflow, and the bank register row first, so nothing is orphaned in the GL.
+
+New `tenders` columns: `participation_fee_paid`, `participation_fee_paid_date`,
+`participation_fee_bank_account_id`, `participation_fee_expense_account_id`,
+`participation_fee_transaction_id`. Fee modal in `tenders.php` gained "Expense Account" + "Paid From"
+Select2 pickers, required only when the fee amount is > 0.
+
+Verified live against the real dev DB: new CLI test posts a real fee, confirms the balanced Dr/Cr
+journal lines, the bank account's `current_balance` actually decreasing, the bank register row, the
+idempotency refusal, and a full reversal restoring everything — 48 assertions, 0 failures, no test
+data left behind. All 7 existing tender test suites + all expense test suites re-run clean (no
+regressions): 175+ tender assertions, 97+ expense assertions.
+
 ## 2026-09-06 (fix) - tender.md: fix typed material names being silently discarded (Select2 event bug), clean up demo data
 
 **Files (modified):** `app/bms/tenders/tender_materials.php`, `tests/test_tender_materials_cli.php`

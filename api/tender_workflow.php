@@ -2,6 +2,7 @@
 // scope-audit: skip — tender workflow API; tenders reference customers, not project-scoped; deferred to Phase G-2
 header('Content-Type: application/json');
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/../core/tender_fee.php';
 
 if (!isAuthenticated()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
@@ -47,13 +48,21 @@ try {
             break;
 
         case 'RECORD_FEE':
-            $fee_amount = $_POST['fee_amount'] ?? 0;
+            $result = payTenderParticipationFee($pdo, (int)$tender_id, (int)$user_id, [
+                'fee_amount'         => $_POST['fee_amount'] ?? 0,
+                'bank_account_id'    => $_POST['bank_account_id'] ?? null,
+                'expense_account_id' => $_POST['expense_account_id'] ?? null,
+            ]);
 
-            $stmt = $pdo->prepare("UPDATE tenders SET status = 'INVITATION', participation_fee_amount = ?, updated_at = NOW() WHERE tender_id = ?");
-            $stmt->execute([$fee_amount, $tender_id]);
+            if ($result['success']) {
+                $feeAmount = $result['fee_amount'] ?? 0;
+                $logMsg = $feeAmount > 0
+                    ? "[Tender Fee Paid] Paid & posted participation fee of $feeAmount for tender #$tender_id (txn #{$result['transaction_id']}). Moved to INVITATION status."
+                    : "[Tender Fee Recorded] No participation fee payable for tender #$tender_id. Moved to INVITATION status.";
+                logActivity($pdo, $user_id, 'UPDATE', $logMsg);
+            }
 
-            logActivity($pdo, $user_id, 'UPDATE', "[Tender Budget Recorded] Recorded participation budget of $fee_amount for tender #$tender_id. Moved to INVITATION status.");
-            echo json_encode(['success' => true, 'message' => "Budget recorded. Tender is now under INVITATION status."]);
+            echo json_encode($result);
             break;
 
         case 'SUBMISSION_PROCESS':
@@ -236,8 +245,23 @@ try {
 
 
         case 'DELETE':
-            $stmt = $pdo->prepare("DELETE FROM tenders WHERE tender_id = ?");
-            $stmt->execute([$tender_id]);
+            // A paid+posted participation fee left real marks on the books
+            // (accrual + outflow + bank register row) — deleting the tender
+            // must reverse all three first, or the GL keeps a dangling entry
+            // pointing at a source that no longer exists (post_principle.md q6).
+            $pdo->beginTransaction();
+            try {
+                reverseTenderParticipationFee($pdo, (int)$tender_id, (int)$user_id);
+
+                $stmt = $pdo->prepare("DELETE FROM tenders WHERE tender_id = ?");
+                $stmt->execute([$tender_id]);
+
+                $pdo->commit();
+            } catch (Throwable $e) {
+                $pdo->rollBack();
+                echo json_encode(['success' => false, 'message' => 'Error deleting tender: ' . $e->getMessage()]);
+                break;
+            }
 
             logActivity($pdo, $user_id, 'DELETE', "[Tender Deletion] Deleted tender #$tender_id");
 

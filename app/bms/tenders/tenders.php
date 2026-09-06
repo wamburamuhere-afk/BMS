@@ -1,11 +1,16 @@
 <?php
 // File: app/bms/tenders/tenders.php
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/payment_source.php';
 
 // Enforce permission
 autoEnforcePermission('tenders'); // Now using proper tender permission
 
 includeHeader();
+
+// Fee payment — same canonical account sources every other payment form uses.
+$fee_bank_accounts = cashBankAccounts($pdo);
+$fee_expense_accounts = expenseAccounts($pdo);
 
 logActivity($pdo, $_SESSION['user_id'], 'View tenders', 'User viewed the tenders management list');
 
@@ -455,11 +460,32 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
                 <input type="hidden" name="action" value="RECORD_FEE">
                 <div class="modal-body p-4">
                     <div class="alert alert-info border-0 py-2 small">
-                        <i class="bi bi-info-circle me-1"></i> Please enter the estimated budget or expenses for this tender participation. This amount will be tracked as the project budget if awarded.
+                        <i class="bi bi-info-circle me-1"></i> If a participation fee is payable to the procuring entity, record it here — it will be paid immediately from the account you choose below and posted to the books. Leave the amount at 0 if no fee applies.
                     </div>
-                    <div class="mb-0">
-                        <label class="form-label fw-bold">Participation Budget (Tshs) <span class="text-danger">*</span></label>
-                        <input type="number" step="0.01" class="form-control" name="fee_amount" required placeholder="e.g. 50000">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Participation Fee (Tshs)</label>
+                        <input type="number" step="0.01" min="0" class="form-control" name="fee_amount" id="fee_amount_input" required placeholder="e.g. 50000">
+                    </div>
+                    <div id="fee_payment_fields">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Expense Account <span class="text-danger">*</span></label>
+                            <select class="form-select select2-static" name="expense_account_id" id="fee_expense_account_id">
+                                <option value="">Select account…</option>
+                                <?php foreach ($fee_expense_accounts as $acc): ?>
+                                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars((!empty($acc['account_code']) ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label fw-bold">Paid From <span class="text-danger">*</span></label>
+                            <select class="form-select select2-static" name="bank_account_id" id="fee_bank_account_id">
+                                <option value="">Select account…</option>
+                                <?php foreach ($fee_bank_accounts as $acc): ?>
+                                    <option value="<?= $acc['account_id'] ?>"><?= htmlspecialchars((!empty($acc['account_code']) ? $acc['account_code'] . ' — ' : '') . $acc['account_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text text-muted">The cash/bank account the fee is paid from.</div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1282,6 +1308,16 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
         });
     });
 
+    // Fee modal — searchable Select2 on the expense/bank account pickers.
+    $('#feeModal').on('shown.bs.modal', function () {
+        const modal = $(this);
+        modal.find('.select2-static').each(function () {
+            if (!$(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2({ theme: 'bootstrap-5', dropdownParent: modal, width: '100%' });
+            }
+        });
+    });
+
     // Trigger filter with Apply button
     $('#applyBtn').on('click', function() {
         let filterDesc = [];
@@ -1696,13 +1732,15 @@ logAudit($pdo, $_SESSION['user_id'], 'VIEW', [
     });
  });
 
- $('select[name="participation_fee_required"]').on('change', function() {
-    if ($(this).val() === 'Yes') {
-        $('#feeAmountBlock').removeClass('d-none').find('input').attr('required', true);
-    } else {
-        $('#feeAmountBlock').addClass('d-none').find('input').attr('required', false);
-    }
- });
+ // A fee > 0 is a real payment — require naming the expense account + the
+ // account it's paid from. A zero fee (nothing payable) needs neither.
+ function toggleFeePaymentFields() {
+    const hasFee = parseFloat($('#fee_amount_input').val()) > 0;
+    $('#fee_expense_account_id, #fee_bank_account_id').prop('required', hasFee);
+    $('#fee_payment_fields').toggleClass('opacity-50', !hasFee);
+ }
+ $('#fee_amount_input').on('input', toggleFeePaymentFields);
+ $('#feeModal').on('show.bs.modal', toggleFeePaymentFields);
  </script>
  
  <style>
