@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-09-07 (fix) - Reject duplicate product names in POS/Products
+
+**Files (changed):** `api/create_product.php`, `api/update_product.php`
+
+Added a case/space-insensitive duplicate check on `product_name` (mirrors the existing
+SKU/barcode duplicate checks in the same files) so registering "water" a second time —
+regardless of case or stray spaces ("Water", "WATER ", "water") — is rejected with a
+clear error instead of silently creating a second row for the same product. Applies to
+both the Add Product modal and the full-page Edit Product form, since both submit
+through these two APIs.
+
 ## 2026-09-06 (docs) - ternant.md Phase 7 complete: multi-tenancy rollout finished (all 13 phases)
 
 **Files (changed):** `ternant.md`

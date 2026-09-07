@@ -169,6 +169,16 @@ try {
         $product_data['tax_rate'] = $tax_rate ? floatval($tax_rate) : 0;
     }
     
+    // Check for duplicate product name — case/space-insensitive so "Water",
+    // "water", and "Water " are all treated as the same product.
+    if ($product_data['product_name'] !== '') {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM products WHERE LOWER(TRIM(product_name)) = LOWER(TRIM(?))");
+        $stmt->execute([$product_data['product_name']]);
+        if ($stmt->fetchColumn() > 0) {
+            throw new Exception('A product named "' . $product_data['product_name'] . '" already exists. Please use a different name.');
+        }
+    }
+
     // Check for duplicate SKU — also against product_code, which is UNIQUE and is
     // stored equal to the SKU. A collision on either would otherwise throw an opaque
     // DB error; this gives a clear message instead.
