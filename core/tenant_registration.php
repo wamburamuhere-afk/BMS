@@ -28,6 +28,8 @@
 require_once __DIR__ . '/control_db.php';
 require_once __DIR__ . '/tenant_resolver.php';
 require_once __DIR__ . '/tenant_provisioner.php';
+require_once __DIR__ . '/platform_settings.php';
+require_once __DIR__ . '/plans.php';
 
 /** Throttle policy. Generous for real humans, ruinous for a script. */
 const REGISTRATION_MAX_PER_IP_HOUR  = 3;
@@ -237,6 +239,25 @@ if (!function_exists('registerTenant')) {
                 ? 'That subdomain is already taken. Please choose another.'
                 : 'We could not finish setting up your account. Please try again shortly.';
             return ['ok' => false, 'error' => $public, 'tenant_id' => null, 'subdomain' => null, 'login_url' => null];
+        }
+
+        // tenant_module_control_plan.md §5.1 — the platform-wide switch for
+        // the UNATTENDED path only (nobody at the platform in the loop yet).
+        // Default 'all' is today's exact behaviour: everything on, byte-
+        // identical, nothing further happens here. A failure to apply the
+        // 'blank' plan is never fatal to registration itself — the owner can
+        // already sign in — it just means "everything on" stands, same as if
+        // the switch were 'all'; logged so it can be finished manually.
+        if (getPlatformSetting('tenant_default_provisioning', 'all') === 'none') {
+            $blank = getPlanByKey('blank');
+            if ($blank) {
+                $ar = applyPlanToTenant((int)$r['tenant_id'], (int)$blank['id']);
+                if (!$ar['ok']) {
+                    error_log('registerTenant: blank-plan apply failed for tenant ' . $r['tenant_id'] . ': ' . $ar['error']);
+                }
+            } else {
+                error_log('registerTenant: provisioning switch is "none" but the reserved "blank" plan is missing — run scripts/setup_control_db.php');
+            }
         }
 
         logRegistrationAttempt($ip, $email, $sub, 'success', null, $r['tenant_id']);

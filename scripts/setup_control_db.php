@@ -352,6 +352,22 @@ try {
     }
     say('  · features catalogue seeded' . ($added ? " ({$added} new)" : ' (no new keys)'));
 
+    // The reserved "Blank" plan (tenant_module_control_plan.md §5.1) — what
+    // self-registration applies when the platform's provisioning switch is set
+    // to "nothing but the base essentials". INSERT IGNORE so re-running this
+    // script never resurrects it if an operator ever renamed/retired it, and
+    // deliberately zero plan_features rows: it exists to represent "nothing",
+    // not a real bundle. Never shown in any plan-picker in the superadmin UI —
+    // filtered out by plan_key wherever plans are listed for a human to choose.
+    $admin->exec("
+        INSERT IGNORE INTO `{$controlDb}`.`plans`
+            (`plan_key`, `name`, `description`, `is_active`, `sort_order`)
+        VALUES ('blank', 'Blank (system)',
+                'Reserved for self-registration''s \"nothing but the base essentials\" mode. Not meant to be applied by hand.',
+                1, 999)
+    ");
+    say('  · reserved "blank" plan seeded');
+
     // Usage quotas (ternant.md Phase 12). NULL means unlimited — deliberately not
     // a magic -1, so "no limit set" and "a real number" can never be confused.
     // Two plain columns on `tenants`, not a second features/tenant_features-shaped

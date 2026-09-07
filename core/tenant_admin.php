@@ -636,6 +636,19 @@ if (!function_exists('createTenantAsOperator')) {
             return $fail('That subdomain is already taken. Please choose another.');
         }
 
+        // Validated BEFORE provisioning (which takes up to a minute and builds a
+        // real database) so a bad plan_id fails fast rather than after the fact.
+        // Guarded by function_exists so this file keeps working stand-alone if
+        // core/plans.php (Phase C of the entitlement work) is ever reverted —
+        // the caller just never gets the option to pass one.
+        $planId = null;
+        if (!empty($in['plan_id']) && function_exists('getPlan')) {
+            $planId = (int)$in['plan_id'];
+            $plan   = getPlan($planId);
+            if (!$plan) return $fail('The selected starting plan no longer exists.');
+            if (!$plan['is_active']) return $fail('The selected starting plan has been retired.');
+        }
+
         $r = provisionTenant($company, $sub, $email, $pw, [
             'status'           => $status,
             'owner_first_name' => trim((string)($in['owner_first_name'] ?? '')),
@@ -649,8 +662,25 @@ if (!function_exists('createTenantAsOperator')) {
             return $fail((string)($r['error'] ?? 'The company could not be created.'));
         }
 
+        // Apply the chosen starting plan atomically, right here — not a
+        // separate step the operator has to remember on tenant_view.php
+        // afterward, closing the window where a new company briefly has every
+        // module on regardless of what was actually agreed (tenant_module_
+        // control_plan.md, Phase B). A plan failure here does NOT roll back
+        // the tenant itself (provisionTenant() already succeeded and the owner
+        // can sign in); it just means the default "everything on" state
+        // stands, exactly as if no plan had been chosen, and the log below
+        // records it so an operator can see it happened and finish manually.
+        if ($planId !== null && function_exists('applyPlanToTenant')) {
+            $ar = applyPlanToTenant((int)$r['tenant_id'], $planId);
+            if (!$ar['ok']) {
+                error_log('createTenantAsOperator: plan apply failed for tenant ' . $r['tenant_id'] . ': ' . $ar['error']);
+            }
+        }
+
         logTenantAdminAction((int)$r['tenant_id'], $sub, 'create',
-            'Created from the superadmin panel for ' . $email . ' (status: ' . $status . ')');
+            'Created from the superadmin panel for ' . $email . ' (status: ' . $status . ')'
+            . ($planId !== null ? ' with starting plan #' . $planId : ''));
 
         return [
             'ok'        => true,

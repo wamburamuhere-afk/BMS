@@ -253,11 +253,32 @@ $html = route(SA_HOST, '/plans');
 ok('plans.php renders with no PHP fatal', !str_contains($html, 'Fatal error'));
 ok('Plans nav item marked active', str_contains($html, 'nav-link active') && str_contains($html, '>Plans<'));
 ok('the test plan appears on the page', str_contains($html, 'Yet Another Name'));
+ok('plans.php never lists the reserved blank plan for an operator to manage',
+   !str_contains($html, '>Blank (system)<'));
 
 $html2 = route(SA_HOST, '/tenants/view?id=' . $tenantId);
 ok('tenant_view.php renders with no PHP fatal', !str_contains($html2, 'Fatal error'));
 ok('shows the Plan card with the resolved current plan name', str_contains($html2, 'Yet Another Name'));
 ok('has the Apply plan control', str_contains($html2, 'id="btnApplyPlan"'));
+ok('tenant_view.php never lists the reserved blank plan as an apply option',
+   !str_contains($html2, '>Blank (system)<'));
+
+// ─────────────────────────────────────────────────────────────────────────────
+section('6. tenant_new.php — starting plan at creation (Phase B)');
+
+$html3 = route(SA_HOST, '/tenants/new');
+ok('tenant_new.php renders with no PHP fatal', !str_contains($html3, 'Fatal error'));
+ok('has the Starting plan dropdown', str_contains($html3, 'name="plan_id"'));
+ok('the reserved blank plan is never offered as a starting plan',
+   !str_contains($html3, '>Blank (system)<'));
+
+// ─────────────────────────────────────────────────────────────────────────────
+section('7. settings.php — self-registration provisioning switch (Phase 5.1)');
+
+$html4 = route(SA_HOST, '/settings');
+ok('settings.php renders with no PHP fatal', !str_contains($html4, 'Fatal error'));
+ok('has the self-registration provisioning-mode radios', str_contains($html4, 'name="provisioning_mode"'));
+ok('both modes are offered', str_contains($html4, 'value="all"') && str_contains($html4, 'value="none"'));
 
 echo "\n---\n$pass passed, $fail failed\n";
 exit($fail > 0 ? 1 : 0);
