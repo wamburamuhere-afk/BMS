@@ -108,6 +108,27 @@ try {
                     WHERE sale_id = ?")
         ->execute([$_SESSION['user_id'], $reason, $sale_id]);
 
+    // Reverse the sale's ledger postings (revenue + COGS), if any were posted by
+    // postPosSale() at sale time. Mirrors create_return.php's use of the same
+    // generic reverser; keyed on '<entity>_void' so it can never collide with a
+    // genuine return (postPosReturn uses 'pos_return'/'pos_return_cogs').
+    // Best-effort: never blocks the void — a voided sale must always void even if
+    // accounting can't post, exactly like the original sale could always complete.
+    require_once __DIR__ . '/../../core/expense_posting.php';
+    $glRevenue = reverseAccrualEntry($pdo, 'pos_sale', $sale_id, (int)$_SESSION['user_id']);
+    $glCogs    = reverseAccrualEntry($pdo, 'pos_cogs',  $sale_id, (int)$_SESSION['user_id']);
+    if (!empty($glRevenue['reason']) && !in_array($glRevenue['reason'], ['reversed', 'already_reversed', 'no_accrual'], true)) {
+        logActivity($pdo, $_SESSION['user_id'], 'POS Void GL warning',
+            "Void of Sale #{$sale['receipt_number']} (id $sale_id) did NOT reverse the ledger: " . $glRevenue['reason']);
+    }
+
+    // Phase 11 (pos_upgrade_plan.md §7) — reverse any loyalty points this sale
+    // earned or redeemed. A void is "as if the sale never happened", exactly
+    // like the stock/cash/GL reversal above — a voided sale must not leave a
+    // customer either richer or poorer in points. Idempotent.
+    require_once __DIR__ . '/../../core/pos_loyalty.php';
+    reverseLoyaltyForSale($pdo, $sale_id, (int)$_SESSION['user_id']);
+
     $pdo->commit();
 
     logActivity($pdo, $_SESSION['user_id'], "Voided POS Sale #{$sale['receipt_number']} (" . number_format((float)$sale['grand_total'], 2) . ")");

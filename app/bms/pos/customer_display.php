@@ -203,7 +203,8 @@ session_start();
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         let lastTimestamp = 0;
-        
+        let displayCurrency = 'TZS'; // Phase 11 (pos_upgrade_plan.md §7) — updated from the server's real setting below
+
         function updateDisplay() {
             $.ajax({
                 url: APP_URL + '/api/pos_session',
@@ -211,6 +212,7 @@ session_start();
                 dataType: 'json',
                 success: function(response) {
                     if (response.success) {
+                        if (response.currency) displayCurrency = response.currency;
                         // Only update if data changed
                         if (response.timestamp !== lastTimestamp) {
                             lastTimestamp = response.timestamp;
@@ -248,16 +250,16 @@ session_start();
                     <div class="cart-item">
                         <div class="item-name">${item.product_name}</div>
                         <div class="item-qty">x${item.quantity}</div>
-                        <div class="item-price">TZS ${itemTotal.toFixed(2)}</div>
+                        <div class="item-price">${displayCurrency} ${itemTotal.toFixed(2)}</div>
                     </div>
                 `;
             });
             cartItems.html(html);
             
             // Update summary
-            $('#displaySubtotal').text('TZS ' + summary.subtotal.toFixed(2));
-            $('#displayTax').text('TZS ' + summary.tax.toFixed(2));
-            $('#displayTotal').text('TZS ' + summary.total.toFixed(2));
+            $('#displaySubtotal').text(displayCurrency + ' ' + summary.subtotal.toFixed(2));
+            $('#displayTax').text(displayCurrency + ' ' + summary.tax.toFixed(2));
+            $('#displayTotal').text(displayCurrency + ' ' + summary.total.toFixed(2));
         }
         
         // Poll every 500ms

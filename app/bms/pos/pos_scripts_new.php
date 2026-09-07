@@ -16,8 +16,61 @@ let currentShiftActive = <?= $shift_active ? 'true' : 'false' ?>;
 let isSplitPayment = false;
 let splitAmounts = { cash: 0, mobile: 0, bank: 0, card: 0 };
 let posDiscountType = '<?= get_setting('pos_discount_type', 'percentage') ?>'; // 'percentage' or 'fixed'
+const POS_AUTO_PRINT_RECEIPT = <?= get_setting('pos_auto_print_receipt', '0') === '1' ? 'true' : 'false' ?>; // Phase 10 (pos_upgrade_plan.md §7)
+const POS_CURRENCY = <?= json_encode($currency) ?>; // Phase 11 (pos_upgrade_plan.md §7) — was hardcoded 'TZS' everywhere
+const POS_LOYALTY_REDEEM_VALUE = <?= (float)getSetting('pos_loyalty_redeem_value', '50') ?>; // currency value of 1 point — preview only, server re-validates
 
 $(document).ready(function() {
+    // Phase 10 (pos_upgrade_plan.md §7) — Select2 AJAX customer search, replacing
+    // the old plain <select> hard-limited to 50 rows with no search at all.
+    $('#customerSelect').select2({
+        theme: 'bootstrap-5', width: '100%', placeholder: 'Walk-in Customer', allowClear: true,
+        ajax: {
+            url: '<?= buildUrl('/api/pos/search_customers.php') ?>',
+            dataType: 'json', delay: 300, cache: true,
+            data: p => ({ q: p.term })
+        }
+    });
+
+    // Phase 11 (pos_upgrade_plan.md §7) — show the selected customer's loyalty
+    // balance and cap how many points they can redeem. Walk-in (no selection)
+    // hides the section — points can't be earned/redeemed without a customer.
+    $('#customerSelect').on('select2:select', function (e) {
+        const points = e.params.data.loyalty_points || 0;
+        $('#loyaltyAvailablePoints').text(points.toLocaleString());
+        $('#redeemPointsInput').attr('max', points).val(0);
+        $('#loyaltyPointsSection').removeClass('d-none');
+        calculateCartTotal();
+    }).on('select2:clear select2:unselect', function () {
+        $('#loyaltyPointsSection').addClass('d-none');
+        $('#redeemPointsInput').val(0);
+        calculateCartTotal();
+    });
+
+    // Phase 10 (pos_upgrade_plan.md §7) — inline "+ New Customer" quick-add.
+    $('#btnQuickAddCustomer').on('click', function () {
+        $('#qac_name, #qac_phone').val('');
+        new bootstrap.Modal(document.getElementById('quickAddCustomerModal')).show();
+    });
+    $('#btnSaveQuickCustomer').on('click', function () {
+        const name = $('#qac_name').val().trim();
+        if (!name) { Swal.fire('Name required', 'Please enter the customer\'s name.', 'warning'); return; }
+        const btn = $(this);
+        btn.prop('disabled', true);
+        $.post('<?= buildUrl('/api/quick_add_customer.php') ?>', {
+            customer_name: name, phone: $('#qac_phone').val().trim()
+        }, function (res) {
+            if (res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('quickAddCustomerModal')).hide();
+                setCustomerSelection(res.customer_id, name);
+                saveCartToStorage();
+                Swal.fire({ icon: 'success', title: 'Customer Added', text: name + ' has been added and selected.', timer: 1800, showConfirmButton: false });
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        }, 'json').always(() => btn.prop('disabled', false));
+    });
+
     // Load cart from localStorage
     loadCartFromStorage();
 
@@ -98,7 +151,7 @@ $(document).ready(function() {
         const ending = parseFloat($(this).val()) || 0;
         const calculated = <?= $cash_balance ?>;
         const difference = ending - calculated;
-        $('#cashDifference').text('TZS ' + difference.toFixed(2));
+        $('#cashDifference').text(POS_CURRENCY + ' ' + difference.toFixed(2));
     });
     
     // Keyboard shortcuts
@@ -123,11 +176,29 @@ $(document).ready(function() {
     });
 });
 
+// Phase 10 (pos_upgrade_plan.md §7) — the customer <select> is now Select2-in-
+// AJAX-mode, so it has no static <option> list to pick from any more. Setting
+// .val(id) alone can't show the right label for an id Select2 has never seen
+// (e.g. restoring from localStorage, or loading a held sale) — this creates a
+// real <option> with the correct text first, then selects it and refreshes
+// the visible Select2 widget via 'change'.
+function setCustomerSelection(id, text) {
+    const $sel = $('#customerSelect');
+    if (!id) { $sel.val('').trigger('change'); return; }
+    if (!$sel.find(`option[value="${id}"]`).length) {
+        $sel.append(new Option(text || ('Customer #' + id), id, true, true));
+    } else {
+        $sel.val(id);
+    }
+    $sel.trigger('change');
+}
+
 // Save/Load cart from localStorage
 function saveCartToStorage() {
     try {
         localStorage.setItem('pos_cart', JSON.stringify(cart));
         localStorage.setItem('pos_customer', $('#customerSelect').val() || '');
+        localStorage.setItem('pos_customer_name', $('#customerSelect option:selected').text() || '');
     } catch (e) {
         console.error('Error saving cart:', e);
     }
@@ -137,14 +208,15 @@ function loadCartFromStorage() {
     try {
         const savedCart = localStorage.getItem('pos_cart');
         const savedCustomer = localStorage.getItem('pos_customer');
-        
+        const savedCustomerName = localStorage.getItem('pos_customer_name');
+
         if (savedCart) {
             cart = JSON.parse(savedCart);
             updateCartDisplay();
         }
-        
+
         if (savedCustomer) {
-            $('#customerSelect').val(savedCustomer);
+            setCustomerSelection(savedCustomer, savedCustomerName);
         }
     } catch (e) {
         console.error('Error loading cart:', e);
@@ -156,6 +228,7 @@ function clearCartStorage() {
     try {
         localStorage.removeItem('pos_cart');
         localStorage.removeItem('pos_customer');
+        localStorage.removeItem('pos_customer_name');
     } catch (e) {
         console.error('Error clearing cart storage:', e);
     }
@@ -265,7 +338,7 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                                     ${isService ? '<span class="badge bg-info text-white mb-1">Service</span>' : ''}
                                     <h6 class="card-title mb-1 small text-truncate fw-bold" title="${product.product_name}">${product.product_name}</h6>
                                     <p class="card-text text-muted small mb-1">${product.sku || ''}</p>
-                                    <p class="card-text fw-bold text-primary mb-1">TZS ${parseFloat(product.selling_price).toLocaleString()}</p>
+                                    <p class="card-text fw-bold text-primary mb-1">${POS_CURRENCY} ${parseFloat(product.selling_price).toLocaleString()}</p>
                                     ${!isService ? `<p class="card-text small ${product.stock_quantity <= 10 ? 'text-danger fw-bold' : 'text-muted'}">
                                         Qty: ${product.stock_quantity}
                                     </p>` : '<p class="card-text small text-muted"><i class="bi bi-infinity"></i> Service</p>'}
@@ -352,7 +425,7 @@ function showProductQuickView(productId) {
     const html = `
         <h6>${currentProduct.product_name}</h6>
         <p class="text-muted small mb-2">${currentProduct.sku || 'No SKU'}</p>
-        <p class="text-success fw-bold">TZS ${parseFloat(currentProduct.selling_price).toLocaleString()}</p>
+        <p class="text-success fw-bold">${POS_CURRENCY} ${parseFloat(currentProduct.selling_price).toLocaleString()}</p>
         ${currentProduct.is_service != 1 ? `<p class="small ${currentProduct.stock_quantity <= 10 ? 'text-danger' : 'text-muted'}">
             Stock: ${currentProduct.stock_quantity}
         </p>` : '<p class="small text-muted"><i class="bi bi-infinity"></i> Service</p>'}
@@ -569,12 +642,25 @@ function calculateCartTotal() {
         totalTax += itemTax;
     });
 
-    const total = subtotal + totalTax;
-    
-    $('#cartSubtotal').text('TZS ' + subtotal.toLocaleString('en-US', {minimumFractionDigits: 2}));
-    $('#cartTax').text('TZS ' + totalTax.toLocaleString('en-US', {minimumFractionDigits: 2}));
-    $('#cartTotal').text('TZS ' + total.toLocaleString('en-US', {minimumFractionDigits: 2}));
-    
+    let total = subtotal + totalTax;
+
+    // Phase 11 (pos_upgrade_plan.md §7) — loyalty point redemption preview.
+    // Client-side only, for display; process_sale.php re-validates the real
+    // balance and computes the authoritative discount server-side.
+    const redeemPts = parseInt($('#redeemPointsInput').val()) || 0;
+    const $preview = $('#loyaltyDiscountPreview');
+    if (redeemPts > 0 && total > 0) {
+        const loyaltyDiscount = Math.min(redeemPts * POS_LOYALTY_REDEEM_VALUE, total);
+        total -= loyaltyDiscount;
+        $preview.text('Loyalty discount: -' + POS_CURRENCY + ' ' + loyaltyDiscount.toLocaleString('en-US', {minimumFractionDigits: 2})).removeClass('d-none');
+    } else {
+        $preview.addClass('d-none');
+    }
+
+    $('#cartSubtotal').text(POS_CURRENCY + ' ' + subtotal.toLocaleString('en-US', {minimumFractionDigits: 2}));
+    $('#cartTax').text(POS_CURRENCY + ' ' + totalTax.toLocaleString('en-US', {minimumFractionDigits: 2}));
+    $('#cartTotal').text(POS_CURRENCY + ' ' + total.toLocaleString('en-US', {minimumFractionDigits: 2}));
+
     // Hide discount row as we now handle per-item discount
     $('#discountRow').hide();
     
@@ -582,13 +668,13 @@ function calculateCartTotal() {
 }
 
 function calculateChange() {
-    const total = parseFloat($('#cartTotal').text().replace('TZS ', '').replace(/,/g, '')) || 0;
+    const total = parseFloat($('#cartTotal').text().replace(POS_CURRENCY + ' ', '').replace(/,/g, '')) || 0;
     const tendered = parseFloat($('#amountTendered').val()) || 0;
     const change = tendered - total;
     
     if (change >= 0) {
         $('#changeAlert').show();
-        $('#changeAmount').text('TZS ' + change.toLocaleString('en-US', {minimumFractionDigits: 2}));
+        $('#changeAmount').text(POS_CURRENCY + ' ' + change.toLocaleString('en-US', {minimumFractionDigits: 2}));
     } else {
         $('#changeAlert').hide();
     }
@@ -630,7 +716,7 @@ function processPayment() {
 
     const paymentMethod = $('input[name="paymentMethod"]:checked').val();
     const customerId = $('#customerSelect').val();
-    const total = parseFloat($('#cartTotal').text().replace('TZS ', '').replace(/,/g, '')) || 0;
+    const total = parseFloat($('#cartTotal').text().replace(POS_CURRENCY + ' ', '').replace(/,/g, '')) || 0;
     
     if (paymentMethod === 'cash') {
         const tendered = parseFloat($('#amountTendered').val()) || 0;
@@ -668,12 +754,23 @@ function processPayment() {
         totalTax += itemTax;
     });
     
-    const calculatedTotal = (subtotal - totalDiscount) + totalTax;
-    
+    let calculatedTotal = (subtotal - totalDiscount) + totalTax;
+
+    // Phase 11 (pos_upgrade_plan.md §7) — fold the loyalty redemption preview
+    // into the total BEFORE computing amount_tendered/change_given below, so
+    // the change due a cashier sees (and the amount_paid/change_given sent to
+    // the server) reflects what the customer actually owes after redeeming
+    // points — not the pre-discount total. The server independently
+    // re-validates and applies the real discount regardless of this value.
+    const redeemPointsRequested = parseInt($('#redeemPointsInput').val()) || 0;
+    if (redeemPointsRequested > 0) {
+        calculatedTotal = Math.max(0, calculatedTotal - Math.min(redeemPointsRequested * POS_LOYALTY_REDEEM_VALUE, calculatedTotal));
+    }
+
     // Calculate global percentage for records if needed (weighted average or just 0)
     // We will send 0 as global percentage since we use itemized discounts
-    const globalDiscountPercent = 0; 
-    
+    const globalDiscountPercent = 0;
+
     const paymentData = {
         receipt_number: currentReceiptNumber,
         customer_id: customerId || null,
@@ -693,7 +790,8 @@ function processPayment() {
         // box (0 = full credit). Everything else: paid in full.
         amount_paid: (paymentMethod === 'credit')
             ? Math.min(parseFloat($('#amountTendered').val()) || 0, calculatedTotal)
-            : calculatedTotal
+            : calculatedTotal,
+        redeem_points: redeemPointsRequested
     };
     
     $('#processPaymentBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Processing...');
@@ -706,12 +804,20 @@ function processPayment() {
         dataType: 'json',
         success: function(response) {
             if (response.success) {
+                // Phase 10 (pos_upgrade_plan.md §7) — "Automatically print the
+                // receipt" POS setting: skip waiting for the button click.
+                if (POS_AUTO_PRINT_RECEIPT) { printReceipt(response.sale_id); }
+                // Phase 11 (pos_upgrade_plan.md §7) — surface what the loyalty
+                // program actually did, since it's silent otherwise.
+                let loyaltyMsg = '';
+                if (response.loyalty_points_earned > 0) loyaltyMsg += ' Earned ' + response.loyalty_points_earned + ' pt(s).';
+                if (response.loyalty_points_redeemed > 0) loyaltyMsg += ' Redeemed ' + response.loyalty_points_redeemed + ' pt(s).';
                 Swal.fire({
                     icon: 'success',
                     title: 'Sale Completed!',
-                    text: 'Receipt #' + currentReceiptNumber,
+                    text: 'Receipt #' + currentReceiptNumber + loyaltyMsg,
                     showCancelButton: true,
-                    confirmButtonText: 'Print Receipt',
+                    confirmButtonText: POS_AUTO_PRINT_RECEIPT ? 'Print Again' : 'Print Receipt',
                     cancelButtonText: 'Next Customer',
                     reverseButtons: true
                 }).then((result) => {
@@ -730,7 +836,9 @@ function processPayment() {
                     $('#changeAlert').hide();
                     
                     // 3. Reset Customer to Walk-in (value "")
-                    $('#customerSelect').val('');
+                    setCustomerSelection('', '');
+                    $('#redeemPointsInput').val(0);
+                    $('#loyaltyPointsSection').addClass('d-none');
                     
                     // 4. Generate New Receipt Number for next sale
                     generateNewReceipt();
@@ -859,7 +967,7 @@ function showHeldSales() {
                                 <td>${sale.hold_reference || 'HOLD-' + sale.hold_id}</td>
                                 <td>${sale.customer_name || 'Walk-in'}</td>
                                 <td>${JSON.parse(sale.items_data).length}</td>
-                                <td>TZS ${parseFloat(sale.total_amount).toLocaleString()}</td>
+                                <td>${POS_CURRENCY} ${parseFloat(sale.total_amount).toLocaleString()}</td>
                                 <td>${new Date(sale.held_at).toLocaleTimeString()}</td>
                                 <td>
                                     <button class="btn btn-sm btn-primary" onclick="loadHeldSale(${sale.hold_id})">
@@ -906,7 +1014,7 @@ function loadHeldSale(holdId) {
                                 
                                 // Restore customer if saved
                                 if (sale.customer_id) {
-                                    $('#customerSelect').val(sale.customer_id);
+                                    setCustomerSelection(sale.customer_id, sale.customer_name);
                                 }
                                 
                                 updateCartDisplay();
@@ -982,24 +1090,45 @@ function performDelete(holdId, silent) {
 }
 
 function startShift() {
-    $('#startShiftModal').modal('show');
+    const $reg = $('#startShiftRegister');
+    if ($reg.hasClass('select2-hidden-accessible')) $reg.select2('destroy');
+    $reg.html('<option value="">Loading registers...</option>');
+
+    $.getJSON('<?= buildUrl('/api/pos/get_registers.php') ?>', { active_only: 1 }, function (res) {
+        $reg.empty();
+        if (res.success && res.data.length) {
+            res.data.forEach(r => {
+                $reg.append(`<option value="${r.register_id}">${safeOutput(r.register_name)} (${safeOutput(r.register_code)})</option>`);
+            });
+        } else {
+            $reg.append('<option value="1">Main Counter</option>');
+        }
+        $reg.select2({ theme: 'bootstrap-5', dropdownParent: $('#startShiftModal'), width: '100%' });
+        $('#startShiftModal').modal('show');
+    }).fail(function () {
+        $reg.html('<option value="1">Main Counter</option>');
+        $reg.select2({ theme: 'bootstrap-5', dropdownParent: $('#startShiftModal'), width: '100%' });
+        $('#startShiftModal').modal('show');
+    });
 }
 
 function confirmStartShift() {
     const openingCash = parseFloat($('#openingCash').val()) || 0;
-    
+    const registerId = $('#startShiftRegister').val() || 1;
+
     console.log('=== STARTING SHIFT ===');
-    console.log('Opening Cash:', openingCash);
-    
+    console.log('Opening Cash:', openingCash, 'Register:', registerId);
+
     // Disable button to prevent double-click
     const btn = event.target;
     $(btn).prop('disabled', true).text('Starting...');
-    
+
     $.ajax({
         url: '<?= buildUrl('/api/pos/open_shift.php') ?>',
         type: 'POST',
-        data: { 
-            opening_cash: openingCash 
+        data: {
+            opening_cash: openingCash,
+            register_id: registerId
         },
         dataType: 'json',
         success: function(response) {
@@ -1011,7 +1140,7 @@ function confirmStartShift() {
                 Swal.fire({
                     icon: 'success',
                     title: 'Shift Started',
-                    text: 'Shift ' + response.shift_code + ' started successfully!',
+                    text: 'Shift ' + response.shift_code + ' started on ' + (response.register_name || 'register') + '.',
                     timer: 2000,
                     showConfirmButton: false
                 }).then(() => {
@@ -1077,12 +1206,18 @@ function confirmEndShift() {
                     title: 'Shift Ended',
                     html: `
                         <p>Shift closed successfully!</p>
-                        <p><strong>Expected:</strong> TZS ${response.expected_cash.toLocaleString()}</p>
-                        <p><strong>Actual:</strong> TZS ${response.ending_cash.toLocaleString()}</p>
-                        <p><strong>Difference:</strong> TZS ${response.cash_difference.toLocaleString()}</p>
+                        <p><strong>Expected:</strong> ${POS_CURRENCY} ${response.expected_cash.toLocaleString()}</p>
+                        <p><strong>Actual:</strong> ${POS_CURRENCY} ${response.ending_cash.toLocaleString()}</p>
+                        <p><strong>Difference:</strong> ${POS_CURRENCY} ${response.cash_difference.toLocaleString()}</p>
+                        <p><strong>Total Sales:</strong> ${POS_CURRENCY} ${(response.total_sales || 0).toLocaleString()}</p>
                     `,
-                    timer: 3000
-                }).then(() => {
+                    showCancelButton: true,
+                    confirmButtonText: 'View Z-Report',
+                    cancelButtonText: 'Close'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.open('<?= getUrl('pos/zreport') ?>?shift_id=' + response.shift_id, '_blank');
+                    }
                     location.reload();
                 });
             } else {
@@ -1111,11 +1246,20 @@ function confirmEndShift() {
 }
 
 function openCashDrawer() {
+    // Phase 10 (pos_upgrade_plan.md §7) — a browser cannot send a raw hardware
+    // "open drawer" command; that needs either a native print-bridge or
+    // WebUSB (Chrome-only, HTTPS-only — unusable on a plain-HTTP LAN
+    // deployment). This used to claim success and do nothing at all. Most
+    // thermal receipt printers with a drawer wired to their kick port (RJ11)
+    // open it automatically on every print job — which already happens for
+    // free whenever a receipt prints — so this is now honest about that
+    // instead of pretending to have opened anything itself.
     Swal.fire({
-        icon: 'success',
+        icon: 'info',
         title: 'Cash Drawer',
-        text: 'Cash drawer opened.',
-        timer: 1500
+        html: 'A web browser cannot send a direct "open drawer" signal.<br><br>' +
+              'If your cash drawer is wired to your receipt printer\'s kick port, ' +
+              'it opens automatically every time a receipt prints — including just now, if one did.',
     });
 }
 
@@ -1148,20 +1292,20 @@ function openSplitPaymentModal() {
         return;
     }
     const total = calculateCartTotal();
-    $('#splitTotalDisplay').text('TZS ' + total.toLocaleString());
-    $('#splitRemaining').text('TZS ' + total.toLocaleString());
+    $('#splitTotalDisplay').text(POS_CURRENCY + ' ' + total.toLocaleString());
+    $('#splitRemaining').text(POS_CURRENCY + ' ' + total.toLocaleString());
     $('.split-amount').val(0);
     $('#splitPaymentModal').modal('show');
 }
 
 function calculateSplitRemaining() {
-    const total = parseFloat($('#cartTotal').text().replace('TZS ', '').replace(/,/g, '')) || 0;
+    const total = parseFloat($('#cartTotal').text().replace(POS_CURRENCY + ' ', '').replace(/,/g, '')) || 0;
     let paid = 0;
     $('.split-amount').each(function() {
         paid += parseFloat($(this).val()) || 0;
     });
     const remaining = total - paid;
-    $('#splitRemaining').text('TZS ' + remaining.toLocaleString());
+    $('#splitRemaining').text(POS_CURRENCY + ' ' + remaining.toLocaleString());
     if (remaining < 0) {
         $('#splitRemaining').addClass('text-danger');
     } else {
@@ -1170,7 +1314,7 @@ function calculateSplitRemaining() {
 }
 
 function processSplitPayment() {
-    const total = parseFloat($('#cartTotal').text().replace('TZS ', '').replace(/,/g, '')) || 0;
+    const total = parseFloat($('#cartTotal').text().replace(POS_CURRENCY + ' ', '').replace(/,/g, '')) || 0;
     let paid = 0;
     splitAmounts = {
         cash: parseFloat($('#splitCash').val()) || 0,
@@ -1182,7 +1326,7 @@ function processSplitPayment() {
     Object.values(splitAmounts).forEach(v => paid += v);
 
     if (Math.abs(paid - total) > 0.1) {
-        Swal.fire('Balance Mismatch', 'Total split amounts must equal the total payable (TZS ' + total.toLocaleString() + ')', 'error');
+        Swal.fire('Balance Mismatch', 'Total split amounts must equal the total payable (' + POS_CURRENCY + ' ' + total.toLocaleString() + ')', 'error');
         return;
     }
 
@@ -1210,8 +1354,8 @@ function openDiscountModal() {
     const discountIcon = $('#discountIcon');
     
     if (posDiscountType === 'fixed') {
-        $('#discountLabel').text('Discount Amount (TZS)'); // Use generic currency if possible, or TZS
-        $('#discountSuffix').text('TZS');
+        $('#discountLabel').text('Discount Amount (' + POS_CURRENCY + ')');
+        $('#discountSuffix').text(POS_CURRENCY);
         $('#discountValue').removeAttr('max');
         discountPresets.addClass('d-none');
         discountIcon.removeClass('bi-percent').addClass('bi-cash');
@@ -1514,7 +1658,7 @@ function updateCashBalanceUI() {
         scanToast(
             '<i class="bi bi-check-circle-fill me-1" style="margin-top:2px;flex-shrink:0"></i>' +
             '<span><strong>' + product.product_name + '</strong><br>' +
-            '<small>TZS ' + fmtPrice + ' &mdash; cart qty: ' + newQty + '</small></span>',
+            '<small>' + POS_CURRENCY + ' ' + fmtPrice + ' &mdash; cart qty: ' + newQty + '</small></span>',
             false
         );
     }

@@ -19,6 +19,32 @@
     </div>
 </div>
 
+<!-- Quick Add Customer Modal — Phase 10 (pos_upgrade_plan.md §7) -->
+<div class="modal fade" id="quickAddCustomerModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-person-plus me-1"></i> New Customer</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Customer Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="qac_name" placeholder="e.g. John Mushi">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Phone</label>
+                    <input type="text" class="form-control" id="qac_phone" placeholder="e.g. 0712 345 678">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btnSaveQuickCustomer"><i class="bi bi-check-circle me-1"></i> Add Customer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Held Sales Modal -->
 <div class="modal fade" id="heldSalesModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -62,8 +88,12 @@
             </div>
             <div class="modal-body">
                 <div class="mb-3">
+                    <label class="form-label">Register / Till</label>
+                    <select class="form-select" id="startShiftRegister" style="width:100%"></select>
+                </div>
+                <div class="mb-3">
                     <label class="form-label">Opening Cash Amount</label>
-                    <input type="number" class="form-control" id="openingCash" 
+                    <input type="number" class="form-control" id="openingCash"
                            min="0" step="0.01" value="0">
                 </div>
             </div>
@@ -94,15 +124,15 @@
                 <div class="alert alert-info">
                     <div class="d-flex justify-content-between">
                         <span>Starting Cash:</span>
-                        <strong><?= format_currency($starting_cash) ?></strong>
+                        <strong><?= format_currency($starting_cash, $currency) ?></strong>
                     </div>
                     <div class="d-flex justify-content-between">
                         <span>Calculated Balance:</span>
-                        <strong><?= format_currency($cash_balance) ?></strong>
+                        <strong><?= format_currency($cash_balance, $currency) ?></strong>
                     </div>
                     <div class="d-flex justify-content-between">
                         <span>Difference:</span>
-                        <strong id="cashDifference">TZS 0.00</strong>
+                        <strong id="cashDifference"><?= htmlspecialchars($currency) ?> 0.00</strong>
                     </div>
                 </div>
                 <div class="mb-3">
@@ -169,35 +199,35 @@
             <div class="modal-body p-4">
                 <div class="alert alert-primary border-0 rounded-4 d-flex justify-content-between align-items-center mb-4">
                     <span class="fw-bold">TOTAL PAYABLE:</span>
-                    <h4 class="fw-bold mb-0" id="splitTotalDisplay">TZS 0.00</h4>
+                    <h4 class="fw-bold mb-0" id="splitTotalDisplay"><?= htmlspecialchars($currency) ?> 0.00</h4>
                 </div>
 
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label small fw-bold text-muted">CASH AMOUNT</label>
                         <div class="input-group">
-                            <span class="input-group-text text-muted">TZS</span>
+                            <span class="input-group-text text-muted"><?= htmlspecialchars($currency) ?></span>
                             <input type="number" class="form-control split-amount" id="splitCash" value="0" oninput="calculateSplitRemaining()">
                         </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small fw-bold text-muted">MOBILE MONEY</label>
                         <div class="input-group">
-                            <span class="input-group-text text-muted">TZS</span>
+                            <span class="input-group-text text-muted"><?= htmlspecialchars($currency) ?></span>
                             <input type="number" class="form-control split-amount" id="splitMobile" value="0" oninput="calculateSplitRemaining()">
                         </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small fw-bold text-muted">BANK TRANSFER</label>
                         <div class="input-group">
-                            <span class="input-group-text text-muted">TZS</span>
+                            <span class="input-group-text text-muted"><?= htmlspecialchars($currency) ?></span>
                             <input type="number" class="form-control split-amount" id="splitBank" value="0" oninput="calculateSplitRemaining()">
                         </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small fw-bold text-muted">CARD / OTHER</label>
                         <div class="input-group">
-                            <span class="input-group-text text-muted">TZS</span>
+                            <span class="input-group-text text-muted"><?= htmlspecialchars($currency) ?></span>
                             <input type="number" class="form-control split-amount" id="splitCard" value="0" oninput="calculateSplitRemaining()">
                         </div>
                     </div>
@@ -205,7 +235,7 @@
 
                 <div class="mt-4 p-3 rounded-4 bg-light d-flex justify-content-between align-items-center">
                     <span class="text-muted fw-bold small">REMAINING BALANCE:</span>
-                    <h5 class="fw-bold mb-0" id="splitRemaining">TZS 0.00</h5>
+                    <h5 class="fw-bold mb-0" id="splitRemaining"><?= htmlspecialchars($currency) ?> 0.00</h5>
                 </div>
             </div>
             <div class="modal-footer border-0 p-4 bg-light">

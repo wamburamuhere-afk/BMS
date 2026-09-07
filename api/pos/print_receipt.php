@@ -19,18 +19,25 @@ if ($sale_id <= 0) {
 
 global $pdo;
 
-// Get sale details
+// Get sale details. The sale's own register_id/register_name (denormalised at
+// sale time — see process_sale.php Phase 8) is the source of truth for which
+// till it was rung up on; pos_registers is joined only for that register's
+// optional receipt branding overrides.
 $stmt = $pdo->prepare("
     SELECT
         s.*,
         c.customer_name,
         c.phone as customer_phone,
+        c.email as customer_email,
         u.username as cashier_name,
-        w.warehouse_name
+        w.warehouse_name,
+        r.register_code, r.receipt_header AS reg_receipt_header,
+        r.receipt_footer AS reg_receipt_footer, r.receipt_logo AS reg_receipt_logo
     FROM pos_sales s
     LEFT JOIN customers c ON s.customer_id = c.customer_id
     LEFT JOIN users u ON s.user_id = u.user_id
     LEFT JOIN warehouses w ON s.warehouse_id = w.warehouse_id
+    LEFT JOIN pos_registers r ON s.register_id = r.register_id
     WHERE s.sale_id = ?
 ");
 $stmt->execute([$sale_id]);
@@ -56,11 +63,29 @@ $stmt = $pdo->prepare("SELECT * FROM pos_sale_items WHERE sale_id = ? ORDER BY s
 $stmt->execute([$sale_id]);
 $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Company info
-$company_name = getSetting('company_name', 'BUSINESS MANAGEMENT SYSTEM');
-$company_address = "Dar es Salaam, Tanzania";
-$company_phone = "+255 123 456 789";
-$company_tin = "123-456-789";
+// Company info — read from the tenant's own Company Profile settings (was
+// hardcoded to placeholder BJP values, so every tenant's receipts printed the
+// same fake address/phone/TIN regardless of who they actually are).
+$company_name    = getSetting('company_name', 'BUSINESS MANAGEMENT SYSTEM');
+$company_address = getSetting('company_physical_address', getSetting('company_address', ''));
+$company_phone   = getSetting('company_phone', '');
+$company_tin     = getSetting('company_tin', '');
+$company_vrn     = getSetting('company_vrn', '');
+$currency        = getSetting('currency', 'TZS'); // Phase 11 (pos_upgrade_plan.md §7) — was hardcoded 'TZS'
+
+// Phase 10 (pos_upgrade_plan.md §7) — configurable paper width + auto-print,
+// set on the POS Settings page (app/constant/settings/pos_config_settings.php).
+$receipt_width = getSetting('pos_receipt_width', '80') === '58' ? '58' : '80';
+$auto_print    = getSetting('pos_auto_print_receipt', '0') === '1';
+
+// Phase 8 (pos_upgrade_plan.md §7) — a register (till) may override the receipt
+// header/footer for its own counter (e.g. a branch name/location distinct from
+// the company header). Falls back to the company-wide text when the register
+// hasn't set its own — most tenants will never touch this and just get the
+// company header, exactly as before.
+$receipt_header_extra = trim($sale['reg_receipt_header'] ?? '');
+$receipt_footer_extra = trim($sale['reg_receipt_footer'] ?? '');
+$register_label        = trim($sale['register_name'] ?? '');
 ?>
 <!DOCTYPE html>
 <html>
@@ -71,7 +96,7 @@ $company_tin = "123-456-789";
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Courier New', monospace;
-            width: 80mm;
+            width: <?= $receipt_width ?>mm;
             margin: 0 auto;
             padding: 10px;
             font-size: 12px;
@@ -143,9 +168,9 @@ $company_tin = "123-456-789";
         }
         @media print {
             @page { margin: 0; }
-            body { 
-                width: 80mm; 
-                margin: 0; 
+            body {
+                width: <?= $receipt_width ?>mm;
+                margin: 0;
                 padding: 10px; /* Compensation for removed page margin */
             }
             .no-print { display: none; }
@@ -157,16 +182,21 @@ $company_tin = "123-456-789";
         <button onclick="window.print()" style="padding: 10px 20px; font-size: 14px; cursor: pointer;">
             Print Receipt
         </button>
+        <button onclick="emailReceipt()" style="padding: 10px 20px; font-size: 14px; cursor: pointer; margin-left: 10px;">
+            Email Receipt
+        </button>
         <button onclick="window.close()" style="padding: 10px 20px; font-size: 14px; cursor: pointer; margin-left: 10px;">
             Close
         </button>
     </div>
 
     <div class="header">
-        <div class="company-name"><?= $company_name ?></div>
-        <div><?= $company_address ?></div>
-        <div>Tel: <?= $company_phone ?></div>
-        <div>TIN: <?= $company_tin ?></div>
+        <div class="company-name"><?= htmlspecialchars($company_name) ?></div>
+        <?php if ($company_address !== ''): ?><div><?= htmlspecialchars($company_address) ?></div><?php endif; ?>
+        <?php if ($company_phone !== ''): ?><div>Tel: <?= htmlspecialchars($company_phone) ?></div><?php endif; ?>
+        <?php if ($company_tin !== ''): ?><div>TIN: <?= htmlspecialchars($company_tin) ?></div><?php endif; ?>
+        <?php if ($company_vrn !== ''): ?><div>VRN: <?= htmlspecialchars($company_vrn) ?></div><?php endif; ?>
+        <?php if ($receipt_header_extra !== ''): ?><div><?= nl2br(htmlspecialchars($receipt_header_extra)) ?></div><?php endif; ?>
     </div>
 
     <div class="receipt-info">
@@ -182,6 +212,12 @@ $company_tin = "123-456-789";
             <span>Cashier:</span>
             <span><?= $sale['cashier_name'] ?? 'N/A' ?></span>
         </div>
+        <?php if ($register_label !== ''): ?>
+        <div>
+            <span>Register:</span>
+            <span><?= htmlspecialchars($register_label) ?></span>
+        </div>
+        <?php endif; ?>
         <?php if (!empty($sale['warehouse_name'])): ?>
         <div>
             <span>Warehouse:</span>
@@ -225,7 +261,7 @@ $company_tin = "123-456-789";
         </div>
         <div class="total-row grand-total">
             <span>TOTAL:</span>
-            <span>TZS <?= number_format($sale['grand_total'], 0) ?></span>
+            <span><?= htmlspecialchars($currency) ?> <?= number_format($sale['grand_total'], 0) ?></span>
         </div>
         <div class="total-row" style="margin-top: 10px;">
             <span>Payment (<?= ucfirst(str_replace('_', ' ', $sale['payment_method'])) ?>):</span>
@@ -241,11 +277,34 @@ $company_tin = "123-456-789";
         <div style="margin-bottom: 10px;">*** THANK YOU ***</div>
         <div>Please keep this receipt for your records</div>
         <div style="margin-top: 10px;">Goods sold are not returnable</div>
+        <?php if ($receipt_footer_extra !== ''): ?>
+        <div style="margin-top: 10px;"><?= nl2br(htmlspecialchars($receipt_footer_extra)) ?></div>
+        <?php endif; ?>
     </div>
 
     <script>
-        // Auto print on load (optional)
-        // window.onload = function() { window.print(); }
+        // Phase 10 (pos_upgrade_plan.md §7) — Email Receipt.
+        function emailReceipt() {
+            const email = prompt('Send this receipt to which email address?', <?= json_encode($sale['customer_email'] ?? '') ?>);
+            if (!email) return;
+            const fd = new FormData();
+            fd.append('sale_id', <?= (int)$sale_id ?>);
+            fd.append('email', email);
+            fd.append('_csrf', <?= json_encode(csrf_token()) ?>);
+            fetch('<?= buildUrl('/api/pos/email_receipt.php') ?>', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(res => alert(res.message))
+                .catch(() => alert('Could not reach the server. Please try again.'));
+        }
     </script>
+
+    <?php if ($auto_print): ?>
+    <script>
+        // Phase 10 (pos_upgrade_plan.md §7) — "Automatically print the receipt"
+        // POS setting. Still just the browser's print dialog / OS default
+        // printer — a plain web app cannot silently print without one.
+        window.onload = function () { window.print(); };
+    </script>
+    <?php endif; ?>
 </body>
 </html>

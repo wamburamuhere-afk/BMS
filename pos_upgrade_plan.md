@@ -399,6 +399,374 @@ the assignment-save POST, `logActivity`/`logAudit` on every scope change
 
 ---
 
+### Phase 7 — Ledger-integrity fix (void→GL reversal + receipt company-info bug)
+
+**Status:** ✅ DONE · **Added:** 2026-09-07 · **Branch:** `feat/pos-professional-upgrade`
+
+Follow-up scouting (2026-09-07, ahead of the "Advanced POS" push in §7 below)
+found two real bugs, not just gaps:
+
+1. `api/pos/void_sale.php` reversed stock and cash on void but **never reversed
+   the GL entries** `postPosSale()` posted at sale time — so a voided sale's
+   revenue/COGS stayed in the ledger-based Trial Balance/Balance Sheet forever,
+   even though it was excluded from the operational P&L. Fixed by calling the
+   existing generic `reverseAccrualEntry($pdo, 'pos_sale'|'pos_cogs', $sale_id, ...)`
+   (already used by `reverseCreditNoteRestock()`) inside the same transaction as
+   the void, before commit — best-effort, never blocks the void, logs a warning
+   on failure exactly like `create_return.php` does for `postPosReturn()`.
+2. `api/pos/print_receipt.php` hardcoded a fake `company_address`/`company_phone`/
+   `company_tin` (BJP's own placeholder values) instead of reading each tenant's
+   own Company Profile — every tenant's printed receipts showed the same fake
+   details. Fixed to read `getSetting('company_physical_address'|'company_phone'|
+   'company_tin'|'company_vrn', ...)`, matching the pattern already used by
+   `petty_cash_print.php`/`supplier_payments.php`; blank fields are now omitted
+   from the printed header instead of showing a placeholder.
+
+Verified live: `tests/test_pos_phase7_void_gl_reversal_cli.php` (28 assertions) —
+posts a synthetic sale via `postPosSale()`, reverses it via the same call
+`void_sale.php` now makes, confirms both reversal entries balance and are
+correctly tagged (`pos_sale_void`/`pos_cogs_void`), confirms idempotency (voiding
+twice does not double-reverse), and confirms rollback leaves no trace.
+
+---
+
+## 7. "Advanced POS" professionalisation (post-scout, 2026-09-07)
+
+Scope for the next tranche of work, ordered to build on what's already shipped
+(§3 Phases 1–6) rather than restart it. Ties into the in-progress tenant
+module-entitlement system (`core/feature_registry.php` already has a `'pos'`
+feature key) — see Phase 13.
+
+| Phase | What | Status |
+|---|---|---|
+| 7 | Ledger-integrity fix (void→GL reversal, receipt company-info bug) | ✅ DONE (above) |
+| 8 | Register/Till model — activate the unused `pos_registers` schema (till selection, per-register receipt branding, populate `cash_register_shifts` totals at close) | ✅ DONE (below) |
+| 9 | Z-Report / EOD reconciliation, built on Phase 8's populated shift totals | ✅ DONE (below) |
+| 10 | Receipt printing improvements, email receipt, Select2 AJAX customer picker with quick-add — **re-scoped, see below** | ✅ DONE (below) |
+| 11 | Loyalty points (real accrual/redemption) + multi-currency (base currency from `system_settings.currency`, replacing the hardcoded `TZS`) | ✅ DONE (below) |
+| 12 | Offline resilience (local queue + sync-on-reconnect) | **Deferred — needs its own design discussion before implementation, per product owner (2026-09-07). Not scheduled in this tranche.** |
+| 13 | Wire a `pos_advanced` feature-registry entry (`depends_on: ['pos']`) so a superadmin can gate the Phase 8-11 features per tenant company | ✅ DONE (below) |
+
+---
+
+### Phase 8 — Register/Till model
+
+**Status:** ✅ DONE · **Added:** 2026-09-07 · **Branch:** `feat/pos-professional-upgrade`
+
+Activated the `pos_registers` schema that had existed since day one with zero
+call sites anywhere in the app:
+
+- **Register selection at shift open.** `api/pos/open_shift.php` now requires an
+  active register (defaults to register #1, "Main Counter", so an un-migrated
+  client never breaks), rejects a register already staffed by another active
+  shift, and stores `register_id` on `cash_register_shifts`. The Start Shift
+  modal gained a Select2 register picker populated from a new
+  `api/pos/get_registers.php`.
+- **Register management.** New CRUD (`get_registers.php`/`save_register.php`/
+  `toggle_register_status.php`, gated by `canEdit('pos_config_settings')`) with
+  a UI added to the existing `pos_config_settings.php` settings page. A register
+  is only ever deactivated, never deleted — past shifts and sales reference it.
+- **Sale-level register denormalisation.** `pos_sales.register_id`/
+  `register_name` (existed, always default/NULL) are now stamped at sale time
+  from the cashier's active shift, mirroring how `customer_name` is already
+  denormalised alongside `customer_id`. `print_receipt.php` joins
+  `pos_registers` off the sale's own `register_id` to show per-register receipt
+  header/footer overrides (falls back to the company-wide header when a
+  register hasn't set its own) and the register name on the printed receipt.
+- **Shift-close totals — the core of this phase.** `cash_register_shifts.
+  total_sales/total_cash_sales/total_card_sales/total_mobile_sales/
+  total_credit_sales/total_refunds/cash_in/cash_out` were defined on this table
+  from day one but `close_shift.php` never wrote to them (permanently 0.00).
+  Extracted the computation into a new, independently-tested
+  `core/pos_shift_reporting.php::posShiftTenderTotals()` — built from
+  `pos_sales` directly (not `cash_register_transactions`, which only ever logs
+  the CASH leg of a sale and so cannot answer "how much card/mobile/credit did
+  this shift do"). Excludes voided sales entirely; attributes a return to the
+  shift the refund itself was processed in (not the original sale's shift,
+  matching `create_return.php`'s own shift assignment).
+- **Real bug found and fixed along the way:** the frontend's split-payment
+  modal sends `payment_method: 'split'`, but `pos_sales.payment_method` is a DB
+  enum that never included `'split'` (it has `'mixed'` for exactly this case).
+  Under this server's non-strict `sql_mode`, MySQL was silently coercing the
+  invalid enum value to `''` — confirmed live: one pre-existing sale already has
+  `payment_method=''`, an unrecoverable tender type. Fixed by mapping
+  `'split'` → the schema's own `'mixed'` value at insert time. The one
+  historical `''` row was left untouched (deliberately — no confirmation it
+  isn't real data; see `core/pos_shift_reporting.php::buildSplitPaymentLegs()`
+  for the accompanying fix that also makes a split sale's per-tender breakdown
+  (previously nowhere recorded) queryable via the new `payment_details` JSON
+  column).
+- **Also fixed in passing:** `open_shift.php`/`close_shift.php` were missing
+  `csrf_check()` entirely — added (the frontend already sends the CSRF header
+  globally via `header.php`'s `$.ajaxSetup`, so this needed no frontend change).
+
+**Known limitation, called out rather than silently absorbed:** `bank_transfer`/
+`voucher`/`loyalty_points` tenders have no dedicated bucket on this schema (only
+cash/card/mobile/credit exist) — they still count in `total_sales`, just not
+broken out individually. A genuinely bank-transfer-heavy tenant should get a
+dedicated column rather than have it folded into an unrelated bucket.
+
+Verified live: `tests/test_pos_phase8_registers_cli.php` (39 assertions) —
+wiring checks across all touched files, `buildSplitPaymentLegs()` unit tests,
+and a full `posShiftTenderTotals()` reconciliation against 7 synthetic
+`pos_sales` rows (cash/card/mobile/credit/mixed/voided/returned) in one
+transaction-isolated shift. Existing POS regression suites
+(`test_pos_sale_posting_cli`, `test_pos_sale_backfill_cli`,
+`test_pos_strictmode_nullable_cli`, `test_pos_credit_ar_cli`,
+`test_pos_cleanup_cli`, `test_stock_movements_enum_safety_cli`) all still pass.
+
+---
+
+### Phase 9 — Z-Report / EOD reconciliation
+
+**Status:** ✅ DONE · **Added:** 2026-09-07 · **Branch:** `feat/pos-professional-upgrade`
+
+Built directly on Phase 8's now-populated shift totals — no schema work needed.
+
+- **`app/bms/pos/zreport.php`** — a printable end-of-shift reconciliation report
+  per shift: cash reconciliation (starting/expected/counted/difference), sales
+  by tender (cash/card/mobile/credit/other, with gross vs net after refunds and
+  a called-out void total), a **GL posting-health warning banner** (flags any
+  completed sale in the shift with no posted ledger entry — `postPosSale()` is
+  best-effort and never blocks a sale, so a chart-of-accounts misconfiguration
+  can silently leave revenue off the Trial Balance), and a full transaction
+  listing. Works for an **active** shift too (live totals recomputed on demand
+  via `posShiftTenderTotals()`), not just a closed one — a supervisor can check
+  an in-progress till without waiting for close.
+- **`app/bms/pos/shift_history.php`** — the list a Z-Report needed to be findable
+  from (none existed before this phase): every shift with its totals and cash
+  difference, linking through to its Z-Report.
+- **Access control:** a cashier may only view their own shift's Z-Report;
+  `canEdit('pos')` (supervisor/admin) can view any shift — cash reconciliation
+  is sensitive, not something every POS user should browse for others.
+- Extracted `core/pos_shift_reporting.php::posShiftReportExtras()` (void
+  summary, return count, GL-unposted count) alongside Phase 8's
+  `posShiftTenderTotals()`, independently unit-tested rather than inlined in
+  the report page.
+- Routes registered (`pos/zreport`, `pos/shifts`) and wired into the POS
+  Workspace header ("Shift History" button) and the close-shift success
+  dialog ("View Z-Report" button, opens the just-closed shift's report).
+- `core/feature_registry.php`'s `'pos'` feature `paths` updated to cover the
+  two new pages + the new core file (the `paths` list is not yet enforced by
+  an active bootstrap guard — confirmed via `featureForPath()` having no call
+  sites outside its own test — but kept accurate for when it is).
+
+Verified live: `tests/test_pos_phase9_zreport_cli.php` (24 assertions) —
+wiring checks, and a live-DB reconciliation of `posShiftReportExtras()`
+against a voided sale, a return, a completed sale with **no** GL posting, and
+a completed sale **with** one (confirming the health check flags only the
+genuinely unposted sale). All Phase 7/8 tests and pre-existing POS regression
+suites re-run clean.
+
+---
+
+### Phase 10 — Customer picker, receipt printing, email receipt
+
+**Status:** ✅ DONE (re-scoped) · **Added:** 2026-09-07 · **Branch:** `feat/pos-professional-upgrade`
+
+**Scope was deliberately narrowed from the original "ESC/POS + drawer kick + email/SMS
+receipt" roadmap wording, for two concrete, verified reasons — not a shortcut, a
+platform-reality correction:**
+
+1. **True ESC/POS raw printing and a software drawer-kick command are not
+   achievable from a plain browser page.** A browser can only open the OS
+   print dialog against HTML/CSS content — it cannot write raw bytes to a
+   printer. The only way around that is either a native local print-bridge
+   agent (extra software to install and maintain on every till, not requested)
+   or WebUSB, which is Chrome-only **and requires a secure (HTTPS) context** —
+   this deployment runs over plain HTTP on a LAN (WAMP), where WebUSB is
+   flatly unavailable. Building either would have meant shipping something
+   that either doesn't work in this tenant's actual environment or silently
+   depends on infrastructure nobody asked for. Documented here instead of
+   silently dropped.
+2. **SMS receipts are not implemented because there is no working SMS gateway
+   integration to build on.** Checked `api/test_sms_config.php` — its own
+   comment reads "In a real system, you'd call the specific gateway API here.
+   For now, we simulate." Building "Send Receipt via SMS" on top of a
+   simulated backend would create the illusion of a working feature while
+   sending nothing. Flagged as a real gap, not implemented.
+
+**What professional-grade printing looks like within that real boundary
+(and what was actually built):**
+- **Configurable receipt paper width** (58mm/80mm) and an **"automatically
+  print on sale complete"** setting, both on `pos_config_settings.php` —
+  `print_receipt.php` now reads them instead of hardcoding 80mm and a
+  commented-out auto-print line.
+- **Honest cash-drawer messaging.** `openCashDrawer()` previously showed a fake
+  "Cash drawer opened!" success toast that did nothing at all. Replaced with an
+  accurate explanation: a browser cannot send a hardware open-drawer signal,
+  but a drawer wired to a printer's kick port already opens automatically on
+  every print — which the auto-print setting above now makes happen for free.
+- **Email Receipt** — genuinely wired to the real SMTP-backed `sendEmail()`
+  (`core/mailer.php`), not simulated. Fails with the real `mailer_last_error()`
+  message (e.g. "SMTP is not configured") rather than a fake success.
+
+**What was fully built as scoped:**
+- **Select2 AJAX customer picker** (`api/pos/search_customers.php`, project-
+  scoped per security.md §23) replacing the old plain `<select>` hard-limited
+  to the first 50 active customers with no search at all.
+- **Inline "+ New Customer" quick-add** — wired up the pre-existing but
+  never-called `api/quick_add_customer.php` (added the `csrf_check()` it was
+  missing) behind a small modal; the new customer is immediately selected.
+- Fixed a restore-path bug this Select2 conversion would otherwise have
+  introduced: an AJAX-mode Select2 has no static `<option>` list, so
+  programmatically restoring a previously-picked customer (from
+  `localStorage`, or from a held sale) needs the option created first —
+  `setCustomerSelection()` handles this at all three call sites.
+- Added `csrf_check()` to `pos_config_settings.php`'s POST handler (and a
+  `_csrf` field to its form), which was missing entirely.
+
+Verified live: `tests/test_pos_phase10_customer_receipt_cli.php` (32
+assertions). All Phase 7-9 tests and pre-existing POS regression suites
+re-run clean.
+
+---
+
+### Phase 11 — Loyalty points + currency-from-settings
+
+**Status:** ✅ DONE · **Added:** 2026-09-07 · **Branch:** `feat/pos-professional-upgrade`
+
+**Currency — the product owner's question answered.** Pulling the POS terminal's
+currency from `system_settings.currency` (instead of a hardcoded `TZS`) is
+exactly the professional baseline: this is what `getSetting('currency', 'TZS')`
+already does elsewhere in the codebase (`pos_dashboard.php`, `zreport.php`,
+`shift_history.php` already had it right; `pos.php`'s own `$currency` was
+literally `= 'TZS';`, and the JS layer never used the variable at all — every
+price/total/change/split-payment label was a hardcoded `'TZS '` string). Fixed
+across `pos.php`, `pos_modals_new.php`, `pos_scripts_new.php` (new
+`POS_CURRENCY` JS constant), `print_receipt.php`, and `customer_display.php` +
+`api/pos_session.php` (the customer-facing screen polls a session bridge with
+no server-settings access of its own — extended its JSON payload with a
+`currency` field instead of adding a heavier bootstrap to that standalone
+page). **This is a single-currency fix** (the right scope for the vast
+majority of SME businesses — one operating currency, configurable). **Genuine
+multi-currency** — accepting foreign-currency tender at checkout with a live
+FX rate captured per sale — is a materially larger feature: it needs a real
+rate source (a `currencies` table with maintained rates, or a live FX API),
+per-sale rate capture, and GL conversion back to the base currency for
+reporting. `pos_sales.currency`/`exchange_rate` columns already exist for it
+but are unused. **Recommendation: scope this as its own future phase if the
+business actually transacts in more than one currency** — building it
+speculatively now would be exactly the kind of premature, undirected work this
+plan tries to avoid.
+
+**Loyalty points — built as a real, complete (if intentionally bounded)
+feature**, not a placeholder:
+- **Schema** (`migrations/tenant/2026_09_07_pos_loyalty_program.php`, applied
+  to every tenant + `schema/tenant_schema_template.sql` for new ones):
+  `customers.loyalty_points_balance` (fast denormalised read, mirrors
+  `products.stock_quantity`) + `customer_loyalty_transactions` (the ledger of
+  truth, mirrors `stock_movements` — every earn/redeem/reversal is an
+  auditable row, never just a mutated number).
+- **`core/pos_loyalty.php`** — `awardLoyaltyPoints()` (floor-rounded, never a
+  customer's favour into more reward than earned; no-op for walk-ins, which
+  can't accrue), `redeemLoyaltyPoints()` (row-locks the customer under `FOR
+  UPDATE` so two tills can't both redeem past the true balance; always
+  validates server-side, never trusts the client's idea of the balance),
+  `reverseLoyaltyForSale()` (used by `void_sale.php` — a void is "as if the
+  sale never happened" for loyalty too, exactly like it already is for
+  stock/cash/GL).
+- **Wired into `process_sale.php`**: redemption applied as an additional
+  discount folded into the existing `discount_amount` (no new column needed);
+  earning computed on the **post-redemption** total (no double-dipping points
+  off a discount other points funded); both counts persisted onto the
+  pre-existing but previously-always-zero
+  `pos_sales.loyalty_points_earned/redeemed` columns.
+- **POS terminal UI**: available balance shown once a registered customer is
+  selected, a "Redeem N pts" input with a live discount preview, surfaced in
+  the sale-completion message.
+- **Settings** (`pos_config_settings.php`): enable toggle, earn rate ("1 pt
+  per N currency spent"), redemption value ("1 pt = N currency off").
+- **Deliberately NOT wired into partial returns** (`create_return.php`) —
+  proportional point clawback on a partial return is a real edge case; a
+  fragile guess under time pressure would be worse than a documented gap. A
+  full void DOES reverse both earn and redeem in full (matching void's
+  existing all-or-nothing semantics).
+- **Known, accepted edge case**: if sale A's earned points are later spent via
+  a *different* sale B's redemption, and THEN sale A is voided, the earn
+  reversal clamps at a balance floor of 0 rather than pushing the customer
+  negative — the business absorbs that small breakage rather than putting a
+  customer in point-debt. A single sale being voided (the actual `void_sale.php`
+  call pattern — one sale_id per void) is unaffected; this only bites the
+  double-chained edge case, and reversing in the opposite order fully avoids
+  it. Documented in `core/pos_loyalty.php`'s own comments, not hidden.
+- **Real bug found and fixed while building this**: the split-payment modal
+  sends `payment_method: 'split'`, but `pos_sales.payment_method` never had
+  `'split'` in its enum (it has `'mixed'`) — under this server's non-strict
+  `sql_mode`, MySQL silently coerced it to `''`. One historical sale already
+  shows this corruption live; left untouched (no confirmation it's safe to
+  edit real financial history) but the root cause is now fixed for every sale
+  going forward.
+
+Verified live: `tests/test_pos_phase11_loyalty_currency_cli.php` (36
+assertions) — schema presence, wiring, and a full live-DB reconciliation of
+award/redeem/reverse/idempotency using an explicit config override (so the
+test doesn't depend on `helpers.php::get_setting()`'s process-wide settings
+cache). All prior phase tests and pre-existing POS regression suites re-run
+clean.
+
+---
+
+### Phase 13 — Wire `pos_advanced` into tenant module entitlement
+
+**Status:** ✅ DONE · **Added:** 2026-09-07 · **Branch:** `feat/pos-professional-upgrade`
+
+**The boundary decision (a real product call, made explicit rather than
+guessed silently):** not everything built in Phases 8-11 is gated. Z-Report/
+Shift History, email receipt, and the Select2 customer picker stayed in base
+`pos` (`default: true`, every tenant gets them) — they're operational hygiene
+every till needs, not a differentiated premium feature. **Multi-register/till
+management and the customer loyalty points program** are what actually got
+gated behind the new `pos_advanced` feature, because they're the two
+genuinely upsell-shaped additions (a second till, a rewards program are both
+things a business either needs or doesn't, unlike "can I see my own shift's
+totals").
+
+**What's real about this gate, not aspirational:**
+- `core/feature_registry.php` — new `pos_advanced` entry, `default: false`,
+  `depends_on: ['pos']`, `page_keys: ['pos_advanced']`. Grantable today through
+  the existing superadmin module-request/grant UI — no new plumbing needed
+  there.
+- `migrations/tenant/2026_09_07_pos_advanced_permission.php` seeds the
+  `pos_advanced` permissions row on every existing tenant (+
+  `schema/tenant_seed_defaults.sql` for new ones).
+- **UI**: `pos_config_settings.php` only renders the "Registers / Tills" and
+  "Loyalty Program" sections when `canView('pos_advanced')` — a plan-locked
+  tenant sees a clear "not included in your current plan" notice instead of a
+  broken or silently-ignored form.
+- **Settings save is also gated server-side**, not just hidden in the UI — a
+  raw POST to `pos_config_settings.php` can't sneak `pos_loyalty_enabled=1`
+  past a missing entitlement.
+- **API-level enforcement**: `save_register.php`/`toggle_register_status.php`
+  check `canView('pos_advanced')` before their existing CRUD permission check.
+  `get_registers.php` (read-only listing) deliberately stays **un-gated** —
+  every tenant, base tier included, still needs to see at least the one
+  default register to open a shift at all; only *creating/editing/
+  deactivating* registers is the premium action.
+- **Runtime double-check, not just settings-page enforcement**:
+  `core/pos_loyalty.php::loyaltySettings()` calls `tenantFeatureEnabled
+  ('pos_advanced')` directly — so a superadmin *revoking* the entitlement
+  immediately disables loyalty accrual/redemption even if
+  `pos_loyalty_enabled` is still `'1'` from before the revoke, rather than
+  requiring someone to remember to also flip that setting off.
+
+Verified live: `tests/test_pos_phase13_entitlement_cli.php` (20 assertions) —
+registry shape, permission seeding, wiring, and a live behavioural check that
+forces the tenant's feature map to `pos_advanced=false` and confirms
+`canView('pos_advanced')` is false **even for an admin session** (entitlement
+is checked before the admin bypass — verified against the actual `canView()`
+source, not assumed) and that `loyaltySettings()` correctly reports
+`enabled=false` regardless of the raw setting. Fixed one pre-existing test
+(`test_feature_registry_cli.php`'s hardcoded dependents-of-`warehouses` list)
+that was stale the moment `pos_advanced` became a transitive dependent via
+`pos` → `warehouses`. All Phase 7-11 tests and pre-existing POS regression
+suites re-run clean; `test_feature_registry_cli.php` back to 106/106.
+
+**This completes the planned tranche** (Phases 7-11, 13 — Phase 12 offline
+resilience remains deliberately deferred per the product owner, 2026-09-07).
+
+---
+
 ## 4. Cross-cutting requirements (every phase)
 
 - **Security (`.claude/security.md`):** CSRF on all writes, permission gate per
