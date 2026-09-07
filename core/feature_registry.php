@@ -112,6 +112,31 @@ if (!function_exists('bmsFeatureRegistry')) {
                     'core/pos_shift_reporting.php',
                 ],
             ],
+            // Phase 13 (pos_upgrade_plan.md §7) — the opt-in upsell tier on top
+            // of base 'pos'. Z-report/shift history/email receipt/customer
+            // picker stayed in base 'pos' (operational hygiene every tenant
+            // needs, not a differentiated premium feature); multi-register
+            // management and the loyalty points program are the two genuinely
+            // upsell-shaped additions, so those are what this actually gates —
+            // see pos_config_settings.php's canView('pos_advanced') wrap around
+            // the Registers/Tills and Loyalty Program sections, and
+            // core/pos_loyalty.php's tenantFeatureEnabled('pos_advanced') check
+            // (so a revoked entitlement disables loyalty even if the
+            // pos_loyalty_enabled setting itself is still '1').
+            'pos_advanced' => [
+                'label'       => 'POS Advanced',
+                'description' => 'Multi-register/till management and the customer loyalty points program.',
+                'default'     => false,
+                'sort_order'  => 21,
+                'page_keys'   => ['pos_advanced'],
+                'depends_on'  => ['pos'],
+                'paths'       => [
+                    'api/pos/get_registers.php',
+                    'api/pos/save_register.php',
+                    'api/pos/toggle_register_status.php',
+                    'core/pos_loyalty.php',
+                ],
+            ],
             'procurement' => [
                 'label'       => 'Procurement',
                 'description' => 'Suppliers, RFQ, purchase orders, GRN, delivery notes, returns and materials. Tenders is separate.',

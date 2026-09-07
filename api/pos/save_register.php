@@ -6,11 +6,14 @@
  *       opening_cash, barcode_scanner, cash_drawer, card_reader,
  *       receipt_header, receipt_footer, receipt_logo
  * Permission: canEdit('pos_config_settings') — register setup is an admin/settings action.
+ * Entitlement: Phase 13 (pos_upgrade_plan.md §7) — multi-register management
+ * is gated behind the 'pos_advanced' tenant feature.
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
 
 if (!isAuthenticated())            { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
+if (!canView('pos_advanced'))      { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Multi-register management is not included in your plan.']); exit; }
 if (!canEdit('pos_config_settings')) { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
 csrf_check();

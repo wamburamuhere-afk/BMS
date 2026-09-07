@@ -30,8 +30,15 @@
 if (!function_exists('loyaltySettings')) {
     function loyaltySettings(): array
     {
+        // Phase 13 (pos_upgrade_plan.md §7) — loyalty is gated behind the
+        // 'pos_advanced' tenant entitlement, on top of its own on/off setting.
+        // Checked here (not just on the settings-page UI) so a superadmin
+        // revoking the entitlement actually disables it immediately, even if
+        // pos_loyalty_enabled is still '1' from before the revoke.
+        $entitled = !function_exists('tenantFeatureEnabled') || tenantFeatureEnabled('pos_advanced');
+
         return [
-            'enabled'       => getSetting('pos_loyalty_enabled', '0') === '1',
+            'enabled'       => $entitled && getSetting('pos_loyalty_enabled', '0') === '1',
             // "1 point earned per this many currency units spent" — e.g. 1000 => 1 point per 1,000 TZS.
             'spend_per_point' => max(0.01, (float)getSetting('pos_loyalty_spend_per_point', '1000')),
             // Currency value of ONE point when redeemed — e.g. 100 => 1 point knocks 100 TZS off the total.

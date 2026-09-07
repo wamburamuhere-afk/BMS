@@ -445,7 +445,7 @@ feature key) — see Phase 13.
 | 10 | Receipt printing improvements, email receipt, Select2 AJAX customer picker with quick-add — **re-scoped, see below** | ✅ DONE (below) |
 | 11 | Loyalty points (real accrual/redemption) + multi-currency (base currency from `system_settings.currency`, replacing the hardcoded `TZS`) | ✅ DONE (below) |
 | 12 | Offline resilience (local queue + sync-on-reconnect) | **Deferred — needs its own design discussion before implementation, per product owner (2026-09-07). Not scheduled in this tranche.** |
-| 13 | Wire a `pos_advanced` feature-registry entry (`depends_on: ['pos']`) so a superadmin can gate the Phase 8-11 features per tenant company | Planned |
+| 13 | Wire a `pos_advanced` feature-registry entry (`depends_on: ['pos']`) so a superadmin can gate the Phase 8-11 features per tenant company | ✅ DONE (below) |
 
 ---
 
@@ -704,6 +704,66 @@ award/redeem/reverse/idempotency using an explicit config override (so the
 test doesn't depend on `helpers.php::get_setting()`'s process-wide settings
 cache). All prior phase tests and pre-existing POS regression suites re-run
 clean.
+
+---
+
+### Phase 13 — Wire `pos_advanced` into tenant module entitlement
+
+**Status:** ✅ DONE · **Added:** 2026-09-07 · **Branch:** `feat/pos-professional-upgrade`
+
+**The boundary decision (a real product call, made explicit rather than
+guessed silently):** not everything built in Phases 8-11 is gated. Z-Report/
+Shift History, email receipt, and the Select2 customer picker stayed in base
+`pos` (`default: true`, every tenant gets them) — they're operational hygiene
+every till needs, not a differentiated premium feature. **Multi-register/till
+management and the customer loyalty points program** are what actually got
+gated behind the new `pos_advanced` feature, because they're the two
+genuinely upsell-shaped additions (a second till, a rewards program are both
+things a business either needs or doesn't, unlike "can I see my own shift's
+totals").
+
+**What's real about this gate, not aspirational:**
+- `core/feature_registry.php` — new `pos_advanced` entry, `default: false`,
+  `depends_on: ['pos']`, `page_keys: ['pos_advanced']`. Grantable today through
+  the existing superadmin module-request/grant UI — no new plumbing needed
+  there.
+- `migrations/tenant/2026_09_07_pos_advanced_permission.php` seeds the
+  `pos_advanced` permissions row on every existing tenant (+
+  `schema/tenant_seed_defaults.sql` for new ones).
+- **UI**: `pos_config_settings.php` only renders the "Registers / Tills" and
+  "Loyalty Program" sections when `canView('pos_advanced')` — a plan-locked
+  tenant sees a clear "not included in your current plan" notice instead of a
+  broken or silently-ignored form.
+- **Settings save is also gated server-side**, not just hidden in the UI — a
+  raw POST to `pos_config_settings.php` can't sneak `pos_loyalty_enabled=1`
+  past a missing entitlement.
+- **API-level enforcement**: `save_register.php`/`toggle_register_status.php`
+  check `canView('pos_advanced')` before their existing CRUD permission check.
+  `get_registers.php` (read-only listing) deliberately stays **un-gated** —
+  every tenant, base tier included, still needs to see at least the one
+  default register to open a shift at all; only *creating/editing/
+  deactivating* registers is the premium action.
+- **Runtime double-check, not just settings-page enforcement**:
+  `core/pos_loyalty.php::loyaltySettings()` calls `tenantFeatureEnabled
+  ('pos_advanced')` directly — so a superadmin *revoking* the entitlement
+  immediately disables loyalty accrual/redemption even if
+  `pos_loyalty_enabled` is still `'1'` from before the revoke, rather than
+  requiring someone to remember to also flip that setting off.
+
+Verified live: `tests/test_pos_phase13_entitlement_cli.php` (20 assertions) —
+registry shape, permission seeding, wiring, and a live behavioural check that
+forces the tenant's feature map to `pos_advanced=false` and confirms
+`canView('pos_advanced')` is false **even for an admin session** (entitlement
+is checked before the admin bypass — verified against the actual `canView()`
+source, not assumed) and that `loyaltySettings()` correctly reports
+`enabled=false` regardless of the raw setting. Fixed one pre-existing test
+(`test_feature_registry_cli.php`'s hardcoded dependents-of-`warehouses` list)
+that was stale the moment `pos_advanced` became a transitive dependent via
+`pos` → `warehouses`. All Phase 7-11 tests and pre-existing POS regression
+suites re-run clean; `test_feature_registry_cli.php` back to 106/106.
+
+**This completes the planned tranche** (Phases 7-11, 13 — Phase 12 offline
+resilience remains deliberately deferred per the product owner, 2026-09-07).
 
 ---
 

@@ -1,5 +1,29 @@
 # BMS Changelog
 
+## 2026-09-07 (feat) - POS Phase 13: wire 'pos_advanced' into tenant module entitlement
+
+**Files (added):** `migrations/tenant/2026_09_07_pos_advanced_permission.php`,
+`tests/test_pos_phase13_entitlement_cli.php`
+**Files (changed):** `core/feature_registry.php`, `core/pos_loyalty.php`, `api/pos/save_register.php`,
+`api/pos/toggle_register_status.php`, `app/constant/settings/pos_config_settings.php`,
+`schema/tenant_seed_defaults.sql`, `tests/test_feature_registry_cli.php`, `pos_upgrade_plan.md`
+
+Final phase of this POS "Advanced" professionalisation tranche (Phase 12 offline-resilience remains
+deliberately deferred per the product owner). Gates multi-register/till management and the loyalty
+points program (Phases 8 and 11) behind a new opt-in `pos_advanced` tenant feature — the two
+genuinely upsell-shaped additions, as distinct from Z-Report/Shift History/email receipt/customer
+picker which stay in base POS as operational hygiene every tenant needs. Enforced at three levels:
+the settings-page UI (sections hidden when not entitled, with a clear plan-upgrade notice), the
+settings-save handler (a raw POST can't sneak loyalty on past a missing entitlement), and the API
+layer (`save_register.php`/`toggle_register_status.php`); `get_registers.php`'s read-only listing
+deliberately stays un-gated since every tenant needs to see their one default register to open a
+shift. `core/pos_loyalty.php` also checks the entitlement directly at runtime, so revoking it
+disables loyalty immediately even if the on/off setting itself is untouched. Fixed one pre-existing
+test (`test_feature_registry_cli.php`) whose hardcoded dependents-of-`warehouses` list went stale the
+moment `pos_advanced` became a transitive dependent via `pos`. Verified live with a new 20-assertion
+CLI test (including a behavioural check that entitlement blocks even an admin session); all prior
+phase tests and pre-existing regression suites re-run clean.
+
 ## 2026-09-07 (feat) - POS Phase 11: Loyalty points program + currency-from-settings fix
 
 **Files (added):** `migrations/tenant/2026_09_07_pos_loyalty_program.php`, `core/pos_loyalty.php`,

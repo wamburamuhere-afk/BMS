@@ -13,6 +13,10 @@ require_once __DIR__ . '/../../../header.php';
 $success_msg = '';
 $error_msg = '';
 
+// Phase 13 (pos_upgrade_plan.md §7) — multi-register management and the
+// loyalty program are the 'pos_advanced' upsell tier on top of base POS.
+$pos_advanced_entitled = canView('pos_advanced');
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
     try {
@@ -20,10 +24,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Phase 10 (pos_upgrade_plan.md §7) — receipt printing preferences.
         save_setting('pos_receipt_width', in_array($_POST['pos_receipt_width'] ?? '', ['58', '80'], true) ? $_POST['pos_receipt_width'] : '80');
         save_setting('pos_auto_print_receipt', isset($_POST['pos_auto_print_receipt']) ? '1' : '0');
-        // Phase 11 (pos_upgrade_plan.md §7) — loyalty program.
-        save_setting('pos_loyalty_enabled', isset($_POST['pos_loyalty_enabled']) ? '1' : '0');
-        save_setting('pos_loyalty_spend_per_point', max(1, (float)($_POST['pos_loyalty_spend_per_point'] ?? 1000)));
-        save_setting('pos_loyalty_redeem_value', max(0, (float)($_POST['pos_loyalty_redeem_value'] ?? 50)));
+        // Phase 11/13 — loyalty program settings only take effect for a
+        // tenant actually entitled to 'pos_advanced'; silently ignored
+        // otherwise so a raw POST can't turn it on without the entitlement.
+        if ($pos_advanced_entitled) {
+            save_setting('pos_loyalty_enabled', isset($_POST['pos_loyalty_enabled']) ? '1' : '0');
+            save_setting('pos_loyalty_spend_per_point', max(1, (float)($_POST['pos_loyalty_spend_per_point'] ?? 1000)));
+            save_setting('pos_loyalty_redeem_value', max(0, (float)($_POST['pos_loyalty_redeem_value'] ?? 50)));
+        }
         $success_msg = "POS settings updated successfully";
     } catch (Exception $e) {
         $error_msg = "Error updating POS settings: " . $e->getMessage();
@@ -92,6 +100,7 @@ $pos_currency = getSetting('currency', 'TZS');
                             <div class="form-text">Sends the receipt straight to your browser's print dialog / default printer — no "Print Receipt" click needed. Requires a printer already set as your OS/browser default.</div>
                         </div>
 
+                        <?php if ($pos_advanced_entitled): ?>
                         <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small">Loyalty Program</h6>
                         <div class="mb-3 form-check">
                             <input type="checkbox" class="form-check-input" id="pos_loyalty_enabled" name="pos_loyalty_enabled" value="1" <?= $pos_loyalty_enabled == '1' ? 'checked' : '' ?>>
@@ -116,6 +125,12 @@ $pos_currency = getSetting('currency', 'TZS');
                                 </div>
                             </div>
                         </div>
+                        <?php else: ?>
+                        <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small">Loyalty Program</h6>
+                        <div class="alert alert-light border small mb-0">
+                            <i class="bi bi-lock me-1"></i> Loyalty points are part of <strong>POS Advanced</strong> — not included in your current plan.
+                        </div>
+                        <?php endif; ?>
 
                         <div class="mt-4 pt-3 border-top d-flex justify-content-end">
                             <button type="submit" name="save_pos" class="btn btn-primary px-5">
@@ -128,6 +143,7 @@ $pos_currency = getSetting('currency', 'TZS');
         </div>
     </div>
 
+    <?php if ($pos_advanced_entitled): ?>
     <!-- Registers / Tills — Phase 8 (pos_upgrade_plan.md §7) -->
     <div class="row mt-4">
         <div class="col-lg-8">
@@ -154,8 +170,23 @@ $pos_currency = getSetting('currency', 'TZS');
             </div>
         </div>
     </div>
+    <?php else: ?>
+    <div class="row mt-4">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold mb-3 text-dark text-uppercase small">Registers / Tills</h6>
+                    <div class="alert alert-light border small mb-0">
+                        <i class="bi bi-lock me-1"></i> Multi-register (multi-till) management is part of <strong>POS Advanced</strong> — not included in your current plan. You still have one default register/till to sign in at.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 </div>
 
+<?php if ($pos_advanced_entitled): ?>
 <!-- Add/Edit Register Modal -->
 <div class="modal fade" id="registerModal" tabindex="-1">
     <div class="modal-dialog">
@@ -215,6 +246,7 @@ $pos_currency = getSetting('currency', 'TZS');
 
 <script>
 let registersCache = [];
+
 
 function loadRegisters() {
     $.getJSON('<?= buildUrl('api/pos/get_registers.php') ?>', function (res) {
@@ -314,6 +346,7 @@ function toggleRegister(id, newStatus) {
 
 $(document).ready(function () { loadRegisters(); });
 </script>
+<?php endif; // $pos_advanced_entitled ?>
 
 <?php
 require_once __DIR__ . '/../../../footer.php';
