@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-09-07 (fix) - POS Phase 7: void→GL reversal + receipt company-info bug
+
+**Files (changed):** `api/pos/void_sale.php`, `api/pos/print_receipt.php`, `pos_upgrade_plan.md`
+**Files (added):** `tests/test_pos_phase7_void_gl_reversal_cli.php`
+
+First phase of the POS "Advanced" professionalisation tranche (see `pos_upgrade_plan.md` §7).
+Voiding a POS sale reversed stock and cash but never reversed the GL entries `postPosSale()`
+posted at sale time, so a voided sale's revenue/COGS stayed in the ledger-based Trial
+Balance/Balance Sheet forever even though it was correctly excluded from the operational P&L.
+Fixed by calling the existing generic `reverseAccrualEntry()` (already used elsewhere for
+credit-note restock reversals) for both `pos_sale` and `pos_cogs` inside the void's own
+transaction, best-effort, mirroring how `create_return.php` handles `postPosReturn()` failures.
+Also fixed `print_receipt.php` hardcoding a fake company address/phone/TIN (BJP's own
+placeholder values) on every tenant's printed receipt instead of reading each tenant's own
+Company Profile settings. Verified live with a new 28-assertion CLI test.
+
 ## 2026-09-07 (fix) - Reject duplicate product names in POS/Products
 
 **Files (changed):** `api/create_product.php`, `api/update_product.php`

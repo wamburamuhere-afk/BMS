@@ -399,6 +399,56 @@ the assignment-save POST, `logActivity`/`logAudit` on every scope change
 
 ---
 
+### Phase 7 — Ledger-integrity fix (void→GL reversal + receipt company-info bug)
+
+**Status:** ✅ DONE · **Added:** 2026-09-07 · **Branch:** `feat/pos-professional-upgrade`
+
+Follow-up scouting (2026-09-07, ahead of the "Advanced POS" push in §7 below)
+found two real bugs, not just gaps:
+
+1. `api/pos/void_sale.php` reversed stock and cash on void but **never reversed
+   the GL entries** `postPosSale()` posted at sale time — so a voided sale's
+   revenue/COGS stayed in the ledger-based Trial Balance/Balance Sheet forever,
+   even though it was excluded from the operational P&L. Fixed by calling the
+   existing generic `reverseAccrualEntry($pdo, 'pos_sale'|'pos_cogs', $sale_id, ...)`
+   (already used by `reverseCreditNoteRestock()`) inside the same transaction as
+   the void, before commit — best-effort, never blocks the void, logs a warning
+   on failure exactly like `create_return.php` does for `postPosReturn()`.
+2. `api/pos/print_receipt.php` hardcoded a fake `company_address`/`company_phone`/
+   `company_tin` (BJP's own placeholder values) instead of reading each tenant's
+   own Company Profile — every tenant's printed receipts showed the same fake
+   details. Fixed to read `getSetting('company_physical_address'|'company_phone'|
+   'company_tin'|'company_vrn', ...)`, matching the pattern already used by
+   `petty_cash_print.php`/`supplier_payments.php`; blank fields are now omitted
+   from the printed header instead of showing a placeholder.
+
+Verified live: `tests/test_pos_phase7_void_gl_reversal_cli.php` (28 assertions) —
+posts a synthetic sale via `postPosSale()`, reverses it via the same call
+`void_sale.php` now makes, confirms both reversal entries balance and are
+correctly tagged (`pos_sale_void`/`pos_cogs_void`), confirms idempotency (voiding
+twice does not double-reverse), and confirms rollback leaves no trace.
+
+---
+
+## 7. "Advanced POS" professionalisation (post-scout, 2026-09-07)
+
+Scope for the next tranche of work, ordered to build on what's already shipped
+(§3 Phases 1–6) rather than restart it. Ties into the in-progress tenant
+module-entitlement system (`core/feature_registry.php` already has a `'pos'`
+feature key) — see Phase 13.
+
+| Phase | What | Status |
+|---|---|---|
+| 7 | Ledger-integrity fix (void→GL reversal, receipt company-info bug) | ✅ DONE (above) |
+| 8 | Register/Till model — activate the unused `pos_registers` schema (till selection, per-register receipt branding, populate `cash_register_shifts` totals at close) | Planned |
+| 9 | Z-Report / EOD reconciliation, built on Phase 8's populated shift totals | Planned |
+| 10 | Real receipt printing (ESC/POS + drawer kick), email/SMS receipt, Select2 AJAX customer picker with quick-add | Planned |
+| 11 | Loyalty points (real accrual/redemption) + multi-currency (base currency from `system_settings.currency`, replacing the hardcoded `TZS`) | Planned |
+| 12 | Offline resilience (local queue + sync-on-reconnect) | **Deferred — needs its own design discussion before implementation, per product owner (2026-09-07). Not scheduled in this tranche.** |
+| 13 | Wire a `pos_advanced` feature-registry entry (`depends_on: ['pos']`) so a superadmin can gate the Phase 8-11 features per tenant company | Planned |
+
+---
+
 ## 4. Cross-cutting requirements (every phase)
 
 - **Security (`.claude/security.md`):** CSRF on all writes, permission gate per
