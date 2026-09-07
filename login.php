@@ -310,6 +310,12 @@ if ($company_logo && strpos($company_logo, 'http') !== 0) {
                     dataType: 'json',
                     success: function(response) {
                         if (response.success) {
+                            // Fire-and-forget: api/finalize_login.php does the GeoIP
+                            // lookup + notification email in its OWN request, so the
+                            // redirect below never waits on either.
+                            if (navigator.sendBeacon) {
+                                navigator.sendBeacon('<?= getUrl('api/finalize_login') ?>');
+                            }
                             window.location.href = 'dashboard';
                         } else {
                             Swal.fire('Login Failed', response.message || 'Invalid username or password.', 'error');
