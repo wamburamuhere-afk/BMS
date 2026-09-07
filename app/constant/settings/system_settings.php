@@ -293,6 +293,19 @@ if ($_POST) {
                                 </div>
                             </div>
                         </a>
+                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header">Plan &amp; Modules</div>
+                        <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
+                           href="<?= getUrl('available_modules') ?>">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-box me-3 bg-primary-soft text-primary">
+                                    <i class="bi bi-grid"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold">Available Modules</h6>
+                                    <small class="text-muted">What your plan includes, request more</small>
+                                </div>
+                            </div>
+                        </a>
                         <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header">Business & Finance</div>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            href="<?= getUrl('payment_settings') ?>">

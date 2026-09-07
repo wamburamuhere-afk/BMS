@@ -368,6 +368,39 @@ try {
     ");
     say('  · reserved "blank" plan seeded');
 
+    // ── Self-service module requests (tenant_module_control_plan.md, Phase C) ──
+    // A tenant's own admin asking for a module they don't have, and a
+    // superadmin approving/declining. Lives here, not in any tenant database,
+    // for the same reason `features`/`tenant_features` do: a request FROM a
+    // tenant and a DECISION about it must both be readable by every
+    // superadmin across every tenant in one place, which only the control
+    // database can do.
+    //
+    // One open (pending) request per (tenant_id, feature_key) — a repeat click
+    // updates the existing row's note rather than creating a duplicate,
+    // enforced by the application layer (core/module_requests.php), not a
+    // unique index, because a tenant MAY legitimately have more than one
+    // *resolved* (approved/declined) historical request for the same feature
+    // over time — only one truly OPEN one at once.
+    $admin->exec("
+        CREATE TABLE IF NOT EXISTS `{$controlDb}`.`feature_upgrade_requests` (
+            `id`            INT AUTO_INCREMENT PRIMARY KEY,
+            `tenant_id`     INT NOT NULL,
+            `feature_key`   VARCHAR(64) NOT NULL,
+            `requested_by`  INT NOT NULL,
+            `note`          VARCHAR(500) NULL,
+            `status`        ENUM('pending','approved','declined') NOT NULL DEFAULT 'pending',
+            `decided_by`    INT NULL,
+            `decided_at`    DATETIME NULL,
+            `decision_note` VARCHAR(500) NULL,
+            `reminded_at`   DATETIME NULL,
+            `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY `idx_tenant_status` (`tenant_id`, `status`),
+            KEY `idx_status_created` (`status`, `created_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    ");
+    say('  · table feature_upgrade_requests ready');
+
     // Usage quotas (ternant.md Phase 12). NULL means unlimited — deliberately not
     // a magic -1, so "no limit set" and "a real number" can never be confused.
     // Two plain columns on `tenants`, not a second features/tenant_features-shaped

@@ -28,6 +28,15 @@
 
 require_once __DIR__ . '/../roots.php';
 
+// Optional, multi-tenancy-only layer — single-tenant installs have no control
+// database at all, so these are guarded by is_file() rather than assumed.
+if (is_file(__DIR__ . '/../core/module_requests.php')) {
+    require_once __DIR__ . '/../core/module_requests.php';
+}
+if (is_file(__DIR__ . '/../core/platform_settings.php')) {
+    require_once __DIR__ . '/../core/platform_settings.php';
+}
+
 header('Content-Type: application/json');
 
 // Same implicit trust boundary as before: this only ever ran for a signed-in
@@ -76,6 +85,25 @@ if (function_exists('get_setting') && get_setting('notif_digest_enabled', '0') =
     && get_setting('notif_digest_last_run') !== date('Y-m-d')) {
     @include_once __DIR__ . '/../cron/send_notification_digests.php';
     $ran[] = 'notif_digest';
+}
+
+// Stale module-request reminder (tenant_module_control_plan.md, Phase C) —
+// PLATFORM-wide, not this tenant's own concern, but this endpoint is exactly
+// the "piggyback on any ordinary page load" mechanism the rest of this file
+// already uses, and there is no per-tenant reason to gate it. Throttled via
+// getPlatformSetting() (control DB), not get_setting() (this tenant's own
+// system_settings) — a per-tenant throttle would fire this once per tenant
+// per day, e-mailing superadmins duplicate reminders for the exact same
+// stale requests.
+if (function_exists('getPlatformSetting') && function_exists('remindStalePendingRequests')
+    && getPlatformSetting('module_request_reminder_last_run') !== date('Y-m-d')) {
+    try {
+        setPlatformSetting('module_request_reminder_last_run', date('Y-m-d'));
+        remindStalePendingRequests();
+        $ran[] = 'module_request_reminders';
+    } catch (Throwable $e) {
+        error_log('run_background_jobs/remindStalePendingRequests: ' . $e->getMessage());
+    }
 }
 
 echo json_encode(['ok' => true, 'ran' => $ran]);
