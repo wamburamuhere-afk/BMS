@@ -181,4 +181,29 @@ section('3c. pos_registers table sanity');
 $seed = $pdo->query("SELECT register_id, register_name, status FROM pos_registers WHERE register_id = 1")->fetch(PDO::FETCH_ASSOC);
 ($seed && $seed['status'] === 'active') ? pass("seed register #1 ({$seed['register_name']}) present and active") : fail('seed register #1 missing or inactive — open_shift.php default would break');
 
+// ─────────────────────────────────────────────────────────────────────────
+section('3d. JS safeOutput() regression guard');
+// ─────────────────────────────────────────────────────────────────────────
+// Real bug found live (2026-09-07): safeOutput() is a per-page LOCAL JS
+// convention in this codebase (each page defines its own copy — it is NOT a
+// global helper from header.php), so calling it in a file that never defines
+// it throws a ReferenceError at runtime. lint (php -l) and every wiring check
+// above are blind to this — they don't execute the JS. This scans every
+// touched-by-this-tranche file: if it calls safeOutput(, it must also define
+// it locally (`function safeOutput`), or the call must not exist at all.
+$jsSafetyFiles = [
+    'app/bms/pos/pos.php', 'app/bms/pos/pos_scripts_new.php', 'app/bms/pos/pos_modals_new.php',
+    'app/bms/pos/shift_history.php', 'app/bms/pos/zreport.php', 'app/bms/pos/customer_display.php',
+    'app/constant/settings/pos_config_settings.php',
+];
+foreach ($jsSafetyFiles as $f) {
+    $src = file_get_contents("$root/$f");
+    $callsIt   = strpos($src, 'safeOutput(') !== false;
+    $definesIt = strpos($src, 'function safeOutput') !== false;
+    if (!$callsIt) { pass("$f: does not call safeOutput() — nothing to check"); continue; }
+    $definesIt
+        ? pass("$f: calls safeOutput() AND defines it locally")
+        : fail("$f: calls safeOutput() but never defines it — ReferenceError at runtime");
+}
+
 exit($failures === 0 ? 0 : 1);

@@ -1098,7 +1098,10 @@ function startShift() {
         $reg.empty();
         if (res.success && res.data.length) {
             res.data.forEach(r => {
-                $reg.append(`<option value="${r.register_id}">${safeOutput(r.register_name)} (${safeOutput(r.register_code)})</option>`);
+                // Built via .text() (auto-escaping), not string-concatenated HTML —
+                // this page has no output-escaping JS helper of its own (that's a
+                // per-page local convention elsewhere, not something pos.php defines).
+                $reg.append($('<option>').val(r.register_id).text(r.register_name + ' (' + r.register_code + ')'));
             });
         } else {
             $reg.append('<option value="1">Main Counter</option>');
