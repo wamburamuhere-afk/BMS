@@ -160,6 +160,11 @@ if (!function_exists('createPlan')) {
 
         $validKeys = array_keys(bmsFeatureRegistry());
         $features  = array_values(array_intersect((array)($in['feature_keys'] ?? []), $validKeys));
+        // Dependency-closed at save time (tenant_module_control_plan.md, Phase
+        // A): a plan checking 'sales' alone silently gains 'warehouses' too —
+        // matches applyPlanToTenant()/setTenantFeatures() auto-including the
+        // same way, so a plan can never itself represent a broken combination.
+        $features  = featureDependencyClosure($features);
         if ($features) {
             $ins = $pdo->prepare("INSERT IGNORE INTO plan_features (plan_id, feature_key) VALUES (?,?)");
             foreach ($features as $fk) $ins->execute([$id, $fk]);
@@ -198,6 +203,11 @@ if (!function_exists('updatePlan')) {
 
         $validKeys = array_keys(bmsFeatureRegistry());
         $features  = array_values(array_intersect((array)($in['feature_keys'] ?? []), $validKeys));
+        // Dependency-closed at save time (tenant_module_control_plan.md, Phase
+        // A): a plan checking 'sales' alone silently gains 'warehouses' too —
+        // matches applyPlanToTenant()/setTenantFeatures() auto-including the
+        // same way, so a plan can never itself represent a broken combination.
+        $features  = featureDependencyClosure($features);
         $pdo->prepare("DELETE FROM plan_features WHERE plan_id = ?")->execute([$id]);
         if ($features) {
             $ins = $pdo->prepare("INSERT IGNORE INTO plan_features (plan_id, feature_key) VALUES (?,?)");

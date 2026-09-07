@@ -23,7 +23,10 @@ try {
     if (!planTablesReady()) {
         $setup = true;
     } else {
-        $plans = listPlans();
+        // Never the reserved 'blank' plan — it exists only for self-
+        // registration's provisioning switch (tenant_module_control_plan.md
+        // §5.1), not as something an operator manages or applies by hand.
+        $plans = array_values(array_filter(listPlans(), fn($p) => $p['plan_key'] !== 'blank'));
         $availableFeatures = getControlPdo()
             ->query("SELECT feature_key, label FROM features WHERE is_available = 1 ORDER BY sort_order, feature_key")
             ->fetchAll();

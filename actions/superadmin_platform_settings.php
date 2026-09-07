@@ -91,5 +91,22 @@ if ($action === 'save_email') {
     exit;
 }
 
+if ($action === 'save_provisioning') {
+    // tenant_module_control_plan.md §5.1 — governs ONLY the unattended,
+    // self-registration path (register.php). A superadmin creating a tenant
+    // by hand (tenant_new.php) always explicitly picks a plan there, or
+    // leaves it blank for "everything on", regardless of this switch.
+    $mode = (string)($_POST['provisioning_mode'] ?? '');
+    if (!in_array($mode, ['all', 'none'], true)) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => "Choose 'all' or 'none'."]);
+        exit;
+    }
+    setPlatformSetting('tenant_default_provisioning', $mode, (int)$me['id']);
+    logTenantAdminAction(null, null, 'platform_settings', "Self-registration starting modules set to '$mode'");
+    echo json_encode(['success' => true, 'message' => 'Self-registration setting updated.']);
+    exit;
+}
+
 http_response_code(422);
 echo json_encode(['success' => false, 'message' => 'Unknown action.']);

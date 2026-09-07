@@ -214,6 +214,46 @@ try {
     ok(($att['outcome'] ?? '') === 'success', 'the signup is recorded as a success');
     ok((int)($att['tenant_id'] ?? 0) === $res['tenant_id'], 'the audit row links to the tenant');
 
+    section('6b. Provisioning-switch = "none" -> self-registration gets the blank plan (tenant_module_control_plan.md 5.1)');
+    $priorMode = getPlatformSetting('tenant_default_provisioning', 'all');
+    setPlatformSetting('tenant_default_provisioning', 'none');
+
+    $subNone = 'regtestnone' . $sfx;
+    $resNone = withTenancy(function () use ($subNone, $pw) {
+        return registerTenant([
+            'company_name'     => 'Blank Mode Test Ltd',
+            'subdomain'        => $subNone,
+            'owner_email'      => "owner@$subNone.test",
+            'owner_password'   => $pw,
+        ], '198.51.100.160');
+    });
+    ok($resNone['ok'] === true, 'registration still succeeds with the switch on "none"', (string)($resNone['error'] ?? ''));
+
+    if ($resNone['ok']) {
+        $made['tenants'][]   = $resNone['tenant_id'];
+        $made['databases'][] = 'bms_t' . $resNone['tenant_id'];
+        $made['users'][]     = 'bms_u' . $resNone['tenant_id'];
+
+        bmsPrimeTenantFeatures((int)$resNone['tenant_id']);
+        // Every switchable module off — the blank plan has zero plan_features.
+        foreach (['sales', 'pos', 'procurement', 'tenders', 'warehouses', 'hr', 'assets', 'projects',
+                  'ai_assistant', 'esignature', 'crm', 'communication', 'compliance'] as $fk) {
+            ok(tenantFeatureEnabled($fk) === false, "switchable module '$fk' is off under the blank plan");
+        }
+        ok(tenantModuleAllowsPage('dashboard') === true, 'the always-on baseline still works (dashboard reachable)');
+        ok(tenantModuleAllowsPage('customers') === true, 'the always-on baseline still works (customers reachable)');
+
+        $tRow = $cpdo->prepare("SELECT plan FROM tenants WHERE id = ?");
+        $tRow->execute([$resNone['tenant_id']]);
+        ok($tRow->fetchColumn() === 'blank', "tenants.plan recorded as 'blank'");
+    }
+
+    // Restore the switch to whatever it was before this test touched it —
+    // this platform setting is shared, global state.
+    setPlatformSetting('tenant_default_provisioning', $priorMode);
+    ok(getPlatformSetting('tenant_default_provisioning', 'all') === $priorMode,
+       'provisioning-mode switch restored to its prior value');
+
     section('7. The same subdomain cannot be taken twice');
     $dup = withTenancy(function () use ($sub) {
         return registerTenant([

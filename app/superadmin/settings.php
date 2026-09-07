@@ -25,6 +25,7 @@ $smtpEncryption = getPlatformSetting('smtp_encryption', 'tls');
 $fromEmail     = getPlatformSetting('from_email');
 $fromName      = getPlatformSetting('from_name');
 $hasSavedPassword = getPlatformSetting('smtp_password_enc') !== '';
+$provisioningMode = getPlatformSetting('tenant_default_provisioning', 'all');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -143,6 +144,44 @@ $hasSavedPassword = getPlatformSetting('smtp_password_enc') !== '';
             </div>
         </div>
 
+        <!-- Self-registration starting modules -->
+        <div class="col-12 col-lg-6">
+            <div class="card panel-card h-100">
+                <div class="card-header"><i class="bi bi-signpost-split text-primary me-1"></i> Self-Registration Starting Modules</div>
+                <div class="card-body">
+                    <p class="text-muted small">
+                        Governs ONLY a company that signs itself up through the public registration form —
+                        nobody at the platform involved yet. Creating a company by hand from
+                        <a href="<?= saUrl('tenants/new') ?>">New Company</a> always lets you pick a plan
+                        explicitly there, regardless of this setting.
+                    </p>
+                    <form id="provisioningForm" autocomplete="off">
+                        <input type="hidden" name="action" value="save_provisioning">
+                        <div class="mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="provisioning_mode" id="pm_all"
+                                       value="all" <?= $provisioningMode === 'all' ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="pm_all">
+                                    <strong>Everything on</strong> — reduce afterward if needed (today's behaviour)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="provisioning_mode" id="pm_none"
+                                       value="none" <?= $provisioningMode === 'none' ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="pm_none">
+                                    <strong>Nothing but the base essentials</strong> — grant modules one at a time
+                                    as the company asks or as agreed
+                                </label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle me-1"></i> Save
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -191,6 +230,11 @@ $('#emailForm').on('submit', function (e) {
     submitSettingsForm(this, '/actions/superadmin_platform_settings.php', 'Email settings updated', function () {
         setTimeout(function () { window.location.reload(); }, 2200);
     });
+});
+
+$('#provisioningForm').on('submit', function (e) {
+    e.preventDefault();
+    submitSettingsForm(this, '/actions/superadmin_platform_settings.php', 'Self-registration setting updated');
 });
 
 $('#btnTestEmail').on('click', function () {

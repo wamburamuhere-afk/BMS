@@ -331,6 +331,7 @@ if (!function_exists('superadminRouteMap')) {
             'activity'     => $d . 'activity.php',
             'settings'     => $d . 'settings.php',
             'plans'        => $d . 'plans.php',
+            'module-requests' => $d . 'module_requests.php',
             'tenants'      => $d . 'tenants.php',
             'tenants/new'  => $d . 'tenant_new.php',
             'tenants/view' => $d . 'tenant_view.php',
