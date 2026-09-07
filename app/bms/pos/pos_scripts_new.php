@@ -982,24 +982,45 @@ function performDelete(holdId, silent) {
 }
 
 function startShift() {
-    $('#startShiftModal').modal('show');
+    const $reg = $('#startShiftRegister');
+    if ($reg.hasClass('select2-hidden-accessible')) $reg.select2('destroy');
+    $reg.html('<option value="">Loading registers...</option>');
+
+    $.getJSON('<?= buildUrl('/api/pos/get_registers.php') ?>', { active_only: 1 }, function (res) {
+        $reg.empty();
+        if (res.success && res.data.length) {
+            res.data.forEach(r => {
+                $reg.append(`<option value="${r.register_id}">${safeOutput(r.register_name)} (${safeOutput(r.register_code)})</option>`);
+            });
+        } else {
+            $reg.append('<option value="1">Main Counter</option>');
+        }
+        $reg.select2({ theme: 'bootstrap-5', dropdownParent: $('#startShiftModal'), width: '100%' });
+        $('#startShiftModal').modal('show');
+    }).fail(function () {
+        $reg.html('<option value="1">Main Counter</option>');
+        $reg.select2({ theme: 'bootstrap-5', dropdownParent: $('#startShiftModal'), width: '100%' });
+        $('#startShiftModal').modal('show');
+    });
 }
 
 function confirmStartShift() {
     const openingCash = parseFloat($('#openingCash').val()) || 0;
-    
+    const registerId = $('#startShiftRegister').val() || 1;
+
     console.log('=== STARTING SHIFT ===');
-    console.log('Opening Cash:', openingCash);
-    
+    console.log('Opening Cash:', openingCash, 'Register:', registerId);
+
     // Disable button to prevent double-click
     const btn = event.target;
     $(btn).prop('disabled', true).text('Starting...');
-    
+
     $.ajax({
         url: '<?= buildUrl('/api/pos/open_shift.php') ?>',
         type: 'POST',
-        data: { 
-            opening_cash: openingCash 
+        data: {
+            opening_cash: openingCash,
+            register_id: registerId
         },
         dataType: 'json',
         success: function(response) {
@@ -1011,7 +1032,7 @@ function confirmStartShift() {
                 Swal.fire({
                     icon: 'success',
                     title: 'Shift Started',
-                    text: 'Shift ' + response.shift_code + ' started successfully!',
+                    text: 'Shift ' + response.shift_code + ' started on ' + (response.register_name || 'register') + '.',
                     timer: 2000,
                     showConfirmButton: false
                 }).then(() => {

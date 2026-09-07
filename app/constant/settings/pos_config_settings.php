@@ -72,7 +72,193 @@ $pos_discount_type = get_setting('pos_discount_type', 'percentage');
             </div>
         </div>
     </div>
+
+    <!-- Registers / Tills — Phase 8 (pos_upgrade_plan.md §7) -->
+    <div class="row mt-4">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h6 class="fw-bold mb-0 text-dark text-uppercase small">Registers / Tills</h6>
+                        <button class="btn btn-sm btn-primary" onclick="openRegisterModal()">
+                            <i class="bi bi-plus-circle me-1"></i> Add Register
+                        </button>
+                    </div>
+                    <p class="text-muted small">Each till a cashier signs in at — its own receipt branding and cash-drawer reconciliation. Registers are never deleted (past shifts reference them), only deactivated.</p>
+                    <div id="registersTableWrap" class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr><th>Name</th><th>Code</th><th>Location</th><th>Status</th><th class="text-end">Actions</th></tr>
+                            </thead>
+                            <tbody id="registersTableBody">
+                                <tr><td colspan="5" class="text-center text-muted py-3">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- Add/Edit Register Modal -->
+<div class="modal fade" id="registerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="registerModalTitle"><i class="bi bi-shop me-1"></i> Add Register</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="reg_register_id" value="0">
+                <div class="mb-3">
+                    <label class="form-label">Register Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="reg_register_name" placeholder="e.g. Main Counter">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Register Code <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="reg_register_code" placeholder="e.g. REG-002">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Location</label>
+                    <input type="text" class="form-control" id="reg_location" placeholder="e.g. Shop Front">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Default Opening Cash</label>
+                    <input type="number" class="form-control" id="reg_opening_cash" min="0" step="0.01" value="0">
+                </div>
+                <div class="mb-3 d-flex gap-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="reg_barcode_scanner" checked>
+                        <label class="form-check-label" for="reg_barcode_scanner">Barcode Scanner</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="reg_cash_drawer" checked>
+                        <label class="form-check-label" for="reg_cash_drawer">Cash Drawer</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="reg_card_reader">
+                        <label class="form-check-label" for="reg_card_reader">Card Reader</label>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Receipt Header (optional override)</label>
+                    <textarea class="form-control" id="reg_receipt_header" rows="2" placeholder="Leave blank to use the company header only"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Receipt Footer (optional addition)</label>
+                    <textarea class="form-control" id="reg_receipt_footer" rows="2" placeholder="e.g. branch-specific note"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveRegister()"><i class="bi bi-check-circle me-1"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let registersCache = [];
+
+function loadRegisters() {
+    $.getJSON('<?= buildUrl('api/pos/get_registers.php') ?>', function (res) {
+        const tbody = $('#registersTableBody');
+        if (!res.success || !res.data.length) {
+            tbody.html('<tr><td colspan="5" class="text-center text-muted py-3">No registers yet</td></tr>');
+            return;
+        }
+        registersCache = res.data;
+        let html = '';
+        res.data.forEach(r => {
+            const badge = r.status === 'active' ? 'success' : 'secondary';
+            const toggleLabel = r.status === 'active' ? 'Deactivate' : 'Activate';
+            const toggleIcon = r.status === 'active' ? 'bi-x-circle' : 'bi-check-circle';
+            html += `<tr>
+                <td>${safeOutput(r.register_name)}</td>
+                <td>${safeOutput(r.register_code)}</td>
+                <td>${safeOutput(r.location)}</td>
+                <td><span class="badge bg-${badge}">${safeOutput(r.status)}</span></td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-outline-primary" onclick="editRegister(${r.register_id})" title="Edit"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="toggleRegister(${r.register_id}, '${r.status === 'active' ? 'inactive' : 'active'}')" title="${toggleLabel}"><i class="bi ${toggleIcon}"></i></button>
+                </td>
+            </tr>`;
+        });
+        tbody.html(html);
+    });
+}
+
+function openRegisterModal() {
+    $('#registerModalTitle').html('<i class="bi bi-shop me-1"></i> Add Register');
+    $('#reg_register_id').val(0);
+    $('#reg_register_name, #reg_register_code, #reg_location, #reg_receipt_header, #reg_receipt_footer').val('');
+    $('#reg_opening_cash').val(0);
+    $('#reg_barcode_scanner, #reg_cash_drawer').prop('checked', true);
+    $('#reg_card_reader').prop('checked', false);
+    new bootstrap.Modal(document.getElementById('registerModal')).show();
+}
+
+function editRegister(id) {
+    const r = registersCache.find(x => x.register_id == id);
+    if (!r) return;
+    $('#registerModalTitle').html('<i class="bi bi-pencil me-1"></i> Edit Register');
+    $('#reg_register_id').val(r.register_id);
+    $('#reg_register_name').val(r.register_name);
+    $('#reg_register_code').val(r.register_code);
+    $('#reg_location').val(r.location || '');
+    $('#reg_opening_cash').val(r.opening_cash || 0);
+    $('#reg_barcode_scanner').prop('checked', !!parseInt(r.barcode_scanner));
+    $('#reg_cash_drawer').prop('checked', !!parseInt(r.cash_drawer));
+    $('#reg_card_reader').prop('checked', !!parseInt(r.card_reader));
+    $('#reg_receipt_header').val(r.receipt_header || '');
+    $('#reg_receipt_footer').val(r.receipt_footer || '');
+    new bootstrap.Modal(document.getElementById('registerModal')).show();
+}
+
+function saveRegister() {
+    const name = $('#reg_register_name').val().trim();
+    const code = $('#reg_register_code').val().trim();
+    if (!name || !code) {
+        Swal.fire('Missing fields', 'Register name and code are required.', 'warning');
+        return;
+    }
+    $.post('<?= buildUrl('api/pos/save_register.php') ?>', {
+        register_id: $('#reg_register_id').val(),
+        register_name: name,
+        register_code: code,
+        location: $('#reg_location').val(),
+        opening_cash: $('#reg_opening_cash').val(),
+        barcode_scanner: $('#reg_barcode_scanner').is(':checked') ? 1 : 0,
+        cash_drawer: $('#reg_cash_drawer').is(':checked') ? 1 : 0,
+        card_reader: $('#reg_card_reader').is(':checked') ? 1 : 0,
+        receipt_header: $('#reg_receipt_header').val(),
+        receipt_footer: $('#reg_receipt_footer').val()
+    }, function (res) {
+        if (res.success) {
+            bootstrap.Modal.getInstance(document.getElementById('registerModal')).hide();
+            Swal.fire({ icon: 'success', title: 'Saved', text: res.message, timer: 1800, showConfirmButton: false });
+            loadRegisters();
+        } else {
+            Swal.fire('Error', res.message, 'error');
+        }
+    }, 'json');
+}
+
+function toggleRegister(id, newStatus) {
+    Swal.fire({
+        title: newStatus === 'inactive' ? 'Deactivate register?' : 'Activate register?',
+        icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/pos/toggle_register_status.php') ?>', { register_id: id, status: newStatus }, function (res) {
+            if (res.success) { loadRegisters(); } else { Swal.fire('Error', res.message, 'error'); }
+        }, 'json');
+    });
+}
+
+$(document).ready(function () { loadRegisters(); });
+</script>
 
 <?php
 require_once __DIR__ . '/../../../footer.php';

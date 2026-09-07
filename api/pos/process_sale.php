@@ -57,6 +57,17 @@ try {
     $receipt_number = $input['receipt_number'] ?? ('RCP-' . date('Ymd') . '-' . mt_rand(1000, 9999));
     $split_details = $input['split_details'] ?? null;
 
+    // Phase 8 (pos_upgrade_plan.md §7) — persist the true per-tender breakdown of a
+    // split sale so shift-close reconciliation (close_shift.php) and any future
+    // Z-report can read it back accurately (previously nothing recorded which
+    // portion went to which tender). Only split sales need this column — a
+    // non-split sale's tender is already fully described by payment_method +
+    // grand_total, so it stays NULL.
+    require_once __DIR__ . '/../../core/pos_shift_reporting.php';
+    $payment_details_json = ($payment_method === 'split' && is_array($split_details))
+        ? buildSplitPaymentLegs($split_details)
+        : null;
+
     // Payment model — how much is actually collected NOW vs put on the customer's
     // account (credit). For non-credit methods the sale is paid in full; for
     // 'credit' the cashier may take a deposit (amount_paid) or nothing. The
@@ -83,7 +94,7 @@ try {
 
     // Check for active shift — pos_sales.shift_id is NOT NULL, so this must be
     // validated before the insert, not silently passed through as null.
-    $stmt = $pdo->prepare("SELECT shift_id FROM cash_register_shifts WHERE user_id = ? AND status = 'active' LIMIT 1");
+    $stmt = $pdo->prepare("SELECT shift_id, register_id FROM cash_register_shifts WHERE user_id = ? AND status = 'active' LIMIT 1");
     $stmt->execute([$user_id]);
     $shift = $stmt->fetch(PDO::FETCH_ASSOC);
     $shift_id = $shift['shift_id'] ?? null;
@@ -91,18 +102,38 @@ try {
         throw new Exception("Please start a cash register shift before completing a sale.");
     }
 
+    // Phase 8 (pos_upgrade_plan.md §7) — denormalise the register onto the sale
+    // itself (pos_sales.register_id/register_name already existed on this schema
+    // but were never populated, always sitting at the column default). Stamping
+    // it at sale time — rather than deriving it later via a join through
+    // shift_id — matches how customer_name is already denormalised alongside
+    // customer_id, and keeps a sale's register a fixed fact of the sale even if
+    // the shift row is later touched for any reason.
+    $register_id = (int)($shift['register_id'] ?? 1);
+    $regNameStmt = $pdo->prepare("SELECT register_name FROM pos_registers WHERE register_id = ?");
+    $regNameStmt->execute([$register_id]);
+    $register_name = $regNameStmt->fetchColumn() ?: null;
+
+    // pos_sales.payment_method is a DB enum that does NOT include 'split' (it has
+    // 'mixed' for exactly this case) — inserting the frontend's raw 'split' value
+    // was silently coerced to '' by MySQL's non-strict enum handling (confirmed
+    // live: one pre-existing sale row already has payment_method=''). Store the
+    // real enum value while keeping $payment_method ('split') for the branching
+    // logic below, which mirrors the frontend's own naming.
+    $db_payment_method = ($payment_method === 'split') ? 'mixed' : $payment_method;
+
     // Insert sale
     $stmt = $pdo->prepare("
         INSERT INTO pos_sales (
             receipt_number, shift_id, user_id, customer_id, warehouse_id, project_id,
             subtotal, discount_percentage, discount_amount, tax_amount, grand_total,
-            payment_method, amount_tendered, change_given,
+            payment_method, amount_tendered, change_given, payment_details, register_id, register_name,
             sale_status, payment_status, sale_date, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', NOW(), NOW())
     ");
-    
+
     $change = $input['change_given'] ?? ($amount_tendered - $total);
-    
+
     $stmt->execute([
         $receipt_number,
         $shift_id,
@@ -115,9 +146,12 @@ try {
         $discount_amount,
         $tax,
         $total,
-        $payment_method,
+        $db_payment_method,
         $amount_tendered,
-        $change
+        $change,
+        $payment_details_json,
+        $register_id,
+        $register_name
     ]);
     
     $sale_id = $pdo->lastInsertId();

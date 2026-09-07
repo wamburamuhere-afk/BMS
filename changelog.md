@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-09-07 (feat) - POS Phase 8: Register/Till model + split-payment enum bug fix
+
+**Files (added):** `api/pos/get_registers.php`, `api/pos/save_register.php`, `api/pos/toggle_register_status.php`,
+`core/pos_shift_reporting.php`, `tests/test_pos_phase8_registers_cli.php`
+**Files (changed):** `api/pos/open_shift.php`, `api/pos/close_shift.php`, `api/pos/process_sale.php`,
+`api/pos/print_receipt.php`, `app/constant/settings/pos_config_settings.php`, `app/bms/pos/pos_modals_new.php`,
+`app/bms/pos/pos_scripts_new.php`, `pos_upgrade_plan.md`
+
+Second phase of the POS "Advanced" professionalisation tranche. Activated the `pos_registers`
+schema (register selection at shift open with a Select2 picker, register CRUD management UI,
+per-register receipt branding, sale-level register denormalisation) and — the core of this
+phase — populated `cash_register_shifts`' per-tender totals (`total_sales`/`total_cash_sales`/
+`total_card_sales`/`total_mobile_sales`/`total_credit_sales`/`total_refunds`) which were defined
+on the table from day one but never written by `close_shift.php`. Along the way found and fixed a
+real data-corruption bug: the split-payment modal sends `payment_method: 'split'`, but the DB enum
+never included that value (it has `'mixed'`), so under this server's non-strict `sql_mode` a split
+sale's payment_method was silently coerced to an empty string — confirmed live on one pre-existing
+sale. Also added `csrf_check()` to `open_shift.php`/`close_shift.php`, which were missing it
+entirely. Verified live with a new 39-assertion CLI test; all pre-existing POS regression suites
+still pass.
+
 ## 2026-09-07 (fix) - POS Phase 7: void→GL reversal + receipt company-info bug
 
 **Files (changed):** `api/pos/void_sale.php`, `api/pos/print_receipt.php`, `pos_upgrade_plan.md`

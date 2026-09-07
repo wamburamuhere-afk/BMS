@@ -19,18 +19,24 @@ if ($sale_id <= 0) {
 
 global $pdo;
 
-// Get sale details
+// Get sale details. The sale's own register_id/register_name (denormalised at
+// sale time — see process_sale.php Phase 8) is the source of truth for which
+// till it was rung up on; pos_registers is joined only for that register's
+// optional receipt branding overrides.
 $stmt = $pdo->prepare("
     SELECT
         s.*,
         c.customer_name,
         c.phone as customer_phone,
         u.username as cashier_name,
-        w.warehouse_name
+        w.warehouse_name,
+        r.register_code, r.receipt_header AS reg_receipt_header,
+        r.receipt_footer AS reg_receipt_footer, r.receipt_logo AS reg_receipt_logo
     FROM pos_sales s
     LEFT JOIN customers c ON s.customer_id = c.customer_id
     LEFT JOIN users u ON s.user_id = u.user_id
     LEFT JOIN warehouses w ON s.warehouse_id = w.warehouse_id
+    LEFT JOIN pos_registers r ON s.register_id = r.register_id
     WHERE s.sale_id = ?
 ");
 $stmt->execute([$sale_id]);
@@ -64,6 +70,15 @@ $company_address = getSetting('company_physical_address', getSetting('company_ad
 $company_phone   = getSetting('company_phone', '');
 $company_tin     = getSetting('company_tin', '');
 $company_vrn     = getSetting('company_vrn', '');
+
+// Phase 8 (pos_upgrade_plan.md §7) — a register (till) may override the receipt
+// header/footer for its own counter (e.g. a branch name/location distinct from
+// the company header). Falls back to the company-wide text when the register
+// hasn't set its own — most tenants will never touch this and just get the
+// company header, exactly as before.
+$receipt_header_extra = trim($sale['reg_receipt_header'] ?? '');
+$receipt_footer_extra = trim($sale['reg_receipt_footer'] ?? '');
+$register_label        = trim($sale['register_name'] ?? '');
 ?>
 <!DOCTYPE html>
 <html>
@@ -171,6 +186,7 @@ $company_vrn     = getSetting('company_vrn', '');
         <?php if ($company_phone !== ''): ?><div>Tel: <?= htmlspecialchars($company_phone) ?></div><?php endif; ?>
         <?php if ($company_tin !== ''): ?><div>TIN: <?= htmlspecialchars($company_tin) ?></div><?php endif; ?>
         <?php if ($company_vrn !== ''): ?><div>VRN: <?= htmlspecialchars($company_vrn) ?></div><?php endif; ?>
+        <?php if ($receipt_header_extra !== ''): ?><div><?= nl2br(htmlspecialchars($receipt_header_extra)) ?></div><?php endif; ?>
     </div>
 
     <div class="receipt-info">
@@ -186,6 +202,12 @@ $company_vrn     = getSetting('company_vrn', '');
             <span>Cashier:</span>
             <span><?= $sale['cashier_name'] ?? 'N/A' ?></span>
         </div>
+        <?php if ($register_label !== ''): ?>
+        <div>
+            <span>Register:</span>
+            <span><?= htmlspecialchars($register_label) ?></span>
+        </div>
+        <?php endif; ?>
         <?php if (!empty($sale['warehouse_name'])): ?>
         <div>
             <span>Warehouse:</span>
@@ -245,6 +267,9 @@ $company_vrn     = getSetting('company_vrn', '');
         <div style="margin-bottom: 10px;">*** THANK YOU ***</div>
         <div>Please keep this receipt for your records</div>
         <div style="margin-top: 10px;">Goods sold are not returnable</div>
+        <?php if ($receipt_footer_extra !== ''): ?>
+        <div style="margin-top: 10px;"><?= nl2br(htmlspecialchars($receipt_footer_extra)) ?></div>
+        <?php endif; ?>
     </div>
 
     <script>

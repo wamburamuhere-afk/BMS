@@ -440,12 +440,80 @@ feature key) — see Phase 13.
 | Phase | What | Status |
 |---|---|---|
 | 7 | Ledger-integrity fix (void→GL reversal, receipt company-info bug) | ✅ DONE (above) |
-| 8 | Register/Till model — activate the unused `pos_registers` schema (till selection, per-register receipt branding, populate `cash_register_shifts` totals at close) | Planned |
+| 8 | Register/Till model — activate the unused `pos_registers` schema (till selection, per-register receipt branding, populate `cash_register_shifts` totals at close) | ✅ DONE (below) |
 | 9 | Z-Report / EOD reconciliation, built on Phase 8's populated shift totals | Planned |
 | 10 | Real receipt printing (ESC/POS + drawer kick), email/SMS receipt, Select2 AJAX customer picker with quick-add | Planned |
 | 11 | Loyalty points (real accrual/redemption) + multi-currency (base currency from `system_settings.currency`, replacing the hardcoded `TZS`) | Planned |
 | 12 | Offline resilience (local queue + sync-on-reconnect) | **Deferred — needs its own design discussion before implementation, per product owner (2026-09-07). Not scheduled in this tranche.** |
 | 13 | Wire a `pos_advanced` feature-registry entry (`depends_on: ['pos']`) so a superadmin can gate the Phase 8-11 features per tenant company | Planned |
+
+---
+
+### Phase 8 — Register/Till model
+
+**Status:** ✅ DONE · **Added:** 2026-09-07 · **Branch:** `feat/pos-professional-upgrade`
+
+Activated the `pos_registers` schema that had existed since day one with zero
+call sites anywhere in the app:
+
+- **Register selection at shift open.** `api/pos/open_shift.php` now requires an
+  active register (defaults to register #1, "Main Counter", so an un-migrated
+  client never breaks), rejects a register already staffed by another active
+  shift, and stores `register_id` on `cash_register_shifts`. The Start Shift
+  modal gained a Select2 register picker populated from a new
+  `api/pos/get_registers.php`.
+- **Register management.** New CRUD (`get_registers.php`/`save_register.php`/
+  `toggle_register_status.php`, gated by `canEdit('pos_config_settings')`) with
+  a UI added to the existing `pos_config_settings.php` settings page. A register
+  is only ever deactivated, never deleted — past shifts and sales reference it.
+- **Sale-level register denormalisation.** `pos_sales.register_id`/
+  `register_name` (existed, always default/NULL) are now stamped at sale time
+  from the cashier's active shift, mirroring how `customer_name` is already
+  denormalised alongside `customer_id`. `print_receipt.php` joins
+  `pos_registers` off the sale's own `register_id` to show per-register receipt
+  header/footer overrides (falls back to the company-wide header when a
+  register hasn't set its own) and the register name on the printed receipt.
+- **Shift-close totals — the core of this phase.** `cash_register_shifts.
+  total_sales/total_cash_sales/total_card_sales/total_mobile_sales/
+  total_credit_sales/total_refunds/cash_in/cash_out` were defined on this table
+  from day one but `close_shift.php` never wrote to them (permanently 0.00).
+  Extracted the computation into a new, independently-tested
+  `core/pos_shift_reporting.php::posShiftTenderTotals()` — built from
+  `pos_sales` directly (not `cash_register_transactions`, which only ever logs
+  the CASH leg of a sale and so cannot answer "how much card/mobile/credit did
+  this shift do"). Excludes voided sales entirely; attributes a return to the
+  shift the refund itself was processed in (not the original sale's shift,
+  matching `create_return.php`'s own shift assignment).
+- **Real bug found and fixed along the way:** the frontend's split-payment
+  modal sends `payment_method: 'split'`, but `pos_sales.payment_method` is a DB
+  enum that never included `'split'` (it has `'mixed'` for exactly this case).
+  Under this server's non-strict `sql_mode`, MySQL was silently coercing the
+  invalid enum value to `''` — confirmed live: one pre-existing sale already has
+  `payment_method=''`, an unrecoverable tender type. Fixed by mapping
+  `'split'` → the schema's own `'mixed'` value at insert time. The one
+  historical `''` row was left untouched (deliberately — no confirmation it
+  isn't real data; see `core/pos_shift_reporting.php::buildSplitPaymentLegs()`
+  for the accompanying fix that also makes a split sale's per-tender breakdown
+  (previously nowhere recorded) queryable via the new `payment_details` JSON
+  column).
+- **Also fixed in passing:** `open_shift.php`/`close_shift.php` were missing
+  `csrf_check()` entirely — added (the frontend already sends the CSRF header
+  globally via `header.php`'s `$.ajaxSetup`, so this needed no frontend change).
+
+**Known limitation, called out rather than silently absorbed:** `bank_transfer`/
+`voucher`/`loyalty_points` tenders have no dedicated bucket on this schema (only
+cash/card/mobile/credit exist) — they still count in `total_sales`, just not
+broken out individually. A genuinely bank-transfer-heavy tenant should get a
+dedicated column rather than have it folded into an unrelated bucket.
+
+Verified live: `tests/test_pos_phase8_registers_cli.php` (39 assertions) —
+wiring checks across all touched files, `buildSplitPaymentLegs()` unit tests,
+and a full `posShiftTenderTotals()` reconciliation against 7 synthetic
+`pos_sales` rows (cash/card/mobile/credit/mixed/voided/returned) in one
+transaction-isolated shift. Existing POS regression suites
+(`test_pos_sale_posting_cli`, `test_pos_sale_backfill_cli`,
+`test_pos_strictmode_nullable_cli`, `test_pos_credit_ar_cli`,
+`test_pos_cleanup_cli`, `test_stock_movements_enum_safety_cli`) all still pass.
 
 ---
 

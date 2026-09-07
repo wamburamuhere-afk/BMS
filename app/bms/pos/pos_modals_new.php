@@ -62,8 +62,12 @@
             </div>
             <div class="modal-body">
                 <div class="mb-3">
+                    <label class="form-label">Register / Till</label>
+                    <select class="form-select" id="startShiftRegister" style="width:100%"></select>
+                </div>
+                <div class="mb-3">
                     <label class="form-label">Opening Cash Amount</label>
-                    <input type="number" class="form-control" id="openingCash" 
+                    <input type="number" class="form-control" id="openingCash"
                            min="0" step="0.01" value="0">
                 </div>
             </div>
