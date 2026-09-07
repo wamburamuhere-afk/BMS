@@ -106,6 +106,10 @@ if (!function_exists('bmsFeatureRegistry')) {
                     'app/bms/pos/pos_scripts_new.php',
                     'app/bms/pos/customer_display.php',
                     'app/bms/pos/api/pos_controller.php',
+                    // Phase 8/9 (pos_upgrade_plan.md §7) — registers + shift Z-report.
+                    'app/bms/pos/zreport.php',
+                    'app/bms/pos/shift_history.php',
+                    'core/pos_shift_reporting.php',
                 ],
             ],
             'procurement' => [

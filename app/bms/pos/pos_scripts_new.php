@@ -1101,9 +1101,15 @@ function confirmEndShift() {
                         <p><strong>Expected:</strong> TZS ${response.expected_cash.toLocaleString()}</p>
                         <p><strong>Actual:</strong> TZS ${response.ending_cash.toLocaleString()}</p>
                         <p><strong>Difference:</strong> TZS ${response.cash_difference.toLocaleString()}</p>
+                        <p><strong>Total Sales:</strong> TZS ${(response.total_sales || 0).toLocaleString()}</p>
                     `,
-                    timer: 3000
-                }).then(() => {
+                    showCancelButton: true,
+                    confirmButtonText: 'View Z-Report',
+                    cancelButtonText: 'Close'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.open('<?= getUrl('pos/zreport') ?>?shift_id=' + response.shift_id, '_blank');
+                    }
                     location.reload();
                 });
             } else {

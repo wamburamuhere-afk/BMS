@@ -84,3 +84,39 @@ if (!function_exists('posShiftTenderTotals')) {
         return $out;
     }
 }
+
+if (!function_exists('posShiftReportExtras')) {
+    /**
+     * The Z-Report (Phase 9) figures that sit alongside posShiftTenderTotals():
+     * void summary, return count, and GL posting health (how many of this
+     * shift's completed sales have no posted 'pos_sale' journal entry —
+     * postPosSale() is best-effort and never blocks a sale, so a misconfigured
+     * chart of accounts can leave a sale silently un-posted).
+     *
+     * @return array{void_count:int,void_amount:float,return_count:int,unposted_count:int}
+     */
+    function posShiftReportExtras(PDO $pdo, int $shiftId): array
+    {
+        $voidStmt = $pdo->prepare("SELECT COUNT(*) AS cnt, COALESCE(SUM(grand_total),0) AS amt
+                                      FROM pos_sales WHERE shift_id = ? AND sale_status = 'voided'");
+        $voidStmt->execute([$shiftId]);
+        $void = $voidStmt->fetch(PDO::FETCH_ASSOC);
+
+        $returnStmt = $pdo->prepare("SELECT COUNT(*) FROM pos_sales WHERE shift_id = ? AND is_return_sale = 1 AND sale_status != 'voided'");
+        $returnStmt->execute([$shiftId]);
+
+        $glStmt = $pdo->prepare("
+            SELECT COUNT(*) FROM pos_sales s
+             WHERE s.shift_id = ? AND s.is_return_sale = 0 AND s.sale_status != 'voided'
+               AND NOT EXISTS (SELECT 1 FROM journal_entries je WHERE je.entity_type = 'pos_sale' AND je.entity_id = s.sale_id AND je.status = 'posted')
+        ");
+        $glStmt->execute([$shiftId]);
+
+        return [
+            'void_count'     => (int)$void['cnt'],
+            'void_amount'    => round((float)$void['amt'], 2),
+            'return_count'   => (int)$returnStmt->fetchColumn(),
+            'unposted_count' => (int)$glStmt->fetchColumn(),
+        ];
+    }
+}

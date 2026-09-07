@@ -1095,6 +1095,11 @@ $routes = [
     'api/pos/receive_payment'     => API_DIR . '/pos/receive_payment.php',
     'api/pos/receive_payment.php' => API_DIR . '/pos/receive_payment.php',
 
+    // POS Phase 9 — Shift History + Z-Report (pos_upgrade_plan.md §7)
+    'pos/shifts'                 => POS_DIR . '/shift_history.php',
+    'pos/shift-history'          => POS_DIR . '/shift_history.php',
+    'pos/zreport'                => POS_DIR . '/zreport.php',
+
 
     // ========================================================================
     // ========================================================================

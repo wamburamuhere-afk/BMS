@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-09-07 (feat) - POS Phase 9: Z-Report / EOD shift reconciliation
+
+**Files (added):** `app/bms/pos/zreport.php`, `app/bms/pos/shift_history.php`, `tests/test_pos_phase9_zreport_cli.php`
+**Files (changed):** `core/pos_shift_reporting.php` (added `posShiftReportExtras()`), `roots.php` (new routes),
+`core/feature_registry.php` (paths), `app/bms/pos/pos_dashboard.php`, `app/bms/pos/pos_scripts_new.php`,
+`pos_upgrade_plan.md`
+
+Third phase of the POS "Advanced" professionalisation tranche, built on Phase 8's shift totals.
+Added a printable Z-Report per shift (cash reconciliation, sales by tender, void/refund summary,
+and a GL posting-health warning that flags any completed sale with no posted ledger entry) and a
+Shift History list to find past shifts from (neither existed before). A cashier can only view their
+own shift's report; supervisors/admins (`canEdit('pos')`) can view any shift. Wired into the POS
+Workspace header and the close-shift success dialog. Verified live with a new 24-assertion CLI test;
+Phase 7/8 tests and all pre-existing POS regression suites still pass.
+
 ## 2026-09-07 (feat) - POS Phase 8: Register/Till model + split-payment enum bug fix
 
 **Files (added):** `api/pos/get_registers.php`, `api/pos/save_register.php`, `api/pos/toggle_register_status.php`,

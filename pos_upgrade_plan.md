@@ -441,7 +441,7 @@ feature key) — see Phase 13.
 |---|---|---|
 | 7 | Ledger-integrity fix (void→GL reversal, receipt company-info bug) | ✅ DONE (above) |
 | 8 | Register/Till model — activate the unused `pos_registers` schema (till selection, per-register receipt branding, populate `cash_register_shifts` totals at close) | ✅ DONE (below) |
-| 9 | Z-Report / EOD reconciliation, built on Phase 8's populated shift totals | Planned |
+| 9 | Z-Report / EOD reconciliation, built on Phase 8's populated shift totals | ✅ DONE (below) |
 | 10 | Real receipt printing (ESC/POS + drawer kick), email/SMS receipt, Select2 AJAX customer picker with quick-add | Planned |
 | 11 | Loyalty points (real accrual/redemption) + multi-currency (base currency from `system_settings.currency`, replacing the hardcoded `TZS`) | Planned |
 | 12 | Offline resilience (local queue + sync-on-reconnect) | **Deferred — needs its own design discussion before implementation, per product owner (2026-09-07). Not scheduled in this tranche.** |
@@ -514,6 +514,49 @@ transaction-isolated shift. Existing POS regression suites
 (`test_pos_sale_posting_cli`, `test_pos_sale_backfill_cli`,
 `test_pos_strictmode_nullable_cli`, `test_pos_credit_ar_cli`,
 `test_pos_cleanup_cli`, `test_stock_movements_enum_safety_cli`) all still pass.
+
+---
+
+### Phase 9 — Z-Report / EOD reconciliation
+
+**Status:** ✅ DONE · **Added:** 2026-09-07 · **Branch:** `feat/pos-professional-upgrade`
+
+Built directly on Phase 8's now-populated shift totals — no schema work needed.
+
+- **`app/bms/pos/zreport.php`** — a printable end-of-shift reconciliation report
+  per shift: cash reconciliation (starting/expected/counted/difference), sales
+  by tender (cash/card/mobile/credit/other, with gross vs net after refunds and
+  a called-out void total), a **GL posting-health warning banner** (flags any
+  completed sale in the shift with no posted ledger entry — `postPosSale()` is
+  best-effort and never blocks a sale, so a chart-of-accounts misconfiguration
+  can silently leave revenue off the Trial Balance), and a full transaction
+  listing. Works for an **active** shift too (live totals recomputed on demand
+  via `posShiftTenderTotals()`), not just a closed one — a supervisor can check
+  an in-progress till without waiting for close.
+- **`app/bms/pos/shift_history.php`** — the list a Z-Report needed to be findable
+  from (none existed before this phase): every shift with its totals and cash
+  difference, linking through to its Z-Report.
+- **Access control:** a cashier may only view their own shift's Z-Report;
+  `canEdit('pos')` (supervisor/admin) can view any shift — cash reconciliation
+  is sensitive, not something every POS user should browse for others.
+- Extracted `core/pos_shift_reporting.php::posShiftReportExtras()` (void
+  summary, return count, GL-unposted count) alongside Phase 8's
+  `posShiftTenderTotals()`, independently unit-tested rather than inlined in
+  the report page.
+- Routes registered (`pos/zreport`, `pos/shifts`) and wired into the POS
+  Workspace header ("Shift History" button) and the close-shift success
+  dialog ("View Z-Report" button, opens the just-closed shift's report).
+- `core/feature_registry.php`'s `'pos'` feature `paths` updated to cover the
+  two new pages + the new core file (the `paths` list is not yet enforced by
+  an active bootstrap guard — confirmed via `featureForPath()` having no call
+  sites outside its own test — but kept accurate for when it is).
+
+Verified live: `tests/test_pos_phase9_zreport_cli.php` (24 assertions) —
+wiring checks, and a live-DB reconciliation of `posShiftReportExtras()`
+against a voided sale, a return, a completed sale with **no** GL posting, and
+a completed sale **with** one (confirming the health check flags only the
+genuinely unposted sale). All Phase 7/8 tests and pre-existing POS regression
+suites re-run clean.
 
 ---
 
