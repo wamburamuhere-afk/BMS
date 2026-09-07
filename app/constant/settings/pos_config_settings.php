@@ -20,6 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Phase 10 (pos_upgrade_plan.md §7) — receipt printing preferences.
         save_setting('pos_receipt_width', in_array($_POST['pos_receipt_width'] ?? '', ['58', '80'], true) ? $_POST['pos_receipt_width'] : '80');
         save_setting('pos_auto_print_receipt', isset($_POST['pos_auto_print_receipt']) ? '1' : '0');
+        // Phase 11 (pos_upgrade_plan.md §7) — loyalty program.
+        save_setting('pos_loyalty_enabled', isset($_POST['pos_loyalty_enabled']) ? '1' : '0');
+        save_setting('pos_loyalty_spend_per_point', max(1, (float)($_POST['pos_loyalty_spend_per_point'] ?? 1000)));
+        save_setting('pos_loyalty_redeem_value', max(0, (float)($_POST['pos_loyalty_redeem_value'] ?? 50)));
         $success_msg = "POS settings updated successfully";
     } catch (Exception $e) {
         $error_msg = "Error updating POS settings: " . $e->getMessage();
@@ -29,6 +33,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $pos_discount_type      = get_setting('pos_discount_type', 'percentage');
 $pos_receipt_width      = get_setting('pos_receipt_width', '80');
 $pos_auto_print_receipt = get_setting('pos_auto_print_receipt', '0');
+$pos_loyalty_enabled          = get_setting('pos_loyalty_enabled', '0');
+$pos_loyalty_spend_per_point  = get_setting('pos_loyalty_spend_per_point', '1000');
+$pos_loyalty_redeem_value     = get_setting('pos_loyalty_redeem_value', '50');
+$pos_currency = getSetting('currency', 'TZS');
 ?>
 
 <div class="container-fluid mt-4">
@@ -82,6 +90,31 @@ $pos_auto_print_receipt = get_setting('pos_auto_print_receipt', '0');
                             <input type="checkbox" class="form-check-input" id="pos_auto_print_receipt" name="pos_auto_print_receipt" value="1" <?= $pos_auto_print_receipt == '1' ? 'checked' : '' ?>>
                             <label class="form-check-label" for="pos_auto_print_receipt">Automatically open and print the receipt when a sale completes</label>
                             <div class="form-text">Sends the receipt straight to your browser's print dialog / default printer — no "Print Receipt" click needed. Requires a printer already set as your OS/browser default.</div>
+                        </div>
+
+                        <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small">Loyalty Program</h6>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="pos_loyalty_enabled" name="pos_loyalty_enabled" value="1" <?= $pos_loyalty_enabled == '1' ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="pos_loyalty_enabled">Enable customer loyalty points</label>
+                            <div class="form-text">Registered customers (not walk-ins) earn points on every sale and can redeem them for a discount at checkout.</div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="pos_loyalty_spend_per_point" class="form-label">Points Earned</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">1 pt per</span>
+                                    <input type="number" class="form-control" id="pos_loyalty_spend_per_point" name="pos_loyalty_spend_per_point" min="1" step="1" value="<?= safe_output($pos_loyalty_spend_per_point) ?>">
+                                    <span class="input-group-text"><?= htmlspecialchars($pos_currency) ?> spent</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="pos_loyalty_redeem_value" class="form-label">Redemption Value</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">1 pt =</span>
+                                    <input type="number" class="form-control" id="pos_loyalty_redeem_value" name="pos_loyalty_redeem_value" min="0" step="0.01" value="<?= safe_output($pos_loyalty_redeem_value) ?>">
+                                    <span class="input-group-text"><?= htmlspecialchars($pos_currency) ?> off</span>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="mt-4 pt-3 border-top d-flex justify-content-end">

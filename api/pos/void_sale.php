@@ -122,6 +122,13 @@ try {
             "Void of Sale #{$sale['receipt_number']} (id $sale_id) did NOT reverse the ledger: " . $glRevenue['reason']);
     }
 
+    // Phase 11 (pos_upgrade_plan.md §7) — reverse any loyalty points this sale
+    // earned or redeemed. A void is "as if the sale never happened", exactly
+    // like the stock/cash/GL reversal above — a voided sale must not leave a
+    // customer either richer or poorer in points. Idempotent.
+    require_once __DIR__ . '/../../core/pos_loyalty.php';
+    reverseLoyaltyForSale($pdo, $sale_id, (int)$_SESSION['user_id']);
+
     $pdo->commit();
 
     logActivity($pdo, $_SESSION['user_id'], "Voided POS Sale #{$sale['receipt_number']} (" . number_format((float)$sale['grand_total'], 2) . ")");

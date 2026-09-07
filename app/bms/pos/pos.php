@@ -70,8 +70,18 @@ $payment_methods = [
     'credit' => 'Customer Credit'
 ];
 
-// Get currency
-$currency = 'TZS';
+// Phase 11 (pos_upgrade_plan.md §7) — the tenant's own configured operating
+// currency, not a hardcoded TZS. This is the professional baseline for a
+// single-currency business (the vast majority of SMEs): every price, receipt,
+// and report reads the one company-wide currency from Settings. Genuine
+// multi-currency (accepting foreign-currency tender at checkout with a live
+// FX rate per sale) is a materially larger feature — pos_sales.currency/
+// exchange_rate columns already exist for it — and is intentionally NOT built
+// here; see pos_upgrade_plan.md §Phase 11 for the recommendation.
+$currency = getSetting('currency', 'TZS');
+
+// Phase 11 (pos_upgrade_plan.md §7) — loyalty program on/off.
+$loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
 ?>
 
 <div class="container-fluid px-0" id="pos-container" style="height: auto; min-height: 100vh;">
@@ -104,8 +114,8 @@ $currency = 'TZS';
         <div class="d-flex align-items-center gap-3">
             <div class="text-center">
                 <div class="fs-6">Cash Balance</div>
-                <div class="fs-4 fw-bold cash-balance-display"><?= format_currency($cash_balance) ?></div>
-                <small>Starting: <?= format_currency($starting_cash) ?></small>
+                <div class="fs-4 fw-bold cash-balance-display"><?= format_currency($cash_balance, $currency) ?></div>
+                <small>Starting: <?= format_currency($starting_cash, $currency) ?></small>
             </div>
             <div class="vr text-white opacity-50"></div>
             <div>
@@ -255,9 +265,9 @@ $currency = 'TZS';
                     <thead class="table-light">
                         <tr>
                             <th width="35%">Product</th>
-                            <th width="15%" class="text-end">Price (TZS)</th>
+                            <th width="15%" class="text-end">Price (<?= htmlspecialchars($currency) ?>)</th>
                             <th width="20%" class="text-center">Qty</th>
-                            <th width="20%" class="text-end">Total (TZS)</th>
+                            <th width="20%" class="text-end">Total (<?= htmlspecialchars($currency) ?>)</th>
                             <th width="10%" class="text-center">Action</th>
                         </tr>
                     </thead>
@@ -277,11 +287,11 @@ $currency = 'TZS';
                 <div class="mb-2">
                     <div class="d-flex justify-content-between mb-1">
                         <span class="text-muted">Subtotal:</span>
-                        <strong id="cartSubtotal">TZS 0.00</strong>
+                        <strong id="cartSubtotal"><?= htmlspecialchars($currency) ?> 0.00</strong>
                     </div>
                     <div class="d-flex justify-content-between mb-1" id="discountRow" style="display: none !important;">
                         <span class="text-muted">Discount (<span id="discountPercentageDisplay">0</span>%):</span>
-                        <strong id="cartDiscount" class="text-danger">-TZS 0.00</strong>
+                        <strong id="cartDiscount" class="text-danger">-<?= htmlspecialchars($currency) ?> 0.00</strong>
                     </div>
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <span class="text-muted">VAT:</span>
@@ -292,11 +302,11 @@ $currency = 'TZS';
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Total Tax:</span>
-                        <strong id="cartTax">TZS 0.00</strong>
+                        <strong id="cartTax"><?= htmlspecialchars($currency) ?> 0.00</strong>
                     </div>
                     <div class="d-flex justify-content-between border-top pt-2">
                         <h6 class="mb-0">TOTAL:</h6>
-                        <h5 class="mb-0 text-success" id="cartTotal">TZS 0.00</h5>
+                        <h5 class="mb-0 text-success" id="cartTotal"><?= htmlspecialchars($currency) ?> 0.00</h5>
                     </div>
                 </div>
             </div>
@@ -314,6 +324,22 @@ $currency = 'TZS';
                         </button>
                     </div>
                 </div>
+
+                <?php if ($loyalty_enabled): ?>
+                <!-- Loyalty Points — Phase 11 (pos_upgrade_plan.md §7) -->
+                <div class="mb-2 d-none" id="loyaltyPointsSection">
+                    <div class="d-flex justify-content-between align-items-center small mb-1">
+                        <span class="text-muted">Loyalty Points Available:</span>
+                        <strong id="loyaltyAvailablePoints" class="text-success">0</strong>
+                    </div>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text">Redeem</span>
+                        <input type="number" class="form-control" id="redeemPointsInput" min="0" step="1" value="0" oninput="calculateCartTotal()">
+                        <span class="input-group-text">pts</span>
+                    </div>
+                    <div class="text-end small text-danger mt-1 d-none" id="loyaltyDiscountPreview"></div>
+                </div>
+                <?php endif; ?>
 
                 <div class="mb-2">
                     <label class="form-label small fw-bold">Payment Method</label>
@@ -334,7 +360,7 @@ $currency = 'TZS';
                     <div class="mb-2">
                         <label class="form-label small fw-bold">Amount Tendered</label>
                         <div class="input-group input-group-sm">
-                            <span class="input-group-text">TZS</span>
+                            <span class="input-group-text"><?= htmlspecialchars($currency) ?></span>
                             <input type="number" class="form-control" id="amountTendered" 
                                    min="0" step="0.01" value="0" oninput="calculateChange()">
                         </div>
@@ -342,7 +368,7 @@ $currency = 'TZS';
                     <div class="alert alert-success py-2" id="changeAlert" style="display: none;">
                         <div class="d-flex justify-content-between small">
                             <span>Change Due:</span>
-                            <strong id="changeAmount">TZS 0.00</strong>
+                            <strong id="changeAmount"><?= htmlspecialchars($currency) ?> 0.00</strong>
                         </div>
                     </div>
                 </div>

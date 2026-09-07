@@ -2,7 +2,7 @@
 // File: api/pos_session.php
 // AJAX API for syncing POS cart to customer display
 header('Content-Type: application/json');
-session_start();
+require_once __DIR__ . '/../roots.php';
 
 // Allow CORS if needed
 header('Access-Control-Allow-Origin: *');
@@ -58,6 +58,9 @@ if ($method === 'POST') {
             'total' => $total,
             'item_count' => count($cart)
         ],
+        // Phase 11 (pos_upgrade_plan.md §7) — the customer display previously
+        // hardcoded 'TZS' with no way to know the tenant's real currency.
+        'currency' => getSetting('currency', 'TZS'),
         'timestamp' => $updated
     ]);
     

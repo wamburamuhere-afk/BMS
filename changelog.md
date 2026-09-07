@@ -1,5 +1,40 @@
 # BMS Changelog
 
+## 2026-09-07 (feat) - POS Phase 11: Loyalty points program + currency-from-settings fix
+
+**Files (added):** `migrations/tenant/2026_09_07_pos_loyalty_program.php`, `core/pos_loyalty.php`,
+`tests/test_pos_phase11_loyalty_currency_cli.php`
+**Files (changed):** `api/pos/process_sale.php`, `api/pos/void_sale.php`, `api/pos/search_customers.php`,
+`api/pos/print_receipt.php`, `api/pos_session.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`,
+`app/bms/pos/pos_modals_new.php`, `app/bms/pos/customer_display.php`, `app/constant/settings/pos_config_settings.php`,
+`schema/tenant_schema_template.sql`, `pos_upgrade_plan.md`
+
+Fifth and final phase of this POS "Advanced" professionalisation tranche (Phase 12 offline-resilience
+remains deliberately deferred per the product owner; Phase 13 entitlement wiring is next).
+
+Fixed the hardcoded `TZS` currency bug across the whole POS terminal (`pos.php`'s own `$currency`
+variable was literally `= 'TZS'` and never even used — every price/total/change/split-payment label
+was a separately hardcoded string) — everything now reads `system_settings.currency`, including the
+customer-facing display screen (extended `api/pos_session.php`'s JSON payload rather than adding a
+heavier bootstrap to that standalone page). This is the correct single-currency scope for the vast
+majority of SME businesses; genuine multi-currency (foreign-tender-at-checkout with a live FX rate)
+is flagged in `pos_upgrade_plan.md` as a separate, materially larger feature to build only if the
+business actually needs it.
+
+Built a real, complete loyalty points program: new `customers.loyalty_points_balance` (fast cache)
++ `customer_loyalty_transactions` (auditable ledger of truth) via a proper tenant migration (propagates
+to every existing tenant DB automatically on deploy, plus the schema template for new tenants).
+`core/pos_loyalty.php` provides award/redeem (row-locked against concurrent redemption at two tills)/
+reverse, wired into `process_sale.php` (redemption as an additional discount, earning computed on the
+post-redemption total) and `void_sale.php` (a void reverses loyalty too, matching its existing
+all-or-nothing semantics for stock/cash/GL). Found and fixed a real data-corruption bug along the way:
+the split-payment modal's `payment_method: 'split'` was never a valid DB enum value (it has `'mixed'`)
+and was being silently coerced to an empty string under this server's non-strict `sql_mode` — confirmed
+on one pre-existing sale, left untouched, root cause fixed going forward.
+
+Verified live with a new 36-assertion CLI test; all prior phase tests and pre-existing POS regression
+suites still pass.
+
 ## 2026-09-07 (feat) - POS Phase 10: Select2 customer picker, receipt printing, email receipt
 
 **Files (added):** `api/pos/search_customers.php`, `api/pos/email_receipt.php`, `tests/test_pos_phase10_customer_receipt_cli.php`

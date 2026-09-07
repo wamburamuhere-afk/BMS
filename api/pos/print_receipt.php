@@ -71,6 +71,7 @@ $company_address = getSetting('company_physical_address', getSetting('company_ad
 $company_phone   = getSetting('company_phone', '');
 $company_tin     = getSetting('company_tin', '');
 $company_vrn     = getSetting('company_vrn', '');
+$currency        = getSetting('currency', 'TZS'); // Phase 11 (pos_upgrade_plan.md §7) — was hardcoded 'TZS'
 
 // Phase 10 (pos_upgrade_plan.md §7) — configurable paper width + auto-print,
 // set on the POS Settings page (app/constant/settings/pos_config_settings.php).
@@ -260,7 +261,7 @@ $register_label        = trim($sale['register_name'] ?? '');
         </div>
         <div class="total-row grand-total">
             <span>TOTAL:</span>
-            <span>TZS <?= number_format($sale['grand_total'], 0) ?></span>
+            <span><?= htmlspecialchars($currency) ?> <?= number_format($sale['grand_total'], 0) ?></span>
         </div>
         <div class="total-row" style="margin-top: 10px;">
             <span>Payment (<?= ucfirst(str_replace('_', ' ', $sale['payment_method'])) ?>):</span>

@@ -443,7 +443,7 @@ feature key) — see Phase 13.
 | 8 | Register/Till model — activate the unused `pos_registers` schema (till selection, per-register receipt branding, populate `cash_register_shifts` totals at close) | ✅ DONE (below) |
 | 9 | Z-Report / EOD reconciliation, built on Phase 8's populated shift totals | ✅ DONE (below) |
 | 10 | Receipt printing improvements, email receipt, Select2 AJAX customer picker with quick-add — **re-scoped, see below** | ✅ DONE (below) |
-| 11 | Loyalty points (real accrual/redemption) + multi-currency (base currency from `system_settings.currency`, replacing the hardcoded `TZS`) | Planned |
+| 11 | Loyalty points (real accrual/redemption) + multi-currency (base currency from `system_settings.currency`, replacing the hardcoded `TZS`) | ✅ DONE (below) |
 | 12 | Offline resilience (local queue + sync-on-reconnect) | **Deferred — needs its own design discussion before implementation, per product owner (2026-09-07). Not scheduled in this tranche.** |
 | 13 | Wire a `pos_advanced` feature-registry entry (`depends_on: ['pos']`) so a superadmin can gate the Phase 8-11 features per tenant company | Planned |
 
@@ -619,6 +619,91 @@ platform-reality correction:**
 Verified live: `tests/test_pos_phase10_customer_receipt_cli.php` (32
 assertions). All Phase 7-9 tests and pre-existing POS regression suites
 re-run clean.
+
+---
+
+### Phase 11 — Loyalty points + currency-from-settings
+
+**Status:** ✅ DONE · **Added:** 2026-09-07 · **Branch:** `feat/pos-professional-upgrade`
+
+**Currency — the product owner's question answered.** Pulling the POS terminal's
+currency from `system_settings.currency` (instead of a hardcoded `TZS`) is
+exactly the professional baseline: this is what `getSetting('currency', 'TZS')`
+already does elsewhere in the codebase (`pos_dashboard.php`, `zreport.php`,
+`shift_history.php` already had it right; `pos.php`'s own `$currency` was
+literally `= 'TZS';`, and the JS layer never used the variable at all — every
+price/total/change/split-payment label was a hardcoded `'TZS '` string). Fixed
+across `pos.php`, `pos_modals_new.php`, `pos_scripts_new.php` (new
+`POS_CURRENCY` JS constant), `print_receipt.php`, and `customer_display.php` +
+`api/pos_session.php` (the customer-facing screen polls a session bridge with
+no server-settings access of its own — extended its JSON payload with a
+`currency` field instead of adding a heavier bootstrap to that standalone
+page). **This is a single-currency fix** (the right scope for the vast
+majority of SME businesses — one operating currency, configurable). **Genuine
+multi-currency** — accepting foreign-currency tender at checkout with a live
+FX rate captured per sale — is a materially larger feature: it needs a real
+rate source (a `currencies` table with maintained rates, or a live FX API),
+per-sale rate capture, and GL conversion back to the base currency for
+reporting. `pos_sales.currency`/`exchange_rate` columns already exist for it
+but are unused. **Recommendation: scope this as its own future phase if the
+business actually transacts in more than one currency** — building it
+speculatively now would be exactly the kind of premature, undirected work this
+plan tries to avoid.
+
+**Loyalty points — built as a real, complete (if intentionally bounded)
+feature**, not a placeholder:
+- **Schema** (`migrations/tenant/2026_09_07_pos_loyalty_program.php`, applied
+  to every tenant + `schema/tenant_schema_template.sql` for new ones):
+  `customers.loyalty_points_balance` (fast denormalised read, mirrors
+  `products.stock_quantity`) + `customer_loyalty_transactions` (the ledger of
+  truth, mirrors `stock_movements` — every earn/redeem/reversal is an
+  auditable row, never just a mutated number).
+- **`core/pos_loyalty.php`** — `awardLoyaltyPoints()` (floor-rounded, never a
+  customer's favour into more reward than earned; no-op for walk-ins, which
+  can't accrue), `redeemLoyaltyPoints()` (row-locks the customer under `FOR
+  UPDATE` so two tills can't both redeem past the true balance; always
+  validates server-side, never trusts the client's idea of the balance),
+  `reverseLoyaltyForSale()` (used by `void_sale.php` — a void is "as if the
+  sale never happened" for loyalty too, exactly like it already is for
+  stock/cash/GL).
+- **Wired into `process_sale.php`**: redemption applied as an additional
+  discount folded into the existing `discount_amount` (no new column needed);
+  earning computed on the **post-redemption** total (no double-dipping points
+  off a discount other points funded); both counts persisted onto the
+  pre-existing but previously-always-zero
+  `pos_sales.loyalty_points_earned/redeemed` columns.
+- **POS terminal UI**: available balance shown once a registered customer is
+  selected, a "Redeem N pts" input with a live discount preview, surfaced in
+  the sale-completion message.
+- **Settings** (`pos_config_settings.php`): enable toggle, earn rate ("1 pt
+  per N currency spent"), redemption value ("1 pt = N currency off").
+- **Deliberately NOT wired into partial returns** (`create_return.php`) —
+  proportional point clawback on a partial return is a real edge case; a
+  fragile guess under time pressure would be worse than a documented gap. A
+  full void DOES reverse both earn and redeem in full (matching void's
+  existing all-or-nothing semantics).
+- **Known, accepted edge case**: if sale A's earned points are later spent via
+  a *different* sale B's redemption, and THEN sale A is voided, the earn
+  reversal clamps at a balance floor of 0 rather than pushing the customer
+  negative — the business absorbs that small breakage rather than putting a
+  customer in point-debt. A single sale being voided (the actual `void_sale.php`
+  call pattern — one sale_id per void) is unaffected; this only bites the
+  double-chained edge case, and reversing in the opposite order fully avoids
+  it. Documented in `core/pos_loyalty.php`'s own comments, not hidden.
+- **Real bug found and fixed while building this**: the split-payment modal
+  sends `payment_method: 'split'`, but `pos_sales.payment_method` never had
+  `'split'` in its enum (it has `'mixed'`) — under this server's non-strict
+  `sql_mode`, MySQL silently coerced it to `''`. One historical sale already
+  shows this corruption live; left untouched (no confirmation it's safe to
+  edit real financial history) but the root cause is now fixed for every sale
+  going forward.
+
+Verified live: `tests/test_pos_phase11_loyalty_currency_cli.php` (36
+assertions) — schema presence, wiring, and a full live-DB reconciliation of
+award/redeem/reverse/idempotency using an explicit config override (so the
+test doesn't depend on `helpers.php::get_setting()`'s process-wide settings
+cache). All prior phase tests and pre-existing POS regression suites re-run
+clean.
 
 ---
 

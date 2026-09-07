@@ -321,6 +321,26 @@ try {
     
     $calculated_total = ($calculated_subtotal - $calculated_discount) + $calculated_tax;
 
+    // Phase 11 (pos_upgrade_plan.md §7) — loyalty point redemption. Applied as
+    // an additional discount on top of the server-recomputed total (never
+    // trusting a client-supplied discount amount); folded into
+    // $calculated_discount so it flows through the existing UPDATE below with
+    // no new columns needed. Points can only be redeemed against a registered
+    // customer — a walk-in sale can't have accrued any to begin with.
+    require_once __DIR__ . '/../../core/pos_loyalty.php';
+    $loyalty_points_redeemed = 0;
+    $redeem_points_requested = max(0, (int)($input['redeem_points'] ?? 0));
+    if ($redeem_points_requested > 0) {
+        $redeemResult = redeemLoyaltyPoints($pdo, $customer_id, $redeem_points_requested, $sale_id, $user_id);
+        if ($redeemResult['error']) {
+            throw new Exception($redeemResult['error']);
+        }
+        $loyalty_points_redeemed = $redeemResult['points'];
+        $loyalty_discount = min($redeemResult['discount'], $calculated_total);
+        $calculated_discount += $loyalty_discount;
+        $calculated_total = round($calculated_total - $loyalty_discount, 2);
+    }
+
     // Finalise the payment model against the server-recomputed total.
     $amount_paid_now = max(0.0, min($amount_paid_now, $calculated_total));
     if ($amount_paid_now >= $calculated_total - 0.01)      $final_payment_status = 'paid';
@@ -342,6 +362,13 @@ try {
         $final_payment_status,
         $sale_id
     ]);
+
+    // Phase 11 — earn loyalty points on the final (post-redemption) total.
+    $loyalty_points_earned = awardLoyaltyPoints($pdo, $customer_id, $sale_id, $calculated_total, $user_id);
+    if ($loyalty_points_earned > 0 || $loyalty_points_redeemed > 0) {
+        $pdo->prepare("UPDATE pos_sales SET loyalty_points_earned = ?, loyalty_points_redeemed = ? WHERE sale_id = ?")
+            ->execute([$loyalty_points_earned, $loyalty_points_redeemed, $sale_id]);
+    }
 
     // Record the initial payment (deposit/full) against the sale, if any was collected.
     // Guarded: the pos_sale_payments table ships with migration 2026_06_08; on a server
@@ -426,7 +453,9 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
         'receipt_number' => $receipt_number,
         'payment_status' => $final_payment_status,
         'amount_paid' => round($amount_paid_now, 2),
-        'balance_due' => $balance_due
+        'balance_due' => $balance_due,
+        'loyalty_points_earned' => $loyalty_points_earned,
+        'loyalty_points_redeemed' => $loyalty_points_redeemed
     ]);
     
 } catch (Exception $e) {

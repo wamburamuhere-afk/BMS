@@ -124,15 +124,15 @@
                 <div class="alert alert-info">
                     <div class="d-flex justify-content-between">
                         <span>Starting Cash:</span>
-                        <strong><?= format_currency($starting_cash) ?></strong>
+                        <strong><?= format_currency($starting_cash, $currency) ?></strong>
                     </div>
                     <div class="d-flex justify-content-between">
                         <span>Calculated Balance:</span>
-                        <strong><?= format_currency($cash_balance) ?></strong>
+                        <strong><?= format_currency($cash_balance, $currency) ?></strong>
                     </div>
                     <div class="d-flex justify-content-between">
                         <span>Difference:</span>
-                        <strong id="cashDifference">TZS 0.00</strong>
+                        <strong id="cashDifference"><?= htmlspecialchars($currency) ?> 0.00</strong>
                     </div>
                 </div>
                 <div class="mb-3">
@@ -199,35 +199,35 @@
             <div class="modal-body p-4">
                 <div class="alert alert-primary border-0 rounded-4 d-flex justify-content-between align-items-center mb-4">
                     <span class="fw-bold">TOTAL PAYABLE:</span>
-                    <h4 class="fw-bold mb-0" id="splitTotalDisplay">TZS 0.00</h4>
+                    <h4 class="fw-bold mb-0" id="splitTotalDisplay"><?= htmlspecialchars($currency) ?> 0.00</h4>
                 </div>
 
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label small fw-bold text-muted">CASH AMOUNT</label>
                         <div class="input-group">
-                            <span class="input-group-text text-muted">TZS</span>
+                            <span class="input-group-text text-muted"><?= htmlspecialchars($currency) ?></span>
                             <input type="number" class="form-control split-amount" id="splitCash" value="0" oninput="calculateSplitRemaining()">
                         </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small fw-bold text-muted">MOBILE MONEY</label>
                         <div class="input-group">
-                            <span class="input-group-text text-muted">TZS</span>
+                            <span class="input-group-text text-muted"><?= htmlspecialchars($currency) ?></span>
                             <input type="number" class="form-control split-amount" id="splitMobile" value="0" oninput="calculateSplitRemaining()">
                         </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small fw-bold text-muted">BANK TRANSFER</label>
                         <div class="input-group">
-                            <span class="input-group-text text-muted">TZS</span>
+                            <span class="input-group-text text-muted"><?= htmlspecialchars($currency) ?></span>
                             <input type="number" class="form-control split-amount" id="splitBank" value="0" oninput="calculateSplitRemaining()">
                         </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small fw-bold text-muted">CARD / OTHER</label>
                         <div class="input-group">
-                            <span class="input-group-text text-muted">TZS</span>
+                            <span class="input-group-text text-muted"><?= htmlspecialchars($currency) ?></span>
                             <input type="number" class="form-control split-amount" id="splitCard" value="0" oninput="calculateSplitRemaining()">
                         </div>
                     </div>
@@ -235,7 +235,7 @@
 
                 <div class="mt-4 p-3 rounded-4 bg-light d-flex justify-content-between align-items-center">
                     <span class="text-muted fw-bold small">REMAINING BALANCE:</span>
-                    <h5 class="fw-bold mb-0" id="splitRemaining">TZS 0.00</h5>
+                    <h5 class="fw-bold mb-0" id="splitRemaining"><?= htmlspecialchars($currency) ?> 0.00</h5>
                 </div>
             </div>
             <div class="modal-footer border-0 p-4 bg-light">

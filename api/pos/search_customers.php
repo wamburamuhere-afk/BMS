@@ -16,7 +16,7 @@ global $pdo;
 $q = trim($_GET['q'] ?? '');
 
 try {
-    $sql = "SELECT customer_id, customer_name, customer_code, phone, mobile
+    $sql = "SELECT customer_id, customer_name, customer_code, phone, mobile, loyalty_points_balance
               FROM customers c
              WHERE status = 'active'";
     $params = [];
@@ -38,7 +38,7 @@ try {
         $text = $r['customer_name'];
         $phone = $r['mobile'] ?: $r['phone'];
         if ($phone) $text .= ' — ' . $phone;
-        $results[] = ['id' => (int)$r['customer_id'], 'text' => $text];
+        $results[] = ['id' => (int)$r['customer_id'], 'text' => $text, 'loyalty_points' => (int)$r['loyalty_points_balance']];
     }
     echo json_encode(['results' => $results]);
 
