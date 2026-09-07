@@ -29,6 +29,9 @@ $company_logo = getSetting('company_logo', '');
             <button id="btnToggleDash" class="btn btn-outline-primary btn-sm">
                 <i class="bi bi-speedometer2 me-1"></i> Sales Dashboard
             </button>
+            <a href="<?= getUrl('pos/shifts') ?>" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-clock-history me-1"></i> Shift History
+            </a>
             <a href="<?= getUrl('pos') ?>" class="btn btn-primary btn-sm">
                 <i class="bi bi-bag-plus me-1"></i> Open POS
             </a>

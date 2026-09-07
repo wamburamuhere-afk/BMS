@@ -4,6 +4,7 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/pos_shift_reporting.php';
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
@@ -15,6 +16,7 @@ if (!canEdit('pos')) {
     echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to close POS shifts']);
     exit();
 }
+csrf_check();
 
 try {
     global $pdo;
@@ -59,29 +61,55 @@ try {
     $stmt->execute([$shift_id]);
     $cash_data = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    $expected_cash = $shift['starting_cash'] + 
-                    $cash_data['cash_in'] - 
-                    $cash_data['cash_out'] + 
-                    $cash_data['cash_sales'] - 
+    $expected_cash = $shift['starting_cash'] +
+                    $cash_data['cash_in'] -
+                    $cash_data['cash_out'] +
+                    $cash_data['cash_sales'] -
                     $cash_data['cash_refunds'];
-    
+
     $cash_difference = $ending_cash - $expected_cash;
-    
+
+    // Phase 8 (pos_upgrade_plan.md §7) — populate the per-tender totals that were
+    // defined on this table from day one but never written by this endpoint (all
+    // stayed at their 0.00 default forever). See core/pos_shift_reporting.php for
+    // why this reads pos_sales directly rather than cash_register_transactions.
+    $totals = posShiftTenderTotals($pdo, $shift_id);
+    $total_sales   = $totals['total_sales'];
+    $total_cash    = $totals['total_cash_sales'];
+    $total_card    = $totals['total_card_sales'];
+    $total_mobile  = $totals['total_mobile_sales'];
+    $total_credit  = $totals['total_credit_sales'];
+    $total_refunds = $totals['total_refunds'];
+
     // Close shift
     $stmt = $pdo->prepare("
-        UPDATE cash_register_shifts 
-        SET end_time = NOW(), 
-            ending_cash = ?, 
+        UPDATE cash_register_shifts
+        SET end_time = NOW(),
+            ending_cash = ?,
             expected_cash = ?,
             cash_difference = ?,
+            cash_in = ?,
+            cash_out = ?,
+            total_sales = ?,
+            total_cash_sales = ?,
+            total_card_sales = ?,
+            total_mobile_sales = ?,
+            total_credit_sales = ?,
+            total_refunds = ?,
             notes = ?,
             status = 'closed',
+            closed_by = ?,
             updated_at = NOW()
         WHERE shift_id = ?
     ");
-    
-    $stmt->execute([$ending_cash, $expected_cash, $cash_difference, $notes, $shift_id]);
-    
+
+    $stmt->execute([
+        $ending_cash, $expected_cash, $cash_difference,
+        $cash_data['cash_in'], $cash_data['cash_out'],
+        $total_sales, $total_cash, $total_card, $total_mobile, $total_credit, $total_refunds,
+        $notes, $user_id, $shift_id
+    ]);
+
     // Clear session shift
     unset($_SESSION['shift_id']);
     
@@ -96,7 +124,13 @@ try {
         'starting_cash' => $shift['starting_cash'],
         'ending_cash' => $ending_cash,
         'expected_cash' => $expected_cash,
-        'cash_difference' => $cash_difference
+        'cash_difference' => $cash_difference,
+        'total_sales' => $total_sales,
+        'total_cash_sales' => $total_cash,
+        'total_card_sales' => $total_card,
+        'total_mobile_sales' => $total_mobile,
+        'total_credit_sales' => $total_credit,
+        'total_refunds' => $total_refunds
     ]);
     
 } catch (Exception $e) {

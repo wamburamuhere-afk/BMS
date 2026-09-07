@@ -1824,6 +1824,28 @@ CREATE TABLE `customer_lpos` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `customer_loyalty_transactions`
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `customer_loyalty_transactions` (
+  `loyalty_txn_id` int NOT NULL AUTO_INCREMENT,
+  `customer_id` int NOT NULL,
+  `sale_id` int DEFAULT NULL,
+  `txn_type` enum('earn','redeem','earn_reversal','redeem_reversal') NOT NULL,
+  `points` int NOT NULL COMMENT 'always positive; txn_type gives direction',
+  `balance_after` int NOT NULL,
+  `notes` varchar(255) DEFAULT NULL,
+  `created_by` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`loyalty_txn_id`),
+  KEY `idx_customer_id` (`customer_id`),
+  KEY `idx_sale_id` (`sale_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `customers`
 --
 
@@ -1862,6 +1884,7 @@ CREATE TABLE `customers` (
   `payment_terms` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `credit_limit` decimal(12,2) DEFAULT '0.00',
   `current_balance` decimal(12,2) DEFAULT '0.00',
+  `loyalty_points_balance` int NOT NULL DEFAULT '0',
   `currency` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'TZS',
   `bank_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `bank_account` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
