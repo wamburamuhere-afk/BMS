@@ -27,6 +27,7 @@
 require_once __DIR__ . '/control_db.php';
 require_once __DIR__ . '/tenant_provisioner.php';
 require_once __DIR__ . '/superadmin_auth.php';
+require_once __DIR__ . '/feature_registry.php';
 
 if (!function_exists('logTenantAdminAction')) {
     /**
@@ -314,6 +315,19 @@ if (!function_exists('setTenantFeatures')) {
      * the defaults keeps following them if those defaults later change. Writing
      * a redundant row would silently pin them.
      *
+     * Dependency-aware (tenant_module_control_plan.md, Phase A — see
+     * core/feature_registry.php's `depends_on` graph):
+     *   - Enabling a feature auto-enables everything it `depends_on`, even if
+     *     the caller never mentioned that key, so a tenant can never end up
+     *     with e.g. Sales on and Warehouses off — a state where Sales' own
+     *     create-flow cannot work at all.
+     *   - Explicitly disabling a feature that some OTHER feature — remaining
+     *     or about-to-be enabled in this SAME call — still depends on is
+     *     REJECTED (whole call, nothing written), naming the dependents, so a
+     *     broken combination is never silently produced OR silently
+     *     overridden. Fixed BEFORE calling this: the caller decides whether to
+     *     also disable the dependent, not this function.
+     *
      * Only keys that actually changed are logged, so the audit trail records
      * decisions rather than every time someone opened the panel and hit Save.
      *
@@ -331,13 +345,58 @@ if (!function_exists('setTenantFeatures')) {
         $current = [];
         foreach (tenantFeatureMatrix($tenantId) as $row) $current[$row['key']] = $row;
 
+        // Raw target state: current effective values, overlaid with this
+        // call's explicit asks. Unknown keys ignored here too — never invent one.
+        $finalWant = [];
+        foreach ($current as $key => $row) $finalWant[$key] = $row['effective'];
+        $explicitFalse = [];
+        foreach ($desired as $key => $want) {
+            $key = (string)$key;
+            if (!isset($current[$key])) continue;
+            $finalWant[$key] = (bool)$want;
+            if ($want === false) $explicitFalse[] = $key;
+        }
+
+        // Reject BEFORE writing anything: an explicit "turn this off" that
+        // would leave some other true-in-this-call feature unable to work.
+        foreach ($explicitFalse as $key) {
+            $brokenDependents = array_values(array_intersect(
+                featureAllDependents($key),
+                array_keys(array_filter($finalWant))
+            ));
+            if ($brokenDependents) {
+                $registry = bmsFeatureRegistry();
+                $names = array_map(fn($k) => $registry[$k]['label'] ?? $k, $brokenDependents);
+                $label = $registry[$key]['label'] ?? $key;
+                return [
+                    'ok' => false,
+                    'error' => "Cannot disable $label — " . implode(', ', $names)
+                        . ' still ' . (count($names) === 1 ? 'depends' : 'depend') . ' on it. '
+                        . 'Disable ' . (count($names) === 1 ? 'it' : 'those') . ' first, or keep '
+                        . "$label on.",
+                    'changed' => 0,
+                ];
+            }
+        }
+
+        // Auto-include: anything left true must have every dependency true too.
+        $closedTrue = featureDependencyClosure(array_keys(array_filter($finalWant)));
+        $closureAdditions = array_diff($closedTrue, array_keys(array_filter($finalWant)));
+        foreach ($closedTrue as $key) $finalWant[$key] = true;
+
+        // Only touch rows this call actually decided something about: what the
+        // caller explicitly asked for, plus whatever the closure silently added.
+        $toWrite = array_unique(array_merge(
+            array_map('strval', array_keys($desired)),
+            $closureAdditions
+        ));
+
         $enabled  = [];
         $disabled = [];
 
-        foreach ($desired as $key => $want) {
-            $key = (string)$key;
+        foreach ($toWrite as $key) {
             if (!isset($current[$key])) continue;      // unknown key — ignore, never invent one
-            $want = (bool)$want;
+            $want = $finalWant[$key];
             $row  = $current[$key];
             $was  = $row['effective'];                 // effective state BEFORE this change
 
@@ -367,6 +426,7 @@ if (!function_exists('setTenantFeatures')) {
                 ($enabled  ? 'enabled: '  . implode(',', $enabled)  . ' ' : '') .
                 ($disabled ? 'disabled: ' . implode(',', $disabled)       : '')
             );
+            if ($closureAdditions) $detail .= ' (auto-included dependency: ' . implode(',', $closureAdditions) . ')';
             logTenantAdminAction($tenantId, $t['subdomain'], 'update_features', $detail);
         }
 

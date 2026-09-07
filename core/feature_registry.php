@@ -82,6 +82,10 @@ if (!function_exists('bmsFeatureRegistry')) {
                 'sort_order'  => 10,
                 'page_keys'   => ['quotations', 'sales_orders', 'lpo', 'sales_returns', 'credit_notes', 'dn'],
                 'paths'       => ['api/sales/'],
+                // Verified in code, not assumed: sales_order_create.php has
+                // warehouse_id as a REQUIRED form field — a Sales Order cannot
+                // be created without a warehouse to fulfil it from.
+                'depends_on'  => ['warehouses'],
             ],
             'pos' => [
                 'label'       => 'Point of Sale',
@@ -89,6 +93,9 @@ if (!function_exists('bmsFeatureRegistry')) {
                 'default'     => true,
                 'sort_order'  => 20,
                 'page_keys'   => ['pos', 'pos_config_settings'],
+                // Verified in code: pos.php filters sellable stock through
+                // userCan('warehouse', ...) — POS sells FROM a warehouse.
+                'depends_on'  => ['warehouses'],
                 // FILES, not the directory — app/bms/pos/ is mostly HR. See warning above.
                 'paths'       => [
                     'api/pos/',
@@ -110,7 +117,17 @@ if (!function_exists('bmsFeatureRegistry')) {
                     'suppliers', 'supplier_payments', 'rfq', 'purchase', 'purchase_orders',
                     'purchase_returns', 'grn', 'dn', 'do', 'debit_notes', 'nip_materials',
                 ],
-                'paths'       => ['api/purchase/'],
+                // sub_contractors.php gates ITSELF with canView('suppliers') —
+                // that page's path belongs here, not under 'projects' (see the
+                // 'projects' entry below for the bug this fixes).
+                'paths'       => [
+                    'api/purchase/',
+                    'app/bms/operations/sub_contractors.php',
+                    'app/bms/operations/sub_contractor_details.php',
+                ],
+                // Verified in code: grn_create.php has warehouse_id as a
+                // REQUIRED form field — a GRN cannot be created without one.
+                'depends_on'  => ['warehouses'],
             ],
             'tenders' => [
                 'label'       => 'Tenders',
@@ -170,17 +187,26 @@ if (!function_exists('bmsFeatureRegistry')) {
                 'default'     => true,
                 'sort_order'  => 80,
                 'page_keys'   => ['projects', 'user_projects'],
+                // sub_contractors.php/sub_contractor_details.php moved OUT of
+                // here — see the 'procurement' entry above. Before this fix, a
+                // tenant with Projects on and Procurement off would pass this
+                // path's guard, then have the page itself deny access via its
+                // own canView('suppliers') check: a confusing half-broken
+                // state instead of a clean, consistent "not available".
                 'paths'       => [
                     'app/bms/operations/projects.php',
                     'app/bms/operations/project_view.php',
                     'app/bms/operations/project_budget_report.php',
                     'app/bms/operations/project_financial_report.php',
                     'app/bms/operations/project_progress_report.php',
-                    'app/bms/operations/sub_contractors.php',
-                    'app/bms/operations/sub_contractor_details.php',
                     'app/bms/operations/inspection_view.php',
                     'app/bms/operations/print_ipc.php',
                 ],
+                // Verified in code: project_view.php directly queries and
+                // displays sub_contractors/suppliers (joined via
+                // sub_contractor_projects/supplier_projects) as an inline,
+                // required part of a project's own page — not optional data.
+                'depends_on'  => ['procurement'],
             ],
             'ai_assistant' => [
                 'label'       => 'AI Assistant',
@@ -199,6 +225,64 @@ if (!function_exists('bmsFeatureRegistry')) {
                 // sign_document.php is PUBLIC and unauthenticated — no session to
                 // gate — so Phase 11.B checks it explicitly in that file too.
                 'paths'       => ['ajax/save_drawn_signature.php', 'sign_document.php'],
+            ],
+            // ── Added 2026-09-07 (tenant_module_control_plan.md, Phase A) ──────
+            // These three ran for every tenant regardless of plan until now — an
+            // audit of every permissions.page_key against this registry found
+            // they were simply never wired in when built as their own projects,
+            // not deliberately exempted like the always-on base set above.
+            'crm' => [
+                'label'       => 'CRM & Marketing',
+                'description' => 'Leads, pipeline, activities and campaign management.',
+                'default'     => true,
+                'sort_order'  => 110,
+                'page_keys'   => [
+                    'crm_dashboard', 'crm_leads', 'crm_pipeline', 'crm_activities', 'crm_convert',
+                    // permission rows with no page behind them yet (see
+                    // permissions.module_name = 'Marketing & CRM') — gated now
+                    // so switching this feature off is honest about scope even
+                    // before they're built.
+                    'crm_bulk', 'crm_import', 'crm_labels', 'crm_reports', 'customer_feedback',
+                    // Real, routed pages that share this feature — see the
+                    // per-file paths below (their directory is mixed with
+                    // 'communication', so the directory itself can't be listed).
+                    'campaign_management', 'lead_generation',
+                ],
+                'paths'       => [
+                    'api/crm/',
+                    'app/bms/crm/',
+                    'app/constant/communication/campaign_management.php',
+                    'app/constant/communication/lead_generation.php',
+                ],
+            ],
+            'communication' => [
+                'label'       => 'Messaging & Reminders',
+                'description' => 'In-app message center, notification center, SMS alerts, payment reminders and collection letters.',
+                'default'     => true,
+                'sort_order'  => 120,
+                'page_keys'   => [
+                    'message_center', 'notification_center',
+                    // permission rows with no page behind them yet (see
+                    // permissions.module_name = 'Communication').
+                    'sms_alerts', 'payment_reminders', 'collection_letters',
+                ],
+                'paths'       => [
+                    'app/constant/communication/message_center.php',
+                    'app/constant/communication/notification_center.php',
+                ],
+            ],
+            'compliance' => [
+                'label'       => 'Compliance',
+                'description' => 'Compliance documents and the compliance report. Regular Document Library stays available regardless.',
+                'default'     => true,
+                'sort_order'  => 130,
+                // 'compliance' itself has no page behind it yet — gated now for
+                // the same honesty-about-scope reason as the CRM/Marketing stubs.
+                'page_keys'   => ['compliance', 'compliance_documents', 'compliance_report'],
+                'paths'       => [
+                    'app/constant/document/compliance_documents.php',
+                    'app/constant/reports/compliance_report.php',
+                ],
             ],
         ];
     }
@@ -521,5 +605,91 @@ if (!function_exists('tenantModuleAllowsPage')) {
             if (tenantFeatureEnabled($featureKey)) return true;
         }
         return false;
+    }
+}
+
+/**
+ * ── Module dependency graph (tenant_module_control_plan.md, Phase A) ────────
+ *
+ * A few features are not independent: `projects` embeds supplier/sub-
+ * contractor data inline, `sales`/`procurement`/`pos` each have a REQUIRED
+ * warehouse field their primary create-flow cannot work without (see the
+ * `depends_on` entries above — every one is verified against the actual page
+ * code, not assumed from naming). Reference point: Odoo's app manifests
+ * declare a `depends` list the same way — installing an app installs its
+ * dependencies, and an app cannot be removed while something else still
+ * depends on it. These three helpers give `setTenantFeatures()` and
+ * `createPlan()`/`updatePlan()` exactly that, as a general mechanism rather
+ * than a one-off check for any single pair.
+ */
+
+if (!function_exists('featureDependsOn')) {
+    /** Direct declared dependencies of one feature. Empty if none or unknown. */
+    function featureDependsOn(string $featureKey): array
+    {
+        return bmsFeatureRegistry()[$featureKey]['depends_on'] ?? [];
+    }
+}
+
+if (!function_exists('featureDependencyClosure')) {
+    /**
+     * Expand a set of "wanted enabled" feature keys to include every
+     * transitive dependency, so enabling `sales` alone also enables
+     * `warehouses` without the caller having to know the graph itself.
+     *
+     * @param  string[] $keys
+     * @return string[] the input keys plus every transitive depends_on,
+     *                   deduplicated. Unknown keys are ignored, never invented.
+     */
+    function featureDependencyClosure(array $keys): array
+    {
+        $registry = bmsFeatureRegistry();
+        $closure  = [];
+        $queue    = array_values(array_unique($keys));
+        while ($queue) {
+            $key = array_pop($queue);
+            if (isset($closure[$key]) || !isset($registry[$key])) continue;
+            $closure[$key] = true;
+            foreach ($registry[$key]['depends_on'] ?? [] as $dep) {
+                if (!isset($closure[$dep])) $queue[] = $dep;
+            }
+        }
+        return array_keys($closure);
+    }
+}
+
+if (!function_exists('featureAllDependents')) {
+    /**
+     * Every feature in the WHOLE registry that transitively depends on
+     * $featureKey, regardless of whether those features are currently enabled
+     * for any tenant — a graph fact, not a per-tenant one. Callers intersect
+     * this with "currently/about-to-be enabled for THIS tenant" to find a real
+     * conflict before rejecting a disable (see setTenantFeatures()).
+     *
+     * @return string[] feature keys; $featureKey itself is never included
+     */
+    function featureAllDependents(string $featureKey): array
+    {
+        $registry   = bmsFeatureRegistry();
+        $dependents = [];
+        // Fixed-point over "depends on something already found" so a chain
+        // (A depends on B depends on C) names A too when C is the one being
+        // disabled, not just the directly-declared B.
+        $frontier = [$featureKey];
+        while ($frontier) {
+            $next = [];
+            foreach ($registry as $key => $def) {
+                if (isset($dependents[$key])) continue;
+                foreach ($def['depends_on'] ?? [] as $dep) {
+                    if (in_array($dep, $frontier, true)) {
+                        $dependents[$key] = true;
+                        $next[] = $key;
+                        break;
+                    }
+                }
+            }
+            $frontier = $next;
+        }
+        return array_keys($dependents);
     }
 }

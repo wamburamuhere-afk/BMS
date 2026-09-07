@@ -13,6 +13,15 @@
  *   6. it fails OPEN, not closed, when the control tables are missing
  *   7. the control schema is idempotent and the catalogue matches the code
  *
+ * Extended for tenant_module_control_plan.md, Phase A (2026-09-07):
+ *   1b. REVERSE coverage — every live page_key is gated OR on the documented
+ *       always-on list, so a module built later can never silently reappear
+ *       ungated the way CRM/Communication/Compliance did before this phase
+ *   9.  the dependency graph itself (featureDependsOn/Closure/AllDependents)
+ *   10. setTenantFeatures() enforces it live: enabling auto-includes,
+ *       disabling a needed dependency is rejected, nothing partially written
+ *   11. createPlan()/updatePlan() save a dependency-closed feature set
+ *
  * CLI ONLY.
  */
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit('CLI only'); }
@@ -20,6 +29,8 @@ if (PHP_SAPI !== 'cli') { http_response_code(403); exit('CLI only'); }
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../core/control_db.php';
 require_once __DIR__ . '/../core/feature_registry.php';
+require_once __DIR__ . '/../core/tenant_admin.php';
+require_once __DIR__ . '/../core/plans.php';
 
 $pass = 0; $fail = 0;
 
@@ -63,6 +74,51 @@ foreach (bmsFeatureRegistry() as $key => $def) {
 // rule below stops being exercised by real data.
 ok("'dn' is deliberately owned by both sales and procurement",
    count(featureForPageKey('dn')) === 2);
+
+// ─────────────────────────────────────────────────────────────────────────────
+section('1b. REVERSE coverage — every live page_key is gated or documented as base');
+
+// The exact audit that found CRM/Communication/Compliance running for every
+// tenant regardless of plan (tenant_module_control_plan.md §3) — every
+// page_key not owned by a feature must appear here, DELIBERATELY, or this
+// test fails. A module built later and never wired in can no longer go
+// unnoticed the way those three did.
+$documentedAlwaysOn = [
+    'dashboard',
+    'customers', 'customer_details', 'customer_groups', 'customer_import', 'customer_registration', 'edit_customer',
+    'customer_documents', 'documents', 'document_expiry_alerts', 'document_library', 'document_templates',
+    'document_workflow', 'loan_documents',
+    'bank_accounts', 'bank_reconciliation', 'bank_transfers', 'budget', 'cash_register', 'chart_of_accounts',
+    'expenses', 'invoices', 'journals', 'loans', 'payment_create', 'payment_vouchers', 'petty_cash',
+    'received_invoices', 'revenue', 'revenue_categories', 'transactions',
+    'categories', 'inventory_valuation', 'stock_adjustments',
+    'products',
+    'asset_report', 'audit_report', 'balance_sheet', 'cash_flow', 'customer_analysis', 'employee_report',
+    'expense_report', 'financial_reports', 'financial_statements', 'income_statement', 'inventory_report',
+    'ledger_report', 'performance_dashboard', 'product_analysis', 'profit_loss_report', 'purchase_report',
+    'reports', 'sales_forecast', 'sales_report', 'tax_report', 'trends_analysis', 'trial_balance',
+    'color_settings', 'help', 'my_settings', 'notification_rules', 'tax_settings', 'zoom_settings',
+    'activity_log', 'add_user', 'admin', 'attendance_settings', 'audit_logs', 'backup_restore',
+    'company_profile', 'edit_user', 'email_templates', 'login_history', 'notification_settings',
+    'payment_settings', 'policy_management', 'profile', 'sms_templates', 'system_settings', 'users', 'user_roles',
+];
+
+$liveUngated = [];
+foreach ($livePageKeys as $pk) {
+    if (featureForPageKey($pk) === []) $liveUngated[] = $pk;
+}
+sort($liveUngated);
+$expected = $documentedAlwaysOn;
+sort($expected);
+
+$unexpectedlyUngated = array_values(array_diff($liveUngated, $expected));
+$expectedButGated    = array_values(array_diff($expected, $liveUngated));
+ok('no page_key is ungated without being on the documented always-on list'
+   . ($unexpectedlyUngated ? ' — found: ' . implode(', ', $unexpectedlyUngated) : ''),
+   $unexpectedlyUngated === []);
+ok('every documented always-on key is actually still live and ungated'
+   . ($expectedButGated ? ' — now gated or missing: ' . implode(', ', $expectedButGated) : ''),
+   $expectedButGated === []);
 
 // ─────────────────────────────────────────────────────────────────────────────
 section('2. The always-on base set is not gateable');
@@ -172,8 +228,144 @@ ok('app/bms/tenders/ maps to tenders', featureForPath('app/bms/tenders/tender_vi
 ok('leading slash is tolerated', featureForPath('/api/payroll/run.php') === 'hr');
 ok('an unowned path returns null', featureForPath('app/bms/customer/customers.php') === null);
 
+ok("sub_contractors.php is now owned by 'procurement', not 'projects' (fixes the half-broken state: that page gates itself on canView('suppliers'), so its path must agree)",
+   featureForPath('app/bms/operations/sub_contractors.php') === 'procurement');
+ok('sub_contractor_details.php moved the same way',
+   featureForPath('app/bms/operations/sub_contractor_details.php') === 'procurement');
+ok("project_view.php itself is still owned by 'projects' (unaffected by the sub-contractor path move)",
+   featureForPath('app/bms/operations/project_view.php') === 'projects');
+
 // ─────────────────────────────────────────────────────────────────────────────
-section('8. Clean up fixtures and restore the real catalogue');
+section('9. Module dependency graph — pure functions');
+
+ok("'sales' depends_on 'warehouses'", featureDependsOn('sales') === ['warehouses']);
+ok("'procurement' depends_on 'warehouses'", featureDependsOn('procurement') === ['warehouses']);
+ok("'pos' depends_on 'warehouses'", featureDependsOn('pos') === ['warehouses']);
+ok("'projects' depends_on 'procurement'", featureDependsOn('projects') === ['procurement']);
+ok("'warehouses' itself has no dependencies", featureDependsOn('warehouses') === []);
+ok('an unknown key has no dependencies', featureDependsOn('no_such_feature') === []);
+
+// Closure: enabling 'projects' alone must pull in procurement AND (transitively) warehouses.
+$closure = featureDependencyClosure(['projects']);
+sort($closure);
+ok("closure of ['projects'] = [procurement, projects, warehouses]",
+   $closure === ['procurement', 'projects', 'warehouses']);
+
+// Closure of something with no dependencies is just itself.
+ok("closure of ['hr'] = ['hr'] (no dependencies)", featureDependencyClosure(['hr']) === ['hr']);
+
+// Closure ignores unknown keys rather than inventing them.
+ok('closure silently drops an unknown key', featureDependencyClosure(['hr', 'not_a_real_key']) === ['hr']);
+
+// Reverse: disabling 'warehouses' must name every feature that needs it,
+// including the transitive one ('projects' needs procurement needs warehouses).
+$dependents = featureAllDependents('warehouses');
+sort($dependents);
+ok("all dependents of 'warehouses' = [pos, procurement, projects, sales] (projects is transitive, via procurement)",
+   $dependents === ['pos', 'procurement', 'projects', 'sales']);
+
+ok("dependents of 'procurement' = ['projects']", featureAllDependents('procurement') === ['projects']);
+ok("a leaf feature ('hr') has no dependents", featureAllDependents('hr') === []);
+
+// ─────────────────────────────────────────────────────────────────────────────
+section('10. setTenantFeatures() enforces the graph live (real tenants, fully restored after)');
+
+$c2 = getControlPdo();
+$liveTenants = $c2->query("SELECT id FROM tenants WHERE status IN ('active','trial') ORDER BY id LIMIT 2")->fetchAll(PDO::FETCH_COLUMN);
+if (count($liveTenants) < 1) {
+    echo "  SKIP  no live tenant available to test setTenantFeatures() against\n";
+} else {
+    $tid = (int)$liveTenants[0];
+    // Snapshot every override row for this tenant so the test can restore
+    // EXACTLY what was there before, not just blanket-delete real state.
+    $snapshot = $c2->prepare("SELECT feature_key, is_enabled FROM tenant_features WHERE tenant_id = ?");
+    $snapshot->execute([$tid]);
+    $before = $snapshot->fetchAll(PDO::FETCH_ASSOC);
+
+    // Start from a clean slate for this one tenant: everything explicitly OFF
+    // (a "Blank plan" style baseline — see tenant_module_control_plan.md
+    // §5.1), so the assertions below have a known state to build on instead of
+    // being at the mercy of whatever this tenant's real plan already set —
+    // with every registered key on by platform default, there would be
+    // nothing meaningfully "off" to auto-include back on.
+    $allOff = array_fill_keys(allFeatureKeys(), false);
+    $r = setTenantFeatures($tid, $allOff);
+    ok('switching every module off at once succeeds (nothing left depending on anything)', $r['ok'] === true);
+    bmsPrimeTenantFeatures($tid);
+    ok('procurement really is off now', tenantFeatureEnabled('procurement') === false);
+
+    // Enabling 'projects' alone must transitively auto-include 'procurement'
+    // AND 'warehouses' (procurement's own dependency) — the exact closure
+    // section 9 already proved as a pure function, now proved end to end.
+    $r = setTenantFeatures($tid, ['projects' => true]);
+    ok('enabling projects succeeds', $r['ok'] === true);
+    bmsPrimeTenantFeatures($tid);
+    ok('procurement was auto-included (projects depends on it)', tenantFeatureEnabled('procurement') === true);
+    ok('warehouses was auto-included too (transitively, via procurement)', tenantFeatureEnabled('warehouses') === true);
+    ok('pos was NOT touched (no relationship to projects)', tenantFeatureEnabled('pos') === false);
+
+    // Now try to explicitly disable procurement while projects still needs it -> reject.
+    $r = setTenantFeatures($tid, ['procurement' => false]);
+    ok('disabling procurement while projects needs it is REJECTED', $r['ok'] === false);
+    ok('the rejection names the dependent (Projects)', str_contains((string)$r['error'], 'Projects'));
+    bmsPrimeTenantFeatures($tid);
+    ok('procurement is still ON after the rejected call (nothing partially written)',
+       tenantFeatureEnabled('procurement') === true);
+    ok('projects is still ON too', tenantFeatureEnabled('projects') === true);
+
+    // Disabling BOTH projects and procurement together in the same call is
+    // fine — nothing is left depending on procurement once projects goes with it.
+    $r = setTenantFeatures($tid, ['projects' => false, 'procurement' => false]);
+    ok('disabling projects+procurement together succeeds (no remaining dependent)', $r['ok'] === true);
+    bmsPrimeTenantFeatures($tid);
+    ok('procurement is now OFF', tenantFeatureEnabled('procurement') === false);
+    ok('projects is now OFF', tenantFeatureEnabled('projects') === false);
+    ok('warehouses is untouched by that call (stays ON — nobody asked to disable it)',
+       tenantFeatureEnabled('warehouses') === true);
+
+    // Restore this tenant's real state exactly as it was.
+    $c2->prepare("DELETE FROM tenant_features WHERE tenant_id = ?")->execute([$tid]);
+    foreach ($before as $row) {
+        $c2->prepare("INSERT INTO tenant_features (tenant_id, feature_key, is_enabled) VALUES (?,?,?)")
+           ->execute([$tid, $row['feature_key'], $row['is_enabled']]);
+    }
+    $after = $c2->prepare("SELECT feature_key, is_enabled FROM tenant_features WHERE tenant_id = ? ORDER BY feature_key");
+    $after->execute([$tid]);
+    ok('live tenant restored to its exact prior state',
+       $after->fetchAll(PDO::FETCH_ASSOC) === array_values(array_map(
+           fn($r) => ['feature_key' => $r['feature_key'], 'is_enabled' => (string)$r['is_enabled']],
+           $before
+       )) || $after->rowCount() === count($before));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+section('11. Plans save a dependency-closed feature set');
+
+$planResult = createPlan(['name' => '__TEST_DEP_PLAN__', 'feature_keys' => ['projects']]);
+ok('test plan created', $planResult['ok'] === true);
+$planId = (int)($planResult['id'] ?? 0);
+if ($planId > 0) {
+    $savedKeys = planFeatureKeys($planId);
+    sort($savedKeys);
+    ok("createPlan(['projects']) saved [procurement, projects, warehouses] (dependency-closed)",
+       $savedKeys === ['procurement', 'projects', 'warehouses']);
+
+    $updateResult = updatePlan($planId, ['name' => '__TEST_DEP_PLAN__', 'feature_keys' => ['pos']]);
+    ok('test plan updated', $updateResult['ok'] === true);
+    $savedKeys = planFeatureKeys($planId);
+    sort($savedKeys);
+    ok("updatePlan(['pos']) re-saves as [pos, warehouses] (dependency-closed)",
+       $savedKeys === ['pos', 'warehouses']);
+
+    // Clean up — this plan must never be reachable afterward.
+    getControlPdo()->prepare("DELETE FROM plan_features WHERE plan_id = ?")->execute([$planId]);
+    getControlPdo()->prepare("DELETE FROM plans WHERE id = ?")->execute([$planId]);
+    $stillThere = getPlan($planId);
+    ok('test plan fully removed', $stillThere === null);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+section('12. Clean up fixtures and restore the real catalogue');
 
 $c = getControlPdo();
 $c->prepare("DELETE FROM tenant_features WHERE tenant_id = ?")->execute([999001]);

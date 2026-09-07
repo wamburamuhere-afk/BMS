@@ -137,7 +137,16 @@ $createdPlanIds[] = $planId;
 
 $p = getPlan($planId);
 ok('plan_key auto-derived from name', $p['plan_key'] === 'phase-c-test-plan', (string)$p['plan_key']);
-ok('feature_keys stored exactly', count(array_diff(planFeatureKeys($planId), ['pos', 'hr'])) === 0 && count(planFeatureKeys($planId)) === 2);
+// Since tenant_module_control_plan.md Phase A, saving a plan is dependency-
+// closed: 'pos' depends_on 'warehouses' (verified in core/feature_registry.php
+// against the actual pos.php/GRN/sales-order code), so requesting ['pos','hr']
+// silently also stores 'warehouses' — the same auto-include
+// setTenantFeatures()/applyPlanToTenant() apply live. See
+// tests/test_feature_registry_cli.php §11 for the dedicated dependency-closure
+// coverage; this assertion just confirms createPlan() itself agrees.
+ok('feature_keys stored exactly (dependency-closed: pos brings warehouses with it)',
+   count(array_diff(planFeatureKeys($planId), ['pos', 'hr', 'warehouses'])) === 0
+   && count(planFeatureKeys($planId)) === 3);
 
 $r2 = createPlan(['name' => 'Phase C Test Plan', 'max_users' => 10]);   // same name again
 ok('a colliding name gets a distinct plan_key (not rejected)', $r2['ok'] === true);
