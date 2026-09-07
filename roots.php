@@ -134,8 +134,12 @@ if (function_exists('touchUserSession') && !empty($_SESSION['session_row_id'])) 
 
 // 3. Idle-session sweep — throttled to once per 5 minutes across ALL traffic
 //    (not just full page loads), same self-contained/fail-silent pattern as
-//    cron/check_hr_expiry.php below in header.php, but placed here instead so
-//    API/AJAX-heavy traffic gives it as many chances to run as page views do.
+//    cron/check_hr_expiry.php (now dispatched via api/run_background_jobs.php,
+//    see header.php), but placed here instead so API/AJAX-heavy traffic gives
+//    it as many chances to run as page views do. Left running inline here,
+//    unlike that group: expireIdleSessions() is a single set-based UPDATE, not
+//    a loop of SMTP sends or a full-table scan, so it never blocks a request
+//    long enough to matter.
 if (function_exists('get_setting') && function_exists('save_setting')
     && (time() - (int) get_setting('session_expiry_last_ts', '0')) >= 300) {
     save_setting('session_expiry_last_ts', (string) time());
@@ -795,6 +799,8 @@ $routes = [
     'api/update_employee_status.php' => API_DIR . '/update_employee_status.php',
     'api/log_audit' => API_DIR . '/log_audit.php',
     'api/log_audit.php' => API_DIR . '/log_audit.php',
+    'api/run_background_jobs' => API_DIR . '/run_background_jobs.php',
+    'api/run_background_jobs.php' => API_DIR . '/run_background_jobs.php',
     'api/delete_employee' => API_DIR . '/delete_employee.php',
     'api/delete_employee.php' => API_DIR . '/delete_employee.php',
     'api/inactivate_employee' => API_DIR . '/inactivate_employee.php',

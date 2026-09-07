@@ -121,43 +121,28 @@ if (!empty($_SESSION['session_row_id'])) {
     }
 }
 
-// Document expiry check — runs at most once per day (see cron/check_document_expiry.php).
-// The engine is self-contained and fails silently so it can never break a page load.
-if (function_exists('get_setting') && get_setting('doc_expiry_last_run') !== date('Y-m-d')) {
-    @include_once __DIR__ . '/cron/check_document_expiry.php';
-}
-
-// Leave accrual — seed this year's leave balances (entitlement + carry-over), once
-// per day. Self-contained + fail-silent (see cron/run_leave_accrual.php).
-if (function_exists('get_setting') && get_setting('leave_accrual_last_run') !== date('Y-m-d')) {
-    @include_once __DIR__ . '/cron/run_leave_accrual.php';
-}
-
-// HR expiry check (contracts + probation, D13) — runs at most once per day
-// (see cron/check_hr_expiry.php). Self-contained + fail-silent.
-if (function_exists('get_setting') && get_setting('hr_expiry_last_run') !== date('Y-m-d')) {
-    @include_once __DIR__ . '/cron/check_hr_expiry.php';
-}
-
-// Smart notification engine — time-based event checks (overdue/expiring/due),
-// at most once per day. Self-contained + fail-silent (see cron/run_notification_checks.php).
-if (function_exists('get_setting') && get_setting('notif_checks_last_run') !== date('Y-m-d')) {
-    @include_once __DIR__ . '/cron/run_notification_checks.php';
-}
-
-// Notification email worker — drain a small batch from the outbox, throttled to
-// ~2 minutes so it never noticeably slows a page load. (Use a server cron for volume.)
-if (function_exists('get_setting') && (time() - (int)get_setting('notif_outbox_last_ts', '0')) >= 120) {
-    if (function_exists('save_setting')) save_setting('notif_outbox_last_ts', (string)time());
-    @include_once __DIR__ . '/cron/process_notifications.php';
-}
-
-// AI daily digest — one summary email per user with pending items, once per day.
-// Opt-in (notif_digest_enabled). Self-contained + fail-silent.
-if (function_exists('get_setting') && get_setting('notif_digest_enabled', '0') === '1'
-    && get_setting('notif_digest_last_run') !== date('Y-m-d')) {
-    @include_once __DIR__ . '/cron/send_notification_digests.php';
-}
+// ── Background housekeeping (email outbox drain + 5 daily checks) ──────────
+// These six jobs used to run INLINE right here (see git history / changelog
+// for the pre-2026-09-07 version). That meant whichever user's ordinary page
+// load happened to be "due" absorbed the full synchronous cost — up to 50 real
+// SMTP sends (each up to a 20s connect timeout) for the outbox, or a full table
+// scan for the daily checks. That is the "the system sometimes just freezes"
+// symptom: nothing to do with the page being loaded, purely a timing
+// coincidence of which request crossed the throttle window.
+//
+// api/run_background_jobs.php now owns the actual work and re-checks every one
+// of these conditions itself; the checks below only decide CHEAPLY (settings
+// are already cached in-process by get_setting()) whether it is worth firing
+// an async, fire-and-forget ping at all, so a normal page load never blocks on
+// any of it.
+$__bmsBackgroundDue = function_exists('get_setting') && (
+    get_setting('doc_expiry_last_run') !== date('Y-m-d')
+    || get_setting('leave_accrual_last_run') !== date('Y-m-d')
+    || get_setting('hr_expiry_last_run') !== date('Y-m-d')
+    || get_setting('notif_checks_last_run') !== date('Y-m-d')
+    || (time() - (int) get_setting('notif_outbox_last_ts', '0')) >= 120
+    || (get_setting('notif_digest_enabled', '0') === '1' && get_setting('notif_digest_last_run') !== date('Y-m-d'))
+);
 
 // Get company type + location from settings
 $settings_stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'company_type'");
@@ -299,6 +284,19 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         }
     }
 </script>
+
+<?php if ($__bmsBackgroundDue): ?>
+<script>
+    // Fire-and-forget: api/run_background_jobs.php re-verifies every condition
+    // itself and does the real work (up to 50 SMTP sends, daily housekeeping
+    // scans) in its OWN request, so THIS page never waits on any of it.
+    if (navigator.sendBeacon) {
+        navigator.sendBeacon(APP_URL + '/api/run_background_jobs');
+    } else {
+        $.post(APP_URL + '/api/run_background_jobs');
+    }
+</script>
+<?php endif; ?>
 
 <?php if ($__bmsAskPreciseLocation): ?>
 <script>
