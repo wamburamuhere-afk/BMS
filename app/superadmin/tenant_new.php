@@ -11,6 +11,7 @@
  * Reads ONLY the control database.
  */
 require_once __DIR__ . '/../../core/tenant_admin.php';
+require_once __DIR__ . '/../../core/plans.php';
 require_once __DIR__ . '/../../core/superadmin_ui.php';
 require_once __DIR__ . '/../../helpers.php';
 
@@ -18,6 +19,13 @@ requireSuperadmin();
 
 $me   = currentSuperadmin();
 $base = function_exists('tenantBaseDomain') ? (tenantBaseDomain() ?? '') : '';
+
+// 'blank' is the reserved plan self-registration's provisioning-mode switch
+// applies internally (tenant_module_control_plan.md §5.1) — it exists to
+// represent "nothing", never as something an operator picks by hand here.
+$startingPlans = planTablesReady()
+    ? array_values(array_filter(listPlans(true), fn($p) => $p['plan_key'] !== 'blank'))
+    : [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -96,6 +104,30 @@ $base = function_exists('tenantBaseDomain') ? (tenantBaseDomain() ?? '') : '';
                                     <option value="active" selected>Active — can sign in immediately</option>
                                     <option value="trial">Trial</option>
                                 </select>
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Starting plan</label>
+                                <?php if (!$startingPlans): ?>
+                                <select class="form-select" name="plan_id" disabled>
+                                    <option value="">Everything on (no plans created yet)</option>
+                                </select>
+                                <div class="form-text">
+                                    <a href="<?= saUrl('plans') ?>">Create a plan</a> to offer a curated starting
+                                    module set here instead.
+                                </div>
+                                <?php else: ?>
+                                <select class="form-select" name="plan_id">
+                                    <option value="">Everything on (apply a plan later if needed)</option>
+                                    <?php foreach ($startingPlans as $p): ?>
+                                    <option value="<?= (int)$p['id'] ?>"><?= safe_output($p['name'], '') ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="form-text">
+                                    Applied immediately — the company never briefly has every module before this
+                                    takes effect. Leave blank for today's default (everything on).
+                                </div>
+                                <?php endif; ?>
                             </div>
 
                             <div class="col-12 col-md-6">

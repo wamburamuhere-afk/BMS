@@ -231,6 +231,58 @@ try {
     ok((int)$cpdo->query("SELECT COUNT(*) FROM tenants WHERE subdomain = " . $cpdo->quote($sub))->fetchColumn() === 1,
         'and only one tenant holds it');
 
+    section('10. Starting plan at creation (tenant_module_control_plan.md Phase B)');
+    $planR = createPlan(['name' => '__SATEST_PLAN__' . $sfx, 'feature_keys' => ['ai_assistant']]);
+    ok($planR['ok'] === true, 'a throwaway plan is created to apply at tenant creation');
+    $testPlanId = (int)($planR['id'] ?? 0);
+
+    $subPlan = 'satestplan' . $sfx;
+    $rPlan = createTenantAsOperator(array_merge($base, [
+        'company_name' => 'Plan At Creation Ltd', 'subdomain' => $subPlan, 'plan_id' => (string)$testPlanId,
+    ]));
+    ok($rPlan['ok'] === true, 'creation with a starting plan succeeds', (string)($rPlan['error'] ?? ''));
+    if ($rPlan['ok']) {
+        $tRow = $cpdo->prepare("SELECT db_name, db_username, plan FROM tenants WHERE id = ?");
+        $tRow->execute([$rPlan['tenant_id']]);
+        $Tp = $tRow->fetch();
+        $made['databases'][] = $Tp['db_name'];
+        $made['users'][]     = $Tp['db_username'];
+
+        ok($Tp['plan'] !== null && getPlanByKey($Tp['plan'])['id'] === $testPlanId,
+           'tenants.plan resolves back to the plan actually applied');
+
+        bmsPrimeTenantFeatures((int)$rPlan['tenant_id']);
+        ok(tenantFeatureEnabled('ai_assistant') === true, 'ai_assistant (in the plan) is on for the new tenant');
+        ok(tenantFeatureEnabled('pos') === false, 'pos (not in the plan) is off for the new tenant');
+        ok(tenantFeatureEnabled('sales') === false, 'sales (not in the plan) is off for the new tenant');
+        ok(tenantModuleAllowsPage('dashboard') === true, 'the always-on baseline still works');
+    }
+
+    section('11. An invalid or retired plan fails BEFORE provisioning (no orphaned tenant/database)');
+    $subBad = 'satestbadplan' . $sfx;
+    $rBad = createTenantAsOperator(array_merge($base, [
+        'company_name' => 'Bad Plan Ltd', 'subdomain' => $subBad, 'plan_id' => '999999999',
+    ]));
+    ok($rBad['ok'] === false, 'a non-existent plan_id is refused');
+    ok((int)$cpdo->query("SELECT COUNT(*) FROM tenants WHERE subdomain = " . $cpdo->quote($subBad))->fetchColumn() === 0,
+       'and nothing was provisioned for it');
+
+    setPlanActive($testPlanId, false);
+    $subRetired = 'satestretired' . $sfx;
+    $rRetired = createTenantAsOperator(array_merge($base, [
+        'company_name' => 'Retired Plan Ltd', 'subdomain' => $subRetired, 'plan_id' => (string)$testPlanId,
+    ]));
+    ok($rRetired['ok'] === false, 'a retired plan_id is refused');
+    ok((int)$cpdo->query("SELECT COUNT(*) FROM tenants WHERE subdomain = " . $cpdo->quote($subRetired))->fetchColumn() === 0,
+       'and nothing was provisioned for it either');
+
+    // Clean up the throwaway plan — no deletePlan() exists (plans are only ever
+    // soft-retired), so remove its rows directly, same as
+    // tests/test_feature_registry_cli.php §11.
+    $cpdo->prepare("DELETE FROM plan_features WHERE plan_id = ?")->execute([$testPlanId]);
+    $cpdo->prepare("DELETE FROM plans WHERE id = ?")->execute([$testPlanId]);
+    ok(getPlan($testPlanId) === null, 'the throwaway plan is fully removed');
+
 } catch (Throwable $e) {
     $fail++;
     echo "\n\033[31mFATAL: " . $e->getMessage() . "\033[0m\n";

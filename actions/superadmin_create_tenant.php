@@ -12,6 +12,7 @@
  * those is in createTenantAsOperator()'s docblock.
  */
 require_once __DIR__ . '/../core/tenant_admin.php';
+require_once __DIR__ . '/../core/plans.php';
 require_once __DIR__ . '/../helpers.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -48,6 +49,7 @@ $r = createTenantAsOperator([
     'owner_first_name'       => (string)($_POST['owner_first_name'] ?? ''),
     'owner_last_name'        => (string)($_POST['owner_last_name'] ?? ''),
     'status'                 => (string)($_POST['status'] ?? 'active'),
+    'plan_id'                => (string)($_POST['plan_id'] ?? ''),
 ]);
 
 if (!$r['ok']) {

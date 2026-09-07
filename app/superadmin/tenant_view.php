@@ -56,7 +56,11 @@ if ($tenant && $tenant['status'] !== 'deleted') {
 
     try {
         if (planTablesReady()) {
-            $plans = listPlans(true);   // active only — a retired plan cannot be (re)applied
+            // active only (a retired plan cannot be re-applied) and never the
+            // reserved 'blank' plan — that one exists only for self-
+            // registration's provisioning switch, never for an operator to
+            // pick by hand (tenant_module_control_plan.md §5.1).
+            $plans = array_values(array_filter(listPlans(true), fn($p) => $p['plan_key'] !== 'blank'));
             if (!empty($tenant['plan'])) {
                 $currentPlan = getPlanByKey((string)$tenant['plan']);
             }

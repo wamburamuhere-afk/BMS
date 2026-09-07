@@ -21,6 +21,7 @@
  */
 
 require_once __DIR__ . '/superadmin_auth.php';
+require_once __DIR__ . '/module_requests.php';
 
 if (!function_exists('renderSuperadminHeader')) {
     /**
@@ -93,6 +94,25 @@ if (!function_exists('renderSuperadminHeader')) {
                             $navItem('tenants',   saUrl('tenants'),   'bi-building',     'Tenants');
                             $navItem('features',  saUrl('features'), 'bi-grid',         'Modules');
                             $navItem('plans',     saUrl('plans'),    'bi-box-seam',     'Plans');
+
+                            $pendingRequests = 0;
+                            if (moduleRequestsTableReady()) {
+                                try {
+                                    $pendingRequests = (int) getControlPdo()
+                                        ->query("SELECT COUNT(*) FROM feature_upgrade_requests WHERE status = 'pending'")
+                                        ->fetchColumn();
+                                } catch (Throwable $e) { /* stays 0 — never breaks the header */ }
+                            }
+                            ?>
+                            <li class="nav-item">
+                                <a class="nav-link<?= $active === 'module-requests' ? ' active' : '' ?>" href="<?= saUrl('module-requests') ?>">
+                                    <i class="bi bi-inbox me-1"></i>Requests
+                                    <?php if ($pendingRequests > 0): ?>
+                                        <span class="badge rounded-pill bg-danger ms-1"><?= $pendingRequests ?></span>
+                                    <?php endif; ?>
+                                </a>
+                            </li>
+                            <?php
                             $navItem('settings',  saUrl('settings'), 'bi-gear-wide-connected', 'Settings');
                             ?>
                             <li class="nav-item ms-lg-2 my-1">
