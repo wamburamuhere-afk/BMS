@@ -49,7 +49,13 @@ has(src($root, 'api/approve_leave.php'), "leaveBalanceFor", 'approve_leave enfor
 has(src($root, 'api/approve_leave.php'), "would exceed the leave balance", 'approve_leave blocks over-application');
 has(src($root, 'api/process_payroll.php'), "unpaidLeaveDaysInPeriod", 'payroll deducts unpaid leave (mode on)');
 has(src($root, 'api/preview_payroll.php'), "unpaidLeaveDaysInPeriod", 'preview mirrors the unpaid-leave deduction');
-has(src($root, 'header.php'), "cron/run_leave_accrual.php", 'accrual cron wired (throttled)');
+// Since 2026-09-07 (perf fix), header.php no longer includes the accrual cron
+// inline (that used to make whichever page load was "due" absorb the scan
+// synchronously) — it fires a fire-and-forget ping to api/run_background_jobs.php,
+// which re-checks the throttle and owns the real include.
+has(src($root, 'header.php'), "leave_accrual_last_run", 'header.php still checks the accrual throttle');
+has(src($root, 'header.php'), "sendBeacon(APP_URL + '/api/run_background_jobs')", 'header.php pings the background-jobs dispatcher when due');
+has(src($root, 'api/run_background_jobs.php'), "cron/run_leave_accrual.php", 'accrual cron wired (throttled) in the dispatcher');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('3. Engine — mapping + normaliser');
