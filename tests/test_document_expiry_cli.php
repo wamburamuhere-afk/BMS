@@ -156,19 +156,36 @@ foreach (["'invoices' =>", "'products' =>", "'approvals' =>", "'others' =>"] as 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-section('8. header.php daily trigger');
+section('8. Daily trigger (header.php ping -> api/run_background_jobs.php)');
 // ─────────────────────────────────────────────────────────────────────────────
-$hdr = readSrc($root, 'header.php');
-// Must verify the real include statement, not just a mention in a comment.
+// Since 2026-09-07 (perf fix), header.php no longer includes the expiry engine
+// inline — that used to make whichever page load was "due" absorb the full
+// scan synchronously. header.php now only decides CHEAPLY whether a fire-and-
+// forget ping is worth sending; api/run_background_jobs.php re-checks the
+// throttle itself and owns the real include. Must verify the real statements,
+// not just a mention in a comment.
+$hdr  = readSrc($root, 'header.php');
+$disp = readSrc($root, 'api/run_background_jobs.php');
+
 $hdrHasThrottle = str_contains($hdr, "get_setting('doc_expiry_last_run')")
                || str_contains($hdr, 'get_setting("doc_expiry_last_run")');
-$hdrHasInclude  = (bool) preg_match('~include(_once)?[^\n]*cron/check_document_expiry\.php~', $hdr);
-if ($hdrHasThrottle && $hdrHasInclude) {
-    pass('header.php runs the expiry engine once per day (throttled include)');
+$hdrFiresPing   = str_contains($hdr, "sendBeacon(APP_URL + '/api/run_background_jobs')");
+if ($hdrHasThrottle && $hdrFiresPing) {
+    pass('header.php cheaply checks the throttle and fires the background-jobs ping when due');
 } else {
-    fail('header.php missing the once-per-day expiry engine trigger — '
+    fail('header.php missing the daily-expiry ping trigger — '
        . (!$hdrHasThrottle ? 'no doc_expiry_last_run throttle; ' : '')
-       . (!$hdrHasInclude  ? 'no include of cron/check_document_expiry.php; ' : ''));
+       . (!$hdrFiresPing   ? 'no sendBeacon to api/run_background_jobs; ' : ''));
+}
+
+$dispHasThrottle = str_contains($disp, "get_setting('doc_expiry_last_run')");
+$dispHasInclude  = (bool) preg_match('~include(_once)?[^\n]*cron/check_document_expiry\.php~', $disp);
+if ($dispHasThrottle && $dispHasInclude) {
+    pass('api/run_background_jobs.php runs the expiry engine once per day (throttled include)');
+} else {
+    fail('api/run_background_jobs.php missing the once-per-day expiry engine trigger — '
+       . (!$dispHasThrottle ? 'no doc_expiry_last_run throttle; ' : '')
+       . (!$dispHasInclude  ? 'no include of cron/check_document_expiry.php; ' : ''));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
