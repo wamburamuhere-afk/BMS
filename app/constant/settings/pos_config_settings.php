@@ -247,6 +247,16 @@ $pos_currency = getSetting('currency', 'TZS');
 <script>
 let registersCache = [];
 
+// This page doesn't include a global safeOutput() helper — it's a per-page
+// local convention elsewhere in the codebase (e.g. app/bms/customer/customers.php),
+// not something header.php defines. Defined here so loadRegisters() below
+// doesn't throw a ReferenceError the moment a register name/code renders.
+function safeOutput(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, function (m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+    });
+}
 
 function loadRegisters() {
     $.getJSON('<?= buildUrl('api/pos/get_registers.php') ?>', function (res) {
