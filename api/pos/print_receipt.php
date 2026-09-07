@@ -28,6 +28,7 @@ $stmt = $pdo->prepare("
         s.*,
         c.customer_name,
         c.phone as customer_phone,
+        c.email as customer_email,
         u.username as cashier_name,
         w.warehouse_name,
         r.register_code, r.receipt_header AS reg_receipt_header,
@@ -71,6 +72,11 @@ $company_phone   = getSetting('company_phone', '');
 $company_tin     = getSetting('company_tin', '');
 $company_vrn     = getSetting('company_vrn', '');
 
+// Phase 10 (pos_upgrade_plan.md §7) — configurable paper width + auto-print,
+// set on the POS Settings page (app/constant/settings/pos_config_settings.php).
+$receipt_width = getSetting('pos_receipt_width', '80') === '58' ? '58' : '80';
+$auto_print    = getSetting('pos_auto_print_receipt', '0') === '1';
+
 // Phase 8 (pos_upgrade_plan.md §7) — a register (till) may override the receipt
 // header/footer for its own counter (e.g. a branch name/location distinct from
 // the company header). Falls back to the company-wide text when the register
@@ -89,7 +95,7 @@ $register_label        = trim($sale['register_name'] ?? '');
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Courier New', monospace;
-            width: 80mm;
+            width: <?= $receipt_width ?>mm;
             margin: 0 auto;
             padding: 10px;
             font-size: 12px;
@@ -161,9 +167,9 @@ $register_label        = trim($sale['register_name'] ?? '');
         }
         @media print {
             @page { margin: 0; }
-            body { 
-                width: 80mm; 
-                margin: 0; 
+            body {
+                width: <?= $receipt_width ?>mm;
+                margin: 0;
                 padding: 10px; /* Compensation for removed page margin */
             }
             .no-print { display: none; }
@@ -174,6 +180,9 @@ $register_label        = trim($sale['register_name'] ?? '');
     <div class="no-print" style="text-align: center; margin-bottom: 10px;">
         <button onclick="window.print()" style="padding: 10px 20px; font-size: 14px; cursor: pointer;">
             Print Receipt
+        </button>
+        <button onclick="emailReceipt()" style="padding: 10px 20px; font-size: 14px; cursor: pointer; margin-left: 10px;">
+            Email Receipt
         </button>
         <button onclick="window.close()" style="padding: 10px 20px; font-size: 14px; cursor: pointer; margin-left: 10px;">
             Close
@@ -273,8 +282,28 @@ $register_label        = trim($sale['register_name'] ?? '');
     </div>
 
     <script>
-        // Auto print on load (optional)
-        // window.onload = function() { window.print(); }
+        // Phase 10 (pos_upgrade_plan.md §7) — Email Receipt.
+        function emailReceipt() {
+            const email = prompt('Send this receipt to which email address?', <?= json_encode($sale['customer_email'] ?? '') ?>);
+            if (!email) return;
+            const fd = new FormData();
+            fd.append('sale_id', <?= (int)$sale_id ?>);
+            fd.append('email', email);
+            fd.append('_csrf', <?= json_encode(csrf_token()) ?>);
+            fetch('<?= buildUrl('/api/pos/email_receipt.php') ?>', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(res => alert(res.message))
+                .catch(() => alert('Could not reach the server. Please try again.'));
+        }
     </script>
+
+    <?php if ($auto_print): ?>
+    <script>
+        // Phase 10 (pos_upgrade_plan.md §7) — "Automatically print the receipt"
+        // POS setting. Still just the browser's print dialog / OS default
+        // printer — a plain web app cannot silently print without one.
+        window.onload = function () { window.print(); };
+    </script>
+    <?php endif; ?>
 </body>
 </html>

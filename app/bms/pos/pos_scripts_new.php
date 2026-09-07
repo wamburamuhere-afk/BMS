@@ -16,8 +16,44 @@ let currentShiftActive = <?= $shift_active ? 'true' : 'false' ?>;
 let isSplitPayment = false;
 let splitAmounts = { cash: 0, mobile: 0, bank: 0, card: 0 };
 let posDiscountType = '<?= get_setting('pos_discount_type', 'percentage') ?>'; // 'percentage' or 'fixed'
+const POS_AUTO_PRINT_RECEIPT = <?= get_setting('pos_auto_print_receipt', '0') === '1' ? 'true' : 'false' ?>; // Phase 10 (pos_upgrade_plan.md §7)
 
 $(document).ready(function() {
+    // Phase 10 (pos_upgrade_plan.md §7) — Select2 AJAX customer search, replacing
+    // the old plain <select> hard-limited to 50 rows with no search at all.
+    $('#customerSelect').select2({
+        theme: 'bootstrap-5', width: '100%', placeholder: 'Walk-in Customer', allowClear: true,
+        ajax: {
+            url: '<?= buildUrl('/api/pos/search_customers.php') ?>',
+            dataType: 'json', delay: 300, cache: true,
+            data: p => ({ q: p.term })
+        }
+    });
+
+    // Phase 10 (pos_upgrade_plan.md §7) — inline "+ New Customer" quick-add.
+    $('#btnQuickAddCustomer').on('click', function () {
+        $('#qac_name, #qac_phone').val('');
+        new bootstrap.Modal(document.getElementById('quickAddCustomerModal')).show();
+    });
+    $('#btnSaveQuickCustomer').on('click', function () {
+        const name = $('#qac_name').val().trim();
+        if (!name) { Swal.fire('Name required', 'Please enter the customer\'s name.', 'warning'); return; }
+        const btn = $(this);
+        btn.prop('disabled', true);
+        $.post('<?= buildUrl('/api/quick_add_customer.php') ?>', {
+            customer_name: name, phone: $('#qac_phone').val().trim()
+        }, function (res) {
+            if (res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('quickAddCustomerModal')).hide();
+                setCustomerSelection(res.customer_id, name);
+                saveCartToStorage();
+                Swal.fire({ icon: 'success', title: 'Customer Added', text: name + ' has been added and selected.', timer: 1800, showConfirmButton: false });
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        }, 'json').always(() => btn.prop('disabled', false));
+    });
+
     // Load cart from localStorage
     loadCartFromStorage();
 
@@ -123,11 +159,29 @@ $(document).ready(function() {
     });
 });
 
+// Phase 10 (pos_upgrade_plan.md §7) — the customer <select> is now Select2-in-
+// AJAX-mode, so it has no static <option> list to pick from any more. Setting
+// .val(id) alone can't show the right label for an id Select2 has never seen
+// (e.g. restoring from localStorage, or loading a held sale) — this creates a
+// real <option> with the correct text first, then selects it and refreshes
+// the visible Select2 widget via 'change'.
+function setCustomerSelection(id, text) {
+    const $sel = $('#customerSelect');
+    if (!id) { $sel.val('').trigger('change'); return; }
+    if (!$sel.find(`option[value="${id}"]`).length) {
+        $sel.append(new Option(text || ('Customer #' + id), id, true, true));
+    } else {
+        $sel.val(id);
+    }
+    $sel.trigger('change');
+}
+
 // Save/Load cart from localStorage
 function saveCartToStorage() {
     try {
         localStorage.setItem('pos_cart', JSON.stringify(cart));
         localStorage.setItem('pos_customer', $('#customerSelect').val() || '');
+        localStorage.setItem('pos_customer_name', $('#customerSelect option:selected').text() || '');
     } catch (e) {
         console.error('Error saving cart:', e);
     }
@@ -137,14 +191,15 @@ function loadCartFromStorage() {
     try {
         const savedCart = localStorage.getItem('pos_cart');
         const savedCustomer = localStorage.getItem('pos_customer');
-        
+        const savedCustomerName = localStorage.getItem('pos_customer_name');
+
         if (savedCart) {
             cart = JSON.parse(savedCart);
             updateCartDisplay();
         }
-        
+
         if (savedCustomer) {
-            $('#customerSelect').val(savedCustomer);
+            setCustomerSelection(savedCustomer, savedCustomerName);
         }
     } catch (e) {
         console.error('Error loading cart:', e);
@@ -156,6 +211,7 @@ function clearCartStorage() {
     try {
         localStorage.removeItem('pos_cart');
         localStorage.removeItem('pos_customer');
+        localStorage.removeItem('pos_customer_name');
     } catch (e) {
         console.error('Error clearing cart storage:', e);
     }
@@ -706,12 +762,15 @@ function processPayment() {
         dataType: 'json',
         success: function(response) {
             if (response.success) {
+                // Phase 10 (pos_upgrade_plan.md §7) — "Automatically print the
+                // receipt" POS setting: skip waiting for the button click.
+                if (POS_AUTO_PRINT_RECEIPT) { printReceipt(response.sale_id); }
                 Swal.fire({
                     icon: 'success',
                     title: 'Sale Completed!',
                     text: 'Receipt #' + currentReceiptNumber,
                     showCancelButton: true,
-                    confirmButtonText: 'Print Receipt',
+                    confirmButtonText: POS_AUTO_PRINT_RECEIPT ? 'Print Again' : 'Print Receipt',
                     cancelButtonText: 'Next Customer',
                     reverseButtons: true
                 }).then((result) => {
@@ -730,7 +789,7 @@ function processPayment() {
                     $('#changeAlert').hide();
                     
                     // 3. Reset Customer to Walk-in (value "")
-                    $('#customerSelect').val('');
+                    setCustomerSelection('', '');
                     
                     // 4. Generate New Receipt Number for next sale
                     generateNewReceipt();
@@ -906,7 +965,7 @@ function loadHeldSale(holdId) {
                                 
                                 // Restore customer if saved
                                 if (sale.customer_id) {
-                                    $('#customerSelect').val(sale.customer_id);
+                                    setCustomerSelection(sale.customer_id, sale.customer_name);
                                 }
                                 
                                 updateCartDisplay();
@@ -1138,11 +1197,20 @@ function confirmEndShift() {
 }
 
 function openCashDrawer() {
+    // Phase 10 (pos_upgrade_plan.md §7) — a browser cannot send a raw hardware
+    // "open drawer" command; that needs either a native print-bridge or
+    // WebUSB (Chrome-only, HTTPS-only — unusable on a plain-HTTP LAN
+    // deployment). This used to claim success and do nothing at all. Most
+    // thermal receipt printers with a drawer wired to their kick port (RJ11)
+    // open it automatically on every print job — which already happens for
+    // free whenever a receipt prints — so this is now honest about that
+    // instead of pretending to have opened anything itself.
     Swal.fire({
-        icon: 'success',
+        icon: 'info',
         title: 'Cash Drawer',
-        text: 'Cash drawer opened.',
-        timer: 1500
+        html: 'A web browser cannot send a direct "open drawer" signal.<br><br>' +
+              'If your cash drawer is wired to your receipt printer\'s kick port, ' +
+              'it opens automatically every time a receipt prints — including just now, if one did.',
     });
 }
 

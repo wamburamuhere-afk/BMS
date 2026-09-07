@@ -19,6 +19,32 @@
     </div>
 </div>
 
+<!-- Quick Add Customer Modal — Phase 10 (pos_upgrade_plan.md §7) -->
+<div class="modal fade" id="quickAddCustomerModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-person-plus me-1"></i> New Customer</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Customer Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="qac_name" placeholder="e.g. John Mushi">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Phone</label>
+                    <input type="text" class="form-control" id="qac_phone" placeholder="e.g. 0712 345 678">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btnSaveQuickCustomer"><i class="bi bi-check-circle me-1"></i> Add Customer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Held Sales Modal -->
 <div class="modal fade" id="heldSalesModal" tabindex="-1">
     <div class="modal-dialog modal-lg">

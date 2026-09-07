@@ -442,7 +442,7 @@ feature key) — see Phase 13.
 | 7 | Ledger-integrity fix (void→GL reversal, receipt company-info bug) | ✅ DONE (above) |
 | 8 | Register/Till model — activate the unused `pos_registers` schema (till selection, per-register receipt branding, populate `cash_register_shifts` totals at close) | ✅ DONE (below) |
 | 9 | Z-Report / EOD reconciliation, built on Phase 8's populated shift totals | ✅ DONE (below) |
-| 10 | Real receipt printing (ESC/POS + drawer kick), email/SMS receipt, Select2 AJAX customer picker with quick-add | Planned |
+| 10 | Receipt printing improvements, email receipt, Select2 AJAX customer picker with quick-add — **re-scoped, see below** | ✅ DONE (below) |
 | 11 | Loyalty points (real accrual/redemption) + multi-currency (base currency from `system_settings.currency`, replacing the hardcoded `TZS`) | Planned |
 | 12 | Offline resilience (local queue + sync-on-reconnect) | **Deferred — needs its own design discussion before implementation, per product owner (2026-09-07). Not scheduled in this tranche.** |
 | 13 | Wire a `pos_advanced` feature-registry entry (`depends_on: ['pos']`) so a superadmin can gate the Phase 8-11 features per tenant company | Planned |
@@ -557,6 +557,68 @@ against a voided sale, a return, a completed sale with **no** GL posting, and
 a completed sale **with** one (confirming the health check flags only the
 genuinely unposted sale). All Phase 7/8 tests and pre-existing POS regression
 suites re-run clean.
+
+---
+
+### Phase 10 — Customer picker, receipt printing, email receipt
+
+**Status:** ✅ DONE (re-scoped) · **Added:** 2026-09-07 · **Branch:** `feat/pos-professional-upgrade`
+
+**Scope was deliberately narrowed from the original "ESC/POS + drawer kick + email/SMS
+receipt" roadmap wording, for two concrete, verified reasons — not a shortcut, a
+platform-reality correction:**
+
+1. **True ESC/POS raw printing and a software drawer-kick command are not
+   achievable from a plain browser page.** A browser can only open the OS
+   print dialog against HTML/CSS content — it cannot write raw bytes to a
+   printer. The only way around that is either a native local print-bridge
+   agent (extra software to install and maintain on every till, not requested)
+   or WebUSB, which is Chrome-only **and requires a secure (HTTPS) context** —
+   this deployment runs over plain HTTP on a LAN (WAMP), where WebUSB is
+   flatly unavailable. Building either would have meant shipping something
+   that either doesn't work in this tenant's actual environment or silently
+   depends on infrastructure nobody asked for. Documented here instead of
+   silently dropped.
+2. **SMS receipts are not implemented because there is no working SMS gateway
+   integration to build on.** Checked `api/test_sms_config.php` — its own
+   comment reads "In a real system, you'd call the specific gateway API here.
+   For now, we simulate." Building "Send Receipt via SMS" on top of a
+   simulated backend would create the illusion of a working feature while
+   sending nothing. Flagged as a real gap, not implemented.
+
+**What professional-grade printing looks like within that real boundary
+(and what was actually built):**
+- **Configurable receipt paper width** (58mm/80mm) and an **"automatically
+  print on sale complete"** setting, both on `pos_config_settings.php` —
+  `print_receipt.php` now reads them instead of hardcoding 80mm and a
+  commented-out auto-print line.
+- **Honest cash-drawer messaging.** `openCashDrawer()` previously showed a fake
+  "Cash drawer opened!" success toast that did nothing at all. Replaced with an
+  accurate explanation: a browser cannot send a hardware open-drawer signal,
+  but a drawer wired to a printer's kick port already opens automatically on
+  every print — which the auto-print setting above now makes happen for free.
+- **Email Receipt** — genuinely wired to the real SMTP-backed `sendEmail()`
+  (`core/mailer.php`), not simulated. Fails with the real `mailer_last_error()`
+  message (e.g. "SMTP is not configured") rather than a fake success.
+
+**What was fully built as scoped:**
+- **Select2 AJAX customer picker** (`api/pos/search_customers.php`, project-
+  scoped per security.md §23) replacing the old plain `<select>` hard-limited
+  to the first 50 active customers with no search at all.
+- **Inline "+ New Customer" quick-add** — wired up the pre-existing but
+  never-called `api/quick_add_customer.php` (added the `csrf_check()` it was
+  missing) behind a small modal; the new customer is immediately selected.
+- Fixed a restore-path bug this Select2 conversion would otherwise have
+  introduced: an AJAX-mode Select2 has no static `<option>` list, so
+  programmatically restoring a previously-picked customer (from
+  `localStorage`, or from a held sale) needs the option created first —
+  `setCustomerSelection()` handles this at all three call sites.
+- Added `csrf_check()` to `pos_config_settings.php`'s POST handler (and a
+  `_csrf` field to its form), which was missing entirely.
+
+Verified live: `tests/test_pos_phase10_customer_receipt_cli.php` (32
+assertions). All Phase 7-9 tests and pre-existing POS regression suites
+re-run clean.
 
 ---
 

@@ -305,15 +305,14 @@ $currency = 'TZS';
             <div class="p-3 border-top bg-white">
                 <div class="mb-2">
                     <label class="form-label small fw-bold">Customer</label>
-                    <select class="form-select form-select-sm" id="customerSelect">
-                        <option value="">Walk-in Customer</option>
-                        <?php
-                        $customers = $pdo->query("SELECT customer_id, customer_name FROM customers WHERE status = 'active' ORDER BY customer_name LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
-                        foreach ($customers as $customer) {
-                            echo "<option value='{$customer['customer_id']}'>{$customer['customer_name']}</option>";
-                        }
-                        ?>
-                    </select>
+                    <div class="input-group input-group-sm">
+                        <select class="form-select form-select-sm" id="customerSelect" style="width:1%;flex:1 1 auto;">
+                            <option value="">Walk-in Customer</option>
+                        </select>
+                        <button type="button" class="btn btn-outline-secondary" id="btnQuickAddCustomer" title="Add new customer">
+                            <i class="bi bi-person-plus"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="mb-2">

@@ -1,5 +1,27 @@
 # BMS Changelog
 
+## 2026-09-07 (feat) - POS Phase 10: Select2 customer picker, receipt printing, email receipt
+
+**Files (added):** `api/pos/search_customers.php`, `api/pos/email_receipt.php`, `tests/test_pos_phase10_customer_receipt_cli.php`
+**Files (changed):** `api/quick_add_customer.php`, `api/pos/print_receipt.php`, `app/bms/pos/pos.php`,
+`app/bms/pos/pos_modals_new.php`, `app/bms/pos/pos_scripts_new.php`,
+`app/constant/settings/pos_config_settings.php`, `pos_upgrade_plan.md`
+
+Fourth phase of the POS "Advanced" professionalisation tranche — scope narrowed from the original
+"ESC/POS + drawer kick + email/SMS receipt" wording for two verified platform-reality reasons (see
+`pos_upgrade_plan.md` §Phase 10 for the full explanation): true ESC/POS printing and a software
+drawer-kick need either a native print-bridge or WebUSB (Chrome+HTTPS only — this deployment runs
+over plain HTTP), and SMS receipts have no real gateway to build on (`api/test_sms_config.php` is
+explicitly a simulation). Replaced the old plain `<select>` (hard-limited to 50 customers, no
+search) with a project-scoped Select2 AJAX customer picker plus an inline "+ New Customer"
+quick-add (wired up the pre-existing but never-called `quick_add_customer.php`, adding the
+`csrf_check()` it was missing). Added genuinely working Email Receipt via the real SMTP-backed
+`sendEmail()`. Added configurable receipt paper width (58/80mm) and auto-print-on-complete
+settings, and replaced the fake "Cash drawer opened!" success toast with an honest explanation of
+what a browser can and can't do. Also fixed a missing `csrf_check()` on `pos_config_settings.php`'s
+form. Verified live with a new 32-assertion CLI test; all prior POS phase tests and pre-existing
+regression suites still pass.
+
 ## 2026-09-07 (feat) - POS Phase 9: Z-Report / EOD shift reconciliation
 
 **Files (added):** `app/bms/pos/zreport.php`, `app/bms/pos/shift_history.php`, `tests/test_pos_phase9_zreport_cli.php`

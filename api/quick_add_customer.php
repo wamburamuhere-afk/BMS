@@ -15,6 +15,7 @@ if (!canCreate('customers')) {
     echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to add customers']);
     exit();
 }
+csrf_check();
 
 try {
     global $pdo;
