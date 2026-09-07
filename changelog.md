@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-09-07 (fix) - POS: Start Shift modal never opened (safeOutput ReferenceError)
+
+**Files (changed):** `app/bms/pos/pos_scripts_new.php`, `app/constant/settings/pos_config_settings.php`
+**Files (added test):** extended `tests/test_pos_phase8_registers_cli.php` with a `safeOutput()` regression guard
+
+Found via live testing on `dev.bms.local`: clicking "Start Shift" appeared to hang and never opened the
+modal. Root cause — `safeOutput()` is a per-page LOCAL JS convention in this codebase (each page that
+uses it defines its own copy; it is not a global helper from `header.php`), and Phase 8's new register-list
+rendering called it in `pos_scripts_new.php` and `pos_config_settings.php` without either file defining it,
+throwing an uncaught `ReferenceError` inside the `$.getJSON` success callback — before `.modal('show')`
+ever ran. Fixed `pos_scripts_new.php` by building the `<option>` via safe DOM `.text()` construction instead
+(no helper needed); fixed `pos_config_settings.php` by adding the standard local `safeOutput()` definition
+(matching the pattern already used elsewhere, e.g. `app/bms/customer/customers.php`). Added a regression
+guard to the Phase 8 CLI test that scans every touched file for a `safeOutput(` call with no matching local
+definition — `php -l` and the existing wiring-pattern checks are blind to this class of bug since they never
+execute the JS. All CLI suites re-verified green after the fix.
+
 ## 2026-09-07 (feat) - POS Phase 13: wire 'pos_advanced' into tenant module entitlement
 
 **Files (added):** `migrations/tenant/2026_09_07_pos_advanced_permission.php`,
