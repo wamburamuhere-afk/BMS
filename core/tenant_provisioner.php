@@ -243,11 +243,28 @@ if (!function_exists('seedTenantCompanyProfile')) {
      * landed on Company Profile with the placeholder "My Company" even though
      * they had just typed their real name at registration.
      *
-     * Logo storage deliberately mirrors company_profile.php's own upload
-     * handling (same directory, same 'company_logo.<ext>' filename) so that
-     * page finds the file with no change on its side.
+     * Logo storage is tenant-prefixed (uploads/t{id}/system/logo/), NOT the
+     * shared uploads/system/logo/ this used to write to. Every tenant on this
+     * server shares one webroot/filesystem (only the database differs), so the
+     * old code meant every self-registered company's logo overwrote the exact
+     * same physical file — whichever company registered most recently silently
+     * became the logo shown on the platform's own legacy/default site too, since
+     * that account's logo (set before company_profile.php's own matching fix)
+     * still points at that same old shared path. Reported live 2026-09-08.
+     *
+     * This request is still running on the PARENT host at this point (the
+     * visitor is on the public /register page, not yet on the new tenant's own
+     * subdomain), so bmsCurrentTenant()/bmsUploadsDir() have not resolved to
+     * this tenant and must not be used here — they would still point at the
+     * shared, unprefixed folder. $tenantId is passed in explicitly instead, and
+     * the path is built to match exactly what bmsTenantPathPrefix() will
+     * independently compute once this SAME tenant's later, real requests
+     * resolve normally: a freshly self-registered tenant is never the legacy
+     * install, so its prefix is unconditionally 't{id}/'. company_profile.php
+     * (via bmsUploadsDir('system/logo')) will find the file at the identical
+     * path with no change needed on its side.
      */
-    function seedTenantCompanyProfile(PDO $tpdo, string $companyName, array $extra): void
+    function seedTenantCompanyProfile(PDO $tpdo, int $tenantId, string $companyName, array $extra): void
     {
         $values = ['company_name' => $companyName];
 
@@ -261,11 +278,14 @@ if (!function_exists('seedTenantCompanyProfile')) {
         $tmpPath = $extra['logo_tmp_path'] ?? null;
         $ext     = $extra['logo_extension'] ?? null;
         if ($tmpPath && $ext && is_uploaded_file($tmpPath)) {
-            $uploadDir = __DIR__ . '/../uploads/system/logo/';
+            require_once __DIR__ . '/tenant_bootstrap.php';   // for bmsEnsureUploadGuard() only — no current-request tenant state used
+            $relDir    = 'uploads/t' . $tenantId . '/system/logo/';
+            $uploadDir = dirname(__DIR__) . '/' . $relDir;
             if (!is_dir($uploadDir)) @mkdir($uploadDir, 0777, true);
+            bmsEnsureUploadGuard($uploadDir);
             $target = $uploadDir . 'company_logo.' . $ext;
             if (move_uploaded_file($tmpPath, $target)) {
-                $values['company_logo'] = 'uploads/system/logo/company_logo.' . $ext;
+                $values['company_logo'] = $relDir . 'company_logo.' . $ext;
             }
         }
 
@@ -519,7 +539,7 @@ if (!function_exists('provisionTenant')) {
             // hiccup writing these optional fields must not tear the whole
             // tenant down. The owner can always fill them in later.
             try {
-                seedTenantCompanyProfile($tpdo, $companyName, [
+                seedTenantCompanyProfile($tpdo, $tenantId, $companyName, [
                     'physical_address' => $opts['physical_address'] ?? '',
                     'postal_address'   => $opts['postal_address'] ?? '',
                     'logo_tmp_path'    => $opts['logo_tmp_path'] ?? null,

@@ -1,5 +1,48 @@
 # BMS Changelog
 
+## 2026-09-08 (fix) - Self-registration: new company's logo no longer overwrites the host's own default logo
+
+**Files (changed):** `core/tenant_provisioner.php`
+**Files (added):** `tests/test_tenant_provisioner_scoped_logo_cli.php`
+
+Reported live: registering a brand-new company through the public self-registration form
+(`register.php`) and uploading a logo at signup silently overwrote the logo shown on that
+same server's own default/legacy site. Root cause: `seedTenantCompanyProfile()` — the
+function that writes what the owner typed at signup into the new tenant's own database —
+saved the uploaded logo to the SAME shared, unprefixed path
+(`uploads/system/logo/company_logo.<ext>`) that `app/constant/settings/company_profile.php`
+used to write to before that page's own separate fix (PR #1829, `bmsUploadsDir('system/logo')`)
+moved it onto a per-tenant folder. This one function was the remaining leftover of that same
+bug class, missed because it lives in the registration flow rather than the Settings pages —
+every tenant on a given host shares one physical webroot/filesystem (only the database
+differs per tenant), so every self-registered company's logo was overwriting the exact same
+physical file, and the host's own default account's `company_logo` setting (set before that
+other fix existed) still points at that same old shared path.
+
+Fixed by passing the newly-provisioned tenant's own id through to `seedTenantCompanyProfile()`
+and building the same `uploads/t{id}/system/logo/` path `bmsTenantPathPrefix()` independently
+computes for that tenant on its later, real requests — a freshly self-registered tenant is
+never the "legacy" install, so its prefix is unconditionally `t{id}/`. Deliberately does NOT
+call `bmsUploadsDir()`/`bmsCurrentTenant()` directly: this code still runs on the *parent*
+host mid-registration, before the new tenant's own requests ever resolve, so those
+current-request-scoped helpers would still point at the shared folder — the target directory
+is built explicitly from the tenant id already in hand instead. `company_profile.php` will
+find the file at the identical path with no change needed on its side.
+
+Past self-registrations that included a logo cannot be recovered — the same physical file was
+repeatedly overwritten, so earlier uploads are unrecoverably gone. Going forward this is fully
+isolated. 17 new assertions (wiring, path-construction-matches-bmsTenantPathPrefix, and a
+live-DB check that the non-logo seeding behaviour — company name/address — is unaffected by
+the new parameter); the true end-to-end proof (an actual multipart-uploaded logo landing in
+the right folder) can only be verified by a real browser submission of `register.php`, since
+`is_uploaded_file()` cannot be satisfied from a CLI script by design. Full pre-existing
+`test_tenant_provisioning_cli.php` (72 assertions) and `test_tenant_registration_cli.php`
+(72 assertions) regression suites re-run clean.
+
+**Related, separate PR (#1829, not part of this change):** the admin-facing Settings ->
+System Settings and Settings -> Company Profile logo uploads had the identical shared-path
+bug and were fixed independently in that PR.
+
 ## 2026-09-08 (feat) - POS: busy-register visibility in Start Shift, supervisor Force Close
 
 **Files (added):** `tests/test_pos_register_visibility_force_close_cli.php`
