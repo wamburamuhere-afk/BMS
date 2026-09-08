@@ -45,6 +45,48 @@ failures present there are unrelated to this change (backup path conventions, lo
 rows, POS color-settings markup, an admin nav link) and reproduce identically on `develop`
 without this fix applied, confirmed by diffing the failure counts with and without it.
 
+## 2026-09-08 (feat) - New companies now get Tanzania address reference data (country/region/district/ward/village)
+
+**Files (added):** `schema/tenant_geography_seed.sql`,
+`migrations/tenant/2026_09_08_seed_geography_reference_data.php`,
+`tests/test_tenant_geography_seed_cli.php`
+**Files (changed):** `core/tenant_provisioner.php`
+
+Reported live: a newly created company has the `countries`/`regions`/`districts`/`wards`/`villages`
+TABLES (`schema/tenant_schema_template.sql` already creates them for every tenant) but zero ROWS
+in them, so the Country -> Region -> District -> Ward -> Village address dropdowns used on
+Customer, Supplier, and Sub-Contractor forms are empty for every new company — even though they
+work correctly on the legacy/reference install and on every tenant that predates the
+multi-tenancy conversion. Root cause: this data was simply never included when Chart-of-Accounts/
+permissions seeding was built (`schema/tenant_seed_defaults.sql`, multi-tenancy Phase 2) — a gap,
+not a regression from a later change.
+
+Unlike Chart of Accounts (where 90 of 195 source accounts had to be excluded because they carry
+real customer names), this data has no privacy dimension at all — it's Tanzania's public
+administrative geography (10 countries, 31 regions, 178 districts, 3,997 wards, 29,472 villages),
+correct identically for every company. Added as its own file, `schema/tenant_geography_seed.sql`,
+deliberately kept separate from the small, hand-curated `tenant_seed_defaults.sql` rather than
+merged into it — this dataset never changes and would otherwise bury that file's carefully
+documented privacy exclusions under tens of thousands of village names on every future diff.
+Generated via `mysqldump --complete-insert` (explicit column names, safe against any future
+schema-column-order drift) chunked to ~256KB per statement rather than one row per statement or
+one giant statement per table — `tenant_provisioner.php` applies this file as a single blocking
+step during every new company's signup, so statement size matters for both provisioning speed and
+staying under a MySQL server's `max_allowed_packet` regardless of how a given deployment has it
+configured. Wired into `provisionTenant()` as a new `apply_geography` step, immediately after the
+existing `apply_seed` step, using the exact same mechanism.
+
+Backfilled every tenant that already exists via `migrations/tenant/2026_09_08_seed_geography_reference_data.php`
+(idempotent — skips entirely if `countries` already has any rows, so it's safe to re-run and
+correctly no-ops on any tenant provisioned after this fix).
+
+Verified live: the seed file applies cleanly to a bare schema-only throwaway database with exact
+row counts matching the source data; the migration was proven idempotent against a synthetic
+"pre-existing tenant" database (schema present, geography empty — the exact shape of every real
+company created before this fix) — first run seeds correctly, second run is a true no-op, no
+duplication either way. 20 new assertions, 0 failures. Pre-existing `test_tenant_provisioning_cli.php`
+(72 assertions) and `test_tenant_registration_cli.php` (72 assertions) re-run clean.
+
 ## 2026-09-08 (feat) - POS: busy-register visibility in Start Shift, supervisor Force Close
 
 **Files (added):** `tests/test_pos_register_visibility_force_close_cli.php`
