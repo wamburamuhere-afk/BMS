@@ -333,6 +333,8 @@ $price_groups = $price_groups_enabled
                             <i class="bi bi-person-plus"></i>
                         </button>
                     </div>
+                    <!-- Phase 19 (pos_upgrade_plan.md §8) — customer credit limit -->
+                    <div class="d-none small mt-1" id="customerCreditInfo"></div>
                 </div>
 
                 <?php if ($price_groups_enabled && count($price_groups) > 1): ?>

@@ -22,6 +22,7 @@ require_once __DIR__ . '/../../core/pos_override_guard.php';
 require_once __DIR__ . '/../../core/pos_price_groups.php';
 require_once __DIR__ . '/../../core/pos_batch_consumption.php';
 require_once __DIR__ . '/../../core/pos_unit_conversion.php';
+require_once __DIR__ . '/../../core/pos_credit_limit.php';
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
@@ -431,6 +432,27 @@ try {
     else                                                   $final_payment_status = 'pending';
     $balance_due = round($calculated_total - $amount_paid_now, 2);
 
+    // Phase 19 (pos_upgrade_plan.md §8) — customer credit-limit enforcement.
+    // Only a real credit EXPOSURE (balance_due > 0) is checked — a "credit"
+    // sale paid in full via a deposit carries no actual risk. A manager
+    // (canEdit('pos')) can explicitly override a blocked sale by re-submitting
+    // with override_credit_limit=1 — the flag itself is meaningless without
+    // that permission, checked fresh server-side, never trusted from the client.
+    if ($is_credit && $balance_due > 0.01) {
+        $overrideRequested = !empty($input['override_credit_limit']);
+        $overridePermitted = $overrideRequested && canEdit('pos');
+        $custNameStmt = $pdo->prepare("SELECT customer_name FROM customers WHERE customer_id = ?");
+        $custNameStmt->execute([$customer_id]);
+        $custName = $custNameStmt->fetchColumn() ?: ('#' . $customer_id);
+        assertPosCreditLimitPermitted($pdo, (int)$customer_id, $balance_due, $overridePermitted, $custName);
+        if ($overridePermitted) {
+            logAudit($pdo, $user_id, 'pos_credit_limit_override', [
+                'entity_type' => 'pos_sale', 'entity_id' => $sale_id,
+                'new_values' => ['customer_id' => $customer_id, 'balance_due' => $balance_due],
+            ]);
+        }
+    }
+
     // Update the main sale record with calculated values + authoritative status.
     $updateSaleStmt = $pdo->prepare("
         UPDATE pos_sales
@@ -541,6 +563,17 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
         'loyalty_points_redeemed' => $loyalty_points_redeemed
     ]);
     
+} catch (PosCreditLimitExceededException $e) {
+    $pdo->rollBack();
+    echo json_encode([
+        'success' => false,
+        'message' => $e->getMessage(),
+        'error_code' => 'credit_limit_exceeded',
+        // Phase 19 — told to the client so it knows whether to even offer an
+        // "Override" retry; the flag is meaningless without this permission,
+        // re-checked fresh server-side on the retry regardless.
+        'can_override' => canEdit('pos'),
+    ]);
 } catch (Exception $e) {
     $pdo->rollBack();
     echo json_encode([

@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-09-08 (feature) - POS Phase 19: customer credit-limit enforcement
+
+**Files (new):** `core/pos_credit_limit.php`, `tests/test_pos_credit_limit_cli.php`
+**Files (changed):** `api/pos/process_sale.php`, `api/pos/search_customers.php`, `app/bms/pos/pos.php`,
+`app/bms/pos/pos_scripts_new.php`, `lang/sw.php`
+
+Sixth phase of the Tier-3 plan (§8 Phase 19). `customers.credit_limit` was captured on the
+customer form since day one but nothing at the point of sale ever checked it. Now enforced only
+against real credit exposure (balance due after any deposit) — mirrors the exact outstanding-balance
+formula `receive_payment.php` already uses. A manager can override (`canEdit('pos')`, re-checked
+server-side on retry) via a structured `error_code`/`can_override` response field, not a
+string-matched error message (which would silently break under Swahili). Customer search now
+surfaces credit limit + live outstanding balance the moment a customer is picked, so a cashier sees
+available credit before attempting a sale rather than only after being blocked.
+
 ## 2026-09-08 (feature) - POS Phase 15: unit conversion at the register (carton/ream/dozen ↔ piece)
 
 **Files (new):** `core/pos_unit_conversion.php`, `migrations/tenant/2026_09_08_pos_unit_conversions.php`,

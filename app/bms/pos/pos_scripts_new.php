@@ -139,7 +139,10 @@ const PT = {
     priceOverrideBelowMin: <?= json_encode(t('%s: price cannot be below the minimum selling price of %s')) ?>,
     priceUpdated: <?= json_encode(t('Price updated')) ?>,
     discountPermissionDenied: <?= json_encode(t('You do not have permission to apply a discount.')) ?>,
-    unitLabel: <?= json_encode(t('Unit')) ?>
+    unitLabel: <?= json_encode(t('Unit')) ?>,
+    overrideAndProceed: <?= json_encode(t('Override and Proceed')) ?>,
+    availableCredit: <?= json_encode(t('Available Credit')) ?>,
+    outstandingLabel: <?= json_encode(t('Outstanding')) ?>
 };
 
 // Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split: a cashier
@@ -190,10 +193,25 @@ $(document).ready(function() {
         if ($('#posPriceGroupId').length && e.params.data.default_price_group_id) {
             $('#posPriceGroupId').val(e.params.data.default_price_group_id).trigger('change');
         }
+        // Phase 19 (pos_upgrade_plan.md §8) — show available credit so a
+        // cashier can see it before attempting a credit sale, not just after
+        // being blocked. Server independently re-validates at checkout regardless.
+        const limit = parseFloat(e.params.data.credit_limit) || 0;
+        const outstanding = parseFloat(e.params.data.outstanding_balance) || 0;
+        const available = limit - outstanding;
+        if (limit > 0) {
+            $('#customerCreditInfo').removeClass('d-none').html(
+                `<i class="bi bi-credit-card"></i> ${PT.availableCredit}: <strong class="${available <= 0 ? 'text-danger' : 'text-success'}">${POS_CURRENCY} ${available.toLocaleString()}</strong>` +
+                (outstanding > 0 ? ` <span class="text-muted">(${PT.outstandingLabel}: ${POS_CURRENCY} ${outstanding.toLocaleString()})</span>` : '')
+            );
+        } else {
+            $('#customerCreditInfo').addClass('d-none').html('');
+        }
         calculateCartTotal();
     }).on('select2:clear select2:unselect', function () {
         $('#loyaltyPointsSection').addClass('d-none');
         $('#redeemPointsInput').val(0);
+        $('#customerCreditInfo').addClass('d-none').html('');
         // Back to the default group (first option, seeded as "Retail") for a
         // walk-in / cleared customer.
         if ($('#posPriceGroupId').length) {
@@ -1075,7 +1093,14 @@ function processPayment() {
     };
     
     $('#processPaymentBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + PT.processing);
-    
+
+    submitPayment(paymentData);
+}
+
+// Phase 19 (pos_upgrade_plan.md §8) — extracted so a blocked credit-limit
+// sale can be retried once with override_credit_limit=1 after a manager
+// confirms, without duplicating the whole request-building step above.
+function submitPayment(paymentData) {
     $.ajax({
         url: '<?= buildUrl('/api/pos/process_sale.php') ?>',
         type: 'POST',
@@ -1135,6 +1160,26 @@ function processPayment() {
                     // 7. Update Cash Balance UI
                     updateCashBalanceUI();
                 });
+            } else if (response.error_code === 'credit_limit_exceeded' && response.can_override) {
+                // Phase 19 (pos_upgrade_plan.md §8) — a manager (canEdit('pos'),
+                // re-checked fresh server-side on the retry) may explicitly
+                // override a blocked credit sale.
+                Swal.fire({
+                    icon: 'warning',
+                    title: PT.paymentFailed,
+                    text: response.message,
+                    showCancelButton: true,
+                    confirmButtonText: PT.overrideAndProceed,
+                    cancelButtonText: PT.cancel
+                }).then(r => {
+                    if (r.isConfirmed) {
+                        paymentData.override_credit_limit = 1;
+                        submitPayment(paymentData);
+                    } else {
+                        $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
+                    }
+                });
+                return;
             } else {
                 Swal.fire({
                     icon: 'error',

@@ -1275,6 +1275,25 @@ figures.
 
 ### Phase 19 — Customer Credit-Limit Enforcement at POS
 
+**Status:** ✅ DONE · **Built:** 2026-09-08 · **Branch:** `feat/pos-tier3-advanced-retail`
+
+Shipped as planned, with one refinement: only a real credit **exposure**
+(`balance_due > 0` after any deposit) is checked — a "credit" sale paid in
+full via a deposit carries no actual risk and is never blocked, even for a
+customer already at their limit. `core/pos_credit_limit.php`
+(`customerOutstandingBalance()`, `assertPosCreditLimitPermitted()`) mirrors
+the exact per-sale balance formula `api/pos/receive_payment.php` already
+uses. A manager override (`canEdit('pos')`, re-checked server-side on
+retry, never trusted from a client flag) is surfaced via a **dedicated
+exception type** (`PosCreditLimitExceededException`) and a structured
+`error_code`/`can_override` JSON field — deliberately not string-matching
+the (translated) error message client-side, which would silently break
+under Swahili. `api/pos/search_customers.php` now returns each customer's
+credit limit + live outstanding balance, shown next to the customer picker
+the moment they're selected — a cashier sees available credit before
+attempting a sale, not only after being blocked. `tests/test_pos_credit_limit_cli.php`
+(19 checks). Full POS regression re-run clean.
+
 **Closes:** `customers.credit_limit` is captured today but never checked.
 **Gate:** base `pos` (protects the business's own cash flow — not an upsell).
 
