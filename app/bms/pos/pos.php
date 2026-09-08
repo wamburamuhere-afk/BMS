@@ -233,9 +233,11 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0"><i class="bi bi-cart3"></i> <?= t('Current Sale') ?></h5>
                     <div class="btn-group btn-group-sm">
+                        <?php if (canEdit('pos_discount_override')): ?>
                         <button class="btn btn-outline-warning" onclick="openDiscountModal()" title="<?= t('Apply Discount') ?>">
                             <i class="bi bi-percent"></i>
                         </button>
+                        <?php endif; ?>
                         <button class="btn btn-outline-danger" onclick="clearCart()" title="<?= t('Clear Cart') ?>">
                             <i class="bi bi-trash"></i>
                         </button>

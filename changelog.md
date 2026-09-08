@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-09-08 (feature) - POS Phase 16: cashier price/discount-override permission split
+
+**Files (new):** `core/pos_override_guard.php`, `migrations/tenant/2026_09_08_pos_override_permissions.php`,
+`tests/test_pos_override_permissions_cli.php`
+**Files (changed):** `api/pos/process_sale.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`,
+`lang/sw.php`, `schema/tenant_seed_defaults.sql`
+
+First phase of the Tier-3 plan (§8 Phase 16). Two new permission page_keys —
+`pos_price_override`, `pos_discount_override` — gate two POS-terminal actions that
+previously had no gate at all beyond general `canCreate('pos')` access.
+
+Found while building this: `process_sale.php` trusted the client-submitted `item['price']`
+directly as the line's base price, validating only that the final (possibly-discounted)
+price stayed at/above `min_selling_price` — a forged request could set the base price to
+anything. Fixed by always resolving the base price server-side from the product's own
+`selling_price` (extracted into `core/pos_override_guard.php::resolvePosLineBasePrice()`
+so it's independently unit-tested), honouring a client-submitted price ONLY when the
+cashier explicitly used the new "Edit Price" affordance (hidden unless they hold
+`pos_price_override`) — a manual override attempted without that permission is silently
+corrected back to the true DB price rather than trusted. A real discount on a line now
+requires `pos_discount_override` (`assertPosLineDiscountPermitted()`) — rejected with a
+clear, translated error otherwise; the "Apply Discount" toolbar button in `pos.php` is
+also hidden server-side for cashiers without the permission (defence in depth, not the
+only gate). All new user-facing strings translated (Swahili) and covered by the existing
+`test_pos_i18n_coverage_cli.php` completeness guard (485 keys, zero gaps). Full POS
+regression suite re-run clean; two pre-existing unrelated failures
+(`test_pos_color_settings_split_cli.php`, `test_pos_dashboard_cli.php`) confirmed present
+on unmodified `develop` too, not introduced here.
+
 ## 2026-09-08 (plan) - POS Tier-3 professionalisation plan (UltimatePOS gap-closure) written
 
 **Files (changed):** `pos_upgrade_plan.md` (new §8, Phases 14-24)

@@ -18,6 +18,7 @@ require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../helpers.php';
 require_once __DIR__ . '/../../core/stock_ledger.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
+require_once __DIR__ . '/../../core/pos_override_guard.php';
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
@@ -220,18 +221,24 @@ try {
         WHERE product_id = ?
     ");
     
+    // Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split. These
+    // are the real security boundary; the client-side hiding in pos.php/
+    // pos_scripts_new.php is UX only, never trusted on its own.
+    $can_price_override    = canEdit('pos_price_override');
+    $can_discount_override = canEdit('pos_discount_override');
+
     foreach ($items as $item) {
         $pid = $item['product_id'];
         $db_product = $products_map[$pid] ?? null;
-        
+
         if (!$db_product) {
             throw new Exception("Product ID $pid not found");
         }
-        
+
         // Validate Price
         $requested_price = floatval($item['discounted_price'] ?? $item['price'] ?? 0);
         $min_price = floatval($db_product['min_selling_price']);
-        
+
         // Allow a small epsilon for float comparison
         if ($requested_price < ($min_price - 0.01)) {
             throw new Exception("Price for '{$db_product['product_name']}' is below minimum selling price.");
@@ -257,14 +264,27 @@ try {
             }
         }
 
-        $original_price = floatval($item['price']); // Original selling price
+        // Phase 16 (pos_upgrade_plan.md §8) — base price resolved server-side,
+        // never trusted from the client unless explicitly overridden by a
+        // permitted cashier (see core/pos_override_guard.php).
+        $priceResolution = resolvePosLineBasePrice($item, $db_product, $can_price_override);
+        $original_price = $priceResolution['original_price'];
+        if ($priceResolution['requested_price'] !== null) {
+            $requested_price = $priceResolution['requested_price'];
+        }
         $tax_rate = floatval($item['tax_rate']);
         $discount_percent = floatval($item['discount_percent']);
-        
+
         $item_original_total = $original_price * $qty;
         $item_discounted_total = $requested_price * $qty;
-        
+
         $item_discount_amount = $item_original_total - $item_discounted_total;
+
+        // A real discount on this line requires pos_discount_override.
+        // Rejects outright rather than silently clamping: an unauthorized
+        // discount attempt on a live sale is worth surfacing as an error, not
+        // quietly overriding the price the cashier saw on screen.
+        assertPosLineDiscountPermitted($item_discount_amount, $can_discount_override, $db_product['product_name']);
         $item_tax_amount = $item_discounted_total * ($tax_rate / 100);
         
         // Update global sums

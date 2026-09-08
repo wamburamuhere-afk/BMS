@@ -132,8 +132,21 @@ const PT = {
     ok: <?= json_encode(t('OK')) ?>,
     successfullyUpdatedItems: <?= json_encode(t('Successfully updated %d items.')) ?>,
     cartQtyLabel: <?= json_encode(t('cart qty:')) ?>,
-    barcodeNotFound: <?= json_encode(t('Barcode not found')) ?>
+    barcodeNotFound: <?= json_encode(t('Barcode not found')) ?>,
+    editPriceTitle: <?= json_encode(t('Edit Price')) ?>,
+    newPriceLabel: <?= json_encode(t('New unit price')) ?>,
+    priceOverrideBelowMin: <?= json_encode(t('%s: price cannot be below the minimum selling price of %s')) ?>,
+    priceUpdated: <?= json_encode(t('Price updated')) ?>,
+    discountPermissionDenied: <?= json_encode(t('You do not have permission to apply a discount.')) ?>
 };
+
+// Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split: a cashier
+// can sell without necessarily being allowed to change a line's price or apply
+// a discount. These flags only control client-side affordances (show/hide the
+// edit-price pencil, the discount toolbar button already gated server-side in
+// pos.php); api/pos/process_sale.php independently re-validates both — the
+// real security boundary, never trusts these client flags alone.
+const POS_CAN_PRICE_OVERRIDE = <?= json_encode(canEdit('pos_price_override')) ?>;
 
 $(document).ready(function() {
     // Phase 10 (pos_upgrade_plan.md §7) — Select2 AJAX customer search, replacing
@@ -665,6 +678,7 @@ function updateCartDisplay() {
                     </td>
                     <td class="text-end">
                         <span class="small">${priceDisplay}</span>
+                        ${POS_CAN_PRICE_OVERRIDE ? `<br><button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" style="font-size:10px;" onclick="editLinePrice(${index})" title="${PT.editPriceTitle}"><i class="bi bi-pencil"></i> ${PT.editPriceTitle}</button>` : ''}
                     </td>
                     <td class="text-center" style="padding: 0.25rem;">
                         <div class="d-flex align-items-center justify-content-center" style="gap: 2px;">
@@ -716,6 +730,43 @@ function updateCartQuantityInput(index, value) {
         updateCartDisplay();
         saveCartToStorage();
     }
+}
+
+// Phase 16 (pos_upgrade_plan.md §8) — manual price override, only reachable
+// when POS_CAN_PRICE_OVERRIDE is true (button isn't even rendered otherwise).
+// Overriding the price clears any discount already applied to this line —
+// one deliberate override, not stacked with a percentage/fixed discount.
+function editLinePrice(index) {
+    const item = cart[index];
+    if (!item) return;
+
+    Swal.fire({
+        title: PT.editPriceTitle,
+        input: 'number',
+        inputLabel: PT.newPriceLabel,
+        inputValue: item.price,
+        inputAttributes: { min: item.min_selling_price, step: '0.01' },
+        showCancelButton: true,
+        confirmButtonText: PT.ok,
+        cancelButtonText: PT.cancel,
+        inputValidator: (value) => {
+            const v = parseFloat(value);
+            if (isNaN(v) || v < item.min_selling_price) {
+                return PT.priceOverrideBelowMin.replace('%s', item.product_name).replace('%s', item.min_selling_price.toLocaleString());
+            }
+        }
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        const newPrice = parseFloat(result.value);
+        item.price = newPrice;
+        item.discounted_price = newPrice;
+        item.discount_percent = 0;
+        item.discount_value = 0;
+        item.manual_price_override = true;
+        updateCartDisplay();
+        saveCartToStorage();
+        Swal.fire({ icon: 'success', title: PT.priceUpdated, timer: 1200, showConfirmButton: false });
+    });
 }
 
 function removeFromCart(index) {
