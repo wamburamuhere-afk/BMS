@@ -31,6 +31,11 @@ if ($component_product_id === $product_id) {
     exit;
 }
 
+// Project-scope (security.md §23) — products.project_id exists; a non-admin
+// must not edit a combo whose parent product belongs to a project they are
+// not assigned to. No-ops for a global (project_id NULL) product.
+assertScopeForRecord('products', 'product_id', $product_id);
+
 try {
     $stmt = $pdo->prepare("SELECT product_name FROM products WHERE product_id = ?");
     $stmt->execute([$product_id]);

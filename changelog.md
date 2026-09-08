@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-09-08 (fix) - Project-scope audit regression from Phases 15/23
+
+**Files (changed):** `api/get_combo_components.php`, `api/save_combo_component.php`, `api/save_product_unit.php`
+
+Final regression sweep (`tests/test_project_scope_cli.php`) caught 3 new files querying the
+project-scoped `products` table without a guard, raising the repo's unscoped-file count from a
+pre-existing 4 to 7 (ceiling is 0 — any new unguarded file is a regression). Added
+`assertScopeForRecord('products', 'product_id', $product_id)` (security.md §23) to each — a
+no-op for a global (project_id NULL) product, a 403 for a product tagged to a project the
+requesting user isn't assigned to. The 4 pre-existing unscoped files
+(`api/document/duplicate_created_document.php`, `app/bms/invoice/received_invoices.php`,
+`app/bms/pos/inactive_employees.php`, `app/bms/pos/leave_types.php`) are untouched by this
+tranche and out of scope for this fix.
+
 ## 2026-09-08 (feature) - POS Phase 23: combo/bundle products
 
 **Files (new):** `core/pos_combo_products.php`, `migrations/tenant/2026_09_08_pos_combo_products.php`,

@@ -17,6 +17,11 @@ if (!canView('products')) { echo json_encode(['success' => false, 'message' => '
 $product_id = (int)($_GET['product_id'] ?? 0);
 if (!$product_id) { echo json_encode(['success' => false, 'message' => 'Invalid product ID']); exit; }
 
+// Project-scope (security.md §23) — products.project_id exists; a non-admin
+// must not see combo components for a product tagged to a project they are
+// not assigned to. No-ops for a global (project_id NULL) product.
+assertScopeForRecord('products', 'product_id', $product_id);
+
 // Need the row id (for delete) alongside getComboComponents()'s summary shape.
 $stmt = $pdo->prepare("
     SELECT ac.id, ac.component_product_id, p.product_name, p.sku, ac.qty_per_unit

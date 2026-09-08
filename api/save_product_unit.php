@@ -32,6 +32,11 @@ if ($unit_price_override !== null && $unit_price_override < 0) {
     exit;
 }
 
+// Project-scope (security.md §23) — products.project_id exists; a non-admin
+// must not edit selling units for a product tagged to a project they are
+// not assigned to. No-ops for a global (project_id NULL) product.
+assertScopeForRecord('products', 'product_id', $product_id);
+
 try {
     $stmt = $pdo->prepare("SELECT product_name, unit FROM products WHERE product_id = ?");
     $stmt->execute([$product_id]);
