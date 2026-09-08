@@ -20,6 +20,7 @@
  */
 
 require_once __DIR__ . '/../roots.php';
+require_once __DIR__ . '/warehouse_scope.php';
 
 if (!function_exists('usersWithPermission')) {
     /**
@@ -235,6 +236,22 @@ if (!function_exists('resolveRecipients')) {
             foreach ($recipients as $uid => $u) {
                 if (!empty($u['is_admin'])) continue;          // admins always in scope
                 if (!isset($assignedSet[$uid])) unset($recipients[$uid]);
+            }
+        }
+
+        // ── Warehouse-scope filter ────────────────────────────────────────
+        // Phase 17 (pos_upgrade_plan.md §8) — same shape as the project-scope
+        // filter above, for events tied to a specific warehouse (e.g. an
+        // expiring batch). Reuses Phase 6's ACL via warehouseIdsForUser()
+        // (core/warehouse_scope.php) computed per-candidate-recipient, since
+        // $_SESSION-based scope only exists for the currently logged-in user.
+        $warehouseId = isset($ctx['warehouse_id']) ? (int)$ctx['warehouse_id'] : 0;
+        if ($scopeAware && $warehouseId > 0) {
+            foreach ($recipients as $uid => $u) {
+                if (!empty($u['is_admin'])) continue; // admins always in scope
+                $ids = warehouseIdsForUser($pdo, (int)$uid, false);
+                if (in_array('*', $ids, true)) continue; // grant-all
+                if (!in_array($warehouseId, $ids, true)) unset($recipients[$uid]);
             }
         }
 

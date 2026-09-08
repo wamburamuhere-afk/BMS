@@ -25,6 +25,7 @@ if (isset($_SESSION['user_lang'])) {
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/stock_ledger.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
+require_once __DIR__ . '/../../core/pos_batch_consumption.php';
 
 header('Content-Type: application/json');
 
@@ -94,6 +95,11 @@ try {
             'created_by'       => $_SESSION['user_id'],
             'notes'            => 'Void of POS Sale #' . $sale['receipt_number'] . ' — ' . $reason,
         ]);
+
+        // Phase 17b (pos_upgrade_plan.md §8) — restore into the EXACT batch(es)
+        // this line originally drew from (FEFO), not just a generic quantity
+        // bump. No-op for a non-batch-tracked line (no pos_sale_item_batches rows).
+        reverseFefoBatchConsumption($pdo, (int)$ln['sale_item_id']);
     }
 
     // Refund the cash drawer for cash sales, against the operator's active shift.

@@ -25,7 +25,7 @@ if (!function_exists('run_notification_checks')) {
     function run_notification_checks(PDO $pdo): array
     {
         $isCli = (php_sapi_name() === 'cli');
-        $sum = ['invoice_overdue' => 0, 'quotation_expiring' => 0, 'tender_deadline' => 0];
+        $sum = ['invoice_overdue' => 0, 'quotation_expiring' => 0, 'tender_deadline' => 0, 'product_batch_expiring' => 0];
 
         // ── Invoice overdue ────────────────────────────────────────────────
         try {
@@ -112,6 +112,62 @@ if (!function_exists('run_notification_checks')) {
             if ($isCli) echo "  tender.deadline: scanned " . count($rows) . " tender(s).\n";
         } catch (Throwable $e) {
             error_log('run_notification_checks tender.deadline: ' . $e->getMessage());
+        }
+
+        // ── Product batch/lot expiring (Phase 17, pos_upgrade_plan.md §8) ───
+        // Milestone-based (30/14/7/1 days), exact pattern as
+        // cron/check_document_expiry.php's document_expiry_reminders —
+        // fires once per milestone per batch, not once per day, to avoid
+        // reminder fatigue over a month-long window. scope_aware on
+        // warehouse_id (see core/notify.php's resolveRecipients()).
+        try {
+            $milestones = [30, 14, 7, 1];
+            $batches = $pdo->query("
+                SELECT pb.batch_id, pb.product_id, pb.warehouse_id, pb.batch_number, pb.expiry_date,
+                       pb.quantity_remaining, p.product_name,
+                       DATEDIFF(pb.expiry_date, CURDATE()) AS days_remaining
+                FROM product_batches pb
+                JOIN products p ON p.product_id = pb.product_id
+                WHERE pb.expiry_date IS NOT NULL
+                  AND pb.quantity_remaining > 0
+                  AND DATEDIFF(pb.expiry_date, CURDATE()) <= 30
+            ")->fetchAll(PDO::FETCH_ASSOC);
+
+            $doneStmt   = $pdo->prepare("SELECT milestone FROM product_batch_expiry_reminders WHERE batch_id = ?");
+            $recordStmt = $pdo->prepare("INSERT IGNORE INTO product_batch_expiry_reminders (batch_id, milestone) VALUES (?, ?)");
+
+            foreach ($batches as $b) {
+                $days = (int)$b['days_remaining'];
+                $reached = array_filter($milestones, fn($m) => $days <= $m);
+                if (empty($reached)) continue;
+
+                $doneStmt->execute([$b['batch_id']]);
+                $done = $doneStmt->fetchAll(PDO::FETCH_COLUMN);
+                $newMilestones = array_diff($reached, $done);
+                if (empty($newMilestones)) continue; // nothing new since the last run
+
+                foreach ($newMilestones as $m) { $recordStmt->execute([$b['batch_id'], $m]); }
+
+                $label = $b['batch_number'] ? ($b['product_name'] . ' (batch ' . $b['batch_number'] . ')') : $b['product_name'];
+                $expOn = date('d M Y', strtotime($b['expiry_date']));
+                $title = $days <= 0 ? 'Product batch expired' : ($days === 1 ? 'Product batch expires tomorrow' : "Product batch expiring in {$days} days");
+
+                $res = dispatchEvent($pdo, 'product.batch_expiring', [
+                    'entity_type'   => 'product_batch',
+                    'entity_id'     => (int)$b['batch_id'],
+                    'warehouse_id'  => (int)$b['warehouse_id'],
+                    'title'         => $title . ': ' . $label,
+                    'message'       => "{$label} expires on {$expOn} ({$days} day(s) remaining), "
+                                     . number_format((float)$b['quantity_remaining'], 2) . ' unit(s) remaining.',
+                    'action_url'    => 'product_view?id=' . (int)$b['product_id'],
+                    'severity'      => $days <= 7 ? 'high' : 'medium',
+                    'dedupe_suffix' => 'm' . min($newMilestones), // one send per milestone, not per day
+                ]);
+                if (!empty($res['dispatched'])) $sum['product_batch_expiring'] += (int)$res['created'] + (int)$res['emailed'];
+            }
+            if ($isCli) echo "  product.batch_expiring: scanned " . count($batches) . " expiring batch(es).\n";
+        } catch (Throwable $e) {
+            error_log('run_notification_checks product.batch_expiring: ' . $e->getMessage());
         }
 
         return $sum;

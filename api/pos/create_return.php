@@ -29,6 +29,7 @@ if (isset($_SESSION['user_lang'])) {
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/stock_ledger.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
+require_once __DIR__ . '/../../core/pos_batch_consumption.php';
 
 header('Content-Type: application/json');
 
@@ -181,6 +182,11 @@ try {
                 'created_by'       => $_SESSION['user_id'],
                 'notes'            => 'Return against POS Sale #' . $orig['receipt_number'] . ' — ' . $reason,
             ]);
+
+            // Phase 17b (pos_upgrade_plan.md §8) — restore into the exact
+            // batch(es) this line drew from, capped at the returned quantity
+            // (a partial return only reverses that much, not the whole line).
+            reverseFefoBatchConsumption($pdo, $iid, $rq);
         }
     }
 

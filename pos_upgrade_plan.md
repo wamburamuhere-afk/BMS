@@ -1063,12 +1063,59 @@ gates only (§3 Phase 1d) — no finer-grained action inside a sale.
 
 ### Phase 17 — Batch/Lot Number + Expiry Tracking, end-to-end (GRN → stock → POS → alerts)
 
+**Status:** ✅ DONE (17a/17b/17c/17d) · **Built:** 2026-09-08 · **Branch:** `feat/pos-tier3-advanced-retail`
+
+Shipped 17a-17d as planned below, with two adjustments made while building
+against the real code (documented, not silently dropped):
+- **The real stock-arrival point is `api/approve_grn.php` (on approval),
+  not `api/create_grn.php`** — a GRN is `pending` at creation and its
+  three-approval-workflow stock side-effects (`$updateStock=false` at
+  create) only fire from `approve_grn.php`. `product_batches` rows are
+  created there, alongside the existing `product_stocks`/`stock_movements`
+  update, using `receipt_items.batch_number`/`.expiry_date`/`.unit_price`
+  already captured at creation time.
+- **`core/notify.php::resolveRecipients()` had NO warehouse-scope branch**
+  (only project-scope) — the plan's claim that it could just reuse
+  `scopeFilterSql('warehouse', ...)` was aspirational; that helper is
+  session-bound to the *current* user and `resolveRecipients()` must check
+  *candidate recipients* who aren't the current session. Added a real,
+  reusable `warehouseIdsForUser(PDO $pdo, int $userId, bool $isAdmin)` to
+  `core/warehouse_scope.php` (a literal per-user-id mirror of
+  `loadUserScope()`'s warehouse derivation) and a matching warehouse-scope
+  branch in `resolveRecipients()`, alongside the existing project-scope one.
+  This is a genuine, reusable engine enhancement, not a one-off hack —
+  future warehouse-scoped events get it for free.
+- **UI batch-picker override** (cashier manually choosing a non-default
+  batch) was deliberately NOT built this pass — server-side FEFO (always
+  correct, always safe) ships; the manual-override affordance is a
+  lower-value polish item deferred, not silently dropped.
+
+Extracted `core/pos_batch_consumption.php` (`consumeFefoBatches()`,
+`reverseFefoBatchConsumption()`) and `core/pos_price_groups.php`-style
+testability. `tests/test_pos_batch_expiry_cli.php` (43 checks: multi-batch
+FEFO split, insufficient-stock non-error, full/partial reversal restoring
+the exact originating batch(es), `warehouseIdsForUser()` admin/grant-all/
+specific-warehouse cases, `resolveRecipients()` warehouse narrowing incl. a
+specific-user+email rule, milestone dedup on two consecutive cron runs).
+Dashboard's "expiring" widget now shows real per-batch data for
+batch-tracked products, unchanged product-level behaviour for the rest.
+Full POS + GRN + notification-engine + feature-registry regression re-run
+clean; pre-existing unrelated failures (`test_pos_color_settings_split_cli`,
+`test_pos_dashboard_cli`, `test_notification_engine_cli` §11 — a stale
+assertion about `save_invoice.php` from an earlier, unrelated
+auto-approve refactor) confirmed present on unmodified `develop` too.
+
 **Closes:** the one gap the product owner asked to be built out fully, not
-minimally. **Gate:** `pos_advanced` for the POS-side batch picker and the
-management UI; the expiry **alerting** itself stays wired through the
-notification engine's own permission model (routes to whoever has
-`canView` on the relevant page_key, same as every other event — see below),
-independent of the POS plan/tier.
+minimally. **Gate, as actually shipped:** base `pos` / ungated — since the
+UI batch-picker override (the one genuinely upsell-shaped piece) was
+deferred, what shipped is automatic FEFO consumption + expiry alerting +
+read-only batch visibility, which is operational integrity every tenant
+needs (same boundary reasoning Phase 13 used to keep Z-Report/receipt in
+base tier), not a premium differentiator. The expiry **alerting** itself
+routes through the notification engine's own permission model (`canView`
+on the relevant page_key + warehouse scope, same as every other event).
+If the batch-picker override is built later, THAT specific affordance
+should gate behind `pos_advanced`, matching the original intent below.
 
 **What exists today (evidence, not assumption):** `receipt_items.batch_number`
 /`.expiry_date` are captured at GRN (`api/create_grn.php:144-181`) but never

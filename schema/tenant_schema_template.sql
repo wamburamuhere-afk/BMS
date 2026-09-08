@@ -5363,6 +5363,26 @@ CREATE TABLE `pos_registers` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `pos_sale_item_batches`
+-- Phase 17 (pos_upgrade_plan.md §8) — links a sale line to the batch(es) it
+-- drew from (FEFO), consumed via core/pos_batch_consumption.php.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `pos_sale_item_batches` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `sale_item_id` int NOT NULL,
+  `batch_id` int NOT NULL,
+  `quantity` decimal(10,3) NOT NULL DEFAULT '0.000',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_sale_item_id` (`sale_item_id`),
+  KEY `idx_batch_id` (`batch_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `pos_sale_items`
 --
 
@@ -5536,6 +5556,55 @@ CREATE TABLE `product_assembly_components` (
   PRIMARY KEY (`id`),
   KEY `parent_product_id` (`parent_product_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=28 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `product_batch_expiry_reminders`
+-- Phase 17 (pos_upgrade_plan.md §8) — milestone-dedupe, mirrors
+-- document_expiry_reminders' exact shape.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_batch_expiry_reminders` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `batch_id` int NOT NULL,
+  `milestone` int NOT NULL,
+  `sent_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_batch_milestone` (`batch_id`,`milestone`),
+  KEY `idx_batch_id` (`batch_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `product_batches`
+-- Phase 17 (pos_upgrade_plan.md §8) — real batch/lot stock ledger, fed at
+-- GRN approval (api/approve_grn.php), consumed FEFO at POS sale
+-- (core/pos_batch_consumption.php). Sparse: only products whose GRN line
+-- specified a batch_number/expiry_date get rows here.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_batches` (
+  `batch_id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `warehouse_id` int NOT NULL,
+  `batch_number` varchar(100) DEFAULT NULL,
+  `expiry_date` date DEFAULT NULL,
+  `quantity_received` decimal(10,3) NOT NULL DEFAULT '0.000',
+  `quantity_remaining` decimal(10,3) NOT NULL DEFAULT '0.000',
+  `unit_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `receipt_id` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`batch_id`),
+  KEY `idx_product_warehouse` (`product_id`,`warehouse_id`),
+  KEY `idx_expiry_date` (`expiry_date`),
+  KEY `idx_quantity_remaining` (`quantity_remaining`),
+  KEY `idx_receipt_id` (`receipt_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

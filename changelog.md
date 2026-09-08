@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-09-08 (feature) - POS Phase 17: batch/lot + expiry tracking, end-to-end (GRN → stock → POS → alerts)
+
+**Files (new):** `core/pos_batch_consumption.php`,
+`migrations/tenant/2026_09_08_pos_product_batches.php`, `tests/test_pos_batch_expiry_cli.php`
+**Files (changed):** `api/approve_grn.php`, `api/pos/process_sale.php`, `api/pos/void_sale.php`,
+`api/pos/create_return.php`, `core/notify.php`, `core/warehouse_scope.php`,
+`cron/run_notification_checks.php`, `app/bms/product/product_view.php`, `app/dashboard.php`,
+`schema/tenant_schema_template.sql`
+
+Third phase of the Tier-3 plan (§8 Phase 17) — the owner's priority item. Turns
+`receipt_items.batch_number`/`.expiry_date` (captured at GRN since day one, never used again) into
+a real, decrementing stock ledger (`product_batches`). Batches are created at GRN **approval**
+(`api/approve_grn.php`), the actual stock-arrival point in this system's three-approval workflow —
+not at GRN creation, which is still `pending`. POS sales consume FEFO (First-Expired-First-Out)
+across open batches (`core/pos_batch_consumption.php::consumeFefoBatches()`); void/return restore
+into the exact originating batch(es), full or partial. Expiry alerts (30/14/7/1-day milestones,
+deduped like the proven `document_expiry_reminders` pattern) fire through the existing notification
+engine — which needed one real enhancement: `resolveRecipients()` only supported project-scoping,
+not warehouse-scoping, so a `warehouseIdsForUser()` helper and a matching scope branch were added,
+letting a `product.batch_expiring` alert respect Phase 6's per-warehouse ACL and still let an admin
+route it to a specific user + email via the existing Notification Rules UI. Dashboard's "expiring"
+widget and a new read-only Batches card on the product page both show real per-batch data.
+Deliberately deferred (documented, not dropped): a POS-terminal UI for a cashier to manually
+override which batch a sale draws from — automatic FEFO is always correct and ships now; the
+manual override is a lower-value polish item. `tests/test_pos_batch_expiry_cli.php` (43 checks).
+Full POS + GRN + notification-engine + feature-registry regression re-run clean; one new
+pre-existing-but-newly-surfaced failure noted (`test_notification_engine_cli.php` §11, a stale
+assertion from an unrelated earlier invoice auto-approve refactor — confirmed present before this
+branch's changes too, not introduced here).
+
 ## 2026-09-08 (feature) - POS Phase 14: selling price tiers (Retail/Wholesale/Custom)
 
 **Files (new):** `core/pos_price_groups.php`, `migrations/tenant/2026_09_08_pos_price_groups.php`,

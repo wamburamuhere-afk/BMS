@@ -573,13 +573,42 @@ function get_system_alerts($pdo, $user_id) {
         $stmt->execute();
         $stock_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Phase 17c (pos_upgrade_plan.md §8) — a product with real batch/lot
+        // rows (product_batches) shows its actual per-batch remaining
+        // quantity + expiry instead of the single, often-stale
+        // products.expiry_date; a product with no batch rows keeps the
+        // pre-Phase-17 behaviour unchanged (one row per product).
+        $batchWhScope = scopeFilterSqlNullable('warehouse', 'pb');
         $stmt = $pdo->prepare("
+            SELECT 'expiring' as type,
+                   p.product_id as id,
+                   p.product_name,
+                   p.sku,
+                   pb.expiry_date,
+                   DATEDIFF(pb.expiry_date, CURDATE()) as days_remaining,
+                   pb.batch_number,
+                   pb.quantity_remaining,
+                   'Product batch expiring soon' as message
+            FROM product_batches pb
+            JOIN products p ON p.product_id = pb.product_id
+            WHERE pb.expiry_date IS NOT NULL
+              AND pb.quantity_remaining > 0
+              AND pb.expiry_date > CURDATE()
+              AND DATEDIFF(pb.expiry_date, CURDATE()) <= 30
+              AND p.status = 'active'
+              {$prodScope}
+              {$batchWhScope}
+
+            UNION ALL
+
             SELECT 'expiring' as type,
                    p.product_id as id,
                    p.product_name,
                    p.sku,
                    p.expiry_date,
                    DATEDIFF(p.expiry_date, CURDATE()) as days_remaining,
+                   NULL as batch_number,
+                   NULL as quantity_remaining,
                    'Product expiring soon' as message
             FROM products p
             WHERE p.expiry_date IS NOT NULL
@@ -587,6 +616,7 @@ function get_system_alerts($pdo, $user_id) {
               AND p.expiry_date > CURDATE()
               AND DATEDIFF(p.expiry_date, CURDATE()) <= 30
               AND p.status = 'active'
+              AND p.product_id NOT IN (SELECT DISTINCT product_id FROM product_batches)
               {$prodScope}
         ");
         $stmt->execute();

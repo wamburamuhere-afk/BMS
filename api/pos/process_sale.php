@@ -20,6 +20,7 @@ require_once __DIR__ . '/../../core/stock_ledger.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 require_once __DIR__ . '/../../core/pos_override_guard.php';
 require_once __DIR__ . '/../../core/pos_price_groups.php';
+require_once __DIR__ . '/../../core/pos_batch_consumption.php';
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
@@ -323,9 +324,16 @@ try {
             $item_discount_amount,
             $item_discounted_total // line_total (excluding tax usually, or including? let's assume excluding since tax is separate)
         ]);
-        
+        $sale_item_id = (int)$pdo->lastInsertId();
+
         // Update stock (Only for non-service products)
         if (!$db_product['is_service']) {
+            // Phase 17b (pos_upgrade_plan.md §8) — FEFO batch consumption, a
+            // bookkeeping layer on top of the product_stocks decrement below,
+            // not a replacement for it. No-op for a product with no open
+            // batches in this warehouse (not batch-tracked).
+            consumeFefoBatches($pdo, $pid, (int)$warehouse_id, $qty, $sale_item_id);
+
             // 1. Global Update
             $stockStmt->execute([ $qty, $qty, $pid ]);
 
