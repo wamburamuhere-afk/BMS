@@ -47,33 +47,33 @@ foreach ($shifts as $s) {
 
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <h4 class="mb-0"><i class="bi bi-clock-history me-2"></i>Shift History</h4>
-        <a href="<?= getUrl('pos') ?>" class="btn btn-primary btn-sm"><i class="bi bi-bag-plus me-1"></i> Open POS</a>
+        <h4 class="mb-0"><i class="bi bi-clock-history me-2"></i><?= t('Shift History') ?></h4>
+        <a href="<?= getUrl('pos') ?>" class="btn btn-primary btn-sm"><i class="bi bi-bag-plus me-1"></i> <?= t('Open POS') ?></a>
     </div>
 
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-3">
                 <div class="fs-4 fw-bold text-primary"><?= $stat_total ?></div>
-                <div class="small text-muted">Shifts Shown</div>
+                <div class="small text-muted"><?= t('Shifts Shown') ?></div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-3">
                 <div class="fs-4 fw-bold text-success"><?= $stat_active ?></div>
-                <div class="small text-muted">Active Now</div>
+                <div class="small text-muted"><?= t('Active Now') ?></div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-3">
                 <div class="fs-4 fw-bold text-warning"><?= number_format($stat_sales, 0) ?></div>
-                <div class="small text-muted">Total Sales (<?= $currency ?>)</div>
+                <div class="small text-muted"><?= sprintf(t('Total Sales (%s)'), $currency) ?></div>
             </div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-3">
                 <div class="fs-4 fw-bold text-danger"><?= $stat_discrep ?></div>
-                <div class="small text-muted">Cash Discrepancies</div>
+                <div class="small text-muted"><?= t('Cash Discrepancies') ?></div>
             </div>
         </div>
     </div>
@@ -82,8 +82,8 @@ foreach ($shifts as $s) {
         <table class="table table-hover align-middle w-100">
             <thead class="table-dark">
                 <tr>
-                    <th>Shift</th><th>Register</th><?php if ($can_view_all): ?><th>Cashier</th><?php endif; ?>
-                    <th>Opened</th><th>Closed</th><th class="text-end">Total Sales</th><th class="text-end">Difference</th><th>Status</th><th class="text-end">Actions</th>
+                    <th><?= t('Shift') ?></th><th><?= t('Register') ?></th><?php if ($can_view_all): ?><th><?= t('Cashier') ?></th><?php endif; ?>
+                    <th><?= t('Opened') ?></th><th><?= t('Closed') ?></th><th class="text-end"><?= t('Total Sales') ?></th><th class="text-end"><?= t('Difference') ?></th><th><?= t('Status') ?></th><th class="text-end"><?= t('Actions') ?></th>
                 </tr>
             </thead>
             <tbody>
@@ -101,22 +101,22 @@ foreach ($shifts as $s) {
                     <td><span class="badge bg-<?= $s['status'] === 'active' ? 'success' : 'secondary' ?>"><?= safe_output(ucfirst($s['status'])) ?></span></td>
                     <td class="text-end">
                         <a class="btn btn-sm btn-outline-primary" href="<?= getUrl('pos/zreport') ?>?shift_id=<?= (int)$s['shift_id'] ?>" target="_blank">
-                            <i class="bi bi-file-earmark-text"></i> Z-Report
+                            <i class="bi bi-file-earmark-text"></i> <?= t('Z-Report') ?>
                         </a>
                         <?php if ($can_view_all && $s['status'] === 'active' && (int)$s['user_id'] !== (int)$user_id): ?>
                         <button type="button" class="btn btn-sm btn-outline-danger force-close-btn"
                                 data-shift-id="<?= (int)$s['shift_id'] ?>"
                                 data-shift-code="<?= htmlspecialchars($s['shift_code'], ENT_QUOTES) ?>"
-                                data-cashier="<?= htmlspecialchars($s['cashier_name'] ?? 'Unknown', ENT_QUOTES) ?>"
+                                data-cashier="<?= htmlspecialchars($s['cashier_name'] ?? t('Unknown'), ENT_QUOTES) ?>"
                                 data-register="<?= htmlspecialchars($s['register_name'] ?? '—', ENT_QUOTES) ?>">
-                            <i class="bi bi-lock"></i> Force Close
+                            <i class="bi bi-lock"></i> <?= t('Force Close') ?>
                         </button>
                         <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
                 <?php if (!$shifts): ?>
-                <tr><td colspan="9" class="text-center text-muted py-4">No shifts found</td></tr>
+                <tr><td colspan="9" class="text-center text-muted py-4"><?= t('No shifts found') ?></td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -140,16 +140,21 @@ function safeOutput(str) {
         .replace(/'/g, '&#039;');
 }
 
+const T_NO_SHIFTS_FOUND = <?= json_encode(t('No shifts found')) ?>;
+const T_TOTAL_LABEL     = <?= json_encode(t('Total:')) ?>;
+const T_DIFF_LABEL      = <?= json_encode(t('Diff:')) ?>;
+const T_ZREPORT_LABEL   = <?= json_encode(t('Z-Report')) ?>;
+
 function renderShiftCards(rows) {
     const cardView = document.getElementById('cardView');
-    if (!rows.length) { cardView.innerHTML = '<div class="col-12 text-center py-5 text-muted">No shifts found</div>'; return; }
+    if (!rows.length) { cardView.innerHTML = '<div class="col-12 text-center py-5 text-muted">' + T_NO_SHIFTS_FOUND + '</div>'; return; }
     let html = '';
     rows.forEach(r => {
         html += `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
             <div class="d-flex justify-content-between"><span class="fw-bold">${r.code}</span><span class="badge bg-${r.status === 'active' ? 'success' : 'secondary'}">${r.status}</span></div>
             <small class="text-muted">${r.register || '—'} · ${r.opened}</small>
-            <div class="mt-2 small">Total: ${r.total} ${r.diff ? '· Diff: ' + r.diff : ''}</div>
-            <a href="${r.url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2"><i class="bi bi-file-earmark-text"></i> Z-Report</a>
+            <div class="mt-2 small">${T_TOTAL_LABEL} ${r.total} ${r.diff ? '· ' + T_DIFF_LABEL + ' ' + r.diff : ''}</div>
+            <a href="${r.url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2"><i class="bi bi-file-earmark-text"></i> ${T_ZREPORT_LABEL}</a>
         </div></div></div>`;
     });
     cardView.innerHTML = html;
@@ -175,6 +180,15 @@ $(document).ready(function () {
     renderShiftCards(rows);
 });
 
+// Per-page local convention (see safeOutput() above): a tiny numbered-
+// placeholder formatter so a translated sentence stays ONE coherent unit
+// (grammar-correct in any language) instead of being concatenated from
+// English word-order fragments — {0}/{1}/{2} can appear in any order in a
+// translation, unlike plain sequential %s substitution.
+function tFormat(str, ...args) {
+    return str.replace(/\{(\d+)\}/g, (m, i) => (args[i] !== undefined ? args[i] : m));
+}
+
 // Force-close a shift left open by another cashier (crashed browser, forgot to
 // log out). Only rendered for canEdit('pos') users, on shifts that aren't the
 // viewer's own — see the PHP condition above the button.
@@ -186,18 +200,18 @@ $(document).on('click', '.force-close-btn', function () {
     const register  = String($btn.data('register'));
 
     Swal.fire({
-        title: 'Force-close this shift?',
-        html: 'This closes <b>' + safeOutput(shiftCode) + '</b> on <b>' + safeOutput(register) +
-              '</b>, opened by <b>' + safeOutput(cashier) + '</b>, using the cash amount you enter ' +
-              'below as the counted total. Only do this if that cashier genuinely cannot close it ' +
-              'themselves — this action is recorded in the audit log.',
+        title: <?= json_encode(t('Force-close this shift?')) ?>,
+        html: tFormat(
+            <?= json_encode(t('This closes <b>{0}</b> on <b>{1}</b>, opened by <b>{2}</b>, using the cash amount you enter below as the counted total. Only do this if that cashier genuinely cannot close it themselves — this action is recorded in the audit log.')) ?>,
+            safeOutput(shiftCode), safeOutput(register), safeOutput(cashier)
+        ),
         icon: 'warning',
         input: 'number',
-        inputLabel: 'Actual cash counted at this till',
+        inputLabel: <?= json_encode(t('Actual cash counted at this till')) ?>,
         inputAttributes: { min: 0, step: '0.01' },
         inputValue: 0,
         showCancelButton: true,
-        confirmButtonText: 'Force Close',
+        confirmButtonText: <?= json_encode(t('Force Close')) ?>,
         confirmButtonColor: '#dc3545'
     }).then(function (result) {
         if (!result.isConfirmed) return;
@@ -205,17 +219,17 @@ $(document).on('click', '.force-close-btn', function () {
         $.post('<?= buildUrl('api/pos/close_shift.php') ?>', {
             shift_id: shiftId,
             ending_cash: result.value || 0,
-            notes: 'Force-closed by <?= htmlspecialchars($_SESSION['username'] ?? 'admin', ENT_QUOTES) ?>'
+            notes: <?= json_encode(sprintf(t('Force-closed by %s'), $_SESSION['username'] ?? 'admin')) ?>
         }, function (res) {
             if (res.success) {
-                Swal.fire({ icon: 'success', title: 'Shift Closed', text: res.message, timer: 2000, showConfirmButton: false })
+                Swal.fire({ icon: 'success', title: <?= json_encode(t('Shift Closed')) ?>, text: res.message, timer: 2000, showConfirmButton: false })
                     .then(() => location.reload());
             } else {
-                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: res.message });
                 $btn.prop('disabled', false);
             }
         }, 'json').fail(function () {
-            Swal.fire({ icon: 'error', title: 'Error', text: 'Force close failed. Please try again.' });
+            Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: <?= json_encode(t('Force close failed. Please try again.')) ?> });
             $btn.prop('disabled', false);
         });
     });

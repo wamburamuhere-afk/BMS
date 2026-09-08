@@ -7,19 +7,26 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+// Respect the caller's saved language preference (set by header.php on their
+// last page load) so t()-wrapped messages below come back in the right
+// language, not always English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../helpers.php';
 require_once __DIR__ . '/../../core/stock_ledger.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit();
 }
 
 if (!canCreate('pos')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to process POS sales']);
+    echo json_encode(['success' => false, 'message' => t('Access Denied: you do not have permission to process POS sales')]);
     exit();
 }
 
@@ -447,8 +454,8 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
     echo json_encode([
         'success' => true,
         'message' => $balance_due > 0.01
-            ? ('Sale recorded on credit. Balance due: ' . number_format($balance_due, 2))
-            : 'Sale completed successfully',
+            ? sprintf(t('Sale recorded on credit. Balance due: %s'), number_format($balance_due, 2))
+            : t('Sale completed successfully'),
         'sale_id' => $sale_id,
         'receipt_number' => $receipt_number,
         'payment_status' => $final_payment_status,

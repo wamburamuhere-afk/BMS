@@ -43,6 +43,48 @@ the right folder) can only be verified by a real browser submission of `register
 System Settings and Settings -> Company Profile logo uploads had the identical shared-path
 bug and were fixed independently in that PR.
 
+## 2026-09-08 (feat) - Full language switching (English/Swahili) across the whole POS module
+
+**Files (changed):** 8 POS page files (`app/bms/pos/pos.php`, `pos_modals_new.php`,
+`pos_scripts_new.php`, `pos_dashboard.php`, `zreport.php`, `shift_history.php`,
+`customer_display.php`, `app/constant/settings/pos_config_settings.php`), 19 genuinely
+POS-functional API files under `api/pos/` (register/shift/sale/return/payment/receipt —
+the other 16 files in that folder are HR/Payroll, co-located by historical accident, and
+deliberately out of scope), `lang/sw.php`
+**Files (added):** `tests/test_pos_i18n_coverage_cli.php`
+
+User request: switching the logged-in user's language preference (Settings > My Settings >
+Preferences > Language) should change everything in POS and everything related to it, using
+the exact same mechanism already live elsewhere in the app (`core/i18n.php`'s `t()`/`te()`,
+`lang/en.php` empty-by-design, `lang/sw.php` holding Swahili) — no new mechanism invented.
+Before this, POS had zero coverage: every label, button, table header, and alert was
+hardcoded English regardless of the user's setting.
+
+Wrapped every genuinely user-facing string across the 8 page files (headers, buttons, table
+columns, form labels, placeholders, tooltips, modal text, Swal alerts) in `t()`, matching the
+exact convention already used on `app/bms/product/products.php`. Separately, the 19 POS API
+files never included `header.php` (which is what actually resolves the saved language on a
+normal page load), so their JSON `message` fields were always English no matter what — each
+now loads the caller's saved preference itself (`$_SESSION['user_lang']`, already set by
+their last page view) before building its response, and every static message is `t()`-wrapped.
+
+Found and fixed a real translation-quality bug along the way, independent of raw coverage:
+a handful of spots (the Force Close confirmation dialog, a "Customer X has been added"
+toast, two entitlement-upsell notices, a busy-register label) had been built by translating
+individual English word-fragments ("This closes" / "on" / "opened by") and concatenating them
+back together at runtime — which breaks grammar the moment a language's word order differs
+from English. Fixed by templating each as ONE coherent sentence with numbered/`%s`
+placeholders instead, so a translation can reorder words freely.
+
+Verified live: `loadLanguage('sw')` resolves real strings from both a page file and an API
+file correctly, reverts cleanly to English with no state leakage, and an unrecognised key
+safely falls back to itself rather than erroring or rendering blank. New
+`test_pos_i18n_coverage_cli.php`'s completeness guard scans all 479 distinct `t()`/`te()` keys
+actually used across all 27 files and confirms every single one has a non-empty `lang/sw.php`
+translation — zero gaps — plus a regression guard for the fragment-concatenation bug class
+specifically. 60 new assertions, 0 failures. All 7 pre-existing POS regression suites (219
+assertions total) re-run clean after both the page-file pass and the API-file pass.
+
 ## 2026-09-08 (fix) - Company logo uploads now tenant-scoped (were shared across every company)
 
 **Files (changed):** `app/constant/settings/system_settings.php`, `app/constant/settings/company_profile.php`

@@ -10,11 +10,18 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+// Respect the caller's saved language preference (set by header.php on their
+// last page load) so t()-wrapped messages below come back in the right
+// language, not always English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
-if (!isAuthenticated())              { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
-if (!canView('pos_advanced'))        { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Multi-register management is not included in your plan.']); exit; }
-if (!canEdit('pos_config_settings')) { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
+
+if (!isAuthenticated())              { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
+if (!canView('pos_advanced'))        { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Multi-register management is not included in your plan.')]); exit; }
+if (!canEdit('pos_config_settings')) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => t('Method not allowed')]); exit; }
 csrf_check();
 
 global $pdo;
@@ -23,7 +30,7 @@ $register_id = (int)($_POST['register_id'] ?? 0);
 $status      = $_POST['status'] ?? '';
 
 if ($register_id <= 0 || !in_array($status, ['active', 'inactive'], true)) {
-    echo json_encode(['success' => false, 'message' => 'Invalid request.']);
+    echo json_encode(['success' => false, 'message' => t('Invalid request.')]);
     exit;
 }
 
@@ -31,7 +38,7 @@ $stmt = $pdo->prepare("SELECT register_name FROM pos_registers WHERE register_id
 $stmt->execute([$register_id]);
 $name = $stmt->fetchColumn();
 if (!$name) {
-    echo json_encode(['success' => false, 'message' => 'Register not found.']);
+    echo json_encode(['success' => false, 'message' => t('Register not found.')]);
     exit;
 }
 
@@ -41,7 +48,7 @@ if ($status === 'inactive') {
     $active = $pdo->prepare("SELECT COUNT(*) FROM cash_register_shifts WHERE register_id = ? AND status = 'active'");
     $active->execute([$register_id]);
     if ($active->fetchColumn() > 0) {
-        echo json_encode(['success' => false, 'message' => 'Cannot deactivate: this register has an open shift right now.']);
+        echo json_encode(['success' => false, 'message' => t('Cannot deactivate: this register has an open shift right now.')]);
         exit;
     }
 }
@@ -52,4 +59,4 @@ $pdo->prepare("UPDATE pos_registers SET status = ?, updated_at = NOW() WHERE reg
 $verb = $status === 'active' ? 'Activated' : 'Deactivated';
 logActivity($pdo, $_SESSION['user_id'], "$verb POS register: $name");
 
-echo json_encode(['success' => true, 'message' => "Register " . strtolower($verb) . " successfully."]);
+echo json_encode(['success' => true, 'message' => $status === 'active' ? t('Register activated successfully.') : t('Register deactivated successfully.')]);

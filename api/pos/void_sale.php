@@ -15,21 +15,28 @@
  * Permission: canDelete('pos')
  */
 require_once __DIR__ . '/../../roots.php';
+// Respect the caller's saved language preference (set by header.php on their
+// last page load) so t()-wrapped messages below come back in the right
+// language, not always English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/stock_ledger.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
 
-if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
-if (!canDelete('pos'))  { http_response_code(403); echo json_encode(['success' => false, 'message' => 'You do not have permission to void POS sales']); exit; }
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
+if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
+if (!canDelete('pos'))  { http_response_code(403); echo json_encode(['success' => false, 'message' => t('You do not have permission to void POS sales')]); exit; }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => t('Method not allowed')]); exit; }
 csrf_check();
 
 $sale_id = (int)($_POST['sale_id'] ?? 0);
 $reason  = trim($_POST['reason'] ?? '');
-if ($sale_id <= 0)   { echo json_encode(['success' => false, 'message' => 'Invalid sale.']); exit; }
-if ($reason === '')  { echo json_encode(['success' => false, 'message' => 'A void reason is required.']); exit; }
+if ($sale_id <= 0)   { echo json_encode(['success' => false, 'message' => t('Invalid sale.')]); exit; }
+if ($reason === '')  { echo json_encode(['success' => false, 'message' => t('A void reason is required.')]); exit; }
 
 try {
     global $pdo;
@@ -139,7 +146,7 @@ try {
         'new_values'  => ['sale_status' => 'voided', 'void_reason' => $reason],
     ]);
 
-    echo json_encode(['success' => true, 'message' => 'Sale voided. Stock and cash have been reversed.']);
+    echo json_encode(['success' => true, 'message' => t('Sale voided. Stock and cash have been reversed.')]);
 
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
