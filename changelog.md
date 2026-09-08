@@ -1,5 +1,69 @@
 # BMS Changelog
 
+## 2026-09-08 (fix) - All 8 POS Tier-3 schema changes were unreachable on any legacy (non-tenant) database — second live incident
+
+**Files (added):** `migrations/2026_09_08_pos_price_groups_legacy_db.php`,
+`migrations/2026_09_08_pos_product_batches_legacy_db.php`,
+`migrations/2026_09_08_pos_cash_denominations_legacy_db.php`,
+`migrations/2026_09_08_pos_network_printer_legacy_db.php`,
+`migrations/2026_09_08_pos_receipt_templates_legacy_db.php`,
+`migrations/2026_09_08_pos_combo_products_legacy_db.php`,
+`migrations/2026_09_08_pos_override_permissions_legacy_db.php`,
+`migrations/2026_09_08_pos_unit_conversions_legacy_db.php`
+
+Second live Sentry incident on the same database in under 90 minutes: after the `product_batches`
+dashboard crash (previous entry), `app/bms/pos/price_groups.php` threw the same
+`Table 'bejundas_main.price_groups' doesn't exist` — a fresh table, not a repeat of the same one.
+That ruled out "one tenant just missed a migration window" and pointed at something systemic.
+
+Root cause, confirmed against the actual production deploy logs, not guessed: **`bejundas_main` is
+not a row in the `tenants` control table at all** — it's `demo.bjptechnologies.co.tz`'s own
+legacy/default database, served via `bmsConnectPdo()`'s non-tenant fallback path when the bare
+domain is hit directly (`core/tenant_bootstrap.php`). `core/tenant_migration_runner.php` only ever
+loops over `tenants` control-table rows — by design, it has no way to reach a host's own legacy
+database. All 8 of today's POS Tier-3 schema changes (Phases 14, 15, 16, 17, 20, 21, 22, 23) were
+written exclusively as `migrations/tenant/*.php` files, so **none of them can ever reach a legacy
+database through the deploy pipeline, no matter how many more deploys run.**
+
+This is not just a demo-database problem: `bms.bjptechnologies.co.tz` — BJP's own real production
+host — is confirmed (via its own deploy log line, "control database is not set up") to be running
+in the same plain legacy mode on its own database (`bejundas_bms_bjp` per `ternant.md`'s Phase 7
+notes), with the identical exposure. It had not yet thrown a Sentry alert only because nobody had
+touched Price Groups, Combo Products, Cash Denominations, Network Printer, Receipt Templates, or
+Unit Conversion there yet.
+
+Fixed by mirroring the schema-bearing half of each of the 8 tenant migrations (table creates,
+column adds, permission-row seeds — not the tenant-scoped `product_price_group_prices` wholesale
+backfill's tenant-specific framing, which is still included since it's just a read of that
+database's own `products` table) into the regular `migrations/` folder, which `migrations/runner.php`
+applies unconditionally to whichever database `DB_NAME` points at on every host, every deploy —
+tenant or not. The pure reference-data geography seed (`2026_09_08_seed_geography_reference_data.php`)
+is deliberately NOT mirrored here: its absence leaves an address dropdown empty, not a fatal error,
+so it's lower priority and left as a known follow-up rather than folded into an incident fix.
+
+Extra care taken given the blast radius of getting this wrong: a failure in a regular migration
+(`exit(1)`) is `script_stop: true` for the **entire** deploy, every host, tenant databases
+included — unlike a tenant migration's failure, which is isolated to that one tenant. Every
+`ALTER TABLE ... ADD COLUMN ... AFTER <column>` here checks the anchor column exists first and
+falls back to appending without a position if it doesn't (an older legacy database's exact history
+is less certain than a tenant's, which is always freshly provisioned from the current schema
+template); the two files touching `pos_registers`/`pos_sale_items` also skip cleanly (exit 0) if
+that table doesn't exist at all, rather than fail, since creating a missing base POS table is a
+separate, pre-existing problem outside this fix's job.
+
+Verified by cloning the pre-Tier-3 shape of every touched table (`products`, `customers`,
+`permissions`, `system_settings`, `notification_events`, `pos_registers`, `pos_sale_items`) into a
+throwaway database, pointing the local environment at it, and running all 8 files for real: clean
+first pass, fully idempotent second pass (0 exit code, "already present" on every check), and
+every defensive branch exercised directly — anchor column missing, and the whole table missing —
+all degrading correctly instead of failing. Throwaway database dropped after; local `config.php`
+(untracked, per-environment) restored to its original `DB_NAME` afterward.
+
+Not addressed here, tracked as a real follow-up: this incident means **any future tenant-only
+migration needs an explicit decision on whether the legacy database also needs it** — that
+decision was simply never made today because nobody realized a live host could still be running in
+non-tenant mode this deep into the multi-tenancy rollout.
+
 ## 2026-09-08 (fix) - Dashboard blank/500 for any tenant missing `product_batches` (live incident)
 
 **Files (changed):** `app/dashboard.php`
