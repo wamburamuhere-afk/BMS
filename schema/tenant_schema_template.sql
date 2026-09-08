@@ -5788,6 +5788,7 @@ CREATE TABLE `products` (
   `discount_rate` decimal(5,2) DEFAULT '0.00',
   `reorder_level` decimal(10,2) DEFAULT '0.00',
   `is_service` tinyint(1) DEFAULT '0',
+  `is_combo` tinyint(1) NOT NULL DEFAULT '0',
   `is_taxable` tinyint(1) DEFAULT '0',
   `manufacturer` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `model` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,

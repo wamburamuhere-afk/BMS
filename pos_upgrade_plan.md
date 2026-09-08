@@ -1450,6 +1450,34 @@ link — no gateway, no new dependency, works today.
 
 ### Phase 23 — Combo/Bundle Products
 
+**Status:** ✅ DONE · **Built:** 2026-09-08 · **Branch:** `feat/pos-tier3-advanced-retail`
+
+Shipped as planned, with real reuse verified before trusting it: read
+`api/get_service_components.php` first to confirm `product_assembly_components`
+(`parent_product_id`/`component_product_id`/`qty_per_unit`, already used for
+service cost-breakdowns and NIP material lists) really does already mean
+"product X is made of N units of product Y" against `products.product_id` —
+it does, so reusing it is genuinely safe: the new `products.is_combo` flag
+is the only gate, existing service/NIP rows are completely untouched, and
+combo behaviour only ever triggers on a product explicitly marked
+`is_combo=1` through the new dedicated UI (never touching the existing
+NIP/service pages or endpoints). `core/pos_combo_products.php`
+(`checkComboAvailability()`, `consumeComboComponents()`,
+`reverseComboComponents()`) — every combo line's component availability is
+checked for the WHOLE cart before any write happens, so a short component
+blocks the sale up front, never a partial failure. **Real pre-existing bug
+found while building this, not introduced, not silently fixed**:
+`void_sale.php`/`create_return.php` already recorded their own (non-combo)
+stock reversals with `reference_type='pos_void'`/`'pos_return'`, neither of
+which is in `stock_movements.reference_type`'s actual ENUM (`'purchase_order',
+'sales_order','pos_sale','invoice','stock_adjustment','stock_transfer',
+'return','production_order','manual'`) — silently coerced under this
+server's non-strict `sql_mode`, the same bug class as Phase 8's `split`/
+`mixed` finding. New combo code correctly uses `'return'`; the pre-existing
+bug in the surrounding (already-shipped, already-tested) code is flagged
+here for a separate fix, not bundled into this phase. `tests/test_pos_combo_products_cli.php`
+(28 checks). Full POS regression re-run clean.
+
 **Closes:** selling a fixed bundle (e.g. a "back-to-school pack") as one line
 that decrements every component's stock. **Gate:** `pos_advanced`.
 

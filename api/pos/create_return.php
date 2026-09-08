@@ -30,6 +30,7 @@ require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/stock_ledger.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 require_once __DIR__ . '/../../core/pos_batch_consumption.php';
+require_once __DIR__ . '/../../core/pos_combo_products.php';
 
 header('Content-Type: application/json');
 
@@ -81,7 +82,7 @@ try {
     }
 
     // Load the original lines being returned, with returnable balance + product flags.
-    $lineStmt = $pdo->prepare("SELECT psi.*, p.is_service
+    $lineStmt = $pdo->prepare("SELECT psi.*, p.is_service, p.is_combo
                                  FROM pos_sale_items psi
                             LEFT JOIN products p ON p.product_id = psi.product_id
                                 WHERE psi.sale_id = ?");
@@ -166,27 +167,40 @@ try {
         $bumpOrig->execute([$rq, $rq, $iid]);
 
         if ((int)($l['is_service'] ?? 0) !== 1 && $pid > 0) {
-            $unitCost = (float)($pdo->query("SELECT COALESCE(cost_price,0) FROM products WHERE product_id = $pid")->fetchColumn() ?: 0);
-            $restock_cost += round($unitCost * $rq, 2);
-            $restoreGlobal->execute([$rq, $rq, $pid]);
-            if ($warehouse_id !== null) $restoreWh->execute([$rq, $pid, $warehouse_id]);
-            recordStockMovement($pdo, [
-                'product_id'       => $pid,
-                'warehouse_id'     => $warehouse_id,
-                'project_id'       => $project_id,
-                'movement_type'    => 'return_in',
-                'quantity'         => $rq,
-                'reference_id'     => $return_id,
-                'reference_type'   => 'pos_return',
-                'reference_number' => $return_receipt,
-                'created_by'       => $_SESSION['user_id'],
-                'notes'            => 'Return against POS Sale #' . $orig['receipt_number'] . ' — ' . $reason,
-            ]);
+            // Phase 23 (pos_upgrade_plan.md §8) — a combo line restores its
+            // COMPONENTS, not itself. Known limitation: restock_cost (feeds
+            // the COGS-reversal GL entry) is not computed for a combo return
+            // — a combo product's own cost_price is typically untracked
+            // (0), and summing component costs is a separate, larger change
+            // to the same COGS logic Phase 18 already scoped narrowly;
+            // documented here rather than guessed at.
+            if (!empty($l['is_combo'])) {
+                if ($warehouse_id !== null) {
+                    reverseComboComponents($pdo, $pid, $rq, $warehouse_id, $project_id, $return_id, $return_receipt, $_SESSION['user_id']);
+                }
+            } else {
+                $unitCost = (float)($pdo->query("SELECT COALESCE(cost_price,0) FROM products WHERE product_id = $pid")->fetchColumn() ?: 0);
+                $restock_cost += round($unitCost * $rq, 2);
+                $restoreGlobal->execute([$rq, $rq, $pid]);
+                if ($warehouse_id !== null) $restoreWh->execute([$rq, $pid, $warehouse_id]);
+                recordStockMovement($pdo, [
+                    'product_id'       => $pid,
+                    'warehouse_id'     => $warehouse_id,
+                    'project_id'       => $project_id,
+                    'movement_type'    => 'return_in',
+                    'quantity'         => $rq,
+                    'reference_id'     => $return_id,
+                    'reference_type'   => 'pos_return',
+                    'reference_number' => $return_receipt,
+                    'created_by'       => $_SESSION['user_id'],
+                    'notes'            => 'Return against POS Sale #' . $orig['receipt_number'] . ' — ' . $reason,
+                ]);
 
-            // Phase 17b (pos_upgrade_plan.md §8) — restore into the exact
-            // batch(es) this line drew from, capped at the returned quantity
-            // (a partial return only reverses that much, not the whole line).
-            reverseFefoBatchConsumption($pdo, $iid, $rq);
+                // Phase 17b (pos_upgrade_plan.md §8) — restore into the exact
+                // batch(es) this line drew from, capped at the returned quantity
+                // (a partial return only reverses that much, not the whole line).
+                reverseFefoBatchConsumption($pdo, $iid, $rq);
+            }
         }
     }
 

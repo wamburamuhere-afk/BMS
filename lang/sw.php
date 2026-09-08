@@ -1055,13 +1055,18 @@ return [
 
     // Phase 15 (pos_upgrade_plan.md §8) — Selling Units (unit conversion at the register)
     '= how many %s' => '= idadi ngapi ya %s',
+    'Add Component' => 'Ongeza Kijenzi',
     'Add Selling Unit' => 'Ongeza Kipimo cha Kuuzia',
+    'A combo has no stock of its own — selling it decrements each component product\'s stock instead, all at once.' => 'Kombo halina hisa yake — kuiuza hupunguza hisa ya kila bidhaa kijenzi badala yake, kwa wakati mmoja.',
+    'Combo Components' => 'Vijenzi vya Kombo',
+    'Component Product' => 'Bidhaa Kijenzi',
     'Delete?' => 'Futa?',
     'Edit Selling Unit' => 'Hariri Kipimo cha Kuuzia',
     'Leave blank to use the base price × quantity' => 'Acha wazi kutumia bei ya msingi × idadi',
     'Price per unit (optional)' => 'Bei kwa kipimo (si lazima)',
     'Sell this product in more than one unit at the register — e.g. a "Carton" of 12, sold and priced independently of the base unit above.' => 'Uza bidhaa hii kwa kipimo zaidi ya kimoja kwenye rejista — mfano "Katoni" ya 12, inayouzwa na kupangiwa bei tofauti na kipimo cha msingi hapo juu.',
     'Selling Units' => 'Vipimo vya Kuuzia',
+    'This is a Combo / Bundle Product' => 'Hii ni Bidhaa ya Kombo / Kifurushi',
     'Unit label' => 'Jina la kipimo',
     'e.g. Carton, Box, Dozen' => 'mfano Katoni, Kasha, Dazani',
 

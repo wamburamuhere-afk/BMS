@@ -129,6 +129,8 @@ try {
         'max_stock_level' => !empty($_POST['max_stock_level']) ? floatval($_POST['max_stock_level']) : 0.000,
         'status' => $_POST['status'] ?? 'active',
         'is_service' => intval($_POST['is_service'] ?? 0),
+        // Phase 23 (pos_upgrade_plan.md §8) — combo/bundle products.
+        'is_combo' => isset($_POST['is_combo']) ? 1 : 0,
         'is_taxable' => isset($_POST['is_taxable']) ? 1 : 0,
         'track_inventory' => intval($_POST['track_inventory'] ?? 1),
         'manufacturer' => !empty($_POST['manufacturer']) ? trim($_POST['manufacturer']) : null,

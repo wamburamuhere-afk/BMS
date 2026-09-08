@@ -192,7 +192,7 @@ try {
     }
 
     $fetchStmt = $pdo->prepare("
-        SELECT p.product_id, p.product_name, p.selling_price, p.min_selling_price, p.is_service, 
+        SELECT p.product_id, p.product_name, p.selling_price, p.min_selling_price, p.is_service, p.is_combo,
                COALESCE(SUM(ps.stock_quantity - IFNULL(ps.reserved_quantity, 0)), 0) as general_available,
                $project_stock_subquery as project_available,
                COALESCE(SUM(IFNULL(ps.reserved_quantity, 0)), 0) as current_warehouse_reserved
@@ -224,6 +224,24 @@ try {
     foreach ($groupPrices as $pid => $price) {
         if (isset($products_map[$pid])) {
             $products_map[$pid]['selling_price'] = $price;
+        }
+    }
+
+    // Phase 23 (pos_upgrade_plan.md §8) — combo/bundle products. Every combo
+    // line's component availability is checked BEFORE any stock is touched
+    // anywhere in this sale — a combo with a short component blocks the
+    // WHOLE sale up front with a clear error, never a partial failure after
+    // other lines already decremented.
+    require_once __DIR__ . '/../../core/pos_combo_products.php';
+    foreach ($items as $item) {
+        $pid = (int)$item['product_id'];
+        $db_product = $products_map[$pid] ?? null;
+        if (!$db_product || empty($db_product['is_combo'])) continue;
+        $qty = floatval($item['quantity'] ?? 0);
+        $shortfalls = checkComboAvailability($pdo, $pid, $qty, (int)$warehouse_id);
+        if (!empty($shortfalls)) {
+            $names = implode(', ', array_map(fn($s) => "{$s['product_name']} (need {$s['needed']}, have {$s['available']})", $shortfalls));
+            throw new Exception("Insufficient stock for combo '{$db_product['product_name']}' component(s): $names");
         }
     }
 
@@ -357,8 +375,13 @@ try {
         ]);
         $sale_item_id = (int)$pdo->lastInsertId();
 
-        // Update stock (Only for non-service products)
-        if (!$db_product['is_service']) {
+        // Phase 23 (pos_upgrade_plan.md §8) — a combo product carries no
+        // stock of its own; selling it decrements each COMPONENT's stock
+        // instead (availability for the whole cart was already verified
+        // above, before any writes started).
+        if (!empty($db_product['is_combo'])) {
+            consumeComboComponents($pdo, $pid, $qty, (int)$warehouse_id, $project_id, $sale_id, $receipt_number, $_SESSION['user_id']);
+        } elseif (!$db_product['is_service']) {
             // Phase 17b (pos_upgrade_plan.md §8) — FEFO batch consumption, a
             // bookkeeping layer on top of the product_stocks decrement below,
             // not a replacement for it. No-op for a product with no open

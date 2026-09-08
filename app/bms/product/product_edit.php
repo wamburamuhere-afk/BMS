@@ -126,6 +126,58 @@ $(document).ready(function() {
         loadSellingUnits();
     }
 
+    // Phase 23 (pos_upgrade_plan.md §8) — Combo Components grid.
+    if ($('#is_combo_toggle').is(':checked')) {
+        loadComboComponents();
+    }
+
+    $('#comboComponentModal').on('shown.bs.modal', function () {
+        if (!$('#cc_component_select').hasClass('select2-hidden-accessible')) {
+            $('#cc_component_select').select2({
+                theme: 'bootstrap-5', dropdownParent: $('#comboComponentModal'),
+                placeholder: <?= json_encode(t('Search product by name or SKU')) ?>,
+                minimumInputLength: 1, width: '100%',
+                ajax: {
+                    url: '<?= buildUrl('api/search_products.php') ?>',
+                    dataType: 'json', delay: 300, cache: true,
+                    data: p => ({ q: p.term }),
+                    processResults: data => ({ results: data.results })
+                }
+            });
+        }
+    });
+
+    $('#comboComponentForm').on('submit', function (e) {
+        e.preventDefault();
+        const btn = $(this).find('[type="submit"]');
+        const orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + <?= json_encode(t('Processing...')) ?>);
+        $.ajax({
+            url: '<?= buildUrl('api/save_combo_component.php') ?>',
+            type: 'POST',
+            data: $(this).serialize(),
+            dataType: 'json',
+            success: function (res) {
+                if (res.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('comboComponentModal')).hide();
+                    loadComboComponents();
+                    Swal.fire({ icon: 'success', title: <?= json_encode(t('Saved!')) ?>, text: res.message, timer: 1500, showConfirmButton: false });
+                } else {
+                    $('#combo-component-message').html('<div class="alert alert-danger py-2 mb-0">' + res.message + '</div>');
+                }
+            },
+            error: function () { $('#combo-component-message').html('<div class="alert alert-danger py-2 mb-0">' + <?= json_encode(t('Server error.')) ?> + '</div>'); },
+            complete: function () { btn.prop('disabled', false).html(orig); }
+        });
+    });
+
+    $('#comboComponentModal').on('hidden.bs.modal', function () {
+        $('#comboComponentForm')[0].reset();
+        $('#cc_id').val('');
+        $('#combo-component-message').html('');
+        if ($('#cc_component_select').hasClass('select2-hidden-accessible')) $('#cc_component_select').val(null).trigger('change');
+    });
+
     $('#sellingUnitForm').on('submit', function (e) {
         e.preventDefault();
         const btn = $(this).find('[type="submit"]');
@@ -195,6 +247,44 @@ function loadSellingUnits() {
             </tr>`;
         });
         $('#sellingUnitsBody').html(html);
+    });
+}
+
+function openAddComboComponentModal() {
+    new bootstrap.Modal(document.getElementById('comboComponentModal')).show();
+}
+
+function loadComboComponents() {
+    $.getJSON('<?= buildUrl('api/get_combo_components.php') ?>', { product_id: PRODUCT_ID }, function (res) {
+        if (!res.success || !res.data.length) {
+            $('#comboComponentsBody').html('<tr><td colspan="3" class="text-center text-muted py-3">' + <?= json_encode(t('No records found')) ?> + '</td></tr>');
+            return;
+        }
+        let html = '';
+        res.data.forEach(c => {
+            html += `<tr>
+                <td>${safeOutput(c.product_name)} <small class="text-muted">${safeOutput(c.sku || '')}</small></td>
+                <td>${c.qty_per_unit}</td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteComboComponent(${c.id})"><i class="bi bi-trash"></i></button>
+                </td>
+            </tr>`;
+        });
+        $('#comboComponentsBody').html(html);
+    });
+}
+
+function deleteComboComponent(id) {
+    Swal.fire({
+        title: <?= json_encode(t('Delete?')) ?>,
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545',
+        confirmButtonText: <?= json_encode(t('Yes, Delete')) ?>
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/delete_combo_component.php') ?>', { id: id, _csrf: <?= json_encode(csrf_token()) ?> }, function (res) {
+            if (res.success) { loadComboComponents(); }
+            else { Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: res.message }); }
+        }, 'json');
     });
 }
 
@@ -683,6 +773,45 @@ function deleteSellingUnit(id) {
                         </div>
                         <?php endif; ?>
 
+                        <?php if (!$product['is_service']): ?>
+                        <!-- Phase 23 (pos_upgrade_plan.md §8) — Combo/Bundle Product -->
+                        <div class="col-md-12 mt-4 p-3 bg-white border rounded">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="is_combo_toggle" name="is_combo"
+                                       value="1" <?= !empty($product['is_combo']) ? 'checked' : '' ?>
+                                       onchange="$('#comboComponentsSection').toggleClass('d-none', !this.checked); if (this.checked) loadComboComponents();">
+                                <label class="form-check-label fw-bold text-primary" for="is_combo_toggle">
+                                    <i class="bi bi-boxes me-1"></i> <?= t('This is a Combo / Bundle Product') ?>
+                                </label>
+                            </div>
+                            <p class="text-muted small mb-3">
+                                <?= t('A combo has no stock of its own — selling it decrements each component product\'s stock instead, all at once.') ?>
+                            </p>
+                            <div id="comboComponentsSection" class="<?= !empty($product['is_combo']) ? '' : 'd-none' ?>">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <strong class="small"><?= t('Combo Components') ?></strong>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="openAddComboComponentModal()">
+                                        <i class="bi bi-plus-circle me-1"></i> <?= t('Add Component') ?>
+                                    </button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover border" id="comboComponentsTable">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th><?= t('Component Product') ?></th>
+                                                <th><?= t('Quantity') ?></th>
+                                                <th style="width:60px;"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="comboComponentsBody">
+                                            <tr><td colspan="3" class="text-center text-muted py-3"><?= t('Loading...') ?></td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
                         <?php if (!$product['is_service'] && !empty($warehouses)): ?>
                         <div class="col-md-12 mt-4 p-3 bg-white border rounded">
                             <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary">
@@ -834,6 +963,38 @@ function deleteSellingUnit(id) {
                     <div class="mb-3">
                         <label class="form-label"><?= t('Price per unit (optional)') ?></label>
                         <input type="number" class="form-control" id="su_price" name="unit_price_override" min="0" step="0.01" placeholder="<?= t('Leave blank to use the base price × quantity') ?>">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> <?= t('Save') ?></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Phase 23 (pos_upgrade_plan.md §8) — Add/Edit Combo Component Modal -->
+<div class="modal fade" id="comboComponentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-boxes me-1"></i> <?= t('Add Component') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="comboComponentForm" autocomplete="off">
+                <div class="modal-body">
+                    <input type="hidden" id="cc_id" name="id">
+                    <input type="hidden" name="product_id" value="<?= (int)$product_id ?>">
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                    <div id="combo-component-message" class="mb-2"></div>
+                    <div class="mb-3">
+                        <label class="form-label"><?= t('Component Product') ?> <span class="text-danger">*</span></label>
+                        <select class="form-select" id="cc_component_select" name="component_product_id" style="width:100%" required></select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><?= t('Quantity') ?> <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="cc_qty_per_unit" name="qty_per_unit" min="0.0001" step="0.0001" required>
                     </div>
                 </div>
                 <div class="modal-footer">

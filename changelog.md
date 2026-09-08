@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-09-08 (feature) - POS Phase 23: combo/bundle products
+
+**Files (new):** `core/pos_combo_products.php`, `migrations/tenant/2026_09_08_pos_combo_products.php`,
+`api/get_combo_components.php`, `api/save_combo_component.php`, `api/delete_combo_component.php`,
+`tests/test_pos_combo_products_cli.php`
+**Files (changed):** `api/pos/process_sale.php`, `api/pos/void_sale.php`, `api/pos/create_return.php`,
+`api/update_product.php`, `app/bms/product/product_edit.php`, `lang/sw.php`,
+`schema/tenant_schema_template.sql`
+
+Tenth phase of the Tier-3 plan (§8 Phase 23). Reuses `product_assembly_components` (already used
+for service cost-breakdowns/NIP material lists — confirmed by reading its existing usage before
+trusting it: `parent_product_id` already means "made of N units of product Y" against
+`products.product_id`) for retail combo/bundle products, gated by a new `products.is_combo` flag
+so existing service/NIP rows are completely unaffected. Selling a combo decrements every
+component's stock atomically — the whole cart's component availability is checked before any
+write, so a short component blocks the sale up front, never a partial failure. Void/return reverse
+into the exact components, full or partial. **Found while building this, not introduced, not
+silently fixed:** `void_sale.php`/`create_return.php` already logged their own stock reversals
+with a `reference_type` value not actually in `stock_movements`'s ENUM — the same bug class as
+Phase 8's `split`/`mixed` finding, flagged for a separate fix.
+
 ## 2026-09-08 (feature) - POS Phase 22: receipt layout variety + WhatsApp receipt link
 
 **Files (new):** `migrations/tenant/2026_09_08_pos_receipt_templates.php`, `tests/test_pos_receipt_templates_cli.php`
