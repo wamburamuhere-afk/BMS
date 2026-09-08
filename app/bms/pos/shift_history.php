@@ -103,6 +103,15 @@ foreach ($shifts as $s) {
                         <a class="btn btn-sm btn-outline-primary" href="<?= getUrl('pos/zreport') ?>?shift_id=<?= (int)$s['shift_id'] ?>" target="_blank">
                             <i class="bi bi-file-earmark-text"></i> Z-Report
                         </a>
+                        <?php if ($can_view_all && $s['status'] === 'active' && (int)$s['user_id'] !== (int)$user_id): ?>
+                        <button type="button" class="btn btn-sm btn-outline-danger force-close-btn"
+                                data-shift-id="<?= (int)$s['shift_id'] ?>"
+                                data-shift-code="<?= htmlspecialchars($s['shift_code'], ENT_QUOTES) ?>"
+                                data-cashier="<?= htmlspecialchars($s['cashier_name'] ?? 'Unknown', ENT_QUOTES) ?>"
+                                data-register="<?= htmlspecialchars($s['register_name'] ?? '—', ENT_QUOTES) ?>">
+                            <i class="bi bi-lock"></i> Force Close
+                        </button>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -117,6 +126,20 @@ foreach ($shifts as $s) {
 </div>
 
 <script>
+// Per-page local convention (this codebase has no global JS output-escaping
+// helper from header.php — each page that needs one defines its own copy,
+// e.g. app/bms/customer/customers.php). Used below before writing the
+// cashier/register name into a Swal.fire html string.
+function safeOutput(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function renderShiftCards(rows) {
     const cardView = document.getElementById('cardView');
     if (!rows.length) { cardView.innerHTML = '<div class="col-12 text-center py-5 text-muted">No shifts found</div>'; return; }
@@ -150,6 +173,52 @@ $(document).ready(function () {
     }, $shifts)) ?>;
     rows.forEach(r => { r.url = zreportBaseUrl + '?shift_id=' + r.shift_id; });
     renderShiftCards(rows);
+});
+
+// Force-close a shift left open by another cashier (crashed browser, forgot to
+// log out). Only rendered for canEdit('pos') users, on shifts that aren't the
+// viewer's own — see the PHP condition above the button.
+$(document).on('click', '.force-close-btn', function () {
+    const $btn = $(this);
+    const shiftId   = $btn.data('shift-id');
+    const shiftCode = String($btn.data('shift-code'));
+    const cashier   = String($btn.data('cashier'));
+    const register  = String($btn.data('register'));
+
+    Swal.fire({
+        title: 'Force-close this shift?',
+        html: 'This closes <b>' + safeOutput(shiftCode) + '</b> on <b>' + safeOutput(register) +
+              '</b>, opened by <b>' + safeOutput(cashier) + '</b>, using the cash amount you enter ' +
+              'below as the counted total. Only do this if that cashier genuinely cannot close it ' +
+              'themselves — this action is recorded in the audit log.',
+        icon: 'warning',
+        input: 'number',
+        inputLabel: 'Actual cash counted at this till',
+        inputAttributes: { min: 0, step: '0.01' },
+        inputValue: 0,
+        showCancelButton: true,
+        confirmButtonText: 'Force Close',
+        confirmButtonColor: '#dc3545'
+    }).then(function (result) {
+        if (!result.isConfirmed) return;
+        $btn.prop('disabled', true);
+        $.post('<?= buildUrl('api/pos/close_shift.php') ?>', {
+            shift_id: shiftId,
+            ending_cash: result.value || 0,
+            notes: 'Force-closed by <?= htmlspecialchars($_SESSION['username'] ?? 'admin', ENT_QUOTES) ?>'
+        }, function (res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: 'Shift Closed', text: res.message, timer: 2000, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                $btn.prop('disabled', false);
+            }
+        }, 'json').fail(function () {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Force close failed. Please try again.' });
+            $btn.prop('disabled', false);
+        });
+    });
 });
 </script>
 

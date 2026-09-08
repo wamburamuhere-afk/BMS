@@ -1,5 +1,41 @@
 # BMS Changelog
 
+## 2026-09-08 (feat) - POS: busy-register visibility in Start Shift, supervisor Force Close
+
+**Files (added):** `tests/test_pos_register_visibility_force_close_cli.php`
+**Files (changed):** `api/pos/get_registers.php`, `api/pos/close_shift.php`,
+`app/bms/pos/pos_scripts_new.php`, `app/bms/pos/shift_history.php`
+
+Follow-up to Phase 8's "one active shift per register" rule, reported live: a cashier could
+only discover a register was already staffed by picking it and reading `open_shift.php`'s
+blind error after clicking Start Shift, and there was no recovery path for a shift left open
+by someone who could no longer close it themselves (crashed browser, forgot to log out) short
+of editing the database directly.
+
+`get_registers.php` now LEFT JOINs each register's current active shift + cashier username;
+the Start Shift dropdown disables a busy register up front and labels it "in use by NAME
+since TIME" instead of letting it be picked at all (`open_shift.php`'s own server-side guard
+is unchanged and still backstops the rare simultaneous-click race). Separately, `close_shift.php`
+now accepts an optional `shift_id` so a supervisor/admin (`canEdit('pos')` — the same gate that
+already lets them view every cashier's shifts in Shift History) can force-close a shift that
+isn't their own; this is distinct from the untouched self-service path (no `shift_id` posted,
+still keyed off `$_SESSION['shift_id']`) and is careful never to clear the *acting* admin's own
+session shift if they happen to have a separate one open. Every force-close is both
+`logActivity`'d and `logAudit`'d (compliance-sensitive, unlike an ordinary self-close).
+`shift_history.php` gained the "Force Close" button — shown only to `canEdit('pos')` users, only
+on an active shift that isn't their own — with a confirmation dialog asking for the actual
+counted cash before closing. Added the standard local `safeOutput()` definition to
+`shift_history.php` before using it in that dialog, since it's the same per-page JS convention
+whose absence caused the 2026-09-07 Start Shift bug.
+
+Verified live against the real dev DB: 14 wiring checks plus a live-DB section that replicates
+`get_registers.php`'s own query and `close_shift.php`'s own force-close/self-close branching
+logic against real fixture rows (33 assertions, 0 failures, no data left behind after rollback).
+All 6 pre-existing POS phase suites re-run clean (186 assertions, 0 failures). Browser
+automation was unavailable this session, so a manual click-through in a real browser is still
+worth doing to confirm the disabled-option styling and the Force Close confirmation dialog
+render as expected.
+
 ## 2026-09-07 (fix) - POS: Start Shift modal never opened (safeOutput ReferenceError)
 
 **Files (changed):** `app/bms/pos/pos_scripts_new.php`, `app/constant/settings/pos_config_settings.php`

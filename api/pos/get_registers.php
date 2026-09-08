@@ -15,12 +15,22 @@ if (!canView('pos'))    { http_response_code(403); echo json_encode(['success' =
 global $pdo;
 
 $active_only = !empty($_GET['active_only']);
-$sql = "SELECT register_id, register_name, register_code, location, opening_cash, status,
-               receipt_printer, barcode_scanner, cash_drawer, card_reader,
-               receipt_header, receipt_footer, receipt_logo, default_cashier
-          FROM pos_registers";
-if ($active_only) $sql .= " WHERE status = 'active'";
-$sql .= " ORDER BY register_name";
+// LEFT JOINs surface whether a register is currently staffed (Phase 8's
+// "one active shift per register" rule in open_shift.php) so the Start Shift
+// modal can disable a busy register up front instead of the cashier only
+// finding out after submitting. canEdit('pos') users can also use this to
+// know who to ask before force-closing a stuck shift from Shift History.
+$sql = "SELECT r.register_id, r.register_name, r.register_code, r.location, r.opening_cash, r.status,
+               r.receipt_printer, r.barcode_scanner, r.cash_drawer, r.card_reader,
+               r.receipt_header, r.receipt_footer, r.receipt_logo, r.default_cashier,
+               sh.shift_id AS active_shift_id,
+               u.username AS active_cashier_name,
+               DATE_FORMAT(sh.start_time, '%d %b, %H:%i') AS active_shift_started_label
+          FROM pos_registers r
+          LEFT JOIN cash_register_shifts sh ON sh.register_id = r.register_id AND sh.status = 'active'
+          LEFT JOIN users u ON u.user_id = sh.user_id";
+if ($active_only) $sql .= " WHERE r.status = 'active'";
+$sql .= " ORDER BY r.register_name";
 
 $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 
