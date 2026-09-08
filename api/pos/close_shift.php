@@ -24,22 +24,39 @@ try {
     $user_id = $_SESSION['user_id'];
     $ending_cash = isset($_POST['ending_cash']) ? floatval($_POST['ending_cash']) : 0;
     $notes = isset($_POST['notes']) ? trim($_POST['notes']) : '';
-    
-    // Get active shift
-    $shift_id = isset($_SESSION['shift_id']) ? $_SESSION['shift_id'] : null;
-    
-    if (!$shift_id) {
-        echo json_encode([
-            'success' => false,
-            'message' => 'No active shift found'
-        ]);
-        exit();
+
+    // Force-close support: Shift History (canEdit('pos') — same gate that already
+    // lets a supervisor/admin VIEW every cashier's shifts) can pass an explicit
+    // shift_id to close a stuck shift left open by someone else (crashed browser,
+    // forgot to log out). Ordinary self-close (the POS page's own "End Shift"
+    // button) never sends shift_id and keeps using the session's own shift,
+    // exactly as before.
+    $requested_shift_id = isset($_POST['shift_id']) ? (int)$_POST['shift_id'] : 0;
+
+    if ($requested_shift_id) {
+        $stmt = $pdo->prepare("SELECT * FROM cash_register_shifts WHERE shift_id = ? AND status = 'active'");
+        $stmt->execute([$requested_shift_id]);
+        $shift = $stmt->fetch(PDO::FETCH_ASSOC);
+        $shift_id = $requested_shift_id;
+        $is_force_close = $shift && (int)$shift['user_id'] !== (int)$user_id;
+    } else {
+        // Get active shift
+        $shift_id = isset($_SESSION['shift_id']) ? $_SESSION['shift_id'] : null;
+
+        if (!$shift_id) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'No active shift found'
+            ]);
+            exit();
+        }
+
+        $stmt = $pdo->prepare("SELECT * FROM cash_register_shifts WHERE shift_id = ? AND user_id = ? AND status = 'active'");
+        $stmt->execute([$shift_id, $user_id]);
+        $shift = $stmt->fetch(PDO::FETCH_ASSOC);
+        $is_force_close = false;
     }
-    
-    $stmt = $pdo->prepare("SELECT * FROM cash_register_shifts WHERE shift_id = ? AND user_id = ? AND status = 'active'");
-    $stmt->execute([$shift_id, $user_id]);
-    $shift = $stmt->fetch(PDO::FETCH_ASSOC);
-    
+
     if (!$shift) {
         echo json_encode([
             'success' => false,
@@ -110,12 +127,27 @@ try {
         $notes, $user_id, $shift_id
     ]);
 
-    // Clear session shift
-    unset($_SESSION['shift_id']);
-    
+    // Clear session shift — only the acting user's OWN session shift, never the
+    // one being force-closed on someone else's behalf (that shift lives in a
+    // different session entirely, and this admin may have their own separate
+    // active shift open at the same time).
+    if (!$is_force_close && ($_SESSION['shift_id'] ?? null) == $shift_id) {
+        unset($_SESSION['shift_id']);
+    }
+
     require_once __DIR__ . '/../../helpers.php';
     $username = $_SESSION['username'] ?? 'User';
-    logActivity($pdo, $user_id, 'Close POS Shift', "$username closed POS shift #{$shift['shift_code']} (Ending Cash: " . number_format($ending_cash, 2) . ")");
+    if ($is_force_close) {
+        logActivity($pdo, $user_id, 'Force-Close POS Shift', "$username force-closed POS shift #{$shift['shift_code']}, opened by another cashier (Ending Cash: " . number_format($ending_cash, 2) . ")");
+        logAudit($pdo, $user_id, 'pos_shift_force_close', [
+            'entity_type' => 'cash_register_shift',
+            'entity_id'   => $shift_id,
+            'old_values'  => ['status' => 'active', 'user_id' => $shift['user_id']],
+            'new_values'  => ['status' => 'closed', 'closed_by' => $user_id, 'ending_cash' => $ending_cash],
+        ]);
+    } else {
+        logActivity($pdo, $user_id, 'Close POS Shift', "$username closed POS shift #{$shift['shift_code']} (Ending Cash: " . number_format($ending_cash, 2) . ")");
+    }
 
     echo json_encode([
         'success' => true,
