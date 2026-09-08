@@ -1,5 +1,24 @@
 # BMS Changelog
 
+## 2026-09-08 (plan) - POS Tier-3 professionalisation plan (UltimatePOS gap-closure) written
+
+**Files (changed):** `pos_upgrade_plan.md` (new §8, Phases 14-24)
+
+Planning only, no code changed. Audited `C:\wamp64\www\UltimatePOS` (mature commercial Laravel
+POS) against BMS's already-shipped POS (§3 Phases 1-13) to find genuine remaining gaps for a
+Tanzanian stationery/retail-counter use case. Confirmed by direct schema/code reads (not
+assumption): `receipt_items.batch_number/expiry_date` already captured at GRN but never used
+downstream; `customers.credit_limit` already exists but never enforced at POS;
+`products.wholesale_price` already exists as a single wholesale price; no unit-conversion,
+combo-product, or network-printer infrastructure exists anywhere. Wrote 11 new phases (14-24)
+reusing existing engines wherever one exists — notably the fully-built notification/email engine
+(`core/notify.php::dispatchEvent()`, `notification_rules`, email outbox) and the proven
+`document_expiry_reminders` milestone-dedupe pattern — for the batch/lot + expiry tracking phase
+(17), which the product owner asked to be built out fully (GRN → batch ledger → FEFO consumption
+at sale → milestone alerts routable to a specific user/role with email, via the existing rules
+UI). Approved by product owner 2026-09-08 to build one phase at a time; no phase starts without
+its own explicit go-ahead.
+
 ## 2026-09-08 (fix) - POS language switching: Z-Report and printed sale receipt now actually translate
 
 **Files (changed):** `app/bms/pos/zreport.php`, `api/pos/print_receipt.php`, `lang/sw.php`
