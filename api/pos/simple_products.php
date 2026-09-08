@@ -9,12 +9,19 @@ header('Access-Control-Allow-Origin: *');
 
 // Include global configuration and database connection
 require_once __DIR__ . '/../../roots.php';
+// Respect the caller's saved language preference (set by header.php on their
+// last page load) so t()-wrapped messages below come back in the right
+// language, not always English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 // Security: Check if user is authenticated
 if (!isAuthenticated()) {
     http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit;
 }
 
@@ -37,12 +44,12 @@ try {
     if ($warehouse_id > 0) {
         if (!userCan('warehouse', $warehouse_id)) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+            echo json_encode(['success' => false, 'message' => t('Access denied: this warehouse is not in your assigned scope.')]);
             exit;
         }
     } elseif (!hasAllWarehouseAccess()) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Select a warehouse — you do not have access to view stock across all warehouses.']);
+        echo json_encode(['success' => false, 'message' => t('Select a warehouse — you do not have access to view stock across all warehouses.')]);
         exit;
     }
 

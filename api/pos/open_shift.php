@@ -4,15 +4,22 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+// Respect the caller's saved language preference (set by header.php on their
+// last page load) so t()-wrapped messages below come back in the right
+// language, not always English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 
 if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit();
 }
 
 if (!canCreate('pos')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to open POS shifts']);
+    echo json_encode(['success' => false, 'message' => t('Access Denied: you do not have permission to open POS shifts')]);
     exit();
 }
 
@@ -32,7 +39,7 @@ try {
     $reg->execute([$register_id]);
     $register = $reg->fetch(PDO::FETCH_ASSOC);
     if (!$register) {
-        echo json_encode(['success' => false, 'message' => 'Selected register is not available. Please choose an active register.']);
+        echo json_encode(['success' => false, 'message' => t('Selected register is not available. Please choose an active register.')]);
         exit();
     }
 
@@ -44,7 +51,7 @@ try {
     if ($existing_shift) {
         echo json_encode([
             'success' => false,
-            'message' => 'You already have an active shift. Please close it first.'
+            'message' => t('You already have an active shift. Please close it first.')
         ]);
         exit();
     }
@@ -53,7 +60,7 @@ try {
     $regBusy = $pdo->prepare("SELECT COUNT(*) FROM cash_register_shifts WHERE register_id = ? AND status = 'active'");
     $regBusy->execute([$register_id]);
     if ($regBusy->fetchColumn() > 0) {
-        echo json_encode(['success' => false, 'message' => "Register \"{$register['register_name']}\" is already in an active shift with another cashier."]);
+        echo json_encode(['success' => false, 'message' => sprintf(t('Register "%s" is already in an active shift with another cashier.'), $register['register_name'])]);
         exit();
     }
 
@@ -83,7 +90,7 @@ try {
 
     echo json_encode([
         'success' => true,
-        'message' => 'Shift started successfully',
+        'message' => t('Shift started successfully'),
         'shift_id' => $shift_id,
         'shift_code' => $shift_code,
         'starting_cash' => $opening_cash,

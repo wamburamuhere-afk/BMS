@@ -10,16 +10,23 @@
  * Permission: canView('pos')
  */
 require_once __DIR__ . '/../../roots.php';
+// Respect the caller's saved language preference (set by header.php on their
+// last page load) so t()-wrapped messages below come back in the right
+// language, not always English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 require_once __DIR__ . '/../../core/permissions.php';   // loads core/project_scope.php
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
 
-if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
-if (!canView('pos'))    { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
+if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
+if (!canView('pos'))    { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
 
 $sale_id = (int)($_GET['sale_id'] ?? 0);
-if ($sale_id <= 0) { echo json_encode(['success' => false, 'message' => 'Invalid sale.']); exit; }
+if ($sale_id <= 0) { echo json_encode(['success' => false, 'message' => t('Invalid sale.')]); exit; }
 
 try {
     global $pdo;
@@ -28,18 +35,18 @@ try {
                            FROM pos_sales WHERE sale_id = ?");
     $st->execute([$sale_id]);
     $sale = $st->fetch(PDO::FETCH_ASSOC);
-    if (!$sale) { echo json_encode(['success' => false, 'message' => 'Sale not found.']); exit; }
+    if (!$sale) { echo json_encode(['success' => false, 'message' => t('Sale not found.')]); exit; }
 
     // Project-scope guard: a non-admin may only see a sale within their scope.
     $pid = $sale['project_id'] !== null && $sale['project_id'] !== '' ? (int)$sale['project_id'] : null;
     if ($pid !== null && !userCan('project', $pid)) {
-        http_response_code(403); echo json_encode(['success' => false, 'message' => 'This sale is not in your project scope.']); exit;
+        http_response_code(403); echo json_encode(['success' => false, 'message' => t('This sale is not in your project scope.')]); exit;
     }
 
     // Warehouse-scope guard: a non-admin may only see a sale drawn from their assigned warehouse(s).
     $wid = $sale['warehouse_id'] !== null && $sale['warehouse_id'] !== '' ? (int)$sale['warehouse_id'] : null;
     if ($wid !== null && !userCan('warehouse', $wid)) {
-        http_response_code(403); echo json_encode(['success' => false, 'message' => 'This sale is not in your assigned warehouse scope.']); exit;
+        http_response_code(403); echo json_encode(['success' => false, 'message' => t('This sale is not in your assigned warehouse scope.')]); exit;
     }
 
     $li = $pdo->prepare("SELECT sale_item_id, product_id, product_name, quantity, unit_price, tax_rate,
@@ -75,5 +82,5 @@ try {
 } catch (Throwable $e) {
     error_log('get_sale_items: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Database error.']);
+    echo json_encode(['success' => false, 'message' => t('Database error.')]);
 }

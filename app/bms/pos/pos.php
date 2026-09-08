@@ -63,11 +63,11 @@ $tax_rates = $pdo->query("SELECT * FROM tax_rates WHERE status = 'active' ORDER 
 
 // Get payment methods
 $payment_methods = [
-    'cash' => 'Cash',
-    'card' => 'Credit/Debit Card',
-    'mobile_money' => 'Mobile Money',
-    'bank_transfer' => 'Bank Transfer',
-    'credit' => 'Customer Credit'
+    'cash' => t('Cash'),
+    'card' => t('Credit/Debit Card'),
+    'mobile_money' => t('Mobile Money'),
+    'bank_transfer' => t('Bank Transfer'),
+    'credit' => t('Customer Credit')
 ];
 
 // Phase 11 (pos_upgrade_plan.md §7) — the tenant's own configured operating
@@ -94,41 +94,41 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
     <div id="posHeaderBar" class="bg-primary text-white py-2 px-3 d-flex justify-content-between align-items-center">
         <div>
             <h4 class="mb-0">
-                <i class="bi bi-cash-register"></i> Point of Sale
+                <i class="bi bi-cash-register"></i> <?= t('Point of Sale') ?>
                 <span id="scannerReadyBadge" class="badge bg-light text-success ms-2 small fw-normal"
                       style="font-size:0.65rem;vertical-align:middle;display:none;"
-                      title="Barcode scanner active — scan a product to add it to the cart">
-                    <i class="bi bi-upc-scan"></i> SCANNER READY
+                      title="<?= t('Barcode scanner active — scan a product to add it to the cart') ?>">
+                    <i class="bi bi-upc-scan"></i> <?= t('SCANNER READY') ?>
                 </span>
             </h4>
             <small class="opacity-75">
                 <?php if ($shift_active): ?>
-                Shift: <?= $shift_active['shift_code'] ?> |
-                Started: <?= date('H:i', strtotime($shift_active['start_time'])) ?> |
-                Cashier: <?= htmlspecialchars($_SESSION['username'] ?? 'User') ?>
+                <?= t('Shift:') ?> <?= $shift_active['shift_code'] ?> |
+                <?= t('Started:') ?> <?= date('H:i', strtotime($shift_active['start_time'])) ?> |
+                <?= t('Cashier:') ?> <?= htmlspecialchars($_SESSION['username'] ?? t('User')) ?>
                 <?php else: ?>
-                No active shift
+                <?= t('No active shift') ?>
                 <?php endif; ?>
             </small>
         </div>
         <div class="d-flex align-items-center gap-3">
             <div class="text-center">
-                <div class="fs-6">Cash Balance</div>
+                <div class="fs-6"><?= t('Cash Balance') ?></div>
                 <div class="fs-4 fw-bold cash-balance-display"><?= format_currency($cash_balance, $currency) ?></div>
-                <small>Starting: <?= format_currency($starting_cash, $currency) ?></small>
+                <small><?= t('Starting:') ?> <?= format_currency($starting_cash, $currency) ?></small>
             </div>
             <div class="vr text-white opacity-50"></div>
             <div>
                 <?php if ($shift_active): ?>
                 <button class="btn btn-light btn-sm me-2" onclick="openCashDrawer()">
-                    <i class="bi bi-cash"></i> Open Drawer
+                    <i class="bi bi-cash"></i> <?= t('Open Drawer') ?>
                 </button>
                 <button class="btn btn-outline-light btn-sm" onclick="endShift()">
-                    <i class="bi bi-power"></i> End Shift
+                    <i class="bi bi-power"></i> <?= t('End Shift') ?>
                 </button>
                 <?php else: ?>
                 <button class="btn btn-warning btn-sm" onclick="startShift()">
-                    <i class="bi bi-play-circle"></i> Start Shift
+                    <i class="bi bi-play-circle"></i> <?= t('Start Shift') ?>
                 </button>
                 <?php endif; ?>
             </div>
@@ -147,7 +147,7 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-white"><i class="bi bi-house-door text-primary"></i></span>
                             <select class="form-select" id="posWarehouseId" onchange="loadProducts()" required>
-                                <option value="" selected disabled>— Select Warehouse —</option>
+                                <option value="" selected disabled><?= t('— Select Warehouse —') ?></option>
                                 <?php
                                 // Shared Project ↔ Warehouse mechanism (core/warehouse_scope.php) narrows
                                 // by project scope first; then narrowed again to this specific user's own
@@ -170,7 +170,7 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-white"><i class="bi bi-briefcase text-info"></i></span>
                             <select class="form-select" id="posProjectId">
-                                <option value="">General (No Project)</option>
+                                <option value=""><?= t('General (No Project)') ?></option>
                                 <?php
                                 $_pos_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
                                 if (isAdmin()) {
@@ -195,8 +195,8 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
                 <div class="row g-2">
                     <div class="col-md-5">
                         <div class="input-group">
-                            <input type="text" class="form-control" id="productSearch" 
-                                   placeholder="Search product by name, SKU or barcode" autofocus>
+                            <input type="text" class="form-control" id="productSearch"
+                                   placeholder="<?= t('Search product by name, SKU or barcode') ?>" autofocus>
                             <button class="btn btn-outline-secondary" type="button" onclick="searchProducts()">
                                 <i class="bi bi-search"></i>
                             </button>
@@ -205,7 +205,7 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
                     <div class="col-md-7">
                         <div class="d-flex gap-2 flex-wrap" id="categoryButtons">
                             <button type="button" class="btn btn-sm btn-outline-primary active" onclick="loadProductsByCategory('all')">
-                                All Products
+                                <?= t('All Products') ?>
                             </button>
                         </div>
                     </div>
@@ -219,9 +219,9 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
                 </div>
                 <div id="loadingProducts" class="text-center py-5">
                     <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading products...</span>
+                        <span class="visually-hidden"><?= t('Loading products...') ?></span>
                     </div>
-                    <p class="mt-2 text-muted">Loading products...</p>
+                    <p class="mt-2 text-muted"><?= t('Loading products...') ?></p>
                 </div>
             </div>
         </div>
@@ -231,29 +231,29 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
             <!-- Current Sale Header -->
             <div class="p-3 border-bottom bg-white">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0"><i class="bi bi-cart3"></i> Current Sale</h5>
+                    <h5 class="mb-0"><i class="bi bi-cart3"></i> <?= t('Current Sale') ?></h5>
                     <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-warning" onclick="openDiscountModal()" title="Apply Discount">
+                        <button class="btn btn-outline-warning" onclick="openDiscountModal()" title="<?= t('Apply Discount') ?>">
                             <i class="bi bi-percent"></i>
                         </button>
-                        <button class="btn btn-outline-danger" onclick="clearCart()" title="Clear Cart">
+                        <button class="btn btn-outline-danger" onclick="clearCart()" title="<?= t('Clear Cart') ?>">
                             <i class="bi bi-trash"></i>
                         </button>
-                        <button class="btn btn-outline-secondary" onclick="holdSale()" title="Hold Sale">
+                        <button class="btn btn-outline-secondary" onclick="holdSale()" title="<?= t('Hold Sale') ?>">
                             <i class="bi bi-pause"></i>
                         </button>
-                        <button class="btn btn-outline-info" onclick="showHeldSales()" title="View Held Sales">
+                        <button class="btn btn-outline-info" onclick="showHeldSales()" title="<?= t('View Held Sales') ?>">
                             <i class="bi bi-list"></i>
                         </button>
                     </div>
                 </div>
                 <div class="row g-2 small">
                     <div class="col-6">
-                        <div class="text-muted">Receipt #</div>
+                        <div class="text-muted"><?= t('Receipt #') ?></div>
                         <strong id="receiptNumber" class="small"><?= generate_receipt_number() ?></strong>
                     </div>
                     <div class="col-6 text-end">
-                        <div class="text-muted">Items</div>
+                        <div class="text-muted"><?= t('Items') ?></div>
                         <strong id="cartItemCount" class="badge bg-primary">0</strong>
                     </div>
                 </div>
@@ -264,11 +264,11 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
                 <table class="table table-sm table-hover bg-white" id="cartTable" style="display: none;">
                     <thead class="table-light">
                         <tr>
-                            <th width="35%">Product</th>
-                            <th width="15%" class="text-end">Price (<?= htmlspecialchars($currency) ?>)</th>
-                            <th width="20%" class="text-center">Qty</th>
-                            <th width="20%" class="text-end">Total (<?= htmlspecialchars($currency) ?>)</th>
-                            <th width="10%" class="text-center">Action</th>
+                            <th width="35%"><?= t('Product') ?></th>
+                            <th width="15%" class="text-end"><?= sprintf(t('Price (%s)'), htmlspecialchars($currency)) ?></th>
+                            <th width="20%" class="text-center"><?= t('Qty') ?></th>
+                            <th width="20%" class="text-end"><?= sprintf(t('Total (%s)'), htmlspecialchars($currency)) ?></th>
+                            <th width="10%" class="text-center"><?= t('Action') ?></th>
                         </tr>
                     </thead>
                     <tbody id="cartBody">
@@ -277,8 +277,8 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
                 </table>
                 <div id="emptyCart" class="text-center py-5 bg-white rounded">
                     <i class="bi bi-cart-x" style="font-size: 3rem; color: #6c757d;"></i>
-                    <p class="text-muted mt-2 mb-1">Cart is empty</p>
-                    <p class="text-muted small">Search or browse products to add items</p>
+                    <p class="text-muted mt-2 mb-1"><?= t('Cart is empty') ?></p>
+                    <p class="text-muted small"><?= t('Search or browse products to add items') ?></p>
                 </div>
             </div>
 
@@ -286,26 +286,26 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
             <div class="p-3 border-top bg-white">
                 <div class="mb-2">
                     <div class="d-flex justify-content-between mb-1">
-                        <span class="text-muted">Subtotal:</span>
+                        <span class="text-muted"><?= t('Subtotal:') ?></span>
                         <strong id="cartSubtotal"><?= htmlspecialchars($currency) ?> 0.00</strong>
                     </div>
                     <div class="d-flex justify-content-between mb-1" id="discountRow" style="display: none !important;">
-                        <span class="text-muted">Discount (<span id="discountPercentageDisplay">0</span>%):</span>
+                        <span class="text-muted"><?= t('Discount') ?> (<span id="discountPercentageDisplay">0</span>%):</span>
                         <strong id="cartDiscount" class="text-danger">-<?= htmlspecialchars($currency) ?> 0.00</strong>
                     </div>
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="text-muted">VAT:</span>
+                        <span class="text-muted"><?= t('VAT:') ?></span>
                         <select id="saleVatSelect" class="form-select form-select-sm" style="width:auto;min-width:140px;">
-                            <option value="0" selected>No Tax (0%)</option>
-                            <option value="18">VAT 18%</option>
+                            <option value="0" selected><?= t('No Tax (0%)') ?></option>
+                            <option value="18"><?= t('VAT 18%') ?></option>
                         </select>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Total Tax:</span>
+                        <span class="text-muted"><?= t('Total Tax:') ?></span>
                         <strong id="cartTax"><?= htmlspecialchars($currency) ?> 0.00</strong>
                     </div>
                     <div class="d-flex justify-content-between border-top pt-2">
-                        <h6 class="mb-0">TOTAL:</h6>
+                        <h6 class="mb-0"><?= t('TOTAL:') ?></h6>
                         <h5 class="mb-0 text-success" id="cartTotal"><?= htmlspecialchars($currency) ?> 0.00</h5>
                     </div>
                 </div>
@@ -314,12 +314,12 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
             <!-- Payment Section -->
             <div class="p-3 border-top bg-white">
                 <div class="mb-2">
-                    <label class="form-label small fw-bold">Customer</label>
+                    <label class="form-label small fw-bold"><?= t('Customer') ?></label>
                     <div class="input-group input-group-sm">
                         <select class="form-select form-select-sm" id="customerSelect" style="width:1%;flex:1 1 auto;">
-                            <option value="">Walk-in Customer</option>
+                            <option value=""><?= t('Walk-in Customer') ?></option>
                         </select>
-                        <button type="button" class="btn btn-outline-secondary" id="btnQuickAddCustomer" title="Add new customer">
+                        <button type="button" class="btn btn-outline-secondary" id="btnQuickAddCustomer" title="<?= t('Add new customer') ?>">
                             <i class="bi bi-person-plus"></i>
                         </button>
                     </div>
@@ -329,27 +329,27 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
                 <!-- Loyalty Points — Phase 11 (pos_upgrade_plan.md §7) -->
                 <div class="mb-2 d-none" id="loyaltyPointsSection">
                     <div class="d-flex justify-content-between align-items-center small mb-1">
-                        <span class="text-muted">Loyalty Points Available:</span>
+                        <span class="text-muted"><?= t('Loyalty Points Available:') ?></span>
                         <strong id="loyaltyAvailablePoints" class="text-success">0</strong>
                     </div>
                     <div class="input-group input-group-sm">
-                        <span class="input-group-text">Redeem</span>
+                        <span class="input-group-text"><?= t('Redeem') ?></span>
                         <input type="number" class="form-control" id="redeemPointsInput" min="0" step="1" value="0" oninput="calculateCartTotal()">
-                        <span class="input-group-text">pts</span>
+                        <span class="input-group-text"><?= t('pts') ?></span>
                     </div>
                     <div class="text-end small text-danger mt-1 d-none" id="loyaltyDiscountPreview"></div>
                 </div>
                 <?php endif; ?>
 
                 <div class="mb-2">
-                    <label class="form-label small fw-bold">Payment Method</label>
+                    <label class="form-label small fw-bold"><?= t('Payment Method') ?></label>
                     <div class="btn-group w-100" role="group" id="paymentMethodGroup">
                         <?php foreach ($payment_methods as $value => $label): ?>
-                            <input type="radio" class="btn-check" name="paymentMethod" 
-                                   id="payment<?= ucfirst($value) ?>" value="<?= $value ?>" 
+                            <input type="radio" class="btn-check" name="paymentMethod"
+                                   id="payment<?= ucfirst($value) ?>" value="<?= $value ?>"
                                    <?= $value == 'cash' ? 'checked' : '' ?>>
                             <label class="btn btn-outline-primary btn-sm" for="payment<?= ucfirst($value) ?>">
-                                <?= $value == 'mobile_money' ? 'Mobile' : ($value == 'bank_transfer' ? 'Bank' : ucfirst($value)) ?>
+                                <?= $value == 'mobile_money' ? t('Mobile') : ($value == 'bank_transfer' ? t('Bank') : $label) ?>
                             </label>
                         <?php endforeach; ?>
                     </div>
@@ -358,16 +358,16 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
                 <!-- Cash Payment Specific -->
                 <div id="cashPaymentSection">
                     <div class="mb-2">
-                        <label class="form-label small fw-bold">Amount Tendered</label>
+                        <label class="form-label small fw-bold"><?= t('Amount Tendered') ?></label>
                         <div class="input-group input-group-sm">
                             <span class="input-group-text"><?= htmlspecialchars($currency) ?></span>
-                            <input type="number" class="form-control" id="amountTendered" 
+                            <input type="number" class="form-control" id="amountTendered"
                                    min="0" step="0.01" value="0" oninput="calculateChange()">
                         </div>
                     </div>
                     <div class="alert alert-success py-2" id="changeAlert" style="display: none;">
                         <div class="d-flex justify-content-between small">
-                            <span>Change Due:</span>
+                            <span><?= t('Change Due:') ?></span>
                             <strong id="changeAmount"><?= htmlspecialchars($currency) ?> 0.00</strong>
                         </div>
                     </div>
@@ -376,10 +376,10 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
                 <!-- Action Buttons -->
                 <div class="d-grid gap-2">
                     <button class="btn btn-success btn-lg" onclick="processPayment()" id="processPaymentBtn">
-                        <i class="bi bi-check-circle"></i> PROCESS PAYMENT
+                        <i class="bi bi-check-circle"></i> <?= t('PROCESS PAYMENT') ?>
                     </button>
                     <button class="btn btn-outline-primary" onclick="openSplitPaymentModal()">
-                        <i class="bi bi-columns-gap"></i> SPLIT PAYMENT
+                        <i class="bi bi-columns-gap"></i> <?= t('SPLIT PAYMENT') ?>
                     </button>
                 </div>
             </div>

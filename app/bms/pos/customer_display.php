@@ -1,14 +1,26 @@
 <?php
 // File: customer_display.php
 // Customer-facing display for POS
-session_start();
+//
+// i18n: this page previously used a bare session_start() and never loaded
+// core/i18n.php (it has no other DB/permission needs, so it skipped the full
+// app bootstrap). It now requires roots.php — the same bootstrap every other
+// POS page uses — purely so t()/loadLanguage() are available, then resolves
+// the CASHIER's own saved language preference exactly like header.php does
+// (this page has no login of its own; it inherits the cashier's session,
+// since it's opened as a second screen from within their already-authenticated
+// POS session).
+require_once __DIR__ . '/../../../roots.php';
+if (session_status() !== PHP_SESSION_ACTIVE) session_start();
+$__cd_lang = $_SESSION['user_lang'] ?? get_setting('user_language_' . ($_SESSION['user_id'] ?? 0), 'en');
+loadLanguage($__cd_lang);
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Display</title>
+    <title><?= t('Customer Display') ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
@@ -166,7 +178,7 @@ session_start();
         <!-- Header -->
         <div class="header">
             <h1 class="store-name">
-                <i class="bi bi-shop"></i> Business Management System
+                <i class="bi bi-shop"></i> <?= t('Business Management System') ?>
             </h1>
         </div>
         
@@ -174,8 +186,8 @@ session_start();
         <div class="cart-container" id="cartDisplay">
             <div class="empty-state" id="emptyState">
                 <i class="bi bi-cart3"></i>
-                <h2>Welcome!</h2>
-                <p class="lead">Your items will appear here</p>
+                <h2><?= t('Welcome!') ?></h2>
+                <p class="lead"><?= t('Your items will appear here') ?></p>
             </div>
             
             <div id="cartItems" style="display: none;">
@@ -186,15 +198,15 @@ session_start();
         <!-- Summary -->
         <div class="summary" id="summarySection" style="display: none;">
             <div class="summary-row">
-                <span class="summary-label">Subtotal:</span>
+                <span class="summary-label"><?= t('Subtotal:') ?></span>
                 <span class="summary-value" id="displaySubtotal">TZS 0.00</span>
             </div>
             <div class="summary-row">
-                <span class="summary-label">Tax:</span>
+                <span class="summary-label"><?= t('Tax:') ?></span>
                 <span class="summary-value" id="displayTax">TZS 0.00</span>
             </div>
             <div class="summary-row summary-total">
-                <span>TOTAL:</span>
+                <span><?= t('TOTAL:') ?></span>
                 <span id="displayTotal">TZS 0.00</span>
             </div>
         </div>

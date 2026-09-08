@@ -20,11 +20,126 @@ const POS_AUTO_PRINT_RECEIPT = <?= get_setting('pos_auto_print_receipt', '0') ==
 const POS_CURRENCY = <?= json_encode($currency) ?>; // Phase 11 (pos_upgrade_plan.md §7) — was hardcoded 'TZS' everywhere
 const POS_LOYALTY_REDEEM_VALUE = <?= (float)getSetting('pos_loyalty_redeem_value', '50') ?>; // currency value of 1 point — preview only, server re-validates
 
+// ══════════════════════ TRANSLATED STRINGS (t()) ══════════════════════
+const PT = {
+    service: <?= json_encode(t('Service')) ?>,
+    lowStock: <?= json_encode(t('LOW STOCK')) ?>,
+    projectStock: <?= json_encode(t('PROJECT STOCK')) ?>,
+    qtyLabel: <?= json_encode(t('Qty:')) ?>,
+    noProductsFound: <?= json_encode(t('No products found')) ?>,
+    tryDifferentSearch: <?= json_encode(t('Try a different search or category')) ?>,
+    errorLoadingProducts: <?= json_encode(t('Error loading products')) ?>,
+    statusLabel: <?= json_encode(t('Status:')) ?>,
+    retry: <?= json_encode(t('Retry')) ?>,
+    noSku: <?= json_encode(t('No SKU')) ?>,
+    stockLabel: <?= json_encode(t('Stock:')) ?>,
+    quantityLabel: <?= json_encode(t('Quantity')) ?>,
+    addToCart: <?= json_encode(t('Add to Cart')) ?>,
+    cancel: <?= json_encode(t('Cancel')) ?>,
+    error: <?= json_encode(t('Error')) ?>,
+    serverError: <?= json_encode(t('Server error.')) ?>,
+    remove: <?= json_encode(t('Remove')) ?>,
+    clearCartTitle: <?= json_encode(t('Clear Cart?')) ?>,
+    clearCartText: <?= json_encode(t('Are you sure you want to remove all items?')) ?>,
+    yesClearIt: <?= json_encode(t('Yes, clear it!')) ?>,
+    loyaltyDiscountLabel: <?= json_encode(t('Loyalty discount:')) ?>,
+    emptyCartTitle: <?= json_encode(t('Empty Cart')) ?>,
+    emptyCartText: <?= json_encode(t('Add items to cart before processing payment.')) ?>,
+    noActiveShiftTitle: <?= json_encode(t('No Active Shift')) ?>,
+    noActiveShiftText: <?= json_encode(t('Please start a shift first.')) ?>,
+    startShift: <?= json_encode(t('Start Shift')) ?>,
+    warehouseRequiredTitle: <?= json_encode(t('Warehouse required')) ?>,
+    warehouseRequiredText: <?= json_encode(t('Please select a warehouse before processing the sale.')) ?>,
+    insufficientPaymentTitle: <?= json_encode(t('Insufficient Payment')) ?>,
+    insufficientPaymentText: <?= json_encode(t('Amount tendered is less than total amount.')) ?>,
+    customerRequiredTitle: <?= json_encode(t('Customer required')) ?>,
+    customerRequiredText: <?= json_encode(t('Select a customer to record a credit (pay-later) sale.')) ?>,
+    processing: <?= json_encode(t('Processing...')) ?>,
+    earnedPts: <?= json_encode(t('Earned %d pt(s).')) ?>,
+    redeemedPts: <?= json_encode(t('Redeemed %d pt(s).')) ?>,
+    saleCompleted: <?= json_encode(t('Sale Completed!')) ?>,
+    receiptHash: <?= json_encode(t('Receipt #')) ?>,
+    printAgain: <?= json_encode(t('Print Again')) ?>,
+    printReceipt: <?= json_encode(t('Print Receipt')) ?>,
+    nextCustomer: <?= json_encode(t('Next Customer')) ?>,
+    paymentFailed: <?= json_encode(t('Payment Failed')) ?>,
+    genericErrorRetry: <?= json_encode(t('An error occurred. Please try again.')) ?>,
+    processPaymentBtn: <?= json_encode(t('PROCESS PAYMENT')) ?>,
+    addItemsBeforeHold: <?= json_encode(t('Add items to cart before holding sale.')) ?>,
+    holdSaleTitle: <?= json_encode(t('Hold Sale')) ?>,
+    holdReferenceLabel: <?= json_encode(t('Hold Reference (optional)')) ?>,
+    holdReferencePlaceholder: <?= json_encode(t('e.g., Customer name or phone')) ?>,
+    saleHeld: <?= json_encode(t('Sale Held')) ?>,
+    saleHeldText: <?= json_encode(t('Sale has been held successfully.')) ?>,
+    noHeldSalesFound: <?= json_encode(t('No held sales found')) ?>,
+    walkIn: <?= json_encode(t('Walk-in')) ?>,
+    walkInCustomer: <?= json_encode(t('Walk-in Customer')) ?>,
+    load: <?= json_encode(t('Load')) ?>,
+    loadHeldSaleTitle: <?= json_encode(t('Load Held Sale?')) ?>,
+    loadHeldSaleText: <?= json_encode(t('Current cart will be replaced. Continue?')) ?>,
+    yesLoadIt: <?= json_encode(t('Yes, Load it')) ?>,
+    loaded: <?= json_encode(t('Loaded')) ?>,
+    saleLoadedSuccessfully: <?= json_encode(t('Sale loaded successfully')) ?>,
+    failedToLoadSaleData: <?= json_encode(t('Failed to load sale data')) ?>,
+    deleteHeldSaleTitle: <?= json_encode(t('Delete Held Sale?')) ?>,
+    cannotRevertText: <?= json_encode(t("You won't be able to revert this!")) ?>,
+    yesDeleteIt: <?= json_encode(t('Yes, delete it!')) ?>,
+    deletedBang: <?= json_encode(t('Deleted!')) ?>,
+    heldSaleDeleted: <?= json_encode(t('Held sale has been deleted.')) ?>,
+    failedToDeleteSale: <?= json_encode(t('Failed to delete sale')) ?>,
+    loadingRegisters: <?= json_encode(t('Loading registers...')) ?>,
+    inUseBySince: <?= json_encode(t('in use by %s since %s')) ?>,
+    starting: <?= json_encode(t('Starting...')) ?>,
+    shiftStarted: <?= json_encode(t('Shift Started')) ?>,
+    shiftStartedText: <?= json_encode(t('Shift %s started on %s.')) ?>,
+    registerWord: <?= json_encode(t('register')) ?>,
+    failedToStartShift: <?= json_encode(t('Failed to start shift:')) ?>,
+    closing: <?= json_encode(t('Closing...')) ?>,
+    shiftEnded: <?= json_encode(t('Shift Ended')) ?>,
+    shiftClosedSuccessfully: <?= json_encode(t('Shift closed successfully!')) ?>,
+    expectedLabel: <?= json_encode(t('Expected:')) ?>,
+    actualLabel: <?= json_encode(t('Actual:')) ?>,
+    differenceLabel: <?= json_encode(t('Difference:')) ?>,
+    totalSalesLabel: <?= json_encode(t('Total Sales:')) ?>,
+    viewZReport: <?= json_encode(t('View Z-Report')) ?>,
+    close: <?= json_encode(t('Close')) ?>,
+    endShift: <?= json_encode(t('End Shift')) ?>,
+    failedToCloseShift: <?= json_encode(t('Failed to close shift:')) ?>,
+    cashDrawerTitle: <?= json_encode(t('Cash Drawer')) ?>,
+    cashDrawerHtml1: <?= json_encode(t('A web browser cannot send a direct "open drawer" signal.')) ?>,
+    cashDrawerHtml2: <?= json_encode(t("If your cash drawer is wired to your receipt printer's kick port, it opens automatically every time a receipt prints — including just now, if one did.")) ?>,
+    discountRange: <?= json_encode(t('Discount must be between 0 and 100%')) ?>,
+    discountApplied: <?= json_encode(t('Discount Applied')) ?>,
+    discountAppliedText: <?= json_encode(t('%d% discount has been applied to this sale.')) ?>,
+    addItemsFirst: <?= json_encode(t('Add items to cart first.')) ?>,
+    balanceMismatch: <?= json_encode(t('Balance Mismatch')) ?>,
+    splitMustEqualTotal: <?= json_encode(t('Total split amounts must equal the total payable (%s)')) ?>,
+    addItemsBeforeDiscount: <?= json_encode(t('Add items to cart before applying discount.')) ?>,
+    discountAmountLabel: <?= json_encode(t('Discount Amount (%s)')) ?>,
+    discountPercentageLabel: <?= json_encode(t('Discount Percentage (%)')) ?>,
+    selectAllProducts: <?= json_encode(t('Select All Products')) ?>,
+    minSellingPriceInfo: <?= json_encode(t('Min Selling Price: %s (Max: %s%%)')) ?>,
+    flexibleAmount: <?= json_encode(t('Flexible Amount')) ?>,
+    invalidDiscount: <?= json_encode(t('Invalid Discount')) ?>,
+    discountCannotBeNegative: <?= json_encode(t('Discount cannot be negative.')) ?>,
+    percentageCannotExceed100: <?= json_encode(t('Percentage cannot be greater than 100.')) ?>,
+    noSelection: <?= json_encode(t('No Selection')) ?>,
+    selectAtLeastOneProduct: <?= json_encode(t('Please select at least one product to discount.')) ?>,
+    priceBelowMinimum: <?= json_encode(t('%s: Price %s is below minimum %s')) ?>,
+    resultingPriceNegative: <?= json_encode(t('%s: Resulting price cannot be negative.')) ?>,
+    priceValidationFailed: <?= json_encode(t('Price Validation Failed')) ?>,
+    otherItemsUpdatedNote: <?= json_encode(t('Note: Other valid items were updated.')) ?>,
+    ok: <?= json_encode(t('OK')) ?>,
+    successfullyUpdatedItems: <?= json_encode(t('Successfully updated %d items.')) ?>,
+    cartQtyLabel: <?= json_encode(t('cart qty:')) ?>,
+    barcodeNotFound: <?= json_encode(t('Barcode not found')) ?>
+};
+
 $(document).ready(function() {
     // Phase 10 (pos_upgrade_plan.md §7) — Select2 AJAX customer search, replacing
     // the old plain <select> hard-limited to 50 rows with no search at all.
     $('#customerSelect').select2({
-        theme: 'bootstrap-5', width: '100%', placeholder: 'Walk-in Customer', allowClear: true,
+        theme: 'bootstrap-5', width: '100%', placeholder: <?= json_encode(t('Walk-in Customer')) ?>, allowClear: true,
         ajax: {
             url: '<?= buildUrl('/api/pos/search_customers.php') ?>',
             dataType: 'json', delay: 300, cache: true,
@@ -54,7 +169,7 @@ $(document).ready(function() {
     });
     $('#btnSaveQuickCustomer').on('click', function () {
         const name = $('#qac_name').val().trim();
-        if (!name) { Swal.fire('Name required', 'Please enter the customer\'s name.', 'warning'); return; }
+        if (!name) { Swal.fire(<?= json_encode(t('Name required')) ?>, <?= json_encode(t("Please enter the customer's name.")) ?>, 'warning'); return; }
         const btn = $(this);
         btn.prop('disabled', true);
         $.post('<?= buildUrl('/api/quick_add_customer.php') ?>', {
@@ -64,9 +179,9 @@ $(document).ready(function() {
                 bootstrap.Modal.getInstance(document.getElementById('quickAddCustomerModal')).hide();
                 setCustomerSelection(res.customer_id, name);
                 saveCartToStorage();
-                Swal.fire({ icon: 'success', title: 'Customer Added', text: name + ' has been added and selected.', timer: 1800, showConfirmButton: false });
+                Swal.fire({ icon: 'success', title: <?= json_encode(t('Customer Added')) ?>, text: <?= json_encode(t('%s has been added and selected.')) ?>.replace('%s', name), timer: 1800, showConfirmButton: false });
             } else {
-                Swal.fire('Error', res.message, 'error');
+                Swal.fire(<?= json_encode(t('Error')) ?>, res.message, 'error');
             }
         }, 'json').always(() => btn.prop('disabled', false));
     });
@@ -86,7 +201,7 @@ $(document).ready(function() {
         } else if ($realOptions.length === 0) {
             $('#posWarehouseId').after(
                 '<div class="text-danger small mt-1" id="posNoWarehouseWarning">' +
-                '<i class="bi bi-exclamation-triangle"></i> No warehouse is assigned to your account — contact an administrator.</div>'
+                '<i class="bi bi-exclamation-triangle"></i> ' + <?= json_encode(t('No warehouse is assigned to your account — contact an administrator.')) ?> + '</div>'
             );
         }
     })();
@@ -186,7 +301,7 @@ function setCustomerSelection(id, text) {
     const $sel = $('#customerSelect');
     if (!id) { $sel.val('').trigger('change'); return; }
     if (!$sel.find(`option[value="${id}"]`).length) {
-        $sel.append(new Option(text || ('Customer #' + id), id, true, true));
+        $sel.append(new Option(text || (<?= json_encode(t('Customer #')) ?> + id), id, true, true));
     } else {
         $sel.val(id);
     }
@@ -332,16 +447,16 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                                 <div class="card-body text-center p-2">
                                     <div class="mb-2" style="height: 80px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
                                         ${imageContent}
-                                        ${!isService && product.stock_quantity <= 10 ? '<span class="badge bg-danger position-absolute top-0 end-0" style="font-size: 8px;">LOW STOCK</span>' : ''}
-                                        ${projectStock > 0 ? '<span class="badge bg-info position-absolute top-0 start-0" style="font-size: 8px;"><i class="bi bi-star-fill"></i> PROJECT STOCK</span>' : ''}
+                                        ${!isService && product.stock_quantity <= 10 ? '<span class="badge bg-danger position-absolute top-0 end-0" style="font-size: 8px;">' + PT.lowStock + '</span>' : ''}
+                                        ${projectStock > 0 ? '<span class="badge bg-info position-absolute top-0 start-0" style="font-size: 8px;"><i class="bi bi-star-fill"></i> ' + PT.projectStock + '</span>' : ''}
                                     </div>
-                                    ${isService ? '<span class="badge bg-info text-white mb-1">Service</span>' : ''}
+                                    ${isService ? '<span class="badge bg-info text-white mb-1">' + PT.service + '</span>' : ''}
                                     <h6 class="card-title mb-1 small text-truncate fw-bold" title="${product.product_name}">${product.product_name}</h6>
                                     <p class="card-text text-muted small mb-1">${product.sku || ''}</p>
                                     <p class="card-text fw-bold text-primary mb-1">${POS_CURRENCY} ${parseFloat(product.selling_price).toLocaleString()}</p>
                                     ${!isService ? `<p class="card-text small ${product.stock_quantity <= 10 ? 'text-danger fw-bold' : 'text-muted'}">
-                                        Qty: ${product.stock_quantity}
-                                    </p>` : '<p class="card-text small text-muted"><i class="bi bi-infinity"></i> Service</p>'}
+                                        ${PT.qtyLabel} ${product.stock_quantity}
+                                    </p>` : '<p class="card-text small text-muted"><i class="bi bi-infinity"></i> ' + PT.service + '</p>'}
                                 </div>
                             </div>
                         </div>
@@ -355,8 +470,8 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                 $('#productGrid').html(`
                     <div class="col-12 text-center py-5">
                         <i class="bi bi-search" style="font-size: 3rem; color: #6c757d;"></i>
-                        <h5 class="mt-3 text-muted">No products found</h5>
-                        <p class="text-muted">Try a different search or category</p>
+                        <h5 class="mt-3 text-muted">${PT.noProductsFound}</h5>
+                        <p class="text-muted">${PT.tryDifferentSearch}</p>
                     </div>
                 `);
             }
@@ -372,9 +487,9 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
             $('#productGrid').html(`
                 <div class="col-12 text-center py-5">
                     <i class="bi bi-exclamation-triangle" style="font-size: 3rem; color: #dc3545;"></i>
-                    <h5 class="mt-3 text-danger">Error loading products</h5>
-                    <p class="text-muted">Status: ${xhr.status} - ${error}</p>
-                    <button class="btn btn-primary" onclick="loadProducts()">Retry</button>
+                    <h5 class="mt-3 text-danger">${PT.errorLoadingProducts}</h5>
+                    <p class="text-muted">${PT.statusLabel} ${xhr.status} - ${error}</p>
+                    <button class="btn btn-primary" onclick="loadProducts()">${PT.retry}</button>
                 </div>
             `);
         }
@@ -424,28 +539,28 @@ function showProductQuickView(productId) {
     
     const html = `
         <h6>${currentProduct.product_name}</h6>
-        <p class="text-muted small mb-2">${currentProduct.sku || 'No SKU'}</p>
+        <p class="text-muted small mb-2">${currentProduct.sku || PT.noSku}</p>
         <p class="text-success fw-bold">${POS_CURRENCY} ${parseFloat(currentProduct.selling_price).toLocaleString()}</p>
         ${currentProduct.is_service != 1 ? `<p class="small ${currentProduct.stock_quantity <= 10 ? 'text-danger' : 'text-muted'}">
-            Stock: ${currentProduct.stock_quantity}
-        </p>` : '<p class="small text-muted"><i class="bi bi-infinity"></i> Service</p>'}
-        
+            ${PT.stockLabel} ${currentProduct.stock_quantity}
+        </p>` : '<p class="small text-muted"><i class="bi bi-infinity"></i> ' + PT.service + '</p>'}
+
         <div class="mb-3">
-            <label class="form-label">Quantity</label>
+            <label class="form-label">${PT.quantityLabel}</label>
             <div class="input-group">
                 <button class="btn btn-outline-secondary" type="button" onclick="adjustQuantity(-1)">-</button>
-                <input type="number" class="form-control text-center" id="quickViewQty" 
+                <input type="number" class="form-control text-center" id="quickViewQty"
                        value="1" min="1" step="1">
                 <button class="btn btn-outline-secondary" type="button" onclick="adjustQuantity(1)">+</button>
             </div>
         </div>
-        
+
         <div class="d-grid gap-2">
             <button class="btn btn-primary" onclick="addToCart()">
-                <i class="bi bi-cart-plus"></i> Add to Cart
+                <i class="bi bi-cart-plus"></i> ${PT.addToCart}
             </button>
             <button class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                Cancel
+                ${PT.cancel}
             </button>
         </div>
     `;
@@ -567,8 +682,8 @@ function updateCartDisplay() {
                         <strong class="small text-success">${itemTotal.toLocaleString()}</strong>
                     </td>
                     <td class="text-center">
-                        <button class="btn btn-sm btn-link text-danger p-0" onclick="removeFromCart(${index})" 
-                                style="font-size: 14px;" title="Remove">
+                        <button class="btn btn-sm btn-link text-danger p-0" onclick="removeFromCart(${index})"
+                                style="font-size: 14px;" title="${PT.remove}">
                             <i class="bi bi-trash"></i>
                         </button>
                     </td>
@@ -613,12 +728,12 @@ function clearCart() {
     if (cart.length === 0) return;
     
     Swal.fire({
-        title: 'Clear Cart?',
-        text: "Are you sure you want to remove all items?",
+        title: PT.clearCartTitle,
+        text: PT.clearCartText,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
-        confirmButtonText: 'Yes, clear it!'
+        confirmButtonText: PT.yesClearIt
     }).then((result) => {
         if (result.isConfirmed) {
             cart = [];
@@ -652,7 +767,7 @@ function calculateCartTotal() {
     if (redeemPts > 0 && total > 0) {
         const loyaltyDiscount = Math.min(redeemPts * POS_LOYALTY_REDEEM_VALUE, total);
         total -= loyaltyDiscount;
-        $preview.text('Loyalty discount: -' + POS_CURRENCY + ' ' + loyaltyDiscount.toLocaleString('en-US', {minimumFractionDigits: 2})).removeClass('d-none');
+        $preview.text(PT.loyaltyDiscountLabel + ' -' + POS_CURRENCY + ' ' + loyaltyDiscount.toLocaleString('en-US', {minimumFractionDigits: 2})).removeClass('d-none');
     } else {
         $preview.addClass('d-none');
     }
@@ -684,20 +799,20 @@ function processPayment() {
     if (cart.length === 0) {
         Swal.fire({
             icon: 'warning',
-            title: 'Empty Cart',
-            text: 'Add items to cart before processing payment.',
+            title: PT.emptyCartTitle,
+            text: PT.emptyCartText,
             timer: 2000
         });
         return;
     }
-    
+
     <?php if (!$shift_active): ?>
     Swal.fire({
         icon: 'warning',
-        title: 'No Active Shift',
-        text: 'Please start a shift first.',
+        title: PT.noActiveShiftTitle,
+        text: PT.noActiveShiftText,
         showConfirmButton: true,
-        confirmButtonText: 'Start Shift'
+        confirmButtonText: PT.startShift
     }).then((result) => {
         if (result.isConfirmed) {
             startShift();
@@ -705,11 +820,11 @@ function processPayment() {
     });
     return;
     <?php endif; ?>
-    
+
     // Warehouse is compulsory — a sale must come out of a specific warehouse's stock.
     const warehouseId = $('#posWarehouseId').val();
     if (!warehouseId) {
-        Swal.fire({ icon: 'warning', title: 'Warehouse required', text: 'Please select a warehouse before processing the sale.' });
+        Swal.fire({ icon: 'warning', title: PT.warehouseRequiredTitle, text: PT.warehouseRequiredText });
         $('#posWarehouseId').focus();
         return;
     }
@@ -723,8 +838,8 @@ function processPayment() {
         if (tendered < total) {
             Swal.fire({
                 icon: 'error',
-                title: 'Insufficient Payment',
-                text: 'Amount tendered is less than total amount.',
+                title: PT.insufficientPaymentTitle,
+                text: PT.insufficientPaymentText,
                 timer: 2000
             });
             return;
@@ -735,7 +850,7 @@ function processPayment() {
     // customer (cannot put a walk-in on account). Any amount typed in the tendered
     // box is treated as a deposit paid now; the rest becomes the balance due.
     if (paymentMethod === 'credit' && (!customerId || customerId === '')) {
-        Swal.fire({ icon: 'warning', title: 'Customer required', text: 'Select a customer to record a credit (pay-later) sale.' });
+        Swal.fire({ icon: 'warning', title: PT.customerRequiredTitle, text: PT.customerRequiredText });
         return;
     }
     
@@ -794,7 +909,7 @@ function processPayment() {
         redeem_points: redeemPointsRequested
     };
     
-    $('#processPaymentBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Processing...');
+    $('#processPaymentBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + PT.processing);
     
     $.ajax({
         url: '<?= buildUrl('/api/pos/process_sale.php') ?>',
@@ -810,15 +925,15 @@ function processPayment() {
                 // Phase 11 (pos_upgrade_plan.md §7) — surface what the loyalty
                 // program actually did, since it's silent otherwise.
                 let loyaltyMsg = '';
-                if (response.loyalty_points_earned > 0) loyaltyMsg += ' Earned ' + response.loyalty_points_earned + ' pt(s).';
-                if (response.loyalty_points_redeemed > 0) loyaltyMsg += ' Redeemed ' + response.loyalty_points_redeemed + ' pt(s).';
+                if (response.loyalty_points_earned > 0) loyaltyMsg += ' ' + PT.earnedPts.replace('%d', response.loyalty_points_earned);
+                if (response.loyalty_points_redeemed > 0) loyaltyMsg += ' ' + PT.redeemedPts.replace('%d', response.loyalty_points_redeemed);
                 Swal.fire({
                     icon: 'success',
-                    title: 'Sale Completed!',
-                    text: 'Receipt #' + currentReceiptNumber + loyaltyMsg,
+                    title: PT.saleCompleted,
+                    text: PT.receiptHash + currentReceiptNumber + loyaltyMsg,
                     showCancelButton: true,
-                    confirmButtonText: POS_AUTO_PRINT_RECEIPT ? 'Print Again' : 'Print Receipt',
-                    cancelButtonText: 'Next Customer',
+                    confirmButtonText: POS_AUTO_PRINT_RECEIPT ? PT.printAgain : PT.printReceipt,
+                    cancelButtonText: PT.nextCustomer,
                     reverseButtons: true
                 }).then((result) => {
                     if (result.isConfirmed) {
@@ -858,19 +973,19 @@ function processPayment() {
             } else {
                 Swal.fire({
                     icon: 'error',
-                    title: 'Payment Failed',
+                    title: PT.paymentFailed,
                     text: response.message
                 });
             }
-            $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> PROCESS PAYMENT');
+            $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
         },
         error: function() {
             Swal.fire({
                 icon: 'error',
-                title: 'Error',
-                text: 'An error occurred. Please try again.'
+                title: PT.error,
+                text: PT.genericErrorRetry
             });
-            $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> PROCESS PAYMENT');
+            $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
         }
     });
 }
@@ -883,24 +998,24 @@ function holdSale() {
     if (cart.length === 0) {
         Swal.fire({
             icon: 'warning',
-            title: 'Empty Cart',
-            text: 'Add items to cart before holding sale.',
+            title: PT.emptyCartTitle,
+            text: PT.addItemsBeforeHold,
             timer: 2000
         });
         return;
     }
-    
+
     const customerId = $('#customerSelect').val();
     const customerName = $('#customerSelect option:selected').text();
-    
+
     Swal.fire({
-        title: 'Hold Sale',
+        title: PT.holdSaleTitle,
         input: 'text',
-        inputLabel: 'Hold Reference (optional)',
-        inputPlaceholder: 'e.g., Customer name or phone',
+        inputLabel: PT.holdReferenceLabel,
+        inputPlaceholder: PT.holdReferencePlaceholder,
         showCancelButton: true,
-        confirmButtonText: 'Hold Sale',
-        inputValue: customerName !== 'Walk-in Customer' ? customerName : ''
+        confirmButtonText: PT.holdSaleTitle,
+        inputValue: customerName !== PT.walkInCustomer ? customerName : ''
     }).then((result) => {
         if (result.isConfirmed) {
             const holdData = {
@@ -921,8 +1036,8 @@ function holdSale() {
                     if (response.success) {
                         Swal.fire({
                             icon: 'success',
-                            title: 'Sale Held',
-                            text: 'Sale has been held successfully.',
+                            title: PT.saleHeld,
+                            text: PT.saleHeldText,
                             timer: 1500
                         });
                         cart = [];
@@ -932,7 +1047,7 @@ function holdSale() {
                     } else {
                         Swal.fire({
                             icon: 'error',
-                            title: 'Error',
+                            title: PT.error,
                             text: response.message
                         });
                     }
@@ -951,12 +1066,12 @@ function showHeldSales() {
             if (response.success) {
                 const tbody = $('#heldSalesBody');
                 tbody.empty();
-                
+
                 if (response.data.length === 0) {
                     tbody.html(`
                         <tr>
                             <td colspan="6" class="text-center text-muted">
-                                No held sales found
+                                ${PT.noHeldSalesFound}
                             </td>
                         </tr>
                     `);
@@ -965,13 +1080,13 @@ function showHeldSales() {
                         const row = `
                             <tr>
                                 <td>${sale.hold_reference || 'HOLD-' + sale.hold_id}</td>
-                                <td>${sale.customer_name || 'Walk-in'}</td>
+                                <td>${sale.customer_name || PT.walkIn}</td>
                                 <td>${JSON.parse(sale.items_data).length}</td>
                                 <td>${POS_CURRENCY} ${parseFloat(sale.total_amount).toLocaleString()}</td>
                                 <td>${new Date(sale.held_at).toLocaleTimeString()}</td>
                                 <td>
                                     <button class="btn btn-sm btn-primary" onclick="loadHeldSale(${sale.hold_id})">
-                                        <i class="bi bi-arrow-clockwise"></i> Load
+                                        <i class="bi bi-arrow-clockwise"></i> ${PT.load}
                                     </button>
                                     <button class="btn btn-sm btn-danger" onclick="deleteHeldSale(${sale.hold_id})">
                                         <i class="bi bi-trash"></i>
@@ -1000,12 +1115,12 @@ function loadHeldSale(holdId) {
                 const sale = response.data.find(s => s.hold_id == holdId);
                 if (sale) {
                     Swal.fire({
-                        title: 'Load Held Sale?',
-                        text: "Current cart will be replaced. Continue?",
+                        title: PT.loadHeldSaleTitle,
+                        text: PT.loadHeldSaleText,
                         icon: 'question',
                         showCancelButton: true,
-                        confirmButtonText: 'Yes, Load it',
-                        cancelButtonText: 'Cancel'
+                        confirmButtonText: PT.yesLoadIt,
+                        cancelButtonText: PT.cancel
                     }).then((result) => {
                         if (result.isConfirmed) {
                             // Parse items and load into cart
@@ -1023,17 +1138,17 @@ function loadHeldSale(holdId) {
                                 
                                 Swal.fire({
                                     icon: 'success',
-                                    title: 'Loaded',
-                                    text: 'Sale loaded successfully',
+                                    title: PT.loaded,
+                                    text: PT.saleLoadedSuccessfully,
                                     timer: 1000,
                                     showConfirmButton: false
                                 });
-                                
+
                                 // Optionally delete the held sale after loading
                                 deleteHeldSale(holdId, true); // true = silent delete
                             } catch (e) {
                                 console.error('Error parsing cart data', e);
-                                Swal.fire('Error', 'Failed to load sale data', 'error');
+                                Swal.fire(PT.error, PT.failedToLoadSaleData, 'error');
                             }
                         }
                     });
@@ -1046,12 +1161,12 @@ function loadHeldSale(holdId) {
 function deleteHeldSale(holdId, silent = false) {
     if (!silent) {
         Swal.fire({
-            title: 'Delete Held Sale?',
-            text: "You won't be able to revert this!",
+            title: PT.deleteHeldSaleTitle,
+            text: PT.cannotRevertText,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
-            confirmButtonText: 'Yes, delete it!'
+            confirmButtonText: PT.yesDeleteIt
         }).then((result) => {
             if (result.isConfirmed) {
                 performDelete(holdId, false);
@@ -1073,18 +1188,18 @@ function performDelete(holdId, silent) {
             if (response.success) {
                 if (!silent) {
                     Swal.fire(
-                        'Deleted!',
-                        'Held sale has been deleted.',
+                        PT.deletedBang,
+                        PT.heldSaleDeleted,
                         'success'
                     );
                     showHeldSales(); // Refresh list
                 }
             } else {
-                if (!silent) Swal.fire('Error', response.message, 'error');
+                if (!silent) Swal.fire(PT.error, response.message, 'error');
             }
         },
         error: function() {
-            if (!silent) Swal.fire('Error', 'Failed to delete sale', 'error');
+            if (!silent) Swal.fire(PT.error, PT.failedToDeleteSale, 'error');
         }
     });
 }
@@ -1092,7 +1207,7 @@ function performDelete(holdId, silent) {
 function startShift() {
     const $reg = $('#startShiftRegister');
     if ($reg.hasClass('select2-hidden-accessible')) $reg.select2('destroy');
-    $reg.html('<option value="">Loading registers...</option>');
+    $reg.html('<option value="">' + PT.loadingRegisters + '</option>');
 
     $.getJSON('<?= buildUrl('/api/pos/get_registers.php') ?>', { active_only: 1 }, function (res) {
         $reg.empty();
@@ -1109,7 +1224,7 @@ function startShift() {
                     // "already in an active shift with another cashier" guard still
                     // backstops this server-side for the rare simultaneous-click race).
                     opt.prop('disabled', true)
-                       .text(label + ' — in use by ' + r.active_cashier_name + ' since ' + r.active_shift_started_label);
+                       .text(label + ' — ' + PT.inUseBySince.replace('%s', r.active_cashier_name).replace('%s', r.active_shift_started_label));
                 }
                 $reg.append(opt);
             });
@@ -1136,7 +1251,7 @@ function confirmStartShift() {
 
     // Disable button to prevent double-click
     const btn = event.target;
-    $(btn).prop('disabled', true).text('Starting...');
+    $(btn).prop('disabled', true).text(PT.starting);
 
     $.ajax({
         url: '<?= buildUrl('/api/pos/open_shift.php') ?>',
@@ -1154,8 +1269,8 @@ function confirmStartShift() {
                 $('#startShiftModal').modal('hide');
                 Swal.fire({
                     icon: 'success',
-                    title: 'Shift Started',
-                    text: 'Shift ' + response.shift_code + ' started on ' + (response.register_name || 'register') + '.',
+                    title: PT.shiftStarted,
+                    text: PT.shiftStartedText.replace('%s', response.shift_code).replace('%s', response.register_name || PT.registerWord),
                     timer: 2000,
                     showConfirmButton: false
                 }).then(() => {
@@ -1164,10 +1279,10 @@ function confirmStartShift() {
             } else {
                 Swal.fire({
                     icon: 'error',
-                    title: 'Error',
+                    title: PT.error,
                     text: response.message
                 });
-                $(btn).prop('disabled', false).text('Start Shift');
+                $(btn).prop('disabled', false).text(PT.startShift);
             }
         },
         error: function(xhr, status, error) {
@@ -1175,13 +1290,13 @@ function confirmStartShift() {
             console.error('Status:', status);
             console.error('Error:', error);
             console.error('Response:', xhr.responseText);
-            
+
             Swal.fire({
                 icon: 'error',
-                title: 'Error',
-                text: 'Failed to start shift: ' + error
+                title: PT.error,
+                text: PT.failedToStartShift + ' ' + error
             });
-            $(btn).prop('disabled', false).text('Start Shift');
+            $(btn).prop('disabled', false).text(PT.startShift);
         }
     });
 }
@@ -1193,14 +1308,14 @@ function endShift() {
 function confirmEndShift() {
     const endingCash = parseFloat($('#endingCash').val()) || 0;
     const notes = $('#shiftNotes').val();
-    
+
     console.log('=== ENDING SHIFT ===');
     console.log('Ending Cash:', endingCash);
     console.log('Notes:', notes);
-    
+
     // Disable button
     const btn = event.target;
-    $(btn).prop('disabled', true).text('Closing...');
+    $(btn).prop('disabled', true).text(PT.closing);
     
     $.ajax({
         url: '<?= buildUrl('/api/pos/close_shift.php') ?>',
@@ -1218,17 +1333,17 @@ function confirmEndShift() {
                 $('#endShiftModal').modal('hide');
                 Swal.fire({
                     icon: 'success',
-                    title: 'Shift Ended',
+                    title: PT.shiftEnded,
                     html: `
-                        <p>Shift closed successfully!</p>
-                        <p><strong>Expected:</strong> ${POS_CURRENCY} ${response.expected_cash.toLocaleString()}</p>
-                        <p><strong>Actual:</strong> ${POS_CURRENCY} ${response.ending_cash.toLocaleString()}</p>
-                        <p><strong>Difference:</strong> ${POS_CURRENCY} ${response.cash_difference.toLocaleString()}</p>
-                        <p><strong>Total Sales:</strong> ${POS_CURRENCY} ${(response.total_sales || 0).toLocaleString()}</p>
+                        <p>${PT.shiftClosedSuccessfully}</p>
+                        <p><strong>${PT.expectedLabel}</strong> ${POS_CURRENCY} ${response.expected_cash.toLocaleString()}</p>
+                        <p><strong>${PT.actualLabel}</strong> ${POS_CURRENCY} ${response.ending_cash.toLocaleString()}</p>
+                        <p><strong>${PT.differenceLabel}</strong> ${POS_CURRENCY} ${response.cash_difference.toLocaleString()}</p>
+                        <p><strong>${PT.totalSalesLabel}</strong> ${POS_CURRENCY} ${(response.total_sales || 0).toLocaleString()}</p>
                     `,
                     showCancelButton: true,
-                    confirmButtonText: 'View Z-Report',
-                    cancelButtonText: 'Close'
+                    confirmButtonText: PT.viewZReport,
+                    cancelButtonText: PT.close
                 }).then((result) => {
                     if (result.isConfirmed) {
                         window.open('<?= getUrl('pos/zreport') ?>?shift_id=' + response.shift_id, '_blank');
@@ -1238,10 +1353,10 @@ function confirmEndShift() {
             } else {
                 Swal.fire({
                     icon: 'error',
-                    title: 'Error',
+                    title: PT.error,
                     text: response.message
                 });
-                $(btn).prop('disabled', false).text('End Shift');
+                $(btn).prop('disabled', false).text(PT.endShift);
             }
         },
         error: function(xhr, status, error) {
@@ -1249,13 +1364,13 @@ function confirmEndShift() {
             console.error('Status:', status);
             console.error('Error:', error);
             console.error('Response:', xhr.responseText);
-            
+
             Swal.fire({
                 icon: 'error',
-                title: 'Error',
-                text: 'Failed to close shift: ' + error
+                title: PT.error,
+                text: PT.failedToCloseShift + ' ' + error
             });
-            $(btn).prop('disabled', false).text('End Shift');
+            $(btn).prop('disabled', false).text(PT.endShift);
         }
     });
 }
@@ -1271,10 +1386,8 @@ function openCashDrawer() {
     // instead of pretending to have opened anything itself.
     Swal.fire({
         icon: 'info',
-        title: 'Cash Drawer',
-        html: 'A web browser cannot send a direct "open drawer" signal.<br><br>' +
-              'If your cash drawer is wired to your receipt printer\'s kick port, ' +
-              'it opens automatically every time a receipt prints — including just now, if one did.',
+        title: PT.cashDrawerTitle,
+        html: PT.cashDrawerHtml1 + '<br><br>' + PT.cashDrawerHtml2,
     });
 }
 
@@ -1286,7 +1399,7 @@ function openDiscountModal() {
 function applyDiscount() {
     const val = parseFloat($('#discountPercentage').val()) || 0;
     if (val < 0 || val > 100) {
-        Swal.fire('Error', 'Discount must be between 0 and 100%', 'error');
+        Swal.fire(PT.error, PT.discountRange, 'error');
         return;
     }
     currentDiscountPercentage = val;
@@ -1294,8 +1407,8 @@ function applyDiscount() {
     $('#discountModal').modal('hide');
     Swal.fire({
         icon: 'success',
-        title: 'Discount Applied',
-        text: currentDiscountPercentage + '% discount has been applied to this sale.',
+        title: PT.discountApplied,
+        text: PT.discountAppliedText.replace('%d', currentDiscountPercentage),
         timer: 1500,
         showConfirmButton: false
     });
@@ -1303,7 +1416,7 @@ function applyDiscount() {
 
 function openSplitPaymentModal() {
     if (cart.length === 0) {
-        Swal.fire('Empty Cart', 'Add items to cart first.', 'warning');
+        Swal.fire(PT.emptyCartTitle, PT.addItemsFirst, 'warning');
         return;
     }
     const total = calculateCartTotal();
@@ -1341,7 +1454,7 @@ function processSplitPayment() {
     Object.values(splitAmounts).forEach(v => paid += v);
 
     if (Math.abs(paid - total) > 0.1) {
-        Swal.fire('Balance Mismatch', 'Total split amounts must equal the total payable (' + POS_CURRENCY + ' ' + total.toLocaleString() + ')', 'error');
+        Swal.fire(PT.balanceMismatch, PT.splitMustEqualTotal.replace('%s', POS_CURRENCY + ' ' + total.toLocaleString()), 'error');
         return;
     }
 
@@ -1354,8 +1467,8 @@ function openDiscountModal() {
     if (cart.length === 0) {
         Swal.fire({
             icon: 'warning',
-            title: 'Empty Cart',
-            text: 'Add items to cart before applying discount.',
+            title: PT.emptyCartTitle,
+            text: PT.addItemsBeforeDiscount,
             timer: 2000
         });
         return;
@@ -1363,19 +1476,19 @@ function openDiscountModal() {
 
     const container = $('#discountProductList');
     container.empty();
-    
+
     // Configure Modal based on Setting
     const discountPresets = $('#discountPresets');
     const discountIcon = $('#discountIcon');
-    
+
     if (posDiscountType === 'fixed') {
-        $('#discountLabel').text('Discount Amount (' + POS_CURRENCY + ')');
+        $('#discountLabel').text(PT.discountAmountLabel.replace('%s', POS_CURRENCY));
         $('#discountSuffix').text(POS_CURRENCY);
         $('#discountValue').removeAttr('max');
         discountPresets.addClass('d-none');
         discountIcon.removeClass('bi-percent').addClass('bi-cash');
     } else {
-        $('#discountLabel').text('Discount Percentage (%)');
+        $('#discountLabel').text(PT.discountPercentageLabel);
         $('#discountSuffix').text('%');
         $('#discountValue').attr('max', '100');
         discountPresets.removeClass('d-none');
@@ -1388,7 +1501,7 @@ function openDiscountModal() {
             <div class="form-check">
                 <input class="form-check-input" type="checkbox" id="selectAllDiscounts" onchange="toggleAllDiscounts(this)">
                 <label class="form-check-label fw-bold" for="selectAllDiscounts">
-                    Select All Products
+                    ${PT.selectAllProducts}
                 </label>
             </div>
         </div>
@@ -1402,12 +1515,11 @@ function openDiscountModal() {
              const priceDiff = item.price - item.min_selling_price;
              const maxDiscount = priceDiff > 0 ? Math.floor((priceDiff / item.price) * 100) : 0;
              minPriceInfo = `<small class="text-muted">
-                            Min Selling Price: ${item.min_selling_price.toLocaleString()} 
-                            (Max: ${maxDiscount}%)
+                            ${PT.minSellingPriceInfo.replace('%s', item.min_selling_price.toLocaleString()).replace('%s%%', maxDiscount + '%')}
                         </small>`;
         } else {
              // For fixed amount, show minimal info or nothing as requested ("flexible")
-             minPriceInfo = `<small class="text-success"><i class="bi bi-unlock"></i> Flexible Amount</small>`;
+             minPriceInfo = `<small class="text-success"><i class="bi bi-unlock"></i> ${PT.flexibleAmount}</small>`;
         }
         
         container.append(`
@@ -1441,8 +1553,8 @@ function applyProductDiscount() {
     if (value < 0) {
         Swal.fire({
             icon: 'error',
-            title: 'Invalid Discount',
-            text: 'Discount cannot be negative.'
+            title: PT.invalidDiscount,
+            text: PT.discountCannotBeNegative
         });
         return;
     }
@@ -1450,8 +1562,8 @@ function applyProductDiscount() {
     if (posDiscountType === 'percentage' && value > 100) {
         Swal.fire({
             icon: 'error',
-            title: 'Invalid Discount',
-            text: 'Percentage cannot be greater than 100.'
+            title: PT.invalidDiscount,
+            text: PT.percentageCannotExceed100
         });
         return;
     }
@@ -1464,8 +1576,8 @@ function applyProductDiscount() {
     if (selectedIndices.length === 0) {
         Swal.fire({
             icon: 'warning',
-            title: 'No Selection',
-            text: 'Please select at least one product to discount.'
+            title: PT.noSelection,
+            text: PT.selectAtLeastOneProduct
         });
         return;
     }
@@ -1498,14 +1610,14 @@ function applyProductDiscount() {
         // Enforce Min Selling Price ONLY for Percentage Mode
         if (posDiscountType === 'percentage') {
             if (value > 0 && newPrice < (item.min_selling_price - 0.01)) {
-                errorMessages.push(`${item.product_name}: Price ${newPrice.toLocaleString()} is below minimum ${item.min_selling_price.toLocaleString()}`);
+                errorMessages.push(PT.priceBelowMinimum.replace('%s', item.product_name).replace('%s', newPrice.toLocaleString()).replace('%s', item.min_selling_price.toLocaleString()));
                 isValid = false;
             }
         }
-        
+
         // Basic limit for fixed (can't be negative)
         if (newPrice < 0) {
-             errorMessages.push(`${item.product_name}: Resulting price cannot be negative.`);
+             errorMessages.push(PT.resultingPriceNegative.replace('%s', item.product_name));
              isValid = false;
         }
 
@@ -1521,15 +1633,15 @@ function applyProductDiscount() {
     if (errorMessages.length > 0) {
         Swal.fire({
             icon: 'error',
-            title: 'Price Validation Failed',
-            html: errorMessages.join('<br>') + '<br><br><b>Note:</b> Other valid items were updated.',
-            confirmButtonText: 'OK'
+            title: PT.priceValidationFailed,
+            html: errorMessages.join('<br>') + '<br><br>' + PT.otherItemsUpdatedNote,
+            confirmButtonText: PT.ok
         });
     } else {
         Swal.fire({
             icon: 'success',
-            title: 'Discount Applied',
-            text: `Successfully updated ${updatedCount} items.`,
+            title: PT.discountApplied,
+            text: PT.successfullyUpdatedItems.replace('%d', updatedCount),
             timer: 1500,
             showConfirmButton: false
         });
@@ -1673,7 +1785,7 @@ function updateCashBalanceUI() {
         scanToast(
             '<i class="bi bi-check-circle-fill me-1" style="margin-top:2px;flex-shrink:0"></i>' +
             '<span><strong>' + product.product_name + '</strong><br>' +
-            '<small>' + POS_CURRENCY + ' ' + fmtPrice + ' &mdash; cart qty: ' + newQty + '</small></span>',
+            '<small>' + POS_CURRENCY + ' ' + fmtPrice + ' &mdash; ' + PT.cartQtyLabel + ' ' + newQty + '</small></span>',
             false
         );
     }
@@ -1707,7 +1819,7 @@ function updateCashBalanceUI() {
             flashHeader('#dc3545', 600);
             scanToast(
                 '<i class="bi bi-exclamation-triangle-fill me-1" style="margin-top:2px;flex-shrink:0"></i>' +
-                '<span>Barcode not found<br><small><code>' + code + '</code></small></span>',
+                '<span>' + PT.barcodeNotFound + '<br><small><code>' + code + '</code></small></span>',
                 true
             );
             console.warn('[Scanner] Not found:', code);

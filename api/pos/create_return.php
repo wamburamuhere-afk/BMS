@@ -19,15 +19,22 @@
  * Permission: canCreate('pos')
  */
 require_once __DIR__ . '/../../roots.php';
+// Respect the caller's saved language preference (set by header.php on their
+// last page load) so t()-wrapped messages below come back in the right
+// language, not always English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/stock_ledger.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
 
-if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
-if (!canCreate('pos'))  { http_response_code(403); echo json_encode(['success' => false, 'message' => 'You do not have permission to process POS returns']); exit; }
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
+if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
+if (!canCreate('pos'))  { http_response_code(403); echo json_encode(['success' => false, 'message' => t('You do not have permission to process POS returns')]); exit; }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => t('Method not allowed')]); exit; }
 csrf_check();
 
 $original_sale_id = (int)($_POST['original_sale_id'] ?? 0);
@@ -36,12 +43,12 @@ $refund_method    = $_POST['refund_method'] ?? 'cash';
 $itemsRaw         = $_POST['items'] ?? '';
 
 $allowed_methods = ['cash', 'card', 'mobile_money', 'bank_transfer'];
-if (!in_array($refund_method, $allowed_methods, true)) { echo json_encode(['success' => false, 'message' => 'Invalid refund method.']); exit; }
-if ($original_sale_id <= 0) { echo json_encode(['success' => false, 'message' => 'Invalid original sale.']); exit; }
-if ($reason === '')         { echo json_encode(['success' => false, 'message' => 'A return reason is required.']); exit; }
+if (!in_array($refund_method, $allowed_methods, true)) { echo json_encode(['success' => false, 'message' => t('Invalid refund method.')]); exit; }
+if ($original_sale_id <= 0) { echo json_encode(['success' => false, 'message' => t('Invalid original sale.')]); exit; }
+if ($reason === '')         { echo json_encode(['success' => false, 'message' => t('A return reason is required.')]); exit; }
 
 $requested = json_decode($itemsRaw, true);
-if (!is_array($requested) || count($requested) === 0) { echo json_encode(['success' => false, 'message' => 'Select at least one item to return.']); exit; }
+if (!is_array($requested) || count($requested) === 0) { echo json_encode(['success' => false, 'message' => t('Select at least one item to return.')]); exit; }
 // Normalise: sale_item_id => return_qty (>0)
 $want = [];
 foreach ($requested as $r) {
@@ -49,7 +56,7 @@ foreach ($requested as $r) {
     $rq  = (float)($r['return_qty'] ?? 0);
     if ($iid > 0 && $rq > 0) $want[$iid] = ($want[$iid] ?? 0) + $rq;
 }
-if (!$want) { echo json_encode(['success' => false, 'message' => 'Nothing to return.']); exit; }
+if (!$want) { echo json_encode(['success' => false, 'message' => t('Nothing to return.')]); exit; }
 
 try {
     global $pdo;
@@ -218,7 +225,7 @@ try {
 
     echo json_encode([
         'success'        => true,
-        'message'        => 'Return processed. Refund: ' . number_format($r_grand, 2),
+        'message'        => sprintf(t('Return processed. Refund: %s'), number_format($r_grand, 2)),
         'return_id'      => $return_id,
         'receipt_number' => $return_receipt,
         'refund_total'   => $r_grand,

@@ -8,9 +8,16 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+// Respect the caller's saved language preference (set by header.php on their
+// last page load) so t()-wrapped messages below come back in the right
+// language, not always English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
-if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
-if (!canView('pos'))    { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
+
+if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
+if (!canView('pos'))    { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
 
 global $pdo;
 
