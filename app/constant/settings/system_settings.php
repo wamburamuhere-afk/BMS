@@ -40,11 +40,14 @@ if ($_POST) {
             // Handle Logo Upload
             if (isset($_FILES['company_logo']) && $_FILES['company_logo']['error'] !== UPLOAD_ERR_NO_FILE) {
                 if ($_FILES['company_logo']['error'] === UPLOAD_ERR_OK) {
-                    $upload_dir = ROOT_DIR . '/uploads/system/logo/';
-                    if (!is_dir($upload_dir)) {
-                        mkdir($upload_dir, 0777, true);
-                    }
-                    
+                    // Tenant-scoped, not ROOT_DIR . '/uploads/system/logo/' — every
+                    // tenant is served from the same shared webroot (ROOT_DIR is
+                    // identical for all of them), so a hardcoded path meant every
+                    // company's logo upload landed in ONE shared folder and could
+                    // overwrite another company's logo. bmsUploadsDir() resolves to
+                    // this request's own tenant subfolder (core/tenant_bootstrap.php).
+                    $upload_dir = bmsUploadsDir('system/logo');
+
                     $file_extension = strtolower(pathinfo($_FILES['company_logo']['name'], PATHINFO_EXTENSION));
                     $allowed_extensions = ['png', 'jpg', 'jpeg', 'gif', 'svg'];
                     
@@ -61,7 +64,7 @@ if ($_POST) {
                                     unlink($old_path);
                                 }
                             }
-                            $settings['company_logo'] = 'uploads/system/logo/' . $file_name;
+                            $settings['company_logo'] = bmsUploadsRel('system/logo') . $file_name;
                         } else {
                             throw new Exception("Failed to move uploaded file to destination.");
                         }
