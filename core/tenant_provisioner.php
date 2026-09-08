@@ -431,8 +431,9 @@ if (!function_exists('provisionTenant')) {
             );
 
             foreach ([
-                'apply_schema' => __DIR__ . '/../schema/tenant_schema_template.sql',
-                'apply_seed'   => __DIR__ . '/../schema/tenant_seed_defaults.sql',
+                'apply_schema'    => __DIR__ . '/../schema/tenant_schema_template.sql',
+                'apply_seed'      => __DIR__ . '/../schema/tenant_seed_defaults.sql',
+                'apply_geography' => __DIR__ . '/../schema/tenant_geography_seed.sql',
             ] as $stepName => $file) {
                 if (!is_file($file)) {
                     throw new RuntimeException(basename($file) . ' is missing from the deployment.');
