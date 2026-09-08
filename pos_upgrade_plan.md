@@ -1504,6 +1504,18 @@ regular sale line already reverses atomically).
 
 ### Phase 24 — Weighing-Scale Barcode Support
 
+**Status:** DEFERRED (confirmed, not built) · **Decided:** 2026-09-08
+
+Per the recommendation below — no confirmed weight-sold inventory, and
+blocked on §3 Phase 5's barcode-scan rebuild (not yet done) — this phase
+was deliberately NOT built in this tranche, the same documented-deferral
+pattern already used for Phase 12 (offline resilience) and Phase 11's
+genuine multi-currency. **This completes the Tier-3 tranche: 10 of 11
+phases shipped (16, 14, 17, 18, 15, 19, 20, 21, 22, 23), each on its own
+commit with its own test suite, on branch `feat/pos-tier3-advanced-retail`.**
+If the business later confirms it sells anything by weight, revisit this
+phase — the design below stays valid.
+
 **Closes:** lowest priority in this tranche — only matters if BMS's POS is
 ever used for anything sold by weight (some general-shop goods; low relevance
 for pure stationery). **Gate:** `pos_advanced`. **Recommendation: defer until
@@ -1525,6 +1537,32 @@ existing `process_sale.php` line-quantity handling.
   guessing.
 
 ---
+
+### Known follow-ups from this tranche (documented, not fixed here — separate work)
+
+Found while building Phases 14-23, each already noted in its own phase
+above, consolidated here so they aren't buried:
+
+1. **`stock_movements.reference_type` enum mismatch** (found in Phase 23) —
+   `void_sale.php` and `create_return.php` already logged their own
+   (non-combo) stock reversals with `reference_type='pos_void'`/`'pos_return'`,
+   neither of which is in the actual live ENUM
+   (`purchase_order,sales_order,pos_sale,invoice,stock_adjustment,
+   stock_transfer,return,production_order,manual`) — silently coerced under
+   this server's non-strict `sql_mode`, the same bug class as §7 Phase 8's
+   `split`/`mixed` finding. Pre-existing, predates this tranche; not fixed
+   here since it's outside Phase 23's stated scope and touches
+   already-shipped, already-tested code from an earlier phase.
+2. **Income Statement POS-COGS drill-down not batch-aware** (Phase 18) —
+   `api/account/get_income_statement_detail.php`'s own inline query still
+   uses average `products.cost_price` only; only the ledger-posting path
+   (`core/sales_posting.php::posSaleCogs()`) was made batch-aware. Making
+   the report match is a separate, larger change to a financially-sensitive
+   report.
+3. **POS-side manual batch-picker UI deferred** (Phase 17) — server-side
+   FEFO (always correct) ships; a cashier/manager manually overriding which
+   batch a sale draws from is a lower-value polish item, not built.
+4. **Phase 24 (weighing-scale barcode) deferred** — see above.
 
 ### Recommended build order
 
