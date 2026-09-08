@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-09-08 (fix) - Dashboard blank/500 for any tenant missing `product_batches` (live incident)
+
+**Files (changed):** `app/dashboard.php`
+
+Live incident, reported via Sentry (`https://demo.bjptechnologies.co.tz/dashboard`, tenant DB
+`bejundas_main`): logging in showed a blank dashboard. Root cause — today's Phase 17 batch/expiry
+widget query (`get_system_alerts()`, added at the same time as `migrations/tenant/2026_09_08_pos_product_batches.php`)
+selects directly from `product_batches` with no error handling, unlike the near-identical
+negative-stock query three lines below it, which is already wrapped in `try/catch`. Any tenant
+whose database doesn't yet have that table — confirmed from the actual deploy log for PR #1839:
+the automated per-tenant migration ran successfully for the 5 tenants that existed in the control
+database at that moment, and `bejundas` was not one of them, consistent with a company that
+self-registered in the few minutes right after that deploy — gets an uncaught `PDOException` that
+takes down the entire dashboard instead of just the one widget.
+
+Fixed by wrapping the batch-expiry query in the same `try/catch (PDOException $e) {}` pattern
+already used for the negative-stock query in this exact function — a missing/not-yet-migrated
+table now degrades to "no expiry alerts shown" for that tenant instead of a blank page. Verified
+locally by renaming `product_batches` away and confirming the query no longer throws (empty
+result instead), then restoring the table; `tests/test_dashboard_time_range_cli.php` (16
+assertions) and `tests/test_pos_batch_expiry_cli.php` (43 assertions, including the dashboard
+widget wiring check) both re-run clean with the table present, confirming no behaviour change for
+tenants that already have it.
+
+Not addressed here, tracked separately: why `bejundas`'s database doesn't have `product_batches`
+yet (self-registration timing vs. the per-tenant migration run, most likely) — this fix only stops
+that gap from blanking the dashboard while the table gets backfilled.
+
 ## 2026-09-08 (fix) - Project-scope audit regression from Phases 15/23
 
 **Files (changed):** `api/get_combo_components.php`, `api/save_combo_component.php`, `api/save_product_unit.php`
