@@ -1101,8 +1101,20 @@ function startShift() {
                 // Built via .text() (auto-escaping), not string-concatenated HTML —
                 // this page has no output-escaping JS helper of its own (that's a
                 // per-page local convention elsewhere, not something pos.php defines).
-                $reg.append($('<option>').val(r.register_id).text(r.register_name + ' (' + r.register_code + ')'));
+                const label = r.register_name + ' (' + r.register_code + ')';
+                const opt = $('<option>').val(r.register_id).text(label);
+                if (r.active_shift_id) {
+                    // Busy till — disable it up front instead of letting the cashier
+                    // pick it and only find out after submitting (open_shift.php's
+                    // "already in an active shift with another cashier" guard still
+                    // backstops this server-side for the rare simultaneous-click race).
+                    opt.prop('disabled', true)
+                       .text(label + ' — in use by ' + r.active_cashier_name + ' since ' + r.active_shift_started_label);
+                }
+                $reg.append(opt);
             });
+            const firstFree = $reg.find('option:not(:disabled)').first().val();
+            if (firstFree) $reg.val(firstFree);
         } else {
             $reg.append('<option value="1">Main Counter</option>');
         }
