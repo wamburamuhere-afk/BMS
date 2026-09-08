@@ -5,15 +5,22 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+// Respect the caller's saved language preference (set by header.php on their
+// last page load) so t()-wrapped messages below come back in the right
+// language, not always English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 
 if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit();
 }
 
 if (!canCreate('pos')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to hold POS sales']);
+    echo json_encode(['success' => false, 'message' => t('Access Denied: you do not have permission to hold POS sales')]);
     exit();
 }
 
@@ -76,7 +83,7 @@ try {
 
     echo json_encode([
         'success' => true,
-        'message' => 'Sale held successfully',
+        'message' => t('Sale held successfully'),
         'hold_id' => $pdo->lastInsertId(),
         'reference' => $hold_reference
     ]);

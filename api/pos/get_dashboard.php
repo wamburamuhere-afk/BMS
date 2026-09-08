@@ -14,12 +14,19 @@
  * Permission: canView('pos')
  */
 require_once __DIR__ . '/../../roots.php';
+// Respect the caller's saved language preference (set by header.php on their
+// last page load) so t()-wrapped messages below come back in the right
+// language, not always English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 require_once __DIR__ . '/../../core/permissions.php';   // loads core/project_scope.php
 
 header('Content-Type: application/json');
 
-if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
-if (!canView('pos'))    { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
+if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
+if (!canView('pos'))    { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
 
 $trend_days = (int)($_GET['trend_days'] ?? 14);
 if ($trend_days < 1 || $trend_days > 90) $trend_days = 14;
@@ -164,5 +171,5 @@ try {
 } catch (Throwable $e) {
     error_log('get_dashboard: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Database error.']);
+    echo json_encode(['success' => false, 'message' => t('Database error.')]);
 }

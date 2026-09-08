@@ -95,82 +95,80 @@ $currency     = getSetting('currency', 'TZS');
 </head>
 <body>
     <div class="no-print" style="text-align:right; margin-bottom: 10px;">
-        <button onclick="window.print()">Print</button>
-        <button onclick="window.close()">Close</button>
+        <button onclick="window.print()"><?= t('Print') ?></button>
+        <button onclick="window.close()"><?= t('Close') ?></button>
     </div>
 
-    <h1><?= htmlspecialchars($company_name) ?> — Z-Report</h1>
+    <h1><?= htmlspecialchars($company_name) ?> — <?= t('Z-Report') ?></h1>
     <div class="sub">
-        Shift <?= htmlspecialchars($shift['shift_code']) ?> ·
-        Register: <?= htmlspecialchars($shift['register_name'] ?: 'N/A') ?> (<?= htmlspecialchars($shift['register_code'] ?: '—') ?>) ·
-        Cashier: <?= htmlspecialchars($shift['cashier_name'] ?: 'N/A') ?><br>
-        Opened: <?= date('d/m/Y H:i', strtotime($shift['start_time'])) ?>
-        <?php if ($shift['end_time']): ?> · Closed: <?= date('d/m/Y H:i', strtotime($shift['end_time'])) ?><?php endif; ?>
-        · Status: <strong><?= htmlspecialchars(ucfirst($shift['status'])) ?></strong>
+        <?= t('Shift') ?> <?= htmlspecialchars($shift['shift_code']) ?> ·
+        <?= t('Register:') ?> <?= htmlspecialchars($shift['register_name'] ?: t('N/A')) ?> (<?= htmlspecialchars($shift['register_code'] ?: '—') ?>) ·
+        <?= t('Cashier:') ?> <?= htmlspecialchars($shift['cashier_name'] ?: t('N/A')) ?><br>
+        <?= t('Opened:') ?> <?= date('d/m/Y H:i', strtotime($shift['start_time'])) ?>
+        <?php if ($shift['end_time']): ?> · <?= t('Closed:') ?> <?= date('d/m/Y H:i', strtotime($shift['end_time'])) ?><?php endif; ?>
+        · <?= t('Status:') ?> <strong><?= htmlspecialchars(ucfirst($shift['status'])) ?></strong>
     </div>
 
     <?php if ($unpostedCount > 0): ?>
     <div class="warn-box">
-        <strong>⚠ Accounting warning:</strong> <?= $unpostedCount ?> sale(s) in this shift did not post to the
-        General Ledger (best-effort posting — check the chart-of-accounts configuration). These sales are still
-        valid and included in the totals below; they are simply not yet reflected on the Trial Balance/Balance Sheet.
+        <strong>⚠ <?= t('Accounting warning:') ?></strong> <?= sprintf(t('%d sale(s) in this shift did not post to the General Ledger (best-effort posting — check the chart-of-accounts configuration). These sales are still valid and included in the totals below; they are simply not yet reflected on the Trial Balance/Balance Sheet.'), $unpostedCount) ?>
     </div>
     <?php endif; ?>
 
     <div class="section">
-        <h2>Cash Reconciliation</h2>
-        <div class="row"><span>Starting Cash</span><span><?= $currency ?> <?= number_format((float)$shift['starting_cash'], 2) ?></span></div>
-        <div class="row"><span>Cash In (manual)</span><span><?= $currency ?> <?= number_format((float)$shift['cash_in'], 2) ?></span></div>
-        <div class="row"><span>Cash Out (manual)</span><span><?= $currency ?> <?= number_format((float)$shift['cash_out'], 2) ?></span></div>
-        <div class="row"><span>Cash Sales</span><span><?= $currency ?> <?= number_format($totals['total_cash_sales'], 2) ?></span></div>
-        <div class="row"><span>Cash Refunds</span><span>-<?= $currency ?> <?= number_format($totals['total_refunds'], 2) ?></span></div>
-        <div class="row total"><span>Expected Cash</span><span><?= $currency ?> <?= number_format((float)$shift['expected_cash'], 2) ?></span></div>
+        <h2><?= t('Cash Reconciliation') ?></h2>
+        <div class="row"><span><?= t('Starting Cash') ?></span><span><?= $currency ?> <?= number_format((float)$shift['starting_cash'], 2) ?></span></div>
+        <div class="row"><span><?= t('Cash In (manual)') ?></span><span><?= $currency ?> <?= number_format((float)$shift['cash_in'], 2) ?></span></div>
+        <div class="row"><span><?= t('Cash Out (manual)') ?></span><span><?= $currency ?> <?= number_format((float)$shift['cash_out'], 2) ?></span></div>
+        <div class="row"><span><?= t('Cash Sales') ?></span><span><?= $currency ?> <?= number_format($totals['total_cash_sales'], 2) ?></span></div>
+        <div class="row"><span><?= t('Cash Refunds') ?></span><span>-<?= $currency ?> <?= number_format($totals['total_refunds'], 2) ?></span></div>
+        <div class="row total"><span><?= t('Expected Cash') ?></span><span><?= $currency ?> <?= number_format((float)$shift['expected_cash'], 2) ?></span></div>
         <?php if ($shift['status'] !== 'active'): ?>
-        <div class="row"><span>Actual Counted Cash</span><span><?= $currency ?> <?= number_format((float)$shift['ending_cash'], 2) ?></span></div>
+        <div class="row"><span><?= t('Actual Counted Cash') ?></span><span><?= $currency ?> <?= number_format((float)$shift['ending_cash'], 2) ?></span></div>
         <?php $diff = (float)$shift['cash_difference']; ?>
-        <div class="row total"><span>Difference</span><span class="<?= abs($diff) < 0.01 ? 'diff-ok' : 'diff-bad' ?>"><?= $currency ?> <?= number_format($diff, 2) ?></span></div>
+        <div class="row total"><span><?= t('Difference') ?></span><span class="<?= abs($diff) < 0.01 ? 'diff-ok' : 'diff-bad' ?>"><?= $currency ?> <?= number_format($diff, 2) ?></span></div>
         <?php endif; ?>
     </div>
 
     <div class="section">
-        <h2>Sales by Tender</h2>
-        <div class="row"><span>Cash</span><span><?= $currency ?> <?= number_format($totals['total_cash_sales'], 2) ?></span></div>
-        <div class="row"><span>Card</span><span><?= $currency ?> <?= number_format($totals['total_card_sales'], 2) ?></span></div>
-        <div class="row"><span>Mobile Money</span><span><?= $currency ?> <?= number_format($totals['total_mobile_sales'], 2) ?></span></div>
-        <div class="row"><span>Credit (on account)</span><span><?= $currency ?> <?= number_format($totals['total_credit_sales'], 2) ?></span></div>
+        <h2><?= t('Sales by Tender') ?></h2>
+        <div class="row"><span><?= t('Cash') ?></span><span><?= $currency ?> <?= number_format($totals['total_cash_sales'], 2) ?></span></div>
+        <div class="row"><span><?= t('Card') ?></span><span><?= $currency ?> <?= number_format($totals['total_card_sales'], 2) ?></span></div>
+        <div class="row"><span><?= t('Mobile Money') ?></span><span><?= $currency ?> <?= number_format($totals['total_mobile_sales'], 2) ?></span></div>
+        <div class="row"><span><?= t('Credit (on account)') ?></span><span><?= $currency ?> <?= number_format($totals['total_credit_sales'], 2) ?></span></div>
         <?php if ($other_tender > 0.009): ?>
-        <div class="row"><span>Other (bank transfer / voucher / loyalty)</span><span><?= $currency ?> <?= number_format($other_tender, 2) ?></span></div>
+        <div class="row"><span><?= t('Other (bank transfer / voucher / loyalty)') ?></span><span><?= $currency ?> <?= number_format($other_tender, 2) ?></span></div>
         <?php endif; ?>
-        <div class="row total"><span>Gross Sales</span><span><?= $currency ?> <?= number_format($totals['total_sales'], 2) ?></span></div>
-        <div class="row"><span>Refunds (<?= $returnCount ?>)</span><span>-<?= $currency ?> <?= number_format($totals['total_refunds'], 2) ?></span></div>
-        <div class="row"><span>Voided Sales (<?= (int)$voids['cnt'] ?>, excluded above)</span><span><?= $currency ?> <?= number_format((float)$voids['amt'], 2) ?></span></div>
-        <div class="row total"><span>Net Sales</span><span><?= $currency ?> <?= number_format($totals['total_sales'] - $totals['total_refunds'], 2) ?></span></div>
+        <div class="row total"><span><?= t('Gross Sales') ?></span><span><?= $currency ?> <?= number_format($totals['total_sales'], 2) ?></span></div>
+        <div class="row"><span><?= sprintf(t('Refunds (%d)'), $returnCount) ?></span><span>-<?= $currency ?> <?= number_format($totals['total_refunds'], 2) ?></span></div>
+        <div class="row"><span><?= sprintf(t('Voided Sales (%d, excluded above)'), (int)$voids['cnt']) ?></span><span><?= $currency ?> <?= number_format((float)$voids['amt'], 2) ?></span></div>
+        <div class="row total"><span><?= t('Net Sales') ?></span><span><?= $currency ?> <?= number_format($totals['total_sales'] - $totals['total_refunds'], 2) ?></span></div>
     </div>
 
     <div class="section">
-        <h2>Transactions (<?= count($transactions) ?>)</h2>
+        <h2><?= sprintf(t('Transactions (%d)'), count($transactions)) ?></h2>
         <table>
-            <thead><tr><th>Receipt #</th><th>Time</th><th>Type</th><th>Method</th><th class="text-end">Amount</th><th>Status</th></tr></thead>
+            <thead><tr><th><?= t('Receipt #') ?></th><th><?= t('Time') ?></th><th><?= t('Type') ?></th><th><?= t('Method') ?></th><th class="text-end"><?= t('Amount') ?></th><th><?= t('Status') ?></th></tr></thead>
             <tbody>
                 <?php foreach ($transactions as $t): ?>
                 <tr>
                     <td><?= htmlspecialchars($t['receipt_number']) ?></td>
                     <td><?= date('H:i', strtotime($t['sale_date'])) ?></td>
-                    <td><?= $t['is_return_sale'] ? 'Return' : 'Sale' ?></td>
+                    <td><?= $t['is_return_sale'] ? t('Return') : t('Sale') ?></td>
                     <td><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $t['payment_method']))) ?></td>
                     <td class="text-end"><?= number_format((float)$t['grand_total'], 2) ?></td>
                     <td><span class="badge badge-<?= $t['sale_status'] === 'voided' ? 'voided' : ($t['is_return_sale'] ? 'return' : 'completed') ?>"><?= htmlspecialchars(ucfirst($t['sale_status'])) ?></span></td>
                 </tr>
                 <?php endforeach; ?>
                 <?php if (!$transactions): ?>
-                <tr><td colspan="6" style="text-align:center; color:#888;">No transactions in this shift</td></tr>
+                <tr><td colspan="6" style="text-align:center; color:#888;"><?= t('No transactions in this shift') ?></td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 
     <?php if (!empty($shift['notes'])): ?>
-    <div class="section"><h2>Notes</h2><div><?= nl2br(htmlspecialchars($shift['notes'])) ?></div></div>
+    <div class="section"><h2><?= t('Notes') ?></h2><div><?= nl2br(htmlspecialchars($shift['notes'])) ?></div></div>
     <?php endif; ?>
 </body>
 </html>

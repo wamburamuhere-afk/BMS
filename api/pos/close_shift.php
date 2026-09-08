@@ -4,16 +4,23 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+// Respect the caller's saved language preference (set by header.php on their
+// last page load) so t()-wrapped messages below come back in the right
+// language, not always English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 require_once __DIR__ . '/../../core/pos_shift_reporting.php';
 
 if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit();
 }
 
 if (!canEdit('pos')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to close POS shifts']);
+    echo json_encode(['success' => false, 'message' => t('Access Denied: you do not have permission to close POS shifts')]);
     exit();
 }
 csrf_check();
@@ -46,7 +53,7 @@ try {
         if (!$shift_id) {
             echo json_encode([
                 'success' => false,
-                'message' => 'No active shift found'
+                'message' => t('No active shift found')
             ]);
             exit();
         }
@@ -60,7 +67,7 @@ try {
     if (!$shift) {
         echo json_encode([
             'success' => false,
-            'message' => 'Active shift not found'
+            'message' => t('Active shift not found')
         ]);
         exit();
     }
@@ -151,7 +158,7 @@ try {
 
     echo json_encode([
         'success' => true,
-        'message' => 'Shift closed successfully',
+        'message' => t('Shift closed successfully'),
         'shift_id' => $shift_id,
         'starting_cash' => $shift['starting_cash'],
         'ending_cash' => $ending_cash,
