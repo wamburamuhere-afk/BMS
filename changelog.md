@@ -1,5 +1,50 @@
 # BMS Changelog
 
+## 2026-09-08 (fix) - Company logo uploads now tenant-scoped (were shared across every company)
+
+**Files (changed):** `app/constant/settings/system_settings.php`, `app/constant/settings/company_profile.php`
+**Files (added):** `tests/test_tenant_scoped_logo_upload_cli.php`
+
+Reported live: uploading a new company's logo appeared to change the logo shown on other
+companies' sites. Root cause — both handlers hardcoded `uploads/system/logo/` (one via
+`ROOT_DIR`, the other via `__DIR__`), a SINGLE physical folder shared by every tenant, since
+every tenant is served from the same webroot on disk (only the database differs per tenant;
+`core/tenant_bootstrap.php`'s own docblock: "ROOT_DIR is identical for all of them"). This is
+exactly the class of bug `bmsUploadsDir()`/`bmsUploadsRel()` were built to prevent (added
+2026-09-03 "after an incident" per that file's own history) — these two handlers were simply
+never migrated to use it. `company_profile.php` was the more severe of the two: it saved every
+company's logo under a fixed literal filename (`company_logo.<ext>`, no timestamp or randomness
+at all), so any two tenants that both saved a logo through it were **guaranteed** to overwrite
+each other's file, not merely at risk of an unlikely same-second collision.
+
+A broader live audit (triggered by the same report) found this is not isolated to logos: of the
+59 real file-upload handlers across the whole codebase, only 7 (all in `api/account/` +
+`api/petty_cash/`) were ever migrated to the tenant-safe helper — the other 52 (HR documents,
+customer/supplier/sub-contractor logos and IDs, purchasing attachments, product images,
+contracts, e-signatures, the document library, tender documents) still hardcode a shared,
+unprefixed path. That is a separate, much larger initiative and is deliberately **out of scope**
+for this fix — tracked separately, to be phased (financial/HR documents first) rather than done
+as one large, harder-to-review pass. This fix addresses only the two logo handlers that
+triggered the live report.
+
+Fixed by resolving both handlers' upload directory via `bmsUploadsDir('system/logo')` and the
+stored `system_settings.company_logo` value via `bmsUploadsRel('system/logo')` — each tenant's
+logo now lands under its own `uploads/t{id}/system/logo/`, while the legacy install (the tenant
+whose `db_name` matches this environment's own `DB_NAME`) keeps the original unprefixed path, so
+its existing logo file is untouched and still valid.
+
+Verified live: 18 assertions — wiring checks confirming the hardcoded paths are gone, plus a
+live-filesystem section proving three different tenant contexts (no-tenant/legacy, and two
+synthetic tenants) resolve to three physically distinct directories, that two tenants can use
+the identical filename and each reads back only their own bytes, and that no tenant's write
+leaks into the legacy directory. All cleaned up after. Re-ran every test suite that touches
+either changed file (`test_admin_lock_and_delegable_settings_cli.php`,
+`test_backup_restore_csrf_cli.php`, `test_login_history_cli.php`,
+`test_pos_color_settings_split_cli.php`, `test_quota_enforcement_cli.php`) — the handful of
+failures present there are unrelated to this change (backup path conventions, login session
+rows, POS color-settings markup, an admin nav link) and reproduce identically on `develop`
+without this fix applied, confirmed by diffing the failure counts with and without it.
+
 ## 2026-09-08 (feat) - POS: busy-register visibility in Start Shift, supervisor Force Close
 
 **Files (added):** `tests/test_pos_register_visibility_force_close_cli.php`
