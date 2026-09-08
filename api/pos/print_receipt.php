@@ -38,7 +38,8 @@ $stmt = $pdo->prepare("
         u.username as cashier_name,
         w.warehouse_name,
         r.register_code, r.receipt_header AS reg_receipt_header,
-        r.receipt_footer AS reg_receipt_footer, r.receipt_logo AS reg_receipt_logo
+        r.receipt_footer AS reg_receipt_footer, r.receipt_logo AS reg_receipt_logo,
+        r.printer_connection_type, r.printer_ip_address, r.printer_port
     FROM pos_sales s
     LEFT JOIN customers c ON s.customer_id = c.customer_id
     LEFT JOIN users u ON s.user_id = u.user_id
@@ -92,6 +93,50 @@ $auto_print    = getSetting('pos_auto_print_receipt', '0') === '1';
 $receipt_header_extra = trim($sale['reg_receipt_header'] ?? '');
 $receipt_footer_extra = trim($sale['reg_receipt_footer'] ?? '');
 $register_label        = trim($sale['register_name'] ?? '');
+
+// Phase 21 (pos_upgrade_plan.md §8) — real network (IP) thermal-printer
+// support. Only for a register explicitly configured for it; every other
+// register is completely unaffected (printer_connection_type defaults to
+// 'browser'). Fail-open: any socket error falls through to the existing
+// browser print-dialog page below, never blocks the cashier from getting a
+// receipt at all.
+if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sale['printer_ip_address'])) {
+    require_once __DIR__ . '/../../core/escpos_printer.php';
+
+    $receiptData = [
+        'company_name' => $company_name, 'company_address' => $company_address,
+        'company_phone' => $company_phone, 'company_tin' => $company_tin, 'company_vrn' => $company_vrn,
+        'receipt_number' => $sale['receipt_number'], 'cashier_name' => $sale['cashier_name'],
+        'sale_date' => $sale['sale_date'], 'customer_name' => $sale['customer_name'],
+        'items' => array_map(fn($i) => [
+            'product_name' => $i['product_name'], 'quantity' => $i['quantity'],
+            'unit_price' => $i['unit_price'], 'line_total' => $i['line_total'],
+        ], $items),
+        'subtotal' => $sale['subtotal'], 'tax_amount' => $sale['tax_amount'],
+        'discount_amount' => $sale['discount_amount'], 'grand_total' => $sale['grand_total'],
+        'payment_method' => $sale['payment_method'], 'amount_tendered' => $sale['amount_tendered'],
+        'change_given' => $sale['change_given'], 'currency' => $currency,
+        'char_width' => $receipt_width === '58' ? 32 : 42,
+    ];
+    $bytes = buildEscPosReceipt($receiptData);
+    $result = sendToNetworkPrinter((string)$sale['printer_ip_address'], (int)($sale['printer_port'] ?: 9100), $bytes);
+
+    if ($result['success']) {
+        logActivity($pdo, $_SESSION['user_id'], "Printed POS Receipt #{$sale['receipt_number']} to network printer {$sale['printer_ip_address']}");
+        ?>
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title><?= t('Receipt Printed') ?></title></head>
+<body style="font-family:sans-serif;text-align:center;padding:40px;">
+    <div style="font-size:48px;color:#198754;">&#10003;</div>
+    <h3><?= t('Receipt sent to the till printer.') ?></h3>
+    <p style="color:#6c757d;"><?= sprintf(t('Receipt #%s'), $sale['receipt_number']) ?></p>
+    <button onclick="window.close()" style="padding:10px 20px;font-size:14px;"><?= t('Close') ?></button>
+</body></html>
+        <?php
+        exit;
+    }
+    // Fail-open: log the reason, fall through to the browser print page below.
+    error_log("Network printer failed for sale #{$sale['sale_id']}: {$result['error']}");
+}
 ?>
 <!DOCTYPE html>
 <html>

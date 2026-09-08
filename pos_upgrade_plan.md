@@ -1356,6 +1356,28 @@ supporting detail, not a second source of truth) and the Z-Report
 
 ### Phase 21 — Network (IP) Thermal-Printer Support (real ESC/POS + drawer-kick)
 
+**Status:** ✅ DONE · **Built:** 2026-09-08 · **Branch:** `feat/pos-tier3-advanced-retail`
+
+Shipped as planned. `core/escpos_printer.php` (`buildEscPosReceipt()`,
+`sendToNetworkPrinter()`) builds the raw ESC/POS byte stream (init, item
+lines, totals, `GS V 0` full cut, `ESC p 0 25 250` drawer-kick — the exact
+sequence that makes the drawer-kick claim real, not speculative: it rides
+the same TCP socket as the print job, no separate hardware channel needed)
+and sends it via a plain `fsockopen()`. `pos_registers` gained
+`printer_connection_type` (default `'browser'` — every existing register's
+behaviour is completely unchanged), `printer_ip_address`, `printer_port`.
+`print_receipt.php` branches on the sale's register before rendering
+anything: network mode attempts the socket send and shows a lightweight
+confirmation page on success; any failure (unreachable IP, timeout) is
+**fail-open** — it falls straight through to the existing browser
+print-dialog page, so a misconfigured printer never blocks a cashier from
+getting a receipt at all. Settings UI on `pos_config_settings.php` (per
+register: connection-type picker, IP/port fields, a "Test Printer" button
+hitting the new `api/pos/test_network_printer.php`). `tests/test_pos_network_printer_cli.php`
+(34 checks, including exact byte-level assertions on the built receipt —
+no real printer hardware needed to verify correctness). Full POS
+regression re-run clean.
+
 **Closes:** §3 Phase 10 correctly ruled out browser-only raw printing and
 WebUSB (needs HTTPS, unavailable on this LAN/HTTP WAMP deployment) — but the
 UltimatePOS audit found a **third path BMS hadn't evaluated**: a printer with

@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-09-08 (feature) - POS Phase 21: network (IP) thermal-printer support (real ESC/POS + drawer-kick)
+
+**Files (new):** `core/escpos_printer.php`, `migrations/tenant/2026_09_08_pos_network_printer.php`,
+`api/pos/test_network_printer.php`, `tests/test_pos_network_printer_cli.php`
+**Files (changed):** `api/pos/print_receipt.php`, `api/pos/save_register.php`, `api/pos/get_registers.php`,
+`app/constant/settings/pos_config_settings.php`, `lang/sw.php`, `schema/tenant_schema_template.sql`,
+`tests/test_pos_i18n_coverage_cli.php`
+
+Eighth phase of the Tier-3 plan (§8 Phase 21). §3 Phase 10 correctly ruled out raw printing from a
+plain browser page — but a printer with its own Ethernet/WiFi interface is a plain TCP socket
+target, not "the browser talking to hardware." `core/escpos_printer.php` builds the real ESC/POS
+byte stream (including the drawer-kick command, which rides the same socket as the print job) and
+sends it via `fsockopen()`. Per-register opt-in (`pos_registers.printer_connection_type`, default
+`'browser'` — every existing register unaffected); `print_receipt.php` fails open to the existing
+browser print-dialog page on any socket error, so a misconfigured printer never blocks a receipt.
+Settings UI gets a connection-type picker + IP/port fields + a Test Printer button per register.
+
 ## 2026-09-08 (feature) - POS Phase 20: cash denomination counting at shift open/close
 
 **Files (new):** `core/pos_denominations.php`, `migrations/tenant/2026_09_08_pos_cash_denominations.php`,

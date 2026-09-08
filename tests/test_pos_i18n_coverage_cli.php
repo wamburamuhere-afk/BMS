@@ -80,6 +80,8 @@ $apiFiles = [
     'api/pos/get_price_group_products.php', 'api/pos/save_price_group_product_price.php',
     // Phase 15 (pos_upgrade_plan.md §8) — unit conversion at the register.
     'api/pos/get_product_units.php',
+    // Phase 21 (pos_upgrade_plan.md §8) — network (IP) thermal printer.
+    'api/pos/print_receipt.php', 'api/pos/test_network_printer.php',
 ];
 $allFiles = array_merge($pageFiles, $apiFiles);
 

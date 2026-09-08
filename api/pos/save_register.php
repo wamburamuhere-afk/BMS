@@ -38,8 +38,18 @@ $card_reader     = !empty($_POST['card_reader']) ? 1 : 0;
 $receipt_header = trim($_POST['receipt_header'] ?? '') ?: null;
 $receipt_footer = trim($_POST['receipt_footer'] ?? '') ?: null;
 
+// Phase 21 (pos_upgrade_plan.md §8) — real network (IP) thermal-printer
+// support. 'browser' (the pre-existing behaviour) stays the default.
+$printer_connection_type = ($_POST['printer_connection_type'] ?? 'browser') === 'network' ? 'network' : 'browser';
+$printer_ip_address = trim($_POST['printer_ip_address'] ?? '') ?: null;
+$printer_port = (int)($_POST['printer_port'] ?? 9100) ?: 9100;
+
 if ($register_name === '' || $register_code === '') {
     echo json_encode(['success' => false, 'message' => t('Register name and code are required.')]);
+    exit;
+}
+if ($printer_connection_type === 'network' && $printer_ip_address === null) {
+    echo json_encode(['success' => false, 'message' => t('A printer IP address is required for a network-connected printer.')]);
     exit;
 }
 
@@ -58,20 +68,25 @@ try {
         $pdo->prepare("UPDATE pos_registers
                           SET register_name = ?, register_code = ?, location = ?, opening_cash = ?,
                               barcode_scanner = ?, cash_drawer = ?, card_reader = ?,
-                              receipt_header = ?, receipt_footer = ?, updated_at = NOW()
+                              receipt_header = ?, receipt_footer = ?,
+                              printer_connection_type = ?, printer_ip_address = ?, printer_port = ?,
+                              updated_at = NOW()
                         WHERE register_id = ?")
             ->execute([$register_name, $register_code, $location, $opening_cash,
                        $barcode_scanner, $cash_drawer, $card_reader,
-                       $receipt_header, $receipt_footer, $register_id]);
+                       $receipt_header, $receipt_footer,
+                       $printer_connection_type, $printer_ip_address, $printer_port, $register_id]);
         logActivity($pdo, $_SESSION['user_id'], "Updated POS register: $register_name ($register_code)");
         $message = t('Register updated successfully.');
     } else {
         $pdo->prepare("INSERT INTO pos_registers
                           (register_name, register_code, location, opening_cash, status,
-                           barcode_scanner, cash_drawer, card_reader, receipt_header, receipt_footer, created_at, updated_at)
-                       VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, NOW(), NOW())")
+                           barcode_scanner, cash_drawer, card_reader, receipt_header, receipt_footer,
+                           printer_connection_type, printer_ip_address, printer_port, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())")
             ->execute([$register_name, $register_code, $location, $opening_cash,
-                       $barcode_scanner, $cash_drawer, $card_reader, $receipt_header, $receipt_footer]);
+                       $barcode_scanner, $cash_drawer, $card_reader, $receipt_header, $receipt_footer,
+                       $printer_connection_type, $printer_ip_address, $printer_port]);
         $register_id = (int)$pdo->lastInsertId();
         logActivity($pdo, $_SESSION['user_id'], "Created POS register: $register_name ($register_code)");
         $message = t('Register created successfully.');
