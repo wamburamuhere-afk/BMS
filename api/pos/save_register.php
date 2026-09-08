@@ -11,11 +11,18 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+// Respect the caller's saved language preference (set by header.php on their
+// last page load) so t()-wrapped messages below come back in the right
+// language, not always English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 
-if (!isAuthenticated())            { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
-if (!canView('pos_advanced'))      { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Multi-register management is not included in your plan.']); exit; }
-if (!canEdit('pos_config_settings')) { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
+
+if (!isAuthenticated())            { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
+if (!canView('pos_advanced'))      { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Multi-register management is not included in your plan.')]); exit; }
+if (!canEdit('pos_config_settings')) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => t('Method not allowed')]); exit; }
 csrf_check();
 
 global $pdo;
@@ -32,7 +39,7 @@ $receipt_header = trim($_POST['receipt_header'] ?? '') ?: null;
 $receipt_footer = trim($_POST['receipt_footer'] ?? '') ?: null;
 
 if ($register_name === '' || $register_code === '') {
-    echo json_encode(['success' => false, 'message' => 'Register name and code are required.']);
+    echo json_encode(['success' => false, 'message' => t('Register name and code are required.')]);
     exit;
 }
 
@@ -43,7 +50,7 @@ try {
     $dupStmt = $pdo->prepare($dupSql);
     $dupStmt->execute($register_id > 0 ? [$register_code, $register_id] : [$register_code]);
     if ($dupStmt->fetchColumn() > 0) {
-        echo json_encode(['success' => false, 'message' => 'Register code already exists. Please use a different code.']);
+        echo json_encode(['success' => false, 'message' => t('Register code already exists. Please use a different code.')]);
         exit;
     }
 
@@ -57,7 +64,7 @@ try {
                        $barcode_scanner, $cash_drawer, $card_reader,
                        $receipt_header, $receipt_footer, $register_id]);
         logActivity($pdo, $_SESSION['user_id'], "Updated POS register: $register_name ($register_code)");
-        $message = 'Register updated successfully.';
+        $message = t('Register updated successfully.');
     } else {
         $pdo->prepare("INSERT INTO pos_registers
                           (register_name, register_code, location, opening_cash, status,
@@ -67,7 +74,7 @@ try {
                        $barcode_scanner, $cash_drawer, $card_reader, $receipt_header, $receipt_footer]);
         $register_id = (int)$pdo->lastInsertId();
         logActivity($pdo, $_SESSION['user_id'], "Created POS register: $register_name ($register_code)");
-        $message = 'Register created successfully.';
+        $message = t('Register created successfully.');
     }
 
     echo json_encode(['success' => true, 'message' => $message, 'register_id' => $register_id]);
@@ -75,5 +82,5 @@ try {
 } catch (PDOException $e) {
     error_log('save_register: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Database error.']);
+    echo json_encode(['success' => false, 'message' => t('Database error.')]);
 }

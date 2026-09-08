@@ -9,12 +9,19 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+// Respect the caller's saved language preference (set by header.php on their
+// last page load) so t()-wrapped messages below come back in the right
+// language, not always English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 require_once __DIR__ . '/../../core/mailer.php';
 
-if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
-if (!canView('pos'))    { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Permission denied']); exit; }
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
+if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
+if (!canView('pos'))    { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => t('Method not allowed')]); exit; }
 csrf_check();
 
 global $pdo;
@@ -22,8 +29,8 @@ global $pdo;
 $sale_id = (int)($_POST['sale_id'] ?? 0);
 $email   = trim($_POST['email'] ?? '');
 
-if ($sale_id <= 0) { echo json_encode(['success' => false, 'message' => 'Invalid sale.']); exit; }
-if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { echo json_encode(['success' => false, 'message' => 'Please enter a valid email address.']); exit; }
+if ($sale_id <= 0) { echo json_encode(['success' => false, 'message' => t('Invalid sale.')]); exit; }
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { echo json_encode(['success' => false, 'message' => t('Please enter a valid email address.')]); exit; }
 
 $stmt = $pdo->prepare("
     SELECT s.*, c.customer_name, u.username AS cashier_name
@@ -34,11 +41,11 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$sale_id]);
 $sale = $stmt->fetch(PDO::FETCH_ASSOC);
-if (!$sale) { echo json_encode(['success' => false, 'message' => 'Sale not found.']); exit; }
+if (!$sale) { echo json_encode(['success' => false, 'message' => t('Sale not found.')]); exit; }
 
 $wid = $sale['warehouse_id'] !== null && $sale['warehouse_id'] !== '' ? (int)$sale['warehouse_id'] : null;
 if ($wid !== null && !userCan('warehouse', $wid)) {
-    echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+    echo json_encode(['success' => false, 'message' => t('Access denied: this warehouse is not in your assigned scope.')]);
     exit;
 }
 
@@ -77,7 +84,7 @@ $ok = sendEmail($email, 'Receipt #' . $sale['receipt_number'] . ' — ' . $compa
 
 if ($ok) {
     logActivity($pdo, $_SESSION['user_id'], 'Emailed POS Receipt', "Emailed receipt #{$sale['receipt_number']} to $email");
-    echo json_encode(['success' => true, 'message' => "Receipt emailed to $email"]);
+    echo json_encode(['success' => true, 'message' => sprintf(t('Receipt emailed to %s'), $email)]);
 } else {
-    echo json_encode(['success' => false, 'message' => 'Could not send email: ' . (mailer_last_error() ?: 'unknown error')]);
+    echo json_encode(['success' => false, 'message' => sprintf(t('Could not send email: %s'), mailer_last_error() ?: t('unknown error'))]);
 }

@@ -24,16 +24,16 @@ $company_logo = getSetting('company_logo', '');
 
     <!-- ── Page header ── -->
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <h4 class="mb-0 text-primary"><i class="bi bi-shop me-2"></i>POS Workspace</h4>
+        <h4 class="mb-0 text-primary"><i class="bi bi-shop me-2"></i><?= t('POS Workspace') ?></h4>
         <div class="d-flex align-items-center gap-2">
             <button id="btnToggleDash" class="btn btn-outline-primary btn-sm">
-                <i class="bi bi-speedometer2 me-1"></i> Sales Dashboard
+                <i class="bi bi-speedometer2 me-1"></i> <?= t('Sales Dashboard') ?>
             </button>
             <a href="<?= getUrl('pos/shifts') ?>" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-clock-history me-1"></i> Shift History
+                <i class="bi bi-clock-history me-1"></i> <?= t('Shift History') ?>
             </a>
             <a href="<?= getUrl('pos') ?>" class="btn btn-primary btn-sm">
-                <i class="bi bi-bag-plus me-1"></i> Open POS
+                <i class="bi bi-bag-plus me-1"></i> <?= t('Open POS') ?>
             </a>
         </div>
     </div>
@@ -42,98 +42,98 @@ $company_logo = getSetting('company_logo', '');
     <div id="paneHistory">
 
         <div class="d-flex align-items-center mb-3">
-            <h5 class="mb-0 text-primary"><i class="bi bi-receipt me-2"></i>Sales History</h5>
+            <h5 class="mb-0 text-primary"><i class="bi bi-receipt me-2"></i><?= t('Sales History') ?></h5>
         </div>
 
         <!-- Period filter -->
         <div class="card border-0 shadow-sm mb-3">
             <div class="card-body py-3">
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-                    <span class="small text-muted fw-bold text-nowrap">Period:</span>
+                    <span class="small text-muted fw-bold text-nowrap"><?= t('Period:') ?></span>
                     <div class="btn-group btn-group-sm" role="group" id="periodGroup">
-                        <button type="button" class="btn btn-outline-primary period-btn" data-period="daily">Daily</button>
-                        <button type="button" class="btn btn-outline-primary period-btn" data-period="weekly">Weekly</button>
-                        <button type="button" class="btn btn-outline-primary period-btn" data-period="monthly">Monthly</button>
-                        <button type="button" class="btn btn-outline-primary period-btn" data-period="quarterly">Quarterly</button>
-                        <button type="button" class="btn btn-primary period-btn" data-period="yearly">Yearly</button>
+                        <button type="button" class="btn btn-outline-primary period-btn" data-period="daily"><?= t('Daily') ?></button>
+                        <button type="button" class="btn btn-outline-primary period-btn" data-period="weekly"><?= t('Weekly') ?></button>
+                        <button type="button" class="btn btn-outline-primary period-btn" data-period="monthly"><?= t('Monthly') ?></button>
+                        <button type="button" class="btn btn-outline-primary period-btn" data-period="quarterly"><?= t('Quarterly') ?></button>
+                        <button type="button" class="btn btn-primary period-btn" data-period="yearly"><?= t('Yearly') ?></button>
                     </div>
                 </div>
 
                 <!-- Daily: single date -->
                 <div id="fp-daily" class="filter-panel d-none row g-2 align-items-end">
                     <div class="col-auto">
-                        <label class="form-label small mb-1">Date</label>
+                        <label class="form-label small mb-1"><?= t('Date') ?></label>
                         <input type="date" id="fDay" class="form-control form-control-sm">
                     </div>
                     <div class="col-auto">
-                        <button class="btn btn-primary btn-sm apply-btn"><i class="bi bi-funnel me-1"></i> Apply</button>
+                        <button class="btn btn-primary btn-sm apply-btn"><i class="bi bi-funnel me-1"></i> <?= t('Apply') ?></button>
                     </div>
                 </div>
 
                 <!-- Weekly: any date in week → Mon–Sun computed -->
                 <div id="fp-weekly" class="filter-panel d-none row g-2 align-items-end">
                     <div class="col-auto">
-                        <label class="form-label small mb-1">Any day in week</label>
+                        <label class="form-label small mb-1"><?= t('Any day in week') ?></label>
                         <input type="date" id="fWeekDay" class="form-control form-control-sm">
                     </div>
                     <div class="col-auto d-flex align-items-end">
                         <span id="weekRangeLabel" class="small text-muted mb-2 ms-1"></span>
                     </div>
                     <div class="col-auto">
-                        <button class="btn btn-primary btn-sm apply-btn"><i class="bi bi-funnel me-1"></i> Apply</button>
+                        <button class="btn btn-primary btn-sm apply-btn"><i class="bi bi-funnel me-1"></i> <?= t('Apply') ?></button>
                     </div>
                 </div>
 
                 <!-- Monthly: month + year -->
                 <div id="fp-monthly" class="filter-panel d-none row g-2 align-items-end">
                     <div class="col-auto">
-                        <label class="form-label small mb-1">Month</label>
+                        <label class="form-label small mb-1"><?= t('Month') ?></label>
                         <select id="fMonth" class="form-select form-select-sm">
-                            <option value="1">January</option><option value="2">February</option>
-                            <option value="3">March</option><option value="4">April</option>
-                            <option value="5">May</option><option value="6">June</option>
-                            <option value="7">July</option><option value="8">August</option>
-                            <option value="9">September</option><option value="10">October</option>
-                            <option value="11">November</option><option value="12">December</option>
+                            <option value="1"><?= t('January') ?></option><option value="2"><?= t('February') ?></option>
+                            <option value="3"><?= t('March') ?></option><option value="4"><?= t('April') ?></option>
+                            <option value="5"><?= t('May') ?></option><option value="6"><?= t('June') ?></option>
+                            <option value="7"><?= t('July') ?></option><option value="8"><?= t('August') ?></option>
+                            <option value="9"><?= t('September') ?></option><option value="10"><?= t('October') ?></option>
+                            <option value="11"><?= t('November') ?></option><option value="12"><?= t('December') ?></option>
                         </select>
                     </div>
                     <div class="col-auto">
-                        <label class="form-label small mb-1">Year</label>
+                        <label class="form-label small mb-1"><?= t('Year') ?></label>
                         <select id="fMonthYear" class="form-select form-select-sm"></select>
                     </div>
                     <div class="col-auto">
-                        <button class="btn btn-primary btn-sm apply-btn"><i class="bi bi-funnel me-1"></i> Apply</button>
+                        <button class="btn btn-primary btn-sm apply-btn"><i class="bi bi-funnel me-1"></i> <?= t('Apply') ?></button>
                     </div>
                 </div>
 
                 <!-- Quarterly: Q1–Q4 + year -->
                 <div id="fp-quarterly" class="filter-panel d-none row g-2 align-items-end">
                     <div class="col-auto">
-                        <label class="form-label small mb-1">Quarter</label>
+                        <label class="form-label small mb-1"><?= t('Quarter') ?></label>
                         <select id="fQuarter" class="form-select form-select-sm">
-                            <option value="1">Q1 (Jan–Mar)</option>
-                            <option value="2">Q2 (Apr–Jun)</option>
-                            <option value="3">Q3 (Jul–Sep)</option>
-                            <option value="4">Q4 (Oct–Dec)</option>
+                            <option value="1"><?= t('Q1 (Jan–Mar)') ?></option>
+                            <option value="2"><?= t('Q2 (Apr–Jun)') ?></option>
+                            <option value="3"><?= t('Q3 (Jul–Sep)') ?></option>
+                            <option value="4"><?= t('Q4 (Oct–Dec)') ?></option>
                         </select>
                     </div>
                     <div class="col-auto">
-                        <label class="form-label small mb-1">Year</label>
+                        <label class="form-label small mb-1"><?= t('Year') ?></label>
                         <select id="fQuarterYear" class="form-select form-select-sm"></select>
                     </div>
                     <div class="col-auto">
-                        <button class="btn btn-primary btn-sm apply-btn"><i class="bi bi-funnel me-1"></i> Apply</button>
+                        <button class="btn btn-primary btn-sm apply-btn"><i class="bi bi-funnel me-1"></i> <?= t('Apply') ?></button>
                     </div>
                 </div>
 
                 <!-- Yearly: year selector only -->
                 <div id="fp-yearly" class="filter-panel row g-2 align-items-end">
                     <div class="col-auto">
-                        <label class="form-label small mb-1">Year</label>
+                        <label class="form-label small mb-1"><?= t('Year') ?></label>
                         <select id="fYear" class="form-select form-select-sm"></select>
                     </div>
                     <div class="col-auto">
-                        <button id="btnFilter" class="btn btn-primary btn-sm apply-btn"><i class="bi bi-funnel me-1"></i> Apply</button>
+                        <button id="btnFilter" class="btn btn-primary btn-sm apply-btn"><i class="bi bi-funnel me-1"></i> <?= t('Apply') ?></button>
                     </div>
                 </div>
 
@@ -145,25 +145,25 @@ $company_logo = getSetting('company_logo', '');
             <div class="col-6 col-md-3">
                 <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
                     <div class="fs-4 fw-bold text-primary" id="stat-net">—</div>
-                    <div class="small text-muted">Net Sales (excl. VAT)</div>
+                    <div class="small text-muted"><?= t('Net Sales (excl. VAT)') ?></div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
                 <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
                     <div class="fs-4 fw-bold text-primary" id="stat-count">—</div>
-                    <div class="small text-muted">Completed Sales</div>
+                    <div class="small text-muted"><?= t('Completed Sales') ?></div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
                 <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
                     <div class="fs-4 fw-bold text-primary" id="stat-returns">—</div>
-                    <div class="small text-muted">Returns</div>
+                    <div class="small text-muted"><?= t('Returns') ?></div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
                 <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
                     <div class="fs-4 fw-bold text-primary" id="stat-voided">—</div>
-                    <div class="small text-muted">Voided</div>
+                    <div class="small text-muted"><?= t('Voided') ?></div>
                 </div>
             </div>
         </div>
@@ -174,19 +174,19 @@ $company_logo = getSetting('company_logo', '');
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <div class="d-flex flex-wrap shadow-sm bg-white" style="border:1px solid #dee2e6;border-radius:8px;overflow:hidden;">
                         <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="copyTable()" style="background:#fff;height:38px;">
-                            <i class="bi bi-clipboard text-info me-1"></i> Copy
+                            <i class="bi bi-clipboard text-info me-1"></i> <?= t('Copy') ?>
                         </button>
                         <div class="bg-light d-none d-sm-block" style="width:1px;height:38px;"></div>
                         <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="exportCSV()" style="background:#fff;height:38px;">
-                            <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> CSV
+                            <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> <?= t('CSV') ?>
                         </button>
                         <div class="bg-light d-none d-sm-block" style="width:1px;height:38px;"></div>
                         <button type="button" class="btn btn-white btn-sm fw-medium px-3 border-0" onclick="printTable()" style="background:#fff;height:38px;">
-                            <i class="bi bi-printer text-primary me-1"></i> Print
+                            <i class="bi bi-printer text-primary me-1"></i> <?= t('Print') ?>
                         </button>
                     </div>
                     <div class="d-flex align-items-center bg-white shadow-sm px-2 py-1 d-print-none" style="border:1px solid #dee2e6;border-radius:8px;height:38px;">
-                        <span class="small text-muted me-2 text-nowrap">Show:</span>
+                        <span class="small text-muted me-2 text-nowrap"><?= t('Show:') ?></span>
                         <select class="form-select form-select-sm border-0 fw-bold p-0" id="pageLenSelect" style="width:55px;background:transparent;">
                             <option value="10">10</option>
                             <option value="25" selected>25</option>
@@ -203,14 +203,14 @@ $company_logo = getSetting('company_logo', '');
             <table id="posSalesTable" class="table table-hover align-middle w-100">
                 <thead>
                     <tr class="text-primary border-bottom">
-                        <th class="text-primary">S/NO</th>
-                        <th class="text-primary">Receipt</th>
-                        <th class="text-primary">Date</th>
-                        <th class="text-primary">Customer</th>
-                        <th class="text-primary text-end">Total</th>
-                        <th class="text-primary">Payment</th>
-                        <th class="text-primary">Status</th>
-                        <th class="text-primary text-end">Actions</th>
+                        <th class="text-primary"><?= t('S/NO') ?></th>
+                        <th class="text-primary"><?= t('Receipt') ?></th>
+                        <th class="text-primary"><?= t('Date') ?></th>
+                        <th class="text-primary"><?= t('Customer') ?></th>
+                        <th class="text-primary text-end"><?= t('Total') ?></th>
+                        <th class="text-primary"><?= t('Payment') ?></th>
+                        <th class="text-primary"><?= t('Status') ?></th>
+                        <th class="text-primary text-end"><?= t('Actions') ?></th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -226,9 +226,9 @@ $company_logo = getSetting('company_logo', '');
     <div id="paneDashboard" class="mt-2 d-none">
 
         <div class="d-flex align-items-center mb-3 flex-wrap gap-2">
-            <h5 class="mb-0 text-primary"><i class="bi bi-speedometer2 me-2"></i>Sales Dashboard</h5>
+            <h5 class="mb-0 text-primary"><i class="bi bi-speedometer2 me-2"></i><?= t('Sales Dashboard') ?></h5>
             <button class="btn btn-sm btn-outline-primary ms-auto" id="btnRefreshDash" onclick="loadDashboard()">
-                <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                <i class="bi bi-arrow-clockwise me-1"></i> <?= t('Refresh') ?>
             </button>
         </div>
 
@@ -237,37 +237,37 @@ $company_logo = getSetting('company_logo', '');
             <div class="col-6 col-md-4 col-xl-2">
                 <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
                     <div class="fs-5 fw-bold text-primary" id="stat-today-net">—</div>
-                    <div class="small text-muted">Today — Net Sales</div>
+                    <div class="small text-muted"><?= t('Today — Net Sales') ?></div>
                 </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2">
                 <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
                     <div class="fs-5 fw-bold text-primary" id="stat-today-count">—</div>
-                    <div class="small text-muted">Today — Sales</div>
+                    <div class="small text-muted"><?= t('Today — Sales') ?></div>
                 </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2">
                 <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
                     <div class="fs-5 fw-bold text-primary" id="stat-today-aov">—</div>
-                    <div class="small text-muted">Avg Sale (AOV)</div>
+                    <div class="small text-muted"><?= t('Avg Sale (AOV)') ?></div>
                 </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2">
                 <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
                     <div class="fs-5 fw-bold text-primary" id="stat-today-items">—</div>
-                    <div class="small text-muted">Items Sold Today</div>
+                    <div class="small text-muted"><?= t('Items Sold Today') ?></div>
                 </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2">
                 <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
                     <div class="fs-5 fw-bold text-primary" id="stat-month-net">—</div>
-                    <div class="small text-muted">This Month — Net</div>
+                    <div class="small text-muted"><?= t('This Month — Net') ?></div>
                 </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2">
                 <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
                     <div class="fs-5 fw-bold text-primary" id="stat-low-stock">—</div>
-                    <div class="small text-muted">Low-Stock Items</div>
+                    <div class="small text-muted"><?= t('Low-Stock Items') ?></div>
                 </div>
             </div>
         </div>
@@ -276,7 +276,7 @@ $company_logo = getSetting('company_logo', '');
             <div class="col-12 col-lg-8">
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-header bg-white border-0 fw-bold text-primary">
-                        <i class="bi bi-graph-up me-1"></i> Sales Trend (last 14 days)
+                        <i class="bi bi-graph-up me-1"></i> <?= t('Sales Trend (last 14 days)') ?>
                     </div>
                     <div class="card-body">
                         <canvas id="trendChart" height="110"></canvas>
@@ -286,11 +286,11 @@ $company_logo = getSetting('company_logo', '');
             <div class="col-12 col-lg-4">
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-header bg-white border-0 fw-bold text-primary">
-                        <i class="bi bi-trophy me-1"></i> Top Products (this month)
+                        <i class="bi bi-trophy me-1"></i> <?= t('Top Products (this month)') ?>
                     </div>
                     <div class="card-body p-2">
                         <div id="topProducts" class="small text-center text-muted py-3">
-                            <span class="spinner-border spinner-border-sm me-1"></span> Loading…
+                            <span class="spinner-border spinner-border-sm me-1"></span> <?= t('Loading…') ?>
                         </div>
                     </div>
                 </div>
@@ -301,20 +301,20 @@ $company_logo = getSetting('company_logo', '');
             <div class="col-12 col-lg-5">
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-header bg-white border-0 fw-bold text-primary">
-                        <i class="bi bi-exclamation-triangle me-1"></i> Low Stock
+                        <i class="bi bi-exclamation-triangle me-1"></i> <?= t('Low Stock') ?>
                     </div>
                     <div class="card-body p-0">
                         <div id="lowStockSpinner" class="small text-center text-muted py-3">
-                            <span class="spinner-border spinner-border-sm me-1"></span> Loading…
+                            <span class="spinner-border spinner-border-sm me-1"></span> <?= t('Loading…') ?>
                         </div>
                         <div id="lowStockWrap" class="d-none">
                             <table id="lowStockTable" class="table table-sm table-hover align-middle w-100 mb-0">
                                 <thead>
                                     <tr class="text-primary">
-                                        <th class="text-primary text-center" style="width:40px">S/NO</th>
-                                        <th class="text-primary">Product</th>
-                                        <th class="text-primary text-end">In Stock</th>
-                                        <th class="text-primary text-end">Min</th>
+                                        <th class="text-primary text-center" style="width:40px"><?= t('S/NO') ?></th>
+                                        <th class="text-primary"><?= t('Product') ?></th>
+                                        <th class="text-primary text-end"><?= t('In Stock') ?></th>
+                                        <th class="text-primary text-end"><?= t('Min') ?></th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
@@ -326,21 +326,21 @@ $company_logo = getSetting('company_logo', '');
             <div class="col-12 col-lg-7">
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-header bg-white border-0 fw-bold text-primary">
-                        <i class="bi bi-clock-history me-1"></i> Recent Sales
+                        <i class="bi bi-clock-history me-1"></i> <?= t('Recent Sales') ?>
                     </div>
                     <div class="card-body p-0">
                         <div id="recentSalesSpinner" class="small text-center text-muted py-3">
-                            <span class="spinner-border spinner-border-sm me-1"></span> Loading…
+                            <span class="spinner-border spinner-border-sm me-1"></span> <?= t('Loading…') ?>
                         </div>
                         <div id="recentSalesWrap" class="d-none">
                             <table id="recentSalesTable" class="table table-sm table-hover align-middle w-100 mb-0">
                                 <thead>
                                     <tr class="text-primary">
-                                        <th class="text-primary text-center" style="width:40px">S/NO</th>
-                                        <th class="text-primary">Receipt</th>
-                                        <th class="text-primary">Customer</th>
-                                        <th class="text-primary text-end">Total</th>
-                                        <th class="text-primary">Status</th>
+                                        <th class="text-primary text-center" style="width:40px"><?= t('S/NO') ?></th>
+                                        <th class="text-primary"><?= t('Receipt') ?></th>
+                                        <th class="text-primary"><?= t('Customer') ?></th>
+                                        <th class="text-primary text-end"><?= t('Total') ?></th>
+                                        <th class="text-primary"><?= t('Status') ?></th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
@@ -360,7 +360,7 @@ $company_logo = getSetting('company_logo', '');
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-arrow-return-left me-1"></i> Process Return / Refund</h5>
+                <h5 class="modal-title"><i class="bi bi-arrow-return-left me-1"></i> <?= t('Process Return / Refund') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form id="returnForm" autocomplete="off">
@@ -368,15 +368,15 @@ $company_logo = getSetting('company_logo', '');
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="original_sale_id" id="ret_sale_id">
                     <div id="ret-message" class="mb-2"></div>
-                    <div class="mb-2 small text-muted">Receipt <span class="fw-bold" id="ret_receipt">—</span> · <span id="ret_customer">—</span></div>
+                    <div class="mb-2 small text-muted"><?= t('Receipt') ?> <span class="fw-bold" id="ret_receipt">—</span> · <span id="ret_customer">—</span></div>
                     <div class="table-responsive">
                         <table class="table table-sm align-middle">
                             <thead>
                                 <tr class="text-primary">
-                                    <th class="text-primary">Product</th>
-                                    <th class="text-primary text-end">Sold</th>
-                                    <th class="text-primary text-end">Returnable</th>
-                                    <th class="text-primary" style="width:120px">Return Qty</th>
+                                    <th class="text-primary"><?= t('Product') ?></th>
+                                    <th class="text-primary text-end"><?= t('Sold') ?></th>
+                                    <th class="text-primary text-end"><?= t('Returnable') ?></th>
+                                    <th class="text-primary" style="width:120px"><?= t('Return Qty') ?></th>
                                 </tr>
                             </thead>
                             <tbody id="ret_lines"></tbody>
@@ -384,23 +384,23 @@ $company_logo = getSetting('company_logo', '');
                     </div>
                     <div class="row g-2">
                         <div class="col-md-6">
-                            <label class="form-label">Refund Method <span class="text-danger">*</span></label>
+                            <label class="form-label"><?= t('Refund Method') ?> <span class="text-danger">*</span></label>
                             <select class="form-select select2-static" name="refund_method" id="ret_method" required>
-                                <option value="cash">Cash</option>
-                                <option value="card">Card</option>
-                                <option value="mobile_money">Mobile Money</option>
-                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="cash"><?= t('Cash') ?></option>
+                                <option value="card"><?= t('Card') ?></option>
+                                <option value="mobile_money"><?= t('Mobile Money') ?></option>
+                                <option value="bank_transfer"><?= t('Bank Transfer') ?></option>
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Reason <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="reason" id="ret_reason" placeholder="e.g. defective, wrong item" required>
+                            <label class="form-label"><?= t('Reason') ?> <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="reason" id="ret_reason" placeholder="<?= t('e.g. defective, wrong item') ?>" required>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Process Return</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> <?= t('Process Return') ?></button>
                 </div>
             </form>
         </div>
@@ -414,7 +414,7 @@ $company_logo = getSetting('company_logo', '');
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-cash-coin me-1"></i> Receive Payment</h5>
+                <h5 class="modal-title"><i class="bi bi-cash-coin me-1"></i> <?= t('Receive Payment') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form id="receiveForm" autocomplete="off">
@@ -422,34 +422,34 @@ $company_logo = getSetting('company_logo', '');
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="sale_id" id="rcv_sale_id">
                     <div id="rcv-message" class="mb-2"></div>
-                    <div class="mb-2 small text-muted">Receipt <span class="fw-bold" id="rcv_receipt">—</span> · <span id="rcv_customer">—</span></div>
+                    <div class="mb-2 small text-muted"><?= t('Receipt') ?> <span class="fw-bold" id="rcv_receipt">—</span> · <span id="rcv_customer">—</span></div>
                     <div class="d-flex justify-content-between mb-3 p-2 rounded" style="background:#e7f0ff;border:1px solid #b6ccfe;">
-                        <span class="text-muted">Balance due</span>
+                        <span class="text-muted"><?= t('Balance due') ?></span>
                         <span class="fw-bold text-primary" id="rcv_balance">0.00</span>
                     </div>
                     <div class="row g-2">
                         <div class="col-md-6">
-                            <label class="form-label">Amount <span class="text-danger">*</span></label>
+                            <label class="form-label"><?= t('Amount') ?> <span class="text-danger">*</span></label>
                             <input type="number" class="form-control" name="amount" id="rcv_amount" min="0" step="any" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Method <span class="text-danger">*</span></label>
+                            <label class="form-label"><?= t('Method') ?> <span class="text-danger">*</span></label>
                             <select class="form-select select2-static" name="payment_method" id="rcv_method" required>
-                                <option value="cash">Cash</option>
-                                <option value="card">Card</option>
-                                <option value="mobile_money">Mobile Money</option>
-                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="cash"><?= t('Cash') ?></option>
+                                <option value="card"><?= t('Card') ?></option>
+                                <option value="mobile_money"><?= t('Mobile Money') ?></option>
+                                <option value="bank_transfer"><?= t('Bank Transfer') ?></option>
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Reference (optional)</label>
-                            <input type="text" class="form-control" name="reference" id="rcv_reference" placeholder="e.g. M-Pesa code">
+                            <label class="form-label"><?= t('Reference (optional)') ?></label>
+                            <input type="text" class="form-control" name="reference" id="rcv_reference" placeholder="<?= t('e.g. M-Pesa code') ?>">
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Record Payment</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> <?= t('Record Payment') ?></button>
                 </div>
             </form>
         </div>
@@ -480,6 +480,55 @@ const PRINT_ROLE  = '<?= addslashes($_print_role) ?>';
 const PRINT_YEAR  = '<?= $_print_year ?>';
 const CO_NAME     = '<?= addslashes(htmlspecialchars($company_name)) ?>';
 const CO_LOGO     = '<?= addslashes(getUrl($company_logo)) ?>';
+
+// ══════════════════════ TRANSLATED STRINGS (t()) ══════════════════════
+const T = {
+    error: <?= json_encode(t('Error')) ?>,
+    loadFailed: <?= json_encode(t('Load failed.')) ?>,
+    serverErrorLoadingSales: <?= json_encode(t('Server error loading sales.')) ?>,
+    dashboardFailed: <?= json_encode(t('Dashboard failed to load.')) ?>,
+    serverErrorRetry: <?= json_encode(t('Server error — click Refresh to retry.')) ?>,
+    refresh: <?= json_encode(t('Refresh')) ?>,
+    loading: <?= json_encode(t('Loading…')) ?>,
+    noSalesThisMonth: <?= json_encode(t('No sales this month')) ?>,
+    netSalesLabel: <?= json_encode(t('Net Sales')) ?>,
+    salesHistoryPrintTitle: <?= json_encode(t('POS Sales History')) ?>,
+    viewReceipt: <?= json_encode(t('View Receipt')) ?>,
+    receivePayment: <?= json_encode(t('Receive Payment')) ?>,
+    returnRefund: <?= json_encode(t('Return / Refund')) ?>,
+    voidSaleLabel: <?= json_encode(t('Void Sale')) ?>,
+    noRecordsFound: <?= json_encode(t('No records found')) ?>,
+    allStockAboveMinimum: <?= json_encode(t('All stock above minimum.')) ?>,
+    noRecentSales: <?= json_encode(t('No recent sales.')) ?>,
+    noSalesFoundPeriod: <?= json_encode(t('No sales found for the selected period.')) ?>,
+    noMatchingRecords: <?= json_encode(t('No matching records.')) ?>,
+    showingXofY: <?= json_encode(t('Showing _START_–_END_ of _TOTAL_')) ?>,
+    due: <?= json_encode(t('due')) ?>,
+    paid: <?= json_encode(t('paid')) ?>,
+    salesHistoryReportTitle: <?= json_encode(t('POS Sales History Report')) ?>,
+    periodLabel: <?= json_encode(t('Period:')) ?>,
+    printedByLabel: <?= json_encode(t('Printed by:')) ?>,
+    printedByFooter: <?= json_encode(t('This document was')) ?>,
+    printedWord: <?= json_encode(t('Printed')) ?>,
+    poweredByFooter: <?= json_encode(t('Powered by BJP Technologies © %d, All Rights Reserved.')) ?>,
+    voidSaleTitle: <?= json_encode(t('Void sale %s?')) ?>,
+    voidReasonPlaceholder: <?= json_encode(t('Reason for voiding (required)')) ?>,
+    voidWarningText: <?= json_encode(t('Stock and cash will be reversed. This cannot be undone.')) ?>,
+    voidSaleButton: <?= json_encode(t('Void Sale')) ?>,
+    reasonRequired: <?= json_encode(t('A reason is required')) ?>,
+    voiding: <?= json_encode(t('Voiding…')) ?>,
+    voided: <?= json_encode(t('Voided')) ?>,
+    failed: <?= json_encode(t('Failed.')) ?>,
+    serverError: <?= json_encode(t('Server error.')) ?>,
+    noReturnableLines: <?= json_encode(t('No returnable lines.')) ?>,
+    nothingSelected: <?= json_encode(t('Nothing selected')) ?>,
+    enterReturnQty: <?= json_encode(t('Enter a return quantity for at least one line.')) ?>,
+    processing: <?= json_encode(t('Processing...')) ?>,
+    returnProcessed: <?= json_encode(t('Return processed')) ?>,
+    saving: <?= json_encode(t('Saving...')) ?>,
+    paymentReceived: <?= json_encode(t('Payment received')) ?>,
+    selectPlaceholder: <?= json_encode(t('Select...')) ?>
+};
 
 const money = n => (parseFloat(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmt   = d => d ? new Date(d.replace(' ','T')).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—';
@@ -586,7 +635,7 @@ function initDashboardTables() {
               render: (d,t,r) => `<span class="${d<=0?'text-danger':'text-primary'}">${(+d).toLocaleString()}</span>` },
             { data: 'min', className: 'text-end text-muted', render: d => (+d).toLocaleString() }
         ],
-        language: { emptyTable: 'All stock above minimum.', info: 'Showing _START_–_END_ of _TOTAL_', infoEmpty: '', paginate: { previous:'‹', next:'›' } }
+        language: { emptyTable: T.allStockAboveMinimum, info: T.showingXofY, infoEmpty: '', paginate: { previous:'‹', next:'›' } }
     });
 
     dtRecent = $('#recentSalesTable').DataTable({
@@ -598,7 +647,7 @@ function initDashboardTables() {
             { data: 'grand_total', className: 'text-end fw-bold', render: d => money(d) },
             { data: 'sale_status', render: d => statusBadge(d) }
         ],
-        language: { emptyTable: 'No recent sales.', info: 'Showing _START_–_END_ of _TOTAL_', infoEmpty: '', paginate: { previous:'‹', next:'›' } }
+        language: { emptyTable: T.noRecentSales, info: T.showingXofY, infoEmpty: '', paginate: { previous:'‹', next:'›' } }
     });
 }
 
@@ -606,18 +655,18 @@ function payBadge(row) {
     if (row.is_return_sale) return '';
     let html = safeOutput(row.payment_method || '—');
     if (row.balance_due > 0.01) {
-        html += ` <span class="badge" style="background:#cfe2ff;color:#084298;padding:3px 7px;border-radius:20px;font-size:.66rem;">due ${money(row.balance_due)}</span>`;
+        html += ` <span class="badge" style="background:#cfe2ff;color:#084298;padding:3px 7px;border-radius:20px;font-size:.66rem;">${T.due} ${money(row.balance_due)}</span>`;
     } else if (row.payment_status === 'paid') {
-        html += ` <span class="badge" style="background:#052c65;color:#fff;padding:3px 7px;border-radius:20px;font-size:.66rem;">paid</span>`;
+        html += ` <span class="badge" style="background:#052c65;color:#fff;padding:3px 7px;border-radius:20px;font-size:.66rem;">${T.paid}</span>`;
     }
     return html;
 }
 
 function actionMenu(row) {
-    let items = `<li><a class="dropdown-item py-2 rounded" href="${RECEIPT_URL}?id=${row.sale_id}" target="_blank"><i class="bi bi-receipt text-primary me-2"></i> View Receipt</a></li>`;
-    if (CAN_EDIT   && row.can_receive) items += `<li><button class="dropdown-item py-2 rounded" onclick="openReceive(${row.sale_id})"><i class="bi bi-cash-coin text-primary me-2"></i> Receive Payment</button></li>`;
-    if (CAN_CREATE && row.can_return)  items += `<li><button class="dropdown-item py-2 rounded" onclick="openReturn(${row.sale_id})"><i class="bi bi-arrow-return-left text-primary me-2"></i> Return / Refund</button></li>`;
-    if (CAN_DELETE && row.can_void)    items += `<li><hr class="dropdown-divider"></li><li><button class="dropdown-item py-2 rounded text-danger" onclick="voidSale(${row.sale_id},'${safeOutput(row.receipt_number)}')"><i class="bi bi-x-octagon text-danger me-2"></i> Void Sale</button></li>`;
+    let items = `<li><a class="dropdown-item py-2 rounded" href="${RECEIPT_URL}?id=${row.sale_id}" target="_blank"><i class="bi bi-receipt text-primary me-2"></i> ${T.viewReceipt}</a></li>`;
+    if (CAN_EDIT   && row.can_receive) items += `<li><button class="dropdown-item py-2 rounded" onclick="openReceive(${row.sale_id})"><i class="bi bi-cash-coin text-primary me-2"></i> ${T.receivePayment}</button></li>`;
+    if (CAN_CREATE && row.can_return)  items += `<li><button class="dropdown-item py-2 rounded" onclick="openReturn(${row.sale_id})"><i class="bi bi-arrow-return-left text-primary me-2"></i> ${T.returnRefund}</button></li>`;
+    if (CAN_DELETE && row.can_void)    items += `<li><hr class="dropdown-divider"></li><li><button class="dropdown-item py-2 rounded text-danger" onclick="voidSale(${row.sale_id},'${safeOutput(row.receipt_number)}')"><i class="bi bi-x-octagon text-danger me-2"></i> ${T.voidSaleLabel}</button></li>`;
     return `<div class="dropdown d-flex justify-content-end">
         <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-gear-fill me-1"></i></button>
         <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${items}</ul>
@@ -643,7 +692,7 @@ function initHistoryTable() {
             {
                 extend: 'print',
                 className: 'd-none',
-                title: 'POS Sales History — ' + CO_NAME,
+                title: T.salesHistoryPrintTitle + ' — ' + CO_NAME,
                 exportOptions: { columns: ':not(:last-child)' },
                 customize: function (win) {
                     $(win.document.body).css('font-family', 'Arial, sans-serif');
@@ -652,14 +701,14 @@ function initHistoryTable() {
                         `<div style="text-align:center;padding:16px 0 12px;border-bottom:3px solid #0d6efd;margin-bottom:16px;">
                             ${CO_LOGO ? `<img src="${CO_LOGO}" style="height:60px;margin-bottom:6px;display:block;margin:0 auto 6px;"><br>` : ''}
                             <h1 style="color:#0d6efd;font-weight:800;text-transform:uppercase;margin:0;font-size:18pt;">${CO_NAME}</h1>
-                            <h2 style="color:#495057;font-weight:600;text-transform:uppercase;margin:4px 0;font-size:12pt;">POS Sales History Report</h2>
-                            <p style="color:#6c757d;margin:0;font-size:9pt;">Period: ${(function(){const r=getDateRange();return r.start+' to '+r.end;})()} &nbsp;|&nbsp; Printed by: ${PRINT_USER} on ${new Date().toLocaleString()}</p>
+                            <h2 style="color:#495057;font-weight:600;text-transform:uppercase;margin:4px 0;font-size:12pt;">${T.salesHistoryReportTitle}</h2>
+                            <p style="color:#6c757d;margin:0;font-size:9pt;">${T.periodLabel} ${(function(){const r=getDateRange();return r.start+' to '+r.end;})()} &nbsp;|&nbsp; ${T.printedByLabel} ${PRINT_USER} on ${new Date().toLocaleString()}</p>
                         </div>`
                     );
                     $(win.document.body).append(
                         `<div style="position:fixed;bottom:0;left:0;right:0;width:100%;padding:1mm 10mm;border-top:1px solid #ddd;background:#fff;display:flex;flex-direction:column;align-items:center;text-align:center;">
-                            <span style="font-size:8pt;color:#444;">This document was <strong>Printed</strong> by <strong>${PRINT_USER} - ${PRINT_ROLE}</strong> on ${new Date().toLocaleString()}</span>
-                            <span style="font-size:7.5pt;font-weight:700;color:#0d6efd;">Powered by BJP Technologies &copy; ${PRINT_YEAR}, All Rights Reserved.</span>
+                            <span style="font-size:8pt;color:#444;">${T.printedByFooter} <strong>${T.printedWord}</strong> by <strong>${PRINT_USER} - ${PRINT_ROLE}</strong> on ${new Date().toLocaleString()}</span>
+                            <span style="font-size:7.5pt;font-weight:700;color:#0d6efd;">${T.poweredByFooter.replace('%d', PRINT_YEAR)}</span>
                         </div>`
                     );
                 }
@@ -675,7 +724,7 @@ function initHistoryTable() {
             { data: 'sale_status',    render: d => statusBadge(d) },
             { data: null,             className: 'text-end', orderable: false, render: (d,t,r) => actionMenu(r) }
         ],
-        language: { emptyTable: 'No sales found for the selected period.', zeroRecords: 'No matching records.' },
+        language: { emptyTable: T.noSalesFoundPeriod, zeroRecords: T.noMatchingRecords },
         drawCallback: function () { renderCards(this.api().rows({ page:'current' }).data().toArray()); }
     });
 
@@ -696,7 +745,7 @@ function loadSales() {
     $('#stat-net,#stat-count,#stat-returns,#stat-voided').html('<span class="spinner-border spinner-border-sm text-primary"></span>');
 
     $.getJSON(GET_SALES, { start_date: from, end_date: to }, function (res) {
-        if (!res.success) { Swal.fire({ icon:'error', title:'Error', text: res.message || 'Load failed.' }); return; }
+        if (!res.success) { Swal.fire({ icon:'error', title: T.error, text: res.message || T.loadFailed }); return; }
         const rows = res.data || [];
         table.clear().rows.add(rows).draw();
         applyView();
@@ -712,7 +761,7 @@ function loadSales() {
         $('#stat-returns').text(returns.toLocaleString());
         $('#stat-voided').text(voided.toLocaleString());
     }).fail(() => {
-        Swal.fire({ icon:'error', title:'Error', text:'Server error loading sales.' });
+        Swal.fire({ icon:'error', title: T.error, text: T.serverErrorLoadingSales });
         $('#stat-net,#stat-count,#stat-returns,#stat-voided').text('—');
     });
 }
@@ -721,15 +770,15 @@ function loadSales() {
 let trendChart;
 function loadDashboard() {
     $('#btnRefreshDash').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
-    $('#topProducts').html('<div class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Loading…</div>');
+    $('#topProducts').html('<div class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> ' + T.loading + '</div>');
     $('#lowStockSpinner,#recentSalesSpinner').removeClass('d-none');
     $('#lowStockWrap,#recentSalesWrap').addClass('d-none');
     $('#stat-today-net,#stat-today-count,#stat-today-aov,#stat-today-items,#stat-month-net,#stat-low-stock').html('<span class="spinner-border spinner-border-sm text-primary"></span>');
 
     $.getJSON(DASH_URL, function (res) {
-        $('#btnRefreshDash').prop('disabled', false).html('<i class="bi bi-arrow-clockwise me-1"></i> Refresh');
+        $('#btnRefreshDash').prop('disabled', false).html('<i class="bi bi-arrow-clockwise me-1"></i> ' + T.refresh);
         if (!res.success) {
-            const errMsg = safeOutput(res.message || 'Dashboard failed to load.');
+            const errMsg = safeOutput(res.message || T.dashboardFailed);
             $('#topProducts').html(`<div class="text-danger text-center py-3"><i class="bi bi-exclamation-triangle me-1"></i>${errMsg}</div>`);
             $('#lowStockSpinner').html(`<div class="text-danger text-center py-3"><i class="bi bi-exclamation-triangle me-1"></i>${errMsg}</div>`);
             $('#recentSalesSpinner').html(`<div class="text-danger text-center py-3"><i class="bi bi-exclamation-triangle me-1"></i>${errMsg}</div>`);
@@ -753,7 +802,7 @@ function loadDashboard() {
             type: 'bar',
             data: {
                 labels: d.trend.map(t => t.label),
-                datasets: [{ label: 'Net Sales (' + CURRENCY + ')', data: d.trend.map(t => t.net), backgroundColor: '#0d6efd', borderRadius: 4 }]
+                datasets: [{ label: T.netSalesLabel + ' (' + CURRENCY + ')', data: d.trend.map(t => t.net), backgroundColor: '#0d6efd', borderRadius: 4 }]
             },
             options: {
                 responsive: true, maintainAspectRatio: true,
@@ -764,9 +813,9 @@ function loadDashboard() {
 
         // Top products (plain table — no DT needed for 5 rows)
         if (!d.top_products.length) {
-            $('#topProducts').html('<div class="text-muted text-center py-3">No sales this month</div>');
+            $('#topProducts').html('<div class="text-muted text-center py-3">' + T.noSalesThisMonth + '</div>');
         } else {
-            let html = '<table class="table table-sm mb-0"><thead><tr class="text-primary"><th class="text-primary text-center" style="width:35px">S/NO</th><th class="text-primary">Product</th><th class="text-primary text-end">Qty</th><th class="text-primary text-end">Revenue</th></tr></thead><tbody>';
+            let html = '<table class="table table-sm mb-0"><thead><tr class="text-primary"><th class="text-primary text-center" style="width:35px">' + <?= json_encode(t('S/NO')) ?> + '</th><th class="text-primary">' + <?= json_encode(t('Product')) ?> + '</th><th class="text-primary text-end">' + <?= json_encode(t('Qty')) ?> + '</th><th class="text-primary text-end">' + <?= json_encode(t('Revenue')) ?> + '</th></tr></thead><tbody>';
             d.top_products.forEach((p, i) => {
                 html += `<tr><td class="text-center text-muted">${i+1}</td><td>${safeOutput(p.name)}</td><td class="text-end fw-bold">${(+p.qty).toLocaleString()}</td><td class="text-end text-primary">${money(p.revenue)}</td></tr>`;
             });
@@ -784,8 +833,8 @@ function loadDashboard() {
         dtRecent.clear().rows.add(d.recent).draw();
 
     }).fail(() => {
-        $('#btnRefreshDash').prop('disabled', false).html('<i class="bi bi-arrow-clockwise me-1"></i> Refresh');
-        const errHtml = '<div class="text-danger text-center py-3"><i class="bi bi-exclamation-triangle me-1"></i> Server error — click Refresh to retry.</div>';
+        $('#btnRefreshDash').prop('disabled', false).html('<i class="bi bi-arrow-clockwise me-1"></i> ' + T.refresh);
+        const errHtml = '<div class="text-danger text-center py-3"><i class="bi bi-exclamation-triangle me-1"></i> ' + T.serverErrorRetry + '</div>';
         $('#topProducts').html(errHtml);
         $('#lowStockSpinner').html(errHtml).removeClass('d-none');
         $('#recentSalesSpinner').html(errHtml).removeClass('d-none');
@@ -803,23 +852,23 @@ function applyView() {
 function voidSale(saleId, receipt) {
     if (!CAN_DELETE) return;
     Swal.fire({
-        title: 'Void sale ' + receipt + '?',
-        input: 'text', inputPlaceholder: 'Reason for voiding (required)',
-        text: 'Stock and cash will be reversed. This cannot be undone.', icon: 'warning',
-        showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Void Sale',
-        inputValidator: v => (!v || !v.trim()) ? 'A reason is required' : undefined
+        title: T.voidSaleTitle.replace('%s', receipt),
+        input: 'text', inputPlaceholder: T.voidReasonPlaceholder,
+        text: T.voidWarningText, icon: 'warning',
+        showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: T.voidSaleButton,
+        inputValidator: v => (!v || !v.trim()) ? T.reasonRequired : undefined
     }).then(r => {
         if (!r.isConfirmed) return;
         const fd = new FormData();
         fd.append('_csrf', CSRF_TOKEN); fd.append('sale_id', saleId); fd.append('reason', r.value.trim());
-        Swal.fire({ title: 'Voiding…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        Swal.fire({ title: T.voiding, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         $.ajax({
             url: VOID_URL, type: 'POST', data: fd, contentType: false, processData: false, dataType: 'json',
             success: function (res) {
-                if (res.success) { loadSales(); if (!$('#paneDashboard').hasClass('d-none')) loadDashboard(); Swal.fire({ icon:'success', title:'Voided', text: res.message, timer:2000, showConfirmButton:false }); }
-                else { Swal.fire({ icon:'error', title:'Error', text: res.message || 'Failed.' }); }
+                if (res.success) { loadSales(); if (!$('#paneDashboard').hasClass('d-none')) loadDashboard(); Swal.fire({ icon:'success', title: T.voided, text: res.message, timer:2000, showConfirmButton:false }); }
+                else { Swal.fire({ icon:'error', title: T.error, text: res.message || T.failed }); }
             },
-            error: function () { Swal.fire({ icon:'error', title:'Error', text:'Server error.' }); }
+            error: function () { Swal.fire({ icon:'error', title: T.error, text: T.serverError }); }
         });
     });
 }
@@ -839,7 +888,7 @@ function openReceive(saleId) {
 function openReturn(saleId) {
     if (!CAN_CREATE) return;
     $.getJSON(GET_ITEMS, { sale_id: saleId }, function (res) {
-        if (!res.success) { Swal.fire({ icon:'error', title:'Error', text: res.message || 'Failed.' }); return; }
+        if (!res.success) { Swal.fire({ icon:'error', title: T.error, text: res.message || T.failed }); return; }
         $('#ret_sale_id').val(res.sale.sale_id);
         $('#ret_receipt').text(res.sale.receipt_number);
         $('#ret_customer').text(res.sale.customer_name);
@@ -853,14 +902,14 @@ function openReturn(saleId) {
                 <td><input type="number" class="form-control form-control-sm ret-qty" min="0" max="${l.returnable}" step="any" value="0" ${dis}></td>
             </tr>`;
         });
-        $('#ret_lines').html(html || '<tr><td colspan="4" class="text-center text-muted py-3">No returnable lines.</td></tr>');
+        $('#ret_lines').html(html || '<tr><td colspan="4" class="text-center text-muted py-3">' + T.noReturnableLines + '</td></tr>');
         new bootstrap.Modal(document.getElementById('returnModal')).show();
     });
 }
 
 // ══════════════════════ MOBILE CARDS ══════════════════════
 function renderCards(rows) {
-    if (!rows.length) { $('#cardView').html('<div class="col-12 text-center py-5 text-muted">No records found</div>'); return; }
+    if (!rows.length) { $('#cardView').html('<div class="col-12 text-center py-5 text-muted">' + T.noRecordsFound + '</div>'); return; }
     let html = '';
     rows.forEach((row, i) => {
         let actions = `<a class="btn btn-sm btn-outline-primary" href="${RECEIPT_URL}?id=${row.sale_id}" target="_blank" style="flex:1;padding:3px 4px;font-size:.72rem"><i class="bi bi-receipt"></i></a>`;
@@ -891,7 +940,7 @@ function renderCards(rows) {
 <?php if ($can_create): ?>
 $('#returnModal').on('shown.bs.modal', function () {
     $(this).find('.select2-static').each(function () {
-        if (!$(this).hasClass('select2-hidden-accessible')) $(this).select2({ theme:'bootstrap-5', dropdownParent:$('#returnModal'), placeholder:'Select...', width:'100%' });
+        if (!$(this).hasClass('select2-hidden-accessible')) $(this).select2({ theme:'bootstrap-5', dropdownParent:$('#returnModal'), placeholder: T.selectPlaceholder, width:'100%' });
     });
 });
 $('#returnModal').on('hidden.bs.modal', function () { $('#returnForm')[0].reset(); $('#ret_lines').empty(); $('#ret-message').html(''); });
@@ -902,9 +951,9 @@ $('#returnForm').on('submit', function (e) {
         const iid = $(this).data('iid'), qty = parseFloat($(this).find('.ret-qty').val()) || 0;
         if (iid && qty > 0) lines.push({ sale_item_id: iid, return_qty: qty });
     });
-    if (!lines.length) { Swal.fire({ icon:'warning', title:'Nothing selected', text:'Enter a return quantity for at least one line.' }); return; }
+    if (!lines.length) { Swal.fire({ icon:'warning', title: T.nothingSelected, text: T.enterReturnQty }); return; }
     const btn = $(this).find('[type=submit]'), orig = btn.html();
-    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Processing...');
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> ' + T.processing);
     const fd = new FormData(this); fd.append('items', JSON.stringify(lines));
     $.ajax({
         url: RETURN_URL, type:'POST', data:fd, contentType:false, processData:false, dataType:'json',
@@ -912,10 +961,10 @@ $('#returnForm').on('submit', function (e) {
             if (res.success) {
                 bootstrap.Modal.getInstance(document.getElementById('returnModal')).hide();
                 loadSales(); if (!$('#paneDashboard').hasClass('d-none')) loadDashboard();
-                Swal.fire({ icon:'success', title:'Return processed', text: res.message, timer:2200, showConfirmButton:false });
-            } else { Swal.fire({ icon:'error', title:'Error', text: res.message || 'Failed.' }); }
+                Swal.fire({ icon:'success', title: T.returnProcessed, text: res.message, timer:2200, showConfirmButton:false });
+            } else { Swal.fire({ icon:'error', title: T.error, text: res.message || T.failed }); }
         },
-        error: function () { Swal.fire({ icon:'error', title:'Error', text:'Server error.' }); },
+        error: function () { Swal.fire({ icon:'error', title: T.error, text: T.serverError }); },
         complete: function () { btn.prop('disabled', false).html(orig); }
     });
 });
@@ -924,24 +973,24 @@ $('#returnForm').on('submit', function (e) {
 <?php if ($can_edit): ?>
 $('#receiveModal').on('shown.bs.modal', function () {
     $(this).find('.select2-static').each(function () {
-        if (!$(this).hasClass('select2-hidden-accessible')) $(this).select2({ theme:'bootstrap-5', dropdownParent:$('#receiveModal'), placeholder:'Select...', width:'100%' });
+        if (!$(this).hasClass('select2-hidden-accessible')) $(this).select2({ theme:'bootstrap-5', dropdownParent:$('#receiveModal'), placeholder: T.selectPlaceholder, width:'100%' });
     });
 });
 $('#receiveModal').on('hidden.bs.modal', function () { $('#receiveForm')[0].reset(); $('#rcv-message').html(''); });
 $('#receiveForm').on('submit', function (e) {
     e.preventDefault();
     const btn = $(this).find('[type=submit]'), orig = btn.html();
-    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> ' + T.saving);
     $.ajax({
         url: RECEIVE_URL, type:'POST', data:new FormData(this), contentType:false, processData:false, dataType:'json',
         success: function (res) {
             if (res.success) {
                 bootstrap.Modal.getInstance(document.getElementById('receiveModal')).hide();
                 loadSales();
-                Swal.fire({ icon:'success', title:'Payment received', text: res.message, timer:2200, showConfirmButton:false });
-            } else { Swal.fire({ icon:'error', title:'Error', text: res.message || 'Failed.' }); }
+                Swal.fire({ icon:'success', title: T.paymentReceived, text: res.message, timer:2200, showConfirmButton:false });
+            } else { Swal.fire({ icon:'error', title: T.error, text: res.message || T.failed }); }
         },
-        error: function () { Swal.fire({ icon:'error', title:'Error', text:'Server error.' }); },
+        error: function () { Swal.fire({ icon:'error', title: T.error, text: T.serverError }); },
         complete: function () { btn.prop('disabled', false).html(orig); }
     });
 });

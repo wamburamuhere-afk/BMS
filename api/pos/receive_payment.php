@@ -13,14 +13,21 @@
  * Permission: canEdit('pos')
  */
 require_once __DIR__ . '/../../roots.php';
+// Respect the caller's saved language preference (set by header.php on their
+// last page load) so t()-wrapped messages below come back in the right
+// language, not always English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
 
-if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Unauthorized']); exit; }
-if (!canEdit('pos'))    { http_response_code(403); echo json_encode(['success' => false, 'message' => 'You do not have permission to receive POS payments']); exit; }
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
+if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
+if (!canEdit('pos'))    { http_response_code(403); echo json_encode(['success' => false, 'message' => t('You do not have permission to receive POS payments')]); exit; }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => t('Method not allowed')]); exit; }
 csrf_check();
 
 $sale_id = (int)($_POST['sale_id'] ?? 0);
@@ -29,9 +36,9 @@ $method  = $_POST['payment_method'] ?? 'cash';
 $reference = trim($_POST['reference'] ?? '');
 
 $allowed = ['cash','card','mobile_money','bank_transfer','voucher','loyalty_points'];
-if ($sale_id <= 0)                     { echo json_encode(['success' => false, 'message' => 'Invalid sale.']); exit; }
-if ($amount <= 0)                      { echo json_encode(['success' => false, 'message' => 'Enter a payment amount greater than zero.']); exit; }
-if (!in_array($method, $allowed, true)){ echo json_encode(['success' => false, 'message' => 'Invalid payment method.']); exit; }
+if ($sale_id <= 0)                     { echo json_encode(['success' => false, 'message' => t('Invalid sale.')]); exit; }
+if ($amount <= 0)                      { echo json_encode(['success' => false, 'message' => t('Enter a payment amount greater than zero.')]); exit; }
+if (!in_array($method, $allowed, true)){ echo json_encode(['success' => false, 'message' => t('Invalid payment method.')]); exit; }
 
 try {
     global $pdo;
@@ -89,7 +96,7 @@ try {
 
     echo json_encode([
         'success' => true,
-        'message' => $new_balance <= 0.01 ? 'Payment received — sale fully settled.' : ('Payment received. Balance due: ' . number_format($new_balance, 2)),
+        'message' => $new_balance <= 0.01 ? t('Payment received — sale fully settled.') : sprintf(t('Payment received. Balance due: %s'), number_format($new_balance, 2)),
         'payment_status' => $new_status,
         'amount_paid' => $new_paid,
         'balance_due' => $new_balance,

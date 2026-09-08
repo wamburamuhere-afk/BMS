@@ -4,15 +4,22 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+// Respect the caller's saved language preference (set by header.php on their
+// last page load) so t()-wrapped messages below come back in the right
+// language, not always English.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
+
 
 if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
     exit();
 }
 
 if (!canDelete('pos')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Access Denied: you do not have permission to delete held POS sales']);
+    echo json_encode(['success' => false, 'message' => t('Access Denied: you do not have permission to delete held POS sales')]);
     exit();
 }
 
@@ -25,7 +32,7 @@ try {
     $user_id = $_SESSION['user_id'];
     
     if ($hold_id <= 0) {
-        echo json_encode(['success' => false, 'message' => 'Invalid hold ID']);
+        echo json_encode(['success' => false, 'message' => t('Invalid hold ID')]);
         exit();
     }
     
@@ -34,7 +41,7 @@ try {
     $stmt->execute([$hold_id, $user_id]);
     
     if (!$stmt->fetch()) {
-        echo json_encode(['success' => false, 'message' => 'Held sale not found or access denied']);
+        echo json_encode(['success' => false, 'message' => t('Held sale not found or access denied')]);
         exit();
     }
     
@@ -48,7 +55,7 @@ try {
 
     echo json_encode([
         'success' => true,
-        'message' => 'Held sale deleted successfully'
+        'message' => t('Held sale deleted successfully')
     ]);
     
 } catch (Exception $e) {

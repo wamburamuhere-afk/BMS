@@ -1,5 +1,92 @@
 # BMS Changelog
 
+## 2026-09-08 (feat) - Full language switching (English/Swahili) across the whole POS module
+
+**Files (changed):** 8 POS page files (`app/bms/pos/pos.php`, `pos_modals_new.php`,
+`pos_scripts_new.php`, `pos_dashboard.php`, `zreport.php`, `shift_history.php`,
+`customer_display.php`, `app/constant/settings/pos_config_settings.php`), 19 genuinely
+POS-functional API files under `api/pos/` (register/shift/sale/return/payment/receipt —
+the other 16 files in that folder are HR/Payroll, co-located by historical accident, and
+deliberately out of scope), `lang/sw.php`
+**Files (added):** `tests/test_pos_i18n_coverage_cli.php`
+
+User request: switching the logged-in user's language preference (Settings > My Settings >
+Preferences > Language) should change everything in POS and everything related to it, using
+the exact same mechanism already live elsewhere in the app (`core/i18n.php`'s `t()`/`te()`,
+`lang/en.php` empty-by-design, `lang/sw.php` holding Swahili) — no new mechanism invented.
+Before this, POS had zero coverage: every label, button, table header, and alert was
+hardcoded English regardless of the user's setting.
+
+Wrapped every genuinely user-facing string across the 8 page files (headers, buttons, table
+columns, form labels, placeholders, tooltips, modal text, Swal alerts) in `t()`, matching the
+exact convention already used on `app/bms/product/products.php`. Separately, the 19 POS API
+files never included `header.php` (which is what actually resolves the saved language on a
+normal page load), so their JSON `message` fields were always English no matter what — each
+now loads the caller's saved preference itself (`$_SESSION['user_lang']`, already set by
+their last page view) before building its response, and every static message is `t()`-wrapped.
+
+Found and fixed a real translation-quality bug along the way, independent of raw coverage:
+a handful of spots (the Force Close confirmation dialog, a "Customer X has been added"
+toast, two entitlement-upsell notices, a busy-register label) had been built by translating
+individual English word-fragments ("This closes" / "on" / "opened by") and concatenating them
+back together at runtime — which breaks grammar the moment a language's word order differs
+from English. Fixed by templating each as ONE coherent sentence with numbered/`%s`
+placeholders instead, so a translation can reorder words freely.
+
+Verified live: `loadLanguage('sw')` resolves real strings from both a page file and an API
+file correctly, reverts cleanly to English with no state leakage, and an unrecognised key
+safely falls back to itself rather than erroring or rendering blank. New
+`test_pos_i18n_coverage_cli.php`'s completeness guard scans all 479 distinct `t()`/`te()` keys
+actually used across all 27 files and confirms every single one has a non-empty `lang/sw.php`
+translation — zero gaps — plus a regression guard for the fragment-concatenation bug class
+specifically. 60 new assertions, 0 failures. All 7 pre-existing POS regression suites (219
+assertions total) re-run clean after both the page-file pass and the API-file pass.
+
+## 2026-09-08 (fix) - Company logo uploads now tenant-scoped (were shared across every company)
+
+**Files (changed):** `app/constant/settings/system_settings.php`, `app/constant/settings/company_profile.php`
+**Files (added):** `tests/test_tenant_scoped_logo_upload_cli.php`
+
+Reported live: uploading a new company's logo appeared to change the logo shown on other
+companies' sites. Root cause — both handlers hardcoded `uploads/system/logo/` (one via
+`ROOT_DIR`, the other via `__DIR__`), a SINGLE physical folder shared by every tenant, since
+every tenant is served from the same webroot on disk (only the database differs per tenant;
+`core/tenant_bootstrap.php`'s own docblock: "ROOT_DIR is identical for all of them"). This is
+exactly the class of bug `bmsUploadsDir()`/`bmsUploadsRel()` were built to prevent (added
+2026-09-03 "after an incident" per that file's own history) — these two handlers were simply
+never migrated to use it. `company_profile.php` was the more severe of the two: it saved every
+company's logo under a fixed literal filename (`company_logo.<ext>`, no timestamp or randomness
+at all), so any two tenants that both saved a logo through it were **guaranteed** to overwrite
+each other's file, not merely at risk of an unlikely same-second collision.
+
+A broader live audit (triggered by the same report) found this is not isolated to logos: of the
+59 real file-upload handlers across the whole codebase, only 7 (all in `api/account/` +
+`api/petty_cash/`) were ever migrated to the tenant-safe helper — the other 52 (HR documents,
+customer/supplier/sub-contractor logos and IDs, purchasing attachments, product images,
+contracts, e-signatures, the document library, tender documents) still hardcode a shared,
+unprefixed path. That is a separate, much larger initiative and is deliberately **out of scope**
+for this fix — tracked separately, to be phased (financial/HR documents first) rather than done
+as one large, harder-to-review pass. This fix addresses only the two logo handlers that
+triggered the live report.
+
+Fixed by resolving both handlers' upload directory via `bmsUploadsDir('system/logo')` and the
+stored `system_settings.company_logo` value via `bmsUploadsRel('system/logo')` — each tenant's
+logo now lands under its own `uploads/t{id}/system/logo/`, while the legacy install (the tenant
+whose `db_name` matches this environment's own `DB_NAME`) keeps the original unprefixed path, so
+its existing logo file is untouched and still valid.
+
+Verified live: 18 assertions — wiring checks confirming the hardcoded paths are gone, plus a
+live-filesystem section proving three different tenant contexts (no-tenant/legacy, and two
+synthetic tenants) resolve to three physically distinct directories, that two tenants can use
+the identical filename and each reads back only their own bytes, and that no tenant's write
+leaks into the legacy directory. All cleaned up after. Re-ran every test suite that touches
+either changed file (`test_admin_lock_and_delegable_settings_cli.php`,
+`test_backup_restore_csrf_cli.php`, `test_login_history_cli.php`,
+`test_pos_color_settings_split_cli.php`, `test_quota_enforcement_cli.php`) — the handful of
+failures present there are unrelated to this change (backup path conventions, login session
+rows, POS color-settings markup, an admin nav link) and reproduce identically on `develop`
+without this fix applied, confirmed by diffing the failure counts with and without it.
+
 ## 2026-09-08 (feat) - New companies now get Tanzania address reference data (country/region/district/ward/village)
 
 **Files (added):** `schema/tenant_geography_seed.sql`,
