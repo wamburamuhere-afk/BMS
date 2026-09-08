@@ -1,5 +1,37 @@
 # BMS Changelog
 
+## 2026-09-08 (fix) - Proactive scout found the same legacy-database gap already live since 2026-09-07 (POS loyalty program)
+
+**Files (added):** `migrations/2026_09_08_pos_loyalty_program_legacy_db.php`,
+`migrations/2026_09_08_pos_advanced_permission_legacy_db.php`
+
+After fixing the two live incidents (previous two entries), audited every other
+`migrations/tenant/*.php` file — not just today's — for the same "can never reach a legacy
+database" gap, since the two incidents proved this bug class is real, not theoretical. Found that
+`migrations/tenant/2026_09_07_pos_loyalty_program.php` (Phase 11, shipped the day before today's
+Tier-3 work) has the identical exposure, and it's worse than either of today's incidents:
+`api/pos/search_customers.php` unconditionally selects `customers.loyalty_points_balance` on
+**every customer search at the POS till** — not a dedicated admin page like `price_groups.php`,
+the ordinary, constantly-hit path of ringing up a credit or loyalty sale. A legacy database
+missing this column has been throwing the same fatal `PDOException` on that path since Phase 11
+shipped, independent of whether anyone happened to report it.
+
+Mirrored `customers.loyalty_points_balance` + `customer_loyalty_transactions` (crash risk — fixed)
+and the `pos_advanced` permission row it and the Registers/Tills feature are gated behind (lower
+severity — a missing row here doesn't crash anything, since `canX()` auto-grants an admin
+regardless, but it means no non-admin role could ever be granted this permission on a legacy
+database, since it never appears in the Roles & Permissions list). Same defensive pattern and same
+throwaway-database verification method as the price_groups/product_batches fixes: cloned the
+pre-Phase-11 shape of `customers`/`permissions`, ran both files twice (idempotent) and with the
+anchor column (`current_balance`) deliberately removed (falls back to appending, doesn't fail).
+
+Deliberately NOT mirrored, checked and ruled out as inapplicable to a legacy database:
+`migrations/tenant/2026_09_04_backfill_file_size_columns.php` (feeds `core/tenant_quotas.php`'s
+storage-quota total — a SaaS subscription-plan concept the legacy/flagship install doesn't have)
+and `migrations/tenant/2026_09_07_module_request_notification_event.php` (a superadmin-approves-a-
+tenant's-module-request notification — meaningless for the install that has no superadmin over
+it). Both were read in full before being excluded, not skipped by assumption.
+
 ## 2026-09-08 (fix) - All 8 POS Tier-3 schema changes were unreachable on any legacy (non-tenant) database — second live incident
 
 **Files (added):** `migrations/2026_09_08_pos_price_groups_legacy_db.php`,
