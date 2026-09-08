@@ -975,6 +975,26 @@ CREATE TABLE `candidates` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `cash_denomination_counts`
+-- Phase 20 (pos_upgrade_plan.md §8) — cash denomination counting at shift open/close.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `cash_denomination_counts` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `shift_id` int NOT NULL,
+  `context` enum('open','close') NOT NULL,
+  `denomination_value` decimal(12,2) NOT NULL,
+  `count` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_shift_context_denom` (`shift_id`,`context`,`denomination_value`),
+  KEY `idx_shift_id` (`shift_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `cash_register_shifts`
 --
 

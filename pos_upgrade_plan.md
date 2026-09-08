@@ -1317,6 +1317,21 @@ exception).
 
 ### Phase 20 — Cash Denomination Counting (shift open/close)
 
+**Status:** ✅ DONE · **Built:** 2026-09-08 · **Branch:** `feat/pos-tier3-advanced-retail`
+
+Shipped as planned. `core/pos_denominations.php` (`posDenominationList()`,
+`validateDenominationBreakdown()`, `save/getDenominationBreakdown()`) — the
+denomination list is admin-configurable (`system_settings.tzs_denominations`,
+CSV, defaulted to current TZS notes/coins), never hardcoded. A collapsible
+"Count by denomination (optional)" grid on both the Start Shift and End
+Shift modals live-sums into the existing `openingCash`/`endingCash` field as
+the cashier types counts — the single total stays authoritative either way,
+the breakdown is optional supporting detail, never required. Server-side
+validation rejects an unconfigured denomination value, a negative count, or
+a breakdown that doesn't sum to the entered total. The Z-Report prints both
+the open and close breakdowns when present. `tests/test_pos_denomination_cli.php`
+(26 checks). Full POS regression re-run clean.
+
 **Closes:** till-counting disputes — currently one lump `actual_cash` number.
 **Gate:** base `pos` (till hygiene).
 

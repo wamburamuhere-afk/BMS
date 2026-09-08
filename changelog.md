@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-09-08 (feature) - POS Phase 20: cash denomination counting at shift open/close
+
+**Files (new):** `core/pos_denominations.php`, `migrations/tenant/2026_09_08_pos_cash_denominations.php`,
+`tests/test_pos_denomination_cli.php`
+**Files (changed):** `api/pos/open_shift.php`, `api/pos/close_shift.php`, `app/bms/pos/pos.php`,
+`app/bms/pos/pos_modals_new.php`, `app/bms/pos/pos_scripts_new.php`, `app/bms/pos/zreport.php`,
+`lang/sw.php`, `schema/tenant_schema_template.sql`
+
+Seventh phase of the Tier-3 plan (§8 Phase 20). Optional "Count by denomination" grid on the
+Start/End Shift modals, live-summing into the existing cash total field as the cashier enters
+counts — the total stays authoritative, the breakdown is supporting detail only, never required
+(fully backward compatible). Denomination values are admin-configurable
+(`system_settings.tzs_denominations`), not hardcoded. Server-side validation rejects an
+unconfigured value, a negative count, or a breakdown that doesn't reconcile to the entered total.
+Z-Report prints both the open and close breakdowns when present, cutting till-counting disputes.
+
 ## 2026-09-08 (feature) - POS Phase 19: customer credit-limit enforcement
 
 **Files (new):** `core/pos_credit_limit.php`, `tests/test_pos_credit_limit_cli.php`

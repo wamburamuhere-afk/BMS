@@ -17,6 +17,7 @@ let isSplitPayment = false;
 let splitAmounts = { cash: 0, mobile: 0, bank: 0, card: 0 };
 let posDiscountType = '<?= get_setting('pos_discount_type', 'percentage') ?>'; // 'percentage' or 'fixed'
 let posSelectedPriceGroupId = 0; // Phase 14 (pos_upgrade_plan.md §8) — 0 = no group chosen, plain selling_price
+const POS_DENOMINATIONS = <?= json_encode($pos_denomination_list) ?>; // Phase 20 (pos_upgrade_plan.md §8)
 const POS_AUTO_PRINT_RECEIPT = <?= get_setting('pos_auto_print_receipt', '0') === '1' ? 'true' : 'false' ?>; // Phase 10 (pos_upgrade_plan.md §7)
 const POS_CURRENCY = <?= json_encode($currency) ?>; // Phase 11 (pos_upgrade_plan.md §7) — was hardcoded 'TZS' everywhere
 const POS_LOYALTY_REDEEM_VALUE = <?= (float)getSetting('pos_loyalty_redeem_value', '50') ?>; // currency value of 1 point — preview only, server re-validates
@@ -142,7 +143,8 @@ const PT = {
     unitLabel: <?= json_encode(t('Unit')) ?>,
     overrideAndProceed: <?= json_encode(t('Override and Proceed')) ?>,
     availableCredit: <?= json_encode(t('Available Credit')) ?>,
-    outstandingLabel: <?= json_encode(t('Outstanding')) ?>
+    outstandingLabel: <?= json_encode(t('Outstanding')) ?>,
+    totalLabel: <?= json_encode(t('Total:')) ?>
 };
 
 // Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split: a cashier
@@ -1452,6 +1454,43 @@ function startShift() {
     });
 }
 
+// Phase 20 (pos_upgrade_plan.md §8) — cash denomination counting. Renders
+// once per container (idempotent — checks for existing rows first), sums
+// live into the target cash input as counts change, and exposes the current
+// breakdown via jQuery .data() for the submit handlers below to read.
+function renderDenomGrid(containerId) {
+    const $container = $('#' + containerId);
+    if ($container.find('tr').length) return; // already rendered
+    const targetInput = $container.data('target-input');
+
+    let html = '<table class="table table-sm"><tbody>';
+    POS_DENOMINATIONS.forEach(v => {
+        html += `<tr>
+            <td class="align-middle small">${POS_CURRENCY} ${v.toLocaleString()}</td>
+            <td style="width:90px;"><input type="number" class="form-control form-control-sm denom-count" data-value="${v}" min="0" step="1" value=""></td>
+            <td class="align-middle text-end small denom-subtotal" style="width:110px;">—</td>
+        </tr>`;
+    });
+    html += `</tbody><tfoot><tr><th colspan="2" class="text-end small">${PT.totalLabel}</th><th class="text-end denom-total">${POS_CURRENCY} 0</th></tr></tfoot></table>`;
+    $container.html(html);
+
+    $container.on('input', '.denom-count', function () {
+        let total = 0;
+        const breakdown = [];
+        $container.find('.denom-count').each(function () {
+            const value = parseFloat($(this).data('value'));
+            const count = parseInt($(this).val()) || 0;
+            const sub = value * count;
+            $(this).closest('tr').find('.denom-subtotal').text(count > 0 ? (POS_CURRENCY + ' ' + sub.toLocaleString()) : '—');
+            total += sub;
+            if (count > 0) breakdown.push({ value: value, count: count });
+        });
+        $container.find('.denom-total').text(POS_CURRENCY + ' ' + total.toLocaleString());
+        $container.data('breakdown', breakdown);
+        if (targetInput) $('#' + targetInput).val(total);
+    });
+}
+
 function confirmStartShift() {
     const openingCash = parseFloat($('#openingCash').val()) || 0;
     const registerId = $('#startShiftRegister').val() || 1;
@@ -1468,7 +1507,10 @@ function confirmStartShift() {
         type: 'POST',
         data: {
             opening_cash: openingCash,
-            register_id: registerId
+            register_id: registerId,
+            // Phase 20 (pos_upgrade_plan.md §8) — only sent if the cashier
+            // actually used the optional denomination grid.
+            denominations: JSON.stringify($('#openDenomGrid').data('breakdown') || [])
         },
         dataType: 'json',
         success: function(response) {
@@ -1532,7 +1574,10 @@ function confirmEndShift() {
         type: 'POST',
         data: {
             ending_cash: endingCash,
-            notes: notes
+            notes: notes,
+            // Phase 20 (pos_upgrade_plan.md §8) — only sent if the cashier
+            // actually used the optional denomination grid.
+            denominations: JSON.stringify($('#closeDenomGrid').data('breakdown') || [])
         },
         dataType: 'json',
         success: function(response) {

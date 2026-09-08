@@ -90,6 +90,10 @@ $price_groups_enabled = canView('pos_advanced');
 $price_groups = $price_groups_enabled
     ? $pdo->query("SELECT price_group_id, name, is_default FROM price_groups WHERE status = 'active' ORDER BY is_default DESC, name ASC")->fetchAll(PDO::FETCH_ASSOC)
     : [];
+
+// Phase 20 (pos_upgrade_plan.md §8) — cash denomination counting.
+require_once ROOT_DIR . '/core/pos_denominations.php';
+$pos_denomination_list = posDenominationList();
 ?>
 
 <div class="container-fluid px-0" id="pos-container" style="height: auto; min-height: 100vh;">
