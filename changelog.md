@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-09-08 (feature) - POS Phase 18: per-batch COGS
+
+**Files (new):** `tests/test_pos_batch_cogs_cli.php`
+**Files (changed):** `core/sales_posting.php`
+
+Fourth phase of the Tier-3 plan (§8 Phase 18), depends on Phase 17. `posSaleCogs()` — the
+function that drives the ledger's COGS entry for every POS sale — now sums each sale line's
+ACTUAL cost from the specific batch(es) it drew from (Phase 17's `pos_sale_item_batches`),
+falling back to the existing average `products.cost_price` for any non-batch-tracked line.
+Documented, deliberate scope boundary: the Income Statement's own POS-COGS drill-down query
+still uses average cost only — making it batch-aware is a separate, larger change to a
+financially-sensitive report, left for later rather than rushed in here.
+
 ## 2026-09-08 (feature) - POS Phase 17: batch/lot + expiry tracking, end-to-end (GRN → stock → POS → alerts)
 
 **Files (new):** `core/pos_batch_consumption.php`,

@@ -1205,6 +1205,25 @@ is additive.
 
 ### Phase 18 — Purchase-to-Sell Cost Mapping (per-batch COGS)
 
+**Status:** ✅ DONE · **Built:** 2026-09-08 · **Branch:** `feat/pos-tier3-advanced-retail`
+
+`core/sales_posting.php::posSaleCogs()` (the function `postPosSale()` calls
+for the ledger's COGS leg) now prefers, per sale line, Σ(quantity × the
+batch(es) it drew from via Phase 17's `pos_sale_item_batches`) — real
+purchase-linked cost, not an average — falling back to the pre-existing
+`quantity × products.cost_price` for any line with no batch consumption
+(not batch-tracked, or sold before this phase). `tests/test_pos_batch_cogs_cli.php`
+(5 checks, including a fixture deliberately designed so batch-cost and
+average-cost give clearly different numbers, proving the batch path is
+actually used, not coincidentally matching). **Known, documented
+divergence, not silently introduced:** the Income Statement's own
+POS-COGS drill-down (`api/account/get_income_statement_detail.php`) still
+computes average-cost only, inline across a report result set — making
+*that* batch-aware too is a separate, larger change to a
+financially-sensitive report, deliberately left for a future pass. POS
+dashboard/Z-Report do not currently show any margin figure at all, so
+there was nothing there to wire up.
+
 **Closes:** accurate per-sale margin instead of a running average cost.
 **Depends on Phase 17** (needs `product_batches`/`pos_sale_item_batches` to
 exist — natural next phase, not standalone). **Gate:** `pos_advanced`.
