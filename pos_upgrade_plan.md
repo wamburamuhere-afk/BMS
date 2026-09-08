@@ -998,6 +998,18 @@ the same product.
 
 ### Phase 16 — Cashier Price/Discount-Override Permission Split
 
+**Status:** ✅ DONE · **Built:** 2026-09-08 · **Branch:** `feat/pos-tier3-advanced-retail`
+
+Shipped as planned below, plus a real pre-existing gap found while building it:
+`process_sale.php` trusted the client-submitted line price directly (only the
+final/discounted price was checked against `min_selling_price`) — a forged
+request could set the base price to anything. Fixed as part of this phase:
+base price now always resolves server-side from `products.selling_price`
+(`core/pos_override_guard.php::resolvePosLineBasePrice()`) unless a permitted
+cashier explicitly used the new "Edit Price" line affordance.
+`tests/test_pos_override_permissions_cli.php` (23 checks). Full POS
+regression suite re-run clean.
+
 **Closes:** a standard anti-fraud control — a cashier can sell but should not
 always be able to change a line's price or discount. **Gate:** base `pos`
 (loss-control hygiene, not a premium feature — same boundary logic Phase 13
