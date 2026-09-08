@@ -206,6 +206,8 @@ INSERT INTO `permissions` (`permission_id`, `permission_name`, `page_key`, `page
 INSERT INTO `permissions` (`permission_id`, `permission_name`, `page_key`, `page_name`, `description`, `module_id`, `module_name`, `created_at`, `is_hidden`) VALUES (226,'Company Calendar','company_calendar','Working Days & Holidays','Company working-days configuration and public holiday calendar, used by leave day-counting',NULL,'Human Resources','2026-08-29 07:47:31',0);
 INSERT INTO `permissions` (`permission_id`, `permission_name`, `page_key`, `page_name`, `description`, `module_id`, `module_name`, `created_at`, `is_hidden`) VALUES (227,'HR Dashboard','hr_dashboard','HR Dashboard','HR command centre: headcount, contract/probation expiry, HR Actions, department distribution, recruitment pipeline',NULL,'Human Resources','2026-08-29 08:11:12',0);
 INSERT INTO `permissions` (`permission_id`, `permission_name`, `page_key`, `page_name`, `description`, `module_id`, `module_name`, `created_at`, `is_hidden`) VALUES (228,'','pos_advanced','POS Advanced','Multi-register/till management and the customer loyalty points program',NULL,'Settings','2026-09-07 00:00:00',0);
+INSERT INTO `permissions` (`permission_id`, `permission_name`, `page_key`, `page_name`, `description`, `module_id`, `module_name`, `created_at`, `is_hidden`) VALUES (229,'','pos_price_override','POS Price Override','Allow changing a cart line''s unit price away from the product''s selling price at the POS terminal',NULL,'Settings','2026-09-08 00:00:00',0);
+INSERT INTO `permissions` (`permission_id`, `permission_name`, `page_key`, `page_name`, `description`, `module_id`, `module_name`, `created_at`, `is_hidden`) VALUES (230,'','pos_discount_override','POS Discount Override','Allow applying a discount to a cart line or sale at the POS terminal',NULL,'Settings','2026-09-08 00:00:00',0);
 INSERT INTO `roles` (`role_id`, `role_name`, `is_admin`, `description`, `created_at`, `updated_at`) VALUES (1,'Admin',1,'Full system access','2025-07-08 03:52:36','2026-05-19 21:31:33');
 INSERT INTO `roles` (`role_id`, `role_name`, `is_admin`, `description`, `created_at`, `updated_at`) VALUES (2,'Managing Director',0,'Full system access','2025-07-08 03:52:36','2026-05-26 03:21:54');
 INSERT INTO `roles` (`role_id`, `role_name`, `is_admin`, `description`, `created_at`, `updated_at`) VALUES (4,'Staff',0,'Basic system access','2025-07-08 03:52:36','2025-10-24 07:05:06');
@@ -931,5 +933,12 @@ UPDATE `accounts` SET `opening_balance` = 0.00, `current_balance` = 0.00;
 -- Defensive: if a regeneration ever forgets the is_subledger filter, drop them
 -- here rather than leaking counterparty names into a new tenant.
 DELETE FROM `accounts` WHERE `is_subledger` = 1;
+
+-- ── POS Phase 14 — default price groups (pos_upgrade_plan.md §8) ───────────
+-- "Retail" needs no per-product override rows — its fallback IS
+-- products.selling_price. A brand-new tenant has no products yet, so
+-- Wholesale starts empty too; it fills in as products are created/edited.
+INSERT IGNORE INTO `price_groups` (`name`, `is_default`, `status`) VALUES ('Retail', 1, 'active');
+INSERT IGNORE INTO `price_groups` (`name`, `is_default`, `status`) VALUES ('Wholesale', 0, 'active');
 
 SET FOREIGN_KEY_CHECKS = @OLD_FOREIGN_KEY_CHECKS;

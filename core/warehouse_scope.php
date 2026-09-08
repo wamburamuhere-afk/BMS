@@ -80,6 +80,74 @@ if (!function_exists('hasAllWarehouseAccess')) {
     }
 }
 
+if (!function_exists('warehouseIdsForUser')) {
+    /**
+     * Phase 17 (pos_upgrade_plan.md §8) — the warehouse-scope equivalent of
+     * loadUserScope()'s warehouse derivation, but computable for ANY user_id
+     * directly from the database — not the current session. Needed by
+     * core/notify.php::resolveRecipients(), which must decide, for each
+     * CANDIDATE recipient (not just the logged-in user), whether they're
+     * allowed to see a given warehouse's expiring-batch alert. Session-based
+     * $_SESSION['scope'] only ever exists for the person currently logged
+     * in, so it cannot answer that for other users.
+     *
+     * Replicates loadUserScope()'s exact algorithm (project-derived
+     * transactional union, then user_scope_overrides replace/extend) —
+     * kept as a literal mirror so the two never silently drift apart.
+     *
+     * @return array ['*'] (unrestricted) or a list of warehouse_ids.
+     */
+    function warehouseIdsForUser(PDO $pdo, int $userId, bool $isAdmin = false): array
+    {
+        if ($isAdmin) return ['*'];
+
+        try {
+            $stmt = $pdo->prepare("SELECT project_id FROM user_projects WHERE user_id = ?");
+            $stmt->execute([$userId]);
+            $projects = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+
+            $warehouses = [];
+            if (!empty($projects)) {
+                $ph = implode(',', array_fill(0, count($projects), '?'));
+                $sql = "
+                    SELECT DISTINCT warehouse_id FROM purchase_orders
+                        WHERE warehouse_id IS NOT NULL AND project_id IN ($ph)
+                    UNION
+                    SELECT DISTINCT warehouse_id FROM purchase_receipts
+                        WHERE warehouse_id IS NOT NULL AND project_id IN ($ph)
+                    UNION
+                    SELECT DISTINCT warehouse_id FROM deliveries
+                        WHERE warehouse_id IS NOT NULL AND project_id IN ($ph)
+                    UNION
+                    SELECT DISTINCT warehouse_id FROM stock_movements
+                        WHERE warehouse_id IS NOT NULL AND project_id IN ($ph)
+                ";
+                $st = $pdo->prepare($sql);
+                $st->execute(array_merge($projects, $projects, $projects, $projects));
+                $warehouses = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+            }
+
+            $ovStmt = $pdo->prepare("SELECT resource_id FROM user_scope_overrides WHERE user_id = ? AND resource_type = 'warehouse'");
+            $ovStmt->execute([$userId]);
+            $overrides = $ovStmt->fetchAll(PDO::FETCH_COLUMN);
+
+            $grantAll = false;
+            $extras = [];
+            foreach ($overrides as $rid) {
+                if ($rid === null) { $grantAll = true; }
+                else { $extras[] = (int)$rid; }
+            }
+
+            if ($grantAll) return ['*'];
+            if (!empty($extras)) return array_values(array_unique($extras));
+            return array_values(array_unique($warehouses));
+        } catch (Throwable $e) {
+            error_log('warehouseIdsForUser failed: ' . $e->getMessage());
+            return []; // default-deny, matches loadUserScope()'s failure mode
+        }
+    }
+}
+
 if (!function_exists('renderWarehouseOptions')) {
     /**
      * Emit the <option> list for a warehouse <select>. Every option carries

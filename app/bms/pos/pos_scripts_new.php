@@ -16,6 +16,8 @@ let currentShiftActive = <?= $shift_active ? 'true' : 'false' ?>;
 let isSplitPayment = false;
 let splitAmounts = { cash: 0, mobile: 0, bank: 0, card: 0 };
 let posDiscountType = '<?= get_setting('pos_discount_type', 'percentage') ?>'; // 'percentage' or 'fixed'
+let posSelectedPriceGroupId = 0; // Phase 14 (pos_upgrade_plan.md §8) — 0 = no group chosen, plain selling_price
+const POS_DENOMINATIONS = <?= json_encode($pos_denomination_list) ?>; // Phase 20 (pos_upgrade_plan.md §8)
 const POS_AUTO_PRINT_RECEIPT = <?= get_setting('pos_auto_print_receipt', '0') === '1' ? 'true' : 'false' ?>; // Phase 10 (pos_upgrade_plan.md §7)
 const POS_CURRENCY = <?= json_encode($currency) ?>; // Phase 11 (pos_upgrade_plan.md §7) — was hardcoded 'TZS' everywhere
 const POS_LOYALTY_REDEEM_VALUE = <?= (float)getSetting('pos_loyalty_redeem_value', '50') ?>; // currency value of 1 point — preview only, server re-validates
@@ -132,8 +134,43 @@ const PT = {
     ok: <?= json_encode(t('OK')) ?>,
     successfullyUpdatedItems: <?= json_encode(t('Successfully updated %d items.')) ?>,
     cartQtyLabel: <?= json_encode(t('cart qty:')) ?>,
-    barcodeNotFound: <?= json_encode(t('Barcode not found')) ?>
+    barcodeNotFound: <?= json_encode(t('Barcode not found')) ?>,
+    editPriceTitle: <?= json_encode(t('Edit Price')) ?>,
+    newPriceLabel: <?= json_encode(t('New unit price')) ?>,
+    priceOverrideBelowMin: <?= json_encode(t('%s: price cannot be below the minimum selling price of %s')) ?>,
+    priceUpdated: <?= json_encode(t('Price updated')) ?>,
+    discountPermissionDenied: <?= json_encode(t('You do not have permission to apply a discount.')) ?>,
+    unitLabel: <?= json_encode(t('Unit')) ?>,
+    overrideAndProceed: <?= json_encode(t('Override and Proceed')) ?>,
+    availableCredit: <?= json_encode(t('Available Credit')) ?>,
+    outstandingLabel: <?= json_encode(t('Outstanding')) ?>,
+    totalLabel: <?= json_encode(t('Total:')) ?>,
+    shareViaWhatsApp: <?= json_encode(t('Share via WhatsApp')) ?>,
+    whatsappNumberLabel: <?= json_encode(t('WhatsApp number (with country code)')) ?>
 };
+
+// Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split: a cashier
+// can sell without necessarily being allowed to change a line's price or apply
+// a discount. These flags only control client-side affordances (show/hide the
+// edit-price pencil, the discount toolbar button already gated server-side in
+// pos.php); api/pos/process_sale.php independently re-validates both — the
+// real security boundary, never trusts these client flags alone.
+const POS_CAN_PRICE_OVERRIDE = <?= json_encode(canEdit('pos_price_override')) ?>;
+
+// Phase 15 (pos_upgrade_plan.md §8) — safeOutput() is a per-page LOCAL JS
+// convention in this codebase (each page defines its own copy, never a
+// global header.php helper — see tests/test_pos_phase8_registers_cli.php
+// §3d, a regression guard added after a real ReferenceError bug). Needed
+// here for the unit-conversion cart badge / dropdown labels.
+function safeOutput(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 
 $(document).ready(function() {
     // Phase 10 (pos_upgrade_plan.md §7) — Select2 AJAX customer search, replacing
@@ -155,10 +192,35 @@ $(document).ready(function() {
         $('#loyaltyAvailablePoints').text(points.toLocaleString());
         $('#redeemPointsInput').attr('max', points).val(0);
         $('#loyaltyPointsSection').removeClass('d-none');
+        // Phase 14 (pos_upgrade_plan.md §8) — auto-apply this customer's price
+        // tier if they have one set; the cashier can still change it manually.
+        if ($('#posPriceGroupId').length && e.params.data.default_price_group_id) {
+            $('#posPriceGroupId').val(e.params.data.default_price_group_id).trigger('change');
+        }
+        // Phase 19 (pos_upgrade_plan.md §8) — show available credit so a
+        // cashier can see it before attempting a credit sale, not just after
+        // being blocked. Server independently re-validates at checkout regardless.
+        const limit = parseFloat(e.params.data.credit_limit) || 0;
+        const outstanding = parseFloat(e.params.data.outstanding_balance) || 0;
+        const available = limit - outstanding;
+        if (limit > 0) {
+            $('#customerCreditInfo').removeClass('d-none').html(
+                `<i class="bi bi-credit-card"></i> ${PT.availableCredit}: <strong class="${available <= 0 ? 'text-danger' : 'text-success'}">${POS_CURRENCY} ${available.toLocaleString()}</strong>` +
+                (outstanding > 0 ? ` <span class="text-muted">(${PT.outstandingLabel}: ${POS_CURRENCY} ${outstanding.toLocaleString()})</span>` : '')
+            );
+        } else {
+            $('#customerCreditInfo').addClass('d-none').html('');
+        }
         calculateCartTotal();
     }).on('select2:clear select2:unselect', function () {
         $('#loyaltyPointsSection').addClass('d-none');
         $('#redeemPointsInput').val(0);
+        $('#customerCreditInfo').addClass('d-none').html('');
+        // Back to the default group (first option, seeded as "Retail") for a
+        // walk-in / cleared customer.
+        if ($('#posPriceGroupId').length) {
+            $('#posPriceGroupId').val($('#posPriceGroupId option:first').val()).trigger('change');
+        }
         calculateCartTotal();
     });
 
@@ -205,6 +267,20 @@ $(document).ready(function() {
             );
         }
     })();
+
+    // Phase 14 (pos_upgrade_plan.md §8) — selling price tiers. Only rendered
+    // when more than one active group exists (see pos.php); sync the initial
+    // selection and reload the product grid (with its resolved
+    // effective_price) whenever the cashier changes it. Existing cart lines
+    // keep the price they were added at — only new additions use the new
+    // group, matching how a real till behaves.
+    if ($('#posPriceGroupId').length) {
+        posSelectedPriceGroupId = parseInt($('#posPriceGroupId').val()) || 0;
+        $('#posPriceGroupId').on('change', function () {
+            posSelectedPriceGroupId = parseInt($(this).val()) || 0;
+            loadProducts();
+        });
+    }
 
     // Shared Project → Warehouse cascade (assets/js/warehouse-project-filter.js):
     // no project -> only warehouses not assigned to any project;
@@ -402,7 +478,8 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
             category: categoryId !== 'all' ? categoryId : '',
             search: searchTerm,
             warehouse_id: warehouseId,
-            project_id: projectId
+            project_id: projectId,
+            price_group_id: posSelectedPriceGroupId || ''
         },
         dataType: 'json',
         success: function(response) {
@@ -453,7 +530,7 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                                     ${isService ? '<span class="badge bg-info text-white mb-1">' + PT.service + '</span>' : ''}
                                     <h6 class="card-title mb-1 small text-truncate fw-bold" title="${product.product_name}">${product.product_name}</h6>
                                     <p class="card-text text-muted small mb-1">${product.sku || ''}</p>
-                                    <p class="card-text fw-bold text-primary mb-1">${POS_CURRENCY} ${parseFloat(product.selling_price).toLocaleString()}</p>
+                                    <p class="card-text fw-bold text-primary mb-1">${POS_CURRENCY} ${parseFloat(product.effective_price ?? product.selling_price).toLocaleString()}</p>
                                     ${!isService ? `<p class="card-text small ${product.stock_quantity <= 10 ? 'text-danger fw-bold' : 'text-muted'}">
                                         ${PT.qtyLabel} ${product.stock_quantity}
                                     </p>` : '<p class="card-text small text-muted"><i class="bi bi-infinity"></i> ' + PT.service + '</p>'}
@@ -531,19 +608,27 @@ function searchProducts() {
     loadProducts('all', searchTerm);
 }
 
+let currentProductUnits = []; // Phase 15 (pos_upgrade_plan.md §8) — this product's extra selling units
+
 function showProductQuickView(productId) {
     const product = products.find(p => p.product_id == productId);
     if (!product) return;
-    
+
     currentProduct = product;
-    
+    currentProductUnits = [];
+
     const html = `
         <h6>${currentProduct.product_name}</h6>
         <p class="text-muted small mb-2">${currentProduct.sku || PT.noSku}</p>
-        <p class="text-success fw-bold">${POS_CURRENCY} ${parseFloat(currentProduct.selling_price).toLocaleString()}</p>
+        <p class="text-success fw-bold" id="quickViewPrice">${POS_CURRENCY} ${parseFloat(currentProduct.effective_price ?? currentProduct.selling_price).toLocaleString()}</p>
         ${currentProduct.is_service != 1 ? `<p class="small ${currentProduct.stock_quantity <= 10 ? 'text-danger' : 'text-muted'}">
             ${PT.stockLabel} ${currentProduct.stock_quantity}
         </p>` : '<p class="small text-muted"><i class="bi bi-infinity"></i> ' + PT.service + '</p>'}
+
+        <div class="mb-3 d-none" id="quickViewUnitWrap">
+            <label class="form-label">${PT.unitLabel}</label>
+            <select class="form-select" id="quickViewUnit" onchange="updateQuickViewUnitPrice()"></select>
+        </div>
 
         <div class="mb-3">
             <label class="form-label">${PT.quantityLabel}</label>
@@ -564,15 +649,52 @@ function showProductQuickView(productId) {
             </button>
         </div>
     `;
-    
+
     $('#quickViewContent').html(html);
-    
+
     // Proper way to handle focus in Bootstrap modals to avoid aria-hidden issues
     $('#productQuickView').off('shown.bs.modal').on('shown.bs.modal', function () {
         $('#quickViewQty').focus().select();
     });
-    
+
     $('#productQuickView').modal('show');
+
+    // Phase 15 (pos_upgrade_plan.md §8) — fetch this product's extra selling
+    // units (base unit is always implicitly available and needs no dropdown
+    // entry when it's the only option).
+    if (currentProduct.is_service != 1) {
+        $.getJSON('<?= buildUrl('/api/pos/get_product_units.php') ?>', { product_id: productId }, function (res) {
+            if (currentProduct.product_id != productId) return; // modal moved on already
+            currentProductUnits = (res.success && res.data) ? res.data : [];
+            if (!currentProductUnits.length) return;
+
+            const sel = $('#quickViewUnit');
+            sel.empty();
+            sel.append(`<option value="">${safeOutput(currentProduct.unit || '')} (x1)</option>`);
+            currentProductUnits.forEach(u => {
+                sel.append(`<option value="${safeOutput(u.unit_label)}">${safeOutput(u.unit_label)} (x${u.base_unit_multiplier})</option>`);
+            });
+            $('#quickViewUnitWrap').removeClass('d-none');
+        });
+    }
+}
+
+// Phase 15 (pos_upgrade_plan.md §8) — live price preview as the cashier
+// switches units; the server independently re-resolves this at checkout,
+// this is display-only.
+function updateQuickViewUnitPrice() {
+    const label = $('#quickViewUnit').val();
+    const basePrice = parseFloat(currentProduct.effective_price ?? currentProduct.selling_price) || 0;
+    if (!label) {
+        $('#quickViewPrice').text(POS_CURRENCY + ' ' + basePrice.toLocaleString());
+        return;
+    }
+    const u = currentProductUnits.find(x => x.unit_label === label);
+    if (!u) return;
+    const perUnitPrice = (u.unit_price_override !== null && u.unit_price_override !== undefined)
+        ? parseFloat(u.unit_price_override)
+        : basePrice * parseFloat(u.base_unit_multiplier);
+    $('#quickViewPrice').text(POS_CURRENCY + ' ' + perUnitPrice.toLocaleString());
 }
 
 function adjustQuantity(amount) {
@@ -584,11 +706,31 @@ function adjustQuantity(amount) {
 
 function addToCart() {
     if (!currentProduct) return;
-    
+
     const quantity = parseInt($('#quickViewQty').val()) || 1;
-    
-    const existingItem = cart.find(item => item.product_id == currentProduct.product_id);
-    
+    const basePrice = parseFloat(currentProduct.effective_price ?? currentProduct.selling_price) || 0;
+
+    // Phase 15 (pos_upgrade_plan.md §8) — unit conversion. An empty
+    // selection = base unit, unchanged behaviour. item.price/quantity stay
+    // "per whatever unit is on this line" so every existing cart/discount/
+    // receipt calculation (price × quantity) keeps working unmodified; the
+    // server independently re-resolves the true base-unit price/quantity
+    // from unit_label at checkout — never trusts this client-side figure.
+    const unitLabel = $('#quickViewUnit').length ? ($('#quickViewUnit').val() || '') : '';
+    let linePrice = basePrice;
+    if (unitLabel) {
+        const u = currentProductUnits.find(x => x.unit_label === unitLabel);
+        if (u) {
+            linePrice = (u.unit_price_override !== null && u.unit_price_override !== undefined)
+                ? parseFloat(u.unit_price_override)
+                : basePrice * parseFloat(u.base_unit_multiplier);
+        }
+    }
+
+    // A different unit of the same product is a DIFFERENT cart line — 2
+    // pieces and 3 cartons of the same item can't be merged into one qty.
+    const existingItem = cart.find(item => item.product_id == currentProduct.product_id && (item.unit_label || '') === unitLabel);
+
     if (existingItem) {
         existingItem.quantity += quantity;
     } else {
@@ -596,17 +738,22 @@ function addToCart() {
             product_id: currentProduct.product_id,
             product_name: currentProduct.product_name,
             sku: currentProduct.sku,
-            price: parseFloat(currentProduct.selling_price) || 0,
+            // Phase 14 (pos_upgrade_plan.md §8) — the chosen price group's
+            // override when one exists for this product, else plain
+            // selling_price (effective_price === selling_price when no group
+            // is active — simple_products.php guarantees this).
+            price: linePrice,
             quantity: quantity,
+            unit_label: unitLabel || undefined, // Phase 15 — resolved server-side, this is display + payload only
             tax_rate: saleVatRate, // cashier-selected VAT (0 or 18), not auto-applied from the product
             min_selling_price: parseFloat(currentProduct.min_selling_price) || 0,
             discount_type: 'percentage', // Default to percentage
             discount_value: 0,
             discount_percent: 0,
-            discounted_price: parseFloat(currentProduct.selling_price) || 0
+            discounted_price: linePrice
         });
     }
-    
+
     updateCartDisplay();
     saveCartToStorage();
     $('#productQuickView').modal('hide');
@@ -661,10 +808,12 @@ function updateCartDisplay() {
                 <tr>
                     <td>
                         <strong class="small">${item.product_name}</strong>
+                        ${item.unit_label ? `<br><span class="badge bg-light text-dark border">${safeOutput(item.unit_label)}</span>` : ''}
                         ${discountBadge}
                     </td>
                     <td class="text-end">
                         <span class="small">${priceDisplay}</span>
+                        ${POS_CAN_PRICE_OVERRIDE ? `<br><button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" style="font-size:10px;" onclick="editLinePrice(${index})" title="${PT.editPriceTitle}"><i class="bi bi-pencil"></i> ${PT.editPriceTitle}</button>` : ''}
                     </td>
                     <td class="text-center" style="padding: 0.25rem;">
                         <div class="d-flex align-items-center justify-content-center" style="gap: 2px;">
@@ -716,6 +865,43 @@ function updateCartQuantityInput(index, value) {
         updateCartDisplay();
         saveCartToStorage();
     }
+}
+
+// Phase 16 (pos_upgrade_plan.md §8) — manual price override, only reachable
+// when POS_CAN_PRICE_OVERRIDE is true (button isn't even rendered otherwise).
+// Overriding the price clears any discount already applied to this line —
+// one deliberate override, not stacked with a percentage/fixed discount.
+function editLinePrice(index) {
+    const item = cart[index];
+    if (!item) return;
+
+    Swal.fire({
+        title: PT.editPriceTitle,
+        input: 'number',
+        inputLabel: PT.newPriceLabel,
+        inputValue: item.price,
+        inputAttributes: { min: item.min_selling_price, step: '0.01' },
+        showCancelButton: true,
+        confirmButtonText: PT.ok,
+        cancelButtonText: PT.cancel,
+        inputValidator: (value) => {
+            const v = parseFloat(value);
+            if (isNaN(v) || v < item.min_selling_price) {
+                return PT.priceOverrideBelowMin.replace('%s', item.product_name).replace('%s', item.min_selling_price.toLocaleString());
+            }
+        }
+    }).then(result => {
+        if (!result.isConfirmed) return;
+        const newPrice = parseFloat(result.value);
+        item.price = newPrice;
+        item.discounted_price = newPrice;
+        item.discount_percent = 0;
+        item.discount_value = 0;
+        item.manual_price_override = true;
+        updateCartDisplay();
+        saveCartToStorage();
+        Swal.fire({ icon: 'success', title: PT.priceUpdated, timer: 1200, showConfirmButton: false });
+    });
 }
 
 function removeFromCart(index) {
@@ -891,6 +1077,7 @@ function processPayment() {
         customer_id: customerId || null,
         warehouse_id: warehouseId,
         project_id: $('#posProjectId').val() || null,
+        price_group_id: posSelectedPriceGroupId || null,
         items: cart,
         subtotal: subtotal,
         discount_percentage: globalDiscountPercent,
@@ -910,7 +1097,14 @@ function processPayment() {
     };
     
     $('#processPaymentBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + PT.processing);
-    
+
+    submitPayment(paymentData);
+}
+
+// Phase 19 (pos_upgrade_plan.md §8) — extracted so a blocked credit-limit
+// sale can be retried once with override_credit_limit=1 after a manager
+// confirms, without duplicating the whole request-building step above.
+function submitPayment(paymentData) {
     $.ajax({
         url: '<?= buildUrl('/api/pos/process_sale.php') ?>',
         type: 'POST',
@@ -927,19 +1121,28 @@ function processPayment() {
                 let loyaltyMsg = '';
                 if (response.loyalty_points_earned > 0) loyaltyMsg += ' ' + PT.earnedPts.replace('%d', response.loyalty_points_earned);
                 if (response.loyalty_points_redeemed > 0) loyaltyMsg += ' ' + PT.redeemedPts.replace('%d', response.loyalty_points_redeemed);
+                // Phase 22 (pos_upgrade_plan.md §8) — build the WhatsApp share
+                // text from the cart BEFORE it's cleared below (no gateway —
+                // a plain wa.me deep-link the cashier's own device opens).
+                const whatsappReceiptText = buildWhatsAppReceiptText(currentReceiptNumber);
+
                 Swal.fire({
                     icon: 'success',
                     title: PT.saleCompleted,
                     text: PT.receiptHash + currentReceiptNumber + loyaltyMsg,
                     showCancelButton: true,
+                    showDenyButton: true,
                     confirmButtonText: POS_AUTO_PRINT_RECEIPT ? PT.printAgain : PT.printReceipt,
+                    denyButtonText: PT.shareViaWhatsApp,
                     cancelButtonText: PT.nextCustomer,
                     reverseButtons: true
                 }).then((result) => {
                     if (result.isConfirmed) {
                         printReceipt(response.sale_id);
+                    } else if (result.isDenied) {
+                        shareReceiptViaWhatsApp(whatsappReceiptText);
                     }
-                    
+
                     // === RESET FOR NEXT CUSTOMER ===
                     // 1. Clear Cart
                     cart = [];
@@ -970,6 +1173,26 @@ function processPayment() {
                     // 7. Update Cash Balance UI
                     updateCashBalanceUI();
                 });
+            } else if (response.error_code === 'credit_limit_exceeded' && response.can_override) {
+                // Phase 19 (pos_upgrade_plan.md §8) — a manager (canEdit('pos'),
+                // re-checked fresh server-side on the retry) may explicitly
+                // override a blocked credit sale.
+                Swal.fire({
+                    icon: 'warning',
+                    title: PT.paymentFailed,
+                    text: response.message,
+                    showCancelButton: true,
+                    confirmButtonText: PT.overrideAndProceed,
+                    cancelButtonText: PT.cancel
+                }).then(r => {
+                    if (r.isConfirmed) {
+                        paymentData.override_credit_limit = 1;
+                        submitPayment(paymentData);
+                    } else {
+                        $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
+                    }
+                });
+                return;
             } else {
                 Swal.fire({
                     icon: 'error',
@@ -987,6 +1210,44 @@ function processPayment() {
             });
             $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
         }
+    });
+}
+
+// Phase 22 (pos_upgrade_plan.md §8) — a free, real WhatsApp receipt share:
+// no gateway, no new dependency, just a wa.me deep-link with the receipt
+// text URL-encoded — opens the cashier's own WhatsApp Web/app to send it.
+function buildWhatsAppReceiptText(receiptNumber) {
+    let lines = [];
+    lines.push(<?= json_encode(t('Receipt #')) ?> + receiptNumber);
+    cart.forEach(item => {
+        const total = (item.discounted_price * item.quantity).toLocaleString();
+        lines.push(`${item.product_name} x${item.quantity} = ${POS_CURRENCY} ${total}`);
+    });
+    const total = $('#cartTotal').text().trim();
+    lines.push('---');
+    lines.push(<?= json_encode(t('TOTAL:')) ?> + ' ' + total);
+    lines.push(<?= json_encode(t('THANK YOU')) ?>);
+    return lines.join('\n');
+}
+
+function shareReceiptViaWhatsApp(text) {
+    const selectedCustomer = $('#customerSelect').select2('data')[0];
+    const suggestedPhone = (selectedCustomer && selectedCustomer.text && selectedCustomer.text.match(/[\d+][\d\s+-]{6,}/))
+        ? selectedCustomer.text.match(/[\d+][\d\s+-]{6,}/)[0].replace(/[\s-]/g, '')
+        : '';
+    Swal.fire({
+        title: PT.shareViaWhatsApp,
+        input: 'text',
+        inputLabel: PT.whatsappNumberLabel,
+        inputValue: suggestedPhone,
+        inputPlaceholder: '2557XXXXXXXX',
+        showCancelButton: true,
+        confirmButtonText: PT.shareViaWhatsApp,
+        cancelButtonText: PT.cancel
+    }).then(r => {
+        if (!r.isConfirmed || !r.value) return;
+        const phone = r.value.replace(/[^\d]/g, '');
+        window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
     });
 }
 
@@ -1242,6 +1503,43 @@ function startShift() {
     });
 }
 
+// Phase 20 (pos_upgrade_plan.md §8) — cash denomination counting. Renders
+// once per container (idempotent — checks for existing rows first), sums
+// live into the target cash input as counts change, and exposes the current
+// breakdown via jQuery .data() for the submit handlers below to read.
+function renderDenomGrid(containerId) {
+    const $container = $('#' + containerId);
+    if ($container.find('tr').length) return; // already rendered
+    const targetInput = $container.data('target-input');
+
+    let html = '<table class="table table-sm"><tbody>';
+    POS_DENOMINATIONS.forEach(v => {
+        html += `<tr>
+            <td class="align-middle small">${POS_CURRENCY} ${v.toLocaleString()}</td>
+            <td style="width:90px;"><input type="number" class="form-control form-control-sm denom-count" data-value="${v}" min="0" step="1" value=""></td>
+            <td class="align-middle text-end small denom-subtotal" style="width:110px;">—</td>
+        </tr>`;
+    });
+    html += `</tbody><tfoot><tr><th colspan="2" class="text-end small">${PT.totalLabel}</th><th class="text-end denom-total">${POS_CURRENCY} 0</th></tr></tfoot></table>`;
+    $container.html(html);
+
+    $container.on('input', '.denom-count', function () {
+        let total = 0;
+        const breakdown = [];
+        $container.find('.denom-count').each(function () {
+            const value = parseFloat($(this).data('value'));
+            const count = parseInt($(this).val()) || 0;
+            const sub = value * count;
+            $(this).closest('tr').find('.denom-subtotal').text(count > 0 ? (POS_CURRENCY + ' ' + sub.toLocaleString()) : '—');
+            total += sub;
+            if (count > 0) breakdown.push({ value: value, count: count });
+        });
+        $container.find('.denom-total').text(POS_CURRENCY + ' ' + total.toLocaleString());
+        $container.data('breakdown', breakdown);
+        if (targetInput) $('#' + targetInput).val(total);
+    });
+}
+
 function confirmStartShift() {
     const openingCash = parseFloat($('#openingCash').val()) || 0;
     const registerId = $('#startShiftRegister').val() || 1;
@@ -1258,7 +1556,10 @@ function confirmStartShift() {
         type: 'POST',
         data: {
             opening_cash: openingCash,
-            register_id: registerId
+            register_id: registerId,
+            // Phase 20 (pos_upgrade_plan.md §8) — only sent if the cashier
+            // actually used the optional denomination grid.
+            denominations: JSON.stringify($('#openDenomGrid').data('breakdown') || [])
         },
         dataType: 'json',
         success: function(response) {
@@ -1322,7 +1623,10 @@ function confirmEndShift() {
         type: 'POST',
         data: {
             ending_cash: endingCash,
-            notes: notes
+            notes: notes,
+            // Phase 20 (pos_upgrade_plan.md §8) — only sent if the cashier
+            // actually used the optional denomination grid.
+            denominations: JSON.stringify($('#closeDenomGrid').data('breakdown') || [])
         },
         dataType: 'json',
         success: function(response) {
@@ -1754,7 +2058,10 @@ function updateCashBalanceUI() {
 
     // ── Add product to cart (scanner path — no modal, no click required) ─────
     function scanAddToCart(product) {
-        const price    = parseFloat(product.selling_price) || 0;
+        // Phase 14 (pos_upgrade_plan.md §8) — same price-group resolution as
+        // the click-to-cart path (addToCart()), so a scanned item respects
+        // the active price group too.
+        const price    = parseFloat(product.effective_price ?? product.selling_price) || 0;
         const existing = cart.find(function (item) {
             return item.product_id == product.product_id;
         });

@@ -65,6 +65,7 @@ try {
     // audit entry. Service products and non-tracked items are skipped.
     $itemsStmt = $pdo->prepare("
         SELECT ri.product_id, ri.quantity_received AS qty,
+               ri.batch_number, ri.expiry_date, ri.unit_price,
                p.is_service, p.track_inventory
         FROM receipt_items ri
         LEFT JOIN products p ON ri.product_id = p.product_id
@@ -81,6 +82,15 @@ try {
     $checkStock   = $pdo->prepare("SELECT stock_id FROM product_stocks WHERE product_id = ? AND warehouse_id = ?");
     $updateStock  = $pdo->prepare("UPDATE product_stocks SET stock_quantity = IFNULL(stock_quantity, 0) + ?, reserved_quantity = IFNULL(reserved_quantity, 0) + ?, last_updated = NOW() WHERE stock_id = ?");
     $insertStock  = $pdo->prepare("INSERT INTO product_stocks (product_id, warehouse_id, stock_quantity, reserved_quantity, last_updated) VALUES (?, ?, ?, ?, NOW())");
+    // Phase 17 (pos_upgrade_plan.md §8) — real batch/lot stock ledger, fed
+    // right here at the moment stock genuinely enters the warehouse (not at
+    // GRN creation, which is still 'pending' and may never be approved).
+    // Sparse: a line with neither batch_number nor expiry_date gets no row —
+    // that product keeps behaving exactly as it did before this phase.
+    $insertBatch  = $pdo->prepare("
+        INSERT INTO product_batches (product_id, warehouse_id, batch_number, expiry_date, quantity_received, quantity_remaining, unit_cost, receipt_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    ");
     // stock_movements has two strict ENUMs:
     //   movement_type  must be one of: purchase_in, sale_out, adjustment_in, adjustment_out, transfer_in, transfer_out, return_in, return_out, production_in, production_out, damaged, expired, found, theft, correction, issue_out
     //   reference_type must be one of: purchase_order, sales_order, pos_sale, invoice, stock_adjustment, stock_transfer, return, production_order, manual
@@ -122,6 +132,20 @@ try {
             'created_by'       => $_SESSION['user_id'],
             'notes'            => "GRN approved: " . $grn['receipt_number'],
         ]);
+
+        // Phase 17 — only when the line actually specified a batch or expiry.
+        $batchNumber = trim((string)($it['batch_number'] ?? ''));
+        $expiryDate  = $it['expiry_date'] ?? null;
+        if ($batchNumber !== '' || !empty($expiryDate)) {
+            $insertBatch->execute([
+                $pid, $warehouse_id,
+                $batchNumber !== '' ? $batchNumber : null,
+                !empty($expiryDate) ? $expiryDate : null,
+                $qty, $qty,
+                (float)($it['unit_price'] ?? 0),
+                $receipt_id,
+            ]);
+        }
     }
 
     $sigResult = workflowCaptureSignature($pdo, 'grn', $receipt_id, 'approved',

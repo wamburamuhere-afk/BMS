@@ -235,6 +235,40 @@ $pos_currency = getSetting('currency', 'TZS');
                     <label class="form-label"><?= t('Receipt Footer (optional addition)') ?></label>
                     <textarea class="form-control" id="reg_receipt_footer" rows="2" placeholder="<?= t('e.g. branch-specific note') ?>"></textarea>
                 </div>
+                <!-- Phase 22 (pos_upgrade_plan.md §8) — receipt layout variety -->
+                <div class="mb-3">
+                    <label class="form-label"><?= t('Receipt Layout') ?></label>
+                    <select class="form-select" id="reg_receipt_template">
+                        <option value="classic"><?= t('Classic (default)') ?></option>
+                        <option value="detailed"><?= t('Detailed (shows per-line discount/tax)') ?></option>
+                        <option value="slim"><?= t('Slim (totals only)') ?></option>
+                    </select>
+                </div>
+                <hr>
+                <!-- Phase 21 (pos_upgrade_plan.md §8) — network (IP) thermal printer -->
+                <div class="mb-3">
+                    <label class="form-label"><?= t('Receipt Printer Connection') ?></label>
+                    <select class="form-select" id="reg_printer_connection_type" onchange="$('#reg_printer_ip_wrap').toggleClass('d-none', this.value !== 'network')">
+                        <option value="browser"><?= t('Browser (print dialog)') ?></option>
+                        <option value="network"><?= t('Network (IP) thermal printer') ?></option>
+                    </select>
+                    <small class="text-muted"><?= t('Network mode sends the receipt directly to a printer with its own IP address on your shop network — no print dialog, real auto-cut and drawer-kick.') ?></small>
+                </div>
+                <div class="d-none" id="reg_printer_ip_wrap">
+                    <div class="row g-2 mb-3">
+                        <div class="col-8">
+                            <label class="form-label"><?= t('Printer IP Address') ?></label>
+                            <input type="text" class="form-control" id="reg_printer_ip_address" placeholder="<?= t('e.g. 192.168.1.50') ?>">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label"><?= t('Port') ?></label>
+                            <input type="number" class="form-control" id="reg_printer_port" value="9100">
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="testNetworkPrinter()">
+                        <i class="bi bi-printer"></i> <?= t('Test Printer') ?>
+                    </button>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
@@ -298,6 +332,11 @@ function openRegisterModal() {
     $('#reg_opening_cash').val(0);
     $('#reg_barcode_scanner, #reg_cash_drawer').prop('checked', true);
     $('#reg_card_reader').prop('checked', false);
+    $('#reg_printer_connection_type').val('browser');
+    $('#reg_printer_ip_address').val('');
+    $('#reg_printer_port').val(9100);
+    $('#reg_printer_ip_wrap').addClass('d-none');
+    $('#reg_receipt_template').val('classic');
     new bootstrap.Modal(document.getElementById('registerModal')).show();
 }
 
@@ -315,7 +354,27 @@ function editRegister(id) {
     $('#reg_card_reader').prop('checked', !!parseInt(r.card_reader));
     $('#reg_receipt_header').val(r.receipt_header || '');
     $('#reg_receipt_footer').val(r.receipt_footer || '');
+    $('#reg_printer_connection_type').val(r.printer_connection_type || 'browser');
+    $('#reg_printer_ip_address').val(r.printer_ip_address || '');
+    $('#reg_printer_port').val(r.printer_port || 9100);
+    $('#reg_printer_ip_wrap').toggleClass('d-none', (r.printer_connection_type || 'browser') !== 'network');
+    $('#reg_receipt_template').val(r.receipt_template || 'classic');
     new bootstrap.Modal(document.getElementById('registerModal')).show();
+}
+
+function testNetworkPrinter() {
+    const ip = $('#reg_printer_ip_address').val().trim();
+    const port = $('#reg_printer_port').val() || 9100;
+    if (!ip) {
+        Swal.fire(<?= json_encode(t('Missing fields')) ?>, <?= json_encode(t('Enter a printer IP address first.')) ?>, 'warning');
+        return;
+    }
+    Swal.fire({ title: <?= json_encode(t('Testing...')) ?>, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    $.post('<?= buildUrl('api/pos/test_network_printer.php') ?>', {
+        printer_ip_address: ip, printer_port: port, _csrf: <?= json_encode(csrf_token()) ?>
+    }, function (res) {
+        Swal.fire({ icon: res.success ? 'success' : 'error', title: res.success ? <?= json_encode(t('Success')) ?> : <?= json_encode(t('Error')) ?>, text: res.message });
+    }, 'json');
 }
 
 function saveRegister() {
@@ -335,7 +394,12 @@ function saveRegister() {
         cash_drawer: $('#reg_cash_drawer').is(':checked') ? 1 : 0,
         card_reader: $('#reg_card_reader').is(':checked') ? 1 : 0,
         receipt_header: $('#reg_receipt_header').val(),
-        receipt_footer: $('#reg_receipt_footer').val()
+        receipt_footer: $('#reg_receipt_footer').val(),
+        printer_connection_type: $('#reg_printer_connection_type').val(),
+        printer_ip_address: $('#reg_printer_ip_address').val(),
+        printer_port: $('#reg_printer_port').val(),
+        receipt_template: $('#reg_receipt_template').val(),
+        _csrf: <?= json_encode(csrf_token()) ?>
     }, function (res) {
         if (res.success) {
             bootstrap.Modal.getInstance(document.getElementById('registerModal')).hide();

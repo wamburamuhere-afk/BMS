@@ -92,7 +92,11 @@ if (!function_exists('bmsFeatureRegistry')) {
                 'description' => 'POS terminal, POS dashboard and customer display.',
                 'default'     => true,
                 'sort_order'  => 20,
-                'page_keys'   => ['pos', 'pos_config_settings'],
+                // pos_price_override / pos_discount_override (Phase 16,
+                // pos_upgrade_plan.md §8) are loss-control RBAC permissions,
+                // not a premium tier feature — every plan/tier that has POS
+                // at all needs the ability to grant/withhold them per role.
+                'page_keys'   => ['pos', 'pos_config_settings', 'pos_price_override', 'pos_discount_override'],
                 // Verified in code: pos.php filters sellable stock through
                 // userCan('warehouse', ...) — POS sells FROM a warehouse.
                 'depends_on'  => ['warehouses'],
@@ -125,7 +129,7 @@ if (!function_exists('bmsFeatureRegistry')) {
             // pos_loyalty_enabled setting itself is still '1').
             'pos_advanced' => [
                 'label'       => 'POS Advanced',
-                'description' => 'Multi-register/till management and the customer loyalty points program.',
+                'description' => 'Multi-register/till management, selling price tiers, and the customer loyalty points program.',
                 'default'     => false,
                 'sort_order'  => 21,
                 'page_keys'   => ['pos_advanced'],
@@ -135,6 +139,13 @@ if (!function_exists('bmsFeatureRegistry')) {
                     'api/pos/save_register.php',
                     'api/pos/toggle_register_status.php',
                     'core/pos_loyalty.php',
+                    // Phase 14 (pos_upgrade_plan.md §8) — selling price tiers.
+                    'app/bms/pos/price_groups.php',
+                    'api/pos/get_price_groups.php',
+                    'api/pos/save_price_group.php',
+                    'api/pos/toggle_price_group_status.php',
+                    'api/pos/get_price_group_products.php',
+                    'api/pos/save_price_group_product_price.php',
                 ],
             ],
             'procurement' => [

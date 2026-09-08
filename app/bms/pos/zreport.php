@@ -16,6 +16,7 @@ if (isset($_SESSION['user_lang'])) {
     loadLanguage($_SESSION['user_lang']);
 }
 require_once __DIR__ . '/../../../core/pos_shift_reporting.php';
+require_once __DIR__ . '/../../../core/pos_denominations.php';
 
 if (!isAuthenticated()) { die('Unauthorized'); }
 if (!canView('pos'))    { die('Permission denied'); }
@@ -42,6 +43,11 @@ if (!$shift) { die('Shift not found'); }
 if ((int)$shift['user_id'] !== (int)$_SESSION['user_id'] && !canEdit('pos')) {
     die('Access denied: you may only view your own shift reports.');
 }
+
+// Phase 20 (pos_upgrade_plan.md §8) — cash denomination breakdown, if the
+// cashier used the optional grid at open/close. Empty arrays render nothing.
+$open_denoms = getDenominationBreakdown($pdo, $shift_id, 'open');
+$close_denoms = getDenominationBreakdown($pdo, $shift_id, 'close');
 
 logActivity($pdo, $_SESSION['user_id'], 'Viewed Z-Report', "Viewed Z-Report for shift #{$shift['shift_code']}");
 
@@ -135,6 +141,33 @@ $currency     = getSetting('currency', 'TZS');
         <div class="row total"><span><?= t('Difference') ?></span><span class="<?= abs($diff) < 0.01 ? 'diff-ok' : 'diff-bad' ?>"><?= $currency ?> <?= number_format($diff, 2) ?></span></div>
         <?php endif; ?>
     </div>
+
+    <?php if (!empty($open_denoms) || !empty($close_denoms)): ?>
+    <div class="section">
+        <h2><?= t('Cash Denomination Count') ?></h2>
+        <div style="display:flex; gap:24px; flex-wrap:wrap;">
+            <?php foreach (['open' => [t('At Shift Open'), $open_denoms], 'close' => [t('At Shift Close'), $close_denoms]] as $ctx => [$label, $rows]): ?>
+                <?php if (!empty($rows)): ?>
+                <table style="min-width:220px;">
+                    <thead><tr><th colspan="3"><?= $label ?></th></tr>
+                        <tr><th><?= t('Denomination') ?></th><th class="text-end"><?= t('Count') ?></th><th class="text-end"><?= t('Subtotal') ?></th></tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($rows as $r): ?>
+                        <tr>
+                            <td><?= $currency ?> <?= number_format($r['denomination_value'], 0) ?></td>
+                            <td class="text-end"><?= (int)$r['count'] ?></td>
+                            <td class="text-end"><?= $currency ?> <?= number_format($r['subtotal'], 2) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <tr class="total"><td colspan="2"><?= t('Total:') ?></td><td class="text-end"><?= $currency ?> <?= number_format(array_sum(array_column($rows, 'subtotal')), 2) ?></td></tr>
+                    </tbody>
+                </table>
+                <?php endif; ?>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <div class="section">
         <h2><?= t('Sales by Tender') ?></h2>

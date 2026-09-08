@@ -18,6 +18,11 @@ require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../helpers.php';
 require_once __DIR__ . '/../../core/stock_ledger.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
+require_once __DIR__ . '/../../core/pos_override_guard.php';
+require_once __DIR__ . '/../../core/pos_price_groups.php';
+require_once __DIR__ . '/../../core/pos_batch_consumption.php';
+require_once __DIR__ . '/../../core/pos_unit_conversion.php';
+require_once __DIR__ . '/../../core/pos_credit_limit.php';
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
@@ -53,6 +58,10 @@ try {
     $customer_id  = $toNullableInt($input['customer_id']  ?? null);
     $warehouse_id = $toNullableInt($input['warehouse_id'] ?? null);
     $project_id   = $toNullableInt($input['project_id']   ?? null);
+    // Phase 14 (pos_upgrade_plan.md §8) — selling price tiers. 0/absent = no
+    // group chosen, every line resolves to plain products.selling_price,
+    // identical to pre-Phase-14 behaviour.
+    $price_group_id = $toNullableInt($input['price_group_id'] ?? null) ?? 0;
     $payment_method = $input['payment_method'] ?? 'cash';
     $amount_tendered = floatval($input['amount_tendered'] ?? 0);
     $items = $input['items'] ?? [];
@@ -183,7 +192,7 @@ try {
     }
 
     $fetchStmt = $pdo->prepare("
-        SELECT p.product_id, p.product_name, p.selling_price, p.min_selling_price, p.is_service, 
+        SELECT p.product_id, p.product_name, p.selling_price, p.min_selling_price, p.is_service, p.is_combo,
                COALESCE(SUM(ps.stock_quantity - IFNULL(ps.reserved_quantity, 0)), 0) as general_available,
                $project_stock_subquery as project_available,
                COALESCE(SUM(IFNULL(ps.reserved_quantity, 0)), 0) as current_warehouse_reserved
@@ -204,13 +213,45 @@ try {
     $fetchStmt->execute($fetchParams);
     $products_db = $fetchStmt->fetchAll(PDO::FETCH_ASSOC);
     $products_map = array_column($products_db, null, 'product_id');
-    
+
+    // Phase 14 (pos_upgrade_plan.md §8) — resolve each product's authoritative
+    // price for the chosen price group BEFORE the item loop below, so
+    // core/pos_override_guard.php::resolvePosLineBasePrice() (which reads
+    // $db_product['selling_price']) is automatically group-aware without
+    // needing to know price groups exist at all. Sparse: a product with no
+    // override row for this group keeps its plain selling_price untouched.
+    $groupPrices = resolveGroupPrices($pdo, $price_group_id, $product_ids);
+    foreach ($groupPrices as $pid => $price) {
+        if (isset($products_map[$pid])) {
+            $products_map[$pid]['selling_price'] = $price;
+        }
+    }
+
+    // Phase 23 (pos_upgrade_plan.md §8) — combo/bundle products. Every combo
+    // line's component availability is checked BEFORE any stock is touched
+    // anywhere in this sale — a combo with a short component blocks the
+    // WHOLE sale up front with a clear error, never a partial failure after
+    // other lines already decremented.
+    require_once __DIR__ . '/../../core/pos_combo_products.php';
+    foreach ($items as $item) {
+        $pid = (int)$item['product_id'];
+        $db_product = $products_map[$pid] ?? null;
+        if (!$db_product || empty($db_product['is_combo'])) continue;
+        $qty = floatval($item['quantity'] ?? 0);
+        $shortfalls = checkComboAvailability($pdo, $pid, $qty, (int)$warehouse_id);
+        if (!empty($shortfalls)) {
+            $names = implode(', ', array_map(fn($s) => "{$s['product_name']} (need {$s['needed']}, have {$s['available']})", $shortfalls));
+            throw new Exception("Insufficient stock for combo '{$db_product['product_name']}' component(s): $names");
+        }
+    }
+
     // Insert sale items and update inventory
     $itemStmt = $pdo->prepare("
         INSERT INTO pos_sale_items (
-            sale_id, product_id, product_name, quantity, unit_price, 
-            tax_rate, tax_amount, discount_rate, discount_amount, line_total
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            sale_id, product_id, product_name, quantity, unit_price,
+            tax_rate, tax_amount, discount_rate, discount_amount, line_total,
+            sold_unit_label, sold_unit_quantity
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
     $stockStmt = $pdo->prepare("
@@ -220,18 +261,50 @@ try {
         WHERE product_id = ?
     ");
     
+    // Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split. These
+    // are the real security boundary; the client-side hiding in pos.php/
+    // pos_scripts_new.php is UX only, never trusted on its own.
+    $can_price_override    = canEdit('pos_price_override');
+    $can_discount_override = canEdit('pos_discount_override');
+
     foreach ($items as $item) {
         $pid = $item['product_id'];
         $db_product = $products_map[$pid] ?? null;
-        
+
         if (!$db_product) {
             throw new Exception("Product ID $pid not found");
         }
-        
+
+        // Phase 15 (pos_upgrade_plan.md §8) — unit conversion at the register.
+        // Resolved BEFORE every other per-line step (price validation, stock
+        // check, Phase 16 override guard, discount, FEFO) so all of them
+        // uniformly operate on base-unit quantity/price — the conversion is
+        // always resolved server-side from product_unit_conversions, never
+        // trusted from the client's multiplier. Absent/empty unit_label =
+        // base unit, item untouched (fully backward compatible).
+        $sold_unit_label = trim((string)($item['unit_label'] ?? ''));
+        $sold_unit_qty = null;
+        if ($sold_unit_label !== '') {
+            $conversion = resolveUnitConversion($pdo, (int)$pid, $sold_unit_label);
+            if ($conversion) {
+                $enteredQty = floatval($item['quantity'] ?? 0);
+                $converted = convertToBaseUnit($conversion, $enteredQty, floatval($db_product['selling_price']));
+                $sold_unit_qty = $enteredQty;
+                $item['quantity'] = $converted['base_quantity'];
+                $item['price'] = $converted['base_unit_price'];
+                $item['discounted_price'] = $converted['base_unit_price'];
+            } else {
+                // Unknown unit label for this product — ignore it rather than
+                // failing the sale; sells at the base unit exactly as if no
+                // unit_label had been sent at all.
+                $sold_unit_label = '';
+            }
+        }
+
         // Validate Price
         $requested_price = floatval($item['discounted_price'] ?? $item['price'] ?? 0);
         $min_price = floatval($db_product['min_selling_price']);
-        
+
         // Allow a small epsilon for float comparison
         if ($requested_price < ($min_price - 0.01)) {
             throw new Exception("Price for '{$db_product['product_name']}' is below minimum selling price.");
@@ -257,14 +330,27 @@ try {
             }
         }
 
-        $original_price = floatval($item['price']); // Original selling price
+        // Phase 16 (pos_upgrade_plan.md §8) — base price resolved server-side,
+        // never trusted from the client unless explicitly overridden by a
+        // permitted cashier (see core/pos_override_guard.php).
+        $priceResolution = resolvePosLineBasePrice($item, $db_product, $can_price_override);
+        $original_price = $priceResolution['original_price'];
+        if ($priceResolution['requested_price'] !== null) {
+            $requested_price = $priceResolution['requested_price'];
+        }
         $tax_rate = floatval($item['tax_rate']);
         $discount_percent = floatval($item['discount_percent']);
-        
+
         $item_original_total = $original_price * $qty;
         $item_discounted_total = $requested_price * $qty;
-        
+
         $item_discount_amount = $item_original_total - $item_discounted_total;
+
+        // A real discount on this line requires pos_discount_override.
+        // Rejects outright rather than silently clamping: an unauthorized
+        // discount attempt on a live sale is worth surfacing as an error, not
+        // quietly overriding the price the cashier saw on screen.
+        assertPosLineDiscountPermitted($item_discount_amount, $can_discount_override, $db_product['product_name']);
         $item_tax_amount = $item_discounted_total * ($tax_rate / 100);
         
         // Update global sums
@@ -283,11 +369,25 @@ try {
             $item_tax_amount,
             $discount_percent,
             $item_discount_amount,
-            $item_discounted_total // line_total (excluding tax usually, or including? let's assume excluding since tax is separate)
+            $item_discounted_total, // line_total (excluding tax usually, or including? let's assume excluding since tax is separate)
+            $sold_unit_label !== '' ? $sold_unit_label : null,
+            $sold_unit_qty,
         ]);
-        
-        // Update stock (Only for non-service products)
-        if (!$db_product['is_service']) {
+        $sale_item_id = (int)$pdo->lastInsertId();
+
+        // Phase 23 (pos_upgrade_plan.md §8) — a combo product carries no
+        // stock of its own; selling it decrements each COMPONENT's stock
+        // instead (availability for the whole cart was already verified
+        // above, before any writes started).
+        if (!empty($db_product['is_combo'])) {
+            consumeComboComponents($pdo, $pid, $qty, (int)$warehouse_id, $project_id, $sale_id, $receipt_number, $_SESSION['user_id']);
+        } elseif (!$db_product['is_service']) {
+            // Phase 17b (pos_upgrade_plan.md §8) — FEFO batch consumption, a
+            // bookkeeping layer on top of the product_stocks decrement below,
+            // not a replacement for it. No-op for a product with no open
+            // batches in this warehouse (not batch-tracked).
+            consumeFefoBatches($pdo, $pid, (int)$warehouse_id, $qty, $sale_item_id);
+
             // 1. Global Update
             $stockStmt->execute([ $qty, $qty, $pid ]);
 
@@ -354,6 +454,27 @@ try {
     elseif ($amount_paid_now > 0.01)                       $final_payment_status = 'partial';
     else                                                   $final_payment_status = 'pending';
     $balance_due = round($calculated_total - $amount_paid_now, 2);
+
+    // Phase 19 (pos_upgrade_plan.md §8) — customer credit-limit enforcement.
+    // Only a real credit EXPOSURE (balance_due > 0) is checked — a "credit"
+    // sale paid in full via a deposit carries no actual risk. A manager
+    // (canEdit('pos')) can explicitly override a blocked sale by re-submitting
+    // with override_credit_limit=1 — the flag itself is meaningless without
+    // that permission, checked fresh server-side, never trusted from the client.
+    if ($is_credit && $balance_due > 0.01) {
+        $overrideRequested = !empty($input['override_credit_limit']);
+        $overridePermitted = $overrideRequested && canEdit('pos');
+        $custNameStmt = $pdo->prepare("SELECT customer_name FROM customers WHERE customer_id = ?");
+        $custNameStmt->execute([$customer_id]);
+        $custName = $custNameStmt->fetchColumn() ?: ('#' . $customer_id);
+        assertPosCreditLimitPermitted($pdo, (int)$customer_id, $balance_due, $overridePermitted, $custName);
+        if ($overridePermitted) {
+            logAudit($pdo, $user_id, 'pos_credit_limit_override', [
+                'entity_type' => 'pos_sale', 'entity_id' => $sale_id,
+                'new_values' => ['customer_id' => $customer_id, 'balance_due' => $balance_due],
+            ]);
+        }
+    }
 
     // Update the main sale record with calculated values + authoritative status.
     $updateSaleStmt = $pdo->prepare("
@@ -465,6 +586,17 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
         'loyalty_points_redeemed' => $loyalty_points_redeemed
     ]);
     
+} catch (PosCreditLimitExceededException $e) {
+    $pdo->rollBack();
+    echo json_encode([
+        'success' => false,
+        'message' => $e->getMessage(),
+        'error_code' => 'credit_limit_exceeded',
+        // Phase 19 — told to the client so it knows whether to even offer an
+        // "Override" retry; the flag is meaningless without this permission,
+        // re-checked fresh server-side on the retry regardless.
+        'can_override' => canEdit('pos'),
+    ]);
 } catch (Exception $e) {
     $pdo->rollBack();
     echo json_encode([

@@ -12,20 +12,21 @@
  * mechanism already live elsewhere (e.g. app/bms/product/products.php) —
  * no new mechanism was invented for POS.
  *
- * Scope: the 8 POS page files (Workspace, modals, terminal JS, Dashboard,
- * Z-Report, Shift History, Customer Display, POS Settings) plus the 19
- * genuinely POS-functional API files under api/pos/ (the other 16 files in
- * that folder are HR/Payroll — departments, designations, salary
- * components, holidays — co-located there by historical accident, not part
- * of "POS" and deliberately out of scope).
+ * Scope: the 9 POS page files (Workspace, modals, terminal JS, Dashboard,
+ * Z-Report, Shift History, Customer Display, POS Settings, Price Groups —
+ * added Phase 14) plus the 24 genuinely POS-functional API files under
+ * api/pos/ (the other files in that folder are HR/Payroll — departments,
+ * designations, salary components, holidays — co-located there by
+ * historical accident, not part of "POS" and deliberately out of scope;
+ * search_customers.php is also excluded here — it has zero t()/te() calls).
  *
  * Verifies:
- *   1. All 27 files lint-clean.
- *   2. Every one of the 19 API files loads the caller's saved language
+ *   1. All 33 files lint-clean.
+ *   2. Every one of the 24 API files loads the caller's saved language
  *      preference (they never included header.php, so t() would otherwise
  *      always default to English regardless of the user's setting).
  *   3. COMPLETENESS GUARD: every literal string passed to t()/te() anywhere
- *      in these 27 files has a real, non-empty translation in lang/sw.php.
+ *      in these 33 files has a real, non-empty translation in lang/sw.php.
  *      This is the regression guard that matters most — it fails loudly if
  *      a future POS change adds a new t()-wrapped string and forgets to
  *      translate it, rather than silently shipping an English word in the
@@ -64,6 +65,8 @@ $pageFiles = [
     'app/bms/pos/pos.php', 'app/bms/pos/pos_modals_new.php', 'app/bms/pos/pos_scripts_new.php',
     'app/bms/pos/pos_dashboard.php', 'app/bms/pos/zreport.php', 'app/bms/pos/shift_history.php',
     'app/bms/pos/customer_display.php', 'app/constant/settings/pos_config_settings.php',
+    // Phase 14 (pos_upgrade_plan.md §8) — selling price tiers.
+    'app/bms/pos/price_groups.php',
 ];
 $apiFiles = [
     'api/pos/close_shift.php', 'api/pos/create_return.php', 'api/pos/delete_held_sale.php',
@@ -72,11 +75,18 @@ $apiFiles = [
     'api/pos/get_sales.php', 'api/pos/hold_sale.php', 'api/pos/open_shift.php', 'api/pos/process_sale.php',
     'api/pos/receive_payment.php', 'api/pos/save_register.php', 'api/pos/simple_products.php',
     'api/pos/test_products.php', 'api/pos/toggle_register_status.php', 'api/pos/void_sale.php',
+    // Phase 14 (pos_upgrade_plan.md §8) — selling price tiers.
+    'api/pos/get_price_groups.php', 'api/pos/save_price_group.php', 'api/pos/toggle_price_group_status.php',
+    'api/pos/get_price_group_products.php', 'api/pos/save_price_group_product_price.php',
+    // Phase 15 (pos_upgrade_plan.md §8) — unit conversion at the register.
+    'api/pos/get_product_units.php',
+    // Phase 21 (pos_upgrade_plan.md §8) — network (IP) thermal printer.
+    'api/pos/print_receipt.php', 'api/pos/test_network_printer.php',
 ];
 $allFiles = array_merge($pageFiles, $apiFiles);
 
 // ─────────────────────────────────────────────────────────────────────────
-section('1. All 27 files lint-clean');
+section('1. All ' . count($allFiles) . ' files lint-clean');
 // ─────────────────────────────────────────────────────────────────────────
 foreach ($allFiles as $f) {
     $path = "$root/$f";
@@ -129,7 +139,7 @@ $allKeys = [];
 foreach ($allFiles as $f) {
     foreach (extractTKeys("$root/$f") as $k) { $allKeys[$k][] = $f; }
 }
-pass('scanned ' . count($allKeys) . ' distinct t()/te() keys across all 27 files');
+pass('scanned ' . count($allKeys) . ' distinct t()/te() keys across all ' . count($allFiles) . ' files');
 
 $untranslated = [];
 foreach ($allKeys as $key => $files) {

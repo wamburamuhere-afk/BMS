@@ -1,5 +1,243 @@
 # BMS Changelog
 
+## 2026-09-08 (fix) - Project-scope audit regression from Phases 15/23
+
+**Files (changed):** `api/get_combo_components.php`, `api/save_combo_component.php`, `api/save_product_unit.php`
+
+Final regression sweep (`tests/test_project_scope_cli.php`) caught 3 new files querying the
+project-scoped `products` table without a guard, raising the repo's unscoped-file count from a
+pre-existing 4 to 7 (ceiling is 0 — any new unguarded file is a regression). Added
+`assertScopeForRecord('products', 'product_id', $product_id)` (security.md §23) to each — a
+no-op for a global (project_id NULL) product, a 403 for a product tagged to a project the
+requesting user isn't assigned to. The 4 pre-existing unscoped files
+(`api/document/duplicate_created_document.php`, `app/bms/invoice/received_invoices.php`,
+`app/bms/pos/inactive_employees.php`, `app/bms/pos/leave_types.php`) are untouched by this
+tranche and out of scope for this fix.
+
+## 2026-09-08 (feature) - POS Phase 23: combo/bundle products
+
+**Files (new):** `core/pos_combo_products.php`, `migrations/tenant/2026_09_08_pos_combo_products.php`,
+`api/get_combo_components.php`, `api/save_combo_component.php`, `api/delete_combo_component.php`,
+`tests/test_pos_combo_products_cli.php`
+**Files (changed):** `api/pos/process_sale.php`, `api/pos/void_sale.php`, `api/pos/create_return.php`,
+`api/update_product.php`, `app/bms/product/product_edit.php`, `lang/sw.php`,
+`schema/tenant_schema_template.sql`
+
+Tenth phase of the Tier-3 plan (§8 Phase 23). Reuses `product_assembly_components` (already used
+for service cost-breakdowns/NIP material lists — confirmed by reading its existing usage before
+trusting it: `parent_product_id` already means "made of N units of product Y" against
+`products.product_id`) for retail combo/bundle products, gated by a new `products.is_combo` flag
+so existing service/NIP rows are completely unaffected. Selling a combo decrements every
+component's stock atomically — the whole cart's component availability is checked before any
+write, so a short component blocks the sale up front, never a partial failure. Void/return reverse
+into the exact components, full or partial. **Found while building this, not introduced, not
+silently fixed:** `void_sale.php`/`create_return.php` already logged their own stock reversals
+with a `reference_type` value not actually in `stock_movements`'s ENUM — the same bug class as
+Phase 8's `split`/`mixed` finding, flagged for a separate fix.
+
+## 2026-09-08 (feature) - POS Phase 22: receipt layout variety + WhatsApp receipt link
+
+**Files (new):** `migrations/tenant/2026_09_08_pos_receipt_templates.php`, `tests/test_pos_receipt_templates_cli.php`
+**Files (changed):** `api/pos/print_receipt.php`, `api/pos/save_register.php`, `api/pos/get_registers.php`,
+`app/constant/settings/pos_config_settings.php`, `app/bms/pos/pos_scripts_new.php`, `lang/sw.php`,
+`schema/tenant_schema_template.sql`
+
+Ninth phase of the Tier-3 plan (§8 Phase 22). Three selectable per-register receipt layouts
+(`pos_registers.receipt_template`) — Classic (unchanged default), Detailed (per-line discount/tax
++ sale-level discount), Slim (totals only) — whitelisted server-side on both save and read, never
+trusting the DB enum alone (the exact lesson from Phase 8's split/mixed enum-coercion bug). The
+post-sale success dialog gained a "Share via WhatsApp" button that builds the receipt text from
+the cart before it's cleared and opens a plain `wa.me` deep-link — no SMS gateway, no new
+dependency, matching what the UltimatePOS audit found actually works there too.
+
+## 2026-09-08 (feature) - POS Phase 21: network (IP) thermal-printer support (real ESC/POS + drawer-kick)
+
+**Files (new):** `core/escpos_printer.php`, `migrations/tenant/2026_09_08_pos_network_printer.php`,
+`api/pos/test_network_printer.php`, `tests/test_pos_network_printer_cli.php`
+**Files (changed):** `api/pos/print_receipt.php`, `api/pos/save_register.php`, `api/pos/get_registers.php`,
+`app/constant/settings/pos_config_settings.php`, `lang/sw.php`, `schema/tenant_schema_template.sql`,
+`tests/test_pos_i18n_coverage_cli.php`
+
+Eighth phase of the Tier-3 plan (§8 Phase 21). §3 Phase 10 correctly ruled out raw printing from a
+plain browser page — but a printer with its own Ethernet/WiFi interface is a plain TCP socket
+target, not "the browser talking to hardware." `core/escpos_printer.php` builds the real ESC/POS
+byte stream (including the drawer-kick command, which rides the same socket as the print job) and
+sends it via `fsockopen()`. Per-register opt-in (`pos_registers.printer_connection_type`, default
+`'browser'` — every existing register unaffected); `print_receipt.php` fails open to the existing
+browser print-dialog page on any socket error, so a misconfigured printer never blocks a receipt.
+Settings UI gets a connection-type picker + IP/port fields + a Test Printer button per register.
+
+## 2026-09-08 (feature) - POS Phase 20: cash denomination counting at shift open/close
+
+**Files (new):** `core/pos_denominations.php`, `migrations/tenant/2026_09_08_pos_cash_denominations.php`,
+`tests/test_pos_denomination_cli.php`
+**Files (changed):** `api/pos/open_shift.php`, `api/pos/close_shift.php`, `app/bms/pos/pos.php`,
+`app/bms/pos/pos_modals_new.php`, `app/bms/pos/pos_scripts_new.php`, `app/bms/pos/zreport.php`,
+`lang/sw.php`, `schema/tenant_schema_template.sql`
+
+Seventh phase of the Tier-3 plan (§8 Phase 20). Optional "Count by denomination" grid on the
+Start/End Shift modals, live-summing into the existing cash total field as the cashier enters
+counts — the total stays authoritative, the breakdown is supporting detail only, never required
+(fully backward compatible). Denomination values are admin-configurable
+(`system_settings.tzs_denominations`), not hardcoded. Server-side validation rejects an
+unconfigured value, a negative count, or a breakdown that doesn't reconcile to the entered total.
+Z-Report prints both the open and close breakdowns when present, cutting till-counting disputes.
+
+## 2026-09-08 (feature) - POS Phase 19: customer credit-limit enforcement
+
+**Files (new):** `core/pos_credit_limit.php`, `tests/test_pos_credit_limit_cli.php`
+**Files (changed):** `api/pos/process_sale.php`, `api/pos/search_customers.php`, `app/bms/pos/pos.php`,
+`app/bms/pos/pos_scripts_new.php`, `lang/sw.php`
+
+Sixth phase of the Tier-3 plan (§8 Phase 19). `customers.credit_limit` was captured on the
+customer form since day one but nothing at the point of sale ever checked it. Now enforced only
+against real credit exposure (balance due after any deposit) — mirrors the exact outstanding-balance
+formula `receive_payment.php` already uses. A manager can override (`canEdit('pos')`, re-checked
+server-side on retry) via a structured `error_code`/`can_override` response field, not a
+string-matched error message (which would silently break under Swahili). Customer search now
+surfaces credit limit + live outstanding balance the moment a customer is picked, so a cashier sees
+available credit before attempting a sale rather than only after being blocked.
+
+## 2026-09-08 (feature) - POS Phase 15: unit conversion at the register (carton/ream/dozen ↔ piece)
+
+**Files (new):** `core/pos_unit_conversion.php`, `migrations/tenant/2026_09_08_pos_unit_conversions.php`,
+`api/get_product_units.php`, `api/save_product_unit.php`, `api/delete_product_unit.php`,
+`api/pos/get_product_units.php`, `tests/test_pos_unit_conversion_cli.php`
+**Files (changed):** `api/pos/process_sale.php`, `app/bms/product/product_edit.php`,
+`app/bms/pos/pos_scripts_new.php`, `lang/sw.php`, `schema/tenant_schema_template.sql`,
+`tests/test_pos_i18n_coverage_cli.php`
+
+Fifth phase of the Tier-3 plan (§8 Phase 15). A product can now have extra selling units (e.g.
+"Carton" = 12 of the base unit) with an optional per-unit price override — resolved entirely
+server-side in `process_sale.php` (client sends the raw entered quantity + a unit label only,
+never a multiplier). Management grid on the product edit page; POS quick-view gets a unit
+dropdown with a live price preview, only shown for products that actually have extra units.
+Gated in base `pos` (till hygiene, not `pos_advanced`) since this is an everyday counter need, not
+a premium feature. **Real bug caught before shipping**: new cart-rendering code called
+`safeOutput()`, a per-page-local JS convention in this codebase — `pos_scripts_new.php` never
+defined it, which `tests/test_pos_phase8_registers_cli.php`'s existing regression guard (added
+after a prior live incident) correctly flagged; fixed by adding the standard local definition.
+
+## 2026-09-08 (feature) - POS Phase 18: per-batch COGS
+
+**Files (new):** `tests/test_pos_batch_cogs_cli.php`
+**Files (changed):** `core/sales_posting.php`
+
+Fourth phase of the Tier-3 plan (§8 Phase 18), depends on Phase 17. `posSaleCogs()` — the
+function that drives the ledger's COGS entry for every POS sale — now sums each sale line's
+ACTUAL cost from the specific batch(es) it drew from (Phase 17's `pos_sale_item_batches`),
+falling back to the existing average `products.cost_price` for any non-batch-tracked line.
+Documented, deliberate scope boundary: the Income Statement's own POS-COGS drill-down query
+still uses average cost only — making it batch-aware is a separate, larger change to a
+financially-sensitive report, left for later rather than rushed in here.
+
+## 2026-09-08 (feature) - POS Phase 17: batch/lot + expiry tracking, end-to-end (GRN → stock → POS → alerts)
+
+**Files (new):** `core/pos_batch_consumption.php`,
+`migrations/tenant/2026_09_08_pos_product_batches.php`, `tests/test_pos_batch_expiry_cli.php`
+**Files (changed):** `api/approve_grn.php`, `api/pos/process_sale.php`, `api/pos/void_sale.php`,
+`api/pos/create_return.php`, `core/notify.php`, `core/warehouse_scope.php`,
+`cron/run_notification_checks.php`, `app/bms/product/product_view.php`, `app/dashboard.php`,
+`schema/tenant_schema_template.sql`
+
+Third phase of the Tier-3 plan (§8 Phase 17) — the owner's priority item. Turns
+`receipt_items.batch_number`/`.expiry_date` (captured at GRN since day one, never used again) into
+a real, decrementing stock ledger (`product_batches`). Batches are created at GRN **approval**
+(`api/approve_grn.php`), the actual stock-arrival point in this system's three-approval workflow —
+not at GRN creation, which is still `pending`. POS sales consume FEFO (First-Expired-First-Out)
+across open batches (`core/pos_batch_consumption.php::consumeFefoBatches()`); void/return restore
+into the exact originating batch(es), full or partial. Expiry alerts (30/14/7/1-day milestones,
+deduped like the proven `document_expiry_reminders` pattern) fire through the existing notification
+engine — which needed one real enhancement: `resolveRecipients()` only supported project-scoping,
+not warehouse-scoping, so a `warehouseIdsForUser()` helper and a matching scope branch were added,
+letting a `product.batch_expiring` alert respect Phase 6's per-warehouse ACL and still let an admin
+route it to a specific user + email via the existing Notification Rules UI. Dashboard's "expiring"
+widget and a new read-only Batches card on the product page both show real per-batch data.
+Deliberately deferred (documented, not dropped): a POS-terminal UI for a cashier to manually
+override which batch a sale draws from — automatic FEFO is always correct and ships now; the
+manual override is a lower-value polish item. `tests/test_pos_batch_expiry_cli.php` (43 checks).
+Full POS + GRN + notification-engine + feature-registry regression re-run clean; one new
+pre-existing-but-newly-surfaced failure noted (`test_notification_engine_cli.php` §11, a stale
+assertion from an unrelated earlier invoice auto-approve refactor — confirmed present before this
+branch's changes too, not introduced here).
+
+## 2026-09-08 (feature) - POS Phase 14: selling price tiers (Retail/Wholesale/Custom)
+
+**Files (new):** `core/pos_price_groups.php`, `migrations/tenant/2026_09_08_pos_price_groups.php`,
+`app/bms/pos/price_groups.php`, `api/pos/get_price_groups.php`, `api/pos/save_price_group.php`,
+`api/pos/toggle_price_group_status.php`, `api/pos/get_price_group_products.php`,
+`api/pos/save_price_group_product_price.php`, `tests/test_pos_price_groups_cli.php`
+**Files (changed):** `api/pos/process_sale.php`, `api/pos/simple_products.php`,
+`api/pos/search_customers.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`,
+`app/bms/customer/customers.php`, `api/add_customer.php`, `api/process_edit_customer.php`,
+`core/feature_registry.php`, `roots.php`, `header.php`, `lang/sw.php`,
+`schema/tenant_schema_template.sql`, `schema/tenant_seed_defaults.sql`,
+`tests/test_pos_i18n_coverage_cli.php`
+
+Second phase of the Tier-3 plan (§8 Phase 14). New `price_groups` +
+`product_price_group_prices` tables (sparse per-product override, falls back to
+`products.selling_price`); seeded "Retail" (default) and "Wholesale" (pre-populated from
+the existing `products.wholesale_price` column wherever it's a real, different price — no
+data thrown away). POS terminal gets a price-group selector (only rendered when more than
+one active group exists) that auto-applies when a customer with a saved
+`default_price_group_id` is selected; every add-to-cart path (click, quick-view, barcode
+scan) now resolves through the chosen group's `effective_price`. Management page
+(`price_groups.php`) lets an admin create groups and set per-product override prices via an
+inline searchable grid. Gated behind the existing `pos_advanced` tenant entitlement — a
+base-tier POS is entirely unaffected (no selector shown, `price_group_id=0` resolves
+identically to pre-Phase-14 behaviour everywhere it's checked). All new UI/API strings
+translated to Swahili (i18n coverage test extended to cover the 6 new files, still zero
+gaps). Fixed in passing: Phase 16's two permission page_keys were missing from
+`feature_registry.php`, caught by `test_feature_registry_cli.php`.
+
+## 2026-09-08 (feature) - POS Phase 16: cashier price/discount-override permission split
+
+**Files (new):** `core/pos_override_guard.php`, `migrations/tenant/2026_09_08_pos_override_permissions.php`,
+`tests/test_pos_override_permissions_cli.php`
+**Files (changed):** `api/pos/process_sale.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`,
+`lang/sw.php`, `schema/tenant_seed_defaults.sql`
+
+First phase of the Tier-3 plan (§8 Phase 16). Two new permission page_keys —
+`pos_price_override`, `pos_discount_override` — gate two POS-terminal actions that
+previously had no gate at all beyond general `canCreate('pos')` access.
+
+Found while building this: `process_sale.php` trusted the client-submitted `item['price']`
+directly as the line's base price, validating only that the final (possibly-discounted)
+price stayed at/above `min_selling_price` — a forged request could set the base price to
+anything. Fixed by always resolving the base price server-side from the product's own
+`selling_price` (extracted into `core/pos_override_guard.php::resolvePosLineBasePrice()`
+so it's independently unit-tested), honouring a client-submitted price ONLY when the
+cashier explicitly used the new "Edit Price" affordance (hidden unless they hold
+`pos_price_override`) — a manual override attempted without that permission is silently
+corrected back to the true DB price rather than trusted. A real discount on a line now
+requires `pos_discount_override` (`assertPosLineDiscountPermitted()`) — rejected with a
+clear, translated error otherwise; the "Apply Discount" toolbar button in `pos.php` is
+also hidden server-side for cashiers without the permission (defence in depth, not the
+only gate). All new user-facing strings translated (Swahili) and covered by the existing
+`test_pos_i18n_coverage_cli.php` completeness guard (485 keys, zero gaps). Full POS
+regression suite re-run clean; two pre-existing unrelated failures
+(`test_pos_color_settings_split_cli.php`, `test_pos_dashboard_cli.php`) confirmed present
+on unmodified `develop` too, not introduced here.
+
+## 2026-09-08 (plan) - POS Tier-3 professionalisation plan (UltimatePOS gap-closure) written
+
+**Files (changed):** `pos_upgrade_plan.md` (new §8, Phases 14-24)
+
+Planning only, no code changed. Audited `C:\wamp64\www\UltimatePOS` (mature commercial Laravel
+POS) against BMS's already-shipped POS (§3 Phases 1-13) to find genuine remaining gaps for a
+Tanzanian stationery/retail-counter use case. Confirmed by direct schema/code reads (not
+assumption): `receipt_items.batch_number/expiry_date` already captured at GRN but never used
+downstream; `customers.credit_limit` already exists but never enforced at POS;
+`products.wholesale_price` already exists as a single wholesale price; no unit-conversion,
+combo-product, or network-printer infrastructure exists anywhere. Wrote 11 new phases (14-24)
+reusing existing engines wherever one exists — notably the fully-built notification/email engine
+(`core/notify.php::dispatchEvent()`, `notification_rules`, email outbox) and the proven
+`document_expiry_reminders` milestone-dedupe pattern — for the batch/lot + expiry tracking phase
+(17), which the product owner asked to be built out fully (GRN → batch ledger → FEFO consumption
+at sale → milestone alerts routable to a specific user/role with email, via the existing rules
+UI). Approved by product owner 2026-09-08 to build one phase at a time; no phase starts without
+its own explicit go-ahead.
+
 ## 2026-09-08 (fix) - POS language switching: Z-Report and printed sale receipt now actually translate
 
 **Files (changed):** `app/bms/pos/zreport.php`, `api/pos/print_receipt.php`, `lang/sw.php`

@@ -25,6 +25,8 @@ if (isset($_SESSION['user_lang'])) {
 require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/stock_ledger.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
+require_once __DIR__ . '/../../core/pos_batch_consumption.php';
+require_once __DIR__ . '/../../core/pos_combo_products.php';
 
 header('Content-Type: application/json');
 
@@ -59,7 +61,7 @@ try {
     }
 
     // Reverse every line back into stock (mirrors process_sale.php in reverse).
-    $items = $pdo->prepare("SELECT psi.*, p.is_service
+    $items = $pdo->prepare("SELECT psi.*, p.is_service, p.is_combo
                               FROM pos_sale_items psi
                          LEFT JOIN products p ON p.product_id = psi.product_id
                              WHERE psi.sale_id = ?");
@@ -79,6 +81,15 @@ try {
         $qty = (float)$ln['quantity'];
         if ($pid <= 0 || $qty <= 0) continue;
 
+        // Phase 23 (pos_upgrade_plan.md §8) — a combo line restores its
+        // COMPONENTS, not itself (it never had its own stock decremented).
+        if (!empty($ln['is_combo'])) {
+            if ($warehouse_id !== null) {
+                reverseComboComponents($pdo, $pid, $qty, $warehouse_id, $project_id, $sale_id, $sale['receipt_number'], $_SESSION['user_id']);
+            }
+            continue;
+        }
+
         $restoreGlobal->execute([$qty, $qty, $pid]);
         if ($warehouse_id !== null) $restoreWh->execute([$qty, $pid, $warehouse_id]);
 
@@ -94,6 +105,11 @@ try {
             'created_by'       => $_SESSION['user_id'],
             'notes'            => 'Void of POS Sale #' . $sale['receipt_number'] . ' — ' . $reason,
         ]);
+
+        // Phase 17b (pos_upgrade_plan.md §8) — restore into the EXACT batch(es)
+        // this line originally drew from (FEFO), not just a generic quantity
+        // bump. No-op for a non-batch-tracked line (no pos_sale_item_batches rows).
+        reverseFefoBatchConsumption($pdo, (int)$ln['sale_item_id']);
     }
 
     // Refund the cash drawer for cash sales, against the operator's active shift.

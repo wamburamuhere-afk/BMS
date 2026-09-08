@@ -975,6 +975,26 @@ CREATE TABLE `candidates` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `cash_denomination_counts`
+-- Phase 20 (pos_upgrade_plan.md §8) — cash denomination counting at shift open/close.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `cash_denomination_counts` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `shift_id` int NOT NULL,
+  `context` enum('open','close') NOT NULL,
+  `denomination_value` decimal(12,2) NOT NULL,
+  `count` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_shift_context_denom` (`shift_id`,`context`,`denomination_value`),
+  KEY `idx_shift_id` (`shift_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `cash_register_shifts`
 --
 
@@ -1883,6 +1903,7 @@ CREATE TABLE `customers` (
   `vat_number` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `payment_terms` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `credit_limit` decimal(12,2) DEFAULT '0.00',
+  `default_price_group_id` int DEFAULT NULL,
   `current_balance` decimal(12,2) DEFAULT '0.00',
   `loyalty_points_balance` int NOT NULL DEFAULT '0',
   `currency` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'TZS',
@@ -5346,6 +5367,10 @@ CREATE TABLE `pos_registers` (
   `opening_cash` decimal(15,2) DEFAULT '0.00',
   `status` enum('active','inactive','maintenance') DEFAULT 'active',
   `receipt_printer` varchar(100) DEFAULT NULL,
+  `printer_connection_type` enum('browser','network') NOT NULL DEFAULT 'browser',
+  `printer_ip_address` varchar(45) DEFAULT NULL,
+  `printer_port` int DEFAULT '9100',
+  `receipt_template` enum('classic','detailed','slim') NOT NULL DEFAULT 'classic',
   `barcode_scanner` tinyint(1) DEFAULT '1',
   `cash_drawer` tinyint(1) DEFAULT '1',
   `card_reader` tinyint(1) DEFAULT '0',
@@ -5359,6 +5384,26 @@ CREATE TABLE `pos_registers` (
   KEY `idx_status` (`status`),
   KEY `default_cashier` (`default_cashier`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ROW_FORMAT=DYNAMIC;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `pos_sale_item_batches`
+-- Phase 17 (pos_upgrade_plan.md §8) — links a sale line to the batch(es) it
+-- drew from (FEFO), consumed via core/pos_batch_consumption.php.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `pos_sale_item_batches` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `sale_item_id` int NOT NULL,
+  `batch_id` int NOT NULL,
+  `quantity` decimal(10,3) NOT NULL DEFAULT '0.000',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_sale_item_id` (`sale_item_id`),
+  KEY `idx_batch_id` (`batch_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -5385,6 +5430,8 @@ CREATE TABLE `pos_sale_items` (
   `returned_quantity` decimal(10,3) DEFAULT '0.000',
   `is_returned` tinyint(1) DEFAULT '0',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `sold_unit_label` varchar(50) DEFAULT NULL,
+  `sold_unit_quantity` decimal(10,3) DEFAULT NULL,
   PRIMARY KEY (`sale_item_id`),
   KEY `idx_sale_id` (`sale_id`),
   KEY `idx_product_id` (`product_id`)
@@ -5496,6 +5543,27 @@ CREATE TABLE `pos_sales` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `price_groups`
+-- Phase 14 (pos_upgrade_plan.md §8) — selling price tiers.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `price_groups` (
+  `price_group_id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `is_default` tinyint(1) NOT NULL DEFAULT '0',
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `created_by` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`price_group_id`),
+  UNIQUE KEY `uq_price_group_name` (`name`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `product_assembly_components`
 --
 
@@ -5514,6 +5582,55 @@ CREATE TABLE `product_assembly_components` (
   PRIMARY KEY (`id`),
   KEY `parent_product_id` (`parent_product_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=28 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `product_batch_expiry_reminders`
+-- Phase 17 (pos_upgrade_plan.md §8) — milestone-dedupe, mirrors
+-- document_expiry_reminders' exact shape.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_batch_expiry_reminders` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `batch_id` int NOT NULL,
+  `milestone` int NOT NULL,
+  `sent_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_batch_milestone` (`batch_id`,`milestone`),
+  KEY `idx_batch_id` (`batch_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `product_batches`
+-- Phase 17 (pos_upgrade_plan.md §8) — real batch/lot stock ledger, fed at
+-- GRN approval (api/approve_grn.php), consumed FEFO at POS sale
+-- (core/pos_batch_consumption.php). Sparse: only products whose GRN line
+-- specified a batch_number/expiry_date get rows here.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_batches` (
+  `batch_id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `warehouse_id` int NOT NULL,
+  `batch_number` varchar(100) DEFAULT NULL,
+  `expiry_date` date DEFAULT NULL,
+  `quantity_received` decimal(10,3) NOT NULL DEFAULT '0.000',
+  `quantity_remaining` decimal(10,3) NOT NULL DEFAULT '0.000',
+  `unit_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `receipt_id` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`batch_id`),
+  KEY `idx_product_warehouse` (`product_id`,`warehouse_id`),
+  KEY `idx_expiry_date` (`expiry_date`),
+  KEY `idx_quantity_remaining` (`quantity_remaining`),
+  KEY `idx_receipt_id` (`receipt_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -5540,6 +5657,27 @@ CREATE TABLE `product_categories` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `product_price_group_prices`
+-- Phase 14 (pos_upgrade_plan.md §8) — sparse per-product override for a price
+-- group; a product with no row here falls back to products.selling_price.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_price_group_prices` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `price_group_id` int NOT NULL,
+  `price` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_product_price_group` (`product_id`,`price_group_id`),
+  KEY `idx_price_group` (`price_group_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `product_stocks`
 --
 
@@ -5563,6 +5701,27 @@ CREATE TABLE `product_stocks` (
   KEY `idx_available_quantity` (`available_quantity`),
   KEY `location_id` (`location_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=103 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ROW_FORMAT=DYNAMIC;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `product_unit_conversions`
+-- Phase 15 (pos_upgrade_plan.md §8) — unit conversion at the register.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_unit_conversions` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `unit_label` varchar(50) NOT NULL,
+  `base_unit_multiplier` decimal(12,4) NOT NULL DEFAULT '1.0000',
+  `unit_price_override` decimal(15,2) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_product_unit_label` (`product_id`,`unit_label`),
+  KEY `idx_product_id` (`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -5629,6 +5788,7 @@ CREATE TABLE `products` (
   `discount_rate` decimal(5,2) DEFAULT '0.00',
   `reorder_level` decimal(10,2) DEFAULT '0.00',
   `is_service` tinyint(1) DEFAULT '0',
+  `is_combo` tinyint(1) NOT NULL DEFAULT '0',
   `is_taxable` tinyint(1) DEFAULT '0',
   `manufacturer` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `model` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,

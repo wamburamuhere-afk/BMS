@@ -30,6 +30,7 @@ $active_only = !empty($_GET['active_only']);
 $sql = "SELECT r.register_id, r.register_name, r.register_code, r.location, r.opening_cash, r.status,
                r.receipt_printer, r.barcode_scanner, r.cash_drawer, r.card_reader,
                r.receipt_header, r.receipt_footer, r.receipt_logo, r.default_cashier,
+               r.printer_connection_type, r.printer_ip_address, r.printer_port, r.receipt_template,
                sh.shift_id AS active_shift_id,
                u.username AS active_cashier_name,
                DATE_FORMAT(sh.start_time, '%d %b, %H:%i') AS active_shift_started_label
