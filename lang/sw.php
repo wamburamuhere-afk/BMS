@@ -1182,6 +1182,29 @@ return [
     '— Select Warehouse —' => '— Chagua Ghala —',
 
     // ------------------------------------------------------------------
+    // POS — Printed sale receipt (api/pos/print_receipt.php)
+    // ------------------------------------------------------------------
+    'Change:' => 'Chenji:',
+    'Could not reach the server. Please try again.' => 'Imeshindwa kufikia seva. Tafadhali jaribu tena.',
+    'Customer:' => 'Mteja:',
+    'Date:' => 'Tarehe:',
+    'Email Receipt' => 'Tuma Risiti kwa Barua Pepe',
+    'Goods sold are not returnable' => 'Bidhaa zilizouzwa hazirudishwi',
+    'ITEM' => 'BIDHAA',
+    'PRICE' => 'BEI',
+    'Payment (%s):' => 'Malipo (%s):',
+    'Please keep this receipt for your records' => 'Tafadhali hifadhi risiti hii kwa kumbukumbu zako',
+    'Print Receipt' => 'Chapisha Risiti',
+    'QTY' => 'IDADI',
+    'Receipt #:' => 'Namba ya Risiti:',
+    'Send this receipt to which email address?' => 'Tuma risiti hii kwa anwani gani ya barua pepe?',
+    'TIN:' => 'TIN:',
+    'THANK YOU' => 'ASANTE',
+    'Tel:' => 'Simu:',
+    'VRN:' => 'VRN:',
+    'Warehouse:' => 'Ghala:',
+
+    // ------------------------------------------------------------------
     // POS — Modals: cart, split payment, shifts, customer (app/bms/pos/pos_modals_new.php)
     // ------------------------------------------------------------------
     'Add to Cart' => 'Ongeza Kwenye Kikapu',

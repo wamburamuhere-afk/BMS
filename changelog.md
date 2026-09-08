@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-09-08 (fix) - POS language switching: Z-Report and printed sale receipt now actually translate
+
+**Files (changed):** `app/bms/pos/zreport.php`, `api/pos/print_receipt.php`, `lang/sw.php`
+
+Follow-up to the "full POS module" language-switching PR (#1833): user-verified via live
+browser testing that two POS documents still printed in English regardless of the cashier's
+saved language preference.
+
+`zreport.php` (end-of-shift Z-Report) already used `t()` throughout but — unlike every other
+POS page — never included `header.php` or resolved `$_SESSION['user_lang']`, so it silently
+fell back to `core/i18n.php`'s English default on every load. Fixed with the same
+`if (isset($_SESSION['user_lang'])) loadLanguage($_SESSION['user_lang']);` guard already used
+across `api/pos/*.php`.
+
+`print_receipt.php` (the actual customer sale receipt) was a deeper gap: it had **zero** `t()`
+calls anywhere in its template — every label (`Receipt #:`, `Date:`, `Cashier:`, `ITEM`/`QTY`/
+`PRICE`, `Subtotal:`, `TOTAL:`, `Payment (%s):`, `*** THANK YOU ***`, etc.) plus its JS-side
+email prompt were hardcoded English literals, never wrapped in the first place. Wrapped all of
+them in `t()`/`sprintf(t(...))` and added the corresponding Swahili entries to `lang/sw.php`
+(reusing existing shared keys — `Cashier:`, `Subtotal:`, `TOTAL:`, `Register:`, etc. — where
+already translated elsewhere in POS).
+
+Verified live in-browser (not just statically): switched the account language between Swahili
+and English via My Settings and re-loaded both the Z-Report and a real printed receipt each
+time — both now fully translate; reverting to English still renders correctly (no blank/
+missing strings). `tests/test_pos_i18n_coverage_cli.php`'s 60 assertions still pass unchanged.
+
 ## 2026-09-08 (fix) - Self-registration: new company's logo no longer overwrites the host's own default logo
 
 **Files (changed):** `core/tenant_provisioner.php`
