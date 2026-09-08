@@ -12,6 +12,7 @@ if (isset($_SESSION['user_lang'])) {
 }
 
 require_once __DIR__ . '/../../core/pos_shift_reporting.php';
+require_once __DIR__ . '/../../core/pos_denominations.php';
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
@@ -31,6 +32,22 @@ try {
     $user_id = $_SESSION['user_id'];
     $ending_cash = isset($_POST['ending_cash']) ? floatval($_POST['ending_cash']) : 0;
     $notes = isset($_POST['notes']) ? trim($_POST['notes']) : '';
+
+    // Phase 20 (pos_upgrade_plan.md §8) — optional cash denomination
+    // breakdown. Never required (backward compatible) — the single
+    // ending_cash total stays authoritative either way.
+    $denominations = [];
+    if (!empty($_POST['denominations'])) {
+        $decoded = json_decode($_POST['denominations'], true);
+        if (is_array($decoded)) {
+            $denomCheck = validateDenominationBreakdown($decoded, $ending_cash);
+            if (!$denomCheck['valid']) {
+                echo json_encode(['success' => false, 'message' => $denomCheck['error']]);
+                exit();
+            }
+            $denominations = $decoded;
+        }
+    }
 
     // Force-close support: Shift History (canEdit('pos') — same gate that already
     // lets a supervisor/admin VIEW every cashier's shifts) can pass an explicit
@@ -133,6 +150,11 @@ try {
         $total_sales, $total_cash, $total_card, $total_mobile, $total_credit, $total_refunds,
         $notes, $user_id, $shift_id
     ]);
+
+    // Phase 20 — persist the validated breakdown, if one was submitted.
+    if (!empty($denominations)) {
+        saveDenominationBreakdown($pdo, (int)$shift_id, 'close', $denominations);
+    }
 
     // Clear session shift — only the acting user's OWN session shift, never the
     // one being force-closed on someone else's behalf (that shift lives in a

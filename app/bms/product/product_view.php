@@ -172,6 +172,28 @@ try {
     $warehouse_stock = [];
 }
 
+// Phase 17d (pos_upgrade_plan.md §8) — batch/lot stock ledger, read-only view.
+// Empty for a non-batch-tracked product (no GRN line for it ever specified a
+// batch_number/expiry_date) — the card below simply doesn't render then.
+$product_batches = [];
+try {
+    $stmt = $pdo->prepare("
+        SELECT pb.batch_id, pb.batch_number, pb.expiry_date, pb.quantity_received,
+               pb.quantity_remaining, pb.unit_cost, pb.created_at,
+               w.warehouse_name, pr.receipt_number,
+               DATEDIFF(pb.expiry_date, CURDATE()) AS days_remaining
+        FROM product_batches pb
+        LEFT JOIN warehouses w ON w.warehouse_id = pb.warehouse_id
+        LEFT JOIN purchase_receipts pr ON pr.receipt_id = pb.receipt_id
+        WHERE pb.product_id = ?
+        ORDER BY (pb.expiry_date IS NULL), pb.expiry_date ASC, pb.batch_id DESC
+    ");
+    $stmt->execute([$product_id]);
+    $product_batches = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $product_batches = [];
+}
+
 // Get recent sales (last 10)
 $recent_sales = [];
 try {
@@ -841,10 +863,59 @@ global $company_logo, $company_name;
                                         </div>
                                     </div>
                                 </div>
+
+                                <?php if (!empty($product_batches)): ?>
+                                <!-- Phase 17d (pos_upgrade_plan.md §8) — Batches, read-only -->
+                                <div class="col-12 mt-3">
+                                    <div class="card">
+                                        <div class="card-header bg-light border-bottom">
+                                            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-upc-scan"></i> Batches / Lots</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="table-responsive">
+                                                <table class="table table-sm">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Batch #</th>
+                                                            <th>Warehouse</th>
+                                                            <th>Expiry Date</th>
+                                                            <th>Received</th>
+                                                            <th>Remaining</th>
+                                                            <th>Unit Cost</th>
+                                                            <th>Source GRN</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <?php foreach ($product_batches as $b):
+                                                            $days = $b['days_remaining'] !== null ? (int)$b['days_remaining'] : null;
+                                                            $expiredClass = ($days !== null && $days <= 0) ? 'text-danger fw-bold' : (($days !== null && $days <= 30) ? 'text-warning fw-bold' : '');
+                                                        ?>
+                                                        <tr>
+                                                            <td><?= safe_output($b['batch_number'] ?? '—') ?></td>
+                                                            <td><?= safe_output($b['warehouse_name'] ?? 'N/A') ?></td>
+                                                            <td class="<?= $expiredClass ?>">
+                                                                <?= $b['expiry_date'] ? date('d M Y', strtotime($b['expiry_date'])) : '—' ?>
+                                                                <?php if ($days !== null && $days <= 30): ?>
+                                                                    (<?= $days <= 0 ? 'expired' : $days . 'd left' ?>)
+                                                                <?php endif; ?>
+                                                            </td>
+                                                            <td><?= format_number($b['quantity_received'], 3) ?></td>
+                                                            <td><?= format_number($b['quantity_remaining'], 3) ?></td>
+                                                            <td><?= format_currency($b['unit_cost']) ?></td>
+                                                            <td><?= safe_output($b['receipt_number'] ?? '—') ?></td>
+                                                        </tr>
+                                                        <?php endforeach; ?>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                         <?php endif; ?>
-                        
+
                         <!-- Sales Performance Tab -->
                         <div class="tab-pane fade <?= $product['is_service'] == 1 ? 'show active' : '' ?>" id="sales" role="tabpanel">
                             <div class="row">

@@ -96,6 +96,11 @@
                     <input type="number" class="form-control" id="openingCash"
                            min="0" step="0.01" value="0">
                 </div>
+                <!-- Phase 20 (pos_upgrade_plan.md §8) — optional denomination count -->
+                <a href="#" class="small" onclick="event.preventDefault(); $('#openDenomGrid').toggleClass('d-none'); renderDenomGrid('openDenomGrid');">
+                    <i class="bi bi-calculator"></i> <?= t('Count by denomination (optional)') ?>
+                </a>
+                <div class="d-none mt-2" id="openDenomGrid" data-target-input="openingCash"></div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
@@ -135,7 +140,12 @@
                         <strong id="cashDifference"><?= htmlspecialchars($currency) ?> 0.00</strong>
                     </div>
                 </div>
-                <div class="mb-3">
+                <!-- Phase 20 (pos_upgrade_plan.md §8) — optional denomination count -->
+                <a href="#" class="small" onclick="event.preventDefault(); $('#closeDenomGrid').toggleClass('d-none'); renderDenomGrid('closeDenomGrid');">
+                    <i class="bi bi-calculator"></i> <?= t('Count by denomination (optional)') ?>
+                </a>
+                <div class="d-none mt-2" id="closeDenomGrid" data-target-input="endingCash"></div>
+                <div class="mb-3 mt-3">
                     <label class="form-label"><?= t('Notes (optional)') ?></label>
                     <textarea class="form-control" id="shiftNotes" rows="2"
                               placeholder="<?= t('Any notes about the shift...') ?>"></textarea>

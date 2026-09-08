@@ -93,6 +93,14 @@ for ($y = (int)date('Y') + 1; $y >= 1950; $y--) { $lk_years[] = ['value' => (str
 // Active WHT rates for the customer "Default WHT" picker (auto-fills on their payments).
 $cust_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage FROM tax_rates WHERE tax_kind = 'wht' AND status = 'active' ORDER BY rate_percentage")->fetchAll(PDO::FETCH_ASSOC);
 
+// Phase 14 (pos_upgrade_plan.md §8) — selling price tiers. The picker only
+// shows when the tenant is entitled to pos_advanced AND more than the seeded
+// default group exists (nothing to choose between otherwise).
+$cust_price_groups_enabled = canView('pos_advanced');
+$cust_price_groups = $cust_price_groups_enabled
+    ? $pdo->query("SELECT price_group_id, name, is_default FROM price_groups WHERE status = 'active' ORDER BY is_default DESC, name ASC")->fetchAll(PDO::FETCH_ASSOC)
+    : [];
+
 // Get projects for linking — admins see all; non-admins see only their assigned projects
 if (isAdmin()) {
     $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
@@ -501,6 +509,17 @@ if (isAdmin()) {
                                     <label for="credit_limit" class="form-label"><?= t('Credit Limit') ?></label>
                                     <input type="number" class="form-control" id="credit_limit" name="credit_limit" placeholder="0.00" step="0.01">
                                 </div>
+                                <?php if ($cust_price_groups_enabled && count($cust_price_groups) > 1): ?>
+                                <div class="col-6 col-md-6 mb-3">
+                                    <label for="default_price_group_id" class="form-label"><?= t('Price Group') ?></label>
+                                    <select class="form-select select2-static" id="default_price_group_id" name="default_price_group_id">
+                                        <option value=""><?= t('None') ?></option>
+                                        <?php foreach ($cust_price_groups as $pg): ?>
+                                        <option value="<?= (int)$pg['price_group_id'] ?>"><?= safe_output($pg['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <?php endif; ?>
                                 <div class="col-12 mb-3">
                                     <label for="add_description" class="form-label"><?= t('Description') ?></label>
                                     <textarea class="form-control" id="add_description" name="description" rows="2" placeholder="<?= t('Customer description or notes') ?>"></textarea>
@@ -790,6 +809,17 @@ if (isAdmin()) {
                                         <label for="edit_credit_limit" class="form-label"><?= t('Credit Limit') ?></label>
                                         <input type="number" class="form-control" id="edit_credit_limit" name="credit_limit" step="0.01" placeholder="0.00">
                                     </div>
+                                    <?php if ($cust_price_groups_enabled && count($cust_price_groups) > 1): ?>
+                                    <div class="col-6 col-md-6 mb-3">
+                                        <label for="edit_default_price_group_id" class="form-label"><?= t('Price Group') ?></label>
+                                        <select class="form-select select2-static" id="edit_default_price_group_id" name="default_price_group_id">
+                                            <option value=""><?= t('None') ?></option>
+                                            <?php foreach ($cust_price_groups as $pg): ?>
+                                            <option value="<?= (int)$pg['price_group_id'] ?>"><?= safe_output($pg['name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <?php endif; ?>
                                     <div class="col-12 mb-3">
                                         <label for="edit_description" class="form-label"><?= t('Description') ?></label>
                                         <textarea class="form-control" id="edit_description" name="description" rows="2" placeholder="<?= t('Customer description or notes') ?>"></textarea>
@@ -1473,6 +1503,7 @@ function editCustomer(customerId) {
                     'customer_type': '#edit_customer_type',
                     'status': '#edit_status',
                     'credit_limit': '#edit_credit_limit',
+                    'default_price_group_id': '#edit_default_price_group_id',
                     'notes': '#edit_description',
                     'contact_person': '#edit_contact_person',
                     'contact_title': '#edit_contact_title',

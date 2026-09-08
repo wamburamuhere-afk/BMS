@@ -11,6 +11,7 @@ if (isset($_SESSION['user_lang'])) {
     loadLanguage($_SESSION['user_lang']);
 }
 
+require_once __DIR__ . '/../../core/pos_denominations.php';
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
@@ -30,6 +31,22 @@ try {
 
     $user_id = $_SESSION['user_id'];
     $opening_cash = isset($_POST['opening_cash']) ? floatval($_POST['opening_cash']) : 0;
+
+    // Phase 20 (pos_upgrade_plan.md §8) — optional cash denomination
+    // breakdown. Never required (backward compatible) — the single
+    // opening_cash total above stays authoritative either way.
+    $denominations = [];
+    if (!empty($_POST['denominations'])) {
+        $decoded = json_decode($_POST['denominations'], true);
+        if (is_array($decoded)) {
+            $denomCheck = validateDenominationBreakdown($decoded, $opening_cash);
+            if (!$denomCheck['valid']) {
+                echo json_encode(['success' => false, 'message' => $denomCheck['error']]);
+                exit();
+            }
+            $denominations = $decoded;
+        }
+    }
 
     // Register (till) selection — Phase 8 (pos_upgrade_plan.md §7). Falls back to
     // register #1 ("Main Counter", the schema's seed row) when the terminal is
@@ -76,9 +93,14 @@ try {
 
     $stmt->execute([$shift_code, $user_id, $register_id, $opening_cash]);
     $shift_id = $pdo->lastInsertId();
-    
+
     // Store shift ID in session
     $_SESSION['shift_id'] = $shift_id;
+
+    // Phase 20 — persist the validated breakdown, if one was submitted.
+    if (!empty($denominations)) {
+        saveDenominationBreakdown($pdo, (int)$shift_id, 'open', $denominations);
+    }
     
     // Note: We DO NOT record an 'Opening cash' transaction in the transactions table
     // because the pos.php calculation already adds shift_active['starting_cash'].

@@ -67,26 +67,63 @@ if (!function_exists('posReceiptAccountId')) {
 
 if (!function_exists('posSaleCogs')) {
     /**
-     * Σ(quantity × products.cost_price) for a POS sale — the Income-Statement convention.
+     * COGS for a POS sale — the Income-Statement/ledger convention.
      *
-     * Guards against corrupt cost data: a product whose cost_price exceeds its
-     * selling_price (with selling_price > 0) is a clear data-entry error — you do
-     * not stock goods at many times their sale price. Including such a line would
-     * inject a bogus COGS into the ledger, so it contributes 0 here (and the backfill
-     * reports it). Once the cost_price is corrected the line is counted normally, so
-     * a re-run is self-healing. Criteria-based — no product ids hard-coded.
+     * Phase 18 (pos_upgrade_plan.md §8) — per-line, prefers the ACTUAL cost of
+     * the specific batch(es) a line drew from (product_batches.unit_cost, via
+     * pos_sale_item_batches — Phase 17's FEFO consumption), which is real
+     * purchase-order-linked data, not an average. A line with no batch
+     * consumption (product not batch-tracked, or sold before Phase 17) falls
+     * back to the pre-existing average-cost convention
+     * (quantity × products.cost_price), unchanged.
+     *
+     * Guards against corrupt cost data on the average-cost fallback path only:
+     * a product whose cost_price exceeds its selling_price (with selling_price
+     * > 0) is a clear data-entry error — you do not stock goods at many times
+     * their sale price. Including such a line would inject a bogus COGS into
+     * the ledger, so it contributes 0 (and the backfill reports it). Once the
+     * cost_price is corrected the line is counted normally, so a re-run is
+     * self-healing. Criteria-based — no product ids hard-coded. This guard
+     * does NOT apply to the batch-cost path — a batch's unit_cost is the real
+     * price paid on its GRN, not a free-text field prone to the same class of
+     * data-entry error.
      *
      * Services (is_service=1) never enter Inventory via GRN, so they must never
      * leave it via COGS either — excluded regardless of any cost_price on file.
+     *
+     * KNOWN DIVERGENCE (documented, not silently introduced): the Income
+     * Statement's own POS-COGS drill-down (api/account/get_income_statement_detail.php)
+     * still uses the average-cost formula only, computed inline across a
+     * report result set rather than per-sale — making it batch-aware too is a
+     * larger, separate change to a financially-sensitive report, deliberately
+     * left for a future pass rather than rushed here.
      */
     function posSaleCogs(PDO $pdo, int $saleId): float
     {
-        $v = $pdo->query("SELECT COALESCE(SUM(si.quantity * COALESCE(p.cost_price,0)),0)
-                            FROM pos_sale_items si
-                            JOIN products p ON si.product_id = p.product_id
-                           WHERE si.sale_id = " . (int)$saleId . "
-                             AND p.is_service = 0
-                             AND NOT (p.cost_price > p.selling_price AND p.selling_price > 0)")->fetchColumn();
+        $v = $pdo->query("
+            SELECT COALESCE(SUM(
+                CASE
+                    WHEN bc.batch_qty > 0 THEN bc.batch_cost_total
+                    ELSE si.quantity * COALESCE(p.cost_price, 0)
+                END
+            ), 0)
+            FROM pos_sale_items si
+            JOIN products p ON si.product_id = p.product_id
+            LEFT JOIN (
+                SELECT psib.sale_item_id,
+                       SUM(psib.quantity) AS batch_qty,
+                       SUM(psib.quantity * pb.unit_cost) AS batch_cost_total
+                FROM pos_sale_item_batches psib
+                JOIN product_batches pb ON pb.batch_id = psib.batch_id
+                GROUP BY psib.sale_item_id
+            ) bc ON bc.sale_item_id = si.sale_item_id
+            WHERE si.sale_id = " . (int)$saleId . "
+              AND p.is_service = 0
+              AND (
+                  bc.batch_qty > 0
+                  OR NOT (p.cost_price > p.selling_price AND p.selling_price > 0)
+              )
+        ")->fetchColumn();
         return round((float)$v, 2);
     }
 }
