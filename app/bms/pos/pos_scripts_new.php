@@ -144,7 +144,9 @@ const PT = {
     overrideAndProceed: <?= json_encode(t('Override and Proceed')) ?>,
     availableCredit: <?= json_encode(t('Available Credit')) ?>,
     outstandingLabel: <?= json_encode(t('Outstanding')) ?>,
-    totalLabel: <?= json_encode(t('Total:')) ?>
+    totalLabel: <?= json_encode(t('Total:')) ?>,
+    shareViaWhatsApp: <?= json_encode(t('Share via WhatsApp')) ?>,
+    whatsappNumberLabel: <?= json_encode(t('WhatsApp number (with country code)')) ?>
 };
 
 // Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split: a cashier
@@ -1119,19 +1121,28 @@ function submitPayment(paymentData) {
                 let loyaltyMsg = '';
                 if (response.loyalty_points_earned > 0) loyaltyMsg += ' ' + PT.earnedPts.replace('%d', response.loyalty_points_earned);
                 if (response.loyalty_points_redeemed > 0) loyaltyMsg += ' ' + PT.redeemedPts.replace('%d', response.loyalty_points_redeemed);
+                // Phase 22 (pos_upgrade_plan.md §8) — build the WhatsApp share
+                // text from the cart BEFORE it's cleared below (no gateway —
+                // a plain wa.me deep-link the cashier's own device opens).
+                const whatsappReceiptText = buildWhatsAppReceiptText(currentReceiptNumber);
+
                 Swal.fire({
                     icon: 'success',
                     title: PT.saleCompleted,
                     text: PT.receiptHash + currentReceiptNumber + loyaltyMsg,
                     showCancelButton: true,
+                    showDenyButton: true,
                     confirmButtonText: POS_AUTO_PRINT_RECEIPT ? PT.printAgain : PT.printReceipt,
+                    denyButtonText: PT.shareViaWhatsApp,
                     cancelButtonText: PT.nextCustomer,
                     reverseButtons: true
                 }).then((result) => {
                     if (result.isConfirmed) {
                         printReceipt(response.sale_id);
+                    } else if (result.isDenied) {
+                        shareReceiptViaWhatsApp(whatsappReceiptText);
                     }
-                    
+
                     // === RESET FOR NEXT CUSTOMER ===
                     // 1. Clear Cart
                     cart = [];
@@ -1199,6 +1210,44 @@ function submitPayment(paymentData) {
             });
             $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
         }
+    });
+}
+
+// Phase 22 (pos_upgrade_plan.md §8) — a free, real WhatsApp receipt share:
+// no gateway, no new dependency, just a wa.me deep-link with the receipt
+// text URL-encoded — opens the cashier's own WhatsApp Web/app to send it.
+function buildWhatsAppReceiptText(receiptNumber) {
+    let lines = [];
+    lines.push(<?= json_encode(t('Receipt #')) ?> + receiptNumber);
+    cart.forEach(item => {
+        const total = (item.discounted_price * item.quantity).toLocaleString();
+        lines.push(`${item.product_name} x${item.quantity} = ${POS_CURRENCY} ${total}`);
+    });
+    const total = $('#cartTotal').text().trim();
+    lines.push('---');
+    lines.push(<?= json_encode(t('TOTAL:')) ?> + ' ' + total);
+    lines.push(<?= json_encode(t('THANK YOU')) ?>);
+    return lines.join('\n');
+}
+
+function shareReceiptViaWhatsApp(text) {
+    const selectedCustomer = $('#customerSelect').select2('data')[0];
+    const suggestedPhone = (selectedCustomer && selectedCustomer.text && selectedCustomer.text.match(/[\d+][\d\s+-]{6,}/))
+        ? selectedCustomer.text.match(/[\d+][\d\s+-]{6,}/)[0].replace(/[\s-]/g, '')
+        : '';
+    Swal.fire({
+        title: PT.shareViaWhatsApp,
+        input: 'text',
+        inputLabel: PT.whatsappNumberLabel,
+        inputValue: suggestedPhone,
+        inputPlaceholder: '2557XXXXXXXX',
+        showCancelButton: true,
+        confirmButtonText: PT.shareViaWhatsApp,
+        cancelButtonText: PT.cancel
+    }).then(r => {
+        if (!r.isConfirmed || !r.value) return;
+        const phone = r.value.replace(/[^\d]/g, '');
+        window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
     });
 }
 

@@ -39,7 +39,7 @@ $stmt = $pdo->prepare("
         w.warehouse_name,
         r.register_code, r.receipt_header AS reg_receipt_header,
         r.receipt_footer AS reg_receipt_footer, r.receipt_logo AS reg_receipt_logo,
-        r.printer_connection_type, r.printer_ip_address, r.printer_port
+        r.printer_connection_type, r.printer_ip_address, r.printer_port, r.receipt_template
     FROM pos_sales s
     LEFT JOIN customers c ON s.customer_id = c.customer_id
     LEFT JOIN users u ON s.user_id = u.user_id
@@ -93,6 +93,11 @@ $auto_print    = getSetting('pos_auto_print_receipt', '0') === '1';
 $receipt_header_extra = trim($sale['reg_receipt_header'] ?? '');
 $receipt_footer_extra = trim($sale['reg_receipt_footer'] ?? '');
 $register_label        = trim($sale['register_name'] ?? '');
+
+// Phase 22 (pos_upgrade_plan.md §8) — receipt layout variety, per register.
+// 'classic' (the pre-existing, unmodified layout) is the default.
+$receipt_template = in_array($sale['receipt_template'] ?? 'classic', ['classic', 'detailed', 'slim'], true)
+    ? $sale['receipt_template'] : 'classic';
 
 // Phase 21 (pos_upgrade_plan.md §8) — real network (IP) thermal-printer
 // support. Only for a register explicitly configured for it; every other
@@ -295,21 +300,37 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
             <div class="item-qty"><?= $item['quantity'] ?></div>
             <div class="item-price"><?= number_format($item['line_total'], 0) ?></div>
         </div>
+        <?php if ($receipt_template !== 'slim'): ?>
         <div style="font-size: 10px; color: #666; margin-left: 5px;">
             @ <?= number_format($item['unit_price'], 0) ?> x <?= $item['quantity'] ?>
+            <?php if ($receipt_template === 'detailed' && (float)($item['discount_amount'] ?? 0) > 0.009): ?>
+                — <?= t('Discount:') ?> -<?= number_format($item['discount_amount'], 0) ?>
+            <?php endif; ?>
+            <?php if ($receipt_template === 'detailed' && (float)($item['tax_rate'] ?? 0) > 0.009): ?>
+                — <?= t('VAT:') ?> <?= number_format($item['tax_rate'], 0) ?>%
+            <?php endif; ?>
         </div>
+        <?php endif; ?>
         <?php endforeach; ?>
     </div>
 
     <div class="totals">
+        <?php if ($receipt_template !== 'slim'): ?>
         <div class="total-row">
             <span><?= t('Subtotal:') ?></span>
             <span><?= number_format($sale['subtotal'], 0) ?></span>
         </div>
+        <?php if ($receipt_template === 'detailed' && (float)($sale['discount_amount'] ?? 0) > 0.009): ?>
+        <div class="total-row">
+            <span><?= t('Discount:') ?></span>
+            <span>-<?= number_format($sale['discount_amount'], 0) ?></span>
+        </div>
+        <?php endif; ?>
         <div class="total-row">
             <span><?= t('Total Tax:') ?></span>
             <span><?= number_format($sale['tax_amount'], 0) ?></span>
         </div>
+        <?php endif; ?>
         <div class="total-row grand-total">
             <span><?= t('TOTAL:') ?></span>
             <span><?= htmlspecialchars($currency) ?> <?= number_format($sale['grand_total'], 0) ?></span>

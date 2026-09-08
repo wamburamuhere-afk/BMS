@@ -5370,6 +5370,7 @@ CREATE TABLE `pos_registers` (
   `printer_connection_type` enum('browser','network') NOT NULL DEFAULT 'browser',
   `printer_ip_address` varchar(45) DEFAULT NULL,
   `printer_port` int DEFAULT '9100',
+  `receipt_template` enum('classic','detailed','slim') NOT NULL DEFAULT 'classic',
   `barcode_scanner` tinyint(1) DEFAULT '1',
   `cash_drawer` tinyint(1) DEFAULT '1',
   `card_reader` tinyint(1) DEFAULT '0',

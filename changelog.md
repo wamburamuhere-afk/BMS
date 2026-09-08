@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-09-08 (feature) - POS Phase 22: receipt layout variety + WhatsApp receipt link
+
+**Files (new):** `migrations/tenant/2026_09_08_pos_receipt_templates.php`, `tests/test_pos_receipt_templates_cli.php`
+**Files (changed):** `api/pos/print_receipt.php`, `api/pos/save_register.php`, `api/pos/get_registers.php`,
+`app/constant/settings/pos_config_settings.php`, `app/bms/pos/pos_scripts_new.php`, `lang/sw.php`,
+`schema/tenant_schema_template.sql`
+
+Ninth phase of the Tier-3 plan (§8 Phase 22). Three selectable per-register receipt layouts
+(`pos_registers.receipt_template`) — Classic (unchanged default), Detailed (per-line discount/tax
++ sale-level discount), Slim (totals only) — whitelisted server-side on both save and read, never
+trusting the DB enum alone (the exact lesson from Phase 8's split/mixed enum-coercion bug). The
+post-sale success dialog gained a "Share via WhatsApp" button that builds the receipt text from
+the cart before it's cleared and opens a plain `wa.me` deep-link — no SMS gateway, no new
+dependency, matching what the UltimatePOS audit found actually works there too.
+
 ## 2026-09-08 (feature) - POS Phase 21: network (IP) thermal-printer support (real ESC/POS + drawer-kick)
 
 **Files (new):** `core/escpos_printer.php`, `migrations/tenant/2026_09_08_pos_network_printer.php`,

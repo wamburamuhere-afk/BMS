@@ -235,6 +235,15 @@ $pos_currency = getSetting('currency', 'TZS');
                     <label class="form-label"><?= t('Receipt Footer (optional addition)') ?></label>
                     <textarea class="form-control" id="reg_receipt_footer" rows="2" placeholder="<?= t('e.g. branch-specific note') ?>"></textarea>
                 </div>
+                <!-- Phase 22 (pos_upgrade_plan.md §8) — receipt layout variety -->
+                <div class="mb-3">
+                    <label class="form-label"><?= t('Receipt Layout') ?></label>
+                    <select class="form-select" id="reg_receipt_template">
+                        <option value="classic"><?= t('Classic (default)') ?></option>
+                        <option value="detailed"><?= t('Detailed (shows per-line discount/tax)') ?></option>
+                        <option value="slim"><?= t('Slim (totals only)') ?></option>
+                    </select>
+                </div>
                 <hr>
                 <!-- Phase 21 (pos_upgrade_plan.md §8) — network (IP) thermal printer -->
                 <div class="mb-3">
@@ -327,6 +336,7 @@ function openRegisterModal() {
     $('#reg_printer_ip_address').val('');
     $('#reg_printer_port').val(9100);
     $('#reg_printer_ip_wrap').addClass('d-none');
+    $('#reg_receipt_template').val('classic');
     new bootstrap.Modal(document.getElementById('registerModal')).show();
 }
 
@@ -348,6 +358,7 @@ function editRegister(id) {
     $('#reg_printer_ip_address').val(r.printer_ip_address || '');
     $('#reg_printer_port').val(r.printer_port || 9100);
     $('#reg_printer_ip_wrap').toggleClass('d-none', (r.printer_connection_type || 'browser') !== 'network');
+    $('#reg_receipt_template').val(r.receipt_template || 'classic');
     new bootstrap.Modal(document.getElementById('registerModal')).show();
 }
 
@@ -387,6 +398,7 @@ function saveRegister() {
         printer_connection_type: $('#reg_printer_connection_type').val(),
         printer_ip_address: $('#reg_printer_ip_address').val(),
         printer_port: $('#reg_printer_port').val(),
+        receipt_template: $('#reg_receipt_template').val(),
         _csrf: <?= json_encode(csrf_token()) ?>
     }, function (res) {
         if (res.success) {

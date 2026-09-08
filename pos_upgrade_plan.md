@@ -1412,6 +1412,22 @@ browser path on any socket error (fail-open, never blocks a sale).
 
 ### Phase 22 — Receipt/Invoice Layout Variety + WhatsApp Receipt Link
 
+**Status:** ✅ DONE · **Built:** 2026-09-08 · **Branch:** `feat/pos-tier3-advanced-retail`
+
+Shipped as planned. `pos_registers.receipt_template` (`'classic'` default —
+the pre-existing, unmodified layout — `'detailed'` adds per-line
+discount/tax and the sale-level discount row, `'slim'` drops the
+subtotal/tax breakdown down to totals only), whitelisted server-side both
+on save (`save_register.php`, mirroring the exact lesson from Phase 8's
+enum-coercion bug — never trust the DB enum alone) and on read
+(`print_receipt.php`). The post-sale success dialog gained a third
+("Share via WhatsApp") button alongside Print/Next Customer — builds the
+receipt text from the cart **before** it's cleared for the next sale, then
+opens a plain `wa.me` deep-link with it URL-encoded; no gateway, no new
+dependency, confirmed working the same way in the UltimatePOS audit that
+originally surfaced this gap. `tests/test_pos_receipt_templates_cli.php`
+(29 checks). Full POS regression re-run clean.
+
 **Closes:** cosmetic but real — one fixed layout today vs. selectable designs.
 **Gate:** base `pos` (a small business shouldn't need the premium tier just to
 pick a receipt look — cosmetic, not a capacity feature).
