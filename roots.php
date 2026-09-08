@@ -1100,6 +1100,10 @@ $routes = [
     'pos/shift-history'          => POS_DIR . '/shift_history.php',
     'pos/zreport'                => POS_DIR . '/zreport.php',
 
+    // POS Phase 14 — Selling Price Tiers (pos_upgrade_plan.md §8)
+    'pos/price-groups'           => POS_DIR . '/price_groups.php',
+    'pos_price_groups'           => POS_DIR . '/price_groups.php',
+
 
     // ========================================================================
     // ========================================================================

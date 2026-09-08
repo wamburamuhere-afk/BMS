@@ -85,6 +85,8 @@ try {
         'customer_type' => $_POST['customer_type'] ?? 'business',
         'status' => $_POST['status'] ?? 'active',
         'credit_limit' => !empty($_POST['credit_limit']) ? $_POST['credit_limit'] : 0,
+        // Phase 14 (pos_upgrade_plan.md §8) — selling price tiers.
+        'default_price_group_id' => !empty($_POST['default_price_group_id']) ? (int)$_POST['default_price_group_id'] : null,
         'notes' => $_POST['description'] ?? null, // Map description to notes
         
         'contact_person' => $_POST['contact_person'] ?? null,

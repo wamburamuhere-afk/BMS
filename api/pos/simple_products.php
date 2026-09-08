@@ -37,6 +37,10 @@ try {
     $search = isset($_GET['search']) ? trim($_GET['search']) : '';
     $warehouse_id = isset($_GET['warehouse_id']) ? intval($_GET['warehouse_id']) : 0;
     $project_id = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
+    // Phase 14 (pos_upgrade_plan.md §8) — selling price tiers. 0/absent means
+    // "no group chosen" -> plain products.selling_price, same as before this
+    // phase (fully backward compatible).
+    $price_group_id = isset($_GET['price_group_id']) ? intval($_GET['price_group_id']) : 0;
 
     // A specific warehouse must be one this user is actually scoped to;
     // omitting it entirely is only allowed for admins / grant-all users
@@ -73,6 +77,7 @@ try {
                 p.barcode,
                 p.selling_price,
                 p.min_selling_price,
+                COALESCE(MAX(pgp.price), p.selling_price) as effective_price,
                 p.tax_rate,
                 p.is_taxable,
                 COALESCE(SUM(ps.stock_quantity), 0) as total_physical,
@@ -83,8 +88,11 @@ try {
                 p.category_id,
                 p.image_url
             FROM products p
-            LEFT JOIN product_stocks ps ON p.product_id = ps.product_id $ps_warehouse_filter
-            WHERE p.status = 'active'";
+            LEFT JOIN product_stocks ps ON p.product_id = ps.product_id $ps_warehouse_filter"
+            . ($price_group_id > 0
+                ? " LEFT JOIN product_price_group_prices pgp ON pgp.product_id = p.product_id AND pgp.price_group_id = :price_group_id"
+                : " LEFT JOIN product_price_group_prices pgp ON 1=0") .
+            " WHERE p.status = 'active'";
 
     // A specific warehouse was chosen: only list products actually available
     // there — a physical product needs a product_stocks row for THIS
@@ -117,7 +125,11 @@ try {
         $sql .= " AND (p.product_name LIKE :search OR p.sku LIKE :search OR p.barcode LIKE :search)";
         $params[':search'] = "%$search%";
     }
-    
+
+    if ($price_group_id > 0) {
+        $params[':price_group_id'] = $price_group_id;
+    }
+
     $sql .= " GROUP BY p.product_id ";
     
     // Sort by project stock first if a project is selected
@@ -135,7 +147,11 @@ try {
     $products = array_map(function($p) use ($project_id) {
         $p['product_id'] = intval($p['product_id']);
         $p['selling_price'] = floatval($p['selling_price']);
-        
+        // Phase 14 — the price a cashier actually sees/starts from: the chosen
+        // price group's override if one exists for this product, else plain
+        // selling_price (identical to $p['selling_price'] when no group chosen).
+        $p['effective_price'] = floatval($p['effective_price']);
+
         $general = floatval($p['general_available']);
         $p_stock = floatval($p['project_stock'] ?? 0);
         

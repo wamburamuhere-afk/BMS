@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-09-08 (feature) - POS Phase 14: selling price tiers (Retail/Wholesale/Custom)
+
+**Files (new):** `core/pos_price_groups.php`, `migrations/tenant/2026_09_08_pos_price_groups.php`,
+`app/bms/pos/price_groups.php`, `api/pos/get_price_groups.php`, `api/pos/save_price_group.php`,
+`api/pos/toggle_price_group_status.php`, `api/pos/get_price_group_products.php`,
+`api/pos/save_price_group_product_price.php`, `tests/test_pos_price_groups_cli.php`
+**Files (changed):** `api/pos/process_sale.php`, `api/pos/simple_products.php`,
+`api/pos/search_customers.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`,
+`app/bms/customer/customers.php`, `api/add_customer.php`, `api/process_edit_customer.php`,
+`core/feature_registry.php`, `roots.php`, `header.php`, `lang/sw.php`,
+`schema/tenant_schema_template.sql`, `schema/tenant_seed_defaults.sql`,
+`tests/test_pos_i18n_coverage_cli.php`
+
+Second phase of the Tier-3 plan (§8 Phase 14). New `price_groups` +
+`product_price_group_prices` tables (sparse per-product override, falls back to
+`products.selling_price`); seeded "Retail" (default) and "Wholesale" (pre-populated from
+the existing `products.wholesale_price` column wherever it's a real, different price — no
+data thrown away). POS terminal gets a price-group selector (only rendered when more than
+one active group exists) that auto-applies when a customer with a saved
+`default_price_group_id` is selected; every add-to-cart path (click, quick-view, barcode
+scan) now resolves through the chosen group's `effective_price`. Management page
+(`price_groups.php`) lets an admin create groups and set per-product override prices via an
+inline searchable grid. Gated behind the existing `pos_advanced` tenant entitlement — a
+base-tier POS is entirely unaffected (no selector shown, `price_group_id=0` resolves
+identically to pre-Phase-14 behaviour everywhere it's checked). All new UI/API strings
+translated to Swahili (i18n coverage test extended to cover the 6 new files, still zero
+gaps). Fixed in passing: Phase 16's two permission page_keys were missing from
+`feature_registry.php`, caught by `test_feature_registry_cli.php`.
+
 ## 2026-09-08 (feature) - POS Phase 16: cashier price/discount-override permission split
 
 **Files (new):** `core/pos_override_guard.php`, `migrations/tenant/2026_09_08_pos_override_permissions.php`,

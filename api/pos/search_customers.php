@@ -16,7 +16,7 @@ global $pdo;
 $q = trim($_GET['q'] ?? '');
 
 try {
-    $sql = "SELECT customer_id, customer_name, customer_code, phone, mobile, loyalty_points_balance
+    $sql = "SELECT customer_id, customer_name, customer_code, phone, mobile, loyalty_points_balance, default_price_group_id
               FROM customers c
              WHERE status = 'active'";
     $params = [];
@@ -38,7 +38,14 @@ try {
         $text = $r['customer_name'];
         $phone = $r['mobile'] ?: $r['phone'];
         if ($phone) $text .= ' — ' . $phone;
-        $results[] = ['id' => (int)$r['customer_id'], 'text' => $text, 'loyalty_points' => (int)$r['loyalty_points_balance']];
+        $results[] = [
+            'id' => (int)$r['customer_id'],
+            'text' => $text,
+            'loyalty_points' => (int)$r['loyalty_points_balance'],
+            // Phase 14 (pos_upgrade_plan.md §8) — auto-applies this customer's
+            // price tier when selected; null when they have none set.
+            'default_price_group_id' => $r['default_price_group_id'] !== null ? (int)$r['default_price_group_id'] : null,
+        ];
     }
     echo json_encode(['results' => $results]);
 

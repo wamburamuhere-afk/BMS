@@ -1625,4 +1625,32 @@ return [
     'You do not have permission to receive POS payments' => 'Huna ruhusa ya kupokea malipo ya POS',
     'You do not have permission to void POS sales' => 'Huna ruhusa ya kubatilisha mauzo ya POS',
     'unknown error' => 'hitilafu isiyojulikana',
+
+    // ------------------------------------------------------------------
+    // POS — Price Groups, Phase 14 (app/bms/pos/price_groups.php + api/pos/*price_group*.php)
+    // ------------------------------------------------------------------
+    'A price group with this name already exists. Please use a different name.' => 'Kundi la bei lenye jina hili tayari lipo. Tafadhali tumia jina tofauti.',
+    'Activate this price group?' => 'Wezesha kundi hili la bei?',
+    'Confirm' => 'Thibitisha',
+    'Deactivate this price group?' => 'Zima kundi hili la bei?',
+    'Default' => 'Chaguo-msingi',
+    'Done' => 'Imekamilika',
+    'Edit Price Group' => 'Hariri Kundi la Bei',
+    'Manage Prices' => 'Simamia Bei',
+    'New Price Group' => 'Kundi Jipya la Bei',
+    'Override Price' => 'Bei Maalum',
+    'Price Group' => 'Kundi la Bei',
+    'Price Groups' => 'Makundi ya Bei',
+    'Price cannot be negative.' => 'Bei haiwezi kuwa hasi.',
+    'Price group activated successfully.' => 'Kundi la bei limewezeshwa kwa mafanikio.',
+    'Price group created successfully.' => 'Kundi la bei limeundwa kwa mafanikio.',
+    'Price group deactivated successfully.' => 'Kundi la bei limezimwa kwa mafanikio.',
+    'Price group not found.' => 'Kundi la bei halikupatikana.',
+    'Price group updated successfully.' => 'Kundi la bei limesasishwa kwa mafanikio.',
+    'Price groups are not included in your plan.' => 'Makundi ya bei hayajajumuishwa kwenye mpango wako.',
+    'Product Overrides' => 'Bei Maalum za Bidhaa',
+    'Saved!' => 'Imehifadhiwa!',
+    'Search product by name or SKU' => 'Tafuta bidhaa kwa jina au SKU',
+    'The default price group cannot be deactivated.' => 'Kundi la bei la chaguo-msingi haliwezi kuzimwa.',
+    'The default price group cannot be renamed.' => 'Kundi la bei la chaguo-msingi haliwezi kubadilishwa jina.',
 ];

@@ -16,6 +16,7 @@ let currentShiftActive = <?= $shift_active ? 'true' : 'false' ?>;
 let isSplitPayment = false;
 let splitAmounts = { cash: 0, mobile: 0, bank: 0, card: 0 };
 let posDiscountType = '<?= get_setting('pos_discount_type', 'percentage') ?>'; // 'percentage' or 'fixed'
+let posSelectedPriceGroupId = 0; // Phase 14 (pos_upgrade_plan.md §8) — 0 = no group chosen, plain selling_price
 const POS_AUTO_PRINT_RECEIPT = <?= get_setting('pos_auto_print_receipt', '0') === '1' ? 'true' : 'false' ?>; // Phase 10 (pos_upgrade_plan.md §7)
 const POS_CURRENCY = <?= json_encode($currency) ?>; // Phase 11 (pos_upgrade_plan.md §7) — was hardcoded 'TZS' everywhere
 const POS_LOYALTY_REDEEM_VALUE = <?= (float)getSetting('pos_loyalty_redeem_value', '50') ?>; // currency value of 1 point — preview only, server re-validates
@@ -168,10 +169,20 @@ $(document).ready(function() {
         $('#loyaltyAvailablePoints').text(points.toLocaleString());
         $('#redeemPointsInput').attr('max', points).val(0);
         $('#loyaltyPointsSection').removeClass('d-none');
+        // Phase 14 (pos_upgrade_plan.md §8) — auto-apply this customer's price
+        // tier if they have one set; the cashier can still change it manually.
+        if ($('#posPriceGroupId').length && e.params.data.default_price_group_id) {
+            $('#posPriceGroupId').val(e.params.data.default_price_group_id).trigger('change');
+        }
         calculateCartTotal();
     }).on('select2:clear select2:unselect', function () {
         $('#loyaltyPointsSection').addClass('d-none');
         $('#redeemPointsInput').val(0);
+        // Back to the default group (first option, seeded as "Retail") for a
+        // walk-in / cleared customer.
+        if ($('#posPriceGroupId').length) {
+            $('#posPriceGroupId').val($('#posPriceGroupId option:first').val()).trigger('change');
+        }
         calculateCartTotal();
     });
 
@@ -218,6 +229,20 @@ $(document).ready(function() {
             );
         }
     })();
+
+    // Phase 14 (pos_upgrade_plan.md §8) — selling price tiers. Only rendered
+    // when more than one active group exists (see pos.php); sync the initial
+    // selection and reload the product grid (with its resolved
+    // effective_price) whenever the cashier changes it. Existing cart lines
+    // keep the price they were added at — only new additions use the new
+    // group, matching how a real till behaves.
+    if ($('#posPriceGroupId').length) {
+        posSelectedPriceGroupId = parseInt($('#posPriceGroupId').val()) || 0;
+        $('#posPriceGroupId').on('change', function () {
+            posSelectedPriceGroupId = parseInt($(this).val()) || 0;
+            loadProducts();
+        });
+    }
 
     // Shared Project → Warehouse cascade (assets/js/warehouse-project-filter.js):
     // no project -> only warehouses not assigned to any project;
@@ -415,7 +440,8 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
             category: categoryId !== 'all' ? categoryId : '',
             search: searchTerm,
             warehouse_id: warehouseId,
-            project_id: projectId
+            project_id: projectId,
+            price_group_id: posSelectedPriceGroupId || ''
         },
         dataType: 'json',
         success: function(response) {
@@ -466,7 +492,7 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                                     ${isService ? '<span class="badge bg-info text-white mb-1">' + PT.service + '</span>' : ''}
                                     <h6 class="card-title mb-1 small text-truncate fw-bold" title="${product.product_name}">${product.product_name}</h6>
                                     <p class="card-text text-muted small mb-1">${product.sku || ''}</p>
-                                    <p class="card-text fw-bold text-primary mb-1">${POS_CURRENCY} ${parseFloat(product.selling_price).toLocaleString()}</p>
+                                    <p class="card-text fw-bold text-primary mb-1">${POS_CURRENCY} ${parseFloat(product.effective_price ?? product.selling_price).toLocaleString()}</p>
                                     ${!isService ? `<p class="card-text small ${product.stock_quantity <= 10 ? 'text-danger fw-bold' : 'text-muted'}">
                                         ${PT.qtyLabel} ${product.stock_quantity}
                                     </p>` : '<p class="card-text small text-muted"><i class="bi bi-infinity"></i> ' + PT.service + '</p>'}
@@ -553,7 +579,7 @@ function showProductQuickView(productId) {
     const html = `
         <h6>${currentProduct.product_name}</h6>
         <p class="text-muted small mb-2">${currentProduct.sku || PT.noSku}</p>
-        <p class="text-success fw-bold">${POS_CURRENCY} ${parseFloat(currentProduct.selling_price).toLocaleString()}</p>
+        <p class="text-success fw-bold">${POS_CURRENCY} ${parseFloat(currentProduct.effective_price ?? currentProduct.selling_price).toLocaleString()}</p>
         ${currentProduct.is_service != 1 ? `<p class="small ${currentProduct.stock_quantity <= 10 ? 'text-danger' : 'text-muted'}">
             ${PT.stockLabel} ${currentProduct.stock_quantity}
         </p>` : '<p class="small text-muted"><i class="bi bi-infinity"></i> ' + PT.service + '</p>'}
@@ -609,14 +635,18 @@ function addToCart() {
             product_id: currentProduct.product_id,
             product_name: currentProduct.product_name,
             sku: currentProduct.sku,
-            price: parseFloat(currentProduct.selling_price) || 0,
+            // Phase 14 (pos_upgrade_plan.md §8) — the chosen price group's
+            // override when one exists for this product, else plain
+            // selling_price (effective_price === selling_price when no group
+            // is active — simple_products.php guarantees this).
+            price: parseFloat(currentProduct.effective_price ?? currentProduct.selling_price) || 0,
             quantity: quantity,
             tax_rate: saleVatRate, // cashier-selected VAT (0 or 18), not auto-applied from the product
             min_selling_price: parseFloat(currentProduct.min_selling_price) || 0,
             discount_type: 'percentage', // Default to percentage
             discount_value: 0,
             discount_percent: 0,
-            discounted_price: parseFloat(currentProduct.selling_price) || 0
+            discounted_price: parseFloat(currentProduct.effective_price ?? currentProduct.selling_price) || 0
         });
     }
     
@@ -942,6 +972,7 @@ function processPayment() {
         customer_id: customerId || null,
         warehouse_id: warehouseId,
         project_id: $('#posProjectId').val() || null,
+        price_group_id: posSelectedPriceGroupId || null,
         items: cart,
         subtotal: subtotal,
         discount_percentage: globalDiscountPercent,
@@ -1805,7 +1836,10 @@ function updateCashBalanceUI() {
 
     // ── Add product to cart (scanner path — no modal, no click required) ─────
     function scanAddToCart(product) {
-        const price    = parseFloat(product.selling_price) || 0;
+        // Phase 14 (pos_upgrade_plan.md §8) — same price-group resolution as
+        // the click-to-cart path (addToCart()), so a scanned item respects
+        // the active price group too.
+        const price    = parseFloat(product.effective_price ?? product.selling_price) || 0;
         const existing = cart.find(function (item) {
             return item.product_id == product.product_id;
         });

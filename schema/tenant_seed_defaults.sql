@@ -934,4 +934,11 @@ UPDATE `accounts` SET `opening_balance` = 0.00, `current_balance` = 0.00;
 -- here rather than leaking counterparty names into a new tenant.
 DELETE FROM `accounts` WHERE `is_subledger` = 1;
 
+-- ── POS Phase 14 — default price groups (pos_upgrade_plan.md §8) ───────────
+-- "Retail" needs no per-product override rows — its fallback IS
+-- products.selling_price. A brand-new tenant has no products yet, so
+-- Wholesale starts empty too; it fills in as products are created/edited.
+INSERT IGNORE INTO `price_groups` (`name`, `is_default`, `status`) VALUES ('Retail', 1, 'active');
+INSERT IGNORE INTO `price_groups` (`name`, `is_default`, `status`) VALUES ('Wholesale', 0, 'active');
+
 SET FOREIGN_KEY_CHECKS = @OLD_FOREIGN_KEY_CHECKS;

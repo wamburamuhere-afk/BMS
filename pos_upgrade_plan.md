@@ -916,6 +916,24 @@ exactly what has to be newly added:**
 
 ### Phase 14 — Selling Price Tiers (Retail / Wholesale / Custom)
 
+**Status:** ✅ DONE · **Built:** 2026-09-08 · **Branch:** `feat/pos-tier3-advanced-retail`
+
+Shipped as planned below. `core/pos_price_groups.php::resolveGroupPrices()`
+extracted for independent testability (same pattern as Phase 16's
+`pos_override_guard.php`); `simple_products.php` resolves per-product via a
+`COALESCE(MAX(pgp.price), p.selling_price)` join (wrapped in `MAX()` to
+satisfy `ONLY_FULL_GROUP_BY` — verified live against the real DB, not
+assumed). Management UI `app/bms/pos/price_groups.php` (list + inline
+per-product price grid), customer form gained a "Price Group" picker
+(`customers.default_price_group_id`) that auto-applies at the POS terminal
+when that customer is selected. `tests/test_pos_price_groups_cli.php`
+(36 checks, transaction-rolled-back). Full POS + feature-registry regression
+suite re-run clean; the same 2 pre-existing unrelated failures persist
+(confirmed present on unmodified `develop`). Found and fixed in passing:
+Phase 16's two new permission page_keys were missing from
+`core/feature_registry.php`'s `pos` → `page_keys` list, which
+`test_feature_registry_cli.php` correctly flagged as "ungated" — fixed here.
+
 **Closes:** walk-in vs. bulk-buyer pricing, the single most common real-world
 gap for a TZ shop counter. **Gate:** `pos_advanced`.
 

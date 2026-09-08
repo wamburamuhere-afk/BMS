@@ -19,6 +19,7 @@ require_once __DIR__ . '/../../helpers.php';
 require_once __DIR__ . '/../../core/stock_ledger.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 require_once __DIR__ . '/../../core/pos_override_guard.php';
+require_once __DIR__ . '/../../core/pos_price_groups.php';
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
@@ -54,6 +55,10 @@ try {
     $customer_id  = $toNullableInt($input['customer_id']  ?? null);
     $warehouse_id = $toNullableInt($input['warehouse_id'] ?? null);
     $project_id   = $toNullableInt($input['project_id']   ?? null);
+    // Phase 14 (pos_upgrade_plan.md §8) — selling price tiers. 0/absent = no
+    // group chosen, every line resolves to plain products.selling_price,
+    // identical to pre-Phase-14 behaviour.
+    $price_group_id = $toNullableInt($input['price_group_id'] ?? null) ?? 0;
     $payment_method = $input['payment_method'] ?? 'cash';
     $amount_tendered = floatval($input['amount_tendered'] ?? 0);
     $items = $input['items'] ?? [];
@@ -205,7 +210,20 @@ try {
     $fetchStmt->execute($fetchParams);
     $products_db = $fetchStmt->fetchAll(PDO::FETCH_ASSOC);
     $products_map = array_column($products_db, null, 'product_id');
-    
+
+    // Phase 14 (pos_upgrade_plan.md §8) — resolve each product's authoritative
+    // price for the chosen price group BEFORE the item loop below, so
+    // core/pos_override_guard.php::resolvePosLineBasePrice() (which reads
+    // $db_product['selling_price']) is automatically group-aware without
+    // needing to know price groups exist at all. Sparse: a product with no
+    // override row for this group keeps its plain selling_price untouched.
+    $groupPrices = resolveGroupPrices($pdo, $price_group_id, $product_ids);
+    foreach ($groupPrices as $pid => $price) {
+        if (isset($products_map[$pid])) {
+            $products_map[$pid]['selling_price'] = $price;
+        }
+    }
+
     // Insert sale items and update inventory
     $itemStmt = $pdo->prepare("
         INSERT INTO pos_sale_items (

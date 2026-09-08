@@ -1883,6 +1883,7 @@ CREATE TABLE `customers` (
   `vat_number` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `payment_terms` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `credit_limit` decimal(12,2) DEFAULT '0.00',
+  `default_price_group_id` int DEFAULT NULL,
   `current_balance` decimal(12,2) DEFAULT '0.00',
   `loyalty_points_balance` int NOT NULL DEFAULT '0',
   `currency` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'TZS',
@@ -5496,6 +5497,27 @@ CREATE TABLE `pos_sales` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `price_groups`
+-- Phase 14 (pos_upgrade_plan.md §8) — selling price tiers.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `price_groups` (
+  `price_group_id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `is_default` tinyint(1) NOT NULL DEFAULT '0',
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `created_by` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`price_group_id`),
+  UNIQUE KEY `uq_price_group_name` (`name`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `product_assembly_components`
 --
 
@@ -5537,6 +5559,27 @@ CREATE TABLE `product_categories` (
   KEY `idx_parent` (`parent_id`),
   KEY `idx_status` (`status`)
 ) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `product_price_group_prices`
+-- Phase 14 (pos_upgrade_plan.md §8) — sparse per-product override for a price
+-- group; a product with no row here falls back to products.selling_price.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_price_group_prices` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `price_group_id` int NOT NULL,
+  `price` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_product_price_group` (`product_id`,`price_group_id`),
+  KEY `idx_price_group` (`price_group_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

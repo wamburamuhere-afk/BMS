@@ -82,6 +82,14 @@ $currency = getSetting('currency', 'TZS');
 
 // Phase 11 (pos_upgrade_plan.md §7) — loyalty program on/off.
 $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
+
+// Phase 14 (pos_upgrade_plan.md §8) — selling price tiers. Gated behind the
+// 'pos_advanced' entitlement, same as Registers/Loyalty; base-tier POS
+// behaves exactly as before this phase (no selector, plain selling_price).
+$price_groups_enabled = canView('pos_advanced');
+$price_groups = $price_groups_enabled
+    ? $pdo->query("SELECT price_group_id, name, is_default FROM price_groups WHERE status = 'active' ORDER BY is_default DESC, name ASC")->fetchAll(PDO::FETCH_ASSOC)
+    : [];
 ?>
 
 <div class="container-fluid px-0" id="pos-container" style="height: auto; min-height: 100vh;">
@@ -326,6 +334,20 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
                         </button>
                     </div>
                 </div>
+
+                <?php if ($price_groups_enabled && count($price_groups) > 1): ?>
+                <!-- Price Group — Phase 14 (pos_upgrade_plan.md §8) -->
+                <div class="mb-2">
+                    <label class="form-label small fw-bold"><?= t('Price Group') ?></label>
+                    <select class="form-select form-select-sm" id="posPriceGroupId">
+                        <?php foreach ($price_groups as $pg): ?>
+                        <option value="<?= (int)$pg['price_group_id'] ?>" <?= $pg['is_default'] ? 'selected' : '' ?>>
+                            <?= safe_output($pg['name']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php endif; ?>
 
                 <?php if ($loyalty_enabled): ?>
                 <!-- Loyalty Points — Phase 11 (pos_upgrade_plan.md §7) -->
