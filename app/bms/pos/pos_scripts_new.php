@@ -138,7 +138,8 @@ const PT = {
     newPriceLabel: <?= json_encode(t('New unit price')) ?>,
     priceOverrideBelowMin: <?= json_encode(t('%s: price cannot be below the minimum selling price of %s')) ?>,
     priceUpdated: <?= json_encode(t('Price updated')) ?>,
-    discountPermissionDenied: <?= json_encode(t('You do not have permission to apply a discount.')) ?>
+    discountPermissionDenied: <?= json_encode(t('You do not have permission to apply a discount.')) ?>,
+    unitLabel: <?= json_encode(t('Unit')) ?>
 };
 
 // Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split: a cashier
@@ -148,6 +149,21 @@ const PT = {
 // pos.php); api/pos/process_sale.php independently re-validates both — the
 // real security boundary, never trusts these client flags alone.
 const POS_CAN_PRICE_OVERRIDE = <?= json_encode(canEdit('pos_price_override')) ?>;
+
+// Phase 15 (pos_upgrade_plan.md §8) — safeOutput() is a per-page LOCAL JS
+// convention in this codebase (each page defines its own copy, never a
+// global header.php helper — see tests/test_pos_phase8_registers_cli.php
+// §3d, a regression guard added after a real ReferenceError bug). Needed
+// here for the unit-conversion cart badge / dropdown labels.
+function safeOutput(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 
 $(document).ready(function() {
     // Phase 10 (pos_upgrade_plan.md §7) — Select2 AJAX customer search, replacing
@@ -570,19 +586,27 @@ function searchProducts() {
     loadProducts('all', searchTerm);
 }
 
+let currentProductUnits = []; // Phase 15 (pos_upgrade_plan.md §8) — this product's extra selling units
+
 function showProductQuickView(productId) {
     const product = products.find(p => p.product_id == productId);
     if (!product) return;
-    
+
     currentProduct = product;
-    
+    currentProductUnits = [];
+
     const html = `
         <h6>${currentProduct.product_name}</h6>
         <p class="text-muted small mb-2">${currentProduct.sku || PT.noSku}</p>
-        <p class="text-success fw-bold">${POS_CURRENCY} ${parseFloat(currentProduct.effective_price ?? currentProduct.selling_price).toLocaleString()}</p>
+        <p class="text-success fw-bold" id="quickViewPrice">${POS_CURRENCY} ${parseFloat(currentProduct.effective_price ?? currentProduct.selling_price).toLocaleString()}</p>
         ${currentProduct.is_service != 1 ? `<p class="small ${currentProduct.stock_quantity <= 10 ? 'text-danger' : 'text-muted'}">
             ${PT.stockLabel} ${currentProduct.stock_quantity}
         </p>` : '<p class="small text-muted"><i class="bi bi-infinity"></i> ' + PT.service + '</p>'}
+
+        <div class="mb-3 d-none" id="quickViewUnitWrap">
+            <label class="form-label">${PT.unitLabel}</label>
+            <select class="form-select" id="quickViewUnit" onchange="updateQuickViewUnitPrice()"></select>
+        </div>
 
         <div class="mb-3">
             <label class="form-label">${PT.quantityLabel}</label>
@@ -603,15 +627,52 @@ function showProductQuickView(productId) {
             </button>
         </div>
     `;
-    
+
     $('#quickViewContent').html(html);
-    
+
     // Proper way to handle focus in Bootstrap modals to avoid aria-hidden issues
     $('#productQuickView').off('shown.bs.modal').on('shown.bs.modal', function () {
         $('#quickViewQty').focus().select();
     });
-    
+
     $('#productQuickView').modal('show');
+
+    // Phase 15 (pos_upgrade_plan.md §8) — fetch this product's extra selling
+    // units (base unit is always implicitly available and needs no dropdown
+    // entry when it's the only option).
+    if (currentProduct.is_service != 1) {
+        $.getJSON('<?= buildUrl('/api/pos/get_product_units.php') ?>', { product_id: productId }, function (res) {
+            if (currentProduct.product_id != productId) return; // modal moved on already
+            currentProductUnits = (res.success && res.data) ? res.data : [];
+            if (!currentProductUnits.length) return;
+
+            const sel = $('#quickViewUnit');
+            sel.empty();
+            sel.append(`<option value="">${safeOutput(currentProduct.unit || '')} (x1)</option>`);
+            currentProductUnits.forEach(u => {
+                sel.append(`<option value="${safeOutput(u.unit_label)}">${safeOutput(u.unit_label)} (x${u.base_unit_multiplier})</option>`);
+            });
+            $('#quickViewUnitWrap').removeClass('d-none');
+        });
+    }
+}
+
+// Phase 15 (pos_upgrade_plan.md §8) — live price preview as the cashier
+// switches units; the server independently re-resolves this at checkout,
+// this is display-only.
+function updateQuickViewUnitPrice() {
+    const label = $('#quickViewUnit').val();
+    const basePrice = parseFloat(currentProduct.effective_price ?? currentProduct.selling_price) || 0;
+    if (!label) {
+        $('#quickViewPrice').text(POS_CURRENCY + ' ' + basePrice.toLocaleString());
+        return;
+    }
+    const u = currentProductUnits.find(x => x.unit_label === label);
+    if (!u) return;
+    const perUnitPrice = (u.unit_price_override !== null && u.unit_price_override !== undefined)
+        ? parseFloat(u.unit_price_override)
+        : basePrice * parseFloat(u.base_unit_multiplier);
+    $('#quickViewPrice').text(POS_CURRENCY + ' ' + perUnitPrice.toLocaleString());
 }
 
 function adjustQuantity(amount) {
@@ -623,11 +684,31 @@ function adjustQuantity(amount) {
 
 function addToCart() {
     if (!currentProduct) return;
-    
+
     const quantity = parseInt($('#quickViewQty').val()) || 1;
-    
-    const existingItem = cart.find(item => item.product_id == currentProduct.product_id);
-    
+    const basePrice = parseFloat(currentProduct.effective_price ?? currentProduct.selling_price) || 0;
+
+    // Phase 15 (pos_upgrade_plan.md §8) — unit conversion. An empty
+    // selection = base unit, unchanged behaviour. item.price/quantity stay
+    // "per whatever unit is on this line" so every existing cart/discount/
+    // receipt calculation (price × quantity) keeps working unmodified; the
+    // server independently re-resolves the true base-unit price/quantity
+    // from unit_label at checkout — never trusts this client-side figure.
+    const unitLabel = $('#quickViewUnit').length ? ($('#quickViewUnit').val() || '') : '';
+    let linePrice = basePrice;
+    if (unitLabel) {
+        const u = currentProductUnits.find(x => x.unit_label === unitLabel);
+        if (u) {
+            linePrice = (u.unit_price_override !== null && u.unit_price_override !== undefined)
+                ? parseFloat(u.unit_price_override)
+                : basePrice * parseFloat(u.base_unit_multiplier);
+        }
+    }
+
+    // A different unit of the same product is a DIFFERENT cart line — 2
+    // pieces and 3 cartons of the same item can't be merged into one qty.
+    const existingItem = cart.find(item => item.product_id == currentProduct.product_id && (item.unit_label || '') === unitLabel);
+
     if (existingItem) {
         existingItem.quantity += quantity;
     } else {
@@ -639,17 +720,18 @@ function addToCart() {
             // override when one exists for this product, else plain
             // selling_price (effective_price === selling_price when no group
             // is active — simple_products.php guarantees this).
-            price: parseFloat(currentProduct.effective_price ?? currentProduct.selling_price) || 0,
+            price: linePrice,
             quantity: quantity,
+            unit_label: unitLabel || undefined, // Phase 15 — resolved server-side, this is display + payload only
             tax_rate: saleVatRate, // cashier-selected VAT (0 or 18), not auto-applied from the product
             min_selling_price: parseFloat(currentProduct.min_selling_price) || 0,
             discount_type: 'percentage', // Default to percentage
             discount_value: 0,
             discount_percent: 0,
-            discounted_price: parseFloat(currentProduct.effective_price ?? currentProduct.selling_price) || 0
+            discounted_price: linePrice
         });
     }
-    
+
     updateCartDisplay();
     saveCartToStorage();
     $('#productQuickView').modal('hide');
@@ -704,6 +786,7 @@ function updateCartDisplay() {
                 <tr>
                     <td>
                         <strong class="small">${item.product_name}</strong>
+                        ${item.unit_label ? `<br><span class="badge bg-light text-dark border">${safeOutput(item.unit_label)}</span>` : ''}
                         ${discountBadge}
                     </td>
                     <td class="text-end">

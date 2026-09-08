@@ -21,6 +21,7 @@ require_once __DIR__ . '/../../core/warehouse_scope.php';
 require_once __DIR__ . '/../../core/pos_override_guard.php';
 require_once __DIR__ . '/../../core/pos_price_groups.php';
 require_once __DIR__ . '/../../core/pos_batch_consumption.php';
+require_once __DIR__ . '/../../core/pos_unit_conversion.php';
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => t('Unauthorized')]);
@@ -228,9 +229,10 @@ try {
     // Insert sale items and update inventory
     $itemStmt = $pdo->prepare("
         INSERT INTO pos_sale_items (
-            sale_id, product_id, product_name, quantity, unit_price, 
-            tax_rate, tax_amount, discount_rate, discount_amount, line_total
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            sale_id, product_id, product_name, quantity, unit_price,
+            tax_rate, tax_amount, discount_rate, discount_amount, line_total,
+            sold_unit_label, sold_unit_quantity
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
     $stockStmt = $pdo->prepare("
@@ -252,6 +254,32 @@ try {
 
         if (!$db_product) {
             throw new Exception("Product ID $pid not found");
+        }
+
+        // Phase 15 (pos_upgrade_plan.md §8) — unit conversion at the register.
+        // Resolved BEFORE every other per-line step (price validation, stock
+        // check, Phase 16 override guard, discount, FEFO) so all of them
+        // uniformly operate on base-unit quantity/price — the conversion is
+        // always resolved server-side from product_unit_conversions, never
+        // trusted from the client's multiplier. Absent/empty unit_label =
+        // base unit, item untouched (fully backward compatible).
+        $sold_unit_label = trim((string)($item['unit_label'] ?? ''));
+        $sold_unit_qty = null;
+        if ($sold_unit_label !== '') {
+            $conversion = resolveUnitConversion($pdo, (int)$pid, $sold_unit_label);
+            if ($conversion) {
+                $enteredQty = floatval($item['quantity'] ?? 0);
+                $converted = convertToBaseUnit($conversion, $enteredQty, floatval($db_product['selling_price']));
+                $sold_unit_qty = $enteredQty;
+                $item['quantity'] = $converted['base_quantity'];
+                $item['price'] = $converted['base_unit_price'];
+                $item['discounted_price'] = $converted['base_unit_price'];
+            } else {
+                // Unknown unit label for this product — ignore it rather than
+                // failing the sale; sells at the base unit exactly as if no
+                // unit_label had been sent at all.
+                $sold_unit_label = '';
+            }
         }
 
         // Validate Price
@@ -322,7 +350,9 @@ try {
             $item_tax_amount,
             $discount_percent,
             $item_discount_amount,
-            $item_discounted_total // line_total (excluding tax usually, or including? let's assume excluding since tax is separate)
+            $item_discounted_total, // line_total (excluding tax usually, or including? let's assume excluding since tax is separate)
+            $sold_unit_label !== '' ? $sold_unit_label : null,
+            $sold_unit_qty,
         ]);
         $sale_item_id = (int)$pdo->lastInsertId();
 

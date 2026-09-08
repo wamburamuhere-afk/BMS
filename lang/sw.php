@@ -1053,6 +1053,18 @@ return [
     'Scan Successful' => 'Uskani Umefanikiwa',
     'Barcode:' => 'Msimbo Punjepunje:',
 
+    // Phase 15 (pos_upgrade_plan.md §8) — Selling Units (unit conversion at the register)
+    '= how many %s' => '= idadi ngapi ya %s',
+    'Add Selling Unit' => 'Ongeza Kipimo cha Kuuzia',
+    'Delete?' => 'Futa?',
+    'Edit Selling Unit' => 'Hariri Kipimo cha Kuuzia',
+    'Leave blank to use the base price × quantity' => 'Acha wazi kutumia bei ya msingi × idadi',
+    'Price per unit (optional)' => 'Bei kwa kipimo (si lazima)',
+    'Sell this product in more than one unit at the register — e.g. a "Carton" of 12, sold and priced independently of the base unit above.' => 'Uza bidhaa hii kwa kipimo zaidi ya kimoja kwenye rejista — mfano "Katoni" ya 12, inayouzwa na kupangiwa bei tofauti na kipimo cha msingi hapo juu.',
+    'Selling Units' => 'Vipimo vya Kuuzia',
+    'Unit label' => 'Jina la kipimo',
+    'e.g. Carton, Box, Dozen' => 'mfano Katoni, Kasha, Dazani',
+
     // ------------------------------------------------------------------
     // Non-Inventory Products (app/bms/product/services.php) — list page,
     // Add/Edit Service modals (Product Identity + Pricing & Planning

@@ -120,8 +120,97 @@ $(document).ready(function() {
     $('.select2-static').each(function() {
         $(this).select2({ theme: 'bootstrap-5', placeholder: 'Select...', allowClear: true, width: '100%' });
     });
+
+    // Phase 15 (pos_upgrade_plan.md §8) — Selling Units grid.
+    if ($('#sellingUnitsBody').length) {
+        loadSellingUnits();
+    }
+
+    $('#sellingUnitForm').on('submit', function (e) {
+        e.preventDefault();
+        const btn = $(this).find('[type="submit"]');
+        const orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + <?= json_encode(t('Processing...')) ?>);
+        $.ajax({
+            url: '<?= buildUrl('api/save_product_unit.php') ?>',
+            type: 'POST',
+            data: $(this).serialize(),
+            dataType: 'json',
+            success: function (res) {
+                if (res.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('sellingUnitModal')).hide();
+                    loadSellingUnits();
+                    Swal.fire({ icon: 'success', title: <?= json_encode(t('Saved!')) ?>, text: res.message, timer: 1500, showConfirmButton: false });
+                } else {
+                    $('#selling-unit-message').html('<div class="alert alert-danger py-2 mb-0">' + res.message + '</div>');
+                }
+            },
+            error: function () { $('#selling-unit-message').html('<div class="alert alert-danger py-2 mb-0">' + <?= json_encode(t('Server error.')) ?> + '</div>'); },
+            complete: function () { btn.prop('disabled', false).html(orig); }
+        });
+    });
+
+    $('#sellingUnitModal').on('hidden.bs.modal', function () {
+        $('#sellingUnitForm')[0].reset();
+        $('#su_id').val('');
+        $('#selling-unit-message').html('');
+        $('#sellingUnitModalTitle').text(<?= json_encode(t('Add Selling Unit')) ?>);
+    });
 });
 
+function openAddSellingUnitModal() {
+    new bootstrap.Modal(document.getElementById('sellingUnitModal')).show();
+}
+
+function editSellingUnit(id, unitLabel, multiplier, priceOverride) {
+    $('#sellingUnitModalTitle').text(<?= json_encode(t('Edit Selling Unit')) ?>);
+    $('#su_id').val(id);
+    $('#su_unit_label').val(unitLabel);
+    $('#su_multiplier').val(multiplier);
+    $('#su_price').val(priceOverride !== null ? priceOverride : '');
+    new bootstrap.Modal(document.getElementById('sellingUnitModal')).show();
+}
+
+function loadSellingUnits() {
+    $.getJSON('<?= buildUrl('api/get_product_units.php') ?>', { product_id: PRODUCT_ID }, function (res) {
+        if (!res.success || !res.data.length) {
+            $('#sellingUnitsBody').html('<tr><td colspan="4" class="text-center text-muted py-3">' + <?= json_encode(t('No records found')) ?> + '</td></tr>');
+            return;
+        }
+        let html = '';
+        res.data.forEach(u => {
+            html += `<tr>
+                <td>${safeOutput(u.unit_label)}</td>
+                <td>${u.base_unit_multiplier}</td>
+                <td>${u.unit_price_override !== null ? Number(u.unit_price_override).toLocaleString() : '<span class="text-muted">—</span>'}</td>
+                <td class="text-center">
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><button class="dropdown-item" onclick="editSellingUnit(${u.id}, ${JSON.stringify(u.unit_label)}, ${u.base_unit_multiplier}, ${u.unit_price_override})"><i class="bi bi-pencil me-2"></i>${<?= json_encode(t('Edit')) ?>}</button></li>
+                            <li><button class="dropdown-item text-danger" onclick="deleteSellingUnit(${u.id})"><i class="bi bi-trash me-2"></i>${<?= json_encode(t('Remove')) ?>}</button></li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>`;
+        });
+        $('#sellingUnitsBody').html(html);
+    });
+}
+
+function deleteSellingUnit(id) {
+    Swal.fire({
+        title: <?= json_encode(t('Delete?')) ?>,
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545',
+        confirmButtonText: <?= json_encode(t('Yes, Delete')) ?>
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/delete_product_unit.php') ?>', { id: id, _csrf: <?= json_encode(csrf_token()) ?> }, function (res) {
+            if (res.success) { loadSellingUnits(); }
+            else { Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: res.message }); }
+        }, 'json');
+    });
+}
 </script>
 
 <style>
@@ -562,6 +651,38 @@ $(document).ready(function() {
                             </div>
                         </div>
 
+                        <?php if (!$product['is_service']): ?>
+                        <!-- Phase 15 (pos_upgrade_plan.md §8) — Selling Units (unit conversion at the register) -->
+                        <div class="col-md-12 mt-4 p-3 bg-white border rounded">
+                            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                                <h6 class="fw-bold mb-0 text-primary">
+                                    <i class="bi bi-boxes me-2"></i> <?= t('Selling Units') ?>
+                                </h6>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openAddSellingUnitModal()">
+                                    <i class="bi bi-plus-circle me-1"></i> <?= t('Add Selling Unit') ?>
+                                </button>
+                            </div>
+                            <p class="text-muted small mb-3">
+                                <?= t('Sell this product in more than one unit at the register — e.g. a "Carton" of 12, sold and priced independently of the base unit above.') ?>
+                            </p>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover border" id="sellingUnitsTable">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th><?= t('Unit') ?></th>
+                                            <th><?= sprintf(t('= how many %s'), safe_output($product['unit'])) ?></th>
+                                            <th><?= t('Price per unit (optional)') ?></th>
+                                            <th style="width:60px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sellingUnitsBody">
+                                        <tr><td colspan="4" class="text-center text-muted py-3"><?= t('Loading...') ?></td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
                         <?php if (!$product['is_service'] && !empty($warehouses)): ?>
                         <div class="col-md-12 mt-4 p-3 bg-white border rounded">
                             <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary">
@@ -683,6 +804,42 @@ $(document).ready(function() {
                 </div>
                 
                 <input type="hidden" name="updated_by" value="<?= $user_id ?>">
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Phase 15 (pos_upgrade_plan.md §8) — Add/Edit Selling Unit Modal -->
+<div class="modal fade" id="sellingUnitModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-boxes me-1"></i> <span id="sellingUnitModalTitle"><?= t('Add Selling Unit') ?></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="sellingUnitForm" autocomplete="off">
+                <div class="modal-body">
+                    <input type="hidden" id="su_id" name="id">
+                    <input type="hidden" name="product_id" value="<?= (int)$product_id ?>">
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                    <div id="selling-unit-message" class="mb-2"></div>
+                    <div class="mb-3">
+                        <label class="form-label"><?= t('Unit label') ?> <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="su_unit_label" name="unit_label" placeholder="<?= t('e.g. Carton, Box, Dozen') ?>" required maxlength="50">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><?= sprintf(t('= how many %s'), safe_output($product['unit'])) ?> <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="su_multiplier" name="base_unit_multiplier" min="0.0001" step="0.0001" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><?= t('Price per unit (optional)') ?></label>
+                        <input type="number" class="form-control" id="su_price" name="unit_price_override" min="0" step="0.01" placeholder="<?= t('Leave blank to use the base price × quantity') ?>">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> <?= t('Save') ?></button>
+                </div>
             </form>
         </div>
     </div>

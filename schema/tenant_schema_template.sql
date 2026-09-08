@@ -5406,6 +5406,8 @@ CREATE TABLE `pos_sale_items` (
   `returned_quantity` decimal(10,3) DEFAULT '0.000',
   `is_returned` tinyint(1) DEFAULT '0',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `sold_unit_label` varchar(50) DEFAULT NULL,
+  `sold_unit_quantity` decimal(10,3) DEFAULT NULL,
   PRIMARY KEY (`sale_item_id`),
   KEY `idx_sale_id` (`sale_id`),
   KEY `idx_product_id` (`product_id`)
@@ -5675,6 +5677,27 @@ CREATE TABLE `product_stocks` (
   KEY `idx_available_quantity` (`available_quantity`),
   KEY `location_id` (`location_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=103 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ROW_FORMAT=DYNAMIC;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `product_unit_conversions`
+-- Phase 15 (pos_upgrade_plan.md §8) — unit conversion at the register.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_unit_conversions` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `unit_label` varchar(50) NOT NULL,
+  `base_unit_multiplier` decimal(12,4) NOT NULL DEFAULT '1.0000',
+  `unit_price_override` decimal(15,2) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_product_unit_label` (`product_id`,`unit_label`),
+  KEY `idx_product_id` (`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

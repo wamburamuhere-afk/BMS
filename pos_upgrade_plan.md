@@ -977,9 +977,38 @@ no named tiers, no per-customer default, no cashier picker.
 
 ### Phase 15 — Unit Conversion at the Register (packs/cartons ↔ pieces)
 
+**Status:** ✅ DONE · **Built:** 2026-09-08 · **Branch:** `feat/pos-tier3-advanced-retail`
+
+Shipped as planned. `products.unit` confirmed (by reading `product_edit.php`)
+to be free-text, not FK-linked to `product_units` — so the new selling-unit
+labels are free-text too, for consistency, not a disconnected lookup system.
+`core/pos_unit_conversion.php` (`resolveUnitConversion()`,
+`convertToBaseUnit()`) resolves everything **server-side** in
+`process_sale.php`: the client sends the raw entered quantity + a unit label,
+never a multiplier or converted price directly — the same "never trust the
+client's math" posture as Phases 16/14/17/18. A `unit_price_override` is
+priced per selling unit (e.g. per carton) and converted back to a
+per-base-unit price so `line_total = price × base_quantity` stays correct
+throughout stock, FEFO, tax, and discount logic untouched from before this
+phase. Management UI on `product_edit.php` ("Selling Units" grid); POS
+quick-view modal gets a unit dropdown (only rendered when a product actually
+has extra units) with a live price preview; cart shows a small unit badge.
+**Real bug found and fixed while building this**: `pos_scripts_new.php`'s new
+code called `safeOutput()`, but that function is a per-page **local** JS
+convention in this codebase (never a global header.php helper — the exact
+bug class `tests/test_pos_phase8_registers_cli.php` §3d already guards
+against, from a prior incident) — and it turned out nothing on the live POS
+terminal page defined it at all. Fixed by adding the standard local
+definition to `pos_scripts_new.php`; caught by that pre-existing regression
+guard before shipping, not after. `tests/test_pos_unit_conversion_cli.php`
+(24 checks). Full POS regression re-run clean.
+
 **Closes:** selling a carton of 12 or a ream of 500 sheets from stock held in
 pieces — a routine stationery/general-shop need BMS's flat per-line POS can't
-do today. **Gate:** `pos_advanced`.
+do today. **Gate:** base `pos` (till hygiene — see the gate-boundary note
+added to Phase 17; unit conversion is an everyday counter need, not a
+premium differentiator, so it wasn't restricted to `pos_advanced` as
+originally sketched).
 
 **What exists today:** `products.unit_of_measure` / `unit` — one unit, no
 conversion. `product_units` table exists but is just a flat lookup list

@@ -1,5 +1,25 @@
 # BMS Changelog
 
+## 2026-09-08 (feature) - POS Phase 15: unit conversion at the register (carton/ream/dozen ↔ piece)
+
+**Files (new):** `core/pos_unit_conversion.php`, `migrations/tenant/2026_09_08_pos_unit_conversions.php`,
+`api/get_product_units.php`, `api/save_product_unit.php`, `api/delete_product_unit.php`,
+`api/pos/get_product_units.php`, `tests/test_pos_unit_conversion_cli.php`
+**Files (changed):** `api/pos/process_sale.php`, `app/bms/product/product_edit.php`,
+`app/bms/pos/pos_scripts_new.php`, `lang/sw.php`, `schema/tenant_schema_template.sql`,
+`tests/test_pos_i18n_coverage_cli.php`
+
+Fifth phase of the Tier-3 plan (§8 Phase 15). A product can now have extra selling units (e.g.
+"Carton" = 12 of the base unit) with an optional per-unit price override — resolved entirely
+server-side in `process_sale.php` (client sends the raw entered quantity + a unit label only,
+never a multiplier). Management grid on the product edit page; POS quick-view gets a unit
+dropdown with a live price preview, only shown for products that actually have extra units.
+Gated in base `pos` (till hygiene, not `pos_advanced`) since this is an everyday counter need, not
+a premium feature. **Real bug caught before shipping**: new cart-rendering code called
+`safeOutput()`, a per-page-local JS convention in this codebase — `pos_scripts_new.php` never
+defined it, which `tests/test_pos_phase8_registers_cli.php`'s existing regression guard (added
+after a prior live incident) correctly flagged; fixed by adding the standard local definition.
+
 ## 2026-09-08 (feature) - POS Phase 18: per-batch COGS
 
 **Files (new):** `tests/test_pos_batch_cogs_cli.php`

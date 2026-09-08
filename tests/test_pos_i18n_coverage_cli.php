@@ -78,6 +78,8 @@ $apiFiles = [
     // Phase 14 (pos_upgrade_plan.md §8) — selling price tiers.
     'api/pos/get_price_groups.php', 'api/pos/save_price_group.php', 'api/pos/toggle_price_group_status.php',
     'api/pos/get_price_group_products.php', 'api/pos/save_price_group_product_price.php',
+    // Phase 15 (pos_upgrade_plan.md §8) — unit conversion at the register.
+    'api/pos/get_product_units.php',
 ];
 $allFiles = array_merge($pageFiles, $apiFiles);
 
