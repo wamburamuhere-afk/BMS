@@ -5,6 +5,12 @@
  * Generate printable receipt for completed sale
  */
 require_once __DIR__ . '/../../roots.php';
+// Respect the caller's saved language preference (set by header.php on their
+// last page load) so t()-wrapped strings below come back in the right
+// language, not always English — same pattern used across api/pos/*.php.
+if (isset($_SESSION['user_lang'])) {
+    loadLanguage($_SESSION['user_lang']);
+}
 require_once __DIR__ . '/../../helpers.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 
@@ -180,53 +186,53 @@ $register_label        = trim($sale['register_name'] ?? '');
 <body>
     <div class="no-print" style="text-align: center; margin-bottom: 10px;">
         <button onclick="window.print()" style="padding: 10px 20px; font-size: 14px; cursor: pointer;">
-            Print Receipt
+            <?= t('Print Receipt') ?>
         </button>
         <button onclick="emailReceipt()" style="padding: 10px 20px; font-size: 14px; cursor: pointer; margin-left: 10px;">
-            Email Receipt
+            <?= t('Email Receipt') ?>
         </button>
         <button onclick="window.close()" style="padding: 10px 20px; font-size: 14px; cursor: pointer; margin-left: 10px;">
-            Close
+            <?= t('Close') ?>
         </button>
     </div>
 
     <div class="header">
         <div class="company-name"><?= htmlspecialchars($company_name) ?></div>
         <?php if ($company_address !== ''): ?><div><?= htmlspecialchars($company_address) ?></div><?php endif; ?>
-        <?php if ($company_phone !== ''): ?><div>Tel: <?= htmlspecialchars($company_phone) ?></div><?php endif; ?>
-        <?php if ($company_tin !== ''): ?><div>TIN: <?= htmlspecialchars($company_tin) ?></div><?php endif; ?>
-        <?php if ($company_vrn !== ''): ?><div>VRN: <?= htmlspecialchars($company_vrn) ?></div><?php endif; ?>
+        <?php if ($company_phone !== ''): ?><div><?= t('Tel:') ?> <?= htmlspecialchars($company_phone) ?></div><?php endif; ?>
+        <?php if ($company_tin !== ''): ?><div><?= t('TIN:') ?> <?= htmlspecialchars($company_tin) ?></div><?php endif; ?>
+        <?php if ($company_vrn !== ''): ?><div><?= t('VRN:') ?> <?= htmlspecialchars($company_vrn) ?></div><?php endif; ?>
         <?php if ($receipt_header_extra !== ''): ?><div><?= nl2br(htmlspecialchars($receipt_header_extra)) ?></div><?php endif; ?>
     </div>
 
     <div class="receipt-info">
         <div>
-            <span>Receipt #:</span>
+            <span><?= t('Receipt #:') ?></span>
             <span><strong><?= $sale['receipt_number'] ?></strong></span>
         </div>
         <div>
-            <span>Date:</span>
+            <span><?= t('Date:') ?></span>
             <span><?= date('d/m/Y H:i', strtotime($sale['sale_date'])) ?></span>
         </div>
         <div>
-            <span>Cashier:</span>
-            <span><?= $sale['cashier_name'] ?? 'N/A' ?></span>
+            <span><?= t('Cashier:') ?></span>
+            <span><?= $sale['cashier_name'] ?? t('N/A') ?></span>
         </div>
         <?php if ($register_label !== ''): ?>
         <div>
-            <span>Register:</span>
+            <span><?= t('Register:') ?></span>
             <span><?= htmlspecialchars($register_label) ?></span>
         </div>
         <?php endif; ?>
         <?php if (!empty($sale['warehouse_name'])): ?>
         <div>
-            <span>Warehouse:</span>
+            <span><?= t('Warehouse:') ?></span>
             <span><?= htmlspecialchars($sale['warehouse_name']) ?></span>
         </div>
         <?php endif; ?>
         <?php if ($sale['customer_name']): ?>
         <div>
-            <span>Customer:</span>
+            <span><?= t('Customer:') ?></span>
             <span><?= $sale['customer_name'] ?></span>
         </div>
         <?php endif; ?>
@@ -234,9 +240,9 @@ $register_label        = trim($sale['register_name'] ?? '');
 
     <div class="items-table">
         <div class="item-row" style="font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 5px;">
-            <div class="item-name">ITEM</div>
-            <div class="item-qty">QTY</div>
-            <div class="item-price">PRICE</div>
+            <div class="item-name"><?= t('ITEM') ?></div>
+            <div class="item-qty"><?= t('QTY') ?></div>
+            <div class="item-price"><?= t('PRICE') ?></div>
         </div>
         <?php foreach ($items as $item): ?>
         <div class="item-row">
@@ -252,31 +258,31 @@ $register_label        = trim($sale['register_name'] ?? '');
 
     <div class="totals">
         <div class="total-row">
-            <span>Subtotal:</span>
+            <span><?= t('Subtotal:') ?></span>
             <span><?= number_format($sale['subtotal'], 0) ?></span>
         </div>
         <div class="total-row">
-            <span>Total Tax:</span>
+            <span><?= t('Total Tax:') ?></span>
             <span><?= number_format($sale['tax_amount'], 0) ?></span>
         </div>
         <div class="total-row grand-total">
-            <span>TOTAL:</span>
+            <span><?= t('TOTAL:') ?></span>
             <span><?= htmlspecialchars($currency) ?> <?= number_format($sale['grand_total'], 0) ?></span>
         </div>
         <div class="total-row" style="margin-top: 10px;">
-            <span>Payment (<?= ucfirst(str_replace('_', ' ', $sale['payment_method'])) ?>):</span>
+            <span><?= sprintf(t('Payment (%s):'), t(ucfirst(str_replace('_', ' ', $sale['payment_method'])))) ?></span>
             <span><?= number_format($sale['amount_tendered'], 0) ?></span>
         </div>
         <div class="total-row">
-            <span>Change:</span>
+            <span><?= t('Change:') ?></span>
             <span><?= number_format($sale['change_given'], 0) ?></span>
         </div>
     </div>
 
     <div class="footer">
-        <div style="margin-bottom: 10px;">*** THANK YOU ***</div>
-        <div>Please keep this receipt for your records</div>
-        <div style="margin-top: 10px;">Goods sold are not returnable</div>
+        <div style="margin-bottom: 10px;">*** <?= t('THANK YOU') ?> ***</div>
+        <div><?= t('Please keep this receipt for your records') ?></div>
+        <div style="margin-top: 10px;"><?= t('Goods sold are not returnable') ?></div>
         <?php if ($receipt_footer_extra !== ''): ?>
         <div style="margin-top: 10px;"><?= nl2br(htmlspecialchars($receipt_footer_extra)) ?></div>
         <?php endif; ?>
@@ -285,7 +291,7 @@ $register_label        = trim($sale['register_name'] ?? '');
     <script>
         // Phase 10 (pos_upgrade_plan.md §7) — Email Receipt.
         function emailReceipt() {
-            const email = prompt('Send this receipt to which email address?', <?= json_encode($sale['customer_email'] ?? '') ?>);
+            const email = prompt(<?= json_encode(t('Send this receipt to which email address?')) ?>, <?= json_encode($sale['customer_email'] ?? '') ?>);
             if (!email) return;
             const fd = new FormData();
             fd.append('sale_id', <?= (int)$sale_id ?>);
@@ -294,7 +300,7 @@ $register_label        = trim($sale['register_name'] ?? '');
             fetch('<?= buildUrl('/api/pos/email_receipt.php') ?>', { method: 'POST', body: fd })
                 .then(r => r.json())
                 .then(res => alert(res.message))
-                .catch(() => alert('Could not reach the server. Please try again.'));
+                .catch(() => alert(<?= json_encode(t('Could not reach the server. Please try again.')) ?>));
         }
     </script>
 
