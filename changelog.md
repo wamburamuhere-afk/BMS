@@ -1,5 +1,37 @@
 # BMS Changelog
 
+## 2026-09-08 (fix) - Proactive scout found the same legacy-database gap already live since 2026-09-07 (POS loyalty program)
+
+**Files (added):** `migrations/2026_09_08_pos_loyalty_program_legacy_db.php`,
+`migrations/2026_09_08_pos_advanced_permission_legacy_db.php`
+
+After fixing the two live incidents (previous two entries), audited every other
+`migrations/tenant/*.php` file — not just today's — for the same "can never reach a legacy
+database" gap, since the two incidents proved this bug class is real, not theoretical. Found that
+`migrations/tenant/2026_09_07_pos_loyalty_program.php` (Phase 11, shipped the day before today's
+Tier-3 work) has the identical exposure, and it's worse than either of today's incidents:
+`api/pos/search_customers.php` unconditionally selects `customers.loyalty_points_balance` on
+**every customer search at the POS till** — not a dedicated admin page like `price_groups.php`,
+the ordinary, constantly-hit path of ringing up a credit or loyalty sale. A legacy database
+missing this column has been throwing the same fatal `PDOException` on that path since Phase 11
+shipped, independent of whether anyone happened to report it.
+
+Mirrored `customers.loyalty_points_balance` + `customer_loyalty_transactions` (crash risk — fixed)
+and the `pos_advanced` permission row it and the Registers/Tills feature are gated behind (lower
+severity — a missing row here doesn't crash anything, since `canX()` auto-grants an admin
+regardless, but it means no non-admin role could ever be granted this permission on a legacy
+database, since it never appears in the Roles & Permissions list). Same defensive pattern and same
+throwaway-database verification method as the price_groups/product_batches fixes: cloned the
+pre-Phase-11 shape of `customers`/`permissions`, ran both files twice (idempotent) and with the
+anchor column (`current_balance`) deliberately removed (falls back to appending, doesn't fail).
+
+Deliberately NOT mirrored, checked and ruled out as inapplicable to a legacy database:
+`migrations/tenant/2026_09_04_backfill_file_size_columns.php` (feeds `core/tenant_quotas.php`'s
+storage-quota total — a SaaS subscription-plan concept the legacy/flagship install doesn't have)
+and `migrations/tenant/2026_09_07_module_request_notification_event.php` (a superadmin-approves-a-
+tenant's-module-request notification — meaningless for the install that has no superadmin over
+it). Both were read in full before being excluded, not skipped by assumption.
+
 ## 2026-09-08 (fix) - All 8 POS Tier-3 schema changes were unreachable on any legacy (non-tenant) database — second live incident
 
 **Files (added):** `migrations/2026_09_08_pos_price_groups_legacy_db.php`,
@@ -68,29 +100,30 @@ non-tenant mode this deep into the multi-tenancy rollout.
 
 **Files (changed):** `app/dashboard.php`
 
-Live incident, reported via Sentry (`https://demo.bjptechnologies.co.tz/dashboard`, tenant DB
+Live incident, reported via Sentry (`https://demo.bjptechnologies.co.tz/dashboard`, database
 `bejundas_main`): logging in showed a blank dashboard. Root cause — today's Phase 17 batch/expiry
 widget query (`get_system_alerts()`, added at the same time as `migrations/tenant/2026_09_08_pos_product_batches.php`)
 selects directly from `product_batches` with no error handling, unlike the near-identical
-negative-stock query three lines below it, which is already wrapped in `try/catch`. Any tenant
-whose database doesn't yet have that table — confirmed from the actual deploy log for PR #1839:
-the automated per-tenant migration ran successfully for the 5 tenants that existed in the control
-database at that moment, and `bejundas` was not one of them, consistent with a company that
-self-registered in the few minutes right after that deploy — gets an uncaught `PDOException` that
-takes down the entire dashboard instead of just the one widget.
+negative-stock query three lines below it, which is already wrapped in `try/catch`. At the time
+this entry was first written, the deploy log showing only 5 tenants migrated (see the very next
+changelog entry below) was read as "`bejundas` just wasn't one of them yet" — a timing/race theory.
+**Correction, superseded by the next entry's investigation:** `bejundas_main` is not a tenant row
+at all; it is `demo.bjptechnologies.co.tz`'s own legacy/non-tenant database, which
+`core/tenant_migration_runner.php` structurally can never reach. The gap was never going to
+self-heal on the next per-tenant migration run — see the next entry for the real cause and its
+fix. Whichever explanation applied, the uncaught `PDOException` took down the entire dashboard
+instead of just the one widget.
 
 Fixed by wrapping the batch-expiry query in the same `try/catch (PDOException $e) {}` pattern
 already used for the negative-stock query in this exact function — a missing/not-yet-migrated
-table now degrades to "no expiry alerts shown" for that tenant instead of a blank page. Verified
-locally by renaming `product_batches` away and confirming the query no longer throws (empty
-result instead), then restoring the table; `tests/test_dashboard_time_range_cli.php` (16
-assertions) and `tests/test_pos_batch_expiry_cli.php` (43 assertions, including the dashboard
-widget wiring check) both re-run clean with the table present, confirming no behaviour change for
-tenants that already have it.
-
-Not addressed here, tracked separately: why `bejundas`'s database doesn't have `product_batches`
-yet (self-registration timing vs. the per-tenant migration run, most likely) — this fix only stops
-that gap from blanking the dashboard while the table gets backfilled.
+table now degrades to "no expiry alerts shown" for that tenant instead of a blank page, while
+anything other than "table doesn't exist" (SQLSTATE 42S02) still reaches `error_log()` rather than
+being silently indistinguishable from the expected case. Verified locally by renaming
+`product_batches` away and confirming the query no longer throws (empty result instead), then
+restoring the table; `tests/test_dashboard_time_range_cli.php` (16 assertions) and
+`tests/test_pos_batch_expiry_cli.php` (43 assertions, including the dashboard widget wiring check)
+both re-run clean with the table present, confirming no behaviour change for tenants that already
+have it.
 
 ## 2026-09-08 (fix) - Project-scope audit regression from Phases 15/23
 
