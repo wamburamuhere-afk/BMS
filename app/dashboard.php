@@ -579,7 +579,6 @@ function get_system_alerts($pdo, $user_id) {
         // products.expiry_date; a product with no batch rows keeps the
         // pre-Phase-17 behaviour unchanged (one row per product).
         $batchWhScope = scopeFilterSqlNullable('warehouse', 'pb');
-        $expiry_alerts = [];
         try {
             $stmt = $pdo->prepare("
                 SELECT 'expiring' as type,
@@ -623,7 +622,15 @@ function get_system_alerts($pdo, $user_id) {
             ");
             $stmt->execute();
             $expiry_alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {}
+        } catch (PDOException $e) {
+            // SQLSTATE 42S02 = table doesn't exist yet on this database (the
+            // known, expected case this catch exists for — stays silent).
+            // Anything else is a real regression in this query and should not
+            // be indistinguishable from that expected case.
+            if ($e->getCode() !== '42S02') {
+                error_log('dashboard.php get_system_alerts(): batch-expiry query failed: ' . $e->getMessage());
+            }
+        }
 
         try {
             $stmt = $pdo->prepare("
