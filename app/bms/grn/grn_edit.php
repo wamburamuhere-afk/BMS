@@ -63,7 +63,7 @@ $project_return_url = $project_id_param > 0
 // Origin context (URL only): where the user came FROM. Drives the post-save redirect so
 // editing a project-linked GRN from the general area does NOT jump into the project.
 // (The GRN keeps its own project link via projectIdHidden below — unchanged.)
-$origin_project_id = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
+$origin_project_id = (projectsModuleActive() && isset($_GET['project_id'])) ? intval($_GET['project_id']) : 0;
 $origin_return_url = $origin_project_id > 0
     ? getUrl('project_view') . '?id=' . $origin_project_id . '&tab=grn'
     : '';
@@ -303,6 +303,7 @@ function generate_grn_number() {
                         </select>
                     </div>
                     
+                    <?php if (projectsModuleActive()): ?>
                     <div class="col-md-4 mb-3">
                         <label for="project_id" class="form-label">Project <span class="text-muted small">(Optional)</span></label>
                         <select class="form-select select2-static" id="project_id" name="project_id"
@@ -317,6 +318,7 @@ function generate_grn_number() {
                         </select>
                         <small class="text-muted" id="grnWarehouseHint">Select project to filter warehouses.</small>
                     </div>
+                    <?php endif; ?>
 
                     <div class="col-md-4 mb-3">
                         <label for="warehouse_id" class="form-label">Warehouse <span class="text-danger">*</span></label>
@@ -998,6 +1000,7 @@ function clearAllItems() {
 const grnAllWarehouses = <?= json_encode(array_values(array_map(function($w){
     return ['warehouse_id'=>(int)$w['warehouse_id'],'warehouse_name'=>$w['warehouse_name'],'location'=>$w['location']??'','project_id'=>(int)$w['project_id']];
 },$warehouses))) ?>;
+const GRN_PROJECTS_ACTIVE = <?= json_encode(projectsModuleActive()) ?>;
 
 function filterGrnWarehouses(projectId) {
     const $sel = $('#warehouse_id');
@@ -1115,7 +1118,7 @@ function loadPurchaseOrderItems() {
                 } else {
                     $('#project_id').val('');
                     $('#projectIdHidden').val('');
-                    filterGrnWarehouses(0);
+                    filterGrnWarehouses(GRN_PROJECTS_ACTIVE ? 0 : undefined);
                 }
                 
                 // Set warehouse if present in PO

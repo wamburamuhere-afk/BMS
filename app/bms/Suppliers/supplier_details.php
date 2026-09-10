@@ -15,7 +15,7 @@ $can_delete = canDelete('suppliers');
 // ── Project context (clean deep-link from Project Details) ───────────────────
 // Arriving as ?project=<id>&back=<tab> shows a "Back to Project" banner and
 // rebuilds the return URL server-side, so the address bar stays clean.
-$proj_ctx_id     = isset($_GET['project']) ? intval($_GET['project']) : 0;
+$proj_ctx_id     = (projectsModuleActive() && isset($_GET['project'])) ? intval($_GET['project']) : 0;
 $proj_ctx_back   = preg_replace('/[^a-z0-9\-]/', '', strtolower($_GET['back'] ?? ''));
 $proj_ctx_name   = '';
 $proj_ctx_return = '';
@@ -1879,12 +1879,14 @@ window.addEventListener('resize', resizeTextToFit);
                                 <option value="">— Select PO (optional) —</option>
                             </select>
                         </div>
+                        <?php if (projectsModuleActive()): ?>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Project <small class="fw-normal text-muted">(optional)</small></label>
                             <select name="project_id" id="ri-project" class="form-select select2-static">
                                 <option value="">— Select Project —</option>
                             </select>
                         </div>
+                        <?php endif; ?>
 
                         <!-- PO Summary panel (visible when PO selected) -->
                         <div class="col-12 d-none" id="ri-po-summary-wrap">

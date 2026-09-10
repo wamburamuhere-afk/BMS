@@ -58,7 +58,10 @@ $orderDirection = $_GET['order'][0]['dir'] ?? 'desc';
 
 // Define column mapping
 // Define column mapping
-$enable_projects = get_setting('enable_projects');
+// $enable_projects reflects BOTH the superadmin's platform grant AND the
+// tenant's own "Enable Projects Module" setting; see projectsModuleActive()
+// (core/project_scope.php).
+$enable_projects = projectsModuleActive() ? 1 : 0;
 $columns = [
     '',               // 0: S/NO
     'e.expense_date', // 1: Date

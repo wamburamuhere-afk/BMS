@@ -113,12 +113,7 @@ global $company_name, $company_logo;
         </div>
         <div class="col-auto d-flex gap-2">
             <?php 
-            $enable_projects = 0;
-            try {
-                $stmt_s = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'enable_projects'");
-                $stmt_s->execute();
-                $enable_projects = $stmt_s->fetchColumn() ?: 0;
-            } catch (Exception $e) {}
+            $enable_projects = projectsModuleActive() ? 1 : 0;
 
             if ($enable_projects && !empty($expense['project_id'])): ?>
                 <a href="<?= getUrl('project_view') ?>?id=<?= $expense['project_id'] ?>" class="btn btn-outline-primary">

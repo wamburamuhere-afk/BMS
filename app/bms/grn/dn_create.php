@@ -22,7 +22,7 @@ if ($edit_id > 0) {
 
 includeHeader();
 
-$project_id = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
+$project_id = (projectsModuleActive() && isset($_GET['project_id'])) ? intval($_GET['project_id']) : 0;
 // Origin context (URL only): where the user came FROM. Drives the post-save redirect so
 // editing a project-linked DN from the general area does NOT jump into the project.
 $origin_project_id = $project_id;
@@ -230,6 +230,7 @@ $return_url = $is_from_po
                                 <select class="form-select" name="party_id" id="dn_party_id" required></select>
                             </div>
 
+                            <?php if (projectsModuleActive()): ?>
                             <!-- Project -->
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Project <span class="text-muted small">(Optional)</span></label>
@@ -240,6 +241,7 @@ $return_url = $is_from_po
                                     <?php endforeach; ?>
                                 </select>
                             </div>
+                            <?php endif; ?>
 
                             <!-- Warehouse -->
                             <div class="col-md-6">

@@ -36,8 +36,11 @@ if ($warehouse_filter > 0 && !userCan('warehouse', $warehouse_filter)) {
     $warehouse_filter = 0; // ignore an out-of-scope warehouse rather than error on a list page
 }
 
-// Check projects setting
-$enable_projects = getSetting('enable_projects', 0);
+// Reflects BOTH the superadmin's platform grant AND the tenant's own "Enable
+// Projects Module" setting — see projectsModuleActive() (core/project_scope.php).
+// Previously checked only the tenant's own setting, so a tenant whose
+// Projects module the platform had revoked could still see this field.
+$enable_projects = projectsModuleActive() ? 1 : 0;
 
 // Scope: assigned project IDs for current user (empty = none, ignored for admin)
 $_grn_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));

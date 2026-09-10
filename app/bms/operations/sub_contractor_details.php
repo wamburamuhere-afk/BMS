@@ -44,8 +44,8 @@ if (empty($_SESSION['scope']['is_admin'])) {
 }
 
 // Context — where did the user come from?
-$from_project    = (($_GET['from'] ?? '') === 'project');
-$back_project_id = intval($_GET['project_id'] ?? 0);
+$from_project    = projectsModuleActive() && (($_GET['from'] ?? '') === 'project');
+$back_project_id = $from_project ? intval($_GET['project_id'] ?? 0) : 0;
 $back_project    = null;
 if ($from_project && $back_project_id > 0) {
     $bp = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE project_id = ?");
@@ -85,17 +85,18 @@ if (!$sc) {
 $categories = $pdo->query("SELECT * FROM supplier_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Projects for assign modal and edit modal — admins see all; non-admins see only assigned
-if (!empty($_SESSION['scope']['is_admin'])) {
-    $all_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
-    if (empty($assigned)) {
-        $all_projects = [];
+$all_projects = [];
+if (projectsModuleActive()) {
+    if (!empty($_SESSION['scope']['is_admin'])) {
+        $all_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
     } else {
-        $ph = implode(',', array_fill(0, count($assigned), '?'));
-        $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name");
-        $pstmt->execute($assigned);
-        $all_projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+        $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+        if (!empty($assigned)) {
+            $ph = implode(',', array_fill(0, count($assigned), '?'));
+            $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name");
+            $pstmt->execute($assigned);
+            $all_projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+        }
     }
 }
 
@@ -414,7 +415,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                 <div class="card border-0 shadow-sm<?= empty($sc_projects) ? ' d-print-none' : '' ?>">
                     <div class="card-header bg-white py-3 d-flex align-items-center">
                         <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-diagram-3 text-primary me-2"></i> Projects Involved <span class="badge bg-primary ms-1"><?= $total_projects ?></span></h6>
-                        <?php if ($can_edit): ?>
+                        <?php if ($can_edit && projectsModuleActive()): ?>
                         <button class="btn btn-sm btn-primary shadow-sm ms-auto" onclick="openAssignProjectModal()" title="Assign to a project">
                             <i class="bi bi-plus-circle me-1"></i> Assign Project
                         </button>
@@ -867,6 +868,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                         <option value="blacklisted">Blacklisted</option>
                                     </select>
                                 </div>
+                                <?php if (projectsModuleActive()): ?>
                                 <div class="col-6 mb-3">
                                     <label class="form-label">Linked Project (Optional)</label>
                                     <select class="form-select select2-static" id="edit_project_id" name="project_id">
@@ -876,6 +878,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <?php endif; ?>
                                 <div class="col-6 mb-3"><label class="form-label">Credit Limit</label><input type="number" class="form-control" id="edit_credit_limit" name="credit_limit" step="0.01"></div>
                                 <div class="col-12 mb-3"><label class="form-label">Description</label><textarea class="form-control" id="edit_description" name="description" rows="2"></textarea></div>
                             </div>
@@ -1562,6 +1565,7 @@ function removeFromProject(projectId, projectName) {
 </script>
 
 <!-- Assign to Project Modal -->
+<?php if (projectsModuleActive()): ?>
 <div class="modal fade" id="assignProjectModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius:12px;">
@@ -1588,6 +1592,7 @@ function removeFromProject(projectId, projectName) {
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <?php
 includeFooter();

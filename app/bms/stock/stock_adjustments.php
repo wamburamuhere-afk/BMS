@@ -108,7 +108,10 @@ try { $products   = $pdo->query("SELECT product_id, product_name, sku FROM produ
 try { $warehouses = warehousesForSelect($pdo); } catch(Exception $e){ $warehouses=[]; }
 try { $users      = $pdo->query("SELECT user_id, username FROM users WHERE status='active' ORDER BY username")->fetchAll(PDO::FETCH_ASSOC); } catch(Exception $e){ $users=[]; }
 
-$enable_projects = getSetting('enable_projects', 0);
+// $enable_projects reflects BOTH the superadmin's platform grant AND the
+// tenant's own "Enable Projects Module" setting; see projectsModuleActive()
+// (core/project_scope.php).
+$enable_projects = projectsModuleActive() ? 1 : 0;
 $projects = [];
 if ($enable_projects) {
     try { $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status!='cancelled' " . scopeFilterSql('project', 'projects') . " ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC); } catch(Exception $e){ $projects=[]; }

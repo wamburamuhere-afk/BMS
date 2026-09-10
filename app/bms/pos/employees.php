@@ -22,7 +22,7 @@ $can_edit_employees = isAdmin() || canEdit('employees');
 // "Back to Project" affordance, and returns there after save — mirroring the
 // Purchase Order create/edit pattern. The return URL is rebuilt server-side from
 // the project id + short tab key, so the address bar stays clean.
-$proj_ctx_id     = isset($_GET['project']) ? intval($_GET['project']) : 0;
+$proj_ctx_id     = (projectsModuleActive() && isset($_GET['project'])) ? intval($_GET['project']) : 0;
 $proj_ctx_back   = preg_replace('/[^a-z0-9\-]/', '', strtolower($_GET['back'] ?? ''));
 $proj_ctx_name   = '';
 $proj_ctx_return = '';
@@ -47,17 +47,18 @@ $employment_types = $pdo->query("SELECT * FROM employment_types WHERE status = '
 $url_project_id = $_GET['project_id'] ?? null;
 
 // Projects dropdown — admins see all active; non-admins see only their assigned projects
-if (isAdmin()) {
-    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status NOT IN ('completed', 'cancelled') ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
-    if (empty($assigned)) {
-        $projects = [];
+$projects = [];
+if (projectsModuleActive()) {
+    if (isAdmin()) {
+        $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status NOT IN ('completed', 'cancelled') ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
     } else {
-        $ph = implode(',', array_fill(0, count($assigned), '?'));
-        $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status NOT IN ('completed','cancelled') AND project_id IN ($ph) ORDER BY project_name");
-        $pstmt->execute($assigned);
-        $projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+        $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+        if (!empty($assigned)) {
+            $ph = implode(',', array_fill(0, count($assigned), '?'));
+            $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status NOT IN ('completed','cancelled') AND project_id IN ($ph) ORDER BY project_name");
+            $pstmt->execute($assigned);
+            $projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+        }
     }
 }
 
@@ -702,6 +703,7 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     <label for="work_location" class="form-label">Work Location</label>
                                     <input type="text" class="form-control" id="work_location" name="work_location" placeholder="Office location">
                                 </div>
+                                <?php if (projectsModuleActive()): ?>
                                 <div class="col-md-6 mb-3">
                                     <label for="project_id" class="form-label">Assign to Project</label>
                                     <select class="form-select select2-static" id="project_id" name="project_id">
@@ -714,7 +716,8 @@ $next_employee_number = peekNextCode($pdo, 'EMP');
                                     </select>
                                     <small class="text-muted">Optional: Link this employee to a specific project.</small>
                                 </div>
-                                <div class="col-md-6 mb-3">
+                                <?php endif; ?>
+                                <div class="col-md-<?= projectsModuleActive() ? 6 : 12 ?> mb-3">
                                     <label for="warehouse_id" class="form-label">Assign to Warehouse</label>
                                     <!-- Plain <select>, NOT select2 — every other Project+Warehouse pair in
                                          BMS keeps Warehouse native so bindWarehouseToProject()'s show/hide +

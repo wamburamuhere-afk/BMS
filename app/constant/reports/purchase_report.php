@@ -13,11 +13,7 @@ includeHeader();
 autoEnforcePermission('purchase_report');
 
 // Projects the current user may see (admins → all; others → assigned only).
-$projects = $pdo->query(
-    "SELECT project_id, project_name FROM projects
-      WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
-      ORDER BY project_name ASC"
-)->fetchAll(PDO::FETCH_ASSOC);
+$projects = projectsForSelect($pdo);
 
 // Warehouses the current user may see, per security.md §23 (Phase 6 — warehouse ACL).
 $warehouses = $pdo->query(
@@ -65,6 +61,7 @@ $currency  = get_setting('currency', 'TZS');
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">To</label>
                     <input type="date" name="date_to" id="f-to" class="form-control" value="<?= htmlspecialchars($date_to) ?>">
                 </div>
+                <?php if (projectsModuleActive()): ?>
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
@@ -74,6 +71,7 @@ $currency  = get_setting('currency', 'TZS');
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <?php endif; ?>
                 <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Warehouse</label>
                     <select name="warehouse_id" id="f-warehouse" class="form-select" style="width:100%">

@@ -56,27 +56,14 @@ $currencies = [
     'KES' => 'Kenyan Shilling'
 ];
 
-// Get projects if enabled
-$enable_projects = 0;
-try {
-    $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'enable_projects'");
-    $stmt->execute();
-    $enable_projects = $stmt->fetchColumn() ?: 0;
-} catch (Exception $e) {}
-
-$projects = [];
-if ($enable_projects) {
-    try {
-        if (isAdmin()) {
-            $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
-        } elseif (!empty($_poc_assigned)) {
-            $_poc_pph = implode(',', array_fill(0, count($_poc_assigned), '?'));
-            $_poc_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($_poc_pph) ORDER BY project_name");
-            $_poc_pstmt->execute($_poc_assigned);
-            $projects = $_poc_pstmt->fetchAll(PDO::FETCH_ASSOC);
-        }
-    } catch (Exception $e) {}
-}
+// Get projects if enabled. $enable_projects now reflects BOTH the
+// superadmin's platform grant AND the tenant's own "Enable Projects Module"
+// setting — see projectsModuleActive() (core/project_scope.php). Previously
+// this checked only the tenant's own setting, so a tenant whose Projects
+// module the platform had revoked could still see this field if their own
+// setting happened to still be on.
+$enable_projects = projectsModuleActive() ? 1 : 0;
+$projects = projectsForSelect($pdo);
 
 // Context-aware back navigation — short ?back=<tab> keeps URLs clean
 $back_tab     = $_GET['back'] ?? '';
@@ -921,7 +908,7 @@ $(document).ready(function(){
     <?php if ($enable_projects): ?>
     rebuildPoWarehouses($('#project_id').val());
     <?php else: ?>
-    rebuildPoWarehouses('');
+    rebuildPoWarehouses(); // no Project field at all — show every warehouse, unfiltered
     <?php endif; ?>
 
     if (rfqRefId && !isEdit) {

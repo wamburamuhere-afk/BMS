@@ -17,12 +17,11 @@ $rfq_supplier_filter = intval($_GET['supplier'] ?? 0);
 // (Phase 6 — pos_upgrade_plan.md); was a flat, fully-unscoped query before.
 $warehouses = warehousesForSelect($pdo);
 
-$enable_projects = 0;
-try {
-    $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key='enable_projects'");
-    $stmt->execute();
-    $enable_projects = $stmt->fetchColumn() ?: 0;
-} catch (Exception $e) {}
+// Reflects BOTH the superadmin's platform grant AND the tenant's own "Enable
+// Projects Module" setting — see projectsModuleActive() (core/project_scope.php).
+// Previously checked only the tenant's own setting, so a tenant whose
+// Projects module the platform had revoked could still see this field.
+$enable_projects = projectsModuleActive() ? 1 : 0;
 
 $projects = [];
 if ($enable_projects) {

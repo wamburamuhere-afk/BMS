@@ -1124,7 +1124,7 @@ function get_progress_color($percentage) {
                             <li><a class="dropdown-item" href="<?= getUrl('suppliers') ?>?action=add"><i class="bi bi-truck"></i> <?= t('Add Supplier') ?></a></li>
                             <?php endif; ?>
 
-                            <?php if (get_setting('enable_projects') == '1' && canView('projects')): ?>
+                            <?php if (projectsModuleActive() && canView('projects')): ?>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="projects"><i class="bi bi-kanban"></i> <?= t('Projects Management') ?></a></li>
                             <?php endif; ?>
@@ -1375,7 +1375,7 @@ function get_progress_color($percentage) {
     <?php
     $ql_has_links = canView('pos') || canCreate('invoices') || canCreate('customers')
                  || canCreate('suppliers') || canCreate('products')
-                 || (get_setting('enable_projects') == '1' && canView('projects'));
+                 || (projectsModuleActive() && canView('projects'));
     ?>
     <div class="row mt-4">
         <div class="col-12">
@@ -1433,7 +1433,7 @@ function get_progress_color($percentage) {
                         </div>
                         <?php endif; ?>
 
-                        <?php if (get_setting('enable_projects') == '1' && canView('projects')): ?>
+                        <?php if (projectsModuleActive() && canView('projects')): ?>
                         <div class="flex-fill" style="min-width: 130px;">
                             <a href="projects" class="btn btn-outline-dark w-100 h-100 py-3">
                                 <i class="bi bi-briefcase display-6"></i>

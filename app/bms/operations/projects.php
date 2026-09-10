@@ -10,7 +10,7 @@ autoEnforcePermission('projects');
 
 includeHeader();
 
-if (get_setting('enable_projects') != '1') {
+if (!projectsModuleActive()) {
     echo "<script>window.location.href = '" . getUrl('dashboard') . "';</script>";
     exit;
 }
