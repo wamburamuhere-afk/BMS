@@ -1,5 +1,44 @@
 # BMS Changelog
 
+## 2026-09-12 (fix) - Warehouse backfill silently did nothing on live tenants — migration filename ordering bug
+
+**Files (new):** `migrations/tenant/2026_09_12_journal_entries_warehouse_backfill_retry.php`,
+`migrations/2026_09_12_journal_entries_warehouse_backfill_retry_legacy_db.php`
+
+**User-reported:** on the live MSAKUZI SHOP POINT tenant, Income Statement's new Warehouse filter
+showed near-zero for every warehouse even though Sales Report (a different, older report reading
+`pos_sales.warehouse_id` directly) showed real multi-million-TZS totals for the same warehouses over
+the same period — the underlying source data clearly had warehouses recorded, but the GL wasn't
+reflecting it.
+
+**Root cause, confirmed via this tenant's own `migrations/status.php` deploy log:** the two migrations
+shipped 2026-09-11 — `..._journal_entries_warehouse_backfill.php` and
+`..._journal_entries_warehouse_id.php` — share the same date prefix, and the migration runner applies
+pending files in filename order. `backfill` sorts before `id`, so **the backfill ran before the
+column it was supposed to fill even existed.** All 7 of its `UPDATE` statements failed with
+`Unknown column 'je.warehouse_id'` and were silently caught by that migration's own try/catch (so the
+deploy log showed "Migration complete" and never failed the build) — then the column-add migration
+ran immediately after and succeeded, leaving the column present but empty. Confirmed via a
+transaction-wrapped local simulation (nulled the already-backfilled rows, ran the new fix, rolled
+back) that this exact scenario is what the fix corrects — restored the identical row counts as before
+nulling (56/56 rows across `pos_sale`/`pos_cogs`/`stock_adjustment` in the local dataset). This
+affected every tenant, not just the one that surfaced it — `core/tenant_migration_runner.php` applies
+`migrations/tenant/*.php` in the same filename-sorted order.
+
+**Fix:** a new migration (tenant + legacy, dated 2026-09-12 so it's independent of the original
+filename collision) that re-runs the exact same backfill logic, but is not order-dependent — it
+checks/adds the column itself first if somehow still missing, then backfills. Unlike the original, a
+real failure here is NOT swallowed (no try/catch around the `UPDATE`s) — it fails the migration loudly,
+so a future ordering mistake can't hide the same way. Idempotent: safe to run on a tenant where the
+2026-09-11 backfill partially or fully succeeded (only touches rows still `NULL`).
+
+**Verified**: `php -l` on both files; ran locally (0 rows touched — this dev DB's backfill already
+ran correctly, confirming the retry is a true no-op when nothing is broken); financial reports
+integrity suite still green. The live-bug reproduction (simulate-then-fix inside a rolled-back
+transaction) is the strongest evidence — it proves this migration produces the exact same result the
+2026-09-11 migration was supposed to produce, from the exact broken starting state confirmed on the
+live tenant.
+
 ## 2026-09-11 (feat) - Capture warehouse on the GL; fix Project-filter accuracy across financial reports
 
 **Files (new):** `api/account/get_warehouses_for_filter.php`,
