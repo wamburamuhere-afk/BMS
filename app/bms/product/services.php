@@ -103,17 +103,18 @@ $brands     = $pdo->query("SELECT brand_id, brand_name FROM brands WHERE status=
 $units      = $pdo->query("SELECT unit_code, unit_name FROM product_units WHERE status='active' ORDER BY unit_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 if (empty($units)) $units = [['unit_code'=>'pcs','unit_name'=>'Pieces']];
 // Projects dropdown — admins see all; non-admins see only their assigned projects
-if (!empty($_SESSION['scope']['is_admin'])) {
-    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status='active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
-    if (empty($assigned)) {
-        $projects = [];
+$projects = [];
+if (projectsModuleActive()) {
+    if (!empty($_SESSION['scope']['is_admin'])) {
+        $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status='active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
     } else {
-        $ph = implode(',', array_fill(0, count($assigned), '?'));
-        $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status='active' AND project_id IN ($ph) ORDER BY project_name");
-        $pstmt->execute($assigned);
-        $projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+        $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+        if (!empty($assigned)) {
+            $ph = implode(',', array_fill(0, count($assigned), '?'));
+            $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status='active' AND project_id IN ($ph) ORDER BY project_name");
+            $pstmt->execute($assigned);
+            $projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+        }
     }
 }
 // Warehouses: shared helper — covers project-derived AND explicitly-granted
@@ -668,6 +669,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             </div>
                             <div class="col-12 mt-3 pt-3 border-top">
                                 <div class="row g-3">
+                                    <?php if (projectsModuleActive()): ?>
                                     <div class="col-md-6">
                                         <label class="form-label fw-bold small"><?= t('Select Project (Optional)') ?></label>
                                         <select class="form-select form-select-sm fw-bold shadow-sm border border-secondary border-opacity-25" name="project_id" id="svc_project_id" onchange="filterWarehouses(this.value, 'svc_warehouse_id')">
@@ -677,7 +679,8 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
-                                    <div class="col-md-6">
+                                    <?php endif; ?>
+                                    <div class="col-md-<?= projectsModuleActive() ? 6 : 12 ?>">
                                         <label class="form-label fw-bold small"><?= t('Select Warehouse') ?> <span class="text-danger">*</span></label>
                                         <select class="form-select form-select-sm fw-bold text-primary shadow-sm border border-primary border-opacity-25" name="warehouse_id" id="svc_warehouse_id" onchange="refreshAllComponentCosts()">
                                             <option value=""><?= t('Select Warehouse') ?></option>
@@ -851,6 +854,7 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             </div>
                             <div class="col-12 mt-3 pt-3 border-top">
                                 <div class="row g-3">
+                                    <?php if (projectsModuleActive()): ?>
                                     <div class="col-md-6">
                                         <label class="form-label fw-bold small"><?= t('Select Project (Optional)') ?></label>
                                         <select class="form-select form-select-sm fw-bold shadow-sm border border-secondary border-opacity-25" name="project_id" id="edit_svc_project_id" onchange="filterWarehouses(this.value, 'edit_svc_warehouse_id')">
@@ -860,7 +864,8 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
-                                    <div class="col-md-6">
+                                    <?php endif; ?>
+                                    <div class="col-md-<?= projectsModuleActive() ? 6 : 12 ?>">
                                         <label class="form-label fw-bold small"><?= t('Select Warehouse') ?> <span class="text-danger">*</span></label>
                                         <select class="form-select form-select-sm fw-bold text-primary shadow-sm border border-primary border-opacity-25" name="warehouse_id" id="edit_svc_warehouse_id" onchange="refreshAllComponentCostsEdit()">
                                             <option value=""><?= t('Select Warehouse') ?></option>
@@ -1027,6 +1032,7 @@ const SVC_I18N = <?= json_encode([
     'search_product' => t('Search product...'),
     'cancel' => t('Cancel'),
 ], JSON_UNESCAPED_UNICODE) ?>;
+const PROJECTS_MODULE_ACTIVE = <?= json_encode(projectsModuleActive()) ?>;
 
 function filterWarehouses(projectId, targetId) {
     const select = document.getElementById(targetId);
@@ -1514,8 +1520,10 @@ function openEditSvcModal(product) {
     document.getElementById('edit_svc_tax').value = product.tax_id || '';
     document.getElementById('edit_svc_status').value = product.status || 'active';
     
-    document.getElementById('edit_svc_project_id').value = product.project_id || '';
-    filterWarehouses(product.project_id, 'edit_svc_warehouse_id'); // Re-filter before setting value
+    if (PROJECTS_MODULE_ACTIVE) {
+        document.getElementById('edit_svc_project_id').value = product.project_id || '';
+        filterWarehouses(product.project_id, 'edit_svc_warehouse_id'); // Re-filter before setting value
+    }
     document.getElementById('edit_svc_warehouse_id').value = product.warehouse_id || '';
     // Auto-generate Item Code if this product never had one
     const generatedCode = product.contract_item_no || ('NIP-' + String(product.product_id).padStart(5, '0'));

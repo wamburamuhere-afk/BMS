@@ -17,8 +17,11 @@ if (!isset($lifecycle_preselect)) $lifecycle_preselect = null;
 $lc_designations = $pdo->query("SELECT designation_id, designation_name FROM designations WHERE status = 'active' ORDER BY designation_name")->fetchAll(PDO::FETCH_ASSOC);
 $lc_departments  = $pdo->query("SELECT department_id, department_name FROM departments WHERE status = 'active' ORDER BY department_name")->fetchAll(PDO::FETCH_ASSOC);
 // Projects: strict scope — a non-admin only ever picks projects they own (§23 rule 1)
-$lc_proj_scope   = function_exists('scopeFilterSql') ? scopeFilterSql('project', 'projects') : '';
-$lc_projects     = $pdo->query("SELECT project_id, project_name FROM projects WHERE status NOT IN ('cancelled') $lc_proj_scope ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+$lc_projects = [];
+if (projectsModuleActive()) {
+    $lc_proj_scope = function_exists('scopeFilterSql') ? scopeFilterSql('project', 'projects') : '';
+    $lc_projects   = $pdo->query("SELECT project_id, project_name FROM projects WHERE status NOT IN ('cancelled') $lc_proj_scope ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+}
 ?>
 
 <!-- New HR Action Modal (shared include) -->
@@ -98,7 +101,7 @@ $lc_projects     = $pdo->query("SELECT project_id, project_name FROM projects WH
 
                     <!-- Transfer -->
                     <div class="row g-3 mt-0 lc-group lc-transfer d-none">
-                        <div class="col-md-6">
+                        <div class="col-md-<?= projectsModuleActive() ? 6 : 12 ?>">
                             <label class="form-label">New Department</label>
                             <select class="form-select select2-static" name="new_department_id" id="lc_new_department">
                                 <option value="">-- Keep current --</option>
@@ -106,7 +109,11 @@ $lc_projects     = $pdo->query("SELECT project_id, project_name FROM projects WH
                                 <option value="<?= (int)$d['department_id'] ?>"><?= safe_output($d['department_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
+                            <?php if (!projectsModuleActive()): ?>
+                            <div class="form-text">Pick a new department.</div>
+                            <?php endif; ?>
                         </div>
+                        <?php if (projectsModuleActive()): ?>
                         <div class="col-md-6">
                             <label class="form-label">New Project</label>
                             <select class="form-select select2-static" name="new_project_id" id="lc_new_project">
@@ -117,6 +124,7 @@ $lc_projects     = $pdo->query("SELECT project_id, project_name FROM projects WH
                             </select>
                             <div class="form-text">Pick a department, a project, or both.</div>
                         </div>
+                        <?php endif; ?>
                     </div>
 
                     <!-- Award -->
@@ -375,7 +383,10 @@ $lc_projects     = $pdo->query("SELECT project_id, project_name FROM projects WH
         e.preventDefault();
         const t = $('#lc_type').val();
         if (t === 'transfer' && !$('#lc_new_department').val() && !$('#lc_new_project').val()) {
-            Swal.fire({ icon: 'error', title: 'Error', text: 'A transfer needs a new department and/or a new project.' });
+            const transferMsg = $('#lc_new_project').length
+                ? 'A transfer needs a new department and/or a new project.'
+                : 'A transfer needs a new department.';
+            Swal.fire({ icon: 'error', title: 'Error', text: transferMsg });
             return;
         }
         if (t === 'leadership' && !$('#lc_employee').val()) {

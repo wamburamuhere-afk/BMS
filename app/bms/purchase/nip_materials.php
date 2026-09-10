@@ -73,17 +73,18 @@ try {
 $warehouses_all = warehousesForSelect($pdo);
 
 $_nip_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
-if (isAdmin()) {
-    $projects_list = $pdo->query("
-        SELECT project_id, project_name FROM projects WHERE status='active' ORDER BY project_name
-    ")->fetchAll(PDO::FETCH_ASSOC);
-} elseif (!empty($_nip_assigned)) {
-    $_nip_pph = implode(',', array_fill(0, count($_nip_assigned), '?'));
-    $_nip_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status='active' AND project_id IN ($_nip_pph) ORDER BY project_name");
-    $_nip_pstmt->execute($_nip_assigned);
-    $projects_list = $_nip_pstmt->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $projects_list = [];
+$projects_list = [];
+if (projectsModuleActive()) {
+    if (isAdmin()) {
+        $projects_list = $pdo->query("
+            SELECT project_id, project_name FROM projects WHERE status='active' ORDER BY project_name
+        ")->fetchAll(PDO::FETCH_ASSOC);
+    } elseif (!empty($_nip_assigned)) {
+        $_nip_pph = implode(',', array_fill(0, count($_nip_assigned), '?'));
+        $_nip_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status='active' AND project_id IN ($_nip_pph) ORDER BY project_name");
+        $_nip_pstmt->execute($_nip_assigned);
+        $projects_list = $_nip_pstmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 
 $nip_for_form = $pdo->query("
@@ -195,10 +196,11 @@ $nip_for_form = $pdo->query("
     <div class="card shadow-sm mb-3 border-0 d-print-none">
         <div class="card-body py-2">
             <div class="row g-2 align-items-center">
-                <div class="col-md-5">
+                <div class="col-md-<?= projectsModuleActive() ? 5 : 9 ?>">
                     <input type="text" class="form-control form-control-sm" id="mlSearch"
                         placeholder="Search list name or number…">
                 </div>
+                <?php if (projectsModuleActive()): ?>
                 <div class="col-md-4">
                     <select class="form-select form-select-sm" id="mlFilterProject">
                         <option value="">All Projects</option>
@@ -207,6 +209,7 @@ $nip_for_form = $pdo->query("
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <?php endif; ?>
                 <div class="col-md-3 text-end">
                     <span class="text-muted small" id="mlCountLabel"></span>
                 </div>
@@ -352,6 +355,7 @@ $nip_for_form = $pdo->query("
 
                     <!-- Project + Warehouse (same row) -->
                     <div class="row g-3 mb-4">
+                        <?php if (projectsModuleActive()): ?>
                         <div class="col-md-6">
                             <label class="form-label fw-bold small">Select Project <span class="text-muted fw-normal">(optional)</span></label>
                             <select class="form-select" name="project_id" id="mlAddProjectId" onchange="mlAddProjectChanged()">
@@ -361,7 +365,8 @@ $nip_for_form = $pdo->query("
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <?php endif; ?>
+                        <div class="col-md-<?= projectsModuleActive() ? 6 : 12 ?>">
                             <label class="form-label fw-bold small">Select Warehouse</label>
                             <select class="form-select" name="warehouse_id" id="mlAddWarehouseId" onchange="mlAddWarehouseChanged()">
                                 <option value="">Select Warehouse</option>
@@ -436,6 +441,7 @@ const NIP_URL         = '<?= rtrim(getUrl(''), '/') ?>';
 const ALL_WH          = <?= json_encode(array_values($warehouses_all)) ?>;
 const ML_ALL_NIPS     = <?= json_encode(array_values($nip_for_form)) ?>;
 const ALL_PROJECTS    = <?= json_encode(array_values($projects_list)) ?>;
+const NIP_PROJECTS_ACTIVE = <?= json_encode(projectsModuleActive()) ?>;
 const ML_COMPANY_NAME = '<?= addslashes($c_name) ?>';
 const ML_COMPANY_LOGO = '<?= !empty($c_logo) ? addslashes(getUrl($c_logo)) : '' ?>';
 const ML_EXPORT_USER  = '<?= addslashes(trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''))) ?>';
@@ -446,6 +452,7 @@ var mlTable;
 
 // ── Warehouse + NIP helpers ───────────────────────────────────────────────────
 function mlGetWarehouses(projId) {
+    if (!NIP_PROJECTS_ACTIVE) return ALL_WH;
     if (projId) return ALL_WH.filter(function(w) { return parseInt(w.project_id) === projId; });
     return ALL_WH.filter(function(w) { return !w.project_id || parseInt(w.project_id) === 0; });
 }
@@ -552,6 +559,10 @@ function mlOpenEdit(id, name) {
             projOpts += '<option value="' + pr.project_id + '"' + (parseInt(pr.project_id) === projId ? ' selected' : '') + '>' + pr.project_name + '</option>';
         });
 
+        var projFieldHtml = NIP_PROJECTS_ACTIVE
+            ? ('<div class="col-md-6"><label class="form-label fw-bold small">Select Project <span class="text-muted fw-normal">(optional)</span></label>'
+               + '<select class="form-select" name="project_id" id="mlEditProjectId" onchange="mlEditProjectChanged()">' + projOpts + '</select></div>')
+            : '';
         var bodyHtml = '<div id="mlEditMsg" class="mb-3"></div>'
             + '<input type="hidden" name="id" value="' + l.id + '">'
             + '<div class="mb-3"><label class="form-label fw-bold small">Material List Name <span class="text-danger">*</span></label>'
@@ -559,9 +570,8 @@ function mlOpenEdit(id, name) {
             + '<div class="mb-3"><label class="form-label fw-bold small">Materials List No</label>'
             + '<input type="text" class="form-control bg-light text-muted" value="' + l.list_no + '" readonly></div>'
             + '<div class="row g-3 mb-4">'
-            + '<div class="col-md-6"><label class="form-label fw-bold small">Select Project <span class="text-muted fw-normal">(optional)</span></label>'
-            + '<select class="form-select" name="project_id" id="mlEditProjectId" onchange="mlEditProjectChanged()">' + projOpts + '</select></div>'
-            + '<div class="col-md-6"><label class="form-label fw-bold small">Select Warehouse</label>'
+            + projFieldHtml
+            + '<div class="col-md-' + (NIP_PROJECTS_ACTIVE ? 6 : 12) + '"><label class="form-label fw-bold small">Select Warehouse</label>'
             + '<select class="form-select" name="warehouse_id" id="mlEditWarehouseId" onchange="mlEditWarehouseChanged()">'
             + mlBuildWarehouseOptions(whId, projId) + '</select></div></div>'
             + '<h6 class="fw-bold small text-uppercase text-muted mb-2"><i class="bi bi-list-ul me-1"></i>Non-Inventory Products</h6>'

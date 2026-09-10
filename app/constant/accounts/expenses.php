@@ -25,8 +25,11 @@ $expense_accounts = expenseAccounts($pdo);
 // shared by every payment form (active cash/bank asset accounts).
 $bank_accounts = cashBankAccounts($pdo);
 
-// Fetch Projects if enabled — filtered to user's assigned projects for non-admins
-$enable_projects = get_setting('enable_projects');
+// Fetch Projects if enabled — filtered to user's assigned projects for non-admins.
+// $enable_projects reflects BOTH the superadmin's platform grant AND the
+// tenant's own "Enable Projects Module" setting; see projectsModuleActive()
+// (core/project_scope.php).
+$enable_projects = projectsModuleActive() ? 1 : 0;
 $projects = [];
 if ($enable_projects == '1') {
     if (isAdmin()) {

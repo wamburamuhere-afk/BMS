@@ -5,6 +5,11 @@ require_once __DIR__ . '/../../roots.php';
 
 global $pdo;
 
+if (!projectsModuleActive()) {
+    echo json_encode(["draw" => (int)($_GET['draw'] ?? 1), "recordsTotal" => 0, "recordsFiltered" => 0, "data" => [], "stats" => []]);
+    exit;
+}
+
 try {
     $draw = isset($_GET['draw']) ? (int)$_GET['draw'] : 1;
     $start = isset($_GET['start']) ? (int)$_GET['start'] : 0;

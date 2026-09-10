@@ -11,11 +11,7 @@ includeHeader();
 
 autoEnforcePermission('ap_aging');
 
-$projects = $pdo->query(
-    "SELECT project_id, project_name FROM projects
-      WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
-      ORDER BY project_name ASC"
-)->fetchAll(PDO::FETCH_ASSOC);
+$projects = projectsForSelect($pdo);
 $as_of    = $_GET['as_of_date'] ?? date('Y-m-d');
 $currency = get_setting('currency', 'TZS');
 ?>
@@ -50,6 +46,7 @@ $currency = get_setting('currency', 'TZS');
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">As of date</label>
                     <input type="date" name="as_of_date" id="f-asof" class="form-control" value="<?= htmlspecialchars($as_of) ?>">
                 </div>
+                <?php if (projectsModuleActive()): ?>
                 <div class="col-md-4">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
@@ -59,7 +56,8 @@ $currency = get_setting('currency', 'TZS');
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="col-md-4">
+                <?php endif; ?>
+                <div class="col-md-<?= projectsModuleActive() ? 4 : 5 ?>">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Supplier / Sub-contractor</label>
                     <select name="vendor_id" id="f-vendor" class="form-select" style="width:100%"></select>
                 </div>

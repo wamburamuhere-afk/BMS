@@ -24,7 +24,7 @@ logActivity($pdo, $_SESSION['user_id'], 'View suppliers', 'User viewed the suppl
 // "Back to Project" affordance, and returns there after save — mirroring the
 // Purchase Order create/edit pattern. The return URL is rebuilt server-side from
 // the project id + short tab key, so the address bar stays clean.
-$proj_ctx_id     = isset($_GET['project']) ? intval($_GET['project']) : 0;
+$proj_ctx_id     = (projectsModuleActive() && isset($_GET['project'])) ? intval($_GET['project']) : 0;
 $proj_ctx_back   = preg_replace('/[^a-z0-9\-]/', '', strtolower($_GET['back'] ?? ''));
 $proj_ctx_name   = '';
 $proj_ctx_return = '';
@@ -132,17 +132,18 @@ $lk_years = [];
 for ($y = (int)date('Y') + 1; $y >= 1950; $y--) { $lk_years[] = ['value' => (string)$y, 'label' => (string)$y]; }
 
 // Fetch projects for linking — admins see all; non-admins see only their assigned projects
-if (isAdmin()) {
-    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
-    if (empty($assigned)) {
-        $projects = [];
+$projects = [];
+if (projectsModuleActive()) {
+    if (isAdmin()) {
+        $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
     } else {
-        $ph = implode(',', array_fill(0, count($assigned), '?'));
-        $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name");
-        $pstmt->execute($assigned);
-        $projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+        $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+        if (!empty($assigned)) {
+            $ph = implode(',', array_fill(0, count($assigned), '?'));
+            $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name");
+            $pstmt->execute($assigned);
+            $projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+        }
     }
 }
 // Translated status label for badges (t() keys already exist from Customers).
@@ -736,6 +737,7 @@ function supplier_status_label($status) {
                                         <option value="blacklisted"><?= t('Blacklisted') ?></option>
                                     </select>
                                 </div>
+                                <?php if (projectsModuleActive()): ?>
                                 <div class="col-12 mb-3">
                                     <label for="project_id" class="form-label"><?= t('Linked Project') ?> <span class="text-muted small fw-normal">(<?= t('Optional') ?>)</span></label>
                                     <select class="form-select select2-enable" id="project_id" name="project_id">
@@ -745,6 +747,7 @@ function supplier_status_label($status) {
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <?php endif; ?>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="credit_limit" class="form-label"><?= t('Credit Limit') ?></label>
                                     <input type="number" class="form-control" id="credit_limit" name="credit_limit" placeholder="0.00" step="0.01">
@@ -1041,6 +1044,7 @@ function supplier_status_label($status) {
                                         <option value="blacklisted"><?= t('Blacklisted') ?></option>
                                     </select>
                                 </div>
+                                <?php if (projectsModuleActive()): ?>
                                 <div class="col-12 mb-3">
                                     <label for="edit_project_id" class="form-label"><?= t('Linked Project') ?> <span class="text-muted small fw-normal">(<?= t('Optional') ?>)</span></label>
                                     <select class="form-select select2-enable" id="edit_project_id" name="project_id">
@@ -1050,6 +1054,7 @@ function supplier_status_label($status) {
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <?php endif; ?>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="edit_credit_limit" class="form-label"><?= t('Credit Limit') ?></label>
                                     <input type="number" class="form-control" id="edit_credit_limit" name="credit_limit" placeholder="0.00" step="0.01">

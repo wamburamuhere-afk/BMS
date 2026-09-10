@@ -65,12 +65,10 @@ $itemStmt = $pdo->prepare("SELECT * FROM quotation_items WHERE order_id = ?");
 $itemStmt->execute([$quotation_id]);
 $items = $itemStmt->fetchAll(PDO::FETCH_ASSOC);
 
-$enable_projects = 0;
-try {
-    $s = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'enable_projects'");
-    $s->execute();
-    $enable_projects = $s->fetchColumn() ?: 0;
-} catch (Exception $e) {}
+// $enable_projects reflects BOTH the superadmin's platform grant AND the
+// tenant's own "Enable Projects Module" setting; see projectsModuleActive()
+// (core/project_scope.php).
+$enable_projects = projectsModuleActive() ? 1 : 0;
 
 if (!function_exists('quote_status_color')) {
     function quote_status_color($status) {

@@ -145,13 +145,10 @@ if (!empty($invoice['customer_lpo_id'])) {
     $lpo_reference_number = $lpoNumStmt->fetchColumn() ?: null;
 }
 
-// Check projects setting
-$enable_projects = 0;
-try {
-    $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'enable_projects'");
-    $stmt->execute();
-    $enable_projects = $stmt->fetchColumn() ?: 0;
-} catch (Exception $e) {}
+// Check projects setting — $enable_projects reflects BOTH the superadmin's
+// platform grant AND the tenant's own "Enable Projects Module" setting; see
+// projectsModuleActive() (core/project_scope.php).
+$enable_projects = projectsModuleActive() ? 1 : 0;
 
 // Page Title
 $page_title = "Invoice #" . $invoice['invoice_number'];

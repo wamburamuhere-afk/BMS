@@ -18,15 +18,9 @@ if (function_exists('autoEnforcePermission')) {
     autoEnforcePermission('expense_report');
 }
 
-// In-scope projects (expenses carry project_id). Empty when the Projects
-// module is off for this tenant — a switched-off module never deletes
-// existing rows, so without this guard the dropdown would keep offering stale
-// projects the tenant can no longer use at all.
-$projects = tenantFeatureEnabled('projects') ? $pdo->query(
-    "SELECT project_id, project_name FROM projects
-      WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
-      ORDER BY project_name ASC"
-)->fetchAll(PDO::FETCH_ASSOC) : [];
+// In-scope projects (expenses carry project_id). Empty when Projects isn't
+// active for this tenant — see projectsModuleActive() (core/project_scope.php).
+$projects = projectsForSelect($pdo);
 
 // Expense-account dropdown source.
 $expense_accounts = $pdo->query("
@@ -75,6 +69,7 @@ $currency  = get_setting('currency', 'TZS');
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">To</label>
                     <input type="date" name="date_to" id="f-to" class="form-control" value="<?= htmlspecialchars($date_to) ?>">
                 </div>
+                <?php if (projectsModuleActive()): ?>
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
@@ -84,6 +79,7 @@ $currency  = get_setting('currency', 'TZS');
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <?php endif; ?>
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Expense Account</label>
                     <select name="expense_account_id" id="f-account" class="form-select" style="width:100%">
