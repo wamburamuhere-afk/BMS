@@ -17,6 +17,13 @@ $projects = $pdo->query(
       ORDER BY project_name ASC"
 )->fetchAll(PDO::FETCH_ASSOC);
 
+// Warehouses the CURRENT user may see, per security.md §23 (Phase 6 — warehouse ACL).
+$warehouses = $pdo->query(
+    "SELECT warehouse_id, warehouse_name FROM warehouses
+      WHERE status = 'active' " . scopeFilterSql('warehouse', 'warehouses') . "
+      ORDER BY warehouse_name ASC"
+)->fetchAll(PDO::FETCH_ASSOC);
+
 $currency = get_setting('currency', 'TZS');
 ?>
 
@@ -41,16 +48,21 @@ $currency = get_setting('currency', 'TZS');
     <div class="card border shadow-sm mb-4 d-print-none" style="border-color:#b6ccfe!important;border-radius:12px;">
         <div class="card-body p-4">
             <form id="filterForm" class="row g-3 align-items-end">
-                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Window</label>
+                <div class="col-md-2"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Window</label>
                     <select name="months" id="f-months" class="form-select" style="width:100%">
                         <option value="6">Last 6 months</option>
                         <option value="12" selected>Last 12 months</option>
                         <option value="24">Last 24 months</option>
                     </select></div>
-                <div class="col-md-5"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
+                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
                         <option value="">All My Projects</option>
                         <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option><?php endforeach; ?>
+                    </select></div>
+                <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Warehouse</label>
+                    <select name="warehouse_id" id="f-warehouse" class="form-select" style="width:100%">
+                        <option value="">All My Warehouses</option>
+                        <?php foreach ($warehouses as $w): ?><option value="<?= (int)$w['warehouse_id'] ?>"><?= safe_output($w['warehouse_name']) ?></option><?php endforeach; ?>
                     </select></div>
                 <div class="col-md-2"><button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter me-1"></i> Apply</button></div>
             </form>
@@ -117,7 +129,7 @@ $(function () {
     const BLUE = '#0d6efd';
     const fmt  = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    $('#f-months, #f-project').select2({ theme: 'bootstrap-5', allowClear: false, width: '100%' });
+    $('#f-months, #f-project, #f-warehouse').select2({ theme: 'bootstrap-5', allowClear: false, width: '100%' });
 
     const table = $('#trendTable').DataTable({
         responsive: false, scrollX: false, pageLength: 25, order: [[0, 'asc']],
@@ -146,7 +158,7 @@ $(function () {
     }
 
     function loadReport() {
-        const params = { months: $('#f-months').val() || '12', project_id: $('#f-project').val() || '' };
+        const params = { months: $('#f-months').val() || '12', project_id: $('#f-project').val() || '', warehouse_id: $('#f-warehouse').val() || '' };
         $.getJSON(DATA_URL, params).done(function (res) {
             if (!res || !res.success) { Swal.fire({ icon:'error', title:'Error', text:(res&&res.message)||'Could not load the report.' }); return; }
             $('#stat-sales').text(fmt(res.summary.total_sales));
@@ -163,7 +175,7 @@ $(function () {
     }
 
     $('#filterForm').on('submit', e => { e.preventDefault(); loadReport(); });
-    $('#f-months, #f-project').on('change', loadReport);
+    $('#f-months, #f-project, #f-warehouse').on('change', loadReport);
     loadReport();
     if (typeof logReportAction === 'function') logReportAction('Viewed Trends Analysis', 'Loaded historical trends report');
 });

@@ -9,7 +9,7 @@ require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
 includeHeader();
 
-autoEnforcePermission('financial_reports');
+autoEnforcePermission('vendor_statement');
 
 $currency  = get_setting('currency', 'TZS');
 $date_from = $_GET['date_from'] ?? date('Y-01-01');

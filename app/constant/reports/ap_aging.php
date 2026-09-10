@@ -9,7 +9,7 @@ require_once __DIR__ . '/../../../helpers.php';
 require_once __DIR__ . '/../../../core/project_scope.php';
 includeHeader();
 
-autoEnforcePermission('financial_reports');
+autoEnforcePermission('ap_aging');
 
 $projects = $pdo->query(
     "SELECT project_id, project_name FROM projects

@@ -67,10 +67,20 @@ if (!function_exists('bmsFeatureRegistry')) {
      *               drift apart. See the directory warning above.
      *
      * Page keys deliberately ABSENT from every feature are always reachable:
-     * dashboard, customers, products, all Finance, all Reports, CRM, Documents
-     * (except e_signatures), Settings and System Settings. A company must always
-     * be able to invoice, see its own ledger and manage its own staff access,
+     * dashboard, customers, products, the statutory Finance statements
+     * (Income Statement, Balance Sheet, Cash Flow, Trial Balance, General
+     * Ledger, Consolidated Expenses, Receivables Aging, Customer Statement,
+     * Expense Report, Tax Report, WHT Credit, Audit Report, Compliance
+     * Report, Sales Report, Inventory Report), CRM, Documents (except
+     * e_signatures), Settings and System Settings. A company must always be
+     * able to invoice, see its own ledger and manage its own staff access,
      * even with every optional module switched off.
+     *
+     * 2026-09-10: everything else under Reports WAS also in this always-on
+     * set — a gap, not a deliberate exemption (see each feature's own
+     * 'page_keys' comment above for the report entries added that day and
+     * why). Reports whose entire dataset comes from one optional module now
+     * follow that module like every other page does.
      */
     function bmsFeatureRegistry(): array
     {
@@ -80,7 +90,18 @@ if (!function_exists('bmsFeatureRegistry')) {
                 'description' => 'Quotations, sales orders, LPO, returns and credit notes. Invoicing itself is always available.',
                 'default'     => true,
                 'sort_order'  => 10,
-                'page_keys'   => ['quotations', 'sales_orders', 'lpo', 'sales_returns', 'credit_notes', 'dn'],
+                'page_keys'   => [
+                    'quotations', 'sales_orders', 'lpo', 'sales_returns', 'credit_notes', 'dn',
+                    // 2026-09-10: these five analytics reports were built on
+                    // sales_orders (Sales-module data) and are gated on that
+                    // basis; the same change also extended their queries to
+                    // union in invoices/pos_sales (previously ignored — a
+                    // data-completeness gap, not a gating one) so they stay
+                    // useful for a Sales-off, POS-only tenant, but their
+                    // primary lens is still sales/quotation analytics.
+                    'performance_dashboard', 'customer_analysis', 'product_analysis',
+                    'sales_forecast', 'trends_analysis',
+                ],
                 'paths'       => ['api/sales/'],
                 // Verified in code, not assumed: sales_order_create.php has
                 // warehouse_id as a REQUIRED form field — a Sales Order cannot
@@ -156,6 +177,16 @@ if (!function_exists('bmsFeatureRegistry')) {
                 'page_keys'   => [
                     'suppliers', 'supplier_payments', 'rfq', 'purchase', 'purchase_orders',
                     'purchase_returns', 'grn', 'dn', 'do', 'debit_notes', 'nip_materials',
+                    // 2026-09-10: these five reports read purchase_orders/
+                    // supplier_invoices/supplier_payments exclusively — no
+                    // Procurement, no data. 'ap_aging' and 'vendor_statement'
+                    // were carved out of the shared 'financial_reports' key
+                    // (which also covers Receivables Aging/Customer Statement —
+                    // those stay ungated); 'wht_report' was carved out of the
+                    // shared 'tax_report' key (which also covers Tax Report/
+                    // WHT Credit — those stay ungated too). See
+                    // migrations/tenant/2026_09_10_*_permission.php.
+                    'purchase_report', 'received_invoices', 'ap_aging', 'vendor_statement', 'wht_report',
                 ],
                 // sub_contractors.php gates ITSELF with canView('suppliers') —
                 // that page's path belongs here, not under 'projects' (see the
@@ -203,6 +234,8 @@ if (!function_exists('bmsFeatureRegistry')) {
                     'my_hr', 'company_calendar', 'attendance', 'attendance_badge',
                     'attendance_clockin', 'attendance_kiosk', 'leaves', 'leave_types',
                     'payroll', 'payslip', 'salary_components',
+                    // 2026-09-10: reads the employees table exclusively.
+                    'employee_report',
                 ],
                 'paths'       => ['api/payroll/'],
             ],
@@ -211,7 +244,8 @@ if (!function_exists('bmsFeatureRegistry')) {
                 'description' => 'Asset register, verification and maintenance. Split from HR so it survives when HR is switched off.',
                 'default'     => true,
                 'sort_order'  => 70,
-                'page_keys'   => ['assets', 'maintenance'],
+                // 2026-09-10: 'asset_report' added — reads the assets table exclusively.
+                'page_keys'   => ['assets', 'maintenance', 'asset_report'],
                 'paths'       => [
                     'api/assets/',
                     'app/bms/operations/assets.php',
