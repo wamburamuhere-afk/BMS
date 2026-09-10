@@ -1,5 +1,82 @@
 # BMS Changelog
 
+## 2026-09-11 (feat) - Capture warehouse on the GL; fix Project-filter accuracy across financial reports
+
+**Files (new):** `api/account/get_warehouses_for_filter.php`,
+`migrations/tenant/2026_09_11_journal_entries_warehouse_id.php`,
+`migrations/tenant/2026_09_11_journal_entries_warehouse_backfill.php`, and their two
+`migrations/2026_09_11_*_legacy_db.php` mirrors.
+
+**Files (modified):** `core/ledger_post.php`, `core/financial_reports.php`,
+`core/sales_posting.php`, `core/revenue_posting.php`, `core/purchase_posting.php`,
+`core/stock_posting.php`, `.claude/reporting-source.md`,
+`api/account/get_projects_for_filter.php`, `api/account/get_income_statement.php`,
+`api/account/get_income_statement_detail.php`, `api/account/get_inventory_report.php`,
+`api/account/get_stock_movements.php`, `api/account/get_stock_transfers.php`,
+`api/account/get_stock_adjustments.php`, `app/bms/invoice/income_statement.php`,
+`app/constant/reports/balance_sheet.php`, `app/constant/reports/cash_flow.php`,
+`app/constant/reports/ar_aging.php`, `app/constant/reports/sales_report.php`,
+`app/constant/reports/expense_report.php`, `app/constant/reports/tax_report.php`,
+`app/constant/reports/inventory_report.php`
+
+**User-reported:** on financial reports (Income Statement, Balance Sheet, Cash Flow, AR Aging,
+Sales Report, Inventory Report, Expense Report, Tax Report), the Project filter dropdown kept
+showing projects even after the Projects module was switched off for a tenant — because disabling
+a module never deletes the underlying `projects` rows (by design), but nothing checked whether the
+tenant could *currently* use Projects before querying/showing that list. Separately, warehouse
+couldn't be used to filter these same reports at all, because `journal_entries` — the canonical
+ledger every one of them reads — had no `warehouse_id` column; no posting path recorded which
+warehouse a GL entry belonged to.
+
+**Part 1 — GL warehouse capture.** Added `journal_entries.warehouse_id` (nullable, indexed) and a
+matching backfill migration that joins each `entity_type` back to its source document's own
+`warehouse_id` (`pos_sales`, `invoices`, `supplier_invoices`, `purchase_returns`, `stock_movements`
+all already carry one). `core/ledger_post.php::postLedgerEntry()` takes it as a new trailing optional
+parameter (backward-compatible with every existing caller). Wired it into the 4 domains where a
+source document genuinely has a single warehouse — POS sale/return/credit-note-restock, invoice
+revenue/COGS/void, supplier & sub-contractor bill accrual + purchase return, stock adjustment +
+reversal — each via one extra internal lookup keyed on the ID the function already receives, so
+**zero external call sites needed to change** (mirrors the existing internal-requery pattern
+`revenue_posting.php`/`purchase_posting.php` already used for `project_id`). Deliberately left `NULL`
+for transactions with no natural single warehouse (payroll, manual journals, asset postings, generic
+bill payments/refunds, expenses) — same discipline `project_id` already follows.
+`core/financial_reports.php`'s `glTrialBalance/glProfitLoss/glBalanceSheet/glCashFlow/glAccountRawSum`
+all accept the same `$warehouseId` + scope-SQL shape already used for `$projectId`.
+
+**Part 2 — Balance Sheet & Cash Flow brought up to standard.** Both had **zero** project filtering or
+scoping at all (worse than reported — a real data-confidentiality gap: non-admins could see every
+project's GL data on these two reports). Added the same Project + Warehouse filter bar (with a
+project→warehouse cascade via `warehouses.project_id`, client-side, no extra AJAX round trip) and
+backend scoping every other GL-derived report already has.
+
+**Part 3 — Gate every Project/Warehouse dropdown by module entitlement.** `get_projects_for_filter.php`
+(Income Statement's shared endpoint, now reused by Balance Sheet/Cash Flow's own inline queries too)
+and each of AR Aging/Sales Report/Expense Report/Tax Report/Inventory Report's own inline project
+list now return empty when `tenantFeatureEnabled('projects')` is false, instead of showing stale rows
+from a module the tenant can no longer use. Inventory Report's 4 data endpoints
+(`get_inventory_report.php`, `get_stock_movements.php`, `get_stock_transfers.php`,
+`get_stock_adjustments.php`) additionally neutralise a hand-crafted `?project_id=` when the module is
+off — not just hiding the dropdown, the data itself stops being filterable by project, per explicit
+instruction. `wht_receivable_report.php` was audited and left as-is: its real dependency is
+Invoicing (always-on core), correctly visible on a POS+Warehouse-only tenant; `payments` has no
+warehouse column to filter by.
+
+**Verified**: `php -l` on every changed file; a rolled-back-transaction smoke test on
+`postLedgerEntry()` confirms both old callers (no warehouse arg → NULL stored) and new ones round-trip
+correctly; real POS sale / invoice / supplier bill / stock adjustment created in a rolled-back
+transaction each produced a `journal_entries` row with the correct `warehouse_id`; the backfill
+migration is idempotent (0 rows touched on re-run) and correctly left historical documents with no
+recorded warehouse untouched (nothing to backfill from a NULL source); `assertLedgerBalanced()` stays
+true after the backfill (only the new nullable column is touched, never amounts); `glProfitLoss`/
+`glBalanceSheet` with an explicit warehouse return different (correctly narrower) totals than
+unfiltered; Income Statement/Balance Sheet/Cash Flow all render correctly with and without a
+warehouse chosen; a simulated Projects-off tenant confirms `?project_id=` is silently neutralised on
+Inventory Report's endpoints rather than 403'd or applied. Full regression sweep across 51 existing
+test suites (ledger posting, financial reports, income statement, balance sheet, cash flow, feature
+registry, warehouse scope) — zero new failures; the 6 failures present both before and after this
+change are pre-existing local test-data-state issues, individually confirmed via a `git stash`
+before/after comparison on each.
+
 ## 2026-09-10 (fix) - Reports menu ignored module entitlement; 5 Sales-analytics reports were blind to POS/invoice activity
 
 **Files (modified):** `core/feature_registry.php`, `core/permissions.php`, `header.php`,

@@ -58,11 +58,12 @@ if (!function_exists('_gl_account_activity')) {
      *                                 [from, to] are summed (used by P&L period view).
      * @param string      $to          Cut-off date (YYYY-MM-DD), inclusive.
      * @param ?int        $projectId   Filter je.project_id = N, or null for all.
+     * @param ?int        $warehouseId Filter je.warehouse_id = N, or null for all.
      * @return array<int,array{account_id:int,account_code:string,account_name:string,
      *               category:?string,statement:?string,normal_side:string,
      *               opening_balance:float,debit:float,credit:float}>
      */
-    function _gl_account_activity(PDO $pdo, ?string $from, string $to, ?int $projectId = null, string $scopeSql = ''): array
+    function _gl_account_activity(PDO $pdo, ?string $from, string $to, ?int $projectId = null, string $scopeSql = '', ?int $warehouseId = null): array
     {
         // Date predicate on the journal header. Bound inside the JOIN so the
         // LEFT JOIN still returns accounts with zero activity (every account row
@@ -77,6 +78,7 @@ if (!function_exists('_gl_account_activity')) {
         // je.project_id IS NULL)") with inline integer ids — used for the
         // "assigned projects OR untagged" non-admin view. Callers use one or the other.
         $projSql = $projectId !== null ? "AND je.project_id = :pid" : "";
+        $whSql   = $warehouseId !== null ? "AND je.warehouse_id = :wid" : "";
 
         // Account inclusion rule (critical): a Trial Balance / Balance Sheet must
         // include EVERY account that carries a real balance — never just the
@@ -110,6 +112,7 @@ if (!function_exists('_gl_account_activity')) {
                                           AND je.status   = 'posted'
                                           $dateSql
                                           $projSql
+                                          $whSql
                                           $scopeSql
              WHERE a.status = 'active'
                 OR COALESCE(a.opening_balance, 0) <> 0
@@ -129,6 +132,7 @@ if (!function_exists('_gl_account_activity')) {
         $stmt->bindValue(':to', $to);
         if ($from !== null)        $stmt->bindValue(':from', $from);
         if ($projectId !== null)   $stmt->bindValue(':pid', $projectId, PDO::PARAM_INT);
+        if ($warehouseId !== null) $stmt->bindValue(':wid', $warehouseId, PDO::PARAM_INT);
         $stmt->execute();
 
         $rows = [];
@@ -170,9 +174,9 @@ if (!function_exists('glTrialBalance')) {
      *
      * @return array{accounts:array,total_debit:float,total_credit:float,balanced:bool,difference:float}
      */
-    function glTrialBalance(PDO $pdo, string $asOf, ?int $projectId = null, bool $includeOpening = false, string $scopeSql = ''): array
+    function glTrialBalance(PDO $pdo, string $asOf, ?int $projectId = null, bool $includeOpening = false, string $scopeSql = '', ?int $warehouseId = null): array
     {
-        $rows = _gl_account_activity($pdo, null, $asOf, $projectId, $scopeSql);
+        $rows = _gl_account_activity($pdo, null, $asOf, $projectId, $scopeSql, $warehouseId);
 
         $accounts = [];
         $totalDr = 0.0;
@@ -235,9 +239,9 @@ if (!function_exists('glProfitLoss')) {
      *               total_revenue:float,total_other_income:float,total_cogs:float,total_expense:float,
      *               total_finance_cost:float,gross_profit:float,net_profit:float}
      */
-    function glProfitLoss(PDO $pdo, string $from, string $to, ?int $projectId = null, string $scopeSql = ''): array
+    function glProfitLoss(PDO $pdo, string $from, string $to, ?int $projectId = null, string $scopeSql = '', ?int $warehouseId = null): array
     {
-        $rows = _gl_account_activity($pdo, $from, $to, $projectId, $scopeSql);
+        $rows = _gl_account_activity($pdo, $from, $to, $projectId, $scopeSql, $warehouseId);
 
         $buckets = ['revenue' => [], 'other_income' => [], 'cogs' => [], 'expense' => [], 'finance_cost' => []];
         $totals  = ['revenue' => 0.0, 'other_income' => 0.0, 'cogs' => 0.0, 'expense' => 0.0, 'finance_cost' => 0.0];
@@ -298,9 +302,9 @@ if (!function_exists('glBalanceSheet')) {
      *
      * @return array with assets/liabilities/equity line arrays + totals + balanced flag.
      */
-    function glBalanceSheet(PDO $pdo, string $asOf, ?int $projectId = null, bool $includeOpening = false, string $scopeSql = ''): array
+    function glBalanceSheet(PDO $pdo, string $asOf, ?int $projectId = null, bool $includeOpening = false, string $scopeSql = '', ?int $warehouseId = null): array
     {
-        $rows = _gl_account_activity($pdo, null, $asOf, $projectId, $scopeSql);
+        $rows = _gl_account_activity($pdo, null, $asOf, $projectId, $scopeSql, $warehouseId);
 
         $assets = []; $liabilities = []; $equity = [];
         $totalAssets = 0.0; $totalLiab = 0.0; $totalEquityAccounts = 0.0;
@@ -585,18 +589,19 @@ if (!function_exists('glAccountRawSum')) {
      * indirect-method working-capital deltas and the depreciation add-back, all from
      * the same single ledger as the rest of the statements.
      */
-    function glAccountRawSum(PDO $pdo, int $accountId, ?string $from, string $to, ?int $projectId = null, string $scopeSql = ''): float
+    function glAccountRawSum(PDO $pdo, int $accountId, ?string $from, string $to, ?int $projectId = null, string $scopeSql = '', ?int $warehouseId = null): float
     {
         if ($accountId <= 0) return 0.0;
         $dateSql = $from === null
             ? "AND je.entry_date <= " . $pdo->quote($to)
             : "AND je.entry_date >= " . $pdo->quote($from) . " AND je.entry_date <= " . $pdo->quote($to);
         $proj = $projectId !== null ? " AND je.project_id = " . (int)$projectId : '';
+        $wh   = $warehouseId !== null ? " AND je.warehouse_id = " . (int)$warehouseId : '';
         return (float)$pdo->query("
             SELECT COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount ELSE -jei.amount END), 0)
               FROM journal_entry_items jei
               JOIN journal_entries je ON je.entry_id = jei.entry_id AND je.status='posted'
-             WHERE jei.account_id = " . (int)$accountId . " $dateSql $proj $scopeSql
+             WHERE jei.account_id = " . (int)$accountId . " $dateSql $proj $wh $scopeSql
         ")->fetchColumn();
     }
 }
@@ -639,7 +644,7 @@ if (!function_exists('glCashFlow')) {
      *   financing:array{lines:array,total:float},
      *   sections_net:float,reconciles:bool,unclassified_count:int}
      */
-    function glCashFlow(PDO $pdo, string $from, string $to, ?int $projectId = null, string $scopeSql = ''): array
+    function glCashFlow(PDO $pdo, string $from, string $to, ?int $projectId = null, string $scopeSql = '', ?int $warehouseId = null): array
     {
         $cashIds = glCashAccountIds($pdo);
 
@@ -650,13 +655,14 @@ if (!function_exists('glCashFlow')) {
         if (!empty($cashIds)) {
             $in   = implode(',', array_map('intval', $cashIds));
             $proj = $projectId !== null ? " AND je.project_id = " . (int)$projectId : '';
-            $balAsOf = function (string $asOf) use ($pdo, $in, $proj, $scopeSql): float {
+            $wh   = $warehouseId !== null ? " AND je.warehouse_id = " . (int)$warehouseId : '';
+            $balAsOf = function (string $asOf) use ($pdo, $in, $proj, $wh, $scopeSql): float {
                 return (float)$pdo->query("
                     SELECT COALESCE(SUM(CASE WHEN jei.type='debit' THEN jei.amount ELSE -jei.amount END), 0)
                       FROM journal_entry_items jei
                       JOIN journal_entries je ON je.entry_id = jei.entry_id AND je.status='posted'
                      WHERE jei.account_id IN ($in)
-                       AND je.entry_date <= " . $pdo->quote($asOf) . " $proj $scopeSql
+                       AND je.entry_date <= " . $pdo->quote($asOf) . " $proj $wh $scopeSql
                 ")->fetchColumn();
             };
             $closing = $balAsOf($to);
@@ -670,6 +676,7 @@ if (!function_exists('glCashFlow')) {
         if (!empty($cashIds)) {
             $in   = implode(',', array_map('intval', $cashIds));
             $proj = $projectId !== null ? " AND je.project_id = " . (int)$projectId : '';
+            $wh   = $warehouseId !== null ? " AND je.warehouse_id = " . (int)$warehouseId : '';
             $sql = "
                 SELECT contra.account_id, a.account_code, a.account_name,
                        at.category, COALESCE(at.liquidity, '') AS liquidity,
@@ -684,7 +691,7 @@ if (!function_exists('glCashFlow')) {
                    AND contra.account_id NOT IN ($in)
                    AND EXISTS (SELECT 1 FROM journal_entry_items cx
                                 WHERE cx.entry_id = je.entry_id AND cx.account_id IN ($in))
-                   $proj $scopeSql
+                   $proj $wh $scopeSql
               GROUP BY contra.account_id, a.account_code, a.account_name, at.category, at.liquidity
               ORDER BY a.account_code, a.account_id
             ";

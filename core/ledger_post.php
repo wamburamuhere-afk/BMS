@@ -44,6 +44,13 @@ if (!function_exists('postLedgerEntry')) {
      * @param ?string      $entity_type   Source table identifier (e.g. 'invoice', 'expense'). NULL if manual.
      * @param string       $date          YYYY-MM-DD entry date.
      * @param int          $user_id       Posting user.
+     * @param ?int         $warehouse_id  Warehouse this entry belongs to, when the
+     *                                    source document has one (POS sale, invoice,
+     *                                    supplier bill, stock adjustment). NULL for
+     *                                    company-wide entries (payroll, manual
+     *                                    journals, asset postings, etc.) — trailing
+     *                                    optional param so every pre-existing caller
+     *                                    is unaffected.
      *
      * @return int  New entry_id.
      *
@@ -57,7 +64,8 @@ if (!function_exists('postLedgerEntry')) {
         ?int    $entity_id,
         ?string $entity_type,
         string  $date,
-        int     $user_id
+        int     $user_id,
+        ?int    $warehouse_id = null
     ): int {
         // ── Pre-flight validation (before any DB write) ─────────────────────
         $description = trim($description);
@@ -149,10 +157,10 @@ if (!function_exists('postLedgerEntry')) {
                     (entry_date, reference_number, description,
                      debit_account_id, credit_account_id, amount,
                      status, created_by,
-                     project_id, entity_id, entity_type,
+                     project_id, entity_id, entity_type, warehouse_id,
                      created_at)
                 VALUES
-                    (?, ?, ?, ?, ?, ?, 'posted', ?, ?, ?, ?, NOW())
+                    (?, ?, ?, ?, ?, ?, 'posted', ?, ?, ?, ?, ?, NOW())
             ");
 
             // Reference number — unique, human-readable. The suffix must survive
@@ -169,7 +177,7 @@ if (!function_exists('postLedgerEntry')) {
                         $date, $reference, $description,
                         $first_debit_account_id, $first_credit_account_id, $total_debits,
                         $user_id,
-                        $project_id, $entity_id, $entity_type,
+                        $project_id, $entity_id, $entity_type, $warehouse_id,
                     ]);
                     $entry_id = (int)$pdo->lastInsertId();
                     break;

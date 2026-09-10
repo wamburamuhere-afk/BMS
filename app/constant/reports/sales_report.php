@@ -17,18 +17,21 @@ $users = $pdo->query("SELECT user_id, CONCAT(first_name,' ',last_name) AS name F
 
 // Projects the CURRENT user may see (admins → all; others → assigned only),
 // per security.md §23. The picker therefore can only offer in-scope projects.
-$projects = $pdo->query(
+// Empty when the Projects module is off for this tenant — a switched-off
+// module never deletes existing rows, so without this guard the dropdown would
+// keep offering stale projects the tenant can no longer use at all.
+$projects = tenantFeatureEnabled('projects') ? $pdo->query(
     "SELECT project_id, project_name FROM projects
       WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
       ORDER BY project_name ASC"
-)->fetchAll(PDO::FETCH_ASSOC);
+)->fetchAll(PDO::FETCH_ASSOC) : [];
 
 // Warehouses the CURRENT user may see, per security.md §23 (Phase 6 — warehouse ACL).
-$warehouses = $pdo->query(
+$warehouses = tenantFeatureEnabled('warehouses') ? $pdo->query(
     "SELECT warehouse_id, warehouse_name FROM warehouses
       WHERE status = 'active' " . scopeFilterSql('warehouse', 'warehouses') . "
       ORDER BY warehouse_name ASC"
-)->fetchAll(PDO::FETCH_ASSOC);
+)->fetchAll(PDO::FETCH_ASSOC) : [];
 $date_from = $_GET['date_from'] ?? date('Y-01-01');
 $date_to   = $_GET['date_to']   ?? date('Y-12-31');
 $currency  = get_setting('currency', 'TZS');

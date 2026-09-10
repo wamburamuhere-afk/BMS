@@ -6,6 +6,7 @@
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
+require_once __DIR__ . '/../../../core/project_scope.php';
 
 includeHeader();
 
@@ -16,6 +17,34 @@ if (function_exists('autoEnforcePermission')) {
 $start_date = $_GET['start_date'] ?? date('Y-m-01');
 $end_date   = $_GET['end_date']   ?? date('Y-m-d');
 $company_name = get_setting('company_name') ?: 'Business Management System';
+
+// 2026-09-11: Project + Warehouse filtering (security.md §23) — this report used
+// to read the WHOLE ledger with no project/warehouse boundary at all, unlike
+// every other GL-derived report. A specific choice binds je.project_id/
+// warehouse_id = N; otherwise non-admins default-scope to "assigned OR untagged".
+$project_id   = isset($_GET['project_id'])   && $_GET['project_id']   !== '' ? (int)$_GET['project_id']   : null;
+$warehouse_id = isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '' ? (int)$_GET['warehouse_id'] : null;
+if ($project_id !== null && !userCan('project', $project_id)) {
+    http_response_code(403);
+    die('Access denied: this project is not in your assigned scope.');
+}
+if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
+    http_response_code(403);
+    die('Access denied: this warehouse is not in your assigned scope.');
+}
+$cf_je_scope = ($project_id !== null ? " AND je.project_id = " . (int)$project_id : scopeFilterSqlNullable('project', 'je'))
+             . ($warehouse_id !== null ? " AND je.warehouse_id = " . (int)$warehouse_id : scopeFilterSqlNullable('warehouse', 'je'));
+
+$cf_projects = tenantFeatureEnabled('projects') ? $pdo->query(
+    "SELECT project_id, project_name FROM projects
+      WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
+      ORDER BY project_name ASC"
+)->fetchAll(PDO::FETCH_ASSOC) : [];
+$cf_warehouses = tenantFeatureEnabled('warehouses') ? $pdo->query(
+    "SELECT warehouse_id, warehouse_name, project_id FROM warehouses
+      WHERE status = 'active' " . scopeFilterSql('warehouse', 'warehouses') . "
+      ORDER BY warehouse_name ASC"
+)->fetchAll(PDO::FETCH_ASSOC) : [];
 
 // Load canonical classification helper (Phase 1).
 require_once __DIR__ . '/../../../core/financial_classification.php';
@@ -72,6 +101,7 @@ try {
                 ON je.entry_id = jei.entry_id
                AND je.entry_date BETWEEN ? AND ?
                AND je.status = 'posted'
+               $cf_je_scope
              WHERE a.account_type_id IN ($ph)
                AND a.status = 'active'
           GROUP BY at.category
@@ -107,6 +137,7 @@ try {
                ON je.entry_id = jei.entry_id
               AND je.entry_date BETWEEN ? AND ?
               AND je.status = 'posted'
+              $cf_je_scope
         WHERE a.status = 'active'
           AND at.category IN ('asset','liability','equity')
         GROUP BY a.account_id, a.account_name, a.account_code, at.category, a.cash_flow_category, at.cash_flow_category, at.type_name
@@ -180,6 +211,7 @@ try {
              OR LOWER(a.account_name) LIKE '%depreciation expense%')
            AND je.entry_date BETWEEN ? AND ?
            AND je.status = 'posted'
+           $cf_je_scope
     ";
     $stmt = $pdo->prepare($dep_sql);
     $stmt->execute([$start_date, $end_date]);
@@ -225,6 +257,7 @@ try {
              WHERE jei.account_id IN ($cph)
                AND je.entry_date < ?
                AND je.status = 'posted'
+               $cf_je_scope
         ");
         $stmt->execute(array_merge($cash_account_ids, [$start_date]));
         $cash_start = $cash_open_col + (float)($stmt->fetchColumn() ?: 0);
@@ -237,6 +270,7 @@ try {
              WHERE jei.account_id IN ($cph)
                AND je.entry_date <= ?
                AND je.status = 'posted'
+               $cf_je_scope
         ");
         $stmt->execute(array_merge($cash_account_ids, [$end_date]));
         $cash_end_actual = $cash_open_col + (float)($stmt->fetchColumn() ?: 0);
@@ -268,16 +302,32 @@ try {
                         </div>
                         <h6 class="mb-0 fw-bold text-dark d-none d-lg-block">Analysis Range</h6>
                     </div>
-                    <form method="GET" class="d-flex align-items-center gap-2">
+                    <form method="GET" class="d-flex align-items-center gap-2 flex-wrap">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-white border-end-0 text-muted">From</span>
                             <input type="date" name="start_date" class="form-control border-start-0 ps-0" value="<?= $start_date ?>" style="width: 140px;">
                             <span class="input-group-text bg-white border-x-0 text-muted">To</span>
                             <input type="date" name="end_date" class="form-control border-start-0 ps-0" value="<?= $end_date ?>" style="width: 140px;">
-                            <button type="submit" class="btn btn-primary px-3 fw-bold">
-                                <i class="bi bi-arrow-clockwise me-1"></i> Update
-                            </button>
                         </div>
+                        <?php if (!empty($cf_projects)): ?>
+                        <select name="project_id" id="cf-project" class="form-select form-select-sm" style="width: 170px;" onchange="cfFilterWarehouses()">
+                            <option value="">All Projects</option>
+                            <?php foreach ($cf_projects as $p): ?>
+                            <option value="<?= (int)$p['project_id'] ?>" <?= $project_id === (int)$p['project_id'] ? 'selected' : '' ?>><?= safe_output($p['project_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php endif; ?>
+                        <?php if (!empty($cf_warehouses)): ?>
+                        <select name="warehouse_id" id="cf-warehouse" class="form-select form-select-sm" style="width: 170px;">
+                            <option value="">All Warehouses</option>
+                            <?php foreach ($cf_warehouses as $w): ?>
+                            <option value="<?= (int)$w['warehouse_id'] ?>" data-project="<?= (int)($w['project_id'] ?? 0) ?>" <?= $warehouse_id === (int)$w['warehouse_id'] ? 'selected' : '' ?>><?= safe_output($w['warehouse_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php endif; ?>
+                        <button type="submit" class="btn btn-primary px-3 fw-bold">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Update
+                        </button>
                     </form>
                 </div>
                 <div class="action-buttons d-flex gap-2">
@@ -498,6 +548,26 @@ try {
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
+// Narrows the Warehouse dropdown to the chosen project's own linked warehouses
+// + any warehouse not tied to a project — client-side only, mirrors
+// balance_sheet.php's bsFilterWarehouses().
+function cfFilterWarehouses() {
+    const projectSel = document.getElementById('cf-project');
+    const whSel = document.getElementById('cf-warehouse');
+    if (!projectSel || !whSel) return;
+    const chosen = projectSel.value;
+    let sawSelected = false;
+    Array.from(whSel.options).forEach(opt => {
+        if (!opt.value) { opt.hidden = false; return; }
+        const optProject = opt.getAttribute('data-project') || '0';
+        const visible = !chosen || optProject === '0' || optProject === chosen;
+        opt.hidden = !visible;
+        if (visible && opt.selected) sawSelected = true;
+    });
+    if (!sawSelected) whSel.value = '';
+}
+document.addEventListener('DOMContentLoaded', cfFilterWarehouses);
+
 function exportToPDF() {
     const element = document.getElementById('reportContent');
     const opt = {

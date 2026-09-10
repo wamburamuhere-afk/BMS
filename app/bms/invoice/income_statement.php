@@ -87,13 +87,19 @@ $is_admin_user = isAdmin();
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Period End</label>
                     <input type="date" class="form-control rounded-3 border-light shadow-sm" id="end_date" name="end_date" value="<?= $end_date ?>">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
                     <select class="form-select rounded-3 border-light shadow-sm" id="project_id" name="project_id">
                         <option value=""><?= $is_admin_user ? 'All Projects (Consolidated)' : 'All My Projects' ?></option>
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Warehouse</label>
+                    <select class="form-select rounded-3 border-light shadow-sm" id="warehouse_id" name="warehouse_id">
+                        <option value=""><?= $is_admin_user ? 'All Warehouses' : 'All My Warehouses' ?></option>
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <button type="submit" class="btn btn-dark w-100 py-2 fw-bold shadow-sm rounded-3">
                         <i class="bi bi-filter me-1"></i> Update Analysis
                     </button>
@@ -304,16 +310,44 @@ function loadProjectsThenReport() {
         // Searchable dropdown (per ui-constants §UI-3). Reloads the report on change.
         if ($.fn.select2) {
             $('#project_id').select2({ theme: 'bootstrap-5', width: '100%', placeholder: 'Select project…', allowClear: true })
-                            .on('change', loadReport);
+                            .on('change', function () { loadWarehouses($(this).val() || ''); });
+        } else {
+            $('#project_id').on('change', function () { loadWarehouses($(this).val() || ''); });
         }
-        loadReport();
+        loadWarehouses('');
     });
+}
+
+// Cascades from the chosen project: narrows to that project's own linked
+// warehouses + any warehouse not tied to a project (see
+// api/account/get_warehouses_for_filter.php's own doc comment).
+function loadWarehouses(projectId) {
+    const $sel = $('#warehouse_id');
+    const currentVal = $sel.val();
+    $.getJSON('<?= buildUrl('api/account/get_warehouses_for_filter.php') ?>', { project_id: projectId }, function(resp) {
+        $sel.find('option:not(:first)').remove();
+        if (resp && resp.success && Array.isArray(resp.warehouses)) {
+            resp.warehouses.forEach(w => {
+                $sel.append('<option value="' + w.warehouse_id + '">' + w.warehouse_name + '</option>');
+            });
+        }
+        // Keep the previous selection if it's still a valid option after narrowing.
+        if (currentVal && $sel.find('option[value="' + currentVal + '"]').length) {
+            $sel.val(currentVal);
+        }
+        if ($.fn.select2 && !$sel.hasClass('select2-hidden-accessible')) {
+            $sel.select2({ theme: 'bootstrap-5', width: '100%', placeholder: 'Select warehouse…', allowClear: true })
+                .on('change', loadReport);
+        }
+        if ($.fn.select2) $sel.trigger('change.select2');
+    }).always(loadReport);
 }
 
 function loadReport() {
     const start = $('#start_date').val();
     const end = $('#end_date').val();
     const projectId = $('#project_id').val() || '';
+    const warehouseId = $('#warehouse_id').val() || '';
 
     if (typeof logReportAction === 'function') {
         logReportAction('Viewed P&L Statement', 'Analysis for ' + start + ' to ' + end + (projectId ? ' • project ' + projectId : ''));
@@ -324,7 +358,7 @@ function loadReport() {
     $.ajax({
         url: '<?= buildUrl('api/account/get_income_statement.php') ?>',
         type: 'GET',
-        data: { start_date: start, end_date: end, project_id: projectId },
+        data: { start_date: start, end_date: end, project_id: projectId, warehouse_id: warehouseId },
         dataType: 'json',
         success: function(response) {
             if (response.success) {
@@ -656,7 +690,8 @@ function openDrill(drill, name) {
     const params = Object.assign({
         start_date: $('#start_date').val(),
         end_date:   $('#end_date').val(),
-        project_id: $('#project_id').val() || ''
+        project_id: $('#project_id').val() || '',
+        warehouse_id: $('#warehouse_id').val() || ''
     }, drill);
 
     const table = ensureDrillTable();
