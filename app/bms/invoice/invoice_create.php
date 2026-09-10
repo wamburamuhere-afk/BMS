@@ -201,13 +201,10 @@ if ($prefill_warehouse_id > 0 && !in_array($prefill_warehouse_id, array_column($
     }
 }
 
-// Get projects if enabled
-$enable_projects = 0;
-try {
-    $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'enable_projects'");
-    $stmt->execute();
-    $enable_projects = $stmt->fetchColumn() ?: 0;
-} catch (Exception $e) {}
+// Get projects if enabled — $enable_projects reflects BOTH the superadmin's
+// platform grant AND the tenant's own "Enable Projects Module" setting; see
+// projectsModuleActive() (core/project_scope.php).
+$enable_projects = projectsModuleActive() ? 1 : 0;
 
 $projects = [];
 if ($enable_projects) {

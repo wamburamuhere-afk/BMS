@@ -151,7 +151,9 @@ for ($i = 1; $i <= 4; $i++) {
 $can_edit_customers  = canEdit('customers');
 $can_delete_invoices = canDelete('invoices');
 $categories = $pdo->query("SELECT * FROM customer_categories WHERE status = 'active' ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
-$projects   = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+$projects   = projectsModuleActive()
+    ? $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC)
+    : [];
 
 $can_create_lpos = canCreate('lpo');
 $can_edit_lpos   = canEdit('lpo');
@@ -2246,6 +2248,7 @@ function deleteLpo(lpoId, lpoNumber) {
                                         <option value="other">Other...</option>
                                     </select>
                                 </div>
+                                <?php if (projectsModuleActive()): ?>
                                 <div class="col-6 mb-3">
                                     <label for="edit_project_id" class="form-label">Linked Project (Optional)</label>
                                     <select class="form-select select2-static" id="edit_project_id" name="project_id">
@@ -2255,6 +2258,7 @@ function deleteLpo(lpoId, lpoNumber) {
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <?php endif; ?>
                                 <div class="col-6 mb-3">
                                     <label for="edit_credit_limit" class="form-label">Credit Limit</label>
                                     <input type="number" class="form-control" id="edit_credit_limit" name="credit_limit" step="0.01" placeholder="0.00">

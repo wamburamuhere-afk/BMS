@@ -32,27 +32,11 @@ if (!isAuthenticated()) {
 try {
     global $pdo;
 
-    // 2026-09-11: a switched-off Projects module never deletes existing project
-    // rows (by design — see the Tenant Modules page), so without this guard the
-    // dropdown kept showing stale projects the tenant can no longer use at all.
-    if (!tenantFeatureEnabled('projects')) {
-        echo json_encode(['success' => true, 'projects' => []]);
-        exit;
-    }
-
-    // Use the canonical scopeFilterSql() helper so this endpoint is scoped
-    // exactly like every other project-scoped list page in BMS.
-    //   - admin                          -> '' (sees all active projects)
-    //   - non-admin with assignments     -> ' AND project_id IN (...) '
-    //   - non-admin with no assignments  -> ' AND 0 ' (default-deny)
-    $stmt = $pdo->query("
-        SELECT project_id, project_name
-          FROM projects
-         WHERE (status != 'archived' OR status IS NULL)
-           " . scopeFilterSql('project', 'projects') . "
-      ORDER BY project_name ASC
-    ");
-    $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Empty when Projects isn't active for this tenant — see
+    // projectsModuleActive() (core/project_scope.php): a switched-off module
+    // never deletes existing project rows, and a tenant's own "Enable
+    // Projects Module" setting can never override the platform grant back on.
+    $projects = projectsForSelect($pdo);
 
     echo json_encode([
         'success'  => true,

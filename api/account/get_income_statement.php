@@ -58,6 +58,10 @@ $project_id = isset($_GET['project_id']) && $_GET['project_id'] !== '' && (int)$
 $warehouse_id = isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '' && (int)$_GET['warehouse_id'] > 0
     ? (int)$_GET['warehouse_id']
     : null;
+// A switched-off Projects module must win over even a hand-crafted
+// ?project_id= — neutralise it here so the data itself stops being
+// filterable by project, not just the dropdown that offers it.
+if (!projectsModuleActive()) $project_id = null;
 
 // ── Scope resolution ──────────────────────────────────────────────────────
 $is_admin = isAdmin();

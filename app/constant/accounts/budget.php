@@ -86,8 +86,10 @@ if ($selected_year  !== 'all') { $exp_where_parts[] = 'YEAR(e.expense_date)  = ?
 if ($selected_month !== 'all') { $exp_where_parts[] = 'MONTH(e.expense_date) = ?'; $exp_where_params[] = $selected_month; }
 $exp_date_filter = $exp_where_parts ? implode(' AND ', $exp_where_parts) . ' AND' : '';
 
-// Fetch Projects if enabled
-$enable_projects = get_setting('enable_projects');
+// Fetch Projects if enabled — $enable_projects reflects BOTH the superadmin's
+// platform grant AND the tenant's own "Enable Projects Module" setting; see
+// projectsModuleActive() (core/project_scope.php).
+$enable_projects = projectsModuleActive() ? 1 : 0;
 $projects = [];
 if ($enable_projects == '1') {
     if (isAdmin()) {

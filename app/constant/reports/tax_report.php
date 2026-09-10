@@ -11,14 +11,9 @@ includeHeader();
 
 autoEnforcePermission('tax_report');
 
-// Empty when the Projects module is off for this tenant — a switched-off
-// module never deletes existing rows, so without this guard the dropdown
-// would keep offering stale projects the tenant can no longer use at all.
-$projects = tenantFeatureEnabled('projects') ? $pdo->query(
-    "SELECT project_id, project_name FROM projects
-      WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
-      ORDER BY project_name ASC"
-)->fetchAll(PDO::FETCH_ASSOC) : [];
+// Empty when Projects isn't active for this tenant — see
+// projectsModuleActive() (core/project_scope.php).
+$projects = projectsForSelect($pdo);
 
 $date_from = $_GET['date_from'] ?? date('Y-01-01');
 $date_to   = $_GET['date_to']   ?? date('Y-12-31');
@@ -50,11 +45,13 @@ $currency  = get_setting('currency', 'TZS');
                     <input type="date" name="date_from" id="f-from" class="form-control" value="<?= htmlspecialchars($date_from) ?>"></div>
                 <div class="col-md-3"><label class="form-label small fw-bold text-muted text-uppercase mb-1">To</label>
                     <input type="date" name="date_to" id="f-to" class="form-control" value="<?= htmlspecialchars($date_to) ?>"></div>
+                <?php if (projectsModuleActive()): ?>
                 <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
                         <option value="">All My Projects</option>
                         <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option><?php endforeach; ?>
                     </select></div>
+                <?php endif; ?>
                 <div class="col-md-2"><button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter me-1"></i> Apply</button></div>
             </form>
         </div>

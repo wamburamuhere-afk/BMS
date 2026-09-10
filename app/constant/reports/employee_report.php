@@ -11,11 +11,7 @@ includeHeader();
 
 autoEnforcePermission('employee_report');
 
-$projects = $pdo->query(
-    "SELECT project_id, project_name FROM projects
-      WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
-      ORDER BY project_name ASC"
-)->fetchAll(PDO::FETCH_ASSOC);
+$projects = projectsForSelect($pdo);
 
 $departments = $pdo->query("SELECT department_id, department_name FROM departments ORDER BY department_name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $currency = get_setting('currency', 'TZS');
@@ -42,11 +38,13 @@ $currency = get_setting('currency', 'TZS');
     <div class="card border shadow-sm mb-4 d-print-none" style="border-color:#b6ccfe!important;border-radius:12px;">
         <div class="card-body p-4">
             <form id="filterForm" class="row g-3 align-items-end">
+                <?php if (projectsModuleActive()): ?>
                 <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
                         <option value="">All My Projects</option>
                         <?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option><?php endforeach; ?>
                     </select></div>
+                <?php endif; ?>
                 <div class="col-md-4"><label class="form-label small fw-bold text-muted text-uppercase mb-1">Department</label>
                     <select name="department_id" id="f-dept" class="form-select" style="width:100%">
                         <option value="">All Departments</option>

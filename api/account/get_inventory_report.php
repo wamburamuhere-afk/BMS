@@ -39,7 +39,7 @@ $project_id   = (isset($_GET['project_id'])   && $_GET['project_id']   !== '') ?
 // 2026-09-11: a switched-off Projects module never deletes existing project
 // rows, so a hand-crafted ?project_id= would still narrow results even with
 // the dropdown empty client-side — enforce the module boundary here too.
-if (!tenantFeatureEnabled('projects')) $project_id = null;
+if (!projectsModuleActive()) $project_id = null;
 
 if ($project_id !== null && !userCan('project', $project_id)) {
     http_response_code(403);

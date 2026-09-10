@@ -102,17 +102,18 @@ $cust_price_groups = $cust_price_groups_enabled
     : [];
 
 // Get projects for linking — admins see all; non-admins see only their assigned projects
-if (isAdmin()) {
-    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
-    if (empty($assigned)) {
-        $projects = [];
+$projects = [];
+if (projectsModuleActive()) {
+    if (isAdmin()) {
+        $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
     } else {
-        $ph = implode(',', array_fill(0, count($assigned), '?'));
-        $stmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name");
-        $stmt->execute($assigned);
-        $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+        if (!empty($assigned)) {
+            $ph = implode(',', array_fill(0, count($assigned), '?'));
+            $stmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name");
+            $stmt->execute($assigned);
+            $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
     }
 }
 
@@ -496,6 +497,7 @@ if (isAdmin()) {
                                     <label for="year" class="form-label"><?= t('Year') ?> <span class="text-danger">*</span></label>
                                     <?= renderOtherSelect('year', 'year', $lk_years, '', 'year_other', t('Select Year'), true) ?>
                                 </div>
+                                <?php if (projectsModuleActive()): ?>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="project_id" class="form-label"><?= t('Linked Project (Optional)') ?></label>
                                     <select class="form-select select2-static" id="project_id" name="project_id">
@@ -505,6 +507,7 @@ if (isAdmin()) {
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <?php endif; ?>
                                 <div class="col-6 col-md-6 mb-3">
                                     <label for="credit_limit" class="form-label"><?= t('Credit Limit') ?></label>
                                     <input type="number" class="form-control" id="credit_limit" name="credit_limit" placeholder="0.00" step="0.01">
@@ -796,6 +799,7 @@ if (isAdmin()) {
                                         <label for="edit_year" class="form-label"><?= t('Year') ?> <span class="text-danger">*</span></label>
                                         <?= renderOtherSelect('edit_year', 'year', $lk_years, '', 'year_other', t('Select Year'), true) ?>
                                     </div>
+                                    <?php if (projectsModuleActive()): ?>
                                     <div class="col-6 col-md-6 mb-3">
                                         <label for="edit_project_id" class="form-label"><?= t('Linked Project (Optional)') ?></label>
                                         <select class="form-select select2-static" id="edit_project_id" name="project_id">
@@ -805,6 +809,7 @@ if (isAdmin()) {
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
+                                    <?php endif; ?>
                                     <div class="col-6 col-md-6 mb-3">
                                         <label for="edit_credit_limit" class="form-label"><?= t('Credit Limit') ?></label>
                                         <input type="number" class="form-control" id="edit_credit_limit" name="credit_limit" step="0.01" placeholder="0.00">

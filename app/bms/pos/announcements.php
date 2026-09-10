@@ -16,8 +16,11 @@ $can_delete = canDelete('announcements');
 $can_publish = function_exists('canPublish') ? canPublish('announcements') : $can_edit;
 
 $departments = $pdo->query("SELECT department_id, department_name FROM departments WHERE status='active' ORDER BY department_name")->fetchAll(PDO::FETCH_ASSOC);
-$proj_scope = function_exists('scopeFilterSql') ? scopeFilterSql('project', 'projects') : '';
-$projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status NOT IN ('cancelled') $proj_scope ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+$projects = [];
+if (projectsModuleActive()) {
+    $proj_scope = function_exists('scopeFilterSql') ? scopeFilterSql('project', 'projects') : '';
+    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status NOT IN ('cancelled') $proj_scope ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
+}
 ?>
 
 <div class="container-fluid mt-4">
@@ -69,11 +72,13 @@ $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE sta
                 <div class="col-md-4 mb-3"><label class="form-label">Priority</label>
                     <select class="form-select" name="priority" id="an_priority"><option value="normal">Normal</option><option value="important">Important</option><option value="urgent">Urgent</option></select></div>
                 <div class="col-md-4 mb-3"><label class="form-label">Audience</label>
-                    <select class="form-select" name="audience_type" id="an_audience"><option value="all">Everyone</option><option value="department">Department</option><option value="project">Project</option></select></div>
+                    <select class="form-select" name="audience_type" id="an_audience"><option value="all">Everyone</option><option value="department">Department</option><?php if (projectsModuleActive()): ?><option value="project">Project</option><?php endif; ?></select></div>
                 <div class="col-md-4 mb-3" id="an_dept_wrap" style="display:none"><label class="form-label">Department</label>
                     <select class="form-select" name="department_id" id="an_dept"><option value="">Select…</option><?php foreach ($departments as $d): ?><option value="<?= (int)$d['department_id'] ?>"><?= safe_output($d['department_name']) ?></option><?php endforeach; ?></select></div>
+                <?php if (projectsModuleActive()): ?>
                 <div class="col-md-4 mb-3" id="an_proj_wrap" style="display:none"><label class="form-label">Project</label>
                     <select class="form-select" name="project_id" id="an_proj"><option value="">Select…</option><?php foreach ($projects as $p): ?><option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option><?php endforeach; ?></select></div>
+                <?php endif; ?>
             </div>
             <div class="row">
                 <div class="col-md-6 mb-3"><label class="form-label">Publish Date <span class="text-danger">*</span></label><input type="date" class="form-control" name="publish_date" id="an_pub" value="<?= date('Y-m-d') ?>" required></div>
