@@ -10,7 +10,7 @@ require_once __DIR__ . '/../../../helpers.php';
 require_once __DIR__ . '/../../../core/project_scope.php';
 includeHeader();
 
-autoEnforcePermission('tax_report');
+autoEnforcePermission('wht_report');
 
 $date_from   = $_GET['date_from'] ?? date('Y-m-01');           // default: this month
 $date_to     = $_GET['date_to']   ?? date('Y-m-t');

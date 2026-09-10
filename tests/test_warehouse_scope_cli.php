@@ -121,6 +121,18 @@ try {
         'app/constant/reports/sales_report.php'      => ["scopeFilterSql('warehouse'"],
         'app/constant/reports/purchase_report.php'   => ["scopeFilterSql('warehouse'"],
         'app/constant/reports/inventory_report.php'  => ["scopeFilterSql('warehouse'"],
+        // 2026-09-10: warehouse filter added to the Sales-analytics reports
+        // (previously had none) alongside gating them under the Sales module.
+        'app/constant/reports/performance_dashboard.php' => ["scopeFilterSql('warehouse'"],
+        'api/account/get_performance_report.php'         => ["userCan('warehouse'", "scopeFilterSqlNullable('warehouse'"],
+        'app/constant/reports/customer_analysis.php' => ["scopeFilterSql('warehouse'"],
+        'api/account/get_customer_analysis_report.php' => ["userCan('warehouse'", "scopeFilterSqlNullable('warehouse'"],
+        'app/constant/reports/product_analysis.php' => ["scopeFilterSql('warehouse'"],
+        'api/account/get_product_analysis_report.php' => ["userCan('warehouse'", "scopeFilterSqlNullable('warehouse'"],
+        'app/constant/reports/sales_forecast.php' => ["scopeFilterSql('warehouse'"],
+        'api/account/get_sales_forecast_report.php' => ["userCan('warehouse'", "scopeFilterSqlNullable('warehouse'"],
+        'app/constant/reports/trends_analysis.php' => ["scopeFilterSql('warehouse'"],
+        'api/account/get_trends_report.php' => ["userCan('warehouse'", "scopeFilterSqlNullable('warehouse'"],
         // Project→warehouse narrowing (procurement + sales create/list/view — see analysis 2026-07-17).
         'app/bms/purchase/rfq.php'                        => ['warehousesForSelect('],
         'api/get_rfqs.php'                                => ["userCan('warehouse'", "scopeFilterSqlNullable('warehouse'"],

@@ -70,18 +70,25 @@ has($header, "getUrl('vendor_statement')", 'Vendor Statement menu link present')
 
 // ─────────────────────────────────────────────────────────────────────────
 section('3. API contracts — permission, scope, buckets');
-foreach (['api/account/get_ar_aging.php' => 'i', 'api/account/get_ap_aging.php' => 'si'] as $f => $alias) {
+// 2026-09-10: get_ap_aging.php/get_vendor_statement.php were carved out of the
+// shared 'financial_reports' key into their own 'ap_aging'/'vendor_statement'
+// keys so Payables Aging/Vendor Statement (100% supplier data) can be gated
+// under the Procurement module without also hiding Receivables Aging/Customer
+// Statement (core, stay on 'financial_reports'). See core/feature_registry.php
+// and migrations/tenant/2026_09_10_*_permission.php.
+foreach (['api/account/get_ar_aging.php' => ['i', 'financial_reports'], 'api/account/get_ap_aging.php' => ['si', 'ap_aging']] as $f => $cfg) {
+    [$alias, $permKey] = $cfg;
     $s = src($root, $f);
-    has($s, "canView('financial_reports')", "$f gated by financial_reports");
+    has($s, "canView('$permKey')", "$f gated by $permKey");
     has($s, "scopeFilterSqlNullable('project', '$alias')", "$f applies project scope");
     has($s, "userCan('project'", "$f verifies a chosen project");
     has($s, "\$days <= 30", "$f buckets 1-30");
     has($s, "\$days <= 60", "$f buckets 31-60");
     has($s, "\$days <= 90", "$f buckets 61-90");
 }
-foreach (['api/account/get_customer_statement.php', 'api/account/get_vendor_statement.php'] as $f) {
+foreach (['api/account/get_customer_statement.php' => 'financial_reports', 'api/account/get_vendor_statement.php' => 'vendor_statement'] as $f => $permKey) {
     $s = src($root, $f);
-    has($s, "canView('financial_reports')", "$f gated by financial_reports");
+    has($s, "canView('$permKey')", "$f gated by $permKey");
     has($s, "opening", "$f computes an opening balance");
     has($s, "scopeFilterSqlNullable", "$f applies project scope");
 }
