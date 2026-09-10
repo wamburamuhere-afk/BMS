@@ -16,16 +16,12 @@ includeHeader();
 autoEnforcePermission('inventory_report');
 
 // Static filter sources (small lists — rendered in PHP, no AJAX needed).
-// $projects_enabled also gates the backend data filter further down — when
-// Projects is off for this tenant, its data must not be filterable by project
-// at all, not just have the dropdown hidden (a switched-off module never
-// deletes existing rows, so the column would otherwise still narrow results).
-$projects_enabled = tenantFeatureEnabled('projects');
-$projects = $projects_enabled ? $pdo->query(
-    "SELECT project_id, project_name FROM projects
-      WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
-      ORDER BY project_name ASC"
-)->fetchAll(PDO::FETCH_ASSOC) : [];
+// Empty when Projects isn't active for this tenant — see
+// projectsModuleActive() (core/project_scope.php). The 4 data endpoints
+// (get_inventory_report.php, get_stock_movements.php, get_stock_transfers.php,
+// get_stock_adjustments.php) each also neutralise a hand-crafted ?project_id=
+// so the data itself stops being filterable by project, not just this dropdown.
+$projects = projectsForSelect($pdo);
 
 $warehouses = tenantFeatureEnabled('warehouses') ? $pdo->query(
     "SELECT warehouse_id, warehouse_name FROM warehouses
@@ -136,6 +132,7 @@ foreach ($warehouses as $w) {
                             <option value="out">Out of Stock</option>
                         </select>
                     </div>
+                    <?php if (projectsModuleActive()): ?>
                     <div class="col-md-2">
                         <label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
                         <select id="s-project" class="form-select" style="width:100%">
@@ -145,6 +142,7 @@ foreach ($warehouses as $w) {
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    <?php endif; ?>
                     <div class="col-md-1">
                         <button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-filter"></i></button>
                     </div>

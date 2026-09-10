@@ -27,6 +27,79 @@ call sites (desktop dropdown + mobile card JS). Also changed the table header fr
 style already used on every other small settings-list page in this module
 (`departments.php`, `designations.php`, `employment_types.php`, `company_calendar.php`).
 
+## 2026-09-11 (fix) - App-wide sweep: no Project selector, filter, or menu item may appear anywhere unless BOTH the superadmin's module grant AND the tenant's own "Enable Projects Module" setting are on
+
+**Files (new):** none — all changes are to existing files.
+
+**Files (modified):** `core/project_scope.php` (new `projectsModuleActive()` /
+`projectsForSelect()` helpers), `assets/js/warehouse-project-filter.js` (cascade
+helpers now show every warehouse, not just unassigned ones, when the Project
+selector doesn't exist in the DOM at all), plus ~75 page/API files across
+Sales, Purchase, Stock/GRN, Invoicing, Customers, Suppliers, HR, Accounts,
+Reports, and the Projects module's own pages (`app/bms/operations/projects.php`,
+`project_view.php`) — full list in the branch diff.
+
+**User-reported:** "why still in reports and in POS.php superadmin even once close
+other modules including project it seems some areas required to select project?
+... i need once modules is not enable there should be no any part explain or need
+filter feature that is not available especially for now this project please if
+superadmin disable should not be seen by anyone for a specific tenant."
+
+**Root cause (two distinct bugs, both app-wide):**
+1. Almost every create/edit/filter page that shows a Project field checked only
+   the tenant's own `system_settings.enable_projects` flag (toggled by the tenant
+   in Settings) — never the superadmin's separate, authoritative `tenant_features`
+   grant. A tenant whose Projects module the platform had revoked, but whose own
+   setting happened to still read `'1'`, kept seeing Project pickers everywhere:
+   POS, Employees, Customers, Suppliers, Sub-Contractors, GRN/DN, Purchase Orders,
+   RFQs, LPOs, Quotations, Sales Orders, Invoices, Stock Adjustments, NIP
+   Materials, Warehouses, Payment Vouchers, Expenses, Budget, Revenue, Bank
+   Transfers, Attendance, the Employee Lifecycle transfer modal, the Announcements
+   audience picker, the dashboard Quick Links, and 8 analytics reports.
+2. The Projects module's *own* pages (`projects.php`, `project_view.php`) had the
+   inverse gap — `projects.php` checked only the tenant's own setting (not the
+   superadmin grant) and `project_view.php` had no module-enablement check
+   whatsoever, so a direct URL hit could reach full project detail even with the
+   module fully revoked by the platform.
+
+**Fix:** added `projectsModuleActive()` (`core/project_scope.php`) — true only
+when both `tenantFeatureEnabled('projects')` AND the tenant's `enable_projects`
+setting are on — and `projectsForSelect($pdo)` for the common "list projects for
+a dropdown" case. Replaced every raw `enable_projects` lookup and every
+ungated `SELECT ... FROM projects` with these helpers; wrapped every Project
+`<select>`, filter dropdown, and menu item in `projectsModuleActive()`. Gated
+`projects.php` and `project_view.php` on the combined flag. Added the same gate
+to the API endpoints that back these dropdowns (`api/search_projects.php`,
+`api/operations/get_projects.php`, `api/received_invoices.php`'s `get_projects`
+action) so a direct request can't bypass the hidden UI either. Confirmed via
+`.claude/reporting-source.md`'s existing warning that already-posted data is
+untouched — only the *selection/filter* surface is hidden, never historical
+records.
+
+**Regression caught before shipping:** simply removing a Project `<select>` from
+a page breaks the shared warehouse cascade — `bindWarehouseToProject()` /
+`filterWarehousesForProject()` (`assets/js/warehouse-project-filter.js`) read
+`.val()` off the (now-missing) field, which returns `undefined`; the existing
+code treated that identically to "a project field exists but nothing is
+selected," which filters the Warehouse dropdown down to *unassigned warehouses
+only* — silently breaking POS, GRN, Procurement, and Sales warehouse selection
+for every tenant without Projects. Fixed the shared functions to special-case
+`undefined` (field doesn't exist → show every warehouse) versus `''`/`null`
+(field exists, nothing picked yet → unassigned only). Two pages
+(`purchase_order_create.php`, `rfq_create.php`) had their own disabled-branch
+cascade calls passing a literal `''`/`0` instead of omitting the argument, which
+hit the same bug even after the shared-function fix — corrected to call the
+rebuild function with no argument. `nip_materials.php` and `grn_create.php` /
+`grn_edit.php` each duplicate this cascade logic locally instead of using the
+shared file — added the equivalent `*_PROJECTS_ACTIVE` guard to each.
+
+**Deliberately left alone:** already-set project associations on existing
+records (e.g. a customer's "Linked Project" badge, a DN/GRN inherited from a
+project-linked PO, an awarded tender's spawned project) continue to display and
+function correctly — this sweep hides the *ability to select/filter*, not
+historical data, matching the reporting rule that posted/existing records are
+never altered.
+
 ## 2026-09-11 (feat) - Capture warehouse on the GL; fix Project-filter accuracy across financial reports
 
 **Files (new):** `api/account/get_warehouses_for_filter.php`,

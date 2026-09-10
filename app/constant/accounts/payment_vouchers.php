@@ -17,12 +17,10 @@ logActivity($pdo, $_SESSION['user_id'], 'View payment vouchers', 'User viewed th
 $expense_accounts = [];
 try { $expense_accounts = expenseAccounts($pdo); } catch (Exception $e) {}
 
-$enable_projects = 0;
-try {
-    $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'enable_projects'");
-    $stmt->execute();
-    $enable_projects = $stmt->fetchColumn() ?: 0;
-} catch (Exception $e) {}
+// $enable_projects reflects BOTH the superadmin's platform grant AND the
+// tenant's own "Enable Projects Module" setting; see projectsModuleActive()
+// (core/project_scope.php).
+$enable_projects = projectsModuleActive() ? 1 : 0;
 
 $projects = [];
 if ($enable_projects) {

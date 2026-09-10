@@ -8,6 +8,11 @@ require_once __DIR__ . '/../../../core/payment_source.php';
 // Phase 5b — enforce view permission on project detail
 autoEnforcePermission('projects');
 
+if (!projectsModuleActive()) {
+    header('Location: ' . getUrl('dashboard'));
+    exit;
+}
+
 // Phase B (scope) — block detail view of projects not in user scope
 $project_id_param = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($project_id_param > 0 && !userCan('project', $project_id_param)) {

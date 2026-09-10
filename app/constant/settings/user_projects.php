@@ -51,8 +51,10 @@ global $pdo;
 
 // See the file-level comment above — this is the ONE switch that hides the
 // project-specific sections (both here and in the JS below) while leaving
-// Warehouse Access fully functional.
-$projectsEnabled = function_exists('tenantFeatureEnabled') ? tenantFeatureEnabled('projects') : true;
+// Warehouse Access fully functional. Reflects BOTH the superadmin's platform
+// grant AND the tenant's own "Enable Projects Module" setting; see
+// projectsModuleActive() (core/project_scope.php).
+$projectsEnabled = function_exists('projectsModuleActive') ? projectsModuleActive() : true;
 
 // ── AJAX: return user's current assignments as JSON ───────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'get_assignments') {

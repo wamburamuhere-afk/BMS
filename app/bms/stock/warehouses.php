@@ -336,17 +336,18 @@ $max_id = $stmt_max->fetchColumn() ?: 0;
 $next_warehouse_code = 'WH-' . str_pad($max_id + 1, 3, '0', STR_PAD_LEFT);
 
 // Fetch projects for selection — admins see all; non-admins see only their assigned projects
-if (isAdmin()) {
-    $active_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name ASC")->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
-    if (empty($assigned)) {
-        $active_projects = [];
+$active_projects = [];
+if (projectsModuleActive()) {
+    if (isAdmin()) {
+        $active_projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name ASC")->fetchAll(PDO::FETCH_ASSOC);
     } else {
-        $ph = implode(',', array_fill(0, count($assigned), '?'));
-        $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name ASC");
-        $pstmt->execute($assigned);
-        $active_projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+        $assigned = array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? []));
+        if (!empty($assigned)) {
+            $ph = implode(',', array_fill(0, count($assigned), '?'));
+            $pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($ph) ORDER BY project_name ASC");
+            $pstmt->execute($assigned);
+            $active_projects = $pstmt->fetchAll(PDO::FETCH_ASSOC);
+        }
     }
 }
 
@@ -1087,6 +1088,7 @@ function get_primary_badge($is_primary) {
                             </div>
                         </div>
                         
+                        <?php if (projectsModuleActive()): ?>
                         <div class="row">
                             <div class="col-md-12 mb-3">
                                 <label for="project_id" class="form-label">Project (Optional)</label>
@@ -1098,6 +1100,8 @@ function get_primary_badge($is_primary) {
                                 </select>
                                 <small class="text-muted">Link this warehouse to a specific project</small>
                             </div>
+                        </div>
+                        <?php endif; ?>
                         </div>
                         
                         <div class="row">

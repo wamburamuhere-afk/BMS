@@ -155,7 +155,7 @@ $pos_denomination_list = posDenominationList();
             <div class="bg-light p-3 border-bottom sticky-top" style="z-index: 1020; top: 0;">
                 <!-- Warehouse & Project Selection -->
                 <div class="row g-2 mb-3">
-                    <div class="col-md-6">
+                    <div class="col-md-<?= projectsModuleActive() ? 6 : 12 ?>">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-white"><i class="bi bi-house-door text-primary"></i></span>
                             <select class="form-select" id="posWarehouseId" onchange="loadProducts()" required>
@@ -178,23 +178,14 @@ $pos_denomination_list = posDenominationList();
                             </select>
                         </div>
                     </div>
+                    <?php if (projectsModuleActive()): ?>
                     <div class="col-md-6">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-white"><i class="bi bi-briefcase text-info"></i></span>
                             <select class="form-select" id="posProjectId">
                                 <option value=""><?= t('General (No Project)') ?></option>
                                 <?php
-                                $_pos_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
-                                if (isAdmin()) {
-                                    $projects = $pdo->query("SELECT project_id, project_name FROM projects WHERE status = 'active' ORDER BY project_name")->fetchAll(PDO::FETCH_ASSOC);
-                                } elseif (!empty($_pos_assigned)) {
-                                    $_pos_pph = implode(',', array_fill(0, count($_pos_assigned), '?'));
-                                    $_pos_pstmt = $pdo->prepare("SELECT project_id, project_name FROM projects WHERE status = 'active' AND project_id IN ($_pos_pph) ORDER BY project_name");
-                                    $_pos_pstmt->execute($_pos_assigned);
-                                    $projects = $_pos_pstmt->fetchAll(PDO::FETCH_ASSOC);
-                                } else {
-                                    $projects = [];
-                                }
+                                $projects = projectsForSelect($pdo);
                                 foreach ($projects as $p) {
                                     echo "<option value='{$p['project_id']}'>{$p['project_name']}</option>";
                                 }
@@ -202,6 +193,7 @@ $pos_denomination_list = posDenominationList();
                             </select>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="row g-2">

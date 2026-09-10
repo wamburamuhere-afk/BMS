@@ -41,6 +41,10 @@ $category_id= isset($_GET['category_id']) && $_GET['category_id'] !== '' ? (int)
 $account_id = isset($_GET['account_id']) && $_GET['account_id'] !== '' ? (int)$_GET['account_id'] : null;
 $project_id = isset($_GET['project_id']) && $_GET['project_id'] !== '' && (int)$_GET['project_id'] > 0 ? (int)$_GET['project_id'] : null;
 $warehouse_id = isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '' && (int)$_GET['warehouse_id'] > 0 ? (int)$_GET['warehouse_id'] : null;
+// A switched-off Projects module must win over even a hand-crafted
+// ?project_id= — neutralise it here so the data itself stops being
+// filterable by project, not just the dropdown that offers it.
+if (!projectsModuleActive()) $project_id = null;
 
 $is_admin = isAdmin();
 if ($project_id !== null && !userCan('project', $project_id)) {

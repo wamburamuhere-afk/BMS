@@ -25,7 +25,7 @@ if ($edit_id > 0) {
 
 includeHeader();
 
-$project_id = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
+$project_id = (projectsModuleActive() && isset($_GET['project_id'])) ? intval($_GET['project_id']) : 0;
 $is_edit    = $edit_id > 0;
 
 // ── LOAD DN (edit mode) ──────────────────────────────────────
@@ -386,6 +386,7 @@ $return_url = getUrl('delivery_notes') . '?type=outbound';
                             </div>
                             <?php endif; ?>
 
+                            <?php if (projectsModuleActive()): ?>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Project <span class="text-muted small">(Optional)</span></label>
                                 <select class="form-select select2-static" name="project_id" id="dn_project_id">
@@ -395,6 +396,7 @@ $return_url = getUrl('delivery_notes') . '?type=outbound';
                                     <?php endforeach; ?>
                                 </select>
                             </div>
+                            <?php endif; ?>
 
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Warehouse (Source) <span class="text-danger">*</span></label>

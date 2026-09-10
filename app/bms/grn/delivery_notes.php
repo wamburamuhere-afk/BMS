@@ -34,7 +34,10 @@ $dn_is_admin    = isAdmin();
 
 // Get filter parameters for dropdowns — scoped by project for non-admins
 $_dn_assigned = isAdmin() ? [] : array_values(array_filter(array_map('intval', $_SESSION['scope']['projects'] ?? [])));
-$enable_projects = getSetting('enable_projects', 0);
+// $enable_projects reflects BOTH the superadmin's platform grant AND the
+// tenant's own "Enable Projects Module" setting; see projectsModuleActive()
+// (core/project_scope.php).
+$enable_projects = projectsModuleActive() ? 1 : 0;
 
 // Warehouses: shared helper — also respects the user's direct warehouse
 // grant (Phase 6, pos_upgrade_plan.md), not just project membership.

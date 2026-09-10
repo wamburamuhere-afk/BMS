@@ -22,7 +22,10 @@ $can_review = canReview('bank_transfers');
 $can_approve= canApprove('bank_transfers');
 
 $currency        = get_setting('currency', 'TZS');
-$enable_projects = get_setting('enable_projects');
+// $enable_projects reflects BOTH the superadmin's platform grant AND the
+// tenant's own "Enable Projects Module" setting; see projectsModuleActive()
+// (core/project_scope.php).
+$enable_projects = projectsModuleActive() ? 1 : 0;
 
 $cash_accounts    = cashBankAccounts($pdo);
 $expense_accounts = expenseAccounts($pdo);   // canonical: active expense + finance_cost

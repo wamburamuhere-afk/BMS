@@ -33,7 +33,7 @@ if (!canCreate('documents')) {
 }
 
 $document_id = isset($_GET['document_id']) ? (int)$_GET['document_id'] : 0;
-$project_id  = (isset($_GET['project_id']) && $_GET['project_id'] !== '') ? (int)$_GET['project_id'] : null;
+$project_id  = (projectsModuleActive() && isset($_GET['project_id']) && $_GET['project_id'] !== '') ? (int)$_GET['project_id'] : null;
 if ($project_id !== null && !userCan('project', $project_id)) {
     header("Location: " . getUrl('unauthorized'));
     exit();

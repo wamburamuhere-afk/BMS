@@ -51,13 +51,12 @@ if (isAdmin()) {
 require_once ROOT_DIR . '/core/warehouse_scope.php';
 $all_warehouses = warehousesForSelect($pdo);
 
-// Projects
-$enable_projects = 0;
-try {
-    $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key='enable_projects'");
-    $stmt->execute();
-    $enable_projects = $stmt->fetchColumn() ?: 0;
-} catch (Exception $e) {}
+// Projects — reflects BOTH the superadmin's platform grant AND the tenant's
+// own "Enable Projects Module" setting; see projectsModuleActive()
+// (core/project_scope.php). Previously checked only the tenant's own
+// setting, so a tenant whose Projects module the platform had revoked could
+// still see this field.
+$enable_projects = projectsModuleActive() ? 1 : 0;
 
 $projects = [];
 if ($enable_projects) {
@@ -519,7 +518,9 @@ function filterRfqWarehouses(projectId) {
 
     const filtered = filterWarehousesForProject(rfqAllWarehouses, projectId);
     if (hint) {
-        if (!projectId || projectId === '' || projectId === '0') {
+        if (projectId === undefined) {
+            hint.textContent = 'Showing every warehouse.';
+        } else if (!projectId || projectId === '' || projectId === '0') {
             hint.textContent = 'Showing warehouses not linked to any project.';
         } else {
             hint.textContent = filtered.length === 0
@@ -550,7 +551,7 @@ function filterRfqWarehouses(projectId) {
     document.getElementById('warehouse_id').value = '<?= $selected_warehouse ?>';
     <?php endif; ?>
     <?php else: ?>
-    filterRfqWarehouses('');
+    filterRfqWarehouses(); // no Project field at all — show every warehouse, unfiltered
     <?php endif; ?>
 })();
 

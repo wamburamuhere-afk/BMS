@@ -481,6 +481,10 @@ if ($method === 'GET') {
             echo json_encode(['success' => false, 'message' => 'Permission denied']);
             exit;
         }
+        if (!projectsModuleActive()) {
+            echo json_encode(['success' => true, 'data' => []]);
+            exit;
+        }
         // Project is the user's choice — show every active project they are
         // assigned to (admins see all), not just those linked to the supplier.
         if (isAdmin()) {
