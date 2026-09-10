@@ -26,6 +26,10 @@ $warehouse_id = (isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '') ?
 $date_from    = $_GET['date_from'] ?? date('Y-01-01');
 $date_to      = $_GET['date_to']   ?? date('Y-12-31');
 $project_id   = (isset($_GET['project_id']) && $_GET['project_id'] !== '') ? (int)$_GET['project_id'] : null;
+// 2026-09-11: a switched-off Projects module never deletes existing project
+// rows, so a hand-crafted ?project_id= would still narrow results even with
+// the dropdown empty client-side — enforce the module boundary here too.
+if (!tenantFeatureEnabled('projects')) $project_id = null;
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_to)) {
     echo json_encode(['success' => false, 'message' => 'Invalid date range']); exit;

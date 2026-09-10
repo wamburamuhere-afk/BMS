@@ -12,12 +12,15 @@ includeHeader();
 
 autoEnforcePermission('financial_reports');
 
-// In-scope projects only (admins → all), per security.md §23.
-$projects = $pdo->query(
+// In-scope projects only (admins → all), per security.md §23. Empty when the
+// Projects module is off for this tenant — a switched-off module never deletes
+// existing project rows, so without this guard the dropdown would keep
+// offering stale projects the tenant can no longer use at all.
+$projects = tenantFeatureEnabled('projects') ? $pdo->query(
     "SELECT project_id, project_name FROM projects
       WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
       ORDER BY project_name ASC"
-)->fetchAll(PDO::FETCH_ASSOC);
+)->fetchAll(PDO::FETCH_ASSOC) : [];
 $as_of    = $_GET['as_of_date'] ?? date('Y-m-d');
 $currency = get_setting('currency', 'TZS');
 ?>

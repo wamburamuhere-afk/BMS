@@ -55,6 +55,9 @@ $end_date   = $_GET['end_date']   ?? date('Y-m-d');
 $project_id = isset($_GET['project_id']) && $_GET['project_id'] !== '' && (int)$_GET['project_id'] > 0
     ? (int)$_GET['project_id']
     : null;
+$warehouse_id = isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '' && (int)$_GET['warehouse_id'] > 0
+    ? (int)$_GET['warehouse_id']
+    : null;
 
 // ── Scope resolution ──────────────────────────────────────────────────────
 $is_admin = isAdmin();
@@ -65,6 +68,11 @@ if (!$is_admin) {
 if ($project_id !== null && !userCan('project', $project_id)) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your assigned scope.']);
+    exit;
+}
+if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
     exit;
 }
 
@@ -83,12 +91,14 @@ try {
 try {
     global $pdo;
 
-    // Specific project binds je.project_id = N; otherwise the canonical
-    // "assigned projects OR untagged" filter ('' for admins).
-    $scopeSql = $project_id === null ? scopeFilterSqlNullable('project', 'je') : '';
+    // Specific project/warehouse binds je.project_id/warehouse_id = N; otherwise
+    // the canonical "assigned OR untagged" filter ('' for admins), same shape for
+    // both dimensions.
+    $scopeSql = ($project_id === null ? scopeFilterSqlNullable('project', 'je') : '')
+              . ($warehouse_id === null ? scopeFilterSqlNullable('warehouse', 'je') : '');
 
-    $cur = glProfitLoss($pdo, $start_date, $end_date, $project_id, $scopeSql);
-    $prv = glProfitLoss($pdo, $prev_start_date, $prev_end_date, $project_id, $scopeSql);
+    $cur = glProfitLoss($pdo, $start_date, $end_date, $project_id, $scopeSql, $warehouse_id);
+    $prv = glProfitLoss($pdo, $prev_start_date, $prev_end_date, $project_id, $scopeSql, $warehouse_id);
 
     // ── Per-account amount maps (current + previous), keyed by account_id ──────
     $curBy = []; $prvBy = [];

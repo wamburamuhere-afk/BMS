@@ -153,7 +153,7 @@ if (!function_exists('postSubcontractorAccrual')) {
         $out = ['posted' => false, 'reason' => ''];
         if ($invoiceId <= 0) { $out['reason'] = 'invalid'; return $out; }
 
-        $r = $pdo->prepare("SELECT amount, tax_amount, invoice_type, project_id, date_raised FROM supplier_invoices WHERE id = ?");
+        $r = $pdo->prepare("SELECT amount, tax_amount, invoice_type, project_id, warehouse_id, date_raised FROM supplier_invoices WHERE id = ?");
         $r->execute([$invoiceId]);
         $inv = $r->fetch(PDO::FETCH_ASSOC);
         if (!$inv) { $out['reason'] = 'not_found'; return $out; }
@@ -173,11 +173,12 @@ if (!function_exists('postSubcontractorAccrual')) {
 
         $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$inv['date_raised']) ? substr((string)$inv['date_raised'], 0, 10) : date('Y-m-d');
         $pid  = !empty($inv['project_id']) ? (int)$inv['project_id'] : null;
+        $whId = !empty($inv['warehouse_id']) ? (int)$inv['warehouse_id'] : null;
         // Split recoverable Input VAT out of COGS (was buried in the gross amount).
         $tax = round((float)($inv['tax_amount'] ?? 0), 2);
         $lines = ppAccrualVatLines($pdo, (int)$cogs, 'Sub-contractor cost (COGS)', (int)$ap, $amount, $tax);
         try {
-            $entry = postLedgerEntry($pdo, "Sub-contractor invoice #$invoiceId — cost certified", $lines, $pid, $invoiceId, 'subcontractor_invoice', $date, $userId);
+            $entry = postLedgerEntry($pdo, "Sub-contractor invoice #$invoiceId — cost certified", $lines, $pid, $invoiceId, 'subcontractor_invoice', $date, $userId, $whId);
             $out['posted'] = true; $out['reason'] = 'posted'; $out['entry_id'] = $entry;
         } catch (Throwable $e) {
             error_log("postSubcontractorAccrual failed (invoice $invoiceId): " . $e->getMessage());
@@ -219,7 +220,7 @@ if (!function_exists('postGoodsInvoiceAccrual')) {
         $out = ['posted' => false, 'reason' => ''];
         if ($invoiceId <= 0) { $out['reason'] = 'invalid'; return $out; }
 
-        $r = $pdo->prepare("SELECT amount, tax_amount, invoice_type, po_id, project_id, date_raised, cost_account_id FROM supplier_invoices WHERE id = ?");
+        $r = $pdo->prepare("SELECT amount, tax_amount, invoice_type, po_id, project_id, warehouse_id, date_raised, cost_account_id FROM supplier_invoices WHERE id = ?");
         $r->execute([$invoiceId]);
         $inv = $r->fetch(PDO::FETCH_ASSOC);
         if (!$inv) { $out['reason'] = 'not_found'; return $out; }
@@ -274,6 +275,7 @@ if (!function_exists('postGoodsInvoiceAccrual')) {
 
         $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$inv['date_raised']) ? substr((string)$inv['date_raised'], 0, 10) : date('Y-m-d');
         $pid  = !empty($inv['project_id']) ? (int)$inv['project_id'] : null;
+        $whId = !empty($inv['warehouse_id']) ? (int)$inv['warehouse_id'] : null;
         $desc = $covered > 0
             ? "Supplier invoice #$invoiceId — remaining payable not covered by an earlier GRN posting"
             : "Supplier invoice #$invoiceId — payable recognised";
@@ -284,7 +286,7 @@ if (!function_exists('postGoodsInvoiceAccrual')) {
         $tax = round((float)($inv['tax_amount'] ?? 0), 2);
         $lines = ppAccrualVatLines($pdo, (int)$debitAcc, $debitDesc, (int)$ap, $toPost, $tax);
         try {
-            $entry = postLedgerEntry($pdo, $desc, $lines, $pid, $invoiceId, 'supplier_invoice', $date, $userId);
+            $entry = postLedgerEntry($pdo, $desc, $lines, $pid, $invoiceId, 'supplier_invoice', $date, $userId, $whId);
             $out['posted'] = true; $out['entry_id'] = $entry;
             $out['reason'] = $covered > 0 ? 'posted_partial_remainder' : 'posted';
             if ($covered > 0) {
@@ -447,7 +449,7 @@ if (!function_exists('postPurchaseReturn')) {
         $out = ['posted' => false, 'reason' => ''];
         if ($returnId <= 0) { $out['reason'] = 'invalid'; return $out; }
 
-        $r = $pdo->prepare("SELECT return_number, return_date, total_amount FROM purchase_returns WHERE purchase_return_id = ?");
+        $r = $pdo->prepare("SELECT return_number, return_date, total_amount, warehouse_id FROM purchase_returns WHERE purchase_return_id = ?");
         $r->execute([$returnId]);
         $ret = $r->fetch(PDO::FETCH_ASSOC);
         if (!$ret) { $out['reason'] = 'not_found'; return $out; }
@@ -467,11 +469,12 @@ if (!function_exists('postPurchaseReturn')) {
 
         $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$ret['return_date']) ? substr((string)$ret['return_date'], 0, 10) : date('Y-m-d');
         $ref  = $ret['return_number'] ?: ('#' . $returnId);
+        $whId = !empty($ret['warehouse_id']) ? (int)$ret['warehouse_id'] : null;
         try {
             $entry = postLedgerEntry($pdo, "Purchase return $ref — goods returned to supplier", [
                 ['account_id' => (int)$ap,  'type' => 'debit',  'amount' => $value, 'description' => 'Supplier debt reduced (Accounts Payable)'],
                 ['account_id' => (int)$inv, 'type' => 'credit', 'amount' => $value, 'description' => 'Goods returned out of inventory'],
-            ], null, $returnId, 'purchase_return', $date, $userId);
+            ], null, $returnId, 'purchase_return', $date, $userId, $whId);
             $out['posted'] = true; $out['reason'] = 'posted'; $out['entry_id'] = $entry;
         } catch (Throwable $e) {
             error_log("postPurchaseReturn failed (return $returnId): " . $e->getMessage());

@@ -40,16 +40,28 @@ $mode       = $_GET['mode']       ?? '';
 $category_id= isset($_GET['category_id']) && $_GET['category_id'] !== '' ? (int)$_GET['category_id'] : null;
 $account_id = isset($_GET['account_id']) && $_GET['account_id'] !== '' ? (int)$_GET['account_id'] : null;
 $project_id = isset($_GET['project_id']) && $_GET['project_id'] !== '' && (int)$_GET['project_id'] > 0 ? (int)$_GET['project_id'] : null;
+$warehouse_id = isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '' && (int)$_GET['warehouse_id'] > 0 ? (int)$_GET['warehouse_id'] : null;
 
 $is_admin = isAdmin();
 if ($project_id !== null && !userCan('project', $project_id)) {
     http_response_code(403); echo json_encode(['success'=>false,'message'=>'Access denied: project not in scope']); exit;
+}
+if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
+    http_response_code(403); echo json_encode(['success'=>false,'message'=>'Access denied: warehouse not in scope']); exit;
 }
 
 // Same scope-clause builder as the main report.
 $scopeClause = function (string $col, string $alias = '') use ($project_id): array {
     if ($project_id !== null) return ['sql' => " AND $col = ?", 'params' => [$project_id]];
     return ['sql' => scopeFilterSqlNullable('project', $alias), 'params' => []];
+};
+// Warehouse equivalent — only applied to sources whose table actually carries a
+// warehouse_id (invoices, pos_sales, supplier_invoices, and journal_entries
+// itself); sources with no warehouse dimension (expenses, payroll, IPC, etc.)
+// are left as-is, same discipline as the GL posting side (Phase 2).
+$whClause = function (string $col, string $alias = '') use ($warehouse_id): array {
+    if ($warehouse_id !== null) return ['sql' => " AND $col = ?", 'params' => [$warehouse_id]];
+    return ['sql' => scopeFilterSqlNullable('warehouse', $alias), 'params' => []];
 };
 $tableExists = function (string $t) use ($pdo): bool {
     try { return (bool)$pdo->query("SHOW TABLES LIKE " . $pdo->quote($t))->fetch(); } catch (Throwable $e) { return false; }
@@ -64,6 +76,7 @@ try {
     case 'invoices':
         $title = 'Sales of Goods & Services — all invoices (GL-posted contribute to P&L)';
         $sc = $scopeClause('i.project_id', 'i');
+        $wh = $whClause('i.warehouse_id', 'i');
         // All statuses except cancelled: GL-posted ones feed the P&L figure;
         // pending / reviewed / draft show as pipeline (not yet recognised).
         $sql = "SELECT i.invoice_number AS ref, i.invoice_date AS date,
@@ -74,9 +87,9 @@ try {
                   FROM invoices i
              LEFT JOIN customers c ON c.customer_id = i.customer_id
                  WHERE i.invoice_date BETWEEN ? AND ?
-                   AND i.status != 'cancelled'" . $sc['sql'] . "
+                   AND i.status != 'cancelled'" . $sc['sql'] . $wh['sql'] . "
               ORDER BY i.invoice_date, i.invoice_number";
-        $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
+        $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params'], $wh['params']));
         $raw = $st->fetchAll(PDO::FETCH_ASSOC);
 
         $glStatuses = ['approved','sent','paid','partial','overdue'];
@@ -161,6 +174,7 @@ try {
     case 'product_cogs':
         $title = 'Cost of Goods Sold (Trading) — by invoice line';
         $sc = $scopeClause('i.project_id', 'i');
+        $wh = $whClause('i.warehouse_id', 'i');
         $sql = "SELECT i.invoice_number AS ref, i.invoice_date AS date,
                        CONCAT(COALESCE(p.product_name, ii.product_name), ' ×', ii.quantity) AS party,
                        (ii.quantity * COALESCE(p.cost_price,0)) AS amount, i.status AS status
@@ -169,9 +183,9 @@ try {
             INNER JOIN products p       ON p.product_id  = ii.product_id
                  WHERE i.invoice_date BETWEEN ? AND ?
                    AND i.status IN ('approved','sent','paid','partial','overdue')
-                   AND ii.product_id IS NOT NULL" . $sc['sql'] . "
+                   AND ii.product_id IS NOT NULL" . $sc['sql'] . $wh['sql'] . "
               ORDER BY i.invoice_date";
-        $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
+        $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params'], $wh['params']));
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
             $rows[] = array_merge(['type' => 'COGS — Invoice'], $r);
         break;
@@ -180,6 +194,7 @@ try {
         $title = 'Sub-contractor Costs';
         if ($tableExists('supplier_invoices')) {
             $sc = $scopeClause('si.project_id', 'si');
+            $wh = $whClause('si.warehouse_id', 'si');
             $sql = "SELECT si.invoice_ref AS ref, si.date_raised AS date,
                            COALESCE(s.supplier_name, s.company_name, '—') AS party,
                            si.amount AS amount, si.status AS status
@@ -187,9 +202,9 @@ try {
                  LEFT JOIN suppliers s ON s.supplier_id = si.supplier_id
                      WHERE si.invoice_type='sub_contractor'
                        AND si.status NOT IN ('cancelled','rejected','deleted','draft')
-                       AND si.date_raised BETWEEN ? AND ?" . $sc['sql'] . "
+                       AND si.date_raised BETWEEN ? AND ?" . $sc['sql'] . $wh['sql'] . "
                   ORDER BY si.date_raised";
-            $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
+            $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params'], $wh['params']));
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
                 $rows[] = array_merge(['type' => 'Sub-contractor'], $r);
         }
@@ -324,6 +339,7 @@ try {
         $title = 'POS / Counter Sales — receipts recognised';
         if ($tableExists('pos_sales')) {
             $sc = $scopeClause('ps.project_id', 'ps');
+            $wh = $whClause('ps.warehouse_id', 'ps');
             $sql = "SELECT ps.receipt_number AS ref, ps.sale_date AS date,
                            COALESCE(NULLIF(ps.customer_name,''), c.customer_name, c.company_name, 'Walk-in') AS party,
                            (ps.grand_total - ps.tax_amount) AS amount, ps.sale_status AS status
@@ -331,9 +347,9 @@ try {
                  LEFT JOIN customers c ON c.customer_id = ps.customer_id
                      WHERE ps.sale_status IN ('completed','partially_refunded','refunded')
                        AND ps.invoice_id IS NULL AND ps.is_return_sale = 0
-                       AND DATE(ps.sale_date) BETWEEN ? AND ?" . $sc['sql'] . "
+                       AND DATE(ps.sale_date) BETWEEN ? AND ?" . $sc['sql'] . $wh['sql'] . "
                   ORDER BY ps.sale_date";
-            $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
+            $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params'], $wh['params']));
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
                 $rows[] = array_merge(['type' => 'POS Sale'], $r);
         }
@@ -343,6 +359,7 @@ try {
         $title = 'POS Returns — contra-revenue';
         if ($tableExists('pos_sales')) {
             $sc = $scopeClause('ps.project_id', 'ps');
+            $wh = $whClause('ps.warehouse_id', 'ps');
             $sql = "SELECT ps.receipt_number AS ref, ps.sale_date AS date,
                            COALESCE(NULLIF(ps.return_reason,''), NULLIF(ps.customer_name,''), c.customer_name, 'Walk-in') AS party,
                            (ps.grand_total - ps.tax_amount) AS amount, ps.sale_status AS status
@@ -351,9 +368,9 @@ try {
                      WHERE ps.is_return_sale = 1
                        AND ps.sale_status NOT IN ('voided','cancelled')
                        AND ps.invoice_id IS NULL
-                       AND DATE(ps.sale_date) BETWEEN ? AND ?" . $sc['sql'] . "
+                       AND DATE(ps.sale_date) BETWEEN ? AND ?" . $sc['sql'] . $wh['sql'] . "
                   ORDER BY ps.sale_date";
-            $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
+            $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params'], $wh['params']));
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
                 $rows[] = array_merge(['type' => 'POS Return'], $r);
         }
@@ -363,6 +380,7 @@ try {
         $title = 'Cost of Goods Sold (POS / Counter) — net of returns, by line';
         if ($tableExists('pos_sale_items')) {
             $sc = $scopeClause('ps.project_id', 'ps');
+            $wh = $whClause('ps.warehouse_id', 'ps');
             $sql = "SELECT ps.receipt_number AS ref, ps.sale_date AS date,
                            CONCAT(CASE WHEN ps.is_return_sale = 1 THEN 'RETURN: ' ELSE '' END,
                                   COALESCE(p.product_name, psi.product_name), ' ×', psi.quantity) AS party,
@@ -375,9 +393,9 @@ try {
                        AND psi.product_id IS NOT NULL
                        AND ( (ps.is_return_sale = 0 AND ps.sale_status IN ('completed','partially_refunded','refunded'))
                           OR (ps.is_return_sale = 1 AND ps.sale_status NOT IN ('voided','cancelled')) )
-                       AND DATE(ps.sale_date) BETWEEN ? AND ?" . $sc['sql'] . "
+                       AND DATE(ps.sale_date) BETWEEN ? AND ?" . $sc['sql'] . $wh['sql'] . "
                   ORDER BY ps.sale_date";
-            $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params']));
+            $st = $pdo->prepare($sql); $st->execute(array_merge([$start_date,$end_date], $sc['params'], $wh['params']));
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r)
                 $rows[] = array_merge(['type' => 'POS COGS'], $r);
         }
@@ -399,6 +417,7 @@ try {
               : "CASE WHEN jei.type='debit'  THEN jei.amount ELSE -jei.amount END";
 
         $jScope = $scopeClause('je.project_id', 'je');
+        $jWh    = $whClause('je.warehouse_id', 'je');
 
         $sql = "SELECT
                     -- Source document reference (the meaningful one, not JRNL-...)
@@ -460,10 +479,10 @@ try {
                   JOIN journal_entries je ON je.entry_id = jei.entry_id
                  WHERE jei.account_id = ? AND je.status='posted'
                    AND je.entry_date BETWEEN ? AND ?"
-              . $jScope['sql'] .
+              . $jScope['sql'] . $jWh['sql'] .
               " ORDER BY je.entry_date";
         $st = $pdo->prepare($sql);
-        $st->execute(array_merge([$account_id, $start_date, $end_date], $jScope['params']));
+        $st->execute(array_merge([$account_id, $start_date, $end_date], $jScope['params'], $jWh['params']));
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
         break;
 

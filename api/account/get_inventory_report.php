@@ -36,6 +36,10 @@ $warehouse_id = (isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '') ?
 $category_id  = (isset($_GET['category_id'])  && $_GET['category_id']  !== '') ? (int)$_GET['category_id']  : null;
 $stock_status = $_GET['stock_status'] ?? '';   // '' | 'in' | 'low' | 'out'
 $project_id   = (isset($_GET['project_id'])   && $_GET['project_id']   !== '') ? (int)$_GET['project_id']   : null;
+// 2026-09-11: a switched-off Projects module never deletes existing project
+// rows, so a hand-crafted ?project_id= would still narrow results even with
+// the dropdown empty client-side — enforce the module boundary here too.
+if (!tenantFeatureEnabled('projects')) $project_id = null;
 
 if ($project_id !== null && !userCan('project', $project_id)) {
     http_response_code(403);

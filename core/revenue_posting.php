@@ -65,7 +65,7 @@ if (!function_exists('postInvoiceRevenue')) {
             }
         } catch (Throwable $e) { /* IPC table absent — no exclusion needed */ }
 
-        $r = $pdo->prepare("SELECT invoice_number, invoice_date, subtotal, tax_amount, grand_total, project_id, output_vat_posted
+        $r = $pdo->prepare("SELECT invoice_number, invoice_date, subtotal, tax_amount, grand_total, project_id, warehouse_id, output_vat_posted
                               FROM invoices WHERE invoice_id = ?");
         $r->execute([$invoiceId]);
         $inv = $r->fetch(PDO::FETCH_ASSOC);
@@ -87,6 +87,7 @@ if (!function_exists('postInvoiceRevenue')) {
         $desc  = "Invoice #" . ($inv['invoice_number'] ?? $invoiceId) . " approved — revenue recognised";
         $date  = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$inv['invoice_date']) ? substr((string)$inv['invoice_date'], 0, 10) : date('Y-m-d');
         $pid   = ($inv['project_id'] !== null && $inv['project_id'] !== '') ? (int)$inv['project_id'] : null;
+        $whId  = ($inv['warehouse_id'] !== null && $inv['warehouse_id'] !== '') ? (int)$inv['warehouse_id'] : null;
 
         $lines = [['account_id' => $ar, 'type' => 'debit', 'amount' => $grand, 'description' => $desc]];
         if ($vat && $tax > 0) {
@@ -97,7 +98,7 @@ if (!function_exists('postInvoiceRevenue')) {
             $lines[] = ['account_id' => (int)$rev, 'type' => 'credit', 'amount' => $grand, 'description' => 'Sales revenue'];
         }
 
-        $entryId = postLedgerEntry($pdo, $desc, $lines, $pid, $invoiceId, 'invoice', $date, $userId);
+        $entryId = postLedgerEntry($pdo, $desc, $lines, $pid, $invoiceId, 'invoice', $date, $userId, $whId);
 
         // Keep the VAT-return report's stamp in sync (no current_balance nudge — the GL is the truth).
         if ($tax > 0 && array_key_exists('output_vat_posted', $inv) && $inv['output_vat_posted'] === null) {
@@ -181,19 +182,20 @@ if (!function_exists('postInvoiceCOGS')) {
         $invAcc  = inventoryAccountId($pdo);
         if (!$cogsAcc || !$invAcc) { $out['reason'] = 'accounts_not_configured'; return $out; }
 
-        $r = $pdo->prepare("SELECT invoice_number, invoice_date, project_id FROM invoices WHERE invoice_id = ?");
+        $r = $pdo->prepare("SELECT invoice_number, invoice_date, project_id, warehouse_id FROM invoices WHERE invoice_id = ?");
         $r->execute([$invoiceId]);
         $inv = $r->fetch(PDO::FETCH_ASSOC);
         if (!$inv) { $out['reason'] = 'invoice_not_found'; return $out; }
 
         $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$inv['invoice_date']) ? substr((string)$inv['invoice_date'], 0, 10) : date('Y-m-d');
         $pid  = !empty($inv['project_id']) ? (int)$inv['project_id'] : null;
+        $whId = !empty($inv['warehouse_id']) ? (int)$inv['warehouse_id'] : null;
         $desc = 'COGS for Invoice ' . ($inv['invoice_number'] ?: ('#' . $invoiceId));
         try {
             $entry = postLedgerEntry($pdo, $desc, [
                 ['account_id' => (int)$cogsAcc, 'type' => 'debit',  'amount' => $cogs, 'description' => 'Cost of goods sold'],
                 ['account_id' => (int)$invAcc,  'type' => 'credit', 'amount' => $cogs, 'description' => 'Inventory reduction'],
-            ], $pid, $invoiceId, 'invoice_cogs', $date, $userId);
+            ], $pid, $invoiceId, 'invoice_cogs', $date, $userId, $whId);
             $out['posted'] = true; $out['reason'] = 'posted'; $out['entry_id'] = $entry;
         } catch (Throwable $e) {
             error_log("postInvoiceCOGS failed (invoice $invoiceId): " . $e->getMessage());
@@ -250,7 +252,7 @@ if (!function_exists('reverseInvoiceRevenue')) {
                     ->fetchAll(PDO::FETCH_ASSOC);
         if (!$rows) { $out['reason'] = 'no_lines'; return $out; }
 
-        $hdr = $pdo->query("SELECT entry_date, project_id FROM journal_entries WHERE entry_id = $origId")
+        $hdr = $pdo->query("SELECT entry_date, project_id, warehouse_id FROM journal_entries WHERE entry_id = $origId")
                    ->fetch(PDO::FETCH_ASSOC);
 
         $lines = [];
@@ -262,13 +264,14 @@ if (!function_exists('reverseInvoiceRevenue')) {
                 'description' => 'Revenue reversal — invoice cancelled',
             ];
         }
-        $pid = isset($hdr['project_id']) && $hdr['project_id'] !== null ? (int)$hdr['project_id'] : null;
+        $pid  = isset($hdr['project_id'])   && $hdr['project_id']   !== null ? (int)$hdr['project_id']   : null;
+        $whId = isset($hdr['warehouse_id']) && $hdr['warehouse_id'] !== null ? (int)$hdr['warehouse_id'] : null;
 
         try {
             $entry = postLedgerEntry(
                 $pdo,
                 "Invoice #$invoiceId cancelled — revenue reversed",
-                $lines, $pid, $invoiceId, 'invoice_void', date('Y-m-d'), $userId
+                $lines, $pid, $invoiceId, 'invoice_void', date('Y-m-d'), $userId, $whId
             );
             $out['reversed'] = true; $out['reason'] = 'reversed'; $out['entry_id'] = $entry;
         } catch (Throwable $e) {

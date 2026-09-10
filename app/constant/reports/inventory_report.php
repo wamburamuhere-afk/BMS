@@ -16,17 +16,22 @@ includeHeader();
 autoEnforcePermission('inventory_report');
 
 // Static filter sources (small lists — rendered in PHP, no AJAX needed).
-$projects = $pdo->query(
+// $projects_enabled also gates the backend data filter further down — when
+// Projects is off for this tenant, its data must not be filterable by project
+// at all, not just have the dropdown hidden (a switched-off module never
+// deletes existing rows, so the column would otherwise still narrow results).
+$projects_enabled = tenantFeatureEnabled('projects');
+$projects = $projects_enabled ? $pdo->query(
     "SELECT project_id, project_name FROM projects
       WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
       ORDER BY project_name ASC"
-)->fetchAll(PDO::FETCH_ASSOC);
+)->fetchAll(PDO::FETCH_ASSOC) : [];
 
-$warehouses = $pdo->query(
+$warehouses = tenantFeatureEnabled('warehouses') ? $pdo->query(
     "SELECT warehouse_id, warehouse_name FROM warehouses
       WHERE status = 'active' " . scopeFilterSql('warehouse', 'warehouses') . "
       ORDER BY warehouse_name ASC"
-)->fetchAll(PDO::FETCH_ASSOC);
+)->fetchAll(PDO::FETCH_ASSOC) : [];
 
 $products = $pdo->query(
     "SELECT product_id, product_code, product_name FROM products
