@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-09-10 (fix/ui) - Shift History: fixed stuck-register root cause, redesigned table to the standard DataTable + gear-dropdown pattern
+
+**Files (modified):** `app/bms/pos/shift_history.php`
+
+**User-reported:** on `demo.bjptechnologies.co.tz/pos`, starting a shift failed — the Register/Till
+list showed the same single register ("NYAGAWA") repeated and disabled multiple times, each "in use
+by" a different past cashier. Root cause traced to `api/pos/get_registers.php`'s
+`LEFT JOIN cash_register_shifts ... WHERE status='active'`: 8 shifts on that tenant had been left
+`active` for weeks (cashiers closing the browser/logging out instead of clicking "End Shift"),
+fanning that one register out into 8 permanently-disabled rows so nobody could ever start a new
+shift on it. The fix for this already existed in the app (`pos/shift-history`'s "Force Close"
+button, `api/pos/close_shift.php`) — verified live on `dev.bms.local` that force-closing a stuck
+shift correctly closes it, computes the cash difference, and frees the register. No code change was
+needed for the root cause itself; this was an operational/data-hygiene issue (cashiers not ending
+shifts), not a bug.
+
+**UI redesign requested on the same page:** converted the plain HTML table to the standard
+DataTable (`.claude/ui-constants.md` §UI-2 — `dom:'rtipB'`, hidden Excel export button, pagination),
+added a leading `S/No` column, replaced the two separate Z-Report/Force-Close buttons with the
+mandatory single gear+caret dropdown (§UI-5), and changed the header from `table-dark` (black) to
+the blue standard already used elsewhere in the codebase
+(`style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;"`, e.g. `app/bms/pos/meetings.php`). Mobile
+card view (`renderShiftCards`) and the force-close click handler were left untouched — only the
+desktop table markup and its init script changed. Verified on `dev.bms.local/pos/shift-history`:
+DataTable pagination/S-No/blue header render correctly, the gear dropdown opens with both menu
+items, and a real Force Close was executed end-to-end (confirmation dialog → API call → shift
+flipped to Closed with correct cash difference → stat cards updated → page still reloads clean).
+
 ## 2026-09-12 (fix) - Removed duplicate "Invoices" link from the Sales menu; Invoicing now bundled into the sellable Sales module instead of being free for every tenant
 
 **Files (modified):** `header.php`, `core/feature_registry.php`, `tests/test_feature_registry_cli.php`
