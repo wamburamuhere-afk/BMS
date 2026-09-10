@@ -1,5 +1,32 @@
 # BMS Changelog
 
+## 2026-09-11 (fix) - POS Price Groups: "Manage Prices" and "Edit" actions did nothing; table header didn't match sibling settings pages
+
+**Files (modified):** `app/bms/pos/price_groups.php`
+
+**User-reported:** "in 'pos/price-groups' it seems like in actions buttons its options is not
+working... just this 'manage prices' and 'edit'... also at the head of the table this color
+should be black as is now but as is in other pages."
+
+**Root cause:** both broken buttons built their `onclick="..."` attribute as
+`onclick="openPricesModal(<id>, <?= json_encode($g['name']) ?>)"` — `json_encode()` always
+wraps a string in double quotes (e.g. `"Retail"`), and since the surrounding HTML attribute
+was *also* double-quoted, the browser closed the attribute at that first embedded quote,
+silently truncating the handler into invalid, non-functional markup. This happened for
+every single row regardless of the group's name. "Deactivate/Activate" was unaffected
+because it only interpolates plain literals (no `json_encode()`). The same bug existed a
+second time in the mobile card view, which builds the identical attribute in JS via
+`` `onclick="editGroup(${JSON.stringify(g.name)})"` ``. Confirmed by comparing against the
+working `editRow` pattern already used on the sibling `departments.php` /
+`designations.php` pages, which avoid this by using a single-quoted `onclick='...'`
+attribute with `htmlspecialchars(json_encode(...), ENT_QUOTES)`.
+
+**Fix:** applied that same safe pattern to `openPricesModal()` and `editGroup()`'s two
+call sites (desktop dropdown + mobile card JS). Also changed the table header from
+`<thead class="table-dark">` (black) to `<thead class="table-light">`, matching the header
+style already used on every other small settings-list page in this module
+(`departments.php`, `designations.php`, `employment_types.php`, `company_calendar.php`).
+
 ## 2026-09-11 (fix) - App-wide sweep: no Project selector, filter, or menu item may appear anywhere unless BOTH the superadmin's module grant AND the tenant's own "Enable Projects Module" setting are on
 
 **Files (new):** none — all changes are to existing files.
