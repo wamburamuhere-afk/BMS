@@ -79,16 +79,18 @@ foreach ($shifts as $s) {
     </div>
 
     <div id="tableView">
-        <table class="table table-hover align-middle w-100">
-            <thead class="table-dark">
+        <table id="shiftHistoryTable" class="table table-hover align-middle w-100">
+            <thead style="--bs-table-color:#fff;--bs-table-bg:#0d6efd;">
                 <tr>
+                    <th class="text-center no-sort" style="width:56px;">S/No</th>
                     <th><?= t('Shift') ?></th><th><?= t('Register') ?></th><?php if ($can_view_all): ?><th><?= t('Cashier') ?></th><?php endif; ?>
-                    <th><?= t('Opened') ?></th><th><?= t('Closed') ?></th><th class="text-end"><?= t('Total Sales') ?></th><th class="text-end"><?= t('Difference') ?></th><th><?= t('Status') ?></th><th class="text-end"><?= t('Actions') ?></th>
+                    <th><?= t('Opened') ?></th><th><?= t('Closed') ?></th><th class="text-end"><?= t('Total Sales') ?></th><th class="text-end"><?= t('Difference') ?></th><th><?= t('Status') ?></th><th class="text-end no-sort no-export"><?= t('Actions') ?></th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($shifts as $s): $diff = (float)$s['cash_difference']; ?>
+                <?php $sno = 0; foreach ($shifts as $s): $sno++; $diff = (float)$s['cash_difference']; ?>
                 <tr>
+                    <td class="text-center"><?= $sno ?></td>
                     <td><?= safe_output($s['shift_code']) ?></td>
                     <td><?= safe_output($s['register_name'], '—') ?></td>
                     <?php if ($can_view_all): ?><td><?= safe_output($s['cashier_name']) ?></td><?php endif; ?>
@@ -100,24 +102,29 @@ foreach ($shifts as $s) {
                     </td>
                     <td><span class="badge bg-<?= $s['status'] === 'active' ? 'success' : 'secondary' ?>"><?= safe_output(ucfirst($s['status'])) ?></span></td>
                     <td class="text-end">
-                        <a class="btn btn-sm btn-outline-primary" href="<?= getUrl('pos/zreport') ?>?shift_id=<?= (int)$s['shift_id'] ?>" target="_blank">
-                            <i class="bi bi-file-earmark-text"></i> <?= t('Z-Report') ?>
-                        </a>
-                        <?php if ($can_view_all && $s['status'] === 'active' && (int)$s['user_id'] !== (int)$user_id): ?>
-                        <button type="button" class="btn btn-sm btn-outline-danger force-close-btn"
-                                data-shift-id="<?= (int)$s['shift_id'] ?>"
-                                data-shift-code="<?= htmlspecialchars($s['shift_code'], ENT_QUOTES) ?>"
-                                data-cashier="<?= htmlspecialchars($s['cashier_name'] ?? t('Unknown'), ENT_QUOTES) ?>"
-                                data-register="<?= htmlspecialchars($s['register_name'] ?? '—', ENT_QUOTES) ?>">
-                            <i class="bi bi-lock"></i> <?= t('Force Close') ?>
-                        </button>
-                        <?php endif; ?>
+                        <div class="dropdown d-flex justify-content-end">
+                            <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-gear-fill"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                                <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('pos/zreport') ?>?shift_id=<?= (int)$s['shift_id'] ?>" target="_blank"><i class="bi bi-file-earmark-text text-primary me-2"></i> <?= t('Z-Report') ?></a></li>
+                                <?php if ($can_view_all && $s['status'] === 'active' && (int)$s['user_id'] !== (int)$user_id): ?>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <button type="button" class="dropdown-item py-2 rounded text-danger force-close-btn"
+                                            data-shift-id="<?= (int)$s['shift_id'] ?>"
+                                            data-shift-code="<?= htmlspecialchars($s['shift_code'], ENT_QUOTES) ?>"
+                                            data-cashier="<?= htmlspecialchars($s['cashier_name'] ?? t('Unknown'), ENT_QUOTES) ?>"
+                                            data-register="<?= htmlspecialchars($s['register_name'] ?? '—', ENT_QUOTES) ?>">
+                                        <i class="bi bi-lock text-danger me-2"></i> <?= t('Force Close') ?>
+                                    </button>
+                                </li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
                     </td>
                 </tr>
                 <?php endforeach; ?>
-                <?php if (!$shifts): ?>
-                <tr><td colspan="9" class="text-center text-muted py-4"><?= t('No shifts found') ?></td></tr>
-                <?php endif; ?>
             </tbody>
         </table>
     </div>
@@ -163,7 +170,22 @@ function applyShiftView() {
     if (window.innerWidth < 768) { $('#tableView').addClass('d-none'); $('#cardView').removeClass('d-none'); }
     else { $('#tableView').removeClass('d-none'); $('#cardView').addClass('d-none'); }
 }
+let dtShiftHistory;
+
 $(document).ready(function () {
+    dtShiftHistory = $('#shiftHistoryTable').DataTable({
+        responsive: false,
+        scrollX: true,
+        pageLength: 25,
+        order: [],
+        dom: 'rtipB',
+        buttons: [
+            { extend: 'excelHtml5', className: 'd-none', filename: 'shift_history_<?= date('Y-m-d') ?>', exportOptions: { columns: ':not(.no-export)' } }
+        ],
+        columnDefs: [{ targets: 'no-sort', orderable: false }],
+        language: { emptyTable: T_NO_SHIFTS_FOUND, zeroRecords: T_NO_SHIFTS_FOUND }
+    });
+
     applyShiftView();
     $(window).on('resize', applyShiftView);
     const zreportBaseUrl = '<?= getUrl('pos/zreport') ?>';
