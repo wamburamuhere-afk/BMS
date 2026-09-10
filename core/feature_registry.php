@@ -226,7 +226,17 @@ if (!function_exists('bmsFeatureRegistry')) {
                 'description' => 'Project register, progress/financial reporting, sub-contractors, IPC and inspections.',
                 'default'     => true,
                 'sort_order'  => 80,
-                'page_keys'   => ['projects', 'user_projects'],
+                // 'user_projects' deliberately NOT owned by this feature
+                // (moved out 2026-09-09): app/constant/settings/user_projects.php
+                // is BOTH the project-scope assignment UI AND the Warehouse
+                // Access assignment UI on one combined page — gating the whole
+                // page on 'projects' made Warehouse Access unreachable too the
+                // moment a tenant switched Projects off, even though warehouse
+                // assignment has nothing to do with Projects. The page itself
+                // now does the finer-grained in-page check via
+                // tenantFeatureEnabled('projects') and hides only the
+                // project-specific sections; see that file's own comment.
+                'page_keys'   => ['projects'],
                 // sub_contractors.php/sub_contractor_details.php moved OUT of
                 // here — see the 'procurement' entry above. Before this fix, a
                 // tenant with Projects on and Procurement off would pass this

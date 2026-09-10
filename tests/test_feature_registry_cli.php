@@ -101,6 +101,11 @@ $documentedAlwaysOn = [
     'activity_log', 'add_user', 'admin', 'attendance_settings', 'audit_logs', 'backup_restore',
     'company_profile', 'edit_user', 'email_templates', 'login_history', 'notification_settings',
     'payment_settings', 'policy_management', 'profile', 'sms_templates', 'system_settings', 'users', 'user_roles',
+    // 2026-09-09: moved out of 'projects' — this page is ALSO the Warehouse
+    // Access assignment UI, which has nothing to do with Projects; the page
+    // itself now gates its project-specific sections via
+    // tenantFeatureEnabled('projects') instead of the whole page 404ing.
+    'user_projects',
 ];
 
 $liveUngated = [];
@@ -127,6 +132,24 @@ foreach (['dashboard', 'customers', 'products', 'invoices', 'chart_of_accounts',
           'trial_balance', 'balance_sheet', 'users', 'user_roles', 'system_settings'] as $baseKey) {
     ok("base page_key '$baseKey' belongs to no feature", featureForPageKey($baseKey) === []);
 }
+
+// Regression guard (2026-09-09): user_projects.php is BOTH the project-scope
+// assignment UI AND the Warehouse Access assignment UI on one combined page.
+// It used to be owned solely by the 'projects' feature, so switching Projects
+// off 404'd the whole page — including Warehouse Access, which has nothing to
+// do with Projects (warehouses matter to POS/Sales/Procurement regardless).
+// Explicit, readable assertion for this specific bug, on top of the bulk
+// coverage check in section 1b above.
+ok("'user_projects' belongs to no feature (reachable even with Projects off — it also does Warehouse Access)",
+   featureForPageKey('user_projects') === []);
+ok("tenantModuleAllowsPage('user_projects') is true even with every feature forced off",
+   (function () {
+       $prev = $GLOBALS['__bms_features'] ?? null;
+       $GLOBALS['__bms_features'] = array_fill_keys(allFeatureKeys(), false);
+       $result = tenantModuleAllowsPage('user_projects');
+       $GLOBALS['__bms_features'] = $prev;
+       return $result;
+   })());
 
 // ─────────────────────────────────────────────────────────────────────────────
 section('3. Resolution matrix — available x enabled x default x no-row');

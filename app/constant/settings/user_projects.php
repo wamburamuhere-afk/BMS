@@ -15,6 +15,21 @@
  *   - "Grant access to ALL warehouses" writes a single resource_id=NULL
  *     override row (loadUserScope() in core/project_scope.php already
  *     interprets that as unrestricted) and supersedes both checklists.
+ *
+ * ENTITLEMENT — this page is DELIBERATELY reachable even when the tenant's
+ * 'projects' module is switched off (core/feature_registry.php no longer
+ * lists 'user_projects' under that feature's page_keys). This page is not
+ * really a Projects page at all — it's the Warehouse Access assignment UI
+ * that happens to also assign project scope, and a company that switches
+ * Projects off still needs to grant its staff warehouse access (POS/Sales/
+ * Procurement all depend on Warehouses regardless of Projects). Instead of
+ * gating the whole page, $projectsEnabled below turns off only the
+ * project-specific sections in-page — same idiom as pos_config_settings.php
+ * wrapping its Registers/Loyalty sections in canView('pos_advanced'). Saving
+ * while disabled never touches the user_projects table at all, so any
+ * existing project-scope assignments are preserved untouched for if/when
+ * Projects is switched back on — matching the "switching it back on restores
+ * access unchanged" guarantee the entitlement system already makes elsewhere.
  */
 
 // scope-audit: skip — admin-only project assignment UI; intentionally shows all projects for assignment configuration
@@ -33,6 +48,11 @@ if (!isAdmin()) {
 }
 
 global $pdo;
+
+// See the file-level comment above — this is the ONE switch that hides the
+// project-specific sections (both here and in the JS below) while leaving
+// Warehouse Access fully functional.
+$projectsEnabled = function_exists('tenantFeatureEnabled') ? tenantFeatureEnabled('projects') : true;
 
 // ── AJAX: return user's current assignments as JSON ───────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'get_assignments') {
@@ -78,11 +98,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $pdo->beginTransaction();
 
-        $pdo->prepare("DELETE FROM user_projects WHERE user_id = ?")->execute([$user_id]);
-        if (!empty($project_ids)) {
-            $ins = $pdo->prepare("INSERT IGNORE INTO user_projects (user_id, project_id, assigned_by) VALUES (?, ?, ?)");
-            foreach ($project_ids as $pid) {
-                if ($pid > 0) $ins->execute([$user_id, $pid, $_SESSION['user_id']]);
+        // Skip entirely when Projects is off for this tenant — the JS never
+        // renders project checkboxes in that state, so $project_ids would
+        // always arrive empty here, and blindly running the delete would
+        // silently wipe out real assignments made before Projects was
+        // switched off. Leave the table untouched instead.
+        if ($projectsEnabled) {
+            $pdo->prepare("DELETE FROM user_projects WHERE user_id = ?")->execute([$user_id]);
+            if (!empty($project_ids)) {
+                $ins = $pdo->prepare("INSERT IGNORE INTO user_projects (user_id, project_id, assigned_by) VALUES (?, ?, ?)");
+                foreach ($project_ids as $pid) {
+                    if ($pid > 0) $ins->execute([$user_id, $pid, $_SESSION['user_id']]);
+                }
             }
         }
 
@@ -102,8 +129,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $pdo->commit();
 
-        logActivity($pdo, $_SESSION['user_id'], 'Updated Project Scope',
-            "user_id=$user_id projects=" . implode(',', $project_ids));
+        if ($projectsEnabled) {
+            logActivity($pdo, $_SESSION['user_id'], 'Updated Project Scope',
+                "user_id=$user_id projects=" . implode(',', $project_ids));
+        }
         $warehouseLogDetail = $grant_all_warehouses ? 'ALL' : implode(',', $warehouse_ids);
         logActivity($pdo, $_SESSION['user_id'], 'Updated Warehouse Access',
             "user_id=$user_id warehouses=$warehouseLogDetail");
@@ -122,10 +151,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $uname = $uStmt->fetchColumn() ?: "User #$user_id";
 
         $warehouseSummary = $grant_all_warehouses ? 'ALL warehouses' : (count($warehouse_ids) . ' warehouse(s)');
+        if ($projectsEnabled) {
+            $projectCountForResponse = count($project_ids);
+            $message = "Saved {$projectCountForResponse} project(s) and {$warehouseSummary} for {$uname}.";
+        } else {
+            // Untouched by this save — report the real, still-current count
+            // rather than 0, so the UI badge doesn't lie about assignments
+            // that still exist, just aren't editable while Projects is off.
+            $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM user_projects WHERE user_id = ?");
+            $cntStmt->execute([$user_id]);
+            $projectCountForResponse = (int)$cntStmt->fetchColumn();
+            $message = "Saved {$warehouseSummary} for {$uname}.";
+        }
         echo json_encode([
             'success' => true,
-            'message' => "Saved " . count($project_ids) . " project(s) and {$warehouseSummary} for {$uname}.",
-            'count'   => count($project_ids),
+            'message' => $message,
+            'count'   => $projectCountForResponse,
             'warehouse_count' => $grant_all_warehouses ? -1 : count($warehouse_ids),
         ]);
     } catch (Throwable $e) {
@@ -145,11 +186,14 @@ $roles = $pdo->query("
     ORDER BY r.role_name
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-$projects = $pdo->query("
+// Not loaded at all when Projects is off — nothing in the UI renders it in
+// that state, and there is no reason to pull project data into the page for
+// a tenant that does not have the module.
+$projects = $projectsEnabled ? $pdo->query("
     SELECT project_id, project_name, contract_number, status
     FROM projects
     ORDER BY project_name
-")->fetchAll(PDO::FETCH_ASSOC);
+")->fetchAll(PDO::FETCH_ASSOC) : [];
 
 // All active warehouses — embedded as JS data (project-linked + external
 // panels are both filtered client-side from this one list, same convention
@@ -193,8 +237,23 @@ require_once 'header.php';
     <!-- Page Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <h2><i class="bi bi-diagram-3"></i> Project Assignments</h2>
-            <p class="text-muted">Assign users to projects. Each user only sees data that belongs to their assigned projects.</p>
+            <h2><i class="bi bi-diagram-3"></i> <?= $projectsEnabled ? 'Project & Warehouse Access' : 'Warehouse Access' ?></h2>
+            <p class="text-muted">
+                <?= $projectsEnabled
+                    ? 'Assign users to projects and warehouses. Each user only sees data that belongs to their assigned projects/warehouses.'
+                    : 'Assign users to warehouses.' ?>
+            </p>
+            <?php if (!$projectsEnabled): ?>
+            <div class="alert alert-info d-flex align-items-start gap-2 mb-0">
+                <i class="bi bi-info-circle fs-5"></i>
+                <div>
+                    <strong>Projects module is off for this company.</strong>
+                    Project-scope assignment is hidden below — Warehouse Access is unaffected and works
+                    normally. Any project assignments made before Projects was switched off are kept
+                    untouched and will reappear here the moment it's switched back on.
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -319,6 +378,10 @@ require_once 'header.php';
     const ALL_PROJECTS   = <?= json_encode(array_values($projects),  JSON_HEX_TAG) ?>;
     const ALL_WAREHOUSES = <?= json_encode(array_values($warehouses), JSON_HEX_TAG) ?>;
     const SAVE_URL     = '<?= buildUrl('user_projects') ?>';
+    // Drives every project-specific section below — see the file-level
+    // comment at the top of this file for why the whole page stays reachable
+    // instead of 404ing when Projects is off.
+    const PROJECTS_ENABLED = <?= $projectsEnabled ? 'true' : 'false' ?>;
 
     let selectedUserId   = null;
     let selectedUserName = '';
@@ -407,7 +470,9 @@ require_once 'header.php';
         selectedUserName = userName;
 
         document.getElementById('col3-heading').textContent = userName;
-        document.getElementById('col3-actions').classList.remove('d-none');
+        // Projects All/None buttons are meaningless with no project
+        // checkboxes to act on — never shown while Projects is off.
+        document.getElementById('col3-actions').classList.toggle('d-none', !PROJECTS_ENABLED);
         document.getElementById('saveBar').classList.remove('d-none');
         document.getElementById('saveBar').style.display = 'flex';
 
@@ -445,7 +510,9 @@ require_once 'header.php';
     function renderProjects(panel, assignedProjectSet, grantAllWarehouses) {
         let html = '<div class="p-3">';
 
-        if (!ALL_PROJECTS.length) {
+        if (!PROJECTS_ENABLED) {
+            html += `<div class="text-center text-muted py-3"><i class="bi bi-slash-circle d-block fs-4 mb-1"></i>Projects module is off for this company.</div>`;
+        } else if (!ALL_PROJECTS.length) {
             html += `<div class="text-center text-muted py-3">No projects in the system yet.</div>`;
         } else {
             html += '<div class="row g-2">';
@@ -476,15 +543,28 @@ require_once 'header.php';
             <div class="form-check form-switch mb-3">
                 <input class="form-check-input" type="checkbox" id="grantAllWarehousesChk" ${grantAllWarehouses ? 'checked' : ''}>
                 <label class="form-check-label fw-bold" for="grantAllWarehousesChk">Grant access to ALL warehouses</label>
-                <div class="form-text">Overrides the two lists below — use for roles that need to see every warehouse (e.g. Managing Director).</div>
+                <div class="form-text">Overrides the list(s) below — use for roles that need to see every warehouse (e.g. Managing Director).</div>
             </div>
-            <div id="warehouseListsWrap">
+            <div id="warehouseListsWrap">`;
+
+        if (PROJECTS_ENABLED) {
+            html += `
                 <div class="mb-1"><small class="text-muted fw-bold text-uppercase">Assign Project &amp; its Warehouses</small></div>
                 <p class="text-muted small mb-2">Tick a project above to reveal its own warehouses here.</p>
                 <div id="projectWarehousesPanel" class="row g-2 mb-3"></div>
                 <div class="mb-1"><small class="text-muted fw-bold text-uppercase">Assign External Warehouse</small></div>
                 <p class="text-muted small mb-2">Warehouses not tied to any project.</p>
-                <div id="externalWarehousesPanel" class="row g-2"></div>
+                <div id="externalWarehousesPanel" class="row g-2"></div>`;
+        } else {
+            // No project concept in play at all — every warehouse is just
+            // directly assignable, one flat list.
+            html += `
+                <div class="mb-1"><small class="text-muted fw-bold text-uppercase">Assign Warehouse</small></div>
+                <p class="text-muted small mb-2">Tick which warehouses this user may access.</p>
+                <div id="externalWarehousesPanel" class="row g-2"></div>`;
+        }
+
+        html += `
             </div>
         </div>`;
 
@@ -510,7 +590,7 @@ require_once 'header.php';
             updateSaveHint();
         });
 
-        refreshProjectWarehouses();
+        if (PROJECTS_ENABLED) refreshProjectWarehouses();
         renderExternalWarehouses();
         document.getElementById('grantAllWarehousesChk').dispatchEvent(new Event('change'));
         updateSaveHint();
@@ -543,9 +623,11 @@ require_once 'header.php';
     function renderExternalWarehouses() {
         const container = document.getElementById('externalWarehousesPanel');
         if (!container) return;
-        const list = ALL_WAREHOUSES.filter(w => !w.project_id);
+        // With Projects off there is no project/external distinction at all
+        // — every warehouse is just directly assignable.
+        const list = PROJECTS_ENABLED ? ALL_WAREHOUSES.filter(w => !w.project_id) : ALL_WAREHOUSES;
         if (!list.length) {
-            container.innerHTML = `<div class="col-12 text-muted small fst-italic">No external (unassigned-to-project) warehouses exist.</div>`;
+            container.innerHTML = `<div class="col-12 text-muted small fst-italic">${PROJECTS_ENABLED ? 'No external (unassigned-to-project) warehouses exist.' : 'No warehouses exist yet.'}</div>`;
             return;
         }
         container.innerHTML = list.map(w => warehouseCheckboxHtml(w, 'ewh')).join('');
@@ -583,11 +665,15 @@ require_once 'header.php';
     }
 
     function updateSaveHint() {
-        const pChecked = document.querySelectorAll('.project-chk:checked').length;
-        const pTotal   = document.querySelectorAll('.project-chk').length;
         const grantAll = document.getElementById('grantAllWarehousesChk')?.checked;
         const wChecked = document.querySelectorAll('.warehouse-chk:checked').length;
         const warehouseText = grantAll ? 'ALL warehouses' : `${wChecked} warehouse(s)`;
+        if (!PROJECTS_ENABLED) {
+            document.getElementById('saveHint').textContent = `${warehouseText} selected.`;
+            return;
+        }
+        const pChecked = document.querySelectorAll('.project-chk:checked').length;
+        const pTotal   = document.querySelectorAll('.project-chk').length;
         document.getElementById('saveHint').textContent =
             `${pChecked} of ${pTotal} project(s) selected · ${warehouseText} selected.`;
     }
