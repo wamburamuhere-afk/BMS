@@ -138,6 +138,21 @@ if (!function_exists('_sp_already_posted')) {
     }
 }
 
+if (!function_exists('_sp_sale_warehouse_id')) {
+    /**
+     * A POS return is ALSO a pos_sales row (is_return_sale=1, original_sale_id set),
+     * so this one lookup covers both postPosSale() and postPosReturn() — neither
+     * function's external signature needs to change to carry a warehouse through.
+     */
+    function _sp_sale_warehouse_id(PDO $pdo, int $saleId): ?int
+    {
+        $s = $pdo->prepare("SELECT warehouse_id FROM pos_sales WHERE sale_id = ?");
+        $s->execute([$saleId]);
+        $v = $s->fetchColumn();
+        return ($v !== false && $v !== null) ? (int)$v : null;
+    }
+}
+
 if (!function_exists('postPosSale')) {
     /**
      * IN-5 — post a completed POS sale's revenue + COGS. Never throws.
@@ -154,6 +169,7 @@ if (!function_exists('postPosSale')) {
 
         $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$date) ? substr((string)$date, 0, 10) : date('Y-m-d');
         $pid  = ($projectId !== null && $projectId !== 0) ? (int)$projectId : null;
+        $whId = _sp_sale_warehouse_id($pdo, $saleId);
         $tax  = round($tax, 2); if ($tax < 0 || $tax > $grandTotal) $tax = 0.0;
         $cashPaid = round(max(0.0, $cashPaid), 2);
         $balanceDue = round(max(0.0, $balanceDue), 2);
@@ -188,7 +204,7 @@ if (!function_exists('postPosSale')) {
                     $lines[] = ['account_id' => (int)$rev, 'type' => 'credit', 'amount' => $grandTotal, 'description' => 'POS sales revenue'];
                 }
                 try {
-                    postLedgerEntry($pdo, $desc, $lines, $pid, $saleId, 'pos_sale', $date, $userId);
+                    postLedgerEntry($pdo, $desc, $lines, $pid, $saleId, 'pos_sale', $date, $userId, $whId);
                     $out['revenue'] = true;
                 } catch (Throwable $e) {
                     error_log("postPosSale revenue failed (sale $saleId): " . $e->getMessage());
@@ -207,7 +223,7 @@ if (!function_exists('postPosSale')) {
                     postLedgerEntry($pdo, "$desc — cost of goods sold", [
                         ['account_id' => (int)$cogsAcc, 'type' => 'debit',  'amount' => $cogs, 'description' => 'COGS'],
                         ['account_id' => (int)$invAcc,  'type' => 'credit', 'amount' => $cogs, 'description' => 'Inventory reduction'],
-                    ], $pid, $saleId, 'pos_cogs', $date, $userId);
+                    ], $pid, $saleId, 'pos_cogs', $date, $userId, $whId);
                     $out['cogs'] = true;
                 } catch (Throwable $e) {
                     error_log("postPosSale COGS failed (sale $saleId): " . $e->getMessage());
@@ -237,6 +253,7 @@ if (!function_exists('postPosReturn')) {
         if ($returnId <= 0 || $refundGross <= 0) { $out['reason'] = 'no_return'; return $out; }
         $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$date) ? substr((string)$date, 0, 10) : date('Y-m-d');
         $pid  = ($projectId !== null && $projectId !== 0) ? (int)$projectId : null;
+        $whId = _sp_sale_warehouse_id($pdo, $returnId);
         $refundTax = round($refundTax, 2); if ($refundTax < 0 || $refundTax > $refundGross) $refundTax = 0.0;
         $netReturn = round($refundGross - $refundTax, 2);
         $desc = "POS return " . ($reference ?: ('#' . $returnId));
@@ -251,7 +268,7 @@ if (!function_exists('postPosReturn')) {
                 $lines = [['account_id' => (int)$sr, 'type' => 'debit', 'amount' => ($vat ? $netReturn : $refundGross), 'description' => 'Sales return']];
                 if ($vat && $refundTax > 0) $lines[] = ['account_id' => (int)$vat, 'type' => 'debit', 'amount' => $refundTax, 'description' => 'Output VAT reversal'];
                 $lines[] = ['account_id' => (int)$cash, 'type' => 'credit', 'amount' => $refundGross, 'description' => 'Refund'];
-                try { postLedgerEntry($pdo, $desc, $lines, $pid, $returnId, 'pos_return', $date, $userId); $out['revenue'] = true; }
+                try { postLedgerEntry($pdo, $desc, $lines, $pid, $returnId, 'pos_return', $date, $userId, $whId); $out['revenue'] = true; }
                 catch (Throwable $e) { error_log("postPosReturn revenue failed (return $returnId): " . $e->getMessage()); $out['reason'] = 'return_post_error'; }
             }
         } else { $out['revenue'] = true; }
@@ -264,7 +281,7 @@ if (!function_exists('postPosReturn')) {
                     postLedgerEntry($pdo, "$desc — restock", [
                         ['account_id' => (int)$invAcc,  'type' => 'debit',  'amount' => $restockCost, 'description' => 'Inventory restocked'],
                         ['account_id' => (int)$cogsAcc, 'type' => 'credit', 'amount' => $restockCost, 'description' => 'COGS reversal'],
-                    ], $pid, $returnId, 'pos_return_cogs', $date, $userId);
+                    ], $pid, $returnId, 'pos_return_cogs', $date, $userId, $whId);
                     $out['cogs'] = true;
                 } catch (Throwable $e) { error_log("postPosReturn COGS failed (return $returnId): " . $e->getMessage()); }
             }
@@ -337,11 +354,15 @@ if (!function_exists('postCreditNoteRestock')) {
 
         $date = preg_match('/^\d{4}-\d{2}-\d{2}/', (string)$date) ? substr((string)$date, 0, 10) : date('Y-m-d');
         $pid  = ($projectId !== null && $projectId !== 0) ? (int)$projectId : null;
+        $whStmt = $pdo->prepare("SELECT i.warehouse_id FROM credit_notes cn JOIN invoices i ON cn.invoice_id = i.invoice_id WHERE cn.credit_note_id = ?");
+        $whStmt->execute([$creditNoteId]);
+        $whVal = $whStmt->fetchColumn();
+        $whId = ($whVal !== false && $whVal !== null) ? (int)$whVal : null;
         try {
             $entry = postLedgerEntry($pdo, "Credit note #$creditNoteId — restock (customer return)", [
                 ['account_id' => (int)$invAcc,  'type' => 'debit',  'amount' => $restockCost, 'description' => 'Inventory restocked (customer return)'],
                 ['account_id' => (int)$cogsAcc, 'type' => 'credit', 'amount' => $restockCost, 'description' => 'COGS reversal (customer return)'],
-            ], $pid, $creditNoteId, 'credit_note_cogs', $date, $userId);
+            ], $pid, $creditNoteId, 'credit_note_cogs', $date, $userId, $whId);
             $out['posted'] = true; $out['reason'] = 'posted'; $out['entry_id'] = $entry;
         } catch (Throwable $e) {
             error_log("postCreditNoteRestock failed (credit note $creditNoteId): " . $e->getMessage());

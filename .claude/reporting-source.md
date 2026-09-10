@@ -10,7 +10,7 @@ statement.
 
 | Table | Role |
 |---|---|
-| `journal_entries` | **Header** — one row per posted event (date, status, source link). |
+| `journal_entries` | **Header** — one row per posted event (date, status, source link, `project_id`, `warehouse_id`). |
 | `journal_entry_items` | **Lines** — the actual `Dr`/`Cr` legs (`type`, `amount`, `account_id`). The Dr/Cr truth. |
 | `accounts` | Names/types/hierarchy each line rolls up into (Assets, Liabilities, Equity, Income, Expense, COGS…). |
 
@@ -26,6 +26,16 @@ Trial Balance sums; the header holds **date + status + source**.
 4. **Project scope:** apply the standard `scopeFilterSqlNullable('project', 'je')` for non-admins
    (see `.claude/security.md` §23).
 5. A figure's **sign/normal side** comes from `accounts.normal_balance` / `account_type`.
+6. **Warehouse scope (2026-09-11):** `journal_entries.warehouse_id` is populated by
+   `postLedgerEntry()` for the transaction types that genuinely have one — POS sales/
+   returns, invoices, supplier/subcontractor bills, purchase returns, stock
+   adjustments (via `core/sales_posting.php`, `revenue_posting.php`,
+   `purchase_posting.php`, `stock_posting.php`). It stays `NULL` for company-wide
+   entries (payroll, manual journals, asset postings, generic bill
+   payments/refunds) — same discipline as `project_id` already follows. Apply
+   `scopeFilterSqlNullable('warehouse', 'je')` for the default (non-admin) view, or
+   pass an explicit `$warehouseId` (after `userCan('warehouse', $id)`) to narrow to
+   one warehouse — every `gl*` function below accepts it as its last parameter.
 
 ### Canonical join (copy this shape)
 ```sql
@@ -34,6 +44,8 @@ FROM journal_entry_items jei
 JOIN journal_entries je ON je.entry_id = jei.entry_id AND je.status = 'posted'
 JOIN accounts        a  ON a.account_id = jei.account_id
 WHERE je.entry_date <= :as_of            -- or BETWEEN :from AND :to
+  -- AND je.project_id = :pid            -- optional, one project chosen
+  -- AND je.warehouse_id = :wid          -- optional, one warehouse chosen
 GROUP BY a.account_id, jei.type;
 ```
 
@@ -44,10 +56,10 @@ ledger. Call these, don't hand-roll SQL:
 
 | Report | Function |
 |---|---|
-| Trial Balance | `glTrialBalance($pdo, $asOf, $projectId, $includeOpening, $scopeSql)` |
-| Income Statement (P&L) | `glProfitLoss($pdo, $from, $to, $projectId, $scopeSql)` |
-| Balance Sheet | `glBalanceSheet($pdo, $asOf, $projectId, $includeOpening, $scopeSql)` |
-| Cash Flow | `glCashFlow($pdo, $from, $to, $projectId, $scopeSql)` |
+| Trial Balance | `glTrialBalance($pdo, $asOf, $projectId, $includeOpening, $scopeSql, $warehouseId)` |
+| Income Statement (P&L) | `glProfitLoss($pdo, $from, $to, $projectId, $scopeSql, $warehouseId)` |
+| Balance Sheet | `glBalanceSheet($pdo, $asOf, $projectId, $includeOpening, $scopeSql, $warehouseId)` |
+| Cash Flow | `glCashFlow($pdo, $from, $to, $projectId, $scopeSql, $warehouseId)` |
 | Guardrail | `assertLedgerBalanced($pdo, $asOf)` — asserts Σ Dr = Σ Cr; run after posting/important reports. |
 
 ## Tracing an event back to its source

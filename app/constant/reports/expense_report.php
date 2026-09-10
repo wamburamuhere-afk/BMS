@@ -18,12 +18,15 @@ if (function_exists('autoEnforcePermission')) {
     autoEnforcePermission('expense_report');
 }
 
-// In-scope projects (expenses carry project_id).
-$projects = $pdo->query(
+// In-scope projects (expenses carry project_id). Empty when the Projects
+// module is off for this tenant — a switched-off module never deletes
+// existing rows, so without this guard the dropdown would keep offering stale
+// projects the tenant can no longer use at all.
+$projects = tenantFeatureEnabled('projects') ? $pdo->query(
     "SELECT project_id, project_name FROM projects
       WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
       ORDER BY project_name ASC"
-)->fetchAll(PDO::FETCH_ASSOC);
+)->fetchAll(PDO::FETCH_ASSOC) : [];
 
 // Expense-account dropdown source.
 $expense_accounts = $pdo->query("

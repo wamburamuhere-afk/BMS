@@ -6,6 +6,7 @@
 ob_start();
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../helpers.php';
+require_once __DIR__ . '/../../../core/project_scope.php';
 
 includeHeader();
 
@@ -20,6 +21,38 @@ $as_of_date = $_GET['as_of_date'] ?? date('Y-m-d');
 $format = (($_GET['format'] ?? 'british') === 'european') ? 'european' : 'british';
 $company_name = get_setting('company_name') ?: 'Business Management System';
 $company_logo = get_setting('company_logo');
+
+// 2026-09-11: Project + Warehouse filtering (security.md §23) — this report used
+// to read the WHOLE ledger with no project/warehouse boundary at all, unlike
+// every other GL-derived report. A specific choice binds je.project_id/
+// warehouse_id = N; otherwise non-admins default-scope to "assigned OR untagged".
+$project_id   = isset($_GET['project_id'])   && $_GET['project_id']   !== '' ? (int)$_GET['project_id']   : null;
+$warehouse_id = isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '' ? (int)$_GET['warehouse_id'] : null;
+if ($project_id !== null && !userCan('project', $project_id)) {
+    http_response_code(403);
+    die('Access denied: this project is not in your assigned scope.');
+}
+if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
+    http_response_code(403);
+    die('Access denied: this warehouse is not in your assigned scope.');
+}
+$bs_je_scope = ($project_id !== null ? " AND je.project_id = " . (int)$project_id : scopeFilterSqlNullable('project', 'je'))
+             . ($warehouse_id !== null ? " AND je.warehouse_id = " . (int)$warehouse_id : scopeFilterSqlNullable('warehouse', 'je'));
+
+// Same "always reachable, empty when the module is off" guard as
+// get_projects_for_filter.php / get_warehouses_for_filter.php — a switched-off
+// module never deletes existing rows, so without this the dropdowns would keep
+// showing stale options the tenant can no longer use.
+$bs_projects = tenantFeatureEnabled('projects') ? $pdo->query(
+    "SELECT project_id, project_name FROM projects
+      WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
+      ORDER BY project_name ASC"
+)->fetchAll(PDO::FETCH_ASSOC) : [];
+$bs_warehouses = tenantFeatureEnabled('warehouses') ? $pdo->query(
+    "SELECT warehouse_id, warehouse_name, project_id FROM warehouses
+      WHERE status = 'active' " . scopeFilterSql('warehouse', 'warehouses') . "
+      ORDER BY warehouse_name ASC"
+)->fetchAll(PDO::FETCH_ASSOC) : [];
 
 /**
  * Accounting formatting for numbers
@@ -92,6 +125,7 @@ try {
                ON jei.entry_id = je.entry_id
               AND je.entry_date <= ?
               AND je.status = 'posted'
+              $bs_je_scope
         WHERE at.category IN ('asset','liability','equity')
           -- Same inclusion rule as core/financial_reports.php::_gl_account_activity():
           -- an account must count here whenever it carries a real balance, not only
@@ -210,6 +244,7 @@ try {
                 ON je.entry_id = jei.entry_id
                AND je.entry_date <= ?
                AND je.status = 'posted'
+               $bs_je_scope
              WHERE a.account_type_id IN ($ph)
                -- Same inclusion rule as the assets/liabilities/equity query above and
                -- core/financial_reports.php::_gl_account_activity() — a deactivated
@@ -274,15 +309,31 @@ try {
                         </div>
                         <h6 class="mb-0 fw-bold text-dark d-none d-lg-block">Report Period</h6>
                     </div>
-                    <form method="GET" class="d-flex align-items-center gap-2">
+                    <form method="GET" class="d-flex align-items-center gap-2 flex-wrap">
                         <input type="hidden" name="format" value="<?= $format ?>">
                         <div class="input-group input-group-sm report-date-picker">
                             <span class="input-group-text bg-white border-end-0 text-muted">As Of</span>
                             <input type="date" name="as_of_date" class="form-control border-start-0 ps-0" value="<?= $as_of_date ?>" style="width: 150px;">
-                            <button type="submit" class="btn btn-primary px-3 fw-bold">
-                                <i class="bi bi-arrow-clockwise me-1"></i> Update
-                            </button>
                         </div>
+                        <?php if (!empty($bs_projects)): ?>
+                        <select name="project_id" id="bs-project" class="form-select form-select-sm" style="width: 170px;" onchange="bsFilterWarehouses()">
+                            <option value="">All Projects</option>
+                            <?php foreach ($bs_projects as $p): ?>
+                            <option value="<?= (int)$p['project_id'] ?>" <?= $project_id === (int)$p['project_id'] ? 'selected' : '' ?>><?= safe_output($p['project_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php endif; ?>
+                        <?php if (!empty($bs_warehouses)): ?>
+                        <select name="warehouse_id" id="bs-warehouse" class="form-select form-select-sm" style="width: 170px;">
+                            <option value="">All Warehouses</option>
+                            <?php foreach ($bs_warehouses as $w): ?>
+                            <option value="<?= (int)$w['warehouse_id'] ?>" data-project="<?= (int)($w['project_id'] ?? 0) ?>" <?= $warehouse_id === (int)$w['warehouse_id'] ? 'selected' : '' ?>><?= safe_output($w['warehouse_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php endif; ?>
+                        <button type="submit" class="btn btn-primary px-3 fw-bold">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Update
+                        </button>
                     </form>
                     <!-- Format toggle: European (horizontal) | British (vertical) -->
                     <div class="btn-group btn-group-sm shadow-sm" role="group" aria-label="Balance sheet format">
@@ -650,6 +701,26 @@ try {
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
+// Narrows the Warehouse dropdown to the chosen project's own linked warehouses
+// + any warehouse not tied to a project — client-side only (no AJAX needed,
+// the full option list was already rendered server-side).
+function bsFilterWarehouses() {
+    const projectSel = document.getElementById('bs-project');
+    const whSel = document.getElementById('bs-warehouse');
+    if (!projectSel || !whSel) return;
+    const chosen = projectSel.value;
+    let sawSelected = false;
+    Array.from(whSel.options).forEach(opt => {
+        if (!opt.value) { opt.hidden = false; return; }
+        const optProject = opt.getAttribute('data-project') || '0';
+        const visible = !chosen || optProject === '0' || optProject === chosen;
+        opt.hidden = !visible;
+        if (visible && opt.selected) sawSelected = true;
+    });
+    if (!sawSelected) whSel.value = '';
+}
+document.addEventListener('DOMContentLoaded', bsFilterWarehouses);
+
 function exportToPDF() {
     const element = document.getElementById('reportContent');
     const opt = {

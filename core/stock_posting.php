@@ -51,6 +51,11 @@ if (!function_exists('postStockAdjustmentGl')) {
 
         if (!$inventoryId || !$equityId) return; // accounts not configured
 
+        $whStmt = $pdo->prepare("SELECT warehouse_id FROM stock_movements WHERE movement_id = ?");
+        $whStmt->execute([$movementId]);
+        $whVal = $whStmt->fetchColumn();
+        $warehouseId = ($whVal !== false && $whVal !== null) ? (int)$whVal : null;
+
         $amount = round(abs($quantity) * $unitCost, 2);
         if ($amount <= 0.0) return; // zero-value adjustment — nothing to post
 
@@ -75,7 +80,7 @@ if (!function_exists('postStockAdjustmentGl')) {
                 ['account_id' => $inventoryId, 'type' => 'credit', 'amount' => $amount],
               ];
 
-        postLedgerEntry($pdo, $desc, $lines, $projectId, $movementId, 'stock_adjustment', $date, $userId);
+        postLedgerEntry($pdo, $desc, $lines, $projectId, $movementId, 'stock_adjustment', $date, $userId, $warehouseId);
     }
 }
 
@@ -101,7 +106,7 @@ if (!function_exists('reverseStockAdjustmentGl')) {
         string $refNum
     ): void {
         $stmt = $pdo->prepare("
-            SELECT je.project_id, jei.account_id, jei.type, jei.amount
+            SELECT je.project_id, je.warehouse_id, jei.account_id, jei.type, jei.amount
               FROM journal_entries je
               JOIN journal_entry_items jei ON jei.entry_id = je.entry_id
              WHERE je.entity_type = 'stock_adjustment'
@@ -114,7 +119,8 @@ if (!function_exists('reverseStockAdjustmentGl')) {
 
         if (empty($origLines)) return; // nothing posted — skip (pre-feature row)
 
-        $projectId     = $origLines[0]['project_id'] ? (int)$origLines[0]['project_id'] : null;
+        $projectId     = $origLines[0]['project_id']   ? (int)$origLines[0]['project_id']   : null;
+        $warehouseId   = $origLines[0]['warehouse_id'] ? (int)$origLines[0]['warehouse_id'] : null;
         $reversalLines = [];
         foreach ($origLines as $l) {
             $reversalLines[] = [
@@ -132,7 +138,8 @@ if (!function_exists('reverseStockAdjustmentGl')) {
             $movementId,
             'stock_adjustment_void',
             date('Y-m-d'),
-            $userId
+            $userId,
+            $warehouseId
         );
     }
 }

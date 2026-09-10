@@ -11,11 +11,14 @@ includeHeader();
 
 autoEnforcePermission('tax_report');
 
-$projects = $pdo->query(
+// Empty when the Projects module is off for this tenant — a switched-off
+// module never deletes existing rows, so without this guard the dropdown
+// would keep offering stale projects the tenant can no longer use at all.
+$projects = tenantFeatureEnabled('projects') ? $pdo->query(
     "SELECT project_id, project_name FROM projects
       WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
       ORDER BY project_name ASC"
-)->fetchAll(PDO::FETCH_ASSOC);
+)->fetchAll(PDO::FETCH_ASSOC) : [];
 
 $date_from = $_GET['date_from'] ?? date('Y-01-01');
 $date_to   = $_GET['date_to']   ?? date('Y-12-31');
