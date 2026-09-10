@@ -554,3 +554,53 @@ if (!function_exists('_scope_distinct_ids')) {
         }
     }
 }
+
+if (!function_exists('projectsModuleActive')) {
+    /**
+     * 2026-09-12 — the single source of truth for "can this tenant use
+     * Projects at all right now?"
+     *
+     * Two INDEPENDENT flags existed before this helper, and most of the
+     * ~25 pages with a Project field checked only one of them (or neither):
+     *   1. tenantFeatureEnabled('projects') — the SUPERADMIN platform grant
+     *      (Tenants -> Modules). Authoritative: a tenant must never be able
+     *      to see Projects UI the platform has switched off for them.
+     *   2. get_setting('enable_projects') — the TENANT's own "Enable Projects
+     *      Module" checkbox (Settings -> System Settings). A tenant's own
+     *      preference to not use Projects even though the platform allows it.
+     *
+     * Both must be true. #1 can only ever narrow #2, never the reverse — a
+     * tenant flipping their own setting back on can't resurrect a module the
+     * platform revoked. Every Project selector/filter in the app must gate on
+     * THIS function (or projectsForSelect() below), not on either flag alone.
+     */
+    function projectsModuleActive(): bool
+    {
+        if (!tenantFeatureEnabled('projects')) return false;
+        return (string)get_setting('enable_projects', '0') === '1';
+    }
+}
+
+if (!function_exists('projectsForSelect')) {
+    /**
+     * The Project list for a <select>/Select2 picker — empty array whenever
+     * projectsModuleActive() is false, so every caller's dropdown naturally
+     * has nothing to offer instead of leaking stale rows from a module the
+     * tenant can no longer use. Callers should still wrap the dropdown's own
+     * markup in `if (projectsModuleActive())` so the FIELD disappears too,
+     * not just its options.
+     *
+     * @param bool $activeOnly Exclude archived projects (default, matches
+     *                         every existing call site's own WHERE clause).
+     */
+    function projectsForSelect(PDO $pdo, bool $activeOnly = true): array
+    {
+        if (!projectsModuleActive()) return [];
+        $statusSql = $activeOnly ? "(status != 'archived' OR status IS NULL)" : '1=1';
+        return $pdo->query(
+            "SELECT project_id, project_name FROM projects
+              WHERE $statusSql " . scopeFilterSql('project', 'projects') . "
+           ORDER BY project_name ASC"
+        )->fetchAll(PDO::FETCH_ASSOC);
+    }
+}

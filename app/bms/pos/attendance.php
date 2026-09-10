@@ -58,12 +58,10 @@ $selected_employee = isset($_GET['employee']) ? (int)$_GET['employee'] : null;
 // regardless of whether the visitor arrived here from that project or not.
 $back_to_project_id = null;
 $back_to_project_name = null;
-$enable_projects = 0;
-try {
-    $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'enable_projects'");
-    $stmt->execute();
-    $enable_projects = $stmt->fetchColumn() ?: 0;
-} catch (Exception $e) {}
+// $enable_projects reflects BOTH the superadmin's platform grant AND the
+// tenant's own "Enable Projects Module" setting; see projectsModuleActive()
+// (core/project_scope.php).
+$enable_projects = projectsModuleActive() ? 1 : 0;
 if ($enable_projects && $selected_employee) {
     $stmt = $pdo->prepare("
         SELECT p.project_id, p.project_name

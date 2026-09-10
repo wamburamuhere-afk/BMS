@@ -14,7 +14,7 @@ require_once __DIR__ . '/../roots.php';
 require_once __DIR__ . '/../core/project_scope.php';
 global $pdo;
 
-if (!isAuthenticated()) {
+if (!isAuthenticated() || !projectsModuleActive()) {
     echo json_encode(['results' => []]);
     exit;
 }

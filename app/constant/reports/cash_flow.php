@@ -24,6 +24,10 @@ $company_name = get_setting('company_name') ?: 'Business Management System';
 // warehouse_id = N; otherwise non-admins default-scope to "assigned OR untagged".
 $project_id   = isset($_GET['project_id'])   && $_GET['project_id']   !== '' ? (int)$_GET['project_id']   : null;
 $warehouse_id = isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '' ? (int)$_GET['warehouse_id'] : null;
+// A switched-off Projects module must win over even a hand-crafted
+// ?project_id= — neutralise it here so the data itself stops being
+// filterable by project, not just the dropdown that offers it.
+if (!projectsModuleActive()) $project_id = null;
 if ($project_id !== null && !userCan('project', $project_id)) {
     http_response_code(403);
     die('Access denied: this project is not in your assigned scope.');
@@ -35,11 +39,9 @@ if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
 $cf_je_scope = ($project_id !== null ? " AND je.project_id = " . (int)$project_id : scopeFilterSqlNullable('project', 'je'))
              . ($warehouse_id !== null ? " AND je.warehouse_id = " . (int)$warehouse_id : scopeFilterSqlNullable('warehouse', 'je'));
 
-$cf_projects = tenantFeatureEnabled('projects') ? $pdo->query(
-    "SELECT project_id, project_name FROM projects
-      WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
-      ORDER BY project_name ASC"
-)->fetchAll(PDO::FETCH_ASSOC) : [];
+// Empty when Projects isn't active for this tenant — see
+// projectsModuleActive() (core/project_scope.php).
+$cf_projects = projectsForSelect($pdo);
 $cf_warehouses = tenantFeatureEnabled('warehouses') ? $pdo->query(
     "SELECT warehouse_id, warehouse_name, project_id FROM warehouses
       WHERE status = 'active' " . scopeFilterSql('warehouse', 'warehouses') . "

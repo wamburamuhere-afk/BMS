@@ -37,6 +37,13 @@ function warehouseMatchesProject(projectId, warehouseProjectId) {
 }
 
 function filterWarehousesForProject(warehouses, projectId) {
+    // 2026-09-12: `projectId === undefined` means the caller read `.val()` off
+    // a project selector that doesn't exist in the DOM at all (Projects
+    // module off for this tenant) — distinct from an existing-but-empty
+    // field (null/''), which means "no project chosen yet" and correctly
+    // filters to unassigned-only warehouses. With no Projects concept for
+    // this tenant at all, every warehouse must stay visible.
+    if (projectId === undefined) return warehouses || [];
     return (warehouses || []).filter(function (w) {
         return warehouseMatchesProject(projectId, w.project_id);
     });
@@ -49,8 +56,22 @@ function bindWarehouseToProject(opts) {
     const onFiltered   = opts.onFiltered || null;
 
     function apply(isInitial) {
-        const projectId = $(projectSel).val();
+        const $proj = $(projectSel);
         const $wh = $(warehouseSel);
+
+        // 2026-09-12: when the Projects module is off for this tenant, the
+        // project selector doesn't exist in the DOM at all (not just empty) —
+        // $proj.val() would then be `undefined`, which warehouseMatchesProject()
+        // treats the same as "no project selected" and hides every
+        // project-linked warehouse. That's correct when a project field
+        // exists and is genuinely blank, but wrong here: with no Projects
+        // concept for this tenant at all, every warehouse must stay visible.
+        if ($proj.length === 0) {
+            $wh.find('option').show();
+            return;
+        }
+
+        const projectId = $proj.val();
 
         $wh.find('option').each(function () {
             if ($(this).val() === '') { $(this).show(); return; }

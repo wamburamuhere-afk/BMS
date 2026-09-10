@@ -101,13 +101,10 @@ $srcQuoteStmt = $pdo->prepare("SELECT sales_order_id, order_number FROM quotatio
 $srcQuoteStmt->execute([$order_id]);
 $source_quote = $srcQuoteStmt->fetch(PDO::FETCH_ASSOC);
 
-// Check projects setting
-$enable_projects = 0;
-try {
-    $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'enable_projects'");
-    $stmt->execute();
-    $enable_projects = $stmt->fetchColumn() ?: 0;
-} catch (Exception $e) {}
+// Check projects setting — $enable_projects reflects BOTH the superadmin's
+// platform grant AND the tenant's own "Enable Projects Module" setting; see
+// projectsModuleActive() (core/project_scope.php).
+$enable_projects = projectsModuleActive() ? 1 : 0;
 
 // Page Title — this page serves Sales Orders only (quotations use quotation_view.php)
 $doc_label = 'Sales Order';

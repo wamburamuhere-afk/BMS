@@ -12,15 +12,11 @@ includeHeader();
 
 autoEnforcePermission('financial_reports');
 
-// In-scope projects only (admins → all), per security.md §23. Empty when the
-// Projects module is off for this tenant — a switched-off module never deletes
-// existing project rows, so without this guard the dropdown would keep
-// offering stale projects the tenant can no longer use at all.
-$projects = tenantFeatureEnabled('projects') ? $pdo->query(
-    "SELECT project_id, project_name FROM projects
-      WHERE (status != 'archived' OR status IS NULL) " . scopeFilterSql('project', 'projects') . "
-      ORDER BY project_name ASC"
-)->fetchAll(PDO::FETCH_ASSOC) : [];
+// In-scope projects only (admins → all), per security.md §23. Empty when
+// Projects isn't active for this tenant — see projectsModuleActive()
+// (core/project_scope.php) for why this checks BOTH the superadmin's module
+// grant and the tenant's own "Enable Projects Module" setting.
+$projects = projectsForSelect($pdo);
 $as_of    = $_GET['as_of_date'] ?? date('Y-m-d');
 $currency = get_setting('currency', 'TZS');
 ?>
@@ -55,6 +51,7 @@ $currency = get_setting('currency', 'TZS');
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">As of date</label>
                     <input type="date" name="as_of_date" id="f-asof" class="form-control" value="<?= htmlspecialchars($as_of) ?>">
                 </div>
+                <?php if (projectsModuleActive()): ?>
                 <div class="col-md-4">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
@@ -64,6 +61,7 @@ $currency = get_setting('currency', 'TZS');
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <?php endif; ?>
                 <div class="col-md-4">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Customer</label>
                     <select name="customer_id" id="f-customer" class="form-select" style="width:100%"></select>

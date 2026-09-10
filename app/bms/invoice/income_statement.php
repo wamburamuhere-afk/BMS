@@ -87,12 +87,14 @@ $is_admin_user = isAdmin();
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Period End</label>
                     <input type="date" class="form-control rounded-3 border-light shadow-sm" id="end_date" name="end_date" value="<?= $end_date ?>">
                 </div>
+                <?php if (projectsModuleActive()): ?>
                 <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
                     <select class="form-select rounded-3 border-light shadow-sm" id="project_id" name="project_id">
                         <option value=""><?= $is_admin_user ? 'All Projects (Consolidated)' : 'All My Projects' ?></option>
                     </select>
                 </div>
+                <?php endif; ?>
                 <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Warehouse</label>
                     <select class="form-select rounded-3 border-light shadow-sm" id="warehouse_id" name="warehouse_id">
