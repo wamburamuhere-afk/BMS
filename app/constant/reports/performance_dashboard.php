@@ -18,6 +18,13 @@ $projects = $pdo->query(
       ORDER BY project_name ASC"
 )->fetchAll(PDO::FETCH_ASSOC);
 
+// Warehouses the CURRENT user may see, per security.md §23 (Phase 6 — warehouse ACL).
+$warehouses = $pdo->query(
+    "SELECT warehouse_id, warehouse_name FROM warehouses
+      WHERE status = 'active' " . scopeFilterSql('warehouse', 'warehouses') . "
+      ORDER BY warehouse_name ASC"
+)->fetchAll(PDO::FETCH_ASSOC);
+
 $date_from = $_GET['date_from'] ?? date('Y-01-01');
 $date_to   = $_GET['date_to']   ?? date('Y-12-31');
 $currency  = get_setting('currency', 'TZS');
@@ -49,20 +56,29 @@ $currency  = get_setting('currency', 'TZS');
     <div class="card border shadow-sm mb-4 d-print-none" style="border-color:#b6ccfe!important;border-radius:12px;">
         <div class="card-body p-4">
             <form id="filterForm" class="row g-3 align-items-end">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">From</label>
                     <input type="date" name="date_from" id="f-from" class="form-control" value="<?= htmlspecialchars($date_from) ?>">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">To</label>
                     <input type="date" name="date_to" id="f-to" class="form-control" value="<?= htmlspecialchars($date_to) ?>">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted text-uppercase mb-1">Project</label>
                     <select name="project_id" id="f-project" class="form-select" style="width:100%">
                         <option value="">All My Projects</option>
                         <?php foreach ($projects as $p): ?>
                             <option value="<?= (int)$p['project_id'] ?>"><?= safe_output($p['project_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-muted text-uppercase mb-1">Warehouse</label>
+                    <select name="warehouse_id" id="f-warehouse" class="form-select" style="width:100%">
+                        <option value="">All My Warehouses</option>
+                        <?php foreach ($warehouses as $w): ?>
+                            <option value="<?= (int)$w['warehouse_id'] ?>"><?= safe_output($w['warehouse_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -177,6 +193,7 @@ $(function () {
     const fmt  = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     $('#f-project').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
+    $('#f-warehouse').select2({ theme: 'bootstrap-5', allowClear: true, width: '100%' });
 
     const table = $('#perfTable').DataTable({
         responsive: false, scrollX: false, pageLength: 25, order: [[0, 'asc']],
@@ -216,7 +233,7 @@ $(function () {
     }
 
     function loadReport() {
-        const params = { date_from: $('#f-from').val(), date_to: $('#f-to').val(), project_id: $('#f-project').val() || '' };
+        const params = { date_from: $('#f-from').val(), date_to: $('#f-to').val(), project_id: $('#f-project').val() || '', warehouse_id: $('#f-warehouse').val() || '' };
         $.getJSON(DATA_URL, params)
             .done(function (res) {
                 if (!res || !res.success) {
@@ -248,6 +265,7 @@ $(function () {
 
     $('#filterForm').on('submit', e => { e.preventDefault(); loadReport(); });
     $('#f-project').on('change', loadReport);
+    $('#f-warehouse').on('change', loadReport);
 
     loadReport();
     if (typeof logReportAction === 'function') logReportAction('Viewed Performance Dashboard', 'Loaded business performance dashboard');

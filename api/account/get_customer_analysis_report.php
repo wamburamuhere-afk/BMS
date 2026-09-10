@@ -3,10 +3,18 @@
  * api/account/get_customer_analysis_report.php
  *
  * AJAX data source for the Customer Analysis report — summary, three chart
- * datasets, and per-customer rows as JSON. Revenue = sales_orders.total_amount.
+ * datasets, and per-customer rows as JSON.
  *
- * Project-scoped per security.md §23 (sales_orders.project_id): one scope
- * clause feeds the summary, every chart, and the rows.
+ * Revenue = invoices.grand_total + pos_sales.grand_total (actual realised
+ * sales — same definition as get_sales_report.php, the reference
+ * implementation). 2026-09-10: used to read sales_orders.grand_total only,
+ * so a POS-only tenant (Sales module off) always showed zero customer
+ * activity here despite real POS sales. sales_orders is deliberately NOT
+ * summed alongside invoices, since an order that gets invoiced would
+ * otherwise be counted twice.
+ *
+ * Project- and warehouse-scoped per security.md §23: one pair of scope
+ * clauses (invoices + pos_sales) feeds the summary, every chart, and the rows.
  */
 require_once __DIR__ . '/../../roots.php';
 require_once __DIR__ . '/../../core/permissions.php';
@@ -27,9 +35,10 @@ if (!canView('customer_analysis')) {
     exit;
 }
 
-$date_from  = $_GET['date_from'] ?? date('Y-01-01');
-$date_to    = $_GET['date_to']   ?? date('Y-12-31');
-$project_id = (isset($_GET['project_id']) && $_GET['project_id'] !== '') ? (int)$_GET['project_id'] : null;
+$date_from    = $_GET['date_from']    ?? date('Y-01-01');
+$date_to      = $_GET['date_to']      ?? date('Y-12-31');
+$project_id   = (isset($_GET['project_id'])   && $_GET['project_id']   !== '') ? (int)$_GET['project_id']   : null;
+$warehouse_id = (isset($_GET['warehouse_id']) && $_GET['warehouse_id'] !== '') ? (int)$_GET['warehouse_id'] : null;
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_to)) {
     echo json_encode(['success' => false, 'message' => 'Invalid date range']);
@@ -40,30 +49,55 @@ if ($project_id !== null && !userCan('project', $project_id)) {
     echo json_encode(['success' => false, 'message' => 'Access denied: this project is not in your assigned scope.']);
     exit;
 }
+if ($warehouse_id !== null && !userCan('warehouse', $warehouse_id)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied: this warehouse is not in your assigned scope.']);
+    exit;
+}
 
 try {
     global $pdo;
 
-    $params = [$date_from, $date_to];
-    $where  = ["so.order_date BETWEEN ? AND ?", "so.status != 'cancelled'"];
-    $scope  = '';
-    if ($project_id !== null) {
-        $where[]  = "so.project_id = ?";
-        $params[] = $project_id;
-    } else {
-        $scope = scopeFilterSqlNullable('project', 'so');
-    }
-    $where_sql = implode(' AND ', $where) . $scope;
+    // ── Invoice WHERE ─────────────────────────────────────────────────────
+    $inv_params = [$date_from, $date_to];
+    $inv_where  = ["i.invoice_date BETWEEN ? AND ?", "i.status != 'cancelled'"];
+    $inv_scope  = '';
+    if ($project_id !== null) { $inv_where[] = "i.project_id = ?"; $inv_params[] = $project_id; }
+    else                      { $inv_scope  .= scopeFilterSqlNullable('project', 'i'); }
+    if ($warehouse_id !== null) { $inv_where[] = "i.warehouse_id = ?"; $inv_params[] = $warehouse_id; }
+    else                        { $inv_scope  .= scopeFilterSqlNullable('warehouse', 'i'); }
+    $inv_where_sql = implode(' AND ', $inv_where) . $inv_scope;
+
+    // ── POS WHERE ─────────────────────────────────────────────────────────
+    $pos_params = [$date_from, $date_to];
+    $pos_where  = ["DATE(ps.sale_date) BETWEEN ? AND ?", "ps.sale_status = 'completed'"];
+    $pos_scope  = '';
+    if ($project_id !== null) { $pos_where[] = "ps.project_id = ?"; $pos_params[] = $project_id; }
+    else                      { $pos_scope  .= scopeFilterSqlNullable('project', 'ps'); }
+    if ($warehouse_id !== null) { $pos_where[] = "ps.warehouse_id = ?"; $pos_params[] = $warehouse_id; }
+    else                        { $pos_scope  .= scopeFilterSqlNullable('warehouse', 'ps'); }
+    $pos_where_sql = implode(' AND ', $pos_where) . $pos_scope;
+
+    $merged = array_merge($inv_params, $pos_params);
+
+    $combinedSql = "
+        SELECT i.customer_id AS cust_id, i.grand_total AS total, i.invoice_date AS order_date
+          FROM invoices i
+         WHERE $inv_where_sql
+        UNION ALL
+        SELECT ps.customer_id AS cust_id, ps.grand_total AS total, ps.sale_date AS order_date
+          FROM pos_sales ps
+         WHERE $pos_where_sql
+    ";
 
     // ── Summary ───────────────────────────────────────────────────────────
     $stmt = $pdo->prepare("
-        SELECT COUNT(DISTINCT so.customer_id)        AS active_customers,
-               COUNT(so.sales_order_id)              AS total_orders,
-               COALESCE(SUM(so.grand_total), 0)     AS total_revenue
-          FROM sales_orders so
-         WHERE $where_sql
+        SELECT COUNT(DISTINCT cust_id) AS active_customers,
+               COUNT(*)                AS total_orders,
+               COALESCE(SUM(total), 0) AS total_revenue
+          FROM ($combinedSql) combined
     ");
-    $stmt->execute($params);
+    $stmt->execute($merged);
     $summary = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     $active = (int)($summary['active_customers'] ?? 0);
     $totrev = (float)($summary['total_revenue'] ?? 0);
@@ -71,17 +105,16 @@ try {
     // ── Chart 1 + rows: per customer ──────────────────────────────────────
     $stmt = $pdo->prepare("
         SELECT COALESCE(c.customer_name, 'Walk-in') AS customer_name,
-               COUNT(so.sales_order_id)             AS total_orders,
-               COALESCE(SUM(so.grand_total), 0)    AS total_spent,
-               COALESCE(AVG(so.grand_total), 0)    AS avg_order,
-               MAX(so.order_date)                   AS last_order
-          FROM sales_orders so
-          LEFT JOIN customers c ON so.customer_id = c.customer_id
-         WHERE $where_sql
-      GROUP BY so.customer_id, c.customer_name
+               COUNT(*)                  AS total_orders,
+               COALESCE(SUM(total), 0)  AS total_spent,
+               COALESCE(AVG(total), 0)  AS avg_order,
+               MAX(order_date)           AS last_order
+          FROM ($combinedSql) combined
+          LEFT JOIN customers c ON combined.cust_id = c.customer_id
+      GROUP BY combined.cust_id, c.customer_name
       ORDER BY total_spent DESC
     ");
-    $stmt->execute($params);
+    $stmt->execute($merged);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $top_customers = array_slice(array_map(fn($r) => ['name' => $r['customer_name'], 'total' => (float)$r['total_spent']], $rows), 0, 8);
@@ -96,13 +129,12 @@ try {
 
     // ── Chart 3: monthly revenue trend ────────────────────────────────────
     $stmt = $pdo->prepare("
-        SELECT DATE_FORMAT(so.order_date, '%Y-%m') AS label,
-               COALESCE(SUM(so.grand_total), 0)   AS value
-          FROM sales_orders so
-         WHERE $where_sql
+        SELECT DATE_FORMAT(order_date, '%Y-%m') AS label,
+               COALESCE(SUM(total), 0)          AS value
+          FROM ($combinedSql) combined
       GROUP BY label ORDER BY label ASC LIMIT 24
     ");
-    $stmt->execute($params);
+    $stmt->execute($merged);
     $monthly = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode([

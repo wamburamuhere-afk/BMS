@@ -90,13 +90,24 @@ $documentedAlwaysOn = [
     'document_workflow', 'loan_documents',
     'bank_accounts', 'bank_reconciliation', 'bank_transfers', 'budget', 'cash_register', 'chart_of_accounts',
     'expenses', 'invoices', 'journals', 'loans', 'payment_create', 'payment_vouchers', 'petty_cash',
-    'received_invoices', 'revenue', 'revenue_categories', 'transactions',
+    'revenue', 'revenue_categories', 'transactions',
     'categories', 'inventory_valuation', 'stock_adjustments',
     'products',
-    'asset_report', 'audit_report', 'balance_sheet', 'cash_flow', 'customer_analysis', 'employee_report',
+    'audit_report', 'balance_sheet', 'cash_flow',
     'expense_report', 'financial_reports', 'financial_statements', 'income_statement', 'inventory_report',
-    'ledger_report', 'performance_dashboard', 'product_analysis', 'profit_loss_report', 'purchase_report',
-    'reports', 'sales_forecast', 'sales_report', 'tax_report', 'trends_analysis', 'trial_balance',
+    'ledger_report', 'profit_loss_report',
+    'reports', 'sales_report', 'tax_report', 'trial_balance',
+    // 2026-09-10: moved OUT of always-on — these read exclusively from one
+    // optional module's tables (verified query-by-query, not assumed from
+    // the label) and are now gated the same way every other page in that
+    // module is: 'purchase_report'/'received_invoices'/'ap_aging'/
+    // 'vendor_statement'/'wht_report' -> procurement; 'performance_dashboard'/
+    // 'customer_analysis'/'product_analysis'/'sales_forecast'/
+    // 'trends_analysis' -> sales; 'employee_report' -> hr; 'asset_report' ->
+    // assets. 'ap_aging'/'vendor_statement'/'wht_report' were carved out of
+    // the shared 'financial_reports'/'tax_report' keys (which stay here,
+    // still covering Receivables Aging/Customer Statement/Tax Report/WHT
+    // Credit) — see migrations/tenant/2026_09_10_*_permission.php.
     'color_settings', 'help', 'my_settings', 'notification_rules', 'tax_settings', 'zoom_settings',
     'activity_log', 'add_user', 'admin', 'attendance_settings', 'audit_logs', 'backup_restore',
     'company_profile', 'edit_user', 'email_templates', 'login_history', 'notification_settings',

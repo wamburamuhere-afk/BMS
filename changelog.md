@@ -1,5 +1,92 @@
 # BMS Changelog
 
+## 2026-09-10 (fix) - Reports menu ignored module entitlement; 5 Sales-analytics reports were blind to POS/invoice activity
+
+**Files (modified):** `core/feature_registry.php`, `core/permissions.php`, `header.php`,
+`app/constant/reports/ap_aging.php`, `app/constant/reports/vendor_statement.php`,
+`app/constant/reports/wht_report.php`, `api/account/get_ap_aging.php`,
+`api/account/get_vendor_statement.php`, `api/account/search_vendors.php`,
+`app/constant/reports/performance_dashboard.php`, `api/account/get_performance_report.php`,
+`app/constant/reports/customer_analysis.php`, `api/account/get_customer_analysis_report.php`,
+`app/constant/reports/product_analysis.php`, `api/account/get_product_analysis_report.php`,
+`app/constant/reports/sales_forecast.php`, `api/account/get_sales_forecast_report.php`,
+`app/constant/reports/trends_analysis.php`, `api/account/get_trends_report.php`,
+`tests/test_feature_registry_cli.php`, `tests/test_ar_ap_aging_cli.php`, `tests/test_warehouse_scope_cli.php`
+
+**Files (new):** `migrations/tenant/2026_09_10_ap_aging_permission.php`,
+`migrations/tenant/2026_09_10_vendor_statement_permission.php`,
+`migrations/tenant/2026_09_10_wht_report_permission.php`, and their three
+`migrations/2026_09_10_*_permission_legacy_db.php` mirrors.
+
+**User-reported:** on a tenant with only POS + Warehouses enabled (all other modules switched off
+via Tenants → Modules), the Reports mega-menu still showed Purchase Report, PO vs Invoice Report,
+Payables Aging, Vendor Statement, WHT Report, Performance, Customer Analysis, Product Analysis,
+Sales Forecast, Trends, Employee Report and Asset Report — 13 reports tied to modules (Procurement,
+Sales, HR, Assets) that were off. This broke the Tenant Modules page's own promise that switching a
+module off hides it "completely — from the menu, from direct links and from its API."
+
+Root cause: `core/feature_registry.php` deliberately excluded every report `page_key` from every
+feature's `page_keys` array (reports were simply never wired into the entitlement system every other
+module already uses) — `canView()` already checks `tenantModuleAllowsPage()` first, so the fix was
+adding the right `page_key` to the right feature. Four report pairs shared one generic `page_key`,
+blocking a clean split: `financial_reports` covered Receivables Aging + Customer Statement (core) AND
+Payables Aging + Vendor Statement (100% supplier data); `tax_report` covered Tax Report + WHT Credit
+(core) AND WHT Report (100% supplier data). Carved out `ap_aging`, `vendor_statement` and `wht_report`
+as their own keys — each new-key migration copies every role's existing grant on the shared key forward,
+so the split doesn't silently strip access from a non-admin role that already had it.
+
+Also fixed, found while tracing each report's actual query (not its label) as part of the same pass:
+Performance, Customer Analysis, Product Analysis, Sales Forecast and Trends all read `sales_orders`
+exclusively — never `invoices` or `pos_sales` — so even on a tenant where Sales is enabled they were
+blind to POS activity, and on a POS-only tenant showed flat zero forever. Rewrote all five to read
+`invoices` + `pos_sales` (the same UNION ALL `api/account/get_sales_report.php` already uses)
+instead of `sales_orders`, deliberately NOT unioning `sales_orders` in as well since an order that
+gets invoiced would otherwise be double-counted. Also added the same `warehouse_id` filter Sales/
+Purchase/Inventory Report already have to all five (dropdown + backend filter), since Warehouses
+being enabled independent of Sales makes a per-branch view meaningful on exactly this kind of tenant.
+
+Caught one real bug via a runtime smoke test before it shipped: the warehouse filter was initially
+applied uniformly across `get_performance_report.php`'s monthly series, including `expenses` (no
+`warehouse_id` column) — fixed by making the scope helper's warehouse dimension opt-out per table.
+
+**Verified**: `php -l` on every changed file; a simulated POS+Warehouse-only tenant confirmed all 13
+gated `page_key`s report blocked and every core key stays open (24/24); ran the three new legacy-DB
+migrations locally (idempotent on re-run, correctly copied 2/2/3 existing role grants); runtime
+smoke-tested all 5 rewritten analytics endpoints with and without a warehouse filter — revenue/sales
+totals agree exactly with `get_sales_report.php`'s own total for the same period, confirming the same
+underlying dataset. Full existing suite re-run: `test_feature_registry_cli` (108/108, was 108/109
+before updating its hardcoded always-on list to match the new design), `test_ar_ap_aging_cli` (43/43,
+after updating two assertions that expected the now-retired shared key), `test_warehouse_scope_cli`
+(171/172 — the one failure is a pre-existing, unrelated data-state issue confirmed present before this
+change), `test_po_invoice_report_cli` (35/35), `test_wht_report_cli` (7/7),
+`test_financial_reports_integrity_cli` (17/17). Not yet browser-verified on the live demo tenant that
+reported this (Claude-in-Chrome was disconnected this session) — recommend a visual pass on
+`shop.demo.bjptechnologies.co.tz` before considering it fully closed.
+
+## 2026-09-10 (fix) - Dashboard Statistics Cards and Quick Links rows didn't fill full width for tenants with fewer modules enabled
+
+**Files (modified):** `app/dashboard.php`
+
+**User-reported:** on a tenant with only POS and Warehouses enabled (all other modules switched off
+via Tenants → Modules), the Dashboard's "Statistics Cards" row and "Quick Links" row left a big empty
+gap on the right instead of stretching to cover the page — both rows still worked at the fixed Bootstrap
+column widths sized for the full set of cards/buttons (`col-xl-3` = 4 cards, `row-cols-lg-6` = 6 buttons),
+so fewer visible items (each gated by its own `canView()`/`canCreate()` check) just left unused space
+instead of redistributing it.
+
+Fixed by replacing the fixed-column grids with a `d-flex flex-wrap gap-3` container where each
+card/button wrapper uses Bootstrap's `.flex-fill` utility (`flex: 1 1 auto`) with a `min-width` floor
+(240px for stat cards, 130px for quick-link buttons). Flexbox distributes any remaining space among the
+items actually present in each wrapped row, so whether 1, 2, or all cards/buttons are visible the row
+always spans the full container width, and items wrap to a new line (rather than shrinking unreadably)
+once the row is too narrow to fit them at their minimum width. No change to the `canView`/`canCreate`
+gates themselves — this only fixes how the already-filtered set of items lays out.
+
+**Not yet live-verified in a browser** (browser automation tool was disconnected this session) — the
+layout change is a standard, widely-used Bootstrap flex pattern; `php -l` confirms no syntax errors.
+Recommend a quick visual check on a modules-restricted tenant (e.g. the POS+Warehouse-only tenant used
+to report this) before considering it fully closed.
+
 ## 2026-09-09 (fix) - Switching Projects off 404'd the whole Warehouse Access assignment page too
 
 **Files (modified):** `core/feature_registry.php`, `app/constant/settings/user_projects.php`,

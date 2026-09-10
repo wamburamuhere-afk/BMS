@@ -21,7 +21,7 @@ if (!isAuthenticated()) {
     echo json_encode(['results' => []]);
     exit;
 }
-if (!canView('financial_reports')) {
+if (!canView('vendor_statement')) {
     http_response_code(403);
     echo json_encode(['results' => []]);
     exit;

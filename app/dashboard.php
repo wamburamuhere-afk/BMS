@@ -1385,9 +1385,11 @@ function get_progress_color($percentage) {
                 </div>
                 <div class="card-body">
                     <?php if ($ql_has_links): ?>
-                    <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-6 g-3">
+                    <!-- flex-wrap + flex-fill (not fixed row-cols) so the buttons always
+                         span full width no matter how many a tenant's modules leave visible -->
+                    <div class="d-flex flex-wrap gap-3">
                         <?php if (canView('pos')): ?>
-                        <div class="col">
+                        <div class="flex-fill" style="min-width: 130px;">
                             <a href="pos" class="btn btn-outline-primary w-100 h-100 py-3">
                                 <i class="bi bi-cart-check display-6"></i>
                                 <div class="mt-2"><?= t('POS') ?></div>
@@ -1396,7 +1398,7 @@ function get_progress_color($percentage) {
                         <?php endif; ?>
 
                         <?php if (canCreate('invoices')): ?>
-                        <div class="col">
+                        <div class="flex-fill" style="min-width: 130px;">
                             <a href="invoice_create" class="btn btn-outline-success w-100 h-100 py-3">
                                 <i class="bi bi-receipt display-6"></i>
                                 <div class="mt-2"><?= t('Create Invoice') ?></div>
@@ -1405,7 +1407,7 @@ function get_progress_color($percentage) {
                         <?php endif; ?>
 
                         <?php if (canCreate('customers')): ?>
-                        <div class="col">
+                        <div class="flex-fill" style="min-width: 130px;">
                             <a href="<?= getUrl('customers') ?>?action=add" class="btn btn-outline-info w-100 h-100 py-3">
                                 <i class="bi bi-person-plus display-6"></i>
                                 <div class="mt-2"><?= t('Add Customer') ?></div>
@@ -1414,7 +1416,7 @@ function get_progress_color($percentage) {
                         <?php endif; ?>
 
                         <?php if (canCreate('suppliers')): ?>
-                        <div class="col">
+                        <div class="flex-fill" style="min-width: 130px;">
                             <a href="<?= getUrl('suppliers') ?>?action=add" class="btn btn-outline-secondary w-100 h-100 py-3">
                                 <i class="bi bi-truck display-6"></i>
                                 <div class="mt-2"><?= t('Add Supplier') ?></div>
@@ -1423,7 +1425,7 @@ function get_progress_color($percentage) {
                         <?php endif; ?>
 
                         <?php if (canCreate('products')): ?>
-                        <div class="col">
+                        <div class="flex-fill" style="min-width: 130px;">
                             <a href="<?= getUrl('product_create') ?>" class="btn btn-outline-warning w-100 h-100 py-3">
                                 <i class="bi bi-plus-circle display-6"></i>
                                 <div class="mt-2"><?= t('Add Product') ?></div>
@@ -1432,7 +1434,7 @@ function get_progress_color($percentage) {
                         <?php endif; ?>
 
                         <?php if (get_setting('enable_projects') == '1' && canView('projects')): ?>
-                        <div class="col">
+                        <div class="flex-fill" style="min-width: 130px;">
                             <a href="projects" class="btn btn-outline-dark w-100 h-100 py-3">
                                 <i class="bi bi-briefcase display-6"></i>
                                 <div class="mt-2"><?= t('Projects Management') ?></div>
@@ -1462,11 +1464,13 @@ function get_progress_color($percentage) {
     <link rel="stylesheet" href="style.css">
 
     <!-- Statistics Cards -->
-    <div class="row mb-4">
+    <!-- flex-wrap + flex-fill (not fixed Bootstrap columns) so the row always
+         spans full width no matter how many cards a tenant's modules leave visible -->
+    <div class="d-flex flex-wrap gap-3 mb-4">
         <!-- 1. Monthly Revenue -->
         <?php if(canView('invoices') || canView('sales_report') || hasReportsAccess()): ?>
-        <div class="col-xl-3 col-md-6 mb-3">
-            <div class="card bg-primary text-white">
+        <div class="flex-fill" style="min-width: 240px;">
+            <div class="card bg-primary text-white h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
@@ -1490,8 +1494,8 @@ function get_progress_color($percentage) {
 
         <!-- 2. Today's POS Sales -->
         <?php if(canView('pos')): ?>
-        <div class="col-xl-3 col-md-6 mb-3">
-            <div class="card bg-success text-white">
+        <div class="flex-fill" style="min-width: 240px;">
+            <div class="card bg-success text-white h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
@@ -1515,8 +1519,8 @@ function get_progress_color($percentage) {
 
         <!-- 3. Overdue Invoices -->
         <?php if(canView('invoices')): ?>
-        <div class="col-xl-3 col-md-6 mb-3">
-            <div class="card bg-warning text-dark">
+        <div class="flex-fill" style="min-width: 240px;">
+            <div class="card bg-warning text-dark h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
@@ -1540,8 +1544,8 @@ function get_progress_color($percentage) {
 
         <!-- 4. Inventory Value -->
         <?php if(canView('products') || canView('inventory_report')): ?>
-        <div class="col-xl-3 col-md-6 mb-3">
-            <div class="card bg-info text-white">
+        <div class="flex-fill" style="min-width: 240px;">
+            <div class="card bg-info text-white h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>

@@ -1177,9 +1177,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                         <?php if(canView('trial_balance')): ?><a class="dropdown-item" href="<?= getUrl('trial_balance') ?>"><i class="bi bi-journal"></i> <?= t('Trial Balance') ?></a><?php endif; ?>
                                         <?php if(canView('ledger_report')): ?><a class="dropdown-item" href="<?= getUrl('ledger_report') ?>"><i class="bi bi-journal-text"></i> <?= t('General Ledger') ?></a><?php endif; ?>
                                         <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('ar_aging') ?>"><i class="bi bi-hourglass-split"></i> <?= t('Receivables Aging') ?></a><?php endif; ?>
-                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('ap_aging') ?>"><i class="bi bi-hourglass-split"></i> <?= t('Payables Aging') ?></a><?php endif; ?>
+                                        <?php if(canView('ap_aging')): ?><a class="dropdown-item" href="<?= getUrl('ap_aging') ?>"><i class="bi bi-hourglass-split"></i> <?= t('Payables Aging') ?></a><?php endif; ?>
                                         <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('customer_statement') ?>"><i class="bi bi-file-earmark-text"></i> <?= t('Customer Statement') ?></a><?php endif; ?>
-                                        <?php if(canView('financial_reports')): ?><a class="dropdown-item" href="<?= getUrl('vendor_statement') ?>"><i class="bi bi-file-earmark-text"></i> <?= t('Vendor Statement') ?></a><?php endif; ?>
+                                        <?php if(canView('vendor_statement')): ?><a class="dropdown-item" href="<?= getUrl('vendor_statement') ?>"><i class="bi bi-file-earmark-text"></i> <?= t('Vendor Statement') ?></a><?php endif; ?>
                                     </div>
                                     <div class="col-lg-3 mega-column">
                                         <h6><?= t('Business Reports') ?></h6>
@@ -1202,7 +1202,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                     <div class="col-lg-3 mega-column">
                                         <h6><?= t('Compliance & Operations') ?></h6>
                                         <?php if(canView('tax_report')): ?><a class="dropdown-item" href="<?= getUrl('tax_report') ?>"><i class="bi bi-percent"></i> <?= t('Tax Report') ?></a><?php endif; ?>
-                                        <?php if(canView('tax_report')): ?><a class="dropdown-item" href="<?= getUrl('wht_report') ?>"><i class="bi bi-cash-stack"></i> <?= t('WHT Report') ?></a><?php endif; ?>
+                                        <?php if(canView('wht_report')): ?><a class="dropdown-item" href="<?= getUrl('wht_report') ?>"><i class="bi bi-cash-stack"></i> <?= t('WHT Report') ?></a><?php endif; ?>
                                         <?php if(canView('tax_report')): ?><a class="dropdown-item" href="<?= getUrl('wht_receivable_report') ?>"><i class="bi bi-cash-coin"></i> <?= t('WHT Credit (Received)') ?></a><?php endif; ?>
                                         <?php if(canView('audit_report')): ?><a class="dropdown-item" href="<?= getUrl('audit_report') ?>"><i class="bi bi-shield-check"></i> <?= t('Audit Report') ?></a><?php endif; ?>
                                         <?php if(canView('compliance_report')): ?><a class="dropdown-item" href="<?= getUrl('compliance_report') ?>"><i class="bi bi-file-check"></i> <?= t('Compliance') ?></a><?php endif; ?>
