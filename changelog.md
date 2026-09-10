@@ -1,5 +1,74 @@
 # BMS Changelog
 
+## 2026-09-09 (fix) - Switching Projects off 404'd the whole Warehouse Access assignment page too
+
+**Files (modified):** `core/feature_registry.php`, `app/constant/settings/user_projects.php`,
+`tests/test_feature_registry_cli.php`
+
+**User-reported:** switching the Projects module off for a tenant made `user_projects.php` entirely
+unreachable, when only the project-scope parts should have blocked — Warehouse Access (assigning
+which warehouses a staff member may use) has nothing to do with Projects and should keep working,
+since POS/Sales/Procurement all depend on Warehouses regardless of whether Projects is on.
+
+Root cause: `user_projects.php` is genuinely two features on one page — project-scope assignment
+AND warehouse-access assignment, sharing one drill-down UI and one save action — but the entitlement
+registry gated the whole page key on the `projects` feature alone. Fixed the same way
+`pos_config_settings.php` already handles its own optional `pos_advanced` section: the page itself
+is now un-gated (`user_projects` moved out of `projects`'s `page_keys`, into the documented
+always-reachable set), and a single `$projectsEnabled = tenantFeatureEnabled('projects')` check
+in-page hides only the project-checkbox column and the project-linked-warehouses sub-panel —
+Warehouse Access (including "Grant ALL warehouses") renders and saves normally either way.
+
+Data-safety fix included: the save handler used to unconditionally `DELETE FROM user_projects` then
+re-insert whatever was submitted — with the project checkboxes never rendered while the module is
+off, that would have silently wiped every existing project assignment on the very next warehouse-only
+save. Now skipped entirely when `$projectsEnabled` is false, so existing project-scope assignments
+survive untouched and reappear the moment Projects is switched back on.
+
+**Verified live**, not just read: logged in as a temporary admin on a real (non-production) tenant
+(#85), toggled its `projects` feature off via `setTenantFeatures()`, confirmed the page returns
+HTTP 200 (not 404) with the "Projects module is off" banner, `PROJECTS_ENABLED = false`, an empty
+project list, and Warehouse Access still fully rendered — then restored the tenant's feature state
+and deleted the temporary account. `test_feature_registry_cli.php` extended with two explicit
+regression assertions (108/108 passing); confirmed zero regressions in the broader project/warehouse
+scope suites (two pre-existing, unrelated failures found and ruled out via `git stash` — neither
+touches any file this fix modified).
+
+## 2026-09-09 (fix) - POS emailed receipt now full-detail PDF (not a stripped summary); WhatsApp share opens directly instead of asking to retype the number
+
+**Files (modified):** `api/pos/email_receipt.php`, `api/pos/search_customers.php`,
+`app/bms/pos/pos_scripts_new.php`, `lang/sw.php`
+
+**Email receipt.** The emailed version only ever showed items + subtotal/tax/total — missing
+company address/phone/TIN/VRN, cashier, warehouse, register, customer, payment method/tendered/
+change, and discount, all of which the *printed* receipt (`print_receipt.php`) already shows.
+Rebuilt to full field parity, and — per the owner's explicit call — delivered as a real PDF
+attachment (reusing `generateLetterPdf()`, the same TCPDF pipeline `tender_print.php`'s BOQ/
+Materials/Checklist exports already use, so the company letterhead/logo comes for free) rather than
+sprawled as inline HTML in the email body. The email body itself is now a short covering note only.
+Verified against a real, existing production sale (#48, read-only) — a valid 26KB PDF with the full
+letterhead, all fields, generates correctly.
+
+**WhatsApp share.** `shareReceiptViaWhatsApp()` already tried to pre-fill the customer's number, but
+regex-scraped it out of the Select2 dropdown's *display text* (`"John Doe — 0723578982"`) — fragile,
+and the real bug: local-format numbers (`0723...`, the majority of real customer records, confirmed
+by querying the live `customers` table) were passed to `wa.me` unnormalized. `wa.me` requires full
+international format with no leading trunk `0`; a raw `0723578982` fails to resolve and WhatsApp
+falls back to its own contact picker — the exact "have to type the number again" the owner reported.
+Fixed two ways: (1) `search_customers.php` now returns a clean `phone` field instead of forcing the
+client to parse it out of a label; (2) new `normalizeWhatsAppPhone()` converts local-trunk `0…` to
+`255…` before building the link. Per the owner's explicit preference, a valid number now opens
+WhatsApp **directly** — no BMS-side confirmation prompt — with the prompt kept only as a fallback
+when no phone is on file at all. Unit-tested against the actual messy phone formats found live in
+the database (`+255 123 456 789`, `0723578982`, `0987821782`, garbage test rows) via a standalone
+Node harness mirroring the exact browser logic.
+
+**Test suites:** `test_pos_phase10_customer_receipt_cli.php` (32/32), `test_pos_phase8_registers_cli.php`
+(46/46), `test_pos_i18n_coverage_cli.php` (77/77 — added the 9 Swahili translations the new strings
+needed, all previously missing), `test_pos_receipt_templates_cli.php` (29/29), `test_pos_credit_ar_cli.php`
+(19/19), `test_pos_denomination_cli.php` (26/26), `test_pos_network_printer_cli.php` (34/34) — all green,
+zero regressions.
+
 ## 2026-09-08 (fix) - Proactive scout found the same legacy-database gap already live since 2026-09-07 (POS loyalty program)
 
 **Files (added):** `migrations/2026_09_08_pos_loyalty_program_legacy_db.php`,

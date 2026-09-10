@@ -1227,6 +1227,19 @@ return [
     'Warehouse:' => 'Ghala:',
 
     // ------------------------------------------------------------------
+    // POS — Emailed sale receipt PDF (api/pos/email_receipt.php)
+    // ------------------------------------------------------------------
+    'Item' => 'Bidhaa',
+    'Payment (%s)' => 'Malipo (%s)',
+    'Change' => 'Chenji',
+    'Sales Receipt' => 'Risiti ya Mauzo',
+    'Receipt #%s — %s' => 'Risiti #%s — %s',
+    'Thank you for your purchase. Your receipt <strong>#%s</strong> for <strong>%s %s</strong> is attached as a PDF.' =>
+        'Asante kwa ununuzi wako. Risiti yako <strong>#%s</strong> ya <strong>%s %s</strong> imeambatanishwa kama PDF.',
+    'Thank you for your business.' => 'Asante kwa biashara yako.',
+    'Could not generate the receipt PDF.' => 'Imeshindwa kutengeneza PDF ya risiti.',
+
+    // ------------------------------------------------------------------
     // POS — Modals: cart, split payment, shifts, customer (app/bms/pos/pos_modals_new.php)
     // ------------------------------------------------------------------
     'Add to Cart' => 'Ongeza Kwenye Kikapu',
@@ -1503,6 +1516,7 @@ return [
     'Starting Cash' => 'Fedha ya Kuanzia',
     'Subtotal' => 'Jumla Ndogo',
     'WhatsApp number (with country code)' => 'Namba ya WhatsApp (na msimbo wa nchi)',
+    'Please enter a valid phone number.' => 'Tafadhali weka namba sahihi ya simu.',
     'Time' => 'Muda',
     'Transactions (%d)' => 'Miamala (%d)',
     'Type' => 'Aina',
