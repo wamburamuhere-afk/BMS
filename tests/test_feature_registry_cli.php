@@ -89,7 +89,7 @@ $documentedAlwaysOn = [
     'customer_documents', 'documents', 'document_expiry_alerts', 'document_library', 'document_templates',
     'document_workflow', 'loan_documents',
     'bank_accounts', 'bank_reconciliation', 'bank_transfers', 'budget', 'cash_register', 'chart_of_accounts',
-    'expenses', 'invoices', 'journals', 'loans', 'payment_create', 'payment_vouchers', 'petty_cash',
+    'expenses', 'journals', 'loans', 'payment_create', 'payment_vouchers', 'petty_cash',
     'revenue', 'revenue_categories', 'transactions',
     'categories', 'inventory_valuation', 'stock_adjustments',
     'products',
@@ -108,6 +108,14 @@ $documentedAlwaysOn = [
     // the shared 'financial_reports'/'tax_report' keys (which stay here,
     // still covering Receivables Aging/Customer Statement/Tax Report/WHT
     // Credit) — see migrations/tenant/2026_09_10_*_permission.php.
+    // 2026-09-12 (tenant_module_control_plan.md): 'invoices' moved OUT of
+    // always-on too — a business decision, not a bug fix: the platform sells
+    // modules individually, and Sales must be self-contained (invoicing
+    // included) the moment it's granted, with no separate purchase needed.
+    // Now owned by 'sales' (see core/feature_registry.php). Payment Vouchers
+    // stays here deliberately — it is a generic "pay anyone" tool (payee is
+    // free text, e.g. staff reimbursements), not procurement-specific, so it
+    // was NOT moved to 'procurement' alongside this change.
     'color_settings', 'help', 'my_settings', 'notification_rules', 'tax_settings', 'zoom_settings',
     'activity_log', 'add_user', 'admin', 'attendance_settings', 'audit_logs', 'backup_restore',
     'company_profile', 'edit_user', 'email_templates', 'login_history', 'notification_settings',
@@ -139,7 +147,7 @@ ok('every documented always-on key is actually still live and ungated'
 // ─────────────────────────────────────────────────────────────────────────────
 section('2. The always-on base set is not gateable');
 
-foreach (['dashboard', 'customers', 'products', 'invoices', 'chart_of_accounts',
+foreach (['dashboard', 'customers', 'products', 'expenses', 'chart_of_accounts',
           'trial_balance', 'balance_sheet', 'users', 'user_roles', 'system_settings'] as $baseKey) {
     ok("base page_key '$baseKey' belongs to no feature", featureForPageKey($baseKey) === []);
 }
@@ -222,7 +230,16 @@ ok("'quotations' (sales-only) is blocked with sales OFF", tenantModuleAllowsPage
 
 primeFixture($realCatalogue, ['sales' => 0, 'procurement' => 0]);
 ok("'dn' blocked only when BOTH owners are off", tenantModuleAllowsPage('dn') === false);
-ok('a base page_key stays allowed with both off', tenantModuleAllowsPage('invoices') === true);
+ok('a base page_key stays allowed with both off', tenantModuleAllowsPage('chart_of_accounts') === true);
+
+// Regression guard (2026-09-12): 'invoices' now belongs to 'sales' (a
+// business decision — Sales must be self-contained the moment it's granted,
+// with no separate module needed for invoicing). Confirm it is actually
+// blocked with Sales off, and reachable again the moment Sales is on.
+primeFixture($realCatalogue, ['sales' => 0]);
+ok("'invoices' blocked with Sales off", tenantModuleAllowsPage('invoices') === false);
+primeFixture($realCatalogue, ['sales' => 1]);
+ok("'invoices' reachable again with Sales on", tenantModuleAllowsPage('invoices') === true);
 
 // POS off must not take HR with it — the app/bms/pos/ directory trap.
 primeFixture($realCatalogue, ['pos' => 0]);

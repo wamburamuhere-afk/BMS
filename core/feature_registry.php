@@ -87,11 +87,23 @@ if (!function_exists('bmsFeatureRegistry')) {
         return [
             'sales' => [
                 'label'       => 'Sales',
-                'description' => 'Quotations, sales orders, LPO, returns and credit notes. Invoicing itself is always available.',
+                'description' => 'Quotations, sales orders, LPO, returns, credit notes and invoicing.',
                 'default'     => true,
                 'sort_order'  => 10,
                 'page_keys'   => [
                     'quotations', 'sales_orders', 'lpo', 'sales_returns', 'credit_notes', 'dn',
+                    // 2026-09-12 (tenant_module_control_plan.md): a tenant
+                    // granted Sales must get a fully working Sales experience
+                    // with no separate purchase needed — invoicing and
+                    // recording a customer's payment against it are part of
+                    // that, not a distinct billable module. A POS-only tenant
+                    // does not lose anything here: POS records its own credit
+                    // sales directly against pos_sales and never reads/writes
+                    // the invoices table. receive_payment.php itself enforces
+                    // on the 'invoices' page_key (see app/constant/accounts/
+                    // receive_payment.php), so it rides along with this entry
+                    // without needing its own.
+                    'invoices',
                     // 2026-09-10: these five analytics reports were built on
                     // sales_orders (Sales-module data) and are gated on that
                     // basis; the same change also extended their queries to
