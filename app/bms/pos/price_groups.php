@@ -62,7 +62,7 @@ if ($pos_advanced_entitled) {
 
     <div id="tableView">
         <table id="groupsTable" class="table table-hover align-middle w-100">
-            <thead class="table-dark">
+            <thead class="table-light">
                 <tr>
                     <th>#</th>
                     <th><?= t('Name') ?></th>
@@ -92,8 +92,8 @@ if ($pos_advanced_entitled) {
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
                                 <?php if ($can_edit): ?>
-                                <li><button class="dropdown-item py-2 rounded" onclick="openPricesModal(<?= (int)$g['price_group_id'] ?>, <?= json_encode($g['name']) ?>)"><i class="bi bi-currency-exchange text-primary me-2"></i> <?= t('Manage Prices') ?></button></li>
-                                <li><button class="dropdown-item py-2 rounded" onclick="editGroup(<?= (int)$g['price_group_id'] ?>, <?= json_encode($g['name']) ?>, <?= $g['is_default'] ? 1 : 0 ?>)"><i class="bi bi-pencil text-primary me-2"></i> <?= t('Edit') ?></button></li>
+                                <li><button class="dropdown-item py-2 rounded" onclick='openPricesModal(<?= (int)$g['price_group_id'] ?>, <?= htmlspecialchars(json_encode($g['name']), ENT_QUOTES) ?>)'><i class="bi bi-currency-exchange text-primary me-2"></i> <?= t('Manage Prices') ?></button></li>
+                                <li><button class="dropdown-item py-2 rounded" onclick='editGroup(<?= (int)$g['price_group_id'] ?>, <?= htmlspecialchars(json_encode($g['name']), ENT_QUOTES) ?>, <?= $g['is_default'] ? 1 : 0 ?>)'><i class="bi bi-pencil text-primary me-2"></i> <?= t('Edit') ?></button></li>
                                 <?php if (!$g['is_default']): ?>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><button class="dropdown-item py-2 rounded" onclick="toggleStatus(<?= (int)$g['price_group_id'] ?>, '<?= $g['status'] === 'active' ? 'inactive' : 'active' ?>')">
@@ -342,8 +342,13 @@ function renderCards(rows) {
         const statusLabel = g.status === 'active' ? <?= json_encode(t('Active')) ?> : <?= json_encode(t('Inactive')) ?>;
         let actions = '';
         if (CAN_EDIT) {
-            actions += `<button class="btn btn-sm btn-outline-primary" onclick="openPricesModal(${g.price_group_id}, ${JSON.stringify(g.name)})" style="flex:1;padding:3px 4px;font-size:0.72rem"><i class="bi bi-currency-exchange"></i></button>`;
-            actions += `<button class="btn btn-sm btn-outline-primary" onclick="editGroup(${g.price_group_id}, ${JSON.stringify(g.name)}, ${g.is_default ? 1 : 0})" style="flex:1;padding:3px 4px;font-size:0.72rem"><i class="bi bi-pencil"></i></button>`;
+            // JSON.stringify() wraps the name in double quotes, which would
+            // prematurely close a double-quoted onclick="..." attribute —
+            // escape those quotes for safe HTML-attribute embedding (same
+            // fix as the desktop dropdown's htmlspecialchars(json_encode()) below).
+            const nameAttr = JSON.stringify(g.name).replace(/"/g, '&quot;');
+            actions += `<button class="btn btn-sm btn-outline-primary" onclick="openPricesModal(${g.price_group_id}, ${nameAttr})" style="flex:1;padding:3px 4px;font-size:0.72rem"><i class="bi bi-currency-exchange"></i></button>`;
+            actions += `<button class="btn btn-sm btn-outline-primary" onclick="editGroup(${g.price_group_id}, ${nameAttr}, ${g.is_default ? 1 : 0})" style="flex:1;padding:3px 4px;font-size:0.72rem"><i class="bi bi-pencil"></i></button>`;
             if (!g.is_default) {
                 const nextStatus = g.status === 'active' ? 'inactive' : 'active';
                 actions += `<button class="btn btn-sm btn-outline-secondary" onclick="toggleStatus(${g.price_group_id}, '${nextStatus}')" style="flex:1;padding:3px 4px;font-size:0.72rem"><i class="bi bi-${g.status === 'active' ? 'pause-circle' : 'play-circle'}"></i></button>`;
