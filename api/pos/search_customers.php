@@ -42,6 +42,10 @@ try {
         $results[] = [
             'id' => (int)$r['customer_id'],
             'text' => $text,
+            // Clean field, not just embedded in 'text' — so the WhatsApp
+            // share button (pos_scripts_new.php) doesn't have to
+            // regex-scrape a display string to find the number.
+            'phone' => (string)($phone ?: ''),
             'loyalty_points' => (int)$r['loyalty_points_balance'],
             // Phase 14 (pos_upgrade_plan.md §8) — auto-applies this customer's
             // price tier when selected; null when they have none set.

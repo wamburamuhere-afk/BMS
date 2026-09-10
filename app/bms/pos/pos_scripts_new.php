@@ -146,7 +146,8 @@ const PT = {
     outstandingLabel: <?= json_encode(t('Outstanding')) ?>,
     totalLabel: <?= json_encode(t('Total:')) ?>,
     shareViaWhatsApp: <?= json_encode(t('Share via WhatsApp')) ?>,
-    whatsappNumberLabel: <?= json_encode(t('WhatsApp number (with country code)')) ?>
+    whatsappNumberLabel: <?= json_encode(t('WhatsApp number (with country code)')) ?>,
+    invalidWhatsappNumber: <?= json_encode(t('Please enter a valid phone number.')) ?>
 };
 
 // Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split: a cashier
@@ -1230,24 +1231,51 @@ function buildWhatsAppReceiptText(receiptNumber) {
     return lines.join('\n');
 }
 
+// Normalizes a raw phone number into the pure-digits, full international
+// format wa.me requires. Found live in the customers table: numbers are
+// stored in every shape imaginable — '+255 723 578 982', '0723578982',
+// '255759086682' — and wa.me silently fails to resolve a local-trunk '0...'
+// number (it just reopens WhatsApp's own contact picker instead of the
+// chat), which is exactly the "have to type it again" symptom this fixes.
+// Tanzania-specific fallback (255) since that's this deployment's market;
+// a number that's already in full international form passes through as-is.
+function normalizeWhatsAppPhone(raw) {
+    if (!raw) return '';
+    let digits = String(raw).replace(/[^\d+]/g, '');
+    if (digits.startsWith('+')) digits = digits.slice(1);
+    if (digits.startsWith('0') && digits.length >= 9) digits = '255' + digits.slice(1);
+    return /^\d{9,15}$/.test(digits) ? digits : '';
+}
+
 function shareReceiptViaWhatsApp(text) {
     const selectedCustomer = $('#customerSelect').select2('data')[0];
-    const suggestedPhone = (selectedCustomer && selectedCustomer.text && selectedCustomer.text.match(/[\d+][\d\s+-]{6,}/))
-        ? selectedCustomer.text.match(/[\d+][\d\s+-]{6,}/)[0].replace(/[\s-]/g, '')
-        : '';
+    const phone = normalizeWhatsAppPhone(selectedCustomer ? selectedCustomer.phone : '');
+
+    if (phone) {
+        // A known, valid number on file — open straight into that chat,
+        // ready to send. No extra BMS-side prompt in between.
+        window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
+        return;
+    }
+
+    // No usable phone on file for this customer (or no customer selected at
+    // all — a walk-in sale) — the only case that still asks.
     Swal.fire({
         title: PT.shareViaWhatsApp,
         input: 'text',
         inputLabel: PT.whatsappNumberLabel,
-        inputValue: suggestedPhone,
         inputPlaceholder: '2557XXXXXXXX',
         showCancelButton: true,
         confirmButtonText: PT.shareViaWhatsApp,
         cancelButtonText: PT.cancel
     }).then(r => {
         if (!r.isConfirmed || !r.value) return;
-        const phone = r.value.replace(/[^\d]/g, '');
-        window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
+        const typed = normalizeWhatsAppPhone(r.value);
+        if (!typed) {
+            Swal.fire({ icon: 'error', title: PT.shareViaWhatsApp, text: PT.invalidWhatsappNumber });
+            return;
+        }
+        window.open('https://wa.me/' + typed + '?text=' + encodeURIComponent(text), '_blank');
     });
 }
 
