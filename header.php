@@ -880,7 +880,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php endif; ?>
 
                         <!-- Sales -->
-                        <?php if(canView('sales_orders') || canView('invoices') || canView('pos')): ?>
+                        <?php if(canView('sales_orders') || canView('pos')): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="salesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-cart"></i> <?= t('Sales') ?>
@@ -898,9 +898,6 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php endif; ?>
                                 <?php if(canView('dn')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('delivery_notes') ?>?type=outbound"><i class="bi bi-box-arrow-up-right"></i> <?= t('DN (Outbound)') ?></a></li>
-                                <?php endif; ?>
-                                <?php if(canView('invoices')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('invoices') ?>"><i class="bi bi-receipt"></i> <?= t('Invoices') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('pos')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> <?= t('POS') ?></a></li>

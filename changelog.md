@@ -1,5 +1,54 @@
 # BMS Changelog
 
+## 2026-09-12 (fix) - Removed duplicate "Invoices" link from the Sales menu; Invoicing now bundled into the sellable Sales module instead of being free for every tenant
+
+**Files (modified):** `header.php`, `core/feature_registry.php`, `tests/test_feature_registry_cli.php`
+
+**User-reported:** "also in 'sales' why there is 'invoice' in pos? please remove it now" — the Sales
+dropdown listed an "Invoices" link immediately before POS, duplicating the one already under
+Finance → Sales & Purchases. Follow-up, once the platform's plan to sell modules individually to
+tenants came up: "in 'finance' just check what is crucial to remain here and [hide] other[s]...
+because i have a plan to grant this module to sell for tenant based on modules/features so don't
+give them profit... if is pos i expect just to give them critical and only that related to that
+[module] granted itself."
+
+**Menu fix:** removed the redundant "Invoices" `<li>` from the Sales dropdown in `header.php` (kept
+the one under Finance), and dropped the now-unused `canView('invoices')` branch from the dropdown's
+own visibility check. POS is unchanged, still grouped with Quotations/Sales Orders/LPO/DN/Returns.
+
+**Entitlement gap found while checking Finance, as asked:** every item in the Finance menu except
+Purchase Orders (Expenses, Revenue, Budget, Chart of Accounts, Bank Accounts, Cash Register, Petty
+Cash, Bank Transfers, Bank Reconciliation, Journals, Invoices, Receive Payment, Payment Vouchers)
+had no module tied to it at all in `core/feature_registry.php` — every tenant got all of it
+regardless of which paid modules they actually held. This was a deliberate original design choice
+("a company must always be able to invoice... even with every module off"), not a bug — so it
+needed a decision, not a silent change; confirmed with the owner before touching anything.
+
+**Fix, per the owner's explicit requirement that a granted module must work completely on its own
+with no separate purchase needed:** `invoices` (and `receive_payment.php`, which already enforces on
+the same `invoices` page_key) moved from the always-on base set into the `sales` feature — a tenant
+only sees/reaches Invoicing once Sales is granted, and gets it automatically the moment it is, no
+extra module required. A POS-only tenant loses nothing here: POS records its own credit sales
+directly against `pos_sales` and never touches the `invoices` table.
+
+**Deliberately left alone:** Payment Vouchers was considered for a matching move into Procurement
+(paying suppliers) but checked first — its payee field is free text ("e.g. Supplier Name, Staff
+Name"), so it is a generic "pay anyone" tool already used for non-procurement payments too. Moving it
+would have broken tenants using it to pay staff or other non-supplier payees, so it stays in the
+always-on baseline, same as Chart of Accounts, Journals, Bank Accounts, Cash Register, Petty Cash,
+Expenses, Revenue and Budget — genuinely cross-cutting bookkeeping every tenant needs regardless of
+which operational modules they've bought, not something tied to one paid feature. Purchase Orders
+was already correctly gated to Procurement before this change; untouched.
+
+**Verified:** `canView()` (`core/permissions.php`) already checks module entitlement before its
+`isAdmin()` bypass, and `invoices.php`/`receive_payment.php` already call
+`autoEnforcePermission('invoices')` — so this is a pure data change in the registry; no page or menu
+code needed to change to start enforcing it. `tests/test_feature_registry_cli.php` updated: removed
+`invoices` from the documented always-on lists (three separate assertions), and added two new
+regression assertions proving `invoices` is blocked with Sales off and reachable again the moment
+Sales is on. Full suite green: 110/110 (was 105/108, with the 3 failures being the now-updated
+old-behavior assertions, not new bugs).
+
 ## 2026-09-12 (fix) - Warehouse backfill silently did nothing on live tenants — migration filename ordering bug
 
 **Files (new):** `migrations/tenant/2026_09_12_journal_entries_warehouse_backfill_retry.php`,
