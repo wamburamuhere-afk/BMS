@@ -1,5 +1,26 @@
 # BMS Changelog
 
+## 2026-09-11 (feat/pos-tier4-professional-retail) - fix: test_pos_batch_expiry_cli.php's own bug, found while syncing with develop
+
+**Scope note:** merged `origin/develop` into this branch (clean, no conflicts — `pos_upgrade_plan.md` and
+`changelog.md` had both been edited concurrently by another session's `fix/product-expiry-notification-gap`
+work, now reconciled) ahead of opening this branch's PR. That merge brought in
+`migrations/tenant/2026_09_11_product_expiry_notifications.php` (new `product_expiry_reminders` table) and
+`tests/test_pos_batch_expiry_cli.php`, previously flagged in this branch's own changelog entries as a
+"pre-existing, unrelated failure" — investigated further while reconciling and found to be two genuine,
+fixable bugs rather than something to leave alone:
+1. The new migration had no `legacy_db` mirror, so `product_expiry_reminders` never existed on this
+   server's main `bms` database (every other tenant-schema change in this repo ships one — see
+   `migrations/*_legacy_db.php`). Applied directly for local/CI parity.
+2. `tests/test_pos_batch_expiry_cli.php` itself: four `INSERT INTO user_scope_overrides` calls omitted
+   `granted_by`, a `NOT NULL` column with no default — every sibling test that writes this table (e.g.
+   `test_warehouse_scope_cli.php`) already supplies it. Fixed to match.
+
+Now passes 46/46 (was crashing with an uncaught `PDOException` partway through, after already printing
+"Failures: 0" from checks that ran before the crash).
+
+---
+
 ## 2026-09-11 (feat/pos-tier4-professional-retail) - POS terminal mobile view + master-sweep follow-up
 
 **Scope note:** user-reported, screenshot-confirmed mobile issue on `pos.php`'s live site — the header
