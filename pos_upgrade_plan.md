@@ -1594,3 +1594,640 @@ suite (transaction-wrapped, reconciled to direct SQL), its own PR into
 `develop`, `changelog.md` updated at commit time — identical discipline to
 every phase in §3 and §7. No phase starts without an explicit go-ahead on that
 phase specifically, per the product owner's "no rushing" instruction.
+
+---
+
+## 9. Tier-4 — Multi-Vertical POS (Restaurant, Serials, Variants, Dashboard
+Intelligence) — SalePro/fasteeypos benchmark, 2026-09-10, re-scoped 2026-09-11
+
+**Status:** APPROVED by product owner 2026-09-10, **re-scoped 2026-09-11 to
+POS-only** after an explicit instruction to stop at the POS module's own
+boundary and not spread into adjacent-but-separate business functions or
+touch any shared, cross-module surface more than strictly necessary. Build
+**one phase at a time, no rushing** — same rule as Tier-3.
+
+**Sources:** (1) a hands-on walkthrough of the SalePro demo
+(`salepropos.com/demo`) — dashboard, POS terminal (Retail POS vs. Restaurant
+POS chosen per warehouse), Restaurant module (Floors/Tables/Reservation/Menu
+Type/Modifier Group/Kitchen/Kitchen Dashboard), Repair module, Add Product
+form, Booking calendar; (2) a hands-on walkthrough of the fasteeypos.com demo
+account — its two-tier icon-rail + contextual sub-menu navigation, and its
+Business Overview dashboard (Sales Targets vs. Actual with achievement
+bands, Top Performing Cashiers, Damage-in-Sales/Damage-in-Purchases KPIs,
+Restaurant "Ingredients"/"Recipes" concept); (3) a full three-angle
+code/schema audit of BMS itself (schema dump of every POS-adjacent table, a
+full read of `api/pos/process_sale.php` end to end, and the project's own
+conventions: `.claude/templates.md`, `.claude/security.md`, migration
+mechanics, `core/project_scope.php`, `core/feature_registry.php`,
+`core/notify.php`); (4) a direct read of `header.php`'s and `roots.php`'s
+real, current POS navigation wiring (see Phase 30 below) to ground the
+navigation redesign in the actual mechanism, not an assumed one.
+
+**The gap this closes:** the product owner's businesses span pharmacy,
+restaurant, pub, stationery, vehicle-spares, and supermarket — but BMS's POS
+is one fixed terminal regardless of warehouse. SalePro solves this not with a
+"pharmacy mode" or "vehicle-spares mode" but with (a) a **per-warehouse POS
+mode switch** (Retail vs. Restaurant) and (b) a dedicated **Restaurant
+module** (tables, kitchen routing, item modifiers) for restaurant/pub, while
+(c) richer **product-level data** (variants, serials, warranty, promotional
+pricing) is what lets the *generic* retail engine serve pharmacy/stationery/
+supermarket/spares-counter-sales without any vertical-specific code at all.
+This tier builds the BMS equivalent of those things — reusing existing BMS
+infrastructure at every point below, not a parallel system — **and stops
+there**: it does not create a new business module outside POS (see the
+"Cut from this plan" note immediately below).
+
+**Cut from this plan, 2026-09-11, with reasons (not silently dropped):**
+- **Repair / Service-Job module — removed entirely, not deferred.** The
+  2026-09-10 draft of this tier included a full ticketing workflow (its own
+  `app/bms/repair/` nav module, its own permission set, billing that reaches
+  into the shared `invoices`/Accounting tables) for vehicle-garage/
+  electronics-repair businesses. On explicit re-scoping instruction
+  ("focus only on POS... should not destroy or harm other modules at all"),
+  this was cut: a job-ticket workflow is not a point-of-sale concern — it is
+  a distinct business module (closer in shape to BMS's existing
+  Project Management or HR-ticket-style modules) that happens to end in a
+  bill. Building it as part of a "POS plan" would mean this plan's own
+  discipline (branch/tests/PR *per phase*, contained to POS) stops applying
+  the moment billing reaches into Accounting's tables — exactly the
+  kind of blast-radius creep the re-scoping instruction was about. If the
+  product owner wants this later, it deserves its own plan document,
+  scouted and reviewed on its own terms, not smuggled into a POS tranche.
+- **Booking/Appointment engine — cut down from a generic, reusable-anywhere
+  calendar to a thin, POS-only reservation slot list.** The original design
+  (`booking_type: general/service_appointment/table_reservation`,
+  `resource_type: table/employee/none`) was deliberately generic so it could
+  later serve non-POS use cases too — but "could be reused by other modules
+  later" is itself a wider surface than "improve POS," and a generic engine
+  is a bigger, more cross-cutting thing to get right than the one feature
+  POS actually needs. Rebuilt inside Phase 30 below as `restaurant_
+  reservations` — table bookings only, owned entirely by the Restaurant
+  sub-module, no ambition to be a platform-wide scheduler.
+
+**One naming correction made before designing anything:** the word
+"workflow" is already a live BMS concept (`workflow_documents`/
+`workflow_steps`/`workflow_signatures` — the document e-signature/
+approval-chain engine used by tenders/POs/quotations/invoices/sales orders).
+The new per-warehouse POS switch is named **`pos_mode`**, not "POS workflow",
+to avoid colliding with that existing, unrelated feature.
+
+**Ground rules for this whole tier (verified against real code, not
+assumed):**
+- **Every new table carries `warehouse_id`** and reuses the existing
+  generic `scopeFilterSqlNullable('warehouse', alias)` / `userCan('warehouse',
+  $id)` (`core/project_scope.php`) — the same ACL §3 Phase 6 already wired
+  into POS/reports/dashboard. No new access-control mechanism anywhere in
+  this tier.
+- **Every new feature is a new `core/feature_registry.php` entry**,
+  `default: false`, enforced UI-side **and** API-side, double-checked at
+  runtime — identical shape to the existing `pos_advanced` entry. Invisible
+  to every existing tenant until a superadmin grants it.
+- **Every schema change ships in two matching halves**: a
+  `migrations/tenant/YYYY_MM_DD_*.php` file (auto-applied to every existing
+  tenant by `core/tenant_migration_runner.php` — one tenant's failure stops
+  only that tenant) **and** the identical change in
+  `schema/tenant_schema_template.sql` (+ `schema/tenant_seed_defaults.sql`
+  for seeded rows), so a brand-new signup gets it from day one instead of
+  relying on the migration backlog. Skipping the second half is exactly the
+  "hanging logic" failure mode called out by the product owner — flagged
+  explicitly per phase below so it can't be silently missed.
+- **Every new column defaults to reproducing today's behaviour exactly.**
+  `warehouses.pos_mode` defaults `'retail'` for every existing and new
+  warehouse — the POS terminal renders byte-for-byte identical to today
+  until an admin explicitly flips one warehouse. No workflow-picker modal
+  appears anywhere until a warehouse actually opts in.
+- **"Assigned staff" always reuses the existing `assigned_to` convention**
+  (`crm_leads`, `loan_risk_factors` already use this exact column name/shape,
+  FK to `users.user_id`) — never a new `waiter_id` column, confirmed there is
+  no such precedent to fork from. A waiter picker filters by
+  `employees.warehouse_id` — a real existing employee/user record, never a
+  new "staff type" entity.
+- **A shared file touched by every module (`header.php`, `roots.php`, any
+  ENUM column another module also reads) is edited only additively, and
+  only inside the lines that already belong to POS.** Phase 30 states
+  exactly which lines of `header.php` it touches and proves, by test, that
+  every other module's menu entry is byte-for-byte unchanged.
+- **Every phase**: its own branch off `develop`, its own
+  `tests/test_*_cli.php` (transaction-rolled-back, reconciled to direct SQL),
+  its own PR into `develop`, its own `changelog.md` entry, and a full re-run
+  of the entire existing `tests/test_pos_*_cli.php` suite (20+ files) before
+  merge — proving a plain retail warehouse is completely unaffected. No phase
+  starts without an explicit go-ahead on that phase specifically.
+
+**Numbering note:** Phase 27 (Repair) and Phase 28 (the original generic
+Booking engine) are kept as short historical stubs at their original slots
+rather than reused for new content — same convention this document already
+uses for Phase 24 (§8, deferred but not renumbered-over). The active,
+buildable phases in this tranche are 25, 26, 29, 30, 31.
+
+**Recommended build order** (lowest blast-radius first — data-only changes,
+then a page-local dashboard, then the highest-touch phase that reorganizes
+shared navigation and the POS terminal, then the most invasive schema change
+last):
+
+1. Phase 25 — Product professional fields
+2. Phase 26 — Serial/IMEI-level stock
+3. Phase 29 — POS Dashboard Intelligence (Sales Targets, Top Cashiers,
+   Damage/Shrinkage)
+4. Phase 30 — Restaurant Module + POS Navigation Reorganization (tables,
+   kitchen, modifiers, recipes, table reservations, and the one-time
+   regrouping of every POS menu entry into a single coherent, gated menu)
+5. Phase 31 — Product Variants
+
+---
+
+### Phase 25 — Product professional fields (Warranty/Guarantee, barcode
+symbology, promotional pricing)
+
+**Status:** APPROVED, not yet built. **Closes:** the pharmacy/stationery/
+supermarket/vehicle-spares-counter gaps that don't need a new module, just
+richer product data — the same conclusion SalePro's own architecture reaches
+(one generic Retail engine, richer product records, no vertical-specific
+code).
+
+**What exists today (confirmed by direct schema read):** `products` already
+has `warranty_period` (int, **no unit** — days vs. months is ambiguous),
+`serial_number` (a single free-text value on the product row, not a per-unit
+table — Phase 26 below is what actually fixes this), `manufacturer`, `model`,
+`barcode` (a single varchar, no symbology/format column). No `guarantee_*`
+columns exist. No promotional/scheduled-price concept exists — Phase 14's
+price groups are customer-tier pricing, not time-bound promotions.
+
+**Build:**
+- `products.warranty_unit ENUM('days','months','years')` (new, resolves the
+  existing column's ambiguity) + `products.guarantee_period INT` +
+  `products.guarantee_unit ENUM('days','months','years')` (new — a distinct
+  concept from warranty, as seen in the SalePro product form).
+- `products.barcode_symbology ENUM('CODE128','CODE39','UPC_A','UPC_E',
+  'EAN_8','EAN_13') DEFAULT 'CODE128'` (new) — pure additive column read by
+  the existing barcode-print page (`api/pos/... print barcode`); zero
+  behaviour change until a product explicitly picks a different symbology.
+- New table `product_promotions` (`promo_id, product_id, price, starts_at,
+  ends_at, status ENUM('active','inactive'), created_by, created_at,
+  updated_at`) — **extends the exact function Phase 14 already extracted**,
+  `core/pos_price_groups.php::resolveGroupPrices()`, with one additional
+  resolution layer checked *before* the price-group lookup: an active,
+  in-window promo price wins, else fall through to the price-group price,
+  else `products.selling_price` — same function, same call sites
+  (`api/pos/simple_products.php`, `api/pos/process_sale.php`), not a new
+  pricing engine.
+- Receipt/invoice line rendering shows a "was / now" strike-through when a
+  promo price applied (cosmetic, `print_receipt.php` only).
+- **Files:** `migrations/tenant/2026_09_10_pos_product_professional_fields.php`
+  (+ matching change in `schema/tenant_schema_template.sql`),
+  `app/bms/product/product_edit.php` (new fields), `core/pos_price_groups.php`
+  (`resolveGroupPrices()` promo layer), `api/pos/print_receipt.php`
+  (was/now line).
+- **Tests:** extend `tests/test_pos_price_groups_cli.php` with a promo-price
+  section (active promo wins; expired/future promo falls through; reconciles
+  to direct SQL) rather than a new file, since it's the same resolver.
+- **Gate:** base `pos` (data quality, not an upsell — every tenant should be
+  able to set a warranty/promo, same boundary logic as Phase 22's receipt
+  templates).
+
+---
+
+### Phase 26 — Serial/IMEI-level stock tracking
+
+**Status:** APPROVED, not yet built. **Depends on:** nothing (independent of
+Phase 25, can build in parallel if ever desired — sequenced after 25 only for
+"quick win first" pacing). **Closes:** selling a specific traceable unit (a
+phone, a vehicle part, an appliance) instead of just a quantity — a real gap
+for the vehicle-spares and electronics verticals.
+
+**What exists today:** `products.track_inventory` (boolean, quantity-based
+only). No per-unit identity table anywhere. Phase 17's `product_batches` is
+the closest existing pattern (a decrementing quantity pool per batch) but a
+serial is qty-always-1, not a pool.
+
+**Build:**
+- New table `product_serials` (`serial_id, product_id, warehouse_id,
+  serial_number, status ENUM('in_stock','sold','returned','damaged'),
+  sale_item_id, receipt_id, created_at, updated_at`) — **modeled directly on
+  Phase 17's `product_batches`/`pos_sale_item_batches` shape**, generalized
+  to single units instead of a decrementing pool. `UNIQUE(product_id,
+  serial_number)`.
+- `products.track_serials TINYINT(1) DEFAULT 0` (new) — a product with the
+  flag off (the default, every existing product) behaves exactly as today,
+  same backward-compatibility rule Phase 17 used for non-batch-tracked
+  products.
+- **Injection point, verified exact against a full read of
+  `process_sale.php`**: immediately alongside the existing
+  `consumeFefoBatches()` call in the per-line loop — a serial-tracked line
+  carries the specific `serial_number` the cashier picked (POS UI: a small
+  serial picker appears only when `track_serials=1`, mirroring Phase 17's
+  batch-picker pattern), resolved and locked in the same transaction,
+  written to a new `pos_sale_item_serials` child table
+  (`id, sale_item_id, serial_id, created_at`) — **the identical child-table
+  pattern** as `pos_sale_item_batches`, inserted right after the
+  `pos_sale_items` row for that line is captured (the exact spot the code
+  audit identified).
+- Void/return flips the serial back to `in_stock`, mirroring Phase 17's
+  batch-reversal logic exactly (`reverseFefoBatchConsumption()`'s sibling
+  function for serials).
+- **Bundled fix, relocated from the removed Repair phase (see Phase 27
+  above):** the same migration file also `ALTER ... MODIFY`s
+  `stock_movements.reference_type` to add the two values Phase 23's own
+  audit found already missing and being silently coerced to `''` under this
+  server's non-strict `sql_mode`: `'pos_void'` and `'pos_return'`. This is a
+  fix to already-broken behaviour (confirmed present on unmodified
+  `develop`), touched here only because this phase already needs to modify
+  that same column's related consume/reverse code path — not a new risk
+  introduced by this phase, and not a reason to touch the enum a second time
+  later.
+- GRN receiving: `api/create_grn.php`/`api/approve_grn.php` gain an optional
+  per-line serial-entry grid (only shown for `track_serials=1` products),
+  writing `product_serials` rows on approval — same "stock arrives on
+  approval, not on creation" rule Phase 17 already established for batches.
+- **Files:** `migrations/tenant/2026_09_10_pos_product_serials.php` (+
+  schema template), `core/pos_serial_tracking.php` (new —
+  `consumeSerial()`/`reverseSerial()`, independently testable like
+  `pos_batch_consumption.php`), `api/pos/process_sale.php`,
+  `api/pos/void_sale.php`/`create_return.php`, `api/create_grn.php`/
+  `approve_grn.php`, `app/bms/product/product_edit.php` (`track_serials`
+  toggle), `app/bms/pos/pos.php` + `pos_scripts_new.php` (serial picker).
+- **Tests:** `tests/test_pos_serial_tracking_cli.php` — GRN writes serial
+  rows; a sale locks the chosen serial to `sold`; void/return restores it;
+  a non-serial-tracked product is completely unaffected (regression guard);
+  a synthetic `pos_void`/`pos_return` stock-movement round-trip no longer
+  silently coerces to `''` (the relocated enum fix); reconciles to direct
+  SQL.
+- **Gate:** `pos_advanced` (a genuinely upsell-shaped capacity feature, same
+  boundary reasoning as Phase 18/21/23).
+
+---
+
+### Phase 27 — REMOVED, 2026-09-11: Repair / Service-Job module
+
+This phase (job tickets for a vehicle garage/electronics-repair counter,
+billed through the shared `invoices` table) was drafted 2026-09-10 and cut
+the next day on explicit instruction to keep this plan inside the POS
+module's own boundary. Reasoning kept here, not deleted, matching this
+document's existing convention for deferred/removed items (see §8 Phase 24):
+a job-ticket workflow is a distinct business module, not a point-of-sale
+concern, and its billing step reached into Accounting's `invoices` table —
+exactly the cross-module surface the re-scoping instruction ruled out. **One
+piece of it is small and genuinely still worth doing on its own merits,
+independent of Repair**, and has been relocated rather than lost: the
+`stock_movements.reference_type` ENUM fix (adding the missing `'pos_void'`/
+`'pos_return'` values Phase 23's own audit found being silently coerced to
+`''`) is now bundled into Phase 26 below, since Phase 26 already touches the
+same consume/reverse stock-movement code path. If a Repair/Service-Job
+module is wanted later, it should be scouted and planned as its own
+document — not re-inserted here.
+
+---
+
+### Phase 28 — MERGED, 2026-09-11: Booking / Appointment engine
+
+The original generic, reusable-anywhere calendar (`booking_type: general/
+service_appointment/table_reservation`, `resource_type: table/employee/
+none`) was cut down on explicit re-scoping instruction — a platform-wide
+scheduler is a bigger, more cross-cutting surface than the one feature POS
+actually needs. Its one real use case, table reservations, is now built as
+`restaurant_reservations` directly inside Phase 30 below, owned entirely by
+the Restaurant sub-module. Kept here as a historical stub per this
+document's numbering convention (see the note above §9 Phase 25).
+
+---
+
+### Phase 29 — POS Dashboard Intelligence (Sales Targets, Top Cashiers,
+Damage/Shrinkage)
+
+**Status:** APPROVED, not yet built. **Depends on:** nothing (independent of
+every other phase in this tier — pure additions to the already-shipped,
+already-tested `app/bms/pos/pos_dashboard.php` from §3 Phase 4). **Closes:**
+three dashboard ideas found live on the fasteeypos.com benchmark that are
+genuinely POS-scoped (unlike its Bank Accounts/Suppliers/Petty Cash tiles,
+which belong to a cross-module "Home" dashboard and are deliberately
+excluded from this plan) and cost close to nothing to add because BMS
+already captures the underlying data.
+
+**What exists today:** `app/bms/pos/pos_dashboard.php` (§3 Phase 4) already
+has a "Best Selling Products" tile built the same way these three would be
+— a scoped SQL aggregate rendered as a card, reconciled to direct SQL in
+`tests/test_pos_dashboard_cli.php`. `stock_movements.movement_type` already
+has `'damaged'`, `'expired'`, and `'theft'` values (confirmed in the live
+ENUM) that are written today by the adjustment/GRN flows but **never
+surfaced on any dashboard anywhere in BMS** — this is a pure reporting gap,
+not a data gap.
+
+**Build:**
+1. **Damage/Shrinkage tile** — a read-only aggregate: `SELECT movement_type,
+   SUM(quantity) FROM stock_movements WHERE movement_type IN
+   ('damaged','expired','theft') AND ...` scoped by
+   `scopeFilterSqlNullable('warehouse', alias)` and the dashboard's existing
+   date-range filter. **Zero schema change** — this is a new query against
+   data that already exists.
+2. **Top Performing Cashiers** — `SELECT user_id, cashier_name,
+   SUM(grand_total), COUNT(*) FROM pos_sales WHERE sale_status='completed'
+   ...` grouped and ranked, same `sale_status` filter and warehouse/date
+   scoping the existing "Best Selling Products" tile already applies. **Zero
+   schema change.**
+3. **Sales Targets vs. Actual**, with the same four achievement bands seen
+   live on fasteeypos (Achieved ≥100%, On Track ≥75%, Needs Improvement
+   ≥50%, Action Required <50%, computed at render time from
+   `actual/target`) — the one genuinely new piece of data in this phase.
+   New table `pos_sales_targets` (`target_id, warehouse_id INT NOT NULL
+   DEFAULT 0, user_id INT NOT NULL DEFAULT 0, period_month DATE, target_amount
+   DECIMAL(14,2), created_by, created_at, updated_at`,
+   `UNIQUE(warehouse_id, user_id, period_month)`). **`0` is used instead of
+   NULL for "all warehouses"/"all cashiers" deliberately** — MySQL treats
+   NULL as distinct in a UNIQUE key, which would silently allow duplicate
+   "company-wide" target rows for the same month; `0` as a sentinel (no real
+   `warehouse_id`/`user_id` is ever `0`) avoids that pitfall cleanly, no
+   application-level dedupe logic needed.
+
+**Files:** `migrations/tenant/2026_09_11_pos_sales_targets.php` (+ schema
+template — this phase's only schema change), `core/pos_dashboard_metrics.php`
+(new — `damageShrinkageSummary()`, `topCashiers()`,
+`salesTargetAchievement()`, independently testable, matching the existing
+`core/pos_shift_reporting.php` extraction pattern), `app/bms/pos/
+pos_dashboard.php` (three new tiles), `api/pos/get_dashboard.php` (extends
+its existing response with the three new blocks, reusing the same scope/
+date-range parameters it already accepts — no new endpoint), new
+`api/pos/save_sales_target.php` (CSRF, `canEdit('pos_advanced')`).
+
+**Tests:** extended into the existing `tests/test_pos_dashboard_cli.php`
+(not a new file, since this is additive to an already-tested page, same
+principle Phase 25 used for `resolveGroupPrices()`) — each new tile
+reconciles to direct SQL; the achievement-band boundaries (exactly 100%,
+75%, 50%) are asserted precisely at the edges, not just "somewhere in the
+middle"; a fresh tenant with zero data renders every new tile's proper
+empty-state (icon + message, matching the existing tiles' pattern) rather
+than a blank div or a JS error; **a `pos`-only tenant (no `pos_advanced`)
+never sees the Sales Targets tile or its "Set Targets" entry point anywhere
+in the rendered HTML** — not hidden by CSS, genuinely absent — verified by
+asserting the string is missing from the response, the same rule applied to
+Phase 30's navigation work below.
+
+**Gate:** Damage/Shrinkage and Top Cashiers are base `pos` (loss-control and
+till-hygiene visibility every tenant needs, same boundary logic as Phase
+16/19/20 — not an upsell). Sales Targets is `pos_advanced` (a
+management-set goal with its own settings UI, matching the Phase 14/18
+boundary for a genuine analytics capability).
+
+---
+
+### Phase 30 — Restaurant Module + POS Navigation Reorganization (Floors,
+Tables, Kitchen, Modifiers, Recipes, Reservations)
+
+**Status:** APPROVED, not yet built. **Depends on:** nothing structurally
+(its reservation feature is now self-contained, not borrowed from a
+separate Booking phase — see Phase 28's merge note above); sequenced after
+25/26/29 for pacing only, so the lower-risk groundwork (feature-registry
+gating, tenant-migration discipline, the `assigned_to`/warehouse-ACL
+patterns) is already proven three times over before this phase touches the
+shared POS terminal and `header.php`. **Closes:** the actual "different shop
+type" mechanism for restaurant/pub, plus the POS-wide navigation cleanup
+identified from the fasteeypos.com benchmark's two-tier icon-rail +
+contextual-submenu pattern.
+
+**Schema:**
+- `warehouses.pos_mode ENUM('retail','restaurant','hybrid') DEFAULT
+  'retail'` (new) — the one warehouse-level switch this whole tier is
+  organized around. Default preserves current behaviour for every warehouse,
+  everywhere, permanently, unless an admin explicitly changes it.
+- `restaurant_floors` (`floor_id, warehouse_id, name, sort_order`),
+  `restaurant_tables` (`table_id, warehouse_id, floor_id, table_number,
+  seats, status ENUM('available','occupied','reserved','cleaning') DEFAULT
+  'available'`).
+- `kitchen_stations` (`station_id, warehouse_id, name`);
+  `products.kitchen_station_id` (new, nullable FK) — routes a product to a
+  station, matching the exact per-product "Kitchen" field confirmed live in
+  the SalePro product form.
+- `kitchen_tickets` (`ticket_id, hold_id, warehouse_id, station_id, status
+  ENUM('queued','preparing','ready','served') DEFAULT 'queued', created_at,
+  updated_at`), `kitchen_ticket_items` (`id, ticket_id, product_id,
+  quantity, modifiers_summary, status`).
+- `modifier_groups` (`group_id, name, selection_type ENUM('single',
+  'multiple'), min_select, max_select, is_required TINYINT(1), status
+  ENUM('active','inactive')`), `modifier_options` (`option_id, group_id,
+  name, price_adjustment, status`), `product_modifier_groups` (link table,
+  `product_id, group_id`) — modeled on Phase 14's "named group + linked
+  options + linked products" shape, the same reuse-by-analogy Phase 14 itself
+  used for price groups.
+- Sale-time modifier choices land in `pos_sale_item_modifiers`
+  (`id, sale_item_id, option_id, option_name, price_adjustment,
+  created_at`) — **the identical child-table pattern** as
+  `pos_sale_item_batches`/Phase 26's `pos_sale_item_serials`, inserted at the
+  identical point in `process_sale.php` (right after the `pos_sale_items`
+  insert captures `sale_item_id`).
+- **Recipes — reuses Phase 23's combo mechanism outright, not a new
+  concept.** The fasteeypos.com benchmark lists "Ingredients" and "Recipes"
+  as distinct from menu items — i.e. a dish's stock should come from its
+  ingredients, not a phantom "dish stock." BMS already has exactly this
+  shape: `product_assembly_components` (`parent_product_id,
+  component_product_id, qty_per_unit`), already reused once for Phase 23's
+  combo products, and `is_combo`/`checkComboAvailability()`/
+  `consumeComboComponents()`/`reverseComboComponents()` already implement
+  "selling this product consumes its linked components' stock" exactly.
+  **A recipe-based menu item is simply marked `is_combo=1` with its
+  ingredients linked via `product_assembly_components`, identically to a
+  retail combo** — zero new table, zero new code path in
+  `process_sale.php`; only the product-edit UI's label changes to "Recipe
+  (Ingredients)" when the product also has `kitchen_station_id` set, purely
+  cosmetic.
+- Service type / waiter / table — **reuses existing dormant columns instead
+  of inventing new ones**: `pos_sales.sale_type` ENUM already includes
+  `'delivery'` (confirmed unused by anything today) — add `'dine_in'`/
+  `'take_away'` to that same ENUM rather than a new column.
+  `pos_sales.delivery_address`/`delivery_fee`/`delivery_time` (confirmed
+  existing, unused) are reused as-is for the Delivery service type. New:
+  `pos_sales.table_id` (nullable FK) and `pos_sales.assigned_to` (the
+  existing convention, reused for "waiter" — no new `waiter_id` column).
+- `pos_held_sales` gains `warehouse_id` and `table_id` (both new, nullable —
+  confirmed by direct read that this table currently has neither) — this is
+  what turns the *existing* hold/park-sale mechanism into an addressable
+  "open table order," not a new order-state system.
+- **Reservations — self-contained, not borrowed from a generic engine (see
+  Phase 28's merge note).** New `restaurant_reservations` (`id,
+  table_id, warehouse_id, customer_id, reservation_time, party_size, status
+  ENUM('booked','seated','completed','cancelled','no_show') DEFAULT
+  'booked', notes, created_by, created_at, updated_at`) and
+  `restaurant_reservation_reminders` (`id, reservation_id, milestone,
+  sent_at`, `UNIQUE(reservation_id, milestone)`, `INSERT IGNORE` dedupe) —
+  the same reminder-dedupe *pattern* Phase 17 already established
+  (`document_expiry_reminders`), reused because `dispatchEvent()` is a
+  shared **function call**, not a shared schema/UI surface, so reusing it
+  does not reintroduce the cross-module surface the generic Booking engine
+  was cut for.
+
+**The mechanism, end to end — every state transition named, nothing left
+implicit:**
+1. Cashier opens POS on a warehouse with `pos_mode IN ('restaurant',
+   'hybrid')` → a "Choose POS Mode" step appears (hybrid only — a pure
+   `'restaurant'` warehouse goes straight to restaurant mode; a pure
+   `'retail'` warehouse never shows this at all, zero UI change).
+2. Selecting a table loads or creates that table's open order — this **is**
+   `pos_held_sales`, now addressable by `table_id` instead of only by the
+   holding user; `restaurant_tables.status` flips to `occupied` the moment
+   an order is opened against it.
+3. Adding a product with linked modifier groups opens the selection modal,
+   enforcing each group's `min/max/required`; the chosen options are priced
+   into the cart line client-side and persisted to `pos_sale_item_modifiers`
+   only once the line is actually sold (step 6) — until then they live in
+   the held sale's JSON blob, same as every other in-progress cart field.
+4. **"Send to Kitchen"** writes/updates `kitchen_tickets`/
+   `kitchen_ticket_items` from the held sale's current contents, grouped by
+   each item's `kitchen_station_id`. This does **not** touch `pos_sales` —
+   the bill isn't finalized, only the kitchen queue and the table's
+   `occupied` status change.
+5. Kitchen Dashboard (`app/bms/restaurant/kitchen_dashboard.php`) polls
+   `kitchen_tickets` scoped by station + `scopeFilterSqlNullable('warehouse',
+   ...)`; staff advance status queued→preparing→ready→served.
+6. **"Close Bill / Pay" is the only point that calls the existing,
+   unmodified `api/pos/process_sale.php`** — passing `table_id`/
+   `sale_type`/`assigned_to` alongside the normal payload, so the sale
+   inherits GL posting, receipt printing, loyalty, everything Phases 1-24
+   already built, with zero changes to that endpoint's own logic beyond
+   accepting the three new optional fields. On success: the held-sale row
+   clears (existing behaviour, unchanged) and `restaurant_tables.status`
+   flips back to `available`.
+
+This keeps the entire Restaurant feature as additive branches around the
+existing terminal and the existing hold-sale/finalize-sale pipeline — never
+a second parallel sale-processing path. Recipes ride the same pipeline too:
+step 6's `process_sale.php` call needs **zero new logic** for a recipe-based
+dish, because Phase 23's existing `is_combo` branch already fires.
+
+**New nav module** `app/bms/restaurant/` — `floors.php`, `tables.php`,
+`reservations.php` (its own page over the new `restaurant_tables_
+reservations` table — not a filtered view over a separate engine, see the
+schema note above), `menu_type.php`, `modifier_group.php` (list + per-group
+option manager + "Manage"/"Products" linking, matching the exact SalePro
+screen shape: Name/Type/Min-Max/Required/Options/Linked Products/Status
+columns), `kitchen.php` (station admin), `kitchen_dashboard.php` (the live
+KDS view, auto-refresh poll same UX as SalePro's 5/10/15/30/60-second
+selector). Standard page skeleton throughout.
+
+**POS Navigation Reorganization — the second half of this phase, grounded in
+a direct read of the real, current wiring, not an assumed one:**
+
+*Current state, confirmed by reading `header.php` and `roots.php` directly:*
+POS's existing pages are scattered across **two unrelated dropdowns** and
+one **complete gap**. `header.php`'s "Sales" dropdown (lines ~902-908)
+carries `POS` (`pos`), `POS Dashboard & Sales` (`pos/dashboard`), and, only
+if `canView('pos_advanced')`, `Price Groups` (`pos/price-groups`).
+Separately, `header.php`'s "System/Settings" dropdown (line ~1242) carries
+`POS Settings` (`pos_config_settings`) — nowhere near the other POS links.
+And `roots.php` already defines two real, working routes —
+`pos/shifts` → `shift_history.php` and `pos/zreport` → `zreport.php` (§3
+Phase 9) — that have **no link anywhere in `header.php` at all**; they are
+reachable today only via in-page buttons inside `pos_dashboard.php`. This
+is exactly the "not well linked" problem flagged from the fasteeypos.com
+walkthrough, just discovered inside BMS's own POS instead of a competitor's.
+
+*The fix, scoped to touch only POS's own lines:* a new `core/pos_nav.php`
+(`posNavGroups(): array`) becomes the single source of truth for POS's menu
+tree — an array of named groups, each entry carrying its route, its label,
+its icon, and the `canView()` key that gates it:
+- **Sell** — POS Terminal (`pos`).
+- **Session & Tills** — Shift History (`pos/shifts`, *newly linked — closes
+  the gap above*), Z-Report (`pos/zreport`, *newly linked*).
+- **Dashboard & Reports** — POS Dashboard & Sales (`pos/dashboard`).
+- **Catalog Setup** (group itself gated `canView('pos_advanced')`) — Price
+  Groups (`pos/price-groups`), Product Variants (once Phase 31 ships).
+- **Restaurant** (group itself gated `canView('restaurant_pos')`) — Floors,
+  Tables, Reservations, Menu Type, Modifier Group, Kitchen, Kitchen
+  Dashboard.
+
+`header.php`'s existing `<?php if(canView('pos')): ?>` block (the one
+already there today) is changed to loop over `posNavGroups()` and render
+each group as a small Bootstrap `collapse` accordion **inside that same
+`<li>`** — using element IDs uniquely prefixed `posNavGroup-*` so they
+cannot collide with any other module's collapse/accordion IDs anywhere else
+in the app. **No new global JS/CSS is added; the shared dropdown wrapper
+`<li class="nav-item dropdown">` and Bootstrap's own dropdown behaviour,
+used by every other module's menu, are untouched.** `POS Settings`
+deliberately **stays** in the System/Settings dropdown — every module's own
+settings page lives there by system-wide convention, and moving only POS's
+would be an inconsistent one-off exception rather than a fix; a single
+cross-link line is added to the top of `pos_config_settings.php` pointing
+back to the POS menu instead, so nothing feels orphaned without breaking
+the convention.
+
+**Files:** `migrations/tenant/2026_09_10_pos_restaurant_module.php` (+ schema
+template + seed defaults for a default floor/station on existing
+warehouses — inert until `pos_mode` is changed), `app/bms/restaurant/*.php`
+(new), `api/restaurant/*.php` (new — tables, reservations, kitchen tickets,
+modifier groups), `app/bms/pos/pos.php` + `pos_modals_new.php` +
+`pos_scripts_new.php` (mode picker, table picker, modifier modal,
+Send-to-Kitchen action — all inside `if ($warehouse['pos_mode'] !==
+'retail')` branches), `api/pos/process_sale.php` (accepts the three new
+optional fields; no change to its existing logic), `api/pos/hold_sale.php`/
+`get_held_sales.php` (table/warehouse addressing), `app/bms/product/
+product_edit.php` (Kitchen station + Modifier Groups picker + Recipe
+ingredients picker relabeling the existing combo-component UI, "Modifier
+groups are managed from Restaurant > Modifier Group" cross-link matching the
+SalePro UX note), new `core/pos_nav.php` (the menu-tree source of truth),
+`header.php` (only the existing `canView('pos')` "Sales"-dropdown block is
+restructured to loop over it; two new links added for Shift History/
+Z-Report), `app/bms/pos/pos_config_settings.php` (the cross-link line back
+to the POS menu).
+
+**Tests:** `tests/test_restaurant_pos_cli.php` — table lifecycle
+(available→occupied→available), kitchen ticket routing by station, modifier
+min/max/required enforcement and pricing math, held-sale→finalized-sale
+table linkage, a recipe-based dish decrements every linked ingredient's
+stock via the unmodified Phase 23 combo path, reservation CRUD and reminder
+milestone dedup, and a full regression re-run of every existing
+`tests/test_pos_*_cli.php` suite proving a plain retail warehouse's POS
+output is byte-for-byte unchanged. **New `tests/test_pos_nav_wiring_cli.php`**
+for the navigation half specifically: a `pos`-only user sees Shift
+History/Z-Report now present and correctly routed, while Catalog Setup and
+Restaurant groups are **completely absent from the rendered HTML** (not
+merely hidden) — and every dropdown belonging to every *other* module
+renders byte-for-byte identical to a snapshot taken before this phase; a
+`pos_advanced` user additionally sees Catalog Setup; a `restaurant_pos` user
+additionally sees all seven Restaurant links; an admin sees everything.
+
+**Gate:** new `restaurant_pos` feature-registry entry, `default: false`,
+`depends_on: ['pos']`. The navigation reorganization itself is not
+separately gated — it always renders — but each group inside it respects
+the exact same per-feature gate it already used before this phase, per
+`posNavGroups()` above.
+
+---
+
+### Phase 31 — Product Variants (size/color matrix)
+
+**Status:** APPROVED, not yet built. **Deliberately last** — the one change
+in this tier that touches the most existing surfaces, so it ships once every
+other active phase's discipline (tenant-migration hygiene, feature-gating,
+warehouse ACL reuse) has been proven three times over (Phases 25, 26, 29)
+plus once more against the highest-touch phase (30).
+
+**The reuse decision that makes this low-risk despite touching everything:**
+a variant is **a normal row in `products`** with two new columns:
+`parent_product_id` (nullable FK to `products.product_id`) and
+`variant_attributes` (JSON, e.g. `{"size":"L","color":"Red"}`) — **not a
+parallel variants table**. Because every downstream system already keys off
+`product_id` (Phase 17 batches, Phase 23 combos, Phase 14 price groups,
+per-warehouse stock, Phase 26 serials, GL posting), a variant automatically
+works with all of them with **zero changes** to those systems — the child
+row *is* a product as far as everything else in BMS is concerned.
+
+**Build:**
+- `products.parent_product_id` (new, nullable, indexed) +
+  `products.variant_attributes` (new, JSON, nullable).
+- `product_edit.php` gains an attribute-builder UI (define attribute types
+  e.g. Size/Color, define values, generate the cartesian-product child rows
+  in bulk with a shared base price/cost the admin can then adjust per
+  variant).
+- POS product grid: a parent with children renders as one tile
+  ("2 Variants" badge, matching the SalePro UX seen live); clicking opens a
+  small variant picker, then adds the chosen child's `product_id` to the
+  cart exactly like any other product — no change to `process_sale.php` at
+  all, since a variant *is* a normal `product_id` by the time it reaches
+  that endpoint.
+- **Files:** `migrations/tenant/2026_09_10_pos_product_variants.php` (+
+  schema template), `app/bms/product/product_edit.php` (attribute builder),
+  `app/bms/pos/pos_scripts_new.php` (variant tile grouping + picker modal),
+  `api/pos/simple_products.php` (groups children under their parent for the
+  grid response).
+- **Tests:** `tests/test_product_variants_cli.php` — variant generation from
+  an attribute matrix, POS line resolves to the correct child `product_id`,
+  stock/batch/serial/combo/price-group all correctly scope to the child
+  (not the parent), a non-variant product is completely unaffected.
+- **Gate:** `pos_advanced`.
