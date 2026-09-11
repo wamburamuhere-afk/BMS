@@ -25,7 +25,7 @@ if (!function_exists('run_notification_checks')) {
     function run_notification_checks(PDO $pdo): array
     {
         $isCli = (php_sapi_name() === 'cli');
-        $sum = ['invoice_overdue' => 0, 'quotation_expiring' => 0, 'tender_deadline' => 0, 'product_batch_expiring' => 0];
+        $sum = ['invoice_overdue' => 0, 'quotation_expiring' => 0, 'tender_deadline' => 0, 'product_batch_expiring' => 0, 'product_expiring' => 0];
 
         // ── Invoice overdue ────────────────────────────────────────────────
         try {
@@ -168,6 +168,70 @@ if (!function_exists('run_notification_checks')) {
             if ($isCli) echo "  product.batch_expiring: scanned " . count($batches) . " expiring batch(es).\n";
         } catch (Throwable $e) {
             error_log('run_notification_checks product.batch_expiring: ' . $e->getMessage());
+        }
+
+        // ── Plain (non-batch-tracked) product expiry ───────────────────────
+        // Gap closed 2026-09-11: the block above only ever scans
+        // `product_batches`. A product that just has `products.expiry_date`
+        // set (no batch tracking turned on for it) previously showed up on
+        // the dashboard's "expiring" widget when someone looked, but never
+        // triggered an automatic alert. Reuses the SAME `product.batch_
+        // expiring` notification_events row (zero new settings UI — any
+        // recipient/email rule already configured for it covers this too),
+        // and only fires for a product where the tenant has explicitly
+        // opted in via the pre-existing `email_alerts` checkbox
+        // (products.email_alerts — previously captured by
+        // api/update_product_alerts.php but never read by anything).
+        // Explicitly excludes anything with its own product_batches rows,
+        // so a batch-tracked product is never double-alerted by both blocks.
+        try {
+            $milestones = [30, 14, 7, 1];
+            $plain = $pdo->query("
+                SELECT p.product_id, p.product_name, p.expiry_date, ps.warehouse_id, ps.stock_quantity,
+                       DATEDIFF(p.expiry_date, CURDATE()) AS days_remaining
+                FROM products p
+                JOIN product_stocks ps ON ps.product_id = p.product_id AND ps.stock_quantity > 0
+                WHERE p.expiry_date IS NOT NULL
+                  AND p.email_alerts = 1
+                  AND p.status = 'active'
+                  AND DATEDIFF(p.expiry_date, CURDATE()) <= 30
+                  AND NOT EXISTS (SELECT 1 FROM product_batches pb WHERE pb.product_id = p.product_id)
+            ")->fetchAll(PDO::FETCH_ASSOC);
+
+            $doneStmt2   = $pdo->prepare("SELECT milestone FROM product_expiry_reminders WHERE product_id = ? AND warehouse_id = ?");
+            $recordStmt2 = $pdo->prepare("INSERT IGNORE INTO product_expiry_reminders (product_id, warehouse_id, milestone) VALUES (?, ?, ?)");
+
+            foreach ($plain as $p) {
+                $days = (int)$p['days_remaining'];
+                $reached = array_filter($milestones, fn($m) => $days <= $m);
+                if (empty($reached)) continue;
+
+                $doneStmt2->execute([$p['product_id'], $p['warehouse_id']]);
+                $done = $doneStmt2->fetchAll(PDO::FETCH_COLUMN);
+                $newMilestones = array_diff($reached, $done);
+                if (empty($newMilestones)) continue; // nothing new since the last run
+
+                foreach ($newMilestones as $m) { $recordStmt2->execute([$p['product_id'], $p['warehouse_id'], $m]); }
+
+                $expOn = date('d M Y', strtotime($p['expiry_date']));
+                $title = $days <= 0 ? 'Product expired' : ($days === 1 ? 'Product expires tomorrow' : "Product expiring in {$days} days");
+
+                $res = dispatchEvent($pdo, 'product.batch_expiring', [
+                    'entity_type'   => 'product',
+                    'entity_id'     => (int)$p['product_id'],
+                    'warehouse_id'  => (int)$p['warehouse_id'],
+                    'title'         => $title . ': ' . $p['product_name'],
+                    'message'       => "{$p['product_name']} expires on {$expOn} ({$days} day(s) remaining), "
+                                     . number_format((float)$p['stock_quantity'], 2) . ' unit(s) remaining.',
+                    'action_url'    => 'product_view?id=' . (int)$p['product_id'],
+                    'severity'      => $days <= 7 ? 'high' : 'medium',
+                    'dedupe_suffix' => 'pm' . min($newMilestones), // 'pm' = plain-product milestone, distinct from batch dedupe
+                ]);
+                if (!empty($res['dispatched'])) $sum['product_expiring'] += (int)$res['created'] + (int)$res['emailed'];
+            }
+            if ($isCli) echo "  product.expiring (plain products): scanned " . count($plain) . " expiring product(s).\n";
+        } catch (Throwable $e) {
+            error_log('run_notification_checks product.expiring: ' . $e->getMessage());
         }
 
         return $sum;
