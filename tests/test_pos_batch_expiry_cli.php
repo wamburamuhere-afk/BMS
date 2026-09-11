@@ -26,6 +26,10 @@
  *      once, dedupes on a second run (idempotent), and a rule targeting a
  *      specific user + email actually resolves that one recipient with the
  *      email channel on.
+ *   9. Runtime — 2026-09-11 gap fix: a plain (non-batch-tracked) product
+ *      with expiry_date + email_alerts=1 now fires and dedupes the same way
+ *      batches do, reusing the same product.batch_expiring event; a product
+ *      that also has batch rows is excluded from this path (no double-alert).
  *
  * All DB writes happen inside rolled-back transactions — nothing persists.
  */
@@ -236,6 +240,47 @@ if (!$prodRow || !$whRow) {
     run_notification_checks($pdo);
     $afterSecond = (int)$pdo->query("SELECT COUNT(*) FROM product_batch_expiry_reminders WHERE batch_id=$dueBatchId")->fetchColumn();
     ($afterSecond === $after) ? pass('second run is idempotent — no duplicate milestone rows') : fail("dedup failed: $after -> $afterSecond");
+
+    $pdo->rollBack();
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+section('9. Runtime — plain (non-batch-tracked) product expiry alert (2026-09-11 gap fix, rolled back)');
+if (!$prodRow || !$whRow) {
+    pass('no active product/warehouse to test against — skipped (n/a)');
+} else {
+    require_once "$root/cron/run_notification_checks.php";
+
+    $pdo->beginTransaction();
+    $pid = (int)$prodRow['product_id'];
+    $wid = (int)$whRow['warehouse_id'];
+
+    // No batch rows for this product in this transaction — the NOT EXISTS
+    // guard must route it through the new plain-product block, not the
+    // existing batch block.
+    $pdo->prepare("UPDATE products SET expiry_date = DATE_ADD(CURDATE(), INTERVAL 3 DAY), email_alerts = 1, status = 'active' WHERE product_id = ?")->execute([$pid]);
+    $pdo->prepare("
+        INSERT INTO product_stocks (product_id, warehouse_id, stock_quantity, reserved_quantity)
+        VALUES (?, ?, 15, 0)
+        ON DUPLICATE KEY UPDATE stock_quantity = 15
+    ")->execute([$pid, $wid]);
+
+    $before = (int)$pdo->query("SELECT COUNT(*) FROM product_expiry_reminders WHERE product_id=$pid AND warehouse_id=$wid")->fetchColumn();
+    run_notification_checks($pdo);
+    $after = (int)$pdo->query("SELECT COUNT(*) FROM product_expiry_reminders WHERE product_id=$pid AND warehouse_id=$wid")->fetchColumn();
+    ($before === 0 && $after > 0) ? pass('a plain expiring product (no batch rows) now fires and records a milestone') : fail("plain-product milestone not recorded: before=$before after=$after");
+
+    run_notification_checks($pdo);
+    $afterSecond = (int)$pdo->query("SELECT COUNT(*) FROM product_expiry_reminders WHERE product_id=$pid AND warehouse_id=$wid")->fetchColumn();
+    ($afterSecond === $after) ? pass('second run is idempotent — no duplicate milestone rows') : fail("dedup failed: $after -> $afterSecond");
+
+    // Now give it a batch row too — the NOT EXISTS guard must suppress the
+    // plain-product path entirely so it is never double-alerted.
+    $pdo->prepare("INSERT INTO product_batches (product_id, warehouse_id, batch_number, expiry_date, quantity_received, quantity_remaining, unit_cost) VALUES (?, ?, 'BATCH-GUARD', DATE_ADD(CURDATE(), INTERVAL 3 DAY), 5, 5, 10)")->execute([$pid, $wid]);
+    $pdo->exec("DELETE FROM product_expiry_reminders WHERE product_id=$pid AND warehouse_id=$wid");
+    run_notification_checks($pdo);
+    $afterBatched = (int)$pdo->query("SELECT COUNT(*) FROM product_expiry_reminders WHERE product_id=$pid AND warehouse_id=$wid")->fetchColumn();
+    ($afterBatched === 0) ? pass('a product WITH batch rows is excluded from the plain-product path (no double-alert)') : fail("NOT EXISTS guard failed — plain-product path fired for a batch-tracked product ($afterBatched rows)");
 
     $pdo->rollBack();
 }
