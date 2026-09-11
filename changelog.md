@@ -1,5 +1,49 @@
 # BMS Changelog
 
+## 2026-09-11 (feat/comms-docs-toggle-modules) - "Comms" and "Docs" are now superadmin-switchable modules
+
+**Request:** product owner asked for "comms" and "docs" to become modules a superadmin can switch on/off
+per tenant, same as every other module (Restaurant POS, CRM, Compliance, etc.).
+
+**What was actually true before this change:** "Comms" (`communication` feature, "Messaging & Reminders")
+already existed and was already switchable — message center, notification center, SMS alerts, payment
+reminders, collection letters. It was missing one page: `email_templates.php` had no feature behind it
+at all (reachable regardless of any toggle) — a gap, not a deliberate exemption, same class as several
+other gaps this registry's own history already documents (CRM/Communication/Compliance on 2026-09-07,
+several Reports pages on 2026-09-10). "Docs" (the Document Library) had NO switchable feature at all —
+it was in the deliberate "always reachable" base set alongside dashboard/customers/products/Settings.
+
+**Fix:** `email_templates` added to the existing `communication` feature. A new `documents` feature
+("Document Library") added, covering `documents`, `document_library`, `document_templates`,
+`document_workflow`, `customer_documents`, `document_expiry_alerts` — deliberately NOT including
+Compliance Documents or E-Signatures, since both already have their own independent, already-switchable
+feature (`compliance` / `esignature`) since 2026-09-07; folding them in here would mean one toggle
+silently flips an already-independent feature too. `loan_documents` also deliberately left alone — it
+belongs to Loans, a separate concern from the general Document Library, not part of this request.
+
+Both are entitlement-layer toggles (superadmin-only by design — `core/feature_registry.php`'s own
+docblock: entitlement is decided by the platform, checked BEFORE any tenant-admin `isAdmin()` bypass; the
+per-tenant on/off switch itself lives in `app/superadmin/tenant_view.php`, driven by the same
+`features`/`tenant_features` control-DB tables every other module already uses — no separate UI needed).
+
+**Files (modified):** `core/feature_registry.php` (`email_templates` added to `communication`'s
+`page_keys`/`paths`; new `documents` feature entry; the top-of-file "always reachable" docblock
+corrected — it had drifted stale after the 2026-09-07 CRM/Communication/Compliance conversion, still
+listing "CRM, Documents (except e_signatures)" as always-on after CRM had already moved), `tests/
+test_feature_registry_cli.php` (its own hardcoded "documented always-on" list updated to match — the
+same maintenance every prior conversion needed; extended with a new §13, 11 live assertions: flips
+`documents`/`communication` off and confirms every owned page is actually blocked — even for an admin
+session, entitlement is checked first — while the adjacent, already-independent `compliance`/
+`esignature` features stay completely unaffected, proving `documents` doesn't accidentally also own
+their pages).
+
+Verified live: `canView()` checked directly (not assumed) for every affected + adjacent page_key, in
+both the off and re-enabled state. Full regression sweep clean (124/125 — the one failure is unrelated,
+pre-existing real-tenant data drift: `tenant_features` already carries live grant rows for tenant #85
+predating this change, flagged separately, not touched).
+
+---
+
 ## 2026-09-11 (feat/pos-tier4-professional-retail) - CRITICAL follow-up: whole Restaurant module crashed the same way for an entitled-but-unmigrated tenant
 
 **Severity: P0, same root cause as the earlier critical fix, different code path.** Two more Sentry
