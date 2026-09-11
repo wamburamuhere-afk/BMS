@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-09-11 (feat/pos-tier4-professional-retail) - POS Tier-4 Phase 31: Product Variants (size/color matrix) — completes the Tier-4 plan
+
+**Scope note:** the final phase of `pos_upgrade_plan.md`'s Tier-4 tranche (Phases 25/26/29/30/31, all now
+✅ DONE). A variant is a normal row in `products` (two new nullable columns — `parent_product_id`,
+`variant_attributes` JSON — not a parallel table), so every downstream system that already keys off
+`product_id` (batches, serials, combos, price groups, per-warehouse stock, GL posting) works with a
+variant with zero changes there. Verified for real, not just asserted, in
+`tests/test_product_variants_cli.php`.
+
+**Files (new):** `migrations/tenant/2026_09_11_pos_product_variants.php` + legacy-DB mirror
+`migrations/2026_09_11_pos_product_variants_legacy_db.php` — `products.parent_product_id` (nullable FK,
+indexed) + `products.variant_attributes` (nullable JSON); both inert until an admin explicitly generates
+variants for a product. `api/generate_product_variants.php` — bulk-inserts the cartesian product of an
+attribute matrix (e.g. Size x Color) as real product rows, reusing the parent's category/brand/supplier/
+unit/tax/status; gated `canView('pos_advanced')` + `canCreate('products')`; rejects a variant-of-a-variant,
+a service, or a combo/bundle as the parent; caps a single matrix at 200 generated rows; re-running the
+same attribute combination is skipped, not duplicated (normalized, key-sorted `variant_attributes` JSON
+compare). `tests/test_product_variants_cli.php` (51 assertions).
+
+**Files (modified):** `app/bms/product/product_edit.php` (Variants section — a child shows read-only
+"variant of X" info; a top-level product shows its existing variants + the attribute-builder generator, gated
+`pos_advanced` and hidden for services), `api/pos/simple_products.php` (a variant child never appears as
+its own top-level grid tile — `AND p.parent_product_id IS NULL`; a parent now carries `variant_count`; a
+new `parent_product_id` GET filter serves the picker's own "this parent's children" request, same
+endpoint, no new file), `app/bms/pos/pos_scripts_new.php` (`openVariantPicker()` — a parent tile with
+`variant_count > 0` opens the picker instead of quick-view directly; picking a specific child hands
+straight off to the existing, completely unmodified `showProductQuickView()`/`addToCart()`/
+`process_sale.php` pipeline, since a variant *is* a normal `product_id` by the time it reaches checkout),
+`app/bms/pos/pos_modals_new.php` (variant picker modal), `core/feature_registry.php` (`pos_advanced`'s
+`paths` list extended), `lang/sw.php` (new translation keys, `tests/test_pos_i18n_coverage_cli.php`
+re-verified clean at 132/132).
+
+---
+
 ## 2026-09-11 (feat/pos-tier4-professional-retail) - POS Tier-4 Phase 30 (UI/nav/tests half, completing the phase): Restaurant Module
 
 **Scope note:** completes Phase 30 (the backend/schema half shipped earlier the same day — see the

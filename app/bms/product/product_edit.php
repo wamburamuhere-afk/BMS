@@ -108,6 +108,34 @@ if ($restaurant_pos_entitled) {
     }
 }
 
+// Phase 31 (pos_upgrade_plan.md §8) — Product Variants. A variant is a
+// normal products row (parent_product_id + variant_attributes JSON), so
+// this is just two extra lookups: is THIS product itself a variant child
+// (show read-only parent info, no generator), or does it have variant
+// children of its own (show them + the attribute-builder generator)?
+$pos_advanced_entitled = canView('pos_advanced');
+$variant_parent = null;
+$variant_children = [];
+if ($pos_advanced_entitled && !$product['is_service']) {
+    try {
+        if (!empty($product['parent_product_id'])) {
+            $pStmt = $pdo->prepare("SELECT product_id, product_name FROM products WHERE product_id = ?");
+            $pStmt->execute([(int)$product['parent_product_id']]);
+            $variant_parent = $pStmt->fetch(PDO::FETCH_ASSOC);
+        } else {
+            $cStmt = $pdo->prepare("
+                SELECT product_id, product_name, sku, selling_price, cost_price, status, variant_attributes
+                FROM products WHERE parent_product_id = ? ORDER BY product_name
+            ");
+            $cStmt->execute([$product_id]);
+            $variant_children = $cStmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+    } catch (PDOException $e) {
+        $variant_parent = null;
+        $variant_children = [];
+    }
+}
+
 // Fetch current stock per warehouse for this product
 $stock_per_warehouse = [];
 try {
@@ -169,6 +197,79 @@ function onKitchenStationChange() {
     $('#comboToggleLabel').text(isRecipe ? RECIPE_STRINGS.recipeLabel : RECIPE_STRINGS.comboLabel);
     $('#comboToggleHint').text(isRecipe ? RECIPE_STRINGS.recipeHint : RECIPE_STRINGS.comboHint);
     $('#comboComponentsLabel').text(isRecipe ? RECIPE_STRINGS.recipeComponents : RECIPE_STRINGS.comboComponents);
+}
+
+// Phase 31 (pos_upgrade_plan.md §8) — Product Variants attribute-builder.
+// Purely client-side row bookkeeping; the actual cartesian-product
+// generation happens server-side in api/generate_product_variants.php,
+// which never trusts anything from here beyond the attribute name/value
+// strings themselves.
+let variantAttrRowSeq = 0;
+function addVariantAttributeRow(name = '', values = '') {
+    const rowId = 'va-row-' + (variantAttrRowSeq++);
+    const row = $(`
+        <div class="row g-2 mb-2 align-items-end" id="${rowId}">
+            <div class="col-sm-3">
+                <label class="form-label small"><?= json_encode(t('Attribute name')) ?></label>
+                <input type="text" class="form-control form-control-sm va-name" placeholder="<?= t('e.g. Size') ?>">
+            </div>
+            <div class="col-sm-7">
+                <label class="form-label small"><?= json_encode(t('Values (comma separated)')) ?></label>
+                <input type="text" class="form-control form-control-sm va-values" placeholder="<?= t('e.g. S, M, L') ?>">
+            </div>
+            <div class="col-sm-2">
+                <button type="button" class="btn btn-sm btn-outline-danger w-100" onclick="$('#${rowId}').remove()">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+    `);
+    row.find('.va-name').val(name);
+    row.find('.va-values').val(values);
+    $('#variantAttributeRows').append(row);
+}
+
+function generateProductVariants(btn) {
+    const attributes = {};
+    $('#variantAttributeRows > div').each(function () {
+        const name = $(this).find('.va-name').val().trim();
+        const values = $(this).find('.va-values').val().split(',').map(v => v.trim()).filter(v => v.length);
+        if (name && values.length) attributes[name] = values;
+    });
+    if (Object.keys(attributes).length === 0) {
+        $('#variantGenerateMsg').html('<div class="alert alert-warning py-2 mb-0"><?= json_encode(t('Add at least one attribute type with at least one value.')) ?></div>');
+        return;
+    }
+
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> <?= json_encode(t('Generating...')) ?>';
+
+    $.ajax({
+        url: '<?= buildUrl('api/generate_product_variants.php') ?>',
+        type: 'POST',
+        data: {
+            parent_product_id: PRODUCT_ID,
+            attributes: JSON.stringify(attributes),
+            base_price: $('#variantBasePrice').val(),
+            base_cost: $('#variantBaseCost').val(),
+            _csrf: <?= json_encode(csrf_token()) ?>
+        },
+        dataType: 'json',
+        success: function (res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: res.message, timer: 1800, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                $('#variantGenerateMsg').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(res.message) + '</div>');
+                btn.disabled = false; btn.innerHTML = orig;
+            }
+        },
+        error: function () {
+            $('#variantGenerateMsg').html('<div class="alert alert-danger py-2 mb-0"><?= json_encode(t('Server error.')) ?></div>');
+            btn.disabled = false; btn.innerHTML = orig;
+        }
+    });
 }
 
 $(document).ready(function() {
@@ -937,6 +1038,91 @@ function deleteSellingUnit(id) {
                                     <?= t('Modifier groups are managed from Restaurant > Modifier Group.') ?>
                                 </small>
                             </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if ($pos_advanced_entitled && !$product['is_service'] && $variant_parent): ?>
+                        <!-- Phase 31 (pos_upgrade_plan.md §8) — this product IS a variant child.
+                             Read-only info; the generator only lives on the parent. -->
+                        <div class="col-md-12 mt-4 p-3 bg-white border rounded">
+                            <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary">
+                                <i class="bi bi-diagram-2 me-1"></i> <?= t('Product Variant') ?>
+                            </h6>
+                            <p class="mb-2">
+                                <?= t('This is a variant of') ?>
+                                <a href="<?= getUrl('product_edit') ?>?id=<?= (int)$variant_parent['product_id'] ?>"><?= safe_output($variant_parent['product_name']) ?></a>.
+                            </p>
+                            <?php
+                            $va = json_decode($product['variant_attributes'] ?? '{}', true) ?: [];
+                            foreach ($va as $attrName => $attrValue):
+                            ?>
+                            <span class="badge bg-light text-dark border me-1"><?= safe_output($attrName) ?>: <?= safe_output($attrValue) ?></span>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php elseif ($pos_advanced_entitled && !$product['is_service']): ?>
+                        <!-- Phase 31 (pos_upgrade_plan.md §8) — Product Variants (size/color matrix).
+                             A variant is a normal products row; generating a matrix here just bulk-creates
+                             child rows via api/generate_product_variants.php, then the admin fine-tunes
+                             each one (price/cost/sku/stock) through this same edit page, per child. -->
+                        <div class="col-md-12 mt-4 p-3 bg-white border rounded">
+                            <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary">
+                                <i class="bi bi-diagram-2 me-1"></i> <?= t('Product Variants') ?>
+                            </h6>
+
+                            <?php if (!empty($variant_children)): ?>
+                            <div class="table-responsive mb-3">
+                                <table class="table table-sm table-hover border">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th><?= t('Variant') ?></th>
+                                            <th><?= t('Attributes') ?></th>
+                                            <th class="text-end"><?= t('Price') ?></th>
+                                            <th><?= t('Status') ?></th>
+                                            <th class="text-end"><?= t('Actions') ?></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($variant_children as $vc): $vAttrs = json_decode($vc['variant_attributes'] ?? '{}', true) ?: []; ?>
+                                        <tr>
+                                            <td><?= safe_output($vc['product_name']) ?></td>
+                                            <td>
+                                                <?php foreach ($vAttrs as $an => $av): ?>
+                                                <span class="badge bg-light text-dark border me-1"><?= safe_output($an) ?>: <?= safe_output($av) ?></span>
+                                                <?php endforeach; ?>
+                                            </td>
+                                            <td class="text-end"><?= number_format((float)$vc['selling_price'], 2) ?></td>
+                                            <td><span class="badge bg-<?= $vc['status'] === 'active' ? 'success' : 'secondary' ?>"><?= safe_output($vc['status']) ?></span></td>
+                                            <td class="text-end">
+                                                <a class="btn btn-sm btn-outline-primary" href="<?= getUrl('product_edit') ?>?id=<?= (int)$vc['product_id'] ?>">
+                                                    <i class="bi bi-pencil"></i> <?= t('Edit') ?>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php endif; ?>
+
+                            <p class="text-muted small mb-2"><?= t('Define attribute types (e.g. Size, Color) and their values, then generate every combination as its own sellable product — stock, batches, serials and pricing all track the specific variant, not this parent.') ?></p>
+                            <div id="variantAttributeRows"></div>
+                            <button type="button" class="btn btn-sm btn-outline-primary mb-3" onclick="addVariantAttributeRow()">
+                                <i class="bi bi-plus-circle me-1"></i> <?= t('Add Attribute Type') ?>
+                            </button>
+                            <div class="row g-2 mb-2">
+                                <div class="col-sm-4">
+                                    <label class="form-label small"><?= t('Base Selling Price (optional — defaults to this product\'s own price)') ?></label>
+                                    <input type="number" step="0.01" class="form-control form-control-sm" id="variantBasePrice">
+                                </div>
+                                <div class="col-sm-4">
+                                    <label class="form-label small"><?= t('Base Cost Price (optional)') ?></label>
+                                    <input type="number" step="0.01" class="form-control form-control-sm" id="variantBaseCost">
+                                </div>
+                            </div>
+                            <div id="variantGenerateMsg" class="mb-2"></div>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="generateProductVariants(this)">
+                                <i class="bi bi-magic me-1"></i> <?= t('Generate Variants') ?>
+                            </button>
                         </div>
                         <?php endif; ?>
 

@@ -2353,11 +2353,21 @@ gate it already used before this redesign, per `posNavGroups()` above.
 
 ### Phase 31 — Product Variants (size/color matrix)
 
-**Status:** APPROVED, not yet built. **Deliberately last** — the one change
-in this tier that touches the most existing surfaces, so it ships once every
-other active phase's discipline (tenant-migration hygiene, feature-gating,
-warehouse ACL reuse) has been proven three times over (Phases 25, 26, 29)
-plus once more against the highest-touch phase (30).
+**Status:** ✅ DONE · **Built:** 2026-09-11 · **Branch:** `feat/pos-tier4-professional-retail`.
+**Deliberately last** — the one change in this tier that touches the most
+existing surfaces, so it shipped once every other active phase's discipline
+(tenant-migration hygiene, feature-gating, warehouse ACL reuse) had been
+proven three times over (Phases 25, 26, 29) plus once more against the
+highest-touch phase (30). Verified live: `tests/test_product_variants_cli.php`
+(51 assertions — schema, wiring, cartesian-product generation from a real
+attribute matrix with unique naming, re-generation dedupe, the POS grid's
+parent-only top-level shape + variant_count, stock/price-group scoping to
+the specific CHILD product_id and not the parent or a sibling, a combo
+correctly rejected as a variant parent, and a completely unrelated product
+proven unaffected — plus a regression sweep of the product/POS catalog
+suites most likely to notice a variant-column regression). Live-rendered
+(no warnings/fatals) via a direct in-process smoke test of both
+`product_edit.php` (Variants section) and `pos.php` (variant picker wiring).
 
 **The reuse decision that makes this low-risk despite touching everything:**
 a variant is **a normal row in `products`** with two new columns:

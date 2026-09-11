@@ -172,7 +172,12 @@ const PT = {
     selectTableFirst: <?= json_encode(t('Select a table first.')) ?>,
     modifiersLabel: <?= json_encode(t('Options')) ?>,
     modifierRequired: <?= json_encode(t('"%s" is required.')) ?>,
-    modifierMinMax: <?= json_encode(t('Choose between %min% and %max% option(s) for "%group%".')) ?>
+    modifierMinMax: <?= json_encode(t('Choose between %min% and %max% option(s) for "%group%".')) ?>,
+    // Phase 31 (pos_upgrade_plan.md §8) — Product Variants strings.
+    variantsLabel: <?= json_encode(t('Variants')) ?>,
+    selectVariant: <?= json_encode(t('Select Variant')) ?>,
+    loadingVariants: <?= json_encode(t('Loading variants...')) ?>,
+    noVariantsAvailable: <?= json_encode(t('No variants available.')) ?>
 };
 
 // Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split: a cashier
@@ -546,14 +551,25 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                         imageContent = `<i class="bi ${isService ? 'bi-briefcase' : 'bi-box-seam'}" style="font-size: 3rem; color: #0d6efd;"></i>`;
                     }
 
+                    // Phase 31 (pos_upgrade_plan.md §8) — a variant parent (variant_count > 0)
+                    // renders as ONE tile; tapping it opens the variant picker instead of
+                    // going straight to quick-view/add-to-cart. A plain, non-variant product
+                    // (variant_count is always 0 unless pos_advanced is entitled) behaves
+                    // byte-for-byte as before.
+                    const variantCount = parseInt(product.variant_count) || 0;
+                    const tileClickHandler = variantCount > 0
+                        ? `openVariantPicker(${product.product_id})`
+                        : `showProductQuickView(${product.product_id})`;
+
                     const card = `
                         <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6">
-                            <div class="card product-card h-100 ${projectStock > 0 ? 'border-info shadow-sm' : ''}" onclick="showProductQuickView(${product.product_id})">
+                            <div class="card product-card h-100 ${projectStock > 0 ? 'border-info shadow-sm' : ''}" onclick="${tileClickHandler}">
                                 <div class="card-body text-center p-2">
                                     <div class="mb-2" style="height: 80px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
                                         ${imageContent}
                                         ${!isService && product.stock_quantity <= 10 ? '<span class="badge bg-danger position-absolute top-0 end-0" style="font-size: 8px;">' + PT.lowStock + '</span>' : ''}
                                         ${projectStock > 0 ? '<span class="badge bg-info position-absolute top-0 start-0" style="font-size: 8px;"><i class="bi bi-star-fill"></i> ' + PT.projectStock + '</span>' : ''}
+                                        ${variantCount > 0 ? '<span class="badge bg-primary position-absolute bottom-0 end-0" style="font-size: 8px;"><i class="bi bi-diagram-2"></i> ' + variantCount + ' ' + PT.variantsLabel + '</span>' : ''}
                                     </div>
                                     ${isService ? '<span class="badge bg-info text-white mb-1">' + PT.service + '</span>' : ''}
                                     <h6 class="card-title mb-1 small text-truncate fw-bold" title="${product.product_name}">${product.product_name}</h6>
@@ -1725,6 +1741,50 @@ function ensureModifierGroupsCache(callback) {
     }).fail(function () {
         modifierGroupsCache = [];
         callback(modifierGroupsCache);
+    });
+}
+
+// ═══════════════ Phase 31 (pos_upgrade_plan.md §8) — Product Variants ═══════════════
+// A variant is a normal product_id by the time it reaches addToCart()/
+// process_sale.php — this picker's only job is letting the cashier resolve
+// "which specific child" before the existing showProductQuickView()/
+// addToCart() flow takes over unchanged.
+function openVariantPicker(parentId) {
+    const warehouseId = $('#posWarehouseId').val();
+    const projectId = $('#posProjectId').val();
+    $('#variantPickerBody').html('<div class="text-center py-4"><div class="spinner-border text-primary"></div><div class="small text-muted mt-2">' + PT.loadingVariants + '</div></div>');
+    new bootstrap.Modal(document.getElementById('variantPickerModal')).show();
+
+    $.getJSON('<?= buildUrl('/api/pos/simple_products.php') ?>', {
+        parent_product_id: parentId,
+        warehouse_id: warehouseId,
+        project_id: projectId,
+        price_group_id: posSelectedPriceGroupId || ''
+    }, function (res) {
+        if (!res.success || !res.data.length) {
+            $('#variantPickerBody').html('<div class="alert alert-info mb-0">' + PT.noVariantsAvailable + '</div>');
+            return;
+        }
+        let html = '<div class="row g-2">';
+        res.data.forEach(v => {
+            const attrs = v.variant_attributes ? JSON.parse(v.variant_attributes) : {};
+            const attrLabel = Object.entries(attrs).map(([k, val]) => `${k}: ${val}`).join(', ');
+            const outOfStock = !v.is_service && parseFloat(v.stock_quantity) <= 0;
+            html += `
+            <div class="col-6 col-md-4">
+                <div class="card border-0 shadow-sm text-center p-2 ${outOfStock ? 'opacity-50' : ''}"
+                     style="cursor:${outOfStock ? 'not-allowed' : 'pointer'};"
+                     ${outOfStock ? '' : `onclick="bootstrap.Modal.getInstance(document.getElementById('variantPickerModal')).hide(); showProductQuickView(${v.product_id});"`}>
+                    <div class="fw-bold small">${safeOutput(attrLabel)}</div>
+                    <div class="text-primary fw-bold">${POS_CURRENCY} ${parseFloat(v.effective_price ?? v.selling_price).toLocaleString()}</div>
+                    ${!v.is_service ? `<div class="small text-muted">${PT.qtyLabel} ${v.stock_quantity}</div>` : ''}
+                </div>
+            </div>`;
+        });
+        html += '</div>';
+        $('#variantPickerBody').html(html);
+    }).fail(function () {
+        $('#variantPickerBody').html('<div class="alert alert-danger mb-0">' + PT.serverError + '</div>');
     });
 }
 

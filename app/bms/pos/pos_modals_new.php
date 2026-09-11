@@ -36,6 +36,24 @@
     </div>
 </div>
 
+<!-- Variant Picker Modal — Phase 31 (pos_upgrade_plan.md §8). Only ever
+     opened from tapping a variant-parent tile (variant_count > 0); picking
+     one child hands straight off to the existing showProductQuickView() /
+     addToCart() flow, unchanged. -->
+<div class="modal fade" id="variantPickerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-diagram-2 me-1"></i> <?= t('Select Variant') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="variantPickerBody" style="max-height:65vh;overflow-y:auto;">
+                <!-- Populated by openVariantPicker() in pos_scripts_new.php -->
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Quick Add Customer Modal — Phase 10 (pos_upgrade_plan.md §7) -->
 <div class="modal fade" id="quickAddCustomerModal" tabindex="-1">
     <div class="modal-dialog modal-sm">

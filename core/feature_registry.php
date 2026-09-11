@@ -184,6 +184,9 @@ if (!function_exists('bmsFeatureRegistry')) {
                     // feature (same boundary reasoning as Phase 18/21/23).
                     'core/pos_serial_tracking.php',
                     'api/pos/get_available_serials.php',
+                    // Phase 31 (pos_upgrade_plan.md §8) — Product Variants
+                    // (size/color matrix), same upsell-shaped boundary.
+                    'api/generate_product_variants.php',
                 ],
             ],
             // Phase 30 (pos_upgrade_plan.md §9) — Restaurant Module. A
