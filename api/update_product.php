@@ -144,6 +144,10 @@ try {
         'guarantee_period' => !empty($_POST['guarantee_period']) ? intval($_POST['guarantee_period']) : null,
         'guarantee_unit' => in_array($_POST['guarantee_unit'] ?? '', ['days', 'months', 'years'], true) ? $_POST['guarantee_unit'] : null,
         'barcode_symbology' => in_array($_POST['barcode_symbology'] ?? '', ['CODE128', 'CODE39', 'UPC_A', 'UPC_E', 'EAN_8', 'EAN_13'], true) ? $_POST['barcode_symbology'] : 'CODE128',
+        // Phase 26 (pos_upgrade_plan.md §9) — gated server-side, never trusted
+        // from the client alone: a raw POST can't turn this on for a tenant
+        // without the pos_advanced entitlement.
+        'track_serials' => (isset($_POST['track_serials']) && canView('pos_advanced')) ? 1 : 0,
         'expiry_days' => !empty($_POST['expiry_days']) ? intval($_POST['expiry_days']) : 0,
         'updated_by' => $user_id,
         'updated_at' => date('Y-m-d H:i:s')

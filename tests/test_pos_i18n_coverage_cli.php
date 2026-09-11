@@ -82,6 +82,8 @@ $apiFiles = [
     'api/pos/get_product_units.php',
     // Phase 21 (pos_upgrade_plan.md §8) — network (IP) thermal printer.
     'api/pos/print_receipt.php', 'api/pos/test_network_printer.php',
+    // Phase 26 (pos_upgrade_plan.md §9) — serial/IMEI-level stock tracking.
+    'api/pos/get_available_serials.php',
 ];
 $allFiles = array_merge($pageFiles, $apiFiles);
 

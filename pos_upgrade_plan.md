@@ -1811,7 +1811,27 @@ price groups are customer-tier pricing, not time-bound promotions.
 
 ---
 
-### Phase 26 — Serial/IMEI-level stock tracking
+### Phase 26 — Serial/IMEI-level stock tracking ✅ DONE (branch feat/pos-tier4-professional-retail)
+
+**Shipped 2026-09-11.** `product_serials` + `pos_sale_item_serials` (modeled on Phase 17's
+`product_batches`/`pos_sale_item_batches`), `products.track_serials` (default 0, zero effect on
+existing products), `core/pos_serial_tracking.php` (`consumeSerial()`/`consumeSerials()`/
+`reverseSerialsForSaleItem()`), wired into `process_sale.php` (pre-flight validation + row-locked
+consumption, mutually exclusive with FEFO batching per line), `void_sale.php`/`create_return.php`
+(full/partial reversal), GRN receiving (`create_grn.php`/`approve_grn.php` — a per-line "Serial
+Numbers" entry, parsed into rows on approval, not creation), a serial picker in the POS Add-to-Cart
+modal (replaces the quantity input; a serial-tracked line's quantity is read-only after adding — it
+IS the picked-serial count). Gated `pos_advanced`, enforced at write (product create/edit), read
+(`simple_products.php` zeroes the flag for a revoked tenant) and UI (toggle/picker genuinely absent,
+not just hidden). Bundled fix: `stock_movements.reference_type` ENUM was missing `'pos_void'`/
+`'pos_return'` (silently coerced to `''` since Phase 1/7) — fixed in the same migration, verified via
+a real round-trip. Known limitation: a partial return restores the earliest-linked serials, not a
+cashier-chosen specific unit — documented, not guessed at. Full Swahili translations added for every
+new string. Tests: `tests/test_pos_serial_tracking_cli.php` (42 checks) + full POS regression re-run
+clean (returns 25, batch/expiry 46, sale posting 18, credit AR 19, cleanup 9, price groups 66, Phase
+13 entitlement 20, feature registry 110, i18n coverage 79).
+
+<details><summary>Original plan (as approved 2026-09-08)</summary>
 
 **Status:** APPROVED, not yet built. **Depends on:** nothing (independent of
 Phase 25, can build in parallel if ever desired — sequenced after 25 only for
@@ -1878,6 +1898,8 @@ serial is qty-always-1, not a pool.
   SQL.
 - **Gate:** `pos_advanced` (a genuinely upsell-shaped capacity feature, same
   boundary reasoning as Phase 18/21/23).
+
+</details>
 
 ---
 

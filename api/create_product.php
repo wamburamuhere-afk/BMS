@@ -162,6 +162,8 @@ try {
         'guarantee_period' => !empty($_POST['guarantee_period']) ? intval($_POST['guarantee_period']) : null,
         'guarantee_unit' => in_array($_POST['guarantee_unit'] ?? '', ['days', 'months', 'years'], true) ? $_POST['guarantee_unit'] : null,
         'barcode_symbology' => in_array($_POST['barcode_symbology'] ?? '', ['CODE128', 'CODE39', 'UPC_A', 'UPC_E', 'EAN_8', 'EAN_13'], true) ? $_POST['barcode_symbology'] : 'CODE128',
+        // Phase 26 (pos_upgrade_plan.md §9) — see api/update_product.php for context.
+        'track_serials' => (isset($_POST['track_serials']) && canView('pos_advanced')) ? 1 : 0,
         'expiry_days' => !empty($_POST['expiry_days']) ? intval($_POST['expiry_days']) : 0,
         'created_by' => $user_id
     ];

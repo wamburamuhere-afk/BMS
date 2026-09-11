@@ -45,6 +45,10 @@ const PT = {
     clearCartText: <?= json_encode(t('Are you sure you want to remove all items?')) ?>,
     yesClearIt: <?= json_encode(t('Yes, clear it!')) ?>,
     loyaltyDiscountLabel: <?= json_encode(t('Loyalty discount:')) ?>,
+    serialTrackedLabel: <?= json_encode(t('Serial / IMEI numbers (select one per unit)')) ?>,
+    noSerialsAvailable: <?= json_encode(t('No serial numbers available in this warehouse.')) ?>,
+    selectAtLeastOneSerial: <?= json_encode(t('Select at least one serial number.')) ?>,
+    loadingSerials: <?= json_encode(t('Loading serial numbers...')) ?>,
     emptyCartTitle: <?= json_encode(t('Empty Cart')) ?>,
     emptyCartText: <?= json_encode(t('Add items to cart before processing payment.')) ?>,
     noActiveShiftTitle: <?= json_encode(t('No Active Shift')) ?>,
@@ -610,6 +614,8 @@ function searchProducts() {
 }
 
 let currentProductUnits = []; // Phase 15 (pos_upgrade_plan.md §8) — this product's extra selling units
+let currentProductSerials = []; // Phase 26 (pos_upgrade_plan.md §9) — this product's in_stock serials in the current warehouse
+let selectedSerials = [];       // the cashier's checked subset for the line about to be added
 
 function showProductQuickView(productId) {
     const product = products.find(p => p.product_id == productId);
@@ -617,6 +623,9 @@ function showProductQuickView(productId) {
 
     currentProduct = product;
     currentProductUnits = [];
+    currentProductSerials = [];
+    selectedSerials = [];
+    const isSerialTracked = currentProduct.is_service != 1 && currentProduct.track_serials == 1;
 
     const html = `
         <h6>${currentProduct.product_name}</h6>
@@ -631,13 +640,23 @@ function showProductQuickView(productId) {
             <select class="form-select" id="quickViewUnit" onchange="updateQuickViewUnitPrice()"></select>
         </div>
 
-        <div class="mb-3">
+        <div class="mb-3 ${isSerialTracked ? 'd-none' : ''}" id="quickViewQtyWrap">
             <label class="form-label">${PT.quantityLabel}</label>
             <div class="input-group">
                 <button class="btn btn-outline-secondary" type="button" onclick="adjustQuantity(-1)">-</button>
                 <input type="number" class="form-control text-center" id="quickViewQty"
                        value="1" min="1" step="1">
                 <button class="btn btn-outline-secondary" type="button" onclick="adjustQuantity(1)">+</button>
+            </div>
+        </div>
+
+        <div class="mb-3 ${isSerialTracked ? '' : 'd-none'}" id="quickViewSerialWrap">
+            <label class="form-label d-flex justify-content-between">
+                <span>${PT.serialTrackedLabel}</span>
+                <span class="badge bg-primary" id="quickViewSerialCount">0</span>
+            </label>
+            <div class="border rounded p-2" style="max-height:180px;overflow-y:auto;" id="quickViewSerialList">
+                <div class="text-muted small">${PT.loadingSerials}</div>
             </div>
         </div>
 
@@ -655,10 +674,26 @@ function showProductQuickView(productId) {
 
     // Proper way to handle focus in Bootstrap modals to avoid aria-hidden issues
     $('#productQuickView').off('shown.bs.modal').on('shown.bs.modal', function () {
-        $('#quickViewQty').focus().select();
+        if (!isSerialTracked) $('#quickViewQty').focus().select();
     });
 
     $('#productQuickView').modal('show');
+
+    // Phase 26 (pos_upgrade_plan.md §9) — fetch this product's in_stock
+    // serials for the currently selected warehouse. Mirrors the unit-fetch
+    // pattern immediately below.
+    if (isSerialTracked) {
+        const warehouseId = $('#posWarehouseId').val();
+        $.getJSON('<?= buildUrl('/api/pos/get_available_serials.php') ?>', { product_id: productId, warehouse_id: warehouseId }, function (res) {
+            if (currentProduct.product_id != productId) return; // modal moved on already
+            currentProductSerials = (res.success && res.data) ? res.data : [];
+            renderSerialPicker();
+        }).fail(function () {
+            if (currentProduct.product_id != productId) return;
+            currentProductSerials = [];
+            renderSerialPicker();
+        });
+    }
 
     // Phase 15 (pos_upgrade_plan.md §8) — fetch this product's extra selling
     // units (base unit is always implicitly available and needs no dropdown
@@ -698,6 +733,39 @@ function updateQuickViewUnitPrice() {
     $('#quickViewPrice').text(POS_CURRENCY + ' ' + perUnitPrice.toLocaleString());
 }
 
+// Phase 26 (pos_upgrade_plan.md §9) — renders the checkbox list of in_stock
+// serials; the running "selected" count IS the line's quantity (a serial is
+// qty-always-1), so there is no separate quantity input for these lines.
+function renderSerialPicker() {
+    const list = $('#quickViewSerialList');
+    if (!currentProductSerials.length) {
+        list.html(`<div class="text-muted small">${PT.noSerialsAvailable}</div>`);
+        $('#quickViewSerialCount').text('0');
+        return;
+    }
+    let html = '';
+    currentProductSerials.forEach(sn => {
+        const id = 'serial_' + safeOutput(sn).replace(/[^a-zA-Z0-9]/g, '_');
+        html += `
+            <div class="form-check">
+                <input class="form-check-input serial-check" type="checkbox" value="${safeOutput(sn)}" id="${id}" onchange="toggleSerialSelection(this)">
+                <label class="form-check-label small" for="${id}">${safeOutput(sn)}</label>
+            </div>`;
+    });
+    list.html(html);
+    $('#quickViewSerialCount').text(selectedSerials.length);
+}
+
+function toggleSerialSelection(checkbox) {
+    const sn = checkbox.value;
+    if (checkbox.checked) {
+        if (!selectedSerials.includes(sn)) selectedSerials.push(sn);
+    } else {
+        selectedSerials = selectedSerials.filter(s => s !== sn);
+    }
+    $('#quickViewSerialCount').text(selectedSerials.length);
+}
+
 function adjustQuantity(amount) {
     const input = $('#quickViewQty');
     let current = parseInt(input.val()) || 1;
@@ -708,7 +776,15 @@ function adjustQuantity(amount) {
 function addToCart() {
     if (!currentProduct) return;
 
-    const quantity = parseInt($('#quickViewQty').val()) || 1;
+    const isSerialTracked = currentProduct.is_service != 1 && currentProduct.track_serials == 1;
+    if (isSerialTracked && selectedSerials.length === 0) {
+        Swal.fire({ icon: 'warning', title: PT.error, text: PT.selectAtLeastOneSerial });
+        return;
+    }
+
+    // Phase 26 (pos_upgrade_plan.md §9) — a serial-tracked line's quantity IS
+    // the count of serials picked; there is no separate quantity input for it.
+    const quantity = isSerialTracked ? selectedSerials.length : (parseInt($('#quickViewQty').val()) || 1);
     const basePrice = parseFloat(currentProduct.effective_price ?? currentProduct.selling_price) || 0;
 
     // Phase 15 (pos_upgrade_plan.md §8) — unit conversion. An empty
@@ -730,7 +806,12 @@ function addToCart() {
 
     // A different unit of the same product is a DIFFERENT cart line — 2
     // pieces and 3 cartons of the same item can't be merged into one qty.
-    const existingItem = cart.find(item => item.product_id == currentProduct.product_id && (item.unit_label || '') === unitLabel);
+    // A serial-tracked line is ALSO never merged — each Add to Cart click
+    // carries its own distinct serial set, so two additions of the "same"
+    // product must stay two separate lines with their own serial_numbers.
+    const existingItem = !isSerialTracked
+        ? cart.find(item => item.product_id == currentProduct.product_id && (item.unit_label || '') === unitLabel)
+        : null;
 
     if (existingItem) {
         existingItem.quantity += quantity;
@@ -751,7 +832,10 @@ function addToCart() {
             discount_type: 'percentage', // Default to percentage
             discount_value: 0,
             discount_percent: 0,
-            discounted_price: linePrice
+            discounted_price: linePrice,
+            // Phase 26 (pos_upgrade_plan.md §9) — the specific serials this
+            // line will consume; re-validated server-side at checkout.
+            serial_numbers: isSerialTracked ? selectedSerials.slice() : undefined
         });
     }
 
@@ -817,16 +901,23 @@ function updateCartDisplay() {
                         ${POS_CAN_PRICE_OVERRIDE ? `<br><button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" style="font-size:10px;" onclick="editLinePrice(${index})" title="${PT.editPriceTitle}"><i class="bi bi-pencil"></i> ${PT.editPriceTitle}</button>` : ''}
                     </td>
                     <td class="text-center" style="padding: 0.25rem;">
-                        <div class="d-flex align-items-center justify-content-center" style="gap: 2px;">
-                            <button class="btn btn-outline-secondary" onclick="updateCartQuantity(${index}, -1)" 
-                                    style="padding: 2px 4px; font-size: 10px; line-height: 1; min-width: 18px;">-</button>
-                            <input type="number" class="form-control text-center" 
-                                   style="width: 35px; padding: 2px; font-size: 11px; height: 22px;"
-                                   value="${item.quantity}" min="1" 
-                                   onchange="updateCartQuantityInput(${index}, this.value)">
-                            <button class="btn btn-outline-secondary" onclick="updateCartQuantity(${index}, 1)" 
-                                    style="padding: 2px 4px; font-size: 10px; line-height: 1; min-width: 18px;">+</button>
-                        </div>
+                        ${item.serial_numbers ?
+                            // Phase 26 (pos_upgrade_plan.md §9) — a serial-tracked
+                            // line's quantity IS its picked serial count; editing it
+                            // here would desync from serial_numbers, so it's
+                            // read-only (remove and re-add to change the selection).
+                            `<span class="badge bg-secondary" title="${safeOutput(item.serial_numbers.join(', '))}">${item.quantity}</span>` :
+                            `<div class="d-flex align-items-center justify-content-center" style="gap: 2px;">
+                                <button class="btn btn-outline-secondary" onclick="updateCartQuantity(${index}, -1)"
+                                        style="padding: 2px 4px; font-size: 10px; line-height: 1; min-width: 18px;">-</button>
+                                <input type="number" class="form-control text-center"
+                                       style="width: 35px; padding: 2px; font-size: 11px; height: 22px;"
+                                       value="${item.quantity}" min="1"
+                                       onchange="updateCartQuantityInput(${index}, this.value)">
+                                <button class="btn btn-outline-secondary" onclick="updateCartQuantity(${index}, 1)"
+                                        style="padding: 2px 4px; font-size: 10px; line-height: 1; min-width: 18px;">+</button>
+                            </div>`
+                        }
                     </td>
                     <td class="text-end">
                         <strong class="small text-success">${itemTotal.toLocaleString()}</strong>

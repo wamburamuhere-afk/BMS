@@ -1,5 +1,60 @@
 # BMS Changelog
 
+## 2026-09-11 (feat/pos-tier4-professional-retail) - POS Tier-4 Phase 26: serial/IMEI-level stock tracking
+
+**Files (new):** `migrations/tenant/2026_09_11_pos_product_serials.php`,
+`migrations/2026_09_11_pos_product_serials_legacy_db.php` (mirrors the tenant migration onto the
+legacy/non-tenant DB in the same commit, same discipline as Phase 25), `core/pos_serial_tracking.php`
+(`consumeSerial()`/`consumeSerials()`/`reverseSerialsForSaleItem()`, modeled directly on
+`core/pos_batch_consumption.php`'s FEFO shape, generalized to single units), `api/pos/get_available_serials.php`
+(pos_advanced-gated, warehouse-scoped), `tests/test_pos_serial_tracking_cli.php` (42 checks).
+
+**Files (modified):** `api/pos/process_sale.php` (pre-flight serial availability validation + real
+row-locked consumption alongside the existing FEFO batch path — a serial-tracked line takes the serial
+branch instead, mutually exclusive per line), `api/pos/void_sale.php`/`create_return.php` (reverse
+serial consumption alongside the existing batch reversal — full for void, capped-count for a partial
+return), `api/create_grn.php`/`approve_grn.php` (optional per-line serial-entry grid; individual
+`product_serials` rows written on approval only, matching Phase 17's "stock arrives on approval, not
+creation" rule), `api/create_product.php`/`api/update_product.php` (persist `track_serials`, gated
+server-side on `canView('pos_advanced')` — never trusted from a raw POST alone), `api/pos/simple_products.php`
+(exposes `track_serials` to the POS grid, itself zeroed when `pos_advanced` has been revoked — a
+runtime double-check, not just a sale-time one), `app/bms/product/product_edit.php` (the on/off
+toggle, gated `canView('pos_advanced')`), `app/bms/grn/grn_create.php` (a "Serial Numbers" column,
+comma/newline-separated), `app/bms/pos/pos_scripts_new.php` (a serial picker in the Add-to-Cart modal
+— replaces the quantity input for a serial-tracked product; quantity IS the picked-serial count; a
+serial-tracked cart line is never merged with another and its quantity becomes read-only once added),
+`core/feature_registry.php` (new `pos_advanced` paths), `schema/tenant_schema_template.sql`,
+`tests/test_pos_i18n_coverage_cli.php` (added the new endpoint to its scanned file list), `lang/sw.php`
+(Swahili translations for every new string).
+
+**Schema:** `products.track_serials` (new, `DEFAULT 0`, zero effect on existing products), new tables
+`product_serials` (`UNIQUE(product_id, serial_number)`) and `pos_sale_item_serials`,
+`receipt_items.serial_numbers` (new, nullable, raw entry text).
+
+**Bundled fix (relocated from the removed Repair phase, §8 Phase 27's note):** `stock_movements.reference_type`
+was missing `'pos_void'`/`'pos_return'` — values `void_sale.php`/`create_return.php` have written since
+Phase 1/7 — so under this server's non-strict `sql_mode` they were silently coerced to `''` instead of
+erroring. Fixed in the same migration since it already touches this column's consume/reverse code path;
+verified live via a real INSERT/SELECT round-trip in the new test, not just a schema check.
+
+**Known, documented limitation:** a partial return's serial reversal restores the earliest-linked
+serials first, not a cashier-chosen specific unit — `create_return.php`'s UI does not yet let someone
+pick which physical serial came back on a partial return. Matches this plan's existing convention for
+bounded edge cases (see Phase 11's loyalty-reversal note); a full void is unaffected (restores every
+linked serial regardless of order).
+
+**Gate:** `pos_advanced` (a genuinely upsell-shaped capacity feature, same boundary reasoning as Phase
+18/21/23) — enforced in the UI (toggle hidden, picker never rendered), at write time
+(`create_product.php`/`update_product.php`), and at read time (`simple_products.php` zeroes the flag
+for a revoked tenant so the POS grid never shows a picker the backend would then ignore).
+
+**Verified live:** migration applied to the legacy DB and all 3 reachable tenants (2 pre-existing,
+unrelated tenants skipped — undecryptable stored credentials, confirmed present before this phase);
+`test_pos_serial_tracking_cli.php` 42/42; full POS regression re-run clean (`test_pos_returns_cli` 25,
+`test_pos_batch_expiry_cli` 46, `test_pos_sale_posting_cli` 18, `test_pos_credit_ar_cli` 19,
+`test_pos_cleanup_cli` 9, `test_pos_price_groups_cli` 66, `test_pos_phase13_entitlement_cli` 20,
+`test_feature_registry_cli` 110, `test_pos_i18n_coverage_cli` 79).
+
 ## 2026-09-11 (feat/pos-tier4-professional-retail) - POS Tier-4 Phase 25: product professional fields (warranty/guarantee units, barcode symbology, promotional pricing)
 
 **Files (new):** `migrations/tenant/2026_09_10_pos_product_professional_fields.php`,

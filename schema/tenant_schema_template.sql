@@ -5407,6 +5407,25 @@ CREATE TABLE `pos_sale_item_batches` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `pos_sale_item_serials`
+-- Phase 26 (pos_upgrade_plan.md §9) — links a sale line to the specific
+-- serial(s) it sold, consumed via core/pos_serial_tracking.php.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `pos_sale_item_serials` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `sale_item_id` int NOT NULL,
+  `serial_id` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_sale_item` (`sale_item_id`),
+  KEY `idx_serial` (`serial_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `pos_sale_items`
 --
 
@@ -5677,6 +5696,31 @@ CREATE TABLE `product_batches` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `product_serials`
+-- Phase 26 (pos_upgrade_plan.md §9) — serial/IMEI-level stock tracking.
+-- Modeled on product_batches above, generalized to single units (qty
+-- always 1). Sparse: only products with track_serials=1 get rows here.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_serials` (
+  `serial_id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `warehouse_id` int NOT NULL,
+  `serial_number` varchar(191) NOT NULL,
+  `status` enum('in_stock','sold','returned','damaged') NOT NULL DEFAULT 'in_stock',
+  `sale_item_id` int DEFAULT NULL,
+  `receipt_id` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`serial_id`),
+  UNIQUE KEY `uq_product_serial` (`product_id`,`serial_number`),
+  KEY `idx_product_wh_status` (`product_id`,`warehouse_id`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `product_categories`
 --
 
@@ -5814,6 +5858,7 @@ CREATE TABLE `products` (
   `status` enum('active','inactive','discontinued','draft','pending','approved') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'active',
   `barcode` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `barcode_symbology` enum('CODE128','CODE39','UPC_A','UPC_E','EAN_8','EAN_13') NOT NULL DEFAULT 'CODE128',
+  `track_serials` tinyint(1) NOT NULL DEFAULT '0',
   `created_by` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -6643,6 +6688,7 @@ CREATE TABLE `receipt_items` (
   `tax_amount` decimal(15,2) NOT NULL DEFAULT '0.00',
   `batch_number` varchar(100) DEFAULT NULL,
   `expiry_date` date DEFAULT NULL,
+  `serial_numbers` text,
   `notes` text,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`receipt_item_id`),
@@ -7383,7 +7429,7 @@ CREATE TABLE `stock_movements` (
   `unit_cost` decimal(15,2) DEFAULT '0.00',
   `total_cost` decimal(15,2) DEFAULT '0.00',
   `reference_id` int DEFAULT NULL,
-  `reference_type` enum('purchase_order','sales_order','pos_sale','invoice','stock_adjustment','stock_transfer','return','production_order','manual') DEFAULT NULL,
+  `reference_type` enum('purchase_order','sales_order','pos_sale','invoice','stock_adjustment','stock_transfer','return','production_order','manual','pos_void','pos_return') DEFAULT NULL,
   `reference_number` varchar(100) DEFAULT NULL,
   `movement_date` date DEFAULT NULL,
   `warehouse_id` int NOT NULL,

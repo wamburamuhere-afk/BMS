@@ -470,6 +470,7 @@ function generate_grn_number() {
                                         <?php endif; ?>
                                         <th width="10%">Batch No.</th>
                                         <th width="10%">Expiry Date</th>
+                                        <th width="12%"><?= t('Serial Numbers') ?></th>
                                         <?php if (!$is_dn): ?>
                                         <th width="5%">Total</th>
                                         <?php endif; ?>
@@ -930,8 +931,14 @@ function addItemRow(product = null) {
                        placeholder="Batch No.">
             </td>
             <td>
-                <input type="date" class="form-control item-expiry" 
+                <input type="date" class="form-control item-expiry"
                        name="items[${index}][expiry_date]">
+            </td>
+            <td>
+                <textarea class="form-control item-serials" rows="1"
+                          name="items[${index}][serial_numbers]"
+                          placeholder="<?= t('Serial-tracked products only — comma or newline separated') ?>"
+                          title="<?= t('Serial-tracked products only — comma or newline separated') ?>"></textarea>
             </td>
             <td class="<?= $is_dn ? 'd-none' : '' ?>">
                 <span class="item-total">0.00</span>
@@ -1437,7 +1444,8 @@ function createGRN(status = 'completed') {
             unit: $(this).find('.item-unit').val(),
             unit_price: $(this).find('.item-price').val(),
             batch_number: $(this).find('.item-batch').val(),
-            expiry_date: $(this).find('.item-expiry').val()
+            expiry_date: $(this).find('.item-expiry').val(),
+            serial_numbers: $(this).find('.item-serials').val()
         };
         
         if (item.product_name && item.quantity_received) {

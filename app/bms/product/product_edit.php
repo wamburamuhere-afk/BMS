@@ -826,6 +826,24 @@ function deleteSellingUnit(id) {
                         </div>
                         <?php endif; ?>
 
+                        <?php if (!$product['is_service'] && canView('pos_advanced')): ?>
+                        <!-- Phase 26 (pos_upgrade_plan.md §9) — serial/IMEI-level stock
+                             tracking. Individual serials are captured at GRN receiving
+                             (Purchase > GRN), not here — this is only the on/off switch. -->
+                        <div class="col-md-12 mt-4 p-3 bg-white border rounded">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="track_serials_toggle" name="track_serials"
+                                       value="1" <?= !empty($product['track_serials']) ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-bold text-primary" for="track_serials_toggle">
+                                    <i class="bi bi-upc-scan me-1"></i> <?= t('Track by Serial / IMEI Number') ?>
+                                </label>
+                            </div>
+                            <p class="text-muted small mb-0">
+                                <?= t('Each unit of this product is sold as a specific, traceable serial/IMEI number instead of a plain quantity. Serial numbers are entered when receiving stock via GRN.') ?>
+                            </p>
+                        </div>
+                        <?php endif; ?>
+
                         <?php if (!$product['is_service'] && !empty($warehouses)): ?>
                         <div class="col-md-12 mt-4 p-3 bg-white border rounded">
                             <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary">

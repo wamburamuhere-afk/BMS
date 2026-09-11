@@ -86,7 +86,8 @@ try {
                 $project_stock_subquery as project_stock,
                 p.is_service,
                 p.category_id,
-                p.image_url
+                p.image_url,
+                p.track_serials
             FROM products p
             LEFT JOIN product_stocks ps ON p.product_id = ps.product_id $ps_warehouse_filter"
             . ($price_group_id > 0
@@ -149,8 +150,16 @@ try {
     $stmt->execute($params);
     $raw_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    // Phase 26 (pos_upgrade_plan.md §9) — a runtime double-check, not just a
+    // sale-time one: if pos_advanced has since been revoked, the POS grid
+    // must not show the serial picker at all for a product that was flagged
+    // track_serials=1 while the tenant was entitled (process_sale.php would
+    // ignore it as a plain quantity line anyway — this keeps the UI honest
+    // about what checkout will actually do).
+    $serialTrackingEnabled = function_exists('tenantFeatureEnabled') ? tenantFeatureEnabled('pos_advanced') : true;
+
     // Process products
-    $products = array_map(function($p) use ($project_id) {
+    $products = array_map(function($p) use ($project_id, $serialTrackingEnabled) {
         $p['product_id'] = intval($p['product_id']);
         $p['selling_price'] = floatval($p['selling_price']);
         // Phase 14 — the price a cashier actually sees/starts from: the chosen
@@ -160,16 +169,17 @@ try {
 
         $general = floatval($p['general_available']);
         $p_stock = floatval($p['project_stock'] ?? 0);
-        
+
         // Final Available = General Stock + This Project's Reserved Stock
         $p['stock_quantity'] = $general + $p_stock;
         $p['project_stock'] = $p_stock;
-        
+
         $p['is_service'] = (bool)$p['is_service'];
         $p['is_taxable'] = (bool)$p['is_taxable'];
         $p['category_id'] = intval($p['category_id']);
         $p['tax_rate'] = (bool)$p['is_taxable'] ? floatval($p['tax_rate'] ?? 0) : 0;
-        
+        $p['track_serials'] = $serialTrackingEnabled ? (int)$p['track_serials'] : 0;
+
         return $p;
     }, $raw_products);
     

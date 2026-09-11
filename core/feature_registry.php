@@ -179,6 +179,11 @@ if (!function_exists('bmsFeatureRegistry')) {
                     'api/pos/toggle_price_group_status.php',
                     'api/pos/get_price_group_products.php',
                     'api/pos/save_price_group_product_price.php',
+                    // Phase 26 (pos_upgrade_plan.md §9) — serial/IMEI-level
+                    // stock tracking, a genuinely upsell-shaped capacity
+                    // feature (same boundary reasoning as Phase 18/21/23).
+                    'core/pos_serial_tracking.php',
+                    'api/pos/get_available_serials.php',
                 ],
             ],
             'procurement' => [

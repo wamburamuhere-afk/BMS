@@ -21,6 +21,7 @@ require_once __DIR__ . '/../../core/warehouse_scope.php';
 require_once __DIR__ . '/../../core/pos_override_guard.php';
 require_once __DIR__ . '/../../core/pos_price_groups.php';
 require_once __DIR__ . '/../../core/pos_batch_consumption.php';
+require_once __DIR__ . '/../../core/pos_serial_tracking.php';
 require_once __DIR__ . '/../../core/pos_unit_conversion.php';
 require_once __DIR__ . '/../../core/pos_credit_limit.php';
 
@@ -192,7 +193,7 @@ try {
     }
 
     $fetchStmt = $pdo->prepare("
-        SELECT p.product_id, p.product_name, p.selling_price, p.min_selling_price, p.is_service, p.is_combo,
+        SELECT p.product_id, p.product_name, p.selling_price, p.min_selling_price, p.is_service, p.is_combo, p.track_serials,
                COALESCE(SUM(ps.stock_quantity - IFNULL(ps.reserved_quantity, 0)), 0) as general_available,
                $project_stock_subquery as project_available,
                COALESCE(SUM(IFNULL(ps.reserved_quantity, 0)), 0) as current_warehouse_reserved
@@ -254,6 +255,39 @@ try {
         if (!empty($shortfalls)) {
             $names = implode(', ', array_map(fn($s) => "{$s['product_name']} (need {$s['needed']}, have {$s['available']})", $shortfalls));
             throw new Exception("Insufficient stock for combo '{$db_product['product_name']}' component(s): $names");
+        }
+    }
+
+    // Phase 26 (pos_upgrade_plan.md §9) — serial/IMEI-tracked lines. Every
+    // serial-tracked line must carry EXACTLY one serial number per unit sold
+    // (a serial is qty-always-1, not a decrementing pool), and every serial
+    // number given must currently be in_stock for this product/warehouse —
+    // validated up front, before any writes, for a clear pre-flight error
+    // instead of a partial-failure mid-loop (same reasoning as the combo
+    // check above). tenantFeatureEnabled('pos_advanced') double-checked here
+    // too (Phase 13's runtime-double-check pattern) — a tenant whose
+    // pos_advanced entitlement has been revoked sells a previously
+    // serial-tracked product as a plain quantity-based line instead of
+    // blocking the sale outright.
+    $serialTrackingEnabled = function_exists('tenantFeatureEnabled') ? tenantFeatureEnabled('pos_advanced') : true;
+    foreach ($items as $item) {
+        $pid = (int)$item['product_id'];
+        $db_product = $products_map[$pid] ?? null;
+        if (!$db_product || empty($db_product['track_serials']) || !$serialTrackingEnabled) continue;
+        $qty = (int)round(floatval($item['quantity'] ?? 0));
+        $serials = array_values(array_filter(array_map('trim', (array)($item['serial_numbers'] ?? []))));
+
+        if (count($serials) !== $qty) {
+            throw new Exception(sprintf(t('Select exactly %d serial number(s) for \'%s\'.'), $qty, $db_product['product_name']));
+        }
+        if (count($serials) !== count(array_unique($serials))) {
+            throw new Exception(sprintf(t('Duplicate serial number selected for \'%s\'.'), $db_product['product_name']));
+        }
+        $placeholders2 = implode(',', array_fill(0, count($serials), '?'));
+        $chk = $pdo->prepare("SELECT COUNT(*) FROM product_serials WHERE product_id = ? AND warehouse_id = ? AND status = 'in_stock' AND serial_number IN ($placeholders2)");
+        $chk->execute(array_merge([$pid, (int)$warehouse_id], $serials));
+        if ((int)$chk->fetchColumn() !== count($serials)) {
+            throw new Exception(sprintf(t('One or more selected serial numbers for \'%s\' are no longer available.'), $db_product['product_name']));
         }
     }
 
@@ -408,11 +442,26 @@ try {
         if (!empty($db_product['is_combo'])) {
             consumeComboComponents($pdo, $pid, $qty, (int)$warehouse_id, $project_id, $sale_id, $receipt_number, $_SESSION['user_id']);
         } elseif (!$db_product['is_service']) {
-            // Phase 17b (pos_upgrade_plan.md §8) — FEFO batch consumption, a
-            // bookkeeping layer on top of the product_stocks decrement below,
-            // not a replacement for it. No-op for a product with no open
-            // batches in this warehouse (not batch-tracked).
-            consumeFefoBatches($pdo, $pid, (int)$warehouse_id, $qty, $sale_item_id);
+            // Phase 26 (pos_upgrade_plan.md §9) — a serial-tracked line locks
+            // its specific serial(s) instead of drawing from FEFO batches;
+            // already validated available above, this is the real
+            // row-locked consumption. A hard failure here (should be
+            // unreachable given the pre-check, but a concurrent sale could
+            // theoretically win the race) rolls back the whole sale rather
+            // than silently under-selling a specific physical unit.
+            if (!empty($db_product['track_serials']) && $serialTrackingEnabled) {
+                $serials = array_values(array_filter(array_map('trim', (array)($item['serial_numbers'] ?? []))));
+                $consumedSerials = consumeSerials($pdo, $pid, (int)$warehouse_id, $serials, $sale_item_id);
+                if (count($consumedSerials) !== count($serials)) {
+                    throw new Exception(sprintf(t('A selected serial number for \'%s\' was just sold by another transaction. Please reselect.'), $db_product['product_name']));
+                }
+            } else {
+                // Phase 17b (pos_upgrade_plan.md §8) — FEFO batch consumption, a
+                // bookkeeping layer on top of the product_stocks decrement below,
+                // not a replacement for it. No-op for a product with no open
+                // batches in this warehouse (not batch-tracked).
+                consumeFefoBatches($pdo, $pid, (int)$warehouse_id, $qty, $sale_item_id);
+            }
 
             // 1. Global Update
             $stockStmt->execute([ $qty, $qty, $pid ]);

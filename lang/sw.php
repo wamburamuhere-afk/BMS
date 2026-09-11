@@ -1757,4 +1757,22 @@ return [
     'Scheduled' => 'Imepangwa',
     'Starts' => 'Inaanza',
     'The promotion end date must be after its start date.' => 'Tarehe ya kumaliza ofa lazima iwe baada ya tarehe ya kuanza.',
+
+    // ------------------------------------------------------------------
+    // POS — Serial/IMEI Tracking, Phase 26 (core/pos_serial_tracking.php +
+    // api/pos/process_sale.php + api/pos/get_available_serials.php +
+    // app/bms/product/product_edit.php + app/bms/grn/grn_create.php)
+    // ------------------------------------------------------------------
+    'A selected serial number for \'%s\' was just sold by another transaction. Please reselect.' => 'Namba ya serial uliyochagua kwa \'%s\' imeuzwa na muamala mwingine. Tafadhali chagua tena.',
+    'Duplicate serial number selected for \'%s\'.' => 'Namba ya serial iliyorudiwa kwa \'%s\'.',
+    'Each unit of this product is sold as a specific, traceable serial/IMEI number instead of a plain quantity. Serial numbers are entered when receiving stock via GRN.' => 'Kila kipande cha bidhaa hii kinauzwa kwa namba maalum ya serial/IMEI inayofuatiliwa badala ya idadi tu. Namba za serial huingizwa wakati wa kupokea hisa kupitia GRN.',
+    'Loading serial numbers...' => 'Inapakia namba za serial...',
+    'No serial numbers available in this warehouse.' => 'Hakuna namba za serial zinazopatikana kwenye ghala hili.',
+    'One or more selected serial numbers for \'%s\' are no longer available.' => 'Namba moja au zaidi za serial ulizochagua kwa \'%s\' hazipatikani tena.',
+    'Select at least one serial number.' => 'Chagua angalau namba moja ya serial.',
+    'Select exactly %d serial number(s) for \'%s\'.' => 'Chagua namba %d za serial kwa \'%s\'.',
+    'Serial / IMEI numbers (select one per unit)' => 'Namba za Serial / IMEI (chagua moja kwa kila kipande)',
+    'Serial Numbers' => 'Namba za Serial',
+    'Serial-tracked products only — comma or newline separated' => 'Kwa bidhaa zenye ufuatiliaji wa serial tu — tenganisha kwa mkato au mstari mpya',
+    'Track by Serial / IMEI Number' => 'Fuatilia kwa Namba ya Serial / IMEI',
 ];
