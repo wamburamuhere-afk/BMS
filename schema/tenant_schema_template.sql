@@ -5604,6 +5604,27 @@ CREATE TABLE `product_batch_expiry_reminders` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `product_expiry_reminders`
+-- 2026-09-11 — milestone-dedupe for plain (non-batch-tracked) products,
+-- mirrors product_batch_expiry_reminders' exact shape. Closes the gap where
+-- a product without batch tracking never triggered an automatic alert.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_expiry_reminders` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `warehouse_id` int NOT NULL,
+  `milestone` int NOT NULL,
+  `sent_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_product_warehouse_milestone` (`product_id`,`warehouse_id`,`milestone`),
+  KEY `idx_product_id` (`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `product_batches`
 -- Phase 17 (pos_upgrade_plan.md §8) — real batch/lot stock ledger, fed at
 -- GRN approval (api/approve_grn.php), consumed FEFO at POS sale

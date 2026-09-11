@@ -1,5 +1,129 @@
 # BMS Changelog
 
+## 2026-09-11 (plan) - Phase 30 POS navigation redesigned: dashboard-hub instead of dropdown-accordion
+
+**Files (modified):** `pos_upgrade_plan.md` (§9 Phase 30 navigation subsection rewritten)
+
+**No code changed — planning only.** On the product owner's own suggestion, replaced the
+dropdown-accordion navigation design (a collapsible menu tree stuffed inside `header.php`'s
+existing "Sales" dropdown) with a dashboard-hub design: `header.php` collapses to one static
+`POS` link → `pos/dashboard`, which becomes a landing hub of destination cards ("Open Terminal"
+primary, "Shift History", "Settings" shortcut, plus "Catalog Setup"/"Restaurant" only when
+`pos_advanced`/`restaurant_pos` are granted). Restaurant's five screens nest under their own
+sub-hub (`app/bms/restaurant/index.php`) rather than becoming five more top-level cards. Net
+effect: `header.php` is touched once for this entire tier instead of once per future POS phase,
+and a `pos`-only tenant sees exactly two cards with nothing implying a locked/broken feature —
+directly answering the "should look complete for whatever's enabled" requirement. Z-Report
+deliberately stays out of the hub (it's per-shift, not a standalone destination — reachable from
+Shift History and the close-shift dialog exactly as §3 Phase 9 already built it).
+
+## 2026-09-11 (fix) - Plain (non-batch-tracked) products now get expiry email/in-app alerts too
+
+**Files (new):** `migrations/tenant/2026_09_11_product_expiry_notifications.php`
+**Files (modified):** `schema/tenant_schema_template.sql`, `cron/run_notification_checks.php`,
+`tests/test_pos_batch_expiry_cli.php`
+
+**Gap:** while explaining §8 Phase 17's expiry-alert system to the product owner, found that the
+milestone cron only ever scanned `product_batches` — a product using just the older, simpler
+`products.expiry_date` field (no batch tracking turned on) showed up on the dashboard's "expiring"
+widget when someone happened to look, but never triggered an automatic email/in-app alert, even
+though `products.email_alerts` (captured by `api/update_product_alerts.php`) already existed for
+exactly this purpose and was silently never read by anything.
+
+**Fix:** added a second block to `cron/run_notification_checks.php` (which already runs daily,
+both via a real server cron and opportunistically once/day from `header.php`) that scans
+`products` for `expiry_date` set + `email_alerts=1` + active stock in `product_stocks`, explicitly
+excluding anything with its own `product_batches` rows so a batch-tracked product is never
+double-alerted by both paths. Reuses the exact same `product.batch_expiring` notification_events
+row and milestone set (30/14/7/1 days) as the existing batch check — zero new Settings UI, any
+recipient/email rule an admin already configured for that event covers this case too. New
+`product_expiry_reminders` table (mirrors `product_batch_expiry_reminders`'s dedupe shape) ships
+in both the tenant migration and `schema/tenant_schema_template.sql`.
+
+Verified live: extended `tests/test_pos_batch_expiry_cli.php` with a new §9 (3 new assertions,
+46/46 passing) — a plain expiring product now fires and dedupes correctly, and a product that
+also has batch rows is confirmed excluded from this new path. Full
+`tests/test_notification_engine_cli.php` regression re-run (76/77 — the 1 failure is the
+pre-existing, unrelated `save_invoice.php`/`invoice.needs_review` gap already documented in
+`pos_upgrade_plan.md` §8 Phase 18's follow-ups, confirmed present before this change too).
+
+## 2026-09-11 (plan) - POS Tier-4 re-scoped to POS-only; dashboard intelligence + nav reorg added (Phases 25-31)
+
+**Files (modified):** `pos_upgrade_plan.md` (§9 revised)
+
+**No code changed — planning only.** Re-checked the 2026-09-10 Tier-4 plan against an explicit
+instruction to keep improvements strictly inside the POS module and not touch/harm any other
+BMS module, then benchmarked a second reference (`fasteeypos.com`, the product owner's own trial
+account) for additional ideas. Result:
+- **Phase 27 (Repair/Service-Job module) removed entirely** — its billing step reached into the
+  shared `invoices`/Accounting tables and it's a distinct business module (job ticketing), not a
+  point-of-sale concern. Kept as a historical stub (not deleted, not renumbered-over) with the
+  reasoning recorded, matching this document's existing convention for Phase 24. Its one
+  independently-useful piece (the `stock_movements.reference_type` enum fix for the pre-existing
+  `pos_void`/`pos_return` coercion bug) was relocated into Phase 26, which already touches that
+  code path.
+- **Phase 28 (generic Booking/Appointment engine) cut down** — replaced by a self-contained
+  `restaurant_reservations` table owned entirely inside the Restaurant phase (30), not a
+  platform-wide scheduler. Kept as a historical stub for the same reason as above.
+- **New Phase 29 (POS Dashboard Intelligence)** — Damage/Shrinkage KPI (surfaces the existing
+  but never-displayed `stock_movements` 'damaged'/'expired'/'theft' data, zero schema change),
+  Top Performing Cashiers leaderboard, and Sales Targets vs. Actual with achievement bands
+  (new `pos_sales_targets` table) — all found on the fasteeypos.com dashboard walkthrough,
+  all additive to the already-shipped `pos_dashboard.php`.
+- **Phase 30 (Restaurant Module) gained two additions**: "Recipes" now explicitly reuses Phase
+  23's combo-product mechanism outright (a recipe-based dish = `is_combo=1` + linked
+  `product_assembly_components`, zero new code path) after the fasteeypos.com Restaurant module's
+  Ingredients/Recipes concept confirmed this was the right shape; and a full **POS Navigation
+  Reorganization** sub-phase, grounded in a direct read of `header.php`/`roots.php` (found: POS's
+  own pages are split across two unrelated dropdowns, and Shift History/Z-Report have no nav link
+  at all today, only in-page buttons) — fixed via a new `core/pos_nav.php` single-source-of-truth
+  menu tree rendered as a scoped Bootstrap `collapse` accordion inside POS's own existing
+  `canView('pos')` block, with a dedicated `tests/test_pos_nav_wiring_cli.php` asserting every
+  other module's menu is byte-for-byte unchanged and that gated groups are completely absent
+  (not just hidden) when a feature isn't granted.
+- Renumbered the final phase (Product Variants) to **31** to keep every phase number
+  historically stable — nothing is ever renumbered-over once assigned.
+
+Active buildable phases: 25, 26, 29, 30, 31. Next: Phase 25 on explicit go-ahead.
+
+## 2026-09-10 (plan) - POS Tier-4 plan added: Restaurant/Repair/Serials/Variants (Phases 25-30)
+
+**Files (modified):** `pos_upgrade_plan.md` (§9 added)
+
+**No code changed — planning only, approved by product owner, build one phase at a time.**
+Benchmarked a live competitor demo (`salepropos.com/demo`) against BMS's own POS (Phases 1-24,
+all already shipped) to find what's genuinely missing for pharmacy/restaurant/pub/stationery/
+vehicle-spares/supermarket verticals. Preceded by a 3-angle codebase scout (schema dump of every
+POS-adjacent table, a full read of `api/pos/process_sale.php`, and the project's own conventions/
+migration mechanics) so the plan reuses existing infrastructure instead of duplicating it. Wrote
+6 new phases into `pos_upgrade_plan.md` §9:
+- **Phase 25** — product professional fields (warranty/guarantee units, barcode symbology,
+  promotional pricing extending Phase 14's `resolveGroupPrices()`).
+- **Phase 26** — serial/IMEI-level stock, modeled on Phase 17's batch-ledger shape.
+- **Phase 27** — Repair/Service-Job module (vehicle-spares workshop / device repair tickets),
+  billed via the existing `invoices` + `postInvoiceRevenue()`/`postInvoiceCOGS()` path rather than
+  the POS sale endpoint (which hard-requires an open cashier shift a repair job has no reason to
+  need) — also bundles a fix for the pre-existing `stock_movements.reference_type` enum gap
+  (`pos_void`/`pos_return` values missing, silently coerced to `''`) since the same migration
+  already touches that column.
+- **Phase 28** — a generic Booking/Appointment engine (reuses `dispatchEvent()` + the
+  `document_expiry_reminders` dedupe pattern for reminders), built before Restaurant so its
+  Reservation screen is a thin view over one calendar system, not a second one.
+- **Phase 29** — Restaurant module (floors/tables/kitchen stations/KDS/modifier groups), wired
+  through the *existing* hold/park-sale mechanism (extended with `warehouse_id`/`table_id`) as the
+  "open table order," finalized only via the existing, unmodified `process_sale.php`. New
+  `warehouses.pos_mode` column (`retail`/`restaurant`/`hybrid`, defaults `retail`) is the only
+  warehouse-level switch — named to avoid colliding with BMS's existing unrelated
+  `workflow_documents` e-signature/approval-chain feature.
+- **Phase 30** — product variants (size/color) as `parent_product_id`/`variant_attributes` columns
+  directly on `products`, not a parallel table, so batches/serials/combos/price-groups/GL all work
+  with zero changes to those systems.
+
+Every phase: own branch/tests/PR, own `migrations/tenant/*.php` + matching
+`schema/tenant_schema_template.sql` change, new `core/feature_registry.php` entries
+(`default: false`), full existing POS regression suite re-run before merge. Next: Phase 25 on
+explicit go-ahead.
+
 ## 2026-09-10 (fix/ui) - Shift History: fixed stuck-register root cause, redesigned table to the standard DataTable + gear-dropdown pattern
 
 **Files (modified):** `app/bms/pos/shift_history.php`
