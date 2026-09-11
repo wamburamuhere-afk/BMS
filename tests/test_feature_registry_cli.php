@@ -86,8 +86,15 @@ section('1b. REVERSE coverage — every live page_key is gated or documented as 
 $documentedAlwaysOn = [
     'dashboard',
     'customers', 'customer_details', 'customer_groups', 'customer_import', 'customer_registration', 'edit_customer',
-    'customer_documents', 'documents', 'document_expiry_alerts', 'document_library', 'document_templates',
-    'document_workflow', 'loan_documents',
+    // 2026-09-11: 'customer_documents'/'documents'/'document_expiry_alerts'/
+    // 'document_library'/'document_templates'/'document_workflow' moved OUT
+    // of always-on into the new 'documents' feature (product owner request:
+    // "comms and docs to be modules to switch on or off") — same class of
+    // gap as CRM/Communication/Compliance on 2026-09-10, not a bug fix.
+    // 'loan_documents' deliberately stays here — it belongs to Loans, a
+    // separate concern from the general Document Library, and was not part
+    // of this request.
+    'loan_documents',
     'bank_accounts', 'bank_reconciliation', 'bank_transfers', 'budget', 'cash_register', 'chart_of_accounts',
     'expenses', 'journals', 'loans', 'payment_create', 'payment_vouchers', 'petty_cash',
     'revenue', 'revenue_categories', 'transactions',
@@ -118,7 +125,10 @@ $documentedAlwaysOn = [
     // was NOT moved to 'procurement' alongside this change.
     'color_settings', 'help', 'my_settings', 'notification_rules', 'tax_settings', 'zoom_settings',
     'activity_log', 'add_user', 'admin', 'attendance_settings', 'audit_logs', 'backup_restore',
-    'company_profile', 'edit_user', 'email_templates', 'login_history', 'notification_settings',
+    // 2026-09-11: 'email_templates' moved OUT of always-on into the existing
+    // 'communication' feature ("Comms") — it was simply never wired in when
+    // built, same class of gap as the others noted above.
+    'company_profile', 'edit_user', 'login_history', 'notification_settings',
     'payment_settings', 'policy_management', 'profile', 'sms_templates', 'system_settings', 'users', 'user_roles',
     // 2026-09-09: moved out of 'projects' — this page is ALSO the Warehouse
     // Access assignment UI, which has nothing to do with Projects; the page
@@ -439,6 +449,52 @@ ok('catalogue table matches the code registry' . ($diff ? ' — missing: ' . imp
 // The two real tenants must be untouched by any of this.
 $realOverrides = (int)$c->query("SELECT COUNT(*) FROM tenant_features WHERE tenant_id IN (85, 86)")->fetchColumn();
 ok('no entitlement rows were written for the real tenants', $realOverrides === 0);
+
+// ─────────────────────────────────────────────────────────────────────────────
+section("13. 'documents' (Docs) and 'communication' (Comms) actually gate their pages live");
+// Product owner request, 2026-09-11: "comms and docs to be modules to
+// switch on or off, superadmin only". Both already exist as real,
+// canView()-driven entitlement keys by the time execution reaches here
+// (verified structurally by every section above — label present, every
+// page_key exists in permissions, reverse-coverage no longer lists them as
+// always-on) — this section is the live behavioural proof: actually flip
+// each off and confirm the pages they own are actually blocked, while a
+// deliberately-adjacent, already-independent feature (compliance/
+// esignature — NOT folded into 'documents' even though the pages live in
+// the same directory) stays completely unaffected.
+// No session_start() here on purpose: this file has already echoed section
+// output by this point, so PHP's own headers-already-sent guard would
+// reject a fresh session start. canView() only ever reads $_SESSION as a
+// plain in-memory superglobal — assigning into it directly is sufficient
+// and never needs an actual session to be active.
+require_once __DIR__ . '/../core/permissions.php';
+$_SESSION['user_id'] = (int)($pdo->query("SELECT user_id FROM users WHERE is_active=1 LIMIT 1")->fetchColumn() ?: 4);
+$_SESSION['is_admin'] = true;
+$_SESSION['role_id'] = 1;
+$prevFeatures2 = $GLOBALS['__bms_features'] ?? null;
+try {
+    $GLOBALS['__bms_features'] = array_fill_keys(allFeatureKeys(), true);
+    $GLOBALS['__bms_features']['documents'] = false;
+    $GLOBALS['__bms_features']['communication'] = false;
+
+    foreach (['documents', 'document_library', 'document_templates', 'document_workflow', 'customer_documents'] as $pk) {
+        ok("canView('$pk') is false with 'documents' off (even for this admin session — entitlement checked before the admin bypass)", canView($pk) === false);
+    }
+    ok("canView('email_templates') is false with 'communication' off", canView('email_templates') === false);
+    ok("canView('message_center') is false with 'communication' off", canView('message_center') === false);
+
+    // The adjacent, already-independent features must be completely unaffected —
+    // proves 'documents' doesn't accidentally also own their pages.
+    ok("canView('compliance_documents') stays TRUE — 'compliance' is its own feature, not folded into 'documents'", canView('compliance_documents') === true);
+    ok("canView('e_signatures') stays TRUE — 'esignature' is its own feature, not folded into 'documents'", canView('e_signatures') === true);
+
+    $GLOBALS['__bms_features']['documents'] = true;
+    $GLOBALS['__bms_features']['communication'] = true;
+    ok("canView('documents') is true again once 'documents' is re-enabled", canView('documents') === true);
+    ok("canView('email_templates') is true again once 'communication' is re-enabled", canView('email_templates') === true);
+} finally {
+    $GLOBALS['__bms_features'] = $prevFeatures2;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 echo "\n" . str_repeat('-', 60) . "\n";
