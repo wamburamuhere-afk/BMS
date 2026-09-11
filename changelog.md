@@ -1,5 +1,52 @@
 # BMS Changelog
 
+## 2026-09-11 (feat/pos-tier4-professional-retail) - CRITICAL: POS terminal down in production for un-migrated tenants — fixed
+
+**Severity: P0.** A Sentry alert from `shop.demo.bjptechnologies.co.tz` (production) surfaced an uncaught
+`PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'pos_mode'` at `app/bms/pos/pos.php`
+line 200 — the **entire POS terminal was down** for this tenant, on every single page load. Root cause:
+tenant-schema migrations (`migrations/tenant/*.php`) are **not wired into the deploy pipeline**
+(`migrations/tenant/README.md` §"Not wired into deploy.yml yet") — the Phase 30/31 code shipped and
+deployed normally, but the corresponding database migration was never run against this tenant's database.
+This is a real, recurring operating condition for this multi-tenant app (a lag between "code deployed"
+and "every tenant's schema migrated"), not a one-off — and the code had zero tolerance for it.
+
+**Investigated further and found this was not the only place that would break the same way:**
+- `api/pos/simple_products.php` (the product-grid API — hit on every POS page load/search) referenced
+  `products.parent_product_id`/`variant_attributes` unconditionally; a missing column made the ENTIRE
+  product grid silently return empty (`success:false` swallowed by the frontend's "no products" state) —
+  this is almost certainly what the user was separately seeing as "products not seen" and "category
+  filter totally removed" on their phone: the page/API were failing, not a mobile-CSS issue.
+- `api/pos/process_sale.php`'s `INSERT INTO pos_sales` unconditionally listed `assigned_to`/`table_id` —
+  the single most severe one found: **no sale could complete at all** for an un-migrated tenant.
+
+**Fix — defensive degrade, not a substitute for the real migration:** all three now catch the specific
+missing-column `PDOException` and fall back to the exact pre-Phase-30/31 behaviour (every warehouse
+treated as `'retail'`; the product grid returns the real catalog with `variant_count`/`parent_product_id`
+defaulted to "no variants"; the sale still posts, just without the table/waiter-assignment metadata) —
+instead of taking down the terminal or silently failing a sale. **This is a safety net, not a fix for the
+missing schema** — the affected tenant(s) still need `core/tenant_migration_runner.php` run against them
+in production before they actually get Restaurant Module / Product Variants functionality; flagged to the
+product owner separately, since this session has no credentialed access to run it against that specific
+tenant's live database from here.
+
+**Files (modified):** `app/bms/pos/pos.php` (pos_mode lookup wrapped, degrades to an empty mode map),
+`api/pos/simple_products.php` (query built with/without the Phase 31 columns, retries on the specific
+missing-column error, never returns an empty grid over it), `api/pos/process_sale.php` (the `pos_sales`
+INSERT retries with a column list that omits `assigned_to`/`table_id` on the same specific error — found
+and fixed a genuine placeholder/column-count mismatch bug in this fallback while writing its test).
+
+**Files (new):** `tests/test_pos_migration_resilience_cli.php` (17 assertions) — proves all three
+directly by temporarily dropping the real columns from a copy of the live schema (DDL auto-commits in
+MySQL, so every drop is undone by an unconditional restore in a `finally` block, even if an assertion
+throws), confirming each of the three files degrades gracefully instead of breaking, then confirming the
+schema is fully restored. Verified live: schema integrity re-checked after the test run, full sibling
+regression sweep (`test_pos_sale_posting`, `test_pos_returns`, `test_pos_credit_ar`, `test_restaurant_pos`,
+`test_pos_nav_wiring`, `test_product_variants`, `test_pos_dashboard`, `test_pos_i18n_coverage`) all still
+passing (same one pre-existing, unrelated S/NO failure as before).
+
+---
+
 ## 2026-09-11 (feat/pos-tier4-professional-retail) - POS Dashboard & Sales mobile view: page no longer scrolls sideways
 
 **Scope note:** follow-up to the pos.php terminal mobile fix — same complaint, different page:
