@@ -76,7 +76,23 @@ try {
                                     $sm_warehouse_filter)";
     }
 
-    $sql = "SELECT 
+    // Phase 31 (pos_upgrade_plan.md §8) — a tenant whose database hasn't yet
+    // had this migration applied must never see a broken/empty product grid
+    // over it: $hasVariantColumns starts true and is flipped to false (with a
+    // one-time, no-variant-grouping retry below) only if the query actually
+    // fails on the missing columns. Once flipped false for a request, the
+    // "parent_product_id" filter/grouping/count is entirely skipped for that
+    // request — identical to how this endpoint behaved before Phase 31.
+    $hasVariantColumns = true;
+    $variantSelectSql = ",
+                p.parent_product_id,
+                p.variant_attributes,
+                (SELECT COUNT(*) FROM products vc WHERE vc.parent_product_id = p.product_id AND vc.status = 'active') as variant_count";
+
+    $buildSql = function (bool $withVariants) use (
+        $project_stock_subquery, $ps_warehouse_filter, $price_group_id, $parent_product_id, $variantSelectSql
+    ): string {
+        $sql = "SELECT
                 p.product_id,
                 p.product_name,
                 p.sku,
@@ -93,10 +109,8 @@ try {
                 p.is_service,
                 p.category_id,
                 p.image_url,
-                p.track_serials,
-                p.parent_product_id,
-                p.variant_attributes,
-                (SELECT COUNT(*) FROM products vc WHERE vc.parent_product_id = p.product_id AND vc.status = 'active') as variant_count
+                p.track_serials"
+                . ($withVariants ? $variantSelectSql : "") . "
             FROM products p
             LEFT JOIN product_stocks ps ON p.product_id = ps.product_id $ps_warehouse_filter"
             . ($price_group_id > 0
@@ -110,17 +124,19 @@ try {
                 AND promo.starts_at <= NOW() AND promo.ends_at >= NOW()" .
             " WHERE p.status = 'active'";
 
-    // Phase 31 (pos_upgrade_plan.md §8) — a variant child never appears as
-    // its own top-level tile (it's reached only through its parent's picker);
-    // requesting one specific parent's children flips that around entirely —
-    // every other filter (category/search/price group) still applies so the
-    // children view respects the same grid context the cashier was already in.
-    if ($parent_product_id > 0) {
-        $sql .= " AND p.parent_product_id = :parent_product_id";
-    } else {
-        $sql .= " AND p.parent_product_id IS NULL";
-    }
+        // Phase 31 — a variant child never appears as its own top-level tile
+        // (it's reached only through its parent's picker); requesting one
+        // specific parent's children flips that around entirely.
+        if ($withVariants) {
+            $sql .= $parent_product_id > 0 ? " AND p.parent_product_id = :parent_product_id" : " AND p.parent_product_id IS NULL";
+        }
+        return $sql;
+    };
 
+    // The rest of the WHERE/GROUP BY/ORDER BY is identical whether or not
+    // the variant columns are present, so it's built once and appended to
+    // either variant of $buildSql() below.
+    $sqlSuffix = '';
     // A specific warehouse was chosen: only list products actually available
     // there — a physical product needs a product_stocks row for THIS
     // warehouse; a service needs its own products.warehouse_id to match
@@ -129,7 +145,7 @@ try {
     // the LEFT JOIN above still lets every company-wide product/service
     // through with a zero quantity instead of excluding it.
     if ($warehouse_id > 0) {
-        $sql .= " AND (
+        $sqlSuffix .= " AND (
                     ps.warehouse_id IS NOT NULL
                     OR (p.is_service = 1 AND p.warehouse_id = :warehouse_svc)
                   )";
@@ -142,14 +158,14 @@ try {
         if ($project_id > 0) $params[':warehouse_sm'] = $warehouse_id;
     }
     if ($project_id > 0) $params[':project_id'] = $project_id;
-    
+
     if ($category > 0) {
-        $sql .= " AND p.category_id = :category";
+        $sqlSuffix .= " AND p.category_id = :category";
         $params[':category'] = $category;
     }
-    
+
     if (!empty($search)) {
-        $sql .= " AND (p.product_name LIKE :search OR p.sku LIKE :search OR p.barcode LIKE :search)";
+        $sqlSuffix .= " AND (p.product_name LIKE :search OR p.sku LIKE :search OR p.barcode LIKE :search)";
         $params[':search'] = "%$search%";
     }
 
@@ -157,23 +173,48 @@ try {
         $params[':price_group_id'] = $price_group_id;
     }
 
-    if ($parent_product_id > 0) {
-        $params[':parent_product_id'] = $parent_product_id;
-    }
+    $sqlSuffix .= " GROUP BY p.product_id ";
 
-    $sql .= " GROUP BY p.product_id ";
-    
     // Sort by project stock first if a project is selected
     if ($project_id > 0) {
-        $sql .= " ORDER BY (project_stock > 0) DESC, p.product_name ASC ";
+        $sqlSuffix .= " ORDER BY (project_stock > 0) DESC, p.product_name ASC ";
     } else {
-        $sql .= " ORDER BY p.product_name LIMIT 100";
+        $sqlSuffix .= " ORDER BY p.product_name LIMIT 100";
     }
-    
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $raw_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
+    $paramsWithVariants = $params;
+    if ($parent_product_id > 0) {
+        $paramsWithVariants[':parent_product_id'] = $parent_product_id;
+    }
+
+    try {
+        $stmt = $pdo->prepare($buildSql(true) . $sqlSuffix);
+        $stmt->execute($paramsWithVariants);
+        $raw_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $missingVariantColumn = stripos($e->getMessage(), 'parent_product_id') !== false
+            || stripos($e->getMessage(), 'variant_attributes') !== false;
+        if (!$missingVariantColumn) {
+            throw $e; // a real, unrelated DB error — let the outer catch handle it normally
+        }
+        // Phase 31 (pos_upgrade_plan.md §8) — this tenant's database hasn't
+        // had the migration applied yet. Degrade to the pre-Phase-31 query
+        // (no variant grouping/columns at all) rather than breaking the
+        // entire product grid over it.
+        error_log('simple_products.php: parent_product_id/variant_attributes missing (tenant DB likely missing the Phase 31 migration) — degrading to no-variant-grouping: ' . $e->getMessage());
+        $hasVariantColumns = false;
+        if ($parent_product_id > 0) {
+            // No column to resolve a variant-children view against — there
+            // is nothing this tenant could have generated, so an empty list
+            // (not an error) is the honest answer.
+            echo json_encode(['success' => true, 'data' => [], 'count' => 0, 'filters' => ['category' => $category, 'search' => $search]]);
+            exit;
+        }
+        $stmt = $pdo->prepare($buildSql(false) . $sqlSuffix);
+        $stmt->execute($params);
+        $raw_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     // Phase 26 (pos_upgrade_plan.md §9) — a runtime double-check, not just a
     // sale-time one: if pos_advanced has since been revoked, the POS grid
     // must not show the serial picker at all for a product that was flagged
@@ -185,7 +226,7 @@ try {
     $variantsEnabled = $serialTrackingEnabled;
 
     // Process products
-    $products = array_map(function($p) use ($project_id, $serialTrackingEnabled, $variantsEnabled) {
+    $products = array_map(function($p) use ($project_id, $serialTrackingEnabled, $variantsEnabled, $hasVariantColumns) {
         $p['product_id'] = intval($p['product_id']);
         $p['selling_price'] = floatval($p['selling_price']);
         // Phase 14 — the price a cashier actually sees/starts from: the chosen
@@ -209,10 +250,13 @@ try {
         // Phase 31 (pos_upgrade_plan.md §8) — same runtime double-check
         // pattern as track_serials above: a tenant whose pos_advanced
         // entitlement has since been revoked never sees the variant picker,
-        // even for a product that has variant children on file.
-        $p['parent_product_id'] = $p['parent_product_id'] !== null ? (int)$p['parent_product_id'] : null;
-        $p['variant_attributes'] = $p['variant_attributes'] ?? null;
-        $p['variant_count'] = $variantsEnabled ? (int)($p['variant_count'] ?? 0) : 0;
+        // even for a product that has variant children on file. When the
+        // columns are missing entirely (tenant DB not yet migrated — see the
+        // fallback query above), these keys are absent from $p; default to
+        // the same "no variants" shape the JS already treats as plain retail.
+        $p['parent_product_id'] = ($hasVariantColumns && ($p['parent_product_id'] ?? null) !== null) ? (int)$p['parent_product_id'] : null;
+        $p['variant_attributes'] = $hasVariantColumns ? ($p['variant_attributes'] ?? null) : null;
+        $p['variant_count'] = ($variantsEnabled && $hasVariantColumns) ? (int)($p['variant_count'] ?? 0) : 0;
 
         return $p;
     }, $raw_products);

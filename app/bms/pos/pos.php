@@ -192,14 +192,25 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
                                 // A plain 'retail' warehouse (the default, every warehouse
                                 // until an admin explicitly changes it) never triggers any
                                 // of this — byte-for-byte unchanged behaviour.
+                                // Defensive: a tenant whose database hasn't yet had the
+                                // Phase 30 migration applied (warehouses.pos_mode missing)
+                                // must NEVER crash the whole POS terminal over this —
+                                // degrade to treating every warehouse as 'retail' instead,
+                                // identical to how the JS side already reads a warehouse
+                                // absent from this map (POS_WAREHOUSE_MODES[wid] || 'retail').
                                 $_pos_warehouse_modes = [];
                                 if (!empty($_pos_warehouse_scoped)) {
-                                    $_ids = array_column($_pos_warehouse_scoped, 'warehouse_id');
-                                    $_ph = implode(',', array_fill(0, count($_ids), '?'));
-                                    $_modeStmt = $pdo->prepare("SELECT warehouse_id, pos_mode FROM warehouses WHERE warehouse_id IN ($_ph)");
-                                    $_modeStmt->execute($_ids);
-                                    foreach ($_modeStmt->fetchAll(PDO::FETCH_ASSOC) as $_mr) {
-                                        $_pos_warehouse_modes[(int)$_mr['warehouse_id']] = $_mr['pos_mode'];
+                                    try {
+                                        $_ids = array_column($_pos_warehouse_scoped, 'warehouse_id');
+                                        $_ph = implode(',', array_fill(0, count($_ids), '?'));
+                                        $_modeStmt = $pdo->prepare("SELECT warehouse_id, pos_mode FROM warehouses WHERE warehouse_id IN ($_ph)");
+                                        $_modeStmt->execute($_ids);
+                                        foreach ($_modeStmt->fetchAll(PDO::FETCH_ASSOC) as $_mr) {
+                                            $_pos_warehouse_modes[(int)$_mr['warehouse_id']] = $_mr['pos_mode'];
+                                        }
+                                    } catch (PDOException $_e) {
+                                        error_log('pos.php: pos_mode lookup failed (tenant DB likely missing the Phase 30 migration) — degrading to retail-only: ' . $_e->getMessage());
+                                        $_pos_warehouse_modes = [];
                                     }
                                 }
                                 ?>
