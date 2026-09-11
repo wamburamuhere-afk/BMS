@@ -1739,7 +1739,31 @@ last):
 ### Phase 25 — Product professional fields (Warranty/Guarantee, barcode
 symbology, promotional pricing)
 
-**Status:** APPROVED, not yet built. **Closes:** the pharmacy/stationery/
+**Status:** ✅ DONE · **Built:** 2026-09-11 · **Branch:** `feat/pos-tier4-professional-retail`
+
+Shipped as planned, with two implementation refinements found while wiring it up:
+`core/pos_price_groups.php::resolveGroupPrices()` no longer short-circuits to empty when
+`price_group_id=0` — a promo must apply even when the cashier hasn't chosen a price group at all,
+which is the common case — so the promo layer is resolved unconditionally and only the group-tier
+lookup is skipped when no group is chosen. And the receipt's "was / now" strikethrough deliberately
+compares against the plain catalog `selling_price`, not whatever price-group tier a specific
+customer would have paid, to avoid conflating two different pricing concepts on one printed line.
+New `resolveActivePromoPrices()` picks the lowest price via `MIN()` if more than one active promo
+window ever overlaps the same product (not prevented by schema — an accepted edge case, documented
+in code). Full Swahili translations added for every new string, including the three new API
+endpoints' JSON messages (`api/get_product_promotions.php`, `api/save_product_promotion.php`,
+`api/toggle_product_promotion.php`) — a deliberate consistency choice beyond this file family's
+usual precedent (sibling combo-component endpoints don't translate their JSON messages), since
+language-preference correctness was a hard requirement for this build. `tests/test_pos_price_groups_cli.php`
+extended (not a new file) to 66 assertions — schema, wiring, and 7 new runtime checks reconciling
+promo resolution to direct SQL. Migration applied and verified live against the local dev DB via its
+legacy-DB mirror (no `tenants` control table configured locally); the tenant-path migration file
+lints clean and follows the same idempotent pattern. Full POS regression re-run clean (returns,
+credit/AR, sale-posting, cleanup, Phase 13 entitlement, batch-expiry); one pre-existing, unrelated
+failure in `test_pos_dashboard_cli` (a Shift History UI string check) confirmed present on the
+branch tip before this phase touched anything.
+
+**Closes:** the pharmacy/stationery/
 supermarket/vehicle-spares-counter gaps that don't need a new module, just
 richer product data — the same conclusion SalePro's own architecture reaches
 (one generic Retail engine, richer product records, no vertical-specific
