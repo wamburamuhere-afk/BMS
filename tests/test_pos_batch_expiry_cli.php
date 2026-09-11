@@ -180,11 +180,11 @@ if (!$anyUser || !$whRow) {
     $pdo->beginTransaction();
     $pdo->exec("DELETE FROM user_scope_overrides WHERE user_id = $anyUser AND resource_type = 'warehouse'");
 
-    $pdo->prepare("INSERT INTO user_scope_overrides (user_id, resource_type, resource_id) VALUES (?, 'warehouse', NULL)")->execute([$anyUser]);
+    $pdo->prepare("INSERT INTO user_scope_overrides (user_id, resource_type, resource_id, granted_by) VALUES (?, 'warehouse', NULL, 1)")->execute([$anyUser]);
     (warehouseIdsForUser($pdo, $anyUser, false) === ['*']) ? pass('grant-all override (resource_id NULL) -> [\'*\']') : fail('grant-all override not honoured');
 
     $pdo->exec("DELETE FROM user_scope_overrides WHERE user_id = $anyUser AND resource_type = 'warehouse'");
-    $pdo->prepare("INSERT INTO user_scope_overrides (user_id, resource_type, resource_id) VALUES (?, 'warehouse', ?)")->execute([$anyUser, $whRow['warehouse_id']]);
+    $pdo->prepare("INSERT INTO user_scope_overrides (user_id, resource_type, resource_id, granted_by) VALUES (?, 'warehouse', ?, 1)")->execute([$anyUser, $whRow['warehouse_id']]);
     $ids = warehouseIdsForUser($pdo, $anyUser, false);
     ($ids === [(int)$whRow['warehouse_id']]) ? pass('specific-warehouse override -> exactly that warehouse') : fail('specific override wrong: ' . json_encode($ids));
 
@@ -199,7 +199,7 @@ if (!$anyUser || !$whRow) {
     $pdo->beginTransaction();
     $pdo->exec("DELETE FROM user_scope_overrides WHERE user_id = $anyUser AND resource_type = 'warehouse'");
     // This user is scoped to a DIFFERENT (nonexistent) warehouse id — must be excluded.
-    $pdo->prepare("INSERT INTO user_scope_overrides (user_id, resource_type, resource_id) VALUES (?, 'warehouse', 999999)")->execute([$anyUser]);
+    $pdo->prepare("INSERT INTO user_scope_overrides (user_id, resource_type, resource_id, granted_by) VALUES (?, 'warehouse', 999999, 1)")->execute([$anyUser]);
 
     $event = ['page_key' => 'products', 'required_verb' => 'view', 'scope_aware' => 1, 'event_key' => 'product.batch_expiring', 'module' => 'Inventory'];
     $rule = [['target_type' => 'user', 'target_id' => $anyUser, 'channel_inapp' => 1, 'channel_email' => 1]];
@@ -209,7 +209,7 @@ if (!$anyUser || !$whRow) {
 
     // Now grant that exact warehouse — must be included, with email channel on (the "route to a specific user + email" case).
     $pdo->exec("DELETE FROM user_scope_overrides WHERE user_id = $anyUser AND resource_type = 'warehouse'");
-    $pdo->prepare("INSERT INTO user_scope_overrides (user_id, resource_type, resource_id) VALUES (?, 'warehouse', ?)")->execute([$anyUser, $whRow['warehouse_id']]);
+    $pdo->prepare("INSERT INTO user_scope_overrides (user_id, resource_type, resource_id, granted_by) VALUES (?, 'warehouse', ?, 1)")->execute([$anyUser, $whRow['warehouse_id']]);
 
     $r2 = resolveRecipients($pdo, $event, ['warehouse_id' => (int)$whRow['warehouse_id']], $rule);
     (count($r2) === 1 && isset($r2[$anyUser]) && !empty($r2[$anyUser]['channels']['email']))

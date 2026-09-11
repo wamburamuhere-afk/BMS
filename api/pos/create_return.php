@@ -30,6 +30,7 @@ require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/stock_ledger.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 require_once __DIR__ . '/../../core/pos_batch_consumption.php';
+require_once __DIR__ . '/../../core/pos_serial_tracking.php';
 require_once __DIR__ . '/../../core/pos_combo_products.php';
 
 header('Content-Type: application/json');
@@ -200,6 +201,11 @@ try {
                 // batch(es) this line drew from, capped at the returned quantity
                 // (a partial return only reverses that much, not the whole line).
                 reverseFefoBatchConsumption($pdo, $iid, $rq);
+
+                // Phase 26 (pos_upgrade_plan.md §9) — restore up to $rq of the
+                // serials this line sold back to in_stock. No-op for a
+                // non-serial-tracked line (no pos_sale_item_serials rows).
+                reverseSerialsForSaleItem($pdo, $iid, (int)round($rq));
             }
         }
     }

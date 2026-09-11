@@ -38,6 +38,22 @@ try {
     $items = $body['items'] ?? [];
     $subtotal = floatval($body['subtotal'] ?? 0);
     $tax = floatval($body['tax'] ?? 0);
+    // Phase 30 (pos_upgrade_plan.md §9) — table-addressable holds. Both
+    // optional/additive: a plain retail hold that never sends them behaves
+    // exactly as before.
+    $warehouse_id = !empty($body['warehouse_id']) ? (int)$body['warehouse_id'] : null;
+    $table_id = !empty($body['table_id']) ? (int)$body['table_id'] : null;
+    if ($table_id) {
+        require_once __DIR__ . '/../../core/project_scope.php';
+        if (!$warehouse_id || !userCan('warehouse', $warehouse_id)) {
+            throw new Exception(t('Access denied: this warehouse is not in your assigned scope.'));
+        }
+        $tblChk = $pdo->prepare("SELECT 1 FROM restaurant_tables WHERE table_id = ? AND warehouse_id = ?");
+        $tblChk->execute([$table_id, $warehouse_id]);
+        if (!$tblChk->fetchColumn()) {
+            throw new Exception(t('The selected table does not belong to this warehouse.'));
+        }
+    }
 
     if (empty($items)) {
         throw new Exception("No items to hold");
@@ -59,24 +75,34 @@ try {
     // Insert held sale
     $stmt = $pdo->prepare("
         INSERT INTO pos_held_sales (
-            user_id, shift_id, customer_id, hold_reference,
+            user_id, shift_id, customer_id, warehouse_id, table_id, hold_reference,
             items_data, subtotal, tax_amount, total_amount, held_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     ");
-    
+
     $total = $subtotal + $tax;
-    
+
     $stmt->execute([
         $user_id,
         $shift_id,
         $customer_id,
+        $warehouse_id,
+        $table_id,
         $hold_reference,
         json_encode($items),
         $subtotal,
         $tax,
         $total
     ]);
-    
+
+    // Phase 30 — opening/loading a table's order occupies it immediately, not
+    // only once the bill is finally closed, so a floor-plan view reflects
+    // reality the moment a server starts taking an order.
+    if ($table_id) {
+        $pdo->prepare("UPDATE restaurant_tables SET status = 'occupied', updated_at = NOW() WHERE table_id = ?")
+            ->execute([$table_id]);
+    }
+
     require_once __DIR__ . '/../../helpers.php';
     $username = $_SESSION['username'] ?? 'User';
     logActivity($pdo, $user_id, 'Hold POS Sale', "$username held a POS sale (Ref: $hold_reference, Total: " . number_format($total, 2) . ")");

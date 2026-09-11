@@ -1739,7 +1739,31 @@ last):
 ### Phase 25 — Product professional fields (Warranty/Guarantee, barcode
 symbology, promotional pricing)
 
-**Status:** APPROVED, not yet built. **Closes:** the pharmacy/stationery/
+**Status:** ✅ DONE · **Built:** 2026-09-11 · **Branch:** `feat/pos-tier4-professional-retail`
+
+Shipped as planned, with two implementation refinements found while wiring it up:
+`core/pos_price_groups.php::resolveGroupPrices()` no longer short-circuits to empty when
+`price_group_id=0` — a promo must apply even when the cashier hasn't chosen a price group at all,
+which is the common case — so the promo layer is resolved unconditionally and only the group-tier
+lookup is skipped when no group is chosen. And the receipt's "was / now" strikethrough deliberately
+compares against the plain catalog `selling_price`, not whatever price-group tier a specific
+customer would have paid, to avoid conflating two different pricing concepts on one printed line.
+New `resolveActivePromoPrices()` picks the lowest price via `MIN()` if more than one active promo
+window ever overlaps the same product (not prevented by schema — an accepted edge case, documented
+in code). Full Swahili translations added for every new string, including the three new API
+endpoints' JSON messages (`api/get_product_promotions.php`, `api/save_product_promotion.php`,
+`api/toggle_product_promotion.php`) — a deliberate consistency choice beyond this file family's
+usual precedent (sibling combo-component endpoints don't translate their JSON messages), since
+language-preference correctness was a hard requirement for this build. `tests/test_pos_price_groups_cli.php`
+extended (not a new file) to 66 assertions — schema, wiring, and 7 new runtime checks reconciling
+promo resolution to direct SQL. Migration applied and verified live against the local dev DB via its
+legacy-DB mirror (no `tenants` control table configured locally); the tenant-path migration file
+lints clean and follows the same idempotent pattern. Full POS regression re-run clean (returns,
+credit/AR, sale-posting, cleanup, Phase 13 entitlement, batch-expiry); one pre-existing, unrelated
+failure in `test_pos_dashboard_cli` (a Shift History UI string check) confirmed present on the
+branch tip before this phase touched anything.
+
+**Closes:** the pharmacy/stationery/
 supermarket/vehicle-spares-counter gaps that don't need a new module, just
 richer product data — the same conclusion SalePro's own architecture reaches
 (one generic Retail engine, richer product records, no vertical-specific
@@ -1787,7 +1811,27 @@ price groups are customer-tier pricing, not time-bound promotions.
 
 ---
 
-### Phase 26 — Serial/IMEI-level stock tracking
+### Phase 26 — Serial/IMEI-level stock tracking ✅ DONE (branch feat/pos-tier4-professional-retail)
+
+**Shipped 2026-09-11.** `product_serials` + `pos_sale_item_serials` (modeled on Phase 17's
+`product_batches`/`pos_sale_item_batches`), `products.track_serials` (default 0, zero effect on
+existing products), `core/pos_serial_tracking.php` (`consumeSerial()`/`consumeSerials()`/
+`reverseSerialsForSaleItem()`), wired into `process_sale.php` (pre-flight validation + row-locked
+consumption, mutually exclusive with FEFO batching per line), `void_sale.php`/`create_return.php`
+(full/partial reversal), GRN receiving (`create_grn.php`/`approve_grn.php` — a per-line "Serial
+Numbers" entry, parsed into rows on approval, not creation), a serial picker in the POS Add-to-Cart
+modal (replaces the quantity input; a serial-tracked line's quantity is read-only after adding — it
+IS the picked-serial count). Gated `pos_advanced`, enforced at write (product create/edit), read
+(`simple_products.php` zeroes the flag for a revoked tenant) and UI (toggle/picker genuinely absent,
+not just hidden). Bundled fix: `stock_movements.reference_type` ENUM was missing `'pos_void'`/
+`'pos_return'` (silently coerced to `''` since Phase 1/7) — fixed in the same migration, verified via
+a real round-trip. Known limitation: a partial return restores the earliest-linked serials, not a
+cashier-chosen specific unit — documented, not guessed at. Full Swahili translations added for every
+new string. Tests: `tests/test_pos_serial_tracking_cli.php` (42 checks) + full POS regression re-run
+clean (returns 25, batch/expiry 46, sale posting 18, credit AR 19, cleanup 9, price groups 66, Phase
+13 entitlement 20, feature registry 110, i18n coverage 79).
+
+<details><summary>Original plan (as approved 2026-09-08)</summary>
 
 **Status:** APPROVED, not yet built. **Depends on:** nothing (independent of
 Phase 25, can build in parallel if ever desired — sequenced after 25 only for
@@ -1855,6 +1899,8 @@ serial is qty-always-1, not a pool.
 - **Gate:** `pos_advanced` (a genuinely upsell-shaped capacity feature, same
   boundary reasoning as Phase 18/21/23).
 
+</details>
+
 ---
 
 ### Phase 27 — REMOVED, 2026-09-11: Repair / Service-Job module
@@ -1894,7 +1940,40 @@ document's numbering convention (see the note above §9 Phase 25).
 ### Phase 29 — POS Dashboard Intelligence (Sales Targets, Top Cashiers,
 Damage/Shrinkage)
 
-**Status:** APPROVED, not yet built. **Depends on:** nothing (independent of
+**Status:** ✅ DONE · **Built:** 2026-09-11 · **Branch:** `feat/pos-tier4-professional-retail`
+
+Shipped exactly as scoped below. `core/pos_dashboard_metrics.php` holds the three
+independently-tested aggregates (`damageShrinkageSummary()`, `topCashiers()`,
+`salesTargetAchievement()` + `salesTargetAchievementBand()`); `api/pos/get_dashboard.php`
+folds `damage_shrinkage`/`top_cashiers` into its existing response unconditionally
+(base `pos`) and `sales_target` only when `canView('pos_advanced')` — verified live by
+forcing the tenant's feature map to `pos_advanced=false` and confirming the key comes
+back `null` even for an admin session, then confirming it's restored once the gate is
+back on. New `api/pos/save_sales_target.php` upserts a `pos_sales_targets` row (CSRF,
+`canEdit('pos_advanced')`, plus `userCan('warehouse', …)` for a specific warehouse or
+`hasAllWarehouseAccess()` for the company-wide `warehouse_id=0` row). `pos_dashboard.php`
+gained three tiles plus a "Set Sales Target" modal, both target-specific pieces wrapped
+in their own `$can_view_targets`/`$can_edit_targets` PHP `if`-blocks so a base-`pos`
+tenant's rendered HTML never contains them at all.
+
+`tests/test_pos_dashboard_cli.php` extended (not a new file) to 143 checks: static
+wiring, the four achievement bands asserted at exact edges (100/99.99/75/74.99/50/49.99%
++ 0/150 for the outer ranges), live reconciliation of Damage/Shrinkage and Top Cashiers
+against direct SQL, a transaction-wrapped synthetic damaged-stock movement + sales-target
+row (rolled back, never touching real data) proving both aggregates pick up a live insert
+correctly, and the entitlement on/off behavioural check above. All pre-existing POS
+regression suites re-run clean (`test_pos_phase13_entitlement_cli` 20,
+`test_feature_registry_cli` 110, `test_pos_serial_tracking_cli` 42,
+`test_pos_price_groups_cli` 66, `test_pos_returns_cli` 25, `test_pos_sale_posting_cli` 18,
+`test_pos_cleanup_cli` 9, `test_pos_i18n_coverage_cli` 82 with zero translation gaps).
+
+**Pre-existing, unrelated failure confirmed, not fixed:** the dashboard test's "Sales
+table has S/NO first column" check was already broken before this phase (its literal
+`>S/NO<` string match against the raw source stopped matching once `S/NO` became
+`t('S/NO')` for i18n) — same finding the Phase 25 agent flagged via `git stash`. Out of
+this phase's scope to fix; documented in `changelog.md`.
+
+**Depends on:** nothing (independent of
 every other phase in this tier — pure additions to the already-shipped,
 already-tested `app/bms/pos/pos_dashboard.php` from §3 Phase 4). **Closes:**
 three dashboard ideas found live on the fasteeypos.com benchmark that are
@@ -1972,7 +2051,40 @@ boundary for a genuine analytics capability).
 ### Phase 30 — Restaurant Module + POS Navigation Reorganization (Floors,
 Tables, Kitchen, Modifiers, Recipes, Reservations)
 
-**Status:** APPROVED, not yet built. **Depends on:** nothing structurally
+**Status:** ✅ DONE · **Built:** 2026-09-11 · **Branch:** `feat/pos-tier4-professional-retail`.
+UI/nav/tests half completed and verified live: `tests/test_restaurant_pos_cli.php`
+(153 assertions — schema, per-endpoint CSRF/permission/warehouse-scope wiring,
+table lifecycle, kitchen-ticket routing by station, modifier price resolution
++ a fix found and shipped in this pass (below), held-sale→table linkage,
+recipe stock consumption via the unmodified Phase 23 combo path, reservation
+CRUD + reminder dedup, and a targeted regression check of the sibling suites
+sharing this phase's touched files — trimmed 2026-09-11 from an initial
+full sweep of every sibling `tests/test_pos_*_cli.php` suite, which was pure
+redundant runtime given the top-level pre-push hook / master sweep already
+runs every suite in the directory once on its own) and `tests/test_pos_nav_wiring_cli.php`
+(47 assertions — header.php carries exactly one POS link with a git-diff
+blast-radius guard, `posNavGroups()` wiring, and live per-entitlement
+rendering of the hub + Restaurant sub-hub across 5 scenarios, proving a
+gated card is genuinely absent from the HTML, not merely hidden). All prior
+Phase 7-29 POS suites re-run clean.
+
+**Bug found and fixed during this pass:** `process_sale.php` resolved a
+modifier's price_adjustment server-side (correct — never trusted the
+client) but only folded it into the line's `discounted_price` *after* the
+discount-permission check had already run against the raw catalog price. A
+modifier that **reduces** price (e.g. "No Rice", -500) therefore looked
+like an unauthorized discount and would have been rejected for any cashier
+without `pos_discount_override` — a modifier that raises price was never
+affected, since a surcharge never trips that check, which is why this
+wasn't caught by hand-testing the common case. Fixed by resolving the
+modifier total earlier in the loop (before the price/discount validation
+block) and folding it into `$original_price` — the line's *true* price —
+for the normal add-to-cart path (skipped for a manual price override, where
+the cashier's typed price is already final). Regression-guarded by
+`test_restaurant_pos_cli.php`'s §D4, which also asserts the fix is
+load-bearing (proves the unfixed calculation really would have failed).
+
+**Depends on:** nothing structurally
 (its reservation feature is now self-contained, not borrowed from a
 separate Booking phase — see Phase 28's merge note above); sequenced after
 25/26/29 for pacing only, so the lower-risk groundwork (feature-registry
@@ -1982,6 +2094,25 @@ shared POS terminal and `header.php`. **Closes:** the actual "different shop
 type" mechanism for restaurant/pub, plus the POS-wide navigation cleanup
 identified from the fasteeypos.com benchmark's two-tier icon-rail +
 contextual-submenu pattern.
+
+**Progress note (2026-09-11):** because this phase is unusually large, its
+actual construction was split into two commits, still tracked as one Phase
+30 here. **Backend/schema half — DONE** (all schema below, `core/pos_nav.php`,
+18 `api/restaurant/*.php` endpoints, `process_sale.php`/`hold_sale.php`/
+`get_held_sales.php` wiring, the `restaurant_pos` feature-registry entry, the
+`restaurant.reservation_upcoming` cron reminder block) — see `changelog.md`
+for the full file list and live-verification method. **UI/nav/tests half —
+also DONE** (same day, second commit): the POS terminal mode/table/modifier
+pickers, the `app/bms/restaurant/*` admin pages, the Kitchen Display page,
+the `header.php`/`pos_dashboard.php` hub navigation reorg, and
+`tests/test_restaurant_pos_cli.php` + `tests/test_pos_nav_wiring_cli.php` —
+see the Status line above for the verification summary and the bug fixed
+along the way. One deliberate scope call made during the backend half: the plan text below
+sketches minute-level reservation reminders, but the actual notification
+cron (`cron/run_notification_checks.php`) runs at most once per day by its
+own documented design — the shipped reminder uses day-granularity milestones
+(`[1, 0]` = "tomorrow"/"today") instead of inventing a finer cadence this
+infrastructure doesn't actually have.
 
 **Schema:**
 - `warehouses.pos_mode ENUM('retail','restaurant','hybrid') DEFAULT
@@ -2225,11 +2356,21 @@ gate it already used before this redesign, per `posNavGroups()` above.
 
 ### Phase 31 — Product Variants (size/color matrix)
 
-**Status:** APPROVED, not yet built. **Deliberately last** — the one change
-in this tier that touches the most existing surfaces, so it ships once every
-other active phase's discipline (tenant-migration hygiene, feature-gating,
-warehouse ACL reuse) has been proven three times over (Phases 25, 26, 29)
-plus once more against the highest-touch phase (30).
+**Status:** ✅ DONE · **Built:** 2026-09-11 · **Branch:** `feat/pos-tier4-professional-retail`.
+**Deliberately last** — the one change in this tier that touches the most
+existing surfaces, so it shipped once every other active phase's discipline
+(tenant-migration hygiene, feature-gating, warehouse ACL reuse) had been
+proven three times over (Phases 25, 26, 29) plus once more against the
+highest-touch phase (30). Verified live: `tests/test_product_variants_cli.php`
+(51 assertions — schema, wiring, cartesian-product generation from a real
+attribute matrix with unique naming, re-generation dedupe, the POS grid's
+parent-only top-level shape + variant_count, stock/price-group scoping to
+the specific CHILD product_id and not the parent or a sibling, a combo
+correctly rejected as a variant parent, and a completely unrelated product
+proven unaffected — plus a regression sweep of the product/POS catalog
+suites most likely to notice a variant-column regression). Live-rendered
+(no warnings/fatals) via a direct in-process smoke test of both
+`product_edit.php` (Variants section) and `pos.php` (variant picker wiring).
 
 **The reuse decision that makes this low-risk despite touching everything:**
 a variant is **a normal row in `products`** with two new columns:

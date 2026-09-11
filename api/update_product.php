@@ -137,6 +137,22 @@ try {
         'model' => !empty($_POST['model']) ? trim($_POST['model']) : null,
         'serial_number' => !empty($_POST['serial_number']) ? trim($_POST['serial_number']) : null,
         'warranty_period' => !empty($_POST['warranty_period']) ? intval($_POST['warranty_period']) : 0,
+        // Phase 25 (pos_upgrade_plan.md §9) — resolves the pre-existing warranty_period
+        // column's day/month/year ambiguity, adds a distinct guarantee concept, and
+        // tags the barcode with a symbology for correct print rendering.
+        'warranty_unit' => in_array($_POST['warranty_unit'] ?? '', ['days', 'months', 'years'], true) ? $_POST['warranty_unit'] : null,
+        'guarantee_period' => !empty($_POST['guarantee_period']) ? intval($_POST['guarantee_period']) : null,
+        'guarantee_unit' => in_array($_POST['guarantee_unit'] ?? '', ['days', 'months', 'years'], true) ? $_POST['guarantee_unit'] : null,
+        'barcode_symbology' => in_array($_POST['barcode_symbology'] ?? '', ['CODE128', 'CODE39', 'UPC_A', 'UPC_E', 'EAN_8', 'EAN_13'], true) ? $_POST['barcode_symbology'] : 'CODE128',
+        // Phase 26 (pos_upgrade_plan.md §9) — gated server-side, never trusted
+        // from the client alone: a raw POST can't turn this on for a tenant
+        // without the pos_advanced entitlement.
+        'track_serials' => (isset($_POST['track_serials']) && canView('pos_advanced')) ? 1 : 0,
+        // Phase 30 (pos_upgrade_plan.md §9) — routes this product to a
+        // kitchen station for Send-to-Kitchen/KDS; only meaningful behind
+        // the restaurant_pos entitlement, gated the same way track_serials
+        // is gated behind pos_advanced above.
+        'kitchen_station_id' => (!empty($_POST['kitchen_station_id']) && canView('restaurant_pos')) ? intval($_POST['kitchen_station_id']) : null,
         'expiry_days' => !empty($_POST['expiry_days']) ? intval($_POST['expiry_days']) : 0,
         'updated_by' => $user_id,
         'updated_at' => date('Y-m-d H:i:s')

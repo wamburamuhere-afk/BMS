@@ -310,11 +310,12 @@ ok('closure silently drops an unknown key', featureDependencyClosure(['hr', 'not
 
 // Reverse: disabling 'warehouses' must name every feature that needs it,
 // including transitive ones ('projects' needs procurement needs warehouses;
-// 'pos_advanced' needs pos needs warehouses — pos_upgrade_plan.md §7 Phase 13).
+// 'pos_advanced'/'restaurant_pos' need pos needs warehouses —
+// pos_upgrade_plan.md §7 Phase 13, §9 Phase 30).
 $dependents = featureAllDependents('warehouses');
 sort($dependents);
-ok("all dependents of 'warehouses' = [pos, pos_advanced, procurement, projects, sales] (projects/pos_advanced are transitive)",
-   $dependents === ['pos', 'pos_advanced', 'procurement', 'projects', 'sales']);
+ok("all dependents of 'warehouses' = [pos, pos_advanced, procurement, projects, restaurant_pos, sales] (projects/pos_advanced/restaurant_pos are transitive)",
+   $dependents === ['pos', 'pos_advanced', 'procurement', 'projects', 'restaurant_pos', 'sales']);
 
 ok("dependents of 'procurement' = ['projects']", featureAllDependents('procurement') === ['projects']);
 ok("a leaf feature ('hr') has no dependents", featureAllDependents('hr') === []);

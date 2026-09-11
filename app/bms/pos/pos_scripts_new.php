@@ -22,6 +22,14 @@ const POS_AUTO_PRINT_RECEIPT = <?= get_setting('pos_auto_print_receipt', '0') ==
 const POS_CURRENCY = <?= json_encode($currency) ?>; // Phase 11 (pos_upgrade_plan.md §7) — was hardcoded 'TZS' everywhere
 const POS_LOYALTY_REDEEM_VALUE = <?= (float)getSetting('pos_loyalty_redeem_value', '50') ?>; // currency value of 1 point — preview only, server re-validates
 
+// Phase 30 (pos_upgrade_plan.md §9) — Restaurant module state. All null/false
+// for a plain retail sale, which is byte-for-byte how every function below
+// already behaves when these stay unset.
+let currentTableId = null;
+let currentTableLabel = '';
+let currentHoldId = null;         // the pos_held_sales row backing the open table order, once one exists
+let modifierGroupsCache = null;   // full modifier_groups+options catalog, fetched once and reused
+
 // ══════════════════════ TRANSLATED STRINGS (t()) ══════════════════════
 const PT = {
     service: <?= json_encode(t('Service')) ?>,
@@ -45,6 +53,10 @@ const PT = {
     clearCartText: <?= json_encode(t('Are you sure you want to remove all items?')) ?>,
     yesClearIt: <?= json_encode(t('Yes, clear it!')) ?>,
     loyaltyDiscountLabel: <?= json_encode(t('Loyalty discount:')) ?>,
+    serialTrackedLabel: <?= json_encode(t('Serial / IMEI numbers (select one per unit)')) ?>,
+    noSerialsAvailable: <?= json_encode(t('No serial numbers available in this warehouse.')) ?>,
+    selectAtLeastOneSerial: <?= json_encode(t('Select at least one serial number.')) ?>,
+    loadingSerials: <?= json_encode(t('Loading serial numbers...')) ?>,
     emptyCartTitle: <?= json_encode(t('Empty Cart')) ?>,
     emptyCartText: <?= json_encode(t('Add items to cart before processing payment.')) ?>,
     noActiveShiftTitle: <?= json_encode(t('No Active Shift')) ?>,
@@ -147,7 +159,27 @@ const PT = {
     totalLabel: <?= json_encode(t('Total:')) ?>,
     shareViaWhatsApp: <?= json_encode(t('Share via WhatsApp')) ?>,
     whatsappNumberLabel: <?= json_encode(t('WhatsApp number (with country code)')) ?>,
-    invalidWhatsappNumber: <?= json_encode(t('Please enter a valid phone number.')) ?>
+    invalidWhatsappNumber: <?= json_encode(t('Please enter a valid phone number.')) ?>,
+    // Phase 30 (pos_upgrade_plan.md §9) — Restaurant module strings.
+    selectTable: <?= json_encode(t('Select Table')) ?>,
+    loadingTables: <?= json_encode(t('Loading tables...')) ?>,
+    noTablesSetUp: <?= json_encode(t('No tables set up for this warehouse yet. Ask an admin to add floors and tables under Restaurant > Floors & Tables.')) ?>,
+    tableLabel: <?= json_encode(t('Table')) ?>,
+    dineInTable: <?= json_encode(t('Dine-in: Table %s')) ?>,
+    sentToKitchen: <?= json_encode(t('Sent to the kitchen.')) ?>,
+    sendToKitchenFailed: <?= json_encode(t('Could not send this order to the kitchen.')) ?>,
+    addItemsBeforeKitchen: <?= json_encode(t('Add items to the order before sending to the kitchen.')) ?>,
+    selectTableFirst: <?= json_encode(t('Select a table first.')) ?>,
+    modifiersLabel: <?= json_encode(t('Options')) ?>,
+    modifierRequired: <?= json_encode(t('"%s" is required.')) ?>,
+    modifierMinMax: <?= json_encode(t('Choose between %min% and %max% option(s) for "%group%".')) ?>,
+    // Phase 31 (pos_upgrade_plan.md §8) — Product Variants strings.
+    variantsLabel: <?= json_encode(t('Variants')) ?>,
+    selectVariant: <?= json_encode(t('Select Variant')) ?>,
+    loadingVariants: <?= json_encode(t('Loading variants...')) ?>,
+    noVariantsAvailable: <?= json_encode(t('No variants available.')) ?>,
+    // Mobile product-grid render cap.
+    showingFirstNProducts: <?= json_encode(t('Showing %shown% of %total% products — search to find more.')) ?>
 };
 
 // Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split: a cashier
@@ -459,7 +491,9 @@ let loadProductsXhr = null; // To track and abort previous requests
 
 function loadProducts(categoryId = 'all', searchTerm = '') {
     if (loadProductsXhr) loadProductsXhr.abort(); // Abort previous request before starting new one
-    
+
+    applyPosModeUi(); // Phase 30 (pos_upgrade_plan.md §9)
+
     $('#loadingProducts').show();
     $('#productGrid').empty();
     
@@ -500,10 +534,21 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                 }
                 const grid = $('#productGrid');
                 grid.empty();
-                
-                console.log('Rendering', products.length, 'products...');
-                
-                response.data.forEach(product => {
+
+                // Mobile-only render cap: a phone screen never benefits from
+                // rendering hundreds of tiles at once (slow, mostly scrolled
+                // past unseen) — cap the DEFAULT (no active search) grid at
+                // 20 tiles there; typing a search reveals the real matches
+                // immediately, same server-side result set as before. Desktop
+                // is completely unaffected (window.innerWidth check below).
+                const MOBILE_BREAKPOINT = 768;
+                const isMobileView = window.innerWidth < MOBILE_BREAKPOINT;
+                const cappedForMobile = isMobileView && !searchTerm && response.data.length > 20;
+                const renderList = cappedForMobile ? response.data.slice(0, 20) : response.data;
+
+                console.log('Rendering', renderList.length, 'of', products.length, 'products...');
+
+                renderList.forEach(product => {
                     const isService = product.is_service == 1 || product.is_service == '1';
                     const projectStock = parseFloat(product.project_stock) || 0;
                     
@@ -519,14 +564,25 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                         imageContent = `<i class="bi ${isService ? 'bi-briefcase' : 'bi-box-seam'}" style="font-size: 3rem; color: #0d6efd;"></i>`;
                     }
 
+                    // Phase 31 (pos_upgrade_plan.md §8) — a variant parent (variant_count > 0)
+                    // renders as ONE tile; tapping it opens the variant picker instead of
+                    // going straight to quick-view/add-to-cart. A plain, non-variant product
+                    // (variant_count is always 0 unless pos_advanced is entitled) behaves
+                    // byte-for-byte as before.
+                    const variantCount = parseInt(product.variant_count) || 0;
+                    const tileClickHandler = variantCount > 0
+                        ? `openVariantPicker(${product.product_id})`
+                        : `showProductQuickView(${product.product_id})`;
+
                     const card = `
-                        <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6">
-                            <div class="card product-card h-100 ${projectStock > 0 ? 'border-info shadow-sm' : ''}" onclick="showProductQuickView(${product.product_id})">
+                        <div class="col-6 col-sm-6 col-md-6 col-lg-4 col-xl-3">
+                            <div class="card product-card h-100 ${projectStock > 0 ? 'border-info shadow-sm' : ''}" onclick="${tileClickHandler}">
                                 <div class="card-body text-center p-2">
                                     <div class="mb-2" style="height: 80px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
                                         ${imageContent}
                                         ${!isService && product.stock_quantity <= 10 ? '<span class="badge bg-danger position-absolute top-0 end-0" style="font-size: 8px;">' + PT.lowStock + '</span>' : ''}
                                         ${projectStock > 0 ? '<span class="badge bg-info position-absolute top-0 start-0" style="font-size: 8px;"><i class="bi bi-star-fill"></i> ' + PT.projectStock + '</span>' : ''}
+                                        ${variantCount > 0 ? '<span class="badge bg-primary position-absolute bottom-0 end-0" style="font-size: 8px;"><i class="bi bi-diagram-2"></i> ' + variantCount + ' ' + PT.variantsLabel + '</span>' : ''}
                                     </div>
                                     ${isService ? '<span class="badge bg-info text-white mb-1">' + PT.service + '</span>' : ''}
                                     <h6 class="card-title mb-1 small text-truncate fw-bold" title="${product.product_name}">${product.product_name}</h6>
@@ -541,7 +597,15 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                     `;
                     grid.append(card);
                 });
-                
+
+                if (cappedForMobile) {
+                    grid.append(`
+                        <div class="col-12 text-center py-2">
+                            <small class="text-muted">${PT.showingFirstNProducts.replace('%shown%', renderList.length).replace('%total%', response.data.length)}</small>
+                        </div>
+                    `);
+                }
+
                 console.log('Products rendered successfully!');
             } else {
                 console.warn('No products in response');
@@ -610,6 +674,10 @@ function searchProducts() {
 }
 
 let currentProductUnits = []; // Phase 15 (pos_upgrade_plan.md §8) — this product's extra selling units
+let currentProductSerials = []; // Phase 26 (pos_upgrade_plan.md §9) — this product's in_stock serials in the current warehouse
+let selectedSerials = [];       // the cashier's checked subset for the line about to be added
+let currentProductModifierGroups = []; // Phase 30 (pos_upgrade_plan.md §9) — full group+option defs linked to this product
+let selectedModifierOptions = [];      // the cashier's checked options for the line about to be added
 
 function showProductQuickView(productId) {
     const product = products.find(p => p.product_id == productId);
@@ -617,6 +685,15 @@ function showProductQuickView(productId) {
 
     currentProduct = product;
     currentProductUnits = [];
+    currentProductSerials = [];
+    selectedSerials = [];
+    currentProductModifierGroups = [];
+    selectedModifierOptions = [];
+    const isSerialTracked = currentProduct.is_service != 1 && currentProduct.track_serials == 1;
+    // Phase 30 (pos_upgrade_plan.md §9) — only a restaurant/hybrid warehouse
+    // with the entitlement ever fetches/shows modifier groups; a plain retail
+    // sale never triggers the extra lookups below.
+    const showModifiers = POS_RESTAURANT_ENABLED && (POS_WAREHOUSE_MODES[parseInt($('#posWarehouseId').val() || 0, 10)] || 'retail') !== 'retail' && currentProduct.is_service != 1;
 
     const html = `
         <h6>${currentProduct.product_name}</h6>
@@ -631,7 +708,7 @@ function showProductQuickView(productId) {
             <select class="form-select" id="quickViewUnit" onchange="updateQuickViewUnitPrice()"></select>
         </div>
 
-        <div class="mb-3">
+        <div class="mb-3 ${isSerialTracked ? 'd-none' : ''}" id="quickViewQtyWrap">
             <label class="form-label">${PT.quantityLabel}</label>
             <div class="input-group">
                 <button class="btn btn-outline-secondary" type="button" onclick="adjustQuantity(-1)">-</button>
@@ -639,6 +716,21 @@ function showProductQuickView(productId) {
                        value="1" min="1" step="1">
                 <button class="btn btn-outline-secondary" type="button" onclick="adjustQuantity(1)">+</button>
             </div>
+        </div>
+
+        <div class="mb-3 ${isSerialTracked ? '' : 'd-none'}" id="quickViewSerialWrap">
+            <label class="form-label d-flex justify-content-between">
+                <span>${PT.serialTrackedLabel}</span>
+                <span class="badge bg-primary" id="quickViewSerialCount">0</span>
+            </label>
+            <div class="border rounded p-2" style="max-height:180px;overflow-y:auto;" id="quickViewSerialList">
+                <div class="text-muted small">${PT.loadingSerials}</div>
+            </div>
+        </div>
+
+        <div class="mb-3 d-none" id="quickViewModifiersWrap">
+            <label class="form-label">${PT.modifiersLabel}</label>
+            <div id="quickViewModifiersList"></div>
         </div>
 
         <div class="d-grid gap-2">
@@ -655,10 +747,46 @@ function showProductQuickView(productId) {
 
     // Proper way to handle focus in Bootstrap modals to avoid aria-hidden issues
     $('#productQuickView').off('shown.bs.modal').on('shown.bs.modal', function () {
-        $('#quickViewQty').focus().select();
+        if (!isSerialTracked) $('#quickViewQty').focus().select();
     });
 
     $('#productQuickView').modal('show');
+
+    // Phase 26 (pos_upgrade_plan.md §9) — fetch this product's in_stock
+    // serials for the currently selected warehouse. Mirrors the unit-fetch
+    // pattern immediately below.
+    if (isSerialTracked) {
+        const warehouseId = $('#posWarehouseId').val();
+        $.getJSON('<?= buildUrl('/api/pos/get_available_serials.php') ?>', { product_id: productId, warehouse_id: warehouseId }, function (res) {
+            if (currentProduct.product_id != productId) return; // modal moved on already
+            currentProductSerials = (res.success && res.data) ? res.data : [];
+            renderSerialPicker();
+        }).fail(function () {
+            if (currentProduct.product_id != productId) return;
+            currentProductSerials = [];
+            renderSerialPicker();
+        });
+    }
+
+    // Phase 30 (pos_upgrade_plan.md §9) — fetch this product's linked
+    // modifier groups (if any) only when the warehouse is restaurant/hybrid
+    // and the tenant is entitled; a plain retail sale never issues either
+    // of the two calls below.
+    if (showModifiers) {
+        $.getJSON('<?= buildUrl('api/restaurant/get_product_modifier_groups.php') ?>', { product_id: productId }, function (linkRes) {
+            if (currentProduct.product_id != productId) return;
+            const linkedIds = (linkRes.success && linkRes.data) ? linkRes.data.map(g => g.group_id) : [];
+            if (!linkedIds.length) return;
+            ensureModifierGroupsCache(function (allGroups) {
+                if (currentProduct.product_id != productId) return;
+                currentProductModifierGroups = allGroups.filter(g => linkedIds.includes(g.group_id) && g.status === 'active');
+                if (currentProductModifierGroups.length) {
+                    $('#quickViewModifiersWrap').removeClass('d-none');
+                    renderModifierPicker();
+                }
+            });
+        });
+    }
 
     // Phase 15 (pos_upgrade_plan.md §8) — fetch this product's extra selling
     // units (base unit is always implicitly available and needs no dropdown
@@ -698,6 +826,39 @@ function updateQuickViewUnitPrice() {
     $('#quickViewPrice').text(POS_CURRENCY + ' ' + perUnitPrice.toLocaleString());
 }
 
+// Phase 26 (pos_upgrade_plan.md §9) — renders the checkbox list of in_stock
+// serials; the running "selected" count IS the line's quantity (a serial is
+// qty-always-1), so there is no separate quantity input for these lines.
+function renderSerialPicker() {
+    const list = $('#quickViewSerialList');
+    if (!currentProductSerials.length) {
+        list.html(`<div class="text-muted small">${PT.noSerialsAvailable}</div>`);
+        $('#quickViewSerialCount').text('0');
+        return;
+    }
+    let html = '';
+    currentProductSerials.forEach(sn => {
+        const id = 'serial_' + safeOutput(sn).replace(/[^a-zA-Z0-9]/g, '_');
+        html += `
+            <div class="form-check">
+                <input class="form-check-input serial-check" type="checkbox" value="${safeOutput(sn)}" id="${id}" onchange="toggleSerialSelection(this)">
+                <label class="form-check-label small" for="${id}">${safeOutput(sn)}</label>
+            </div>`;
+    });
+    list.html(html);
+    $('#quickViewSerialCount').text(selectedSerials.length);
+}
+
+function toggleSerialSelection(checkbox) {
+    const sn = checkbox.value;
+    if (checkbox.checked) {
+        if (!selectedSerials.includes(sn)) selectedSerials.push(sn);
+    } else {
+        selectedSerials = selectedSerials.filter(s => s !== sn);
+    }
+    $('#quickViewSerialCount').text(selectedSerials.length);
+}
+
 function adjustQuantity(amount) {
     const input = $('#quickViewQty');
     let current = parseInt(input.val()) || 1;
@@ -705,11 +866,94 @@ function adjustQuantity(amount) {
     input.val(newValue);
 }
 
+// ─────────────────── Phase 30 (pos_upgrade_plan.md §9) — modifiers ───────────────────
+function renderModifierPicker() {
+    let html = '';
+    currentProductModifierGroups.forEach(g => {
+        const inputType = g.selection_type === 'single' ? 'radio' : 'checkbox';
+        const name = 'mod_group_' + g.group_id;
+        html += `<div class="border rounded p-2 mb-2">
+            <div class="small fw-bold mb-1">${safeOutput(g.name)} ${g.is_required == 1 ? '<span class="text-danger">*</span>' : ''}</div>`;
+        (g.options || []).filter(o => o.status === 'active').forEach(o => {
+            const adj = parseFloat(o.price_adjustment) || 0;
+            const adjLabel = adj !== 0 ? ` (${adj > 0 ? '+' : ''}${adj.toLocaleString()})` : '';
+            const id = `modopt_${g.group_id}_${o.option_id}`;
+            html += `<div class="form-check">
+                <input class="form-check-input" type="${inputType}" name="${name}" id="${id}"
+                       onchange="toggleModifierOption(${g.group_id}, ${o.option_id}, ${JSON.stringify(o.name)}, ${adj}, '${g.selection_type}', '${inputType}')">
+                <label class="form-check-label small" for="${id}">${safeOutput(o.name)}${adjLabel}</label>
+            </div>`;
+        });
+        html += `</div>`;
+    });
+    $('#quickViewModifiersList').html(html);
+}
+
+function toggleModifierOption(groupId, optionId, optionName, priceAdjustment, selectionType, inputType) {
+    if (inputType === 'radio') {
+        // A single-select group: this new choice replaces any prior one from
+        // the same group (the browser already visually unchecks siblings —
+        // this keeps selectedModifierOptions in sync with that).
+        selectedModifierOptions = selectedModifierOptions.filter(o => o.group_id !== groupId);
+        selectedModifierOptions.push({ group_id: groupId, option_id: optionId, option_name: optionName, price_adjustment: priceAdjustment });
+        return;
+    }
+    const existingIdx = selectedModifierOptions.findIndex(o => o.option_id === optionId);
+    if (existingIdx >= 0) {
+        selectedModifierOptions.splice(existingIdx, 1);
+    } else {
+        const group = currentProductModifierGroups.find(g => g.group_id === groupId);
+        const countInGroup = selectedModifierOptions.filter(o => o.group_id === groupId).length;
+        if (group && group.max_select > 0 && countInGroup >= group.max_select) {
+            Swal.fire({ icon: 'warning', title: PT.error, text: PT.modifierMinMax.replace('%group%', group.name).replace('%min%', group.min_select).replace('%max%', group.max_select) });
+            // Revert the checkbox the browser already ticked.
+            $(`#modopt_${groupId}_${optionId}`).prop('checked', false);
+            return;
+        }
+        selectedModifierOptions.push({ group_id: groupId, option_id: optionId, option_name: optionName, price_adjustment: priceAdjustment });
+    }
+}
+
+// Returns true if every required group has at least one selection (and every
+// group respects its own min_select); shows the specific error otherwise.
+function validateModifierSelections() {
+    for (const g of currentProductModifierGroups) {
+        const count = selectedModifierOptions.filter(o => o.group_id === g.group_id).length;
+        if (g.is_required == 1 && count === 0) {
+            Swal.fire({ icon: 'warning', title: PT.error, text: PT.modifierRequired.replace('%s', g.name) });
+            return false;
+        }
+        if (count > 0 && g.min_select > 0 && count < g.min_select) {
+            Swal.fire({ icon: 'warning', title: PT.error, text: PT.modifierMinMax.replace('%group%', g.name).replace('%min%', g.min_select).replace('%max%', g.max_select) });
+            return false;
+        }
+    }
+    return true;
+}
+
 function addToCart() {
     if (!currentProduct) return;
 
-    const quantity = parseInt($('#quickViewQty').val()) || 1;
+    const isSerialTracked = currentProduct.is_service != 1 && currentProduct.track_serials == 1;
+    if (isSerialTracked && selectedSerials.length === 0) {
+        Swal.fire({ icon: 'warning', title: PT.error, text: PT.selectAtLeastOneSerial });
+        return;
+    }
+    if (currentProductModifierGroups.length && !validateModifierSelections()) {
+        return;
+    }
+
+    // Phase 26 (pos_upgrade_plan.md §9) — a serial-tracked line's quantity IS
+    // the count of serials picked; there is no separate quantity input for it.
+    const quantity = isSerialTracked ? selectedSerials.length : (parseInt($('#quickViewQty').val()) || 1);
     const basePrice = parseFloat(currentProduct.effective_price ?? currentProduct.selling_price) || 0;
+    // Phase 30 (pos_upgrade_plan.md §9) — chosen modifier options are priced
+    // into the line client-side for display; process_sale.php independently
+    // re-resolves the same option_ids server-side (never trusts this client
+    // total) and folds its own validated sum into the line's true price, so
+    // a tampered request can't under/over price a modifier.
+    const modifierAdjustmentTotal = selectedModifierOptions.reduce((sum, o) => sum + (parseFloat(o.price_adjustment) || 0), 0);
+    const hasModifiers = selectedModifierOptions.length > 0;
 
     // Phase 15 (pos_upgrade_plan.md §8) — unit conversion. An empty
     // selection = base unit, unchanged behaviour. item.price/quantity stay
@@ -728,9 +972,17 @@ function addToCart() {
         }
     }
 
+    linePrice += modifierAdjustmentTotal;
+
     // A different unit of the same product is a DIFFERENT cart line — 2
     // pieces and 3 cartons of the same item can't be merged into one qty.
-    const existingItem = cart.find(item => item.product_id == currentProduct.product_id && (item.unit_label || '') === unitLabel);
+    // A serial-tracked or modifier-carrying line is ALSO never merged — each
+    // Add to Cart click carries its own distinct serial set or option
+    // choices, so two additions of the "same" product must stay two separate
+    // lines rather than silently summing unrelated selections into one qty.
+    const existingItem = (!isSerialTracked && !hasModifiers)
+        ? cart.find(item => item.product_id == currentProduct.product_id && (item.unit_label || '') === unitLabel)
+        : null;
 
     if (existingItem) {
         existingItem.quantity += quantity;
@@ -751,7 +1003,15 @@ function addToCart() {
             discount_type: 'percentage', // Default to percentage
             discount_value: 0,
             discount_percent: 0,
-            discounted_price: linePrice
+            discounted_price: linePrice,
+            // Phase 26 (pos_upgrade_plan.md §9) — the specific serials this
+            // line will consume; re-validated server-side at checkout.
+            serial_numbers: isSerialTracked ? selectedSerials.slice() : undefined,
+            // Phase 30 (pos_upgrade_plan.md §9) — the chosen modifier options
+            // for this line; process_sale.php re-resolves name/price_adjustment
+            // server-side from option_id and never trusts these client values
+            // for anything beyond display/record-keeping.
+            modifiers: hasModifiers ? selectedModifierOptions.slice() : undefined
         });
     }
 
@@ -810,6 +1070,7 @@ function updateCartDisplay() {
                     <td>
                         <strong class="small">${item.product_name}</strong>
                         ${item.unit_label ? `<br><span class="badge bg-light text-dark border">${safeOutput(item.unit_label)}</span>` : ''}
+                        ${item.modifiers && item.modifiers.length ? `<br><span class="small text-muted">${item.modifiers.map(m => safeOutput(m.option_name)).join(', ')}</span>` : ''}
                         ${discountBadge}
                     </td>
                     <td class="text-end">
@@ -817,16 +1078,23 @@ function updateCartDisplay() {
                         ${POS_CAN_PRICE_OVERRIDE ? `<br><button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" style="font-size:10px;" onclick="editLinePrice(${index})" title="${PT.editPriceTitle}"><i class="bi bi-pencil"></i> ${PT.editPriceTitle}</button>` : ''}
                     </td>
                     <td class="text-center" style="padding: 0.25rem;">
-                        <div class="d-flex align-items-center justify-content-center" style="gap: 2px;">
-                            <button class="btn btn-outline-secondary" onclick="updateCartQuantity(${index}, -1)" 
-                                    style="padding: 2px 4px; font-size: 10px; line-height: 1; min-width: 18px;">-</button>
-                            <input type="number" class="form-control text-center" 
-                                   style="width: 35px; padding: 2px; font-size: 11px; height: 22px;"
-                                   value="${item.quantity}" min="1" 
-                                   onchange="updateCartQuantityInput(${index}, this.value)">
-                            <button class="btn btn-outline-secondary" onclick="updateCartQuantity(${index}, 1)" 
-                                    style="padding: 2px 4px; font-size: 10px; line-height: 1; min-width: 18px;">+</button>
-                        </div>
+                        ${item.serial_numbers ?
+                            // Phase 26 (pos_upgrade_plan.md §9) — a serial-tracked
+                            // line's quantity IS its picked serial count; editing it
+                            // here would desync from serial_numbers, so it's
+                            // read-only (remove and re-add to change the selection).
+                            `<span class="badge bg-secondary" title="${safeOutput(item.serial_numbers.join(', '))}">${item.quantity}</span>` :
+                            `<div class="d-flex align-items-center justify-content-center" style="gap: 2px;">
+                                <button class="btn btn-outline-secondary" onclick="updateCartQuantity(${index}, -1)"
+                                        style="padding: 2px 4px; font-size: 10px; line-height: 1; min-width: 18px;">-</button>
+                                <input type="number" class="form-control text-center"
+                                       style="width: 35px; padding: 2px; font-size: 11px; height: 22px;"
+                                       value="${item.quantity}" min="1"
+                                       onchange="updateCartQuantityInput(${index}, this.value)">
+                                <button class="btn btn-outline-secondary" onclick="updateCartQuantity(${index}, 1)"
+                                        style="padding: 2px 4px; font-size: 10px; line-height: 1; min-width: 18px;">+</button>
+                            </div>`
+                        }
                     </td>
                     <td class="text-end">
                         <strong class="small text-success">${itemTotal.toLocaleString()}</strong>
@@ -1094,7 +1362,12 @@ function processPayment() {
         amount_paid: (paymentMethod === 'credit')
             ? Math.min(parseFloat($('#amountTendered').val()) || 0, calculatedTotal)
             : calculatedTotal,
-        redeem_points: redeemPointsRequested
+        redeem_points: redeemPointsRequested,
+        // Phase 30 (pos_upgrade_plan.md §9) — additive/optional; undefined for
+        // every plain retail sale, which process_sale.php treats identically
+        // to how it behaved before this phase.
+        table_id: currentTableId || undefined,
+        sale_type: currentTableId ? 'dine_in' : undefined
     };
     
     $('#processPaymentBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + PT.processing);
@@ -1149,7 +1422,14 @@ function submitPayment(paymentData) {
                     cart = [];
                     updateCartDisplay();
                     clearCartStorage();
-                    
+
+                    // 1b. Phase 30 (pos_upgrade_plan.md §9) — the bill just
+                    // closed frees the table server-side (process_sale.php);
+                    // mirror that client-side so the next sale on this
+                    // terminal starts as an ordinary walk-in, not still
+                    // pinned to the table that was just paid out.
+                    clearTableSelection();
+
                     // 2. Clear Payment Inputs
                     $('#amountTendered').val('0');
                     $('#changeAlert').hide();
@@ -1283,6 +1563,252 @@ function printReceipt(saleId) {
     window.open('<?= getUrl('pos/print-receipt') ?>?id=' + saleId, '_blank');
 }
 
+// ═══════════════ Phase 30 (pos_upgrade_plan.md §9) — Restaurant module ═══════════════
+// All of this is additive: a plain 'retail' warehouse never calls into any of
+// it, because applyPosModeUi() below hides every entry point (the Table and
+// Send-to-Kitchen buttons) unless the selected warehouse's pos_mode !== 'retail'
+// and the tenant holds the restaurant_pos entitlement. "Hybrid" warehouses are
+// treated as "both modes usable side by side" — a cashier who never opens the
+// table picker gets a completely ordinary retail sale; one who does gets a
+// table-addressed order. This is a deliberate simplification of the plan's
+// separate "Choose POS Mode" step for hybrid warehouses: the same end state
+// (both modes available) with materially less new UI-state-machine surface.
+
+function applyPosModeUi() {
+    const wid = parseInt($('#posWarehouseId').val() || 0, 10);
+    const mode = POS_WAREHOUSE_MODES[wid] || 'retail';
+    const show = POS_RESTAURANT_ENABLED && mode !== 'retail';
+    $('#restaurantTableBtn').toggleClass('d-none', !show);
+    if (!show) {
+        // Warehouse changed away from a restaurant/hybrid one — drop any
+        // selected table so a stale table_id from a different warehouse can
+        // never ride along on the next sale.
+        clearTableSelection();
+    } else {
+        $('#sendToKitchenBtn').toggleClass('d-none', !currentTableId);
+    }
+}
+
+function clearTableSelection() {
+    currentTableId = null;
+    currentTableLabel = '';
+    currentHoldId = null;
+    $('#restaurantTableIndicator').addClass('d-none');
+    $('#sendToKitchenBtn').addClass('d-none');
+}
+
+function openTablePicker() {
+    const wid = parseInt($('#posWarehouseId').val() || 0, 10);
+    if (!wid) {
+        Swal.fire({ icon: 'warning', title: PT.warehouseRequiredTitle, text: PT.warehouseRequiredText });
+        return;
+    }
+    $('#tablePickerBody').html('<div class="text-center py-4"><div class="spinner-border text-primary"></div><div class="small text-muted mt-2">' + PT.loadingTables + '</div></div>');
+    new bootstrap.Modal(document.getElementById('tablePickerModal')).show();
+
+    $.getJSON('<?= buildUrl('api/restaurant/get_floors.php') ?>', { warehouse_id: wid }, function (fres) {
+        if (!fres.success || !fres.data.length) {
+            $('#tablePickerBody').html('<div class="alert alert-info mb-0">' + PT.noTablesSetUp + '</div>');
+            return;
+        }
+        let pending = fres.data.length;
+        const sections = {};
+        fres.data.forEach(floor => {
+            $.getJSON('<?= buildUrl('api/restaurant/get_tables.php') ?>', { warehouse_id: wid, floor_id: floor.floor_id }, function (tres) {
+                sections[floor.floor_id] = renderTablePickerFloor(floor, tres.success ? tres.data : [], wid);
+                pending--;
+                if (pending === 0) {
+                    let out = '';
+                    fres.data.forEach(f => { out += sections[f.floor_id]; });
+                    $('#tablePickerBody').html(out || '<div class="alert alert-info mb-0">' + PT.noTablesSetUp + '</div>');
+                }
+            });
+        });
+    }).fail(function () {
+        $('#tablePickerBody').html('<div class="alert alert-danger mb-0">' + PT.serverError + '</div>');
+    });
+}
+
+function renderTablePickerFloor(floor, tables, warehouseId) {
+    const colors = { available: '#198754', occupied: '#dc3545', reserved: '#fd7e14', cleaning: '#6c757d' };
+    let cards = '';
+    tables.forEach(t => {
+        const color = colors[t.status] || '#6c757d';
+        cards += `
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center p-2" style="cursor:pointer;border-top:4px solid ${color} !important;"
+                 onclick="selectTable(${t.table_id}, ${warehouseId}, ${JSON.stringify(t.table_number)})">
+                <div class="fw-bold">${safeOutput(t.table_number)}</div>
+                <div class="small text-muted">${t.seats} <?= t('seats') ?></div>
+                <span class="badge mt-1" style="background:${color};color:#fff;">${safeOutput(t.status)}</span>
+            </div>
+        </div>`;
+    });
+    return `<div class="mb-3"><h6 class="small text-muted">${safeOutput(floor.name)}</h6><div class="row g-2">${cards}</div></div>`;
+}
+
+function selectTable(tableId, warehouseId, tableNumber) {
+    bootstrap.Modal.getInstance(document.getElementById('tablePickerModal'))?.hide();
+
+    $.getJSON('<?= buildUrl('/api/pos/get_held_sales.php') ?>', { table_id: tableId, warehouse_id: warehouseId }, function (res) {
+        currentTableId = tableId;
+        currentTableLabel = tableNumber;
+        currentHoldId = null;
+
+        const existing = (res.success && res.data && res.data.length) ? res.data[0] : null;
+        if (existing) {
+            try {
+                cart = JSON.parse(existing.items_data);
+                currentHoldId = existing.hold_id;
+                if (existing.customer_id) setCustomerSelection(existing.customer_id, existing.customer_name);
+            } catch (e) {
+                console.error('Error restoring table order', e);
+                cart = [];
+            }
+        } else {
+            cart = [];
+        }
+
+        updateCartDisplay();
+        saveCartToStorage();
+        $('#restaurantTableIndicatorText').text(PT.dineInTable.replace('%s', tableNumber));
+        $('#restaurantTableIndicator').removeClass('d-none');
+        $('#sendToKitchenBtn').removeClass('d-none');
+
+        $.post('<?= buildUrl('api/restaurant/update_table_status.php') ?>', {
+            table_id: tableId, status: 'occupied', _csrf: <?= json_encode(csrf_token()) ?>
+        });
+    }).fail(function () {
+        Swal.fire({ icon: 'error', title: PT.error, text: PT.serverError });
+    });
+}
+
+function sendCurrentOrderToKitchen() {
+    if (!currentTableId) {
+        Swal.fire({ icon: 'warning', title: PT.error, text: PT.selectTableFirst });
+        return;
+    }
+    if (cart.length === 0) {
+        Swal.fire({ icon: 'warning', title: PT.emptyCartTitle, text: PT.addItemsBeforeKitchen });
+        return;
+    }
+
+    const wid = parseInt($('#posWarehouseId').val() || 0, 10);
+    const btn = $('#sendToKitchenBtn');
+    const origHtml = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+    // Every "Send to Kitchen" press re-persists the table's current cart as a
+    // fresh held sale, then points the kitchen ticket at it. A prior held
+    // row for this table (if any) is left as-is rather than deleted here —
+    // delete_held_sale.php enforces per-owner ownership, so a different
+    // staff member picking up someone else's table couldn't clear it anyway.
+    // Known, documented limitation: a table revisited many times across
+    // different cashiers can accumulate stale 'held' rows that are never
+    // loaded again (get_held_sales.php always returns only the newest one).
+    // This does not affect stock, cash, or the GL — purely a tidiness gap.
+    const holdData = {
+        reference: 'Table ' + currentTableLabel,
+        customer_id: $('#customerSelect').val() || null,
+        items: cart,
+        subtotal: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+        tax: cart.reduce((sum, item) => sum + (item.discounted_price * item.quantity) * ((parseFloat(item.tax_rate) || 0) / 100), 0),
+        warehouse_id: wid,
+        table_id: currentTableId
+    };
+
+    $.ajax({
+        url: '<?= buildUrl('/api/pos/hold_sale.php') ?>',
+        type: 'POST',
+        data: JSON.stringify(holdData),
+        contentType: 'application/json',
+        dataType: 'json',
+        success: function (holdRes) {
+            if (!holdRes.success) {
+                Swal.fire({ icon: 'error', title: PT.sendToKitchenFailed, text: holdRes.message });
+                btn.prop('disabled', false).html(origHtml);
+                return;
+            }
+            currentHoldId = holdRes.hold_id;
+            $.post('<?= buildUrl('api/restaurant/send_to_kitchen.php') ?>', {
+                hold_id: currentHoldId, warehouse_id: wid, _csrf: <?= json_encode(csrf_token()) ?>
+            }, function (res) {
+                if (res.success) {
+                    Swal.fire({ icon: 'success', title: PT.sentToKitchen, timer: 1500, showConfirmButton: false });
+                } else {
+                    Swal.fire({ icon: 'error', title: PT.sendToKitchenFailed, text: res.message });
+                }
+            }, 'json').fail(function () {
+                Swal.fire({ icon: 'error', title: PT.sendToKitchenFailed, text: PT.serverError });
+            }).always(function () {
+                btn.prop('disabled', false).html(origHtml);
+            });
+        },
+        error: function () {
+            Swal.fire({ icon: 'error', title: PT.sendToKitchenFailed, text: PT.serverError });
+            btn.prop('disabled', false).html(origHtml);
+        }
+    });
+}
+
+// ─────────────────────────── Modifier groups ───────────────────────────
+// Fetched once per page load (a small, company-wide catalog, same "load once,
+// reuse" treatment Phase 15 already gives core/pos_price_groups.php's units).
+function ensureModifierGroupsCache(callback) {
+    if (modifierGroupsCache !== null) { callback(modifierGroupsCache); return; }
+    $.getJSON('<?= buildUrl('api/restaurant/get_modifier_groups.php') ?>', function (res) {
+        modifierGroupsCache = (res.success && res.data) ? res.data : [];
+        callback(modifierGroupsCache);
+    }).fail(function () {
+        modifierGroupsCache = [];
+        callback(modifierGroupsCache);
+    });
+}
+
+// ═══════════════ Phase 31 (pos_upgrade_plan.md §8) — Product Variants ═══════════════
+// A variant is a normal product_id by the time it reaches addToCart()/
+// process_sale.php — this picker's only job is letting the cashier resolve
+// "which specific child" before the existing showProductQuickView()/
+// addToCart() flow takes over unchanged.
+function openVariantPicker(parentId) {
+    const warehouseId = $('#posWarehouseId').val();
+    const projectId = $('#posProjectId').val();
+    $('#variantPickerBody').html('<div class="text-center py-4"><div class="spinner-border text-primary"></div><div class="small text-muted mt-2">' + PT.loadingVariants + '</div></div>');
+    new bootstrap.Modal(document.getElementById('variantPickerModal')).show();
+
+    $.getJSON('<?= buildUrl('/api/pos/simple_products.php') ?>', {
+        parent_product_id: parentId,
+        warehouse_id: warehouseId,
+        project_id: projectId,
+        price_group_id: posSelectedPriceGroupId || ''
+    }, function (res) {
+        if (!res.success || !res.data.length) {
+            $('#variantPickerBody').html('<div class="alert alert-info mb-0">' + PT.noVariantsAvailable + '</div>');
+            return;
+        }
+        let html = '<div class="row g-2">';
+        res.data.forEach(v => {
+            const attrs = v.variant_attributes ? JSON.parse(v.variant_attributes) : {};
+            const attrLabel = Object.entries(attrs).map(([k, val]) => `${k}: ${val}`).join(', ');
+            const outOfStock = !v.is_service && parseFloat(v.stock_quantity) <= 0;
+            html += `
+            <div class="col-6 col-md-4">
+                <div class="card border-0 shadow-sm text-center p-2 ${outOfStock ? 'opacity-50' : ''}"
+                     style="cursor:${outOfStock ? 'not-allowed' : 'pointer'};"
+                     ${outOfStock ? '' : `onclick="bootstrap.Modal.getInstance(document.getElementById('variantPickerModal')).hide(); showProductQuickView(${v.product_id});"`}>
+                    <div class="fw-bold small">${safeOutput(attrLabel)}</div>
+                    <div class="text-primary fw-bold">${POS_CURRENCY} ${parseFloat(v.effective_price ?? v.selling_price).toLocaleString()}</div>
+                    ${!v.is_service ? `<div class="small text-muted">${PT.qtyLabel} ${v.stock_quantity}</div>` : ''}
+                </div>
+            </div>`;
+        });
+        html += '</div>';
+        $('#variantPickerBody').html(html);
+    }).fail(function () {
+        $('#variantPickerBody').html('<div class="alert alert-danger mb-0">' + PT.serverError + '</div>');
+    });
+}
+
 function holdSale() {
     if (cart.length === 0) {
         Swal.fire({
@@ -1312,7 +1838,11 @@ function holdSale() {
                 customer_id: customerId || null,
                 items: cart,
                 subtotal: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-                tax: cart.reduce((sum, item) => sum + (item.discounted_price * item.quantity) * ((parseFloat(item.tax_rate) || 0) / 100), 0)
+                tax: cart.reduce((sum, item) => sum + (item.discounted_price * item.quantity) * ((parseFloat(item.tax_rate) || 0) / 100), 0),
+                // Phase 30 (pos_upgrade_plan.md §9) — additive/optional; undefined for
+                // every plain retail hold, which behaves exactly as before.
+                warehouse_id: currentTableId ? parseInt($('#posWarehouseId').val()) : undefined,
+                table_id: currentTableId || undefined
             };
             
             $.ajax({

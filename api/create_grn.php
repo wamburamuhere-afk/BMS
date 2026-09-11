@@ -35,7 +35,9 @@ try {
     // AUTO-MIGRATION: Ensure columns exist in receipt_items (for online server stability)
     $columns_to_check = [
         'purchase_order_item_id' => "INT NULL AFTER receipt_id",
-        'unit'                   => "VARCHAR(20) DEFAULT 'pcs' AFTER expiry_date"
+        'unit'                   => "VARCHAR(20) DEFAULT 'pcs' AFTER expiry_date",
+        // Phase 26 (pos_upgrade_plan.md §9) — serial/IMEI-level stock tracking.
+        'serial_numbers'         => "TEXT NULL AFTER expiry_date"
     ];
     foreach ($columns_to_check as $col => $definition) {
         $check = $pdo->query("SHOW COLUMNS FROM receipt_items LIKE '$col'")->fetch();
@@ -144,8 +146,8 @@ try {
         INSERT INTO receipt_items (
             receipt_id, purchase_order_item_id, product_id,
             quantity_received, unit_price, tax_rate, tax_amount,
-            batch_number, expiry_date, unit
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            batch_number, expiry_date, serial_numbers, unit
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     // Stock side-effects no longer fire on create — they move to approve_grn.php
@@ -162,6 +164,11 @@ try {
         $tax_amount = $qty * $price * ($tax_rate / 100);
         $batch      = $item['batch_number'] ?? null;
         $expiry     = !empty($item['expiry_date']) ? $item['expiry_date'] : null;
+        // Phase 26 (pos_upgrade_plan.md §9) — raw comma/newline-separated
+        // serial numbers as entered; parsed into individual product_serials
+        // rows on GRN approval (approve_grn.php), never here (a created,
+        // not-yet-approved GRN may never be approved).
+        $serialNumbersRaw = trim((string)($item['serial_numbers'] ?? ''));
         $unit       = $item['unit'] ?? 'pcs';
 
         // Skip invalid items
@@ -177,6 +184,7 @@ try {
             $tax_amount,
             $batch,
             $expiry,
+            $serialNumbersRaw !== '' ? $serialNumbersRaw : null,
             $unit
         ]);
         

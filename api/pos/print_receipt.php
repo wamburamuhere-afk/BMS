@@ -302,7 +302,20 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
         </div>
         <?php if ($receipt_template !== 'slim'): ?>
         <div style="font-size: 10px; color: #666; margin-left: 5px;">
-            @ <?= number_format($item['unit_price'], 0) ?> x <?= $item['quantity'] ?>
+            <?php
+                // Phase 25 (pos_upgrade_plan.md §9) — a promo price on this line
+                // shows a "was / now" strikethrough (cosmetic only; the real
+                // pricing decision already happened server-side in process_sale.php).
+                $promo_was = (float)($item['promo_original_price'] ?? 0);
+            ?>
+            @
+            <?php if ($promo_was > 0.009 && $promo_was > (float)$item['unit_price']): ?>
+                <span style="text-decoration: line-through;"><?= number_format($promo_was, 0) ?></span>
+                <?= t('now') ?> <?= number_format($item['unit_price'], 0) ?>
+            <?php else: ?>
+                <?= number_format($item['unit_price'], 0) ?>
+            <?php endif; ?>
+            x <?= $item['quantity'] ?>
             <?php if ($receipt_template === 'detailed' && (float)($item['discount_amount'] ?? 0) > 0.009): ?>
                 — <?= t('Discount:') ?> -<?= number_format($item['discount_amount'], 0) ?>
             <?php endif; ?>
