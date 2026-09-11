@@ -86,6 +86,14 @@ $apiFiles = [
     'api/pos/get_available_serials.php',
     // Phase 29 (pos_upgrade_plan.md §9) — POS Dashboard Intelligence.
     'api/pos/save_sales_target.php',
+    // Phase 30 (pos_upgrade_plan.md §9) — Restaurant Module backend.
+    'api/restaurant/get_floors.php', 'api/restaurant/save_floor.php',
+    'api/restaurant/get_tables.php', 'api/restaurant/save_table.php', 'api/restaurant/update_table_status.php',
+    'api/restaurant/get_kitchen_stations.php', 'api/restaurant/save_kitchen_station.php',
+    'api/restaurant/send_to_kitchen.php', 'api/restaurant/get_kitchen_tickets.php', 'api/restaurant/update_ticket_status.php',
+    'api/restaurant/get_modifier_groups.php', 'api/restaurant/save_modifier_group.php', 'api/restaurant/save_modifier_option.php',
+    'api/restaurant/get_product_modifier_groups.php', 'api/restaurant/save_product_modifier_links.php',
+    'api/restaurant/get_reservations.php', 'api/restaurant/save_reservation.php', 'api/restaurant/update_reservation_status.php',
 ];
 // Core helper files that call t()/te() directly (achievement-band labels
 // etc.) but aren't a page or an API endpoint themselves, so section 2's
@@ -94,6 +102,8 @@ $apiFiles = [
 $coreFiles = [
     // Phase 29 (pos_upgrade_plan.md §9) — POS Dashboard Intelligence.
     'core/pos_dashboard_metrics.php',
+    // Phase 30 (pos_upgrade_plan.md §9) — Restaurant Module backend.
+    'core/pos_nav.php',
 ];
 $allFiles = array_merge($pageFiles, $apiFiles, $coreFiles);
 

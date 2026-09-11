@@ -74,6 +74,16 @@ try {
     $receipt_number = $input['receipt_number'] ?? ('RCP-' . date('Ymd') . '-' . mt_rand(1000, 9999));
     $split_details = $input['split_details'] ?? null;
 
+    // Phase 30 (pos_upgrade_plan.md §9) — Restaurant module. All three fields
+    // are optional and additive: a plain retail sale that never sends them
+    // behaves byte-for-byte as before. table_id is verified below (must
+    // belong to $warehouse_id) before being trusted for the post-commit
+    // status flip.
+    $table_id = $toNullableInt($input['table_id'] ?? null);
+    $sale_type_in = in_array($input['sale_type'] ?? '', ['walk_in', 'customer', 'online', 'delivery', 'dine_in', 'take_away'], true)
+        ? $input['sale_type'] : 'walk_in';
+    $assigned_to = $toNullableInt($input['assigned_to'] ?? null);
+
     // Phase 8 (pos_upgrade_plan.md §7) — persist the true per-tender breakdown of a
     // split sale so shift-close reconciliation (close_shift.php) and any future
     // Z-report can read it back accurately (previously nothing recorded which
@@ -109,6 +119,17 @@ try {
         throw new Exception("Access denied: this warehouse is not in your assigned scope.");
     }
 
+    // Phase 30 — a table_id must genuinely belong to the sale's own
+    // warehouse; never trust it bare from the client (a stale/forged
+    // table_id from a different warehouse must not flip a stranger's table).
+    if ($table_id) {
+        $tblChk = $pdo->prepare("SELECT 1 FROM restaurant_tables WHERE table_id = ? AND warehouse_id = ?");
+        $tblChk->execute([$table_id, $warehouse_id]);
+        if (!$tblChk->fetchColumn()) {
+            throw new Exception(t('The selected table does not belong to this warehouse.'));
+        }
+    }
+
     // Check for active shift — pos_sales.shift_id is NOT NULL, so this must be
     // validated before the insert, not silently passed through as null.
     $stmt = $pdo->prepare("SELECT shift_id, register_id FROM cash_register_shifts WHERE user_id = ? AND status = 'active' LIMIT 1");
@@ -142,11 +163,11 @@ try {
     // Insert sale
     $stmt = $pdo->prepare("
         INSERT INTO pos_sales (
-            receipt_number, shift_id, user_id, customer_id, warehouse_id, project_id,
+            receipt_number, shift_id, user_id, assigned_to, customer_id, warehouse_id, table_id, project_id,
             subtotal, discount_percentage, discount_amount, tax_amount, grand_total,
             payment_method, amount_tendered, change_given, payment_details, register_id, register_name,
-            sale_status, payment_status, sale_date, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', NOW(), NOW())
+            sale_type, sale_status, payment_status, sale_date, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', NOW(), NOW())
     ");
 
     $change = $input['change_given'] ?? ($amount_tendered - $total);
@@ -155,8 +176,10 @@ try {
         $receipt_number,
         $shift_id,
         $user_id,
+        $assigned_to,
         $customer_id,
         $warehouse_id,
+        $table_id,
         $project_id,
         $subtotal,
         $discount_percentage,
@@ -168,7 +191,8 @@ try {
         $change,
         $payment_details_json,
         $register_id,
-        $register_name
+        $register_name,
+        $sale_type_in
     ]);
     
     $sale_id = $pdo->lastInsertId();
@@ -435,6 +459,34 @@ try {
         ]);
         $sale_item_id = (int)$pdo->lastInsertId();
 
+        // Phase 30 (pos_upgrade_plan.md §9) — modifier choices for this line.
+        // Never trust the client's price_adjustment/option_name — resolve
+        // both from modifier_options so a tampered request can't under/over
+        // price a modifier. An unknown/inactive option_id is silently
+        // skipped rather than failing the whole sale (mirrors how an unknown
+        // unit_label is ignored above).
+        $chosenModifiers = is_array($item['modifiers'] ?? null) ? $item['modifiers'] : [];
+        if (!empty($chosenModifiers)) {
+            $modOptIds = array_values(array_unique(array_filter(array_map(
+                fn($m) => (int)($m['option_id'] ?? 0), $chosenModifiers
+            ))));
+            if (!empty($modOptIds)) {
+                $modPlaceholders = str_repeat('?,', count($modOptIds) - 1) . '?';
+                $modStmt = $pdo->prepare("SELECT option_id, name, price_adjustment FROM modifier_options WHERE option_id IN ($modPlaceholders) AND status = 'active'");
+                $modStmt->execute($modOptIds);
+                $modOptions = $modStmt->fetchAll(PDO::FETCH_ASSOC);
+                if (!empty($modOptions)) {
+                    $insModStmt = $pdo->prepare("
+                        INSERT INTO pos_sale_item_modifiers (sale_item_id, option_id, option_name, price_adjustment, created_at)
+                        VALUES (?, ?, ?, ?, NOW())
+                    ");
+                    foreach ($modOptions as $mo) {
+                        $insModStmt->execute([$sale_item_id, $mo['option_id'], $mo['name'], $mo['price_adjustment']]);
+                    }
+                }
+            }
+        }
+
         // Phase 23 (pos_upgrade_plan.md §8) — a combo product carries no
         // stock of its own; selling it decrements each COMPONENT's stock
         // instead (availability for the whole cart was already verified
@@ -642,6 +694,21 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
     }
 
     $pdo->commit();
+
+    // Phase 30 (pos_upgrade_plan.md §9) — closing a table's bill frees the
+    // table for the next guest. Best-effort, after commit: a failure here
+    // must never undo an already-completed sale. The held order itself
+    // (pos_held_sales) is cleared by the existing client-side call to
+    // delete_held_sale.php once it sees this response's success=true —
+    // unchanged by this phase.
+    if ($table_id) {
+        try {
+            $pdo->prepare("UPDATE restaurant_tables SET status = 'available', updated_at = NOW() WHERE table_id = ?")
+                ->execute([$table_id]);
+        } catch (Throwable $e) {
+            error_log("POS Phase 30 table-release warning for table_id={$table_id}: " . $e->getMessage());
+        }
+    }
 
     // Log the activity
     $username = $_SESSION['username'] ?? 'User';

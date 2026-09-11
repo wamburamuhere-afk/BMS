@@ -5306,6 +5306,8 @@ CREATE TABLE `pos_held_sales` (
   `shift_id` int NOT NULL,
   `user_id` int NOT NULL,
   `customer_id` int DEFAULT NULL,
+  `warehouse_id` int DEFAULT NULL,
+  `table_id` int DEFAULT NULL,
   `items_data` json NOT NULL,
   `item_count` int DEFAULT '0',
   `subtotal` decimal(15,2) DEFAULT '0.00',
@@ -5490,13 +5492,15 @@ CREATE TABLE `pos_sales` (
   `shift_id` int NOT NULL,
   `shift_code` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `user_id` int NOT NULL,
+  `assigned_to` int DEFAULT NULL,
   `cashier_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `customer_id` int DEFAULT NULL,
   `warehouse_id` int DEFAULT NULL,
+  `table_id` int DEFAULT NULL,
   `project_id` int DEFAULT NULL,
   `customer_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `customer_phone` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `sale_type` enum('walk_in','customer','online','delivery') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'walk_in',
+  `sale_type` enum('walk_in','customer','online','delivery','dine_in','take_away') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'walk_in',
   `sale_status` enum('draft','pending','completed','cancelled','refunded','partially_refunded','voided','on_hold') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'draft',
   `subtotal` decimal(15,2) NOT NULL DEFAULT '0.00',
   `discount_percentage` decimal(5,2) DEFAULT '0.00',
@@ -5883,6 +5887,7 @@ CREATE TABLE `products` (
   `barcode` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `barcode_symbology` enum('CODE128','CODE39','UPC_A','UPC_E','EAN_8','EAN_13') NOT NULL DEFAULT 'CODE128',
   `track_serials` tinyint(1) NOT NULL DEFAULT '0',
+  `kitchen_station_id` int DEFAULT NULL,
   `created_by` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -8602,6 +8607,7 @@ CREATE TABLE `warehouses` (
   `is_primary` int NOT NULL DEFAULT '0',
   `capacity` decimal(15,2) NOT NULL DEFAULT '0.00',
   `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `pos_mode` enum('retail','restaurant','hybrid') NOT NULL DEFAULT 'retail',
   PRIMARY KEY (`warehouse_id`),
   UNIQUE KEY `warehouse_code` (`warehouse_code`),
   KEY `idx_warehouse_code` (`warehouse_code`),
@@ -8678,6 +8684,193 @@ CREATE TABLE `workflow_steps` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `restaurant_floors`
+--
+-- Phase 30 (pos_upgrade_plan.md §9) — Restaurant Module backend.
+--
+
+CREATE TABLE `restaurant_floors` (
+  `floor_id` int NOT NULL AUTO_INCREMENT,
+  `warehouse_id` int NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `sort_order` int NOT NULL DEFAULT '0',
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`floor_id`),
+  KEY `idx_rf_warehouse` (`warehouse_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `restaurant_tables`
+--
+
+CREATE TABLE `restaurant_tables` (
+  `table_id` int NOT NULL AUTO_INCREMENT,
+  `warehouse_id` int NOT NULL,
+  `floor_id` int NOT NULL,
+  `table_number` varchar(50) NOT NULL,
+  `seats` int NOT NULL DEFAULT '2',
+  `status` enum('available','occupied','reserved','cleaning') NOT NULL DEFAULT 'available',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`table_id`),
+  KEY `idx_rt_warehouse` (`warehouse_id`),
+  KEY `idx_rt_floor` (`floor_id`),
+  KEY `idx_rt_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `kitchen_stations`
+--
+
+CREATE TABLE `kitchen_stations` (
+  `station_id` int NOT NULL AUTO_INCREMENT,
+  `warehouse_id` int NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`station_id`),
+  KEY `idx_ks_warehouse` (`warehouse_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `kitchen_tickets`
+--
+
+CREATE TABLE `kitchen_tickets` (
+  `ticket_id` int NOT NULL AUTO_INCREMENT,
+  `hold_id` int DEFAULT NULL,
+  `warehouse_id` int NOT NULL,
+  `station_id` int NOT NULL,
+  `table_id` int DEFAULT NULL,
+  `status` enum('queued','preparing','ready','served') NOT NULL DEFAULT 'queued',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`ticket_id`),
+  KEY `idx_kt_warehouse_station_status` (`warehouse_id`,`station_id`,`status`),
+  KEY `idx_kt_hold` (`hold_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `kitchen_ticket_items`
+--
+
+CREATE TABLE `kitchen_ticket_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `ticket_id` int NOT NULL,
+  `product_id` int NOT NULL,
+  `quantity` decimal(10,3) NOT NULL DEFAULT '1.000',
+  `modifiers_summary` varchar(500) DEFAULT NULL,
+  `status` enum('queued','preparing','ready','served') NOT NULL DEFAULT 'queued',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_kti_ticket` (`ticket_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `modifier_groups`
+--
+
+CREATE TABLE `modifier_groups` (
+  `group_id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(150) NOT NULL,
+  `selection_type` enum('single','multiple') NOT NULL DEFAULT 'single',
+  `min_select` int NOT NULL DEFAULT '0',
+  `max_select` int NOT NULL DEFAULT '1',
+  `is_required` tinyint(1) NOT NULL DEFAULT '0',
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `created_by` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`group_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `modifier_options`
+--
+
+CREATE TABLE `modifier_options` (
+  `option_id` int NOT NULL AUTO_INCREMENT,
+  `group_id` int NOT NULL,
+  `name` varchar(150) NOT NULL,
+  `price_adjustment` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`option_id`),
+  KEY `idx_mo_group` (`group_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `product_modifier_groups`
+--
+
+CREATE TABLE `product_modifier_groups` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `group_id` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_pmg_product_group` (`product_id`,`group_id`),
+  KEY `idx_pmg_group` (`group_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `pos_sale_item_modifiers`
+--
+
+CREATE TABLE `pos_sale_item_modifiers` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `sale_item_id` int NOT NULL,
+  `option_id` int DEFAULT NULL,
+  `option_name` varchar(150) NOT NULL,
+  `price_adjustment` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_psim_sale_item` (`sale_item_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `restaurant_reservations`
+--
+
+CREATE TABLE `restaurant_reservations` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `table_id` int NOT NULL,
+  `warehouse_id` int NOT NULL,
+  `customer_id` int DEFAULT NULL,
+  `customer_name` varchar(150) DEFAULT NULL,
+  `customer_phone` varchar(30) DEFAULT NULL,
+  `reservation_time` datetime NOT NULL,
+  `party_size` int NOT NULL DEFAULT '1',
+  `status` enum('booked','seated','completed','cancelled','no_show') NOT NULL DEFAULT 'booked',
+  `notes` text,
+  `created_by` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_rr_warehouse_time` (`warehouse_id`,`reservation_time`),
+  KEY `idx_rr_table` (`table_id`),
+  KEY `idx_rr_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `restaurant_reservation_reminders`
+--
+
+CREATE TABLE `restaurant_reservation_reminders` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `reservation_id` int NOT NULL,
+  `milestone` int NOT NULL,
+  `sent_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_rrr_reservation_milestone` (`reservation_id`,`milestone`),
+  KEY `idx_rrr_reservation` (`reservation_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping events for database 'bms'

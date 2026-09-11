@@ -186,6 +186,25 @@ if (!function_exists('bmsFeatureRegistry')) {
                     'api/pos/get_available_serials.php',
                 ],
             ],
+            // Phase 30 (pos_upgrade_plan.md §9) — Restaurant Module. A
+            // genuinely different POS mode (table service, kitchen display,
+            // modifier groups, reservations), not something every retail
+            // tenant needs — gated separately from 'pos_advanced' since a
+            // tenant could plausibly want multi-register/loyalty without
+            // ever running a restaurant, or vice versa.
+            'restaurant_pos' => [
+                'label'       => 'Restaurant POS',
+                'description' => 'Floors/Tables, Kitchen Display, Modifier Groups and table Reservations for a restaurant/hybrid warehouse.',
+                'default'     => false,
+                'sort_order'  => 22,
+                'page_keys'   => ['restaurant_pos'],
+                'depends_on'  => ['pos'],
+                'paths'       => [
+                    'api/restaurant/',
+                    'app/bms/restaurant/',
+                    'core/pos_nav.php',
+                ],
+            ],
             'procurement' => [
                 'label'       => 'Procurement',
                 'description' => 'Suppliers, RFQ, purchase orders, GRN, delivery notes, returns and materials. Tenders is separate.',

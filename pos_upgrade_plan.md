@@ -2051,7 +2051,8 @@ boundary for a genuine analytics capability).
 ### Phase 30 — Restaurant Module + POS Navigation Reorganization (Floors,
 Tables, Kitchen, Modifiers, Recipes, Reservations)
 
-**Status:** APPROVED, not yet built. **Depends on:** nothing structurally
+**Status:** IN PROGRESS — backend/schema half shipped, UI/nav/tests half
+pending. **Depends on:** nothing structurally
 (its reservation feature is now self-contained, not borrowed from a
 separate Booking phase — see Phase 28's merge note above); sequenced after
 25/26/29 for pacing only, so the lower-risk groundwork (feature-registry
@@ -2061,6 +2062,25 @@ shared POS terminal and `header.php`. **Closes:** the actual "different shop
 type" mechanism for restaurant/pub, plus the POS-wide navigation cleanup
 identified from the fasteeypos.com benchmark's two-tier icon-rail +
 contextual-submenu pattern.
+
+**Progress note (2026-09-11):** because this phase is unusually large, its
+actual construction was split into two commits, still tracked as one Phase
+30 here. **Backend/schema half — DONE** (all schema below, `core/pos_nav.php`,
+18 `api/restaurant/*.php` endpoints, `process_sale.php`/`hold_sale.php`/
+`get_held_sales.php` wiring, the `restaurant_pos` feature-registry entry, the
+`restaurant.reservation_upcoming` cron reminder block) — see `changelog.md`
+for the full file list and live-verification method. Everything below in
+this section describing UI/nav/pages/tests is **NOT yet built** — that is
+the next commit's scope: the POS terminal mode/table/modifier pickers, the
+`app/bms/restaurant/*` admin pages, the Kitchen Display page, the
+`header.php`/`pos_dashboard.php` hub navigation reorg, and
+`tests/test_restaurant_pos_cli.php` + `tests/test_pos_nav_wiring_cli.php`.
+One deliberate scope call made during the backend half: the plan text below
+sketches minute-level reservation reminders, but the actual notification
+cron (`cron/run_notification_checks.php`) runs at most once per day by its
+own documented design — the shipped reminder uses day-granularity milestones
+(`[1, 0]` = "tomorrow"/"today") instead of inventing a finer cadence this
+infrastructure doesn't actually have.
 
 **Schema:**
 - `warehouses.pos_mode ENUM('retail','restaurant','hybrid') DEFAULT

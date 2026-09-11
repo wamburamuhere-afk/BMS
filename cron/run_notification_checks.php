@@ -25,7 +25,7 @@ if (!function_exists('run_notification_checks')) {
     function run_notification_checks(PDO $pdo): array
     {
         $isCli = (php_sapi_name() === 'cli');
-        $sum = ['invoice_overdue' => 0, 'quotation_expiring' => 0, 'tender_deadline' => 0, 'product_batch_expiring' => 0, 'product_expiring' => 0];
+        $sum = ['invoice_overdue' => 0, 'quotation_expiring' => 0, 'tender_deadline' => 0, 'product_batch_expiring' => 0, 'product_expiring' => 0, 'restaurant_reservation_upcoming' => 0];
 
         // ── Invoice overdue ────────────────────────────────────────────────
         try {
@@ -232,6 +232,65 @@ if (!function_exists('run_notification_checks')) {
             if ($isCli) echo "  product.expiring (plain products): scanned " . count($plain) . " expiring product(s).\n";
         } catch (Throwable $e) {
             error_log('run_notification_checks product.expiring: ' . $e->getMessage());
+        }
+
+        // ── Restaurant reservation upcoming (Phase 30, pos_upgrade_plan.md §9) ──
+        // This check runs at most once per day (see file header), so its
+        // milestones are DAYS-before, not minutes-before — "tomorrow" (1) and
+        // "today" (0) — matching this cron's real cadence rather than a
+        // finer granularity nothing here actually delivers. Only 'booked'
+        // reservations remind; a seated/completed/cancelled/no_show booking
+        // has nothing left to remind anyone about.
+        try {
+            if (!$pdo->query("SHOW TABLES LIKE 'restaurant_reservations'")->fetch()) {
+                throw new RuntimeException('skip'); // restaurant module migration not yet run on this DB
+            }
+            $milestones = [1, 0];
+            $reservations = $pdo->query("
+                SELECT id, table_id, warehouse_id, customer_name, reservation_time, party_size,
+                       DATEDIFF(DATE(reservation_time), CURDATE()) AS days_until
+                FROM restaurant_reservations
+                WHERE status = 'booked'
+                  AND DATE(reservation_time) >= CURDATE()
+                  AND DATEDIFF(DATE(reservation_time), CURDATE()) <= 1
+            ")->fetchAll(PDO::FETCH_ASSOC);
+
+            $doneStmt   = $pdo->prepare("SELECT milestone FROM restaurant_reservation_reminders WHERE reservation_id = ?");
+            $recordStmt = $pdo->prepare("INSERT IGNORE INTO restaurant_reservation_reminders (reservation_id, milestone) VALUES (?, ?)");
+
+            $sum['restaurant_reservation_upcoming'] = 0;
+            foreach ($reservations as $r) {
+                $days = (int)$r['days_until'];
+                $reached = array_filter($milestones, fn($m) => $days <= $m);
+                if (empty($reached)) continue;
+
+                $doneStmt->execute([$r['id']]);
+                $done = $doneStmt->fetchAll(PDO::FETCH_COLUMN);
+                $newMilestones = array_diff($reached, $done);
+                if (empty($newMilestones)) continue;
+
+                foreach ($newMilestones as $m) { $recordStmt->execute([$r['id'], $m]); }
+
+                $when = $days === 0 ? 'today' : 'tomorrow';
+                $timeLabel = date('d M Y, H:i', strtotime($r['reservation_time']));
+
+                $res = dispatchEvent($pdo, 'restaurant.reservation_upcoming', [
+                    'entity_type'   => 'restaurant_reservation',
+                    'entity_id'     => (int)$r['id'],
+                    'warehouse_id'  => (int)$r['warehouse_id'],
+                    'title'         => "Reservation $when: {$r['customer_name']}",
+                    'message'       => "{$r['customer_name']} ({$r['party_size']} guest(s)) reserved for {$timeLabel}.",
+                    'action_url'    => 'restaurant/reservations',
+                    'severity'      => 'medium',
+                    'dedupe_suffix' => 'm' . min($newMilestones),
+                ]);
+                if (!empty($res['dispatched'])) $sum['restaurant_reservation_upcoming'] += (int)$res['created'] + (int)$res['emailed'];
+            }
+            if ($isCli) echo "  restaurant.reservation_upcoming: scanned " . count($reservations) . " upcoming reservation(s).\n";
+        } catch (RuntimeException $e) {
+            if ($e->getMessage() !== 'skip') { error_log('run_notification_checks restaurant.reservation_upcoming: ' . $e->getMessage()); }
+        } catch (Throwable $e) {
+            error_log('run_notification_checks restaurant.reservation_upcoming: ' . $e->getMessage());
         }
 
         return $sum;

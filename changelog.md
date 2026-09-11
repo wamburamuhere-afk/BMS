@@ -1,5 +1,70 @@
 # BMS Changelog
 
+## 2026-09-11 (feat/pos-tier4-professional-retail) - POS Tier-4 Phase 30 (backend/schema half): Restaurant Module
+
+**Scope note:** Phase 30 is unusually large, so its actual construction is split into two commits — this
+one is schema + server-side/API plumbing only. The UI (POS terminal mode/table/modifier pickers, the
+`app/bms/restaurant/*` admin pages, Kitchen Display page, `header.php`/dashboard nav reorg) and the
+dedicated test suite land in a follow-up commit. `pos_upgrade_plan.md`'s Phase 30 section is not yet
+marked done — it carries a progress note instead.
+
+**Files (new):** `migrations/tenant/2026_09_11_pos_restaurant_module.php` + legacy-DB mirror
+`migrations/2026_09_11_pos_restaurant_module_legacy_db.php` — `warehouses.pos_mode` ENUM (default
+`'retail'`, so every existing warehouse is unaffected until an admin opts in); `restaurant_floors`,
+`restaurant_tables`, `kitchen_stations`, `kitchen_tickets`, `kitchen_ticket_items`, `modifier_groups`,
+`modifier_options`, `product_modifier_groups`, `pos_sale_item_modifiers` (identical child-table shape
+to `pos_sale_item_batches`/`pos_sale_item_serials`), `restaurant_reservations`,
+`restaurant_reservation_reminders`; reuses dormant `pos_sales.sale_type` ENUM (adds `dine_in`/
+`take_away`) instead of a new column, adds `pos_sales.table_id`/`assigned_to` and
+`pos_held_sales.warehouse_id`/`table_id`; seeds a default "Main Floor" + "Main Kitchen" per existing
+warehouse (inert until `pos_mode` changes); seeds the `restaurant_pos` permission row and a
+`restaurant.reservation_upcoming` `notification_events` row. `core/pos_nav.php` (`posNavGroups()` —
+the gated hub-card source of truth the UI half will consume). 18 new `api/restaurant/*.php` endpoints:
+floor/table/kitchen-station CRUD, table status transitions, `send_to_kitchen.php` (writes
+`kitchen_tickets`/`kitchen_ticket_items` from a held sale's snapshot grouped by
+`products.kitchen_station_id`, without touching `pos_sales`), kitchen-ticket status advance
+(queued→preparing→ready→served, forward-only), modifier-group/option CRUD, product↔modifier-group
+linking, and reservation CRUD + status transitions (booked→seated/completed/cancelled/no_show, each
+flipping the table's own status in step).
+
+**Files (modified):** `core/feature_registry.php` (new `restaurant_pos` entry, `default: false`,
+`depends_on: ['pos']`), `schema/tenant_schema_template.sql` + `schema/tenant_seed_defaults.sql`,
+`tests/test_feature_registry_cli.php` (dependents-of-`warehouses` list extended, same fix class Phase
+13 needed), `api/pos/process_sale.php` (accepts optional `table_id`/`sale_type`/`assigned_to`; a
+`table_id` is verified to belong to the sale's own warehouse before being trusted; writes
+`pos_sale_item_modifiers` right after each `pos_sale_items` insert, resolving option name/price from
+`modifier_options` server-side rather than trusting the client; on success, best-effort flips a linked
+table back to `available` after commit — never undoes an already-completed sale), `api/pos/
+hold_sale.php` (optional `warehouse_id`/`table_id`; opening a table's order flips it to `occupied`),
+`api/pos/get_held_sales.php` (a `table_id`+`warehouse_id` lookup returns that table's open order to
+any scoped staff member, not only the original holder), `cron/run_notification_checks.php`
+(`restaurant.reservation_upcoming` block — day-granularity milestones `[1, 0]` since this cron's own
+header documents an at-most-once-per-day cadence, not the minute-level reminder the plan text
+sketched; a finer cadence isn't real infrastructure today, so this doesn't pretend to have one),
+`tests/test_pos_i18n_coverage_cli.php` (added `core/pos_nav.php` and all 18 new `api/restaurant/*.php`
+files to its scanned lists — 655 keys, 58 files, zero translation gaps), `lang/sw.php` (Swahili
+translations for every new string).
+
+**Recipes confirmed to need zero new code:** `core/pos_combo_products.php`'s existing
+`is_combo`/`checkComboAvailability()`/`consumeComboComponents()`/`reverseComboComponents()` (Phase 23)
+already implement "selling this decrements its linked components' stock" purely off `is_combo`,
+independent of `kitchen_station_id` — a recipe-based dish is just a combo product that also has a
+kitchen station set.
+
+**Verification:** migration applied + verified live (legacy DB + 3/5 reachable tenants via
+`core/tenant_migration_runner.php` — 2 skipped on the same pre-existing credential-decrypt issue
+Phases 26/29 already hit, unrelated to this change); every new table/column/seed row confirmed via
+direct `SHOW TABLES`/`SHOW COLUMNS`/`SELECT`; every new `api/restaurant/*.php` endpoint exercised
+end-to-end via a real simulated HTTP request (session + POST/GET + CSRF token) against the live dev
+DB — floor/table/kitchen-station create, table status available→occupied (and a deliberately
+CSRF-less request confirmed rejected), modifier-group+option create, product↔group linking,
+reservation create→seated with the table flipping reserved→occupied in step. Regression re-run clean:
+`test_feature_registry_cli` 112, `test_pos_sale_posting_cli` 18, `test_pos_returns_cli` 25,
+`test_pos_serial_tracking_cli` 42, `test_pos_price_groups_cli` 66, `test_pos_cleanup_cli` 9,
+`test_pos_i18n_coverage_cli` 119. All touched files lint-clean.
+
+---
+
 ## 2026-09-11 (feat/pos-tier4-professional-retail) - POS Tier-4 Phase 29: dashboard intelligence (Sales Targets, Top Cashiers, Damage/Shrinkage)
 
 **Files (new):** `migrations/tenant/2026_09_11_pos_sales_targets.php` + legacy-DB mirror
