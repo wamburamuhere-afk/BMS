@@ -1,5 +1,35 @@
 # BMS Changelog
 
+## 2026-09-11 (feat/pos-tier4-professional-retail) - POS Dashboard & Sales mobile view: page no longer scrolls sideways
+
+**Scope note:** follow-up to the pos.php terminal mobile fix — same complaint, different page:
+`app/bms/pos/pos_dashboard.php` ("POS Dashboard and Sales") shifted/scrolled horizontally on a phone.
+Desktop (where the existing DataTables already display well) is untouched — every fix is inside a
+`@media (max-width: 767.98px)` block.
+
+**Root causes found:**
+1. `#periodGroup` (the Daily/Weekly/Monthly/Quarterly/Yearly filter) is a Bootstrap `.btn-group` — those
+   never wrap by default, so 5 buttons side by side forced the page wider than the screen.
+2. `#lowStockTable` and `#recentSalesTable` (the two Dashboard-pane mini-tables) had no overflow
+   container of their own — unlike the main Sales History table, which already sets DataTables'
+   `scrollX: true` and has a mobile card-view fallback.
+
+**Files (modified):** `app/bms/pos/pos_dashboard.php` —
+- `#periodGroup` now wraps onto a second row on mobile instead of overflowing.
+- `#lowStockWrap`/`#recentSalesWrap` wrapped in `.table-responsive` (contains any overflow to the table
+  itself, never the page — a no-op on desktop, which is already wide enough).
+- The least useful column (S/NO) is hidden via CSS on `#lowStockTable`, `#recentSalesTable`, and the
+  plain `#topProducts`/`#topCashiers` tables on mobile, freeing enough width that internal scrolling is
+  rarely needed at all; smaller fonts/badges to match.
+- `#posDashboardContainer` (new id on the page's outer container) gets `overflow-x: hidden` on mobile as
+  a defense-in-depth backstop, in case of any other overflow source not explicitly listed above.
+
+Verified: `tests/test_pos_dashboard_cli.php` still 142/143 (the one failure is the pre-existing,
+documented, unrelated S/NO source-string check), `tests/test_pos_i18n_coverage_cli.php` still 132/132
+(no new translatable strings — CSS-only change), live in-process render with zero PHP warnings/fatals.
+
+---
+
 ## 2026-09-11 (feat/pos-tier4-professional-retail) - fix: test_pos_batch_expiry_cli.php's own bug, found while syncing with develop
 
 **Scope note:** merged `origin/develop` into this branch (clean, no conflicts — `pos_upgrade_plan.md` and
