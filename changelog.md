@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-09-11 (feat/pos-tier4-professional-retail) - POS terminal mobile header: professional redesign (visual polish, not just no-overflow)
+
+**Scope note:** follow-up to the earlier "no longer scrolls sideways" fix — that fix stopped the overflow
+but the header still looked cramped/unpolished on a phone (title wrapping awkwardly, shift info running
+into illegible mid-value line breaks, Cash Balance and the shift buttons squeezed together). This pass
+is a genuine visual redesign of the mobile header, still scoped entirely to
+`@media (max-width: 767.98px)` — desktop is untouched, and no content was removed (every field the
+header showed before still shows).
+
+**Files (modified):** `app/bms/pos/pos.php` —
+- Shift-info line (`Shift: ... | Started: ... | Cashier: ...`) now wraps each field into its own
+  `.pos-shift-info-item` `<span>` (added, harmless on desktop — same visual output there) so a line
+  break only ever happens *between* fields, never mid-value; the `|` separators are hidden on mobile in
+  favour of a clean gap between the wrapped chips.
+  now stacks as three clearly-separated sections: title → shift info → Cash Balance (own centered
+  block, with a subtle top divider) → action buttons (Open Drawer / End Shift, or Start Shift, now an
+  even, equal-width row instead of stacked/squeezed).
+- Verified live: a synthetic active shift renders all 3 shift-info chips correctly (in-process render,
+  transaction rolled back after); `tests/test_pos_barcode_cli.php` (73/73) and
+  `tests/test_pos_i18n_coverage_cli.php` (132/132) still clean.
+
+---
+
 ## 2026-09-11 (feat/pos-tier4-professional-retail) - CRITICAL: POS terminal down in production for un-migrated tenants — fixed
 
 **Severity: P0.** A Sentry alert from `shop.demo.bjptechnologies.co.tz` (production) surfaced an uncaught
