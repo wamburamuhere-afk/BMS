@@ -67,6 +67,11 @@ $pageFiles = [
     'app/bms/pos/customer_display.php', 'app/constant/settings/pos_config_settings.php',
     // Phase 14 (pos_upgrade_plan.md §8) — selling price tiers.
     'app/bms/pos/price_groups.php',
+    // Phase 30 (pos_upgrade_plan.md §9) — Restaurant Module admin pages.
+    'app/bms/restaurant/index.php', 'app/bms/restaurant/floors.php', 'app/bms/restaurant/tables.php',
+    'app/bms/restaurant/kitchen.php', 'app/bms/restaurant/kitchen_dashboard.php',
+    'app/bms/restaurant/modifier_group.php', 'app/bms/restaurant/reservations.php',
+    'app/bms/restaurant/menu_type.php',
 ];
 $apiFiles = [
     'api/pos/close_shift.php', 'api/pos/create_return.php', 'api/pos/delete_held_sale.php',
@@ -82,8 +87,31 @@ $apiFiles = [
     'api/pos/get_product_units.php',
     // Phase 21 (pos_upgrade_plan.md §8) — network (IP) thermal printer.
     'api/pos/print_receipt.php', 'api/pos/test_network_printer.php',
+    // Phase 26 (pos_upgrade_plan.md §9) — serial/IMEI-level stock tracking.
+    'api/pos/get_available_serials.php',
+    // Phase 29 (pos_upgrade_plan.md §9) — POS Dashboard Intelligence.
+    'api/pos/save_sales_target.php',
+    // Phase 30 (pos_upgrade_plan.md §9) — Restaurant Module backend.
+    'api/restaurant/get_floors.php', 'api/restaurant/save_floor.php',
+    'api/restaurant/get_tables.php', 'api/restaurant/save_table.php', 'api/restaurant/update_table_status.php',
+    'api/restaurant/get_kitchen_stations.php', 'api/restaurant/save_kitchen_station.php',
+    'api/restaurant/send_to_kitchen.php', 'api/restaurant/get_kitchen_tickets.php', 'api/restaurant/update_ticket_status.php',
+    'api/restaurant/get_modifier_groups.php', 'api/restaurant/save_modifier_group.php', 'api/restaurant/save_modifier_option.php',
+    'api/restaurant/get_product_modifier_groups.php', 'api/restaurant/save_product_modifier_links.php',
+    'api/restaurant/get_reservations.php', 'api/restaurant/save_reservation.php', 'api/restaurant/update_reservation_status.php',
+    'api/restaurant/get_group_products.php', 'api/restaurant/toggle_group_product_link.php',
 ];
-$allFiles = array_merge($pageFiles, $apiFiles);
+// Core helper files that call t()/te() directly (achievement-band labels
+// etc.) but aren't a page or an API endpoint themselves, so section 2's
+// "loads the caller's language preference" check doesn't apply to them —
+// still scanned for lint + translation completeness like everything else.
+$coreFiles = [
+    // Phase 29 (pos_upgrade_plan.md §9) — POS Dashboard Intelligence.
+    'core/pos_dashboard_metrics.php',
+    // Phase 30 (pos_upgrade_plan.md §9) — Restaurant Module backend.
+    'core/pos_nav.php', 'core/restaurant_scope.php',
+];
+$allFiles = array_merge($pageFiles, $apiFiles, $coreFiles);
 
 // ─────────────────────────────────────────────────────────────────────────
 section('1. All ' . count($allFiles) . ' files lint-clean');

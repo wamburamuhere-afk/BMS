@@ -65,6 +65,7 @@ define('GRN_DIR', BMS_DIR . '/grn');
 define('OPERATIONS_DIR', BMS_DIR . '/operations');
 define('TENDERS_DIR', BMS_DIR . '/tenders');
 define('CRM_DIR',     BMS_DIR . '/crm');
+define('RESTAURANT_DIR', BMS_DIR . '/restaurant');
 
 // Special Directories
 define('API_DIR', ROOT_DIR . '/api');
@@ -1103,6 +1104,18 @@ $routes = [
     // POS Phase 14 — Selling Price Tiers (pos_upgrade_plan.md §8)
     'pos/price-groups'           => POS_DIR . '/price_groups.php',
     'pos_price_groups'           => POS_DIR . '/price_groups.php',
+
+    // POS Phase 30 — Restaurant Module (pos_upgrade_plan.md §9)
+    'restaurant'                    => RESTAURANT_DIR . '/index.php',
+    // floors.php gives the combined floor+table card overview; tables.php is
+    // the dedicated flat-list CRUD view (more convenient for many tables).
+    'restaurant/floors'             => RESTAURANT_DIR . '/floors.php',
+    'restaurant/tables'             => RESTAURANT_DIR . '/tables.php',
+    'restaurant/kitchen'            => RESTAURANT_DIR . '/kitchen.php',
+    'restaurant/kitchen-dashboard'  => RESTAURANT_DIR . '/kitchen_dashboard.php',
+    'restaurant/modifier-group'     => RESTAURANT_DIR . '/modifier_group.php',
+    'restaurant/reservations'       => RESTAURANT_DIR . '/reservations.php',
+    'restaurant/menu-type'          => RESTAURANT_DIR . '/menu_type.php',
 
 
     // ========================================================================

@@ -179,6 +179,33 @@ if (!function_exists('bmsFeatureRegistry')) {
                     'api/pos/toggle_price_group_status.php',
                     'api/pos/get_price_group_products.php',
                     'api/pos/save_price_group_product_price.php',
+                    // Phase 26 (pos_upgrade_plan.md §9) — serial/IMEI-level
+                    // stock tracking, a genuinely upsell-shaped capacity
+                    // feature (same boundary reasoning as Phase 18/21/23).
+                    'core/pos_serial_tracking.php',
+                    'api/pos/get_available_serials.php',
+                    // Phase 31 (pos_upgrade_plan.md §8) — Product Variants
+                    // (size/color matrix), same upsell-shaped boundary.
+                    'api/generate_product_variants.php',
+                ],
+            ],
+            // Phase 30 (pos_upgrade_plan.md §9) — Restaurant Module. A
+            // genuinely different POS mode (table service, kitchen display,
+            // modifier groups, reservations), not something every retail
+            // tenant needs — gated separately from 'pos_advanced' since a
+            // tenant could plausibly want multi-register/loyalty without
+            // ever running a restaurant, or vice versa.
+            'restaurant_pos' => [
+                'label'       => 'Restaurant POS',
+                'description' => 'Floors/Tables, Kitchen Display, Modifier Groups and table Reservations for a restaurant/hybrid warehouse.',
+                'default'     => false,
+                'sort_order'  => 22,
+                'page_keys'   => ['restaurant_pos'],
+                'depends_on'  => ['pos'],
+                'paths'       => [
+                    'api/restaurant/',
+                    'app/bms/restaurant/',
+                    'core/pos_nav.php',
                 ],
             ],
             'procurement' => [

@@ -71,6 +71,71 @@ try {
     $warehouses = [];
 }
 
+// Phase 30 (pos_upgrade_plan.md §9) — Kitchen station + Modifier Groups,
+// only relevant behind the restaurant_pos entitlement. Kitchen stations are
+// warehouse-scoped but products are a company-wide catalog, so every
+// station across every restaurant/hybrid warehouse the user can see is
+// offered, labeled with its own warehouse — the admin picks the one
+// specific station this product routes to.
+$restaurant_pos_entitled = canView('restaurant_pos');
+$kitchen_stations = [];
+$modifier_groups = [];
+$product_modifier_group_ids = [];
+if ($restaurant_pos_entitled) {
+    try {
+        require_once ROOT_DIR . '/core/restaurant_scope.php';
+        $restaurant_warehouses = restaurantWarehousesForSelect($pdo);
+        if (!empty($restaurant_warehouses)) {
+            $whIds = array_map(fn($w) => (int)$w['warehouse_id'], $restaurant_warehouses);
+            $ph = implode(',', array_fill(0, count($whIds), '?'));
+            $stmt = $pdo->prepare("
+                SELECT ks.station_id, ks.name, w.warehouse_name
+                FROM kitchen_stations ks
+                JOIN warehouses w ON w.warehouse_id = ks.warehouse_id
+                WHERE ks.warehouse_id IN ($ph) AND ks.status = 'active'
+                ORDER BY w.warehouse_name, ks.name
+            ");
+            $stmt->execute($whIds);
+            $kitchen_stations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+        $modifier_groups = $pdo->query("SELECT group_id, name FROM modifier_groups WHERE status = 'active' ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+        $linkStmt = $pdo->prepare("SELECT group_id FROM product_modifier_groups WHERE product_id = ?");
+        $linkStmt->execute([$product_id]);
+        $product_modifier_group_ids = array_map('intval', $linkStmt->fetchAll(PDO::FETCH_COLUMN));
+    } catch (PDOException $e) {
+        $kitchen_stations = [];
+        $modifier_groups = [];
+    }
+}
+
+// Phase 31 (pos_upgrade_plan.md §8) — Product Variants. A variant is a
+// normal products row (parent_product_id + variant_attributes JSON), so
+// this is just two extra lookups: is THIS product itself a variant child
+// (show read-only parent info, no generator), or does it have variant
+// children of its own (show them + the attribute-builder generator)?
+$pos_advanced_entitled = canView('pos_advanced');
+$variant_parent = null;
+$variant_children = [];
+if ($pos_advanced_entitled && !$product['is_service']) {
+    try {
+        if (!empty($product['parent_product_id'])) {
+            $pStmt = $pdo->prepare("SELECT product_id, product_name FROM products WHERE product_id = ?");
+            $pStmt->execute([(int)$product['parent_product_id']]);
+            $variant_parent = $pStmt->fetch(PDO::FETCH_ASSOC);
+        } else {
+            $cStmt = $pdo->prepare("
+                SELECT product_id, product_name, sku, selling_price, cost_price, status, variant_attributes
+                FROM products WHERE parent_product_id = ? ORDER BY product_name
+            ");
+            $cStmt->execute([$product_id]);
+            $variant_children = $cStmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+    } catch (PDOException $e) {
+        $variant_parent = null;
+        $variant_children = [];
+    }
+}
+
 // Fetch current stock per warehouse for this product
 $stock_per_warehouse = [];
 try {
@@ -115,6 +180,97 @@ $dim_height = $dimensions[2] ?? 0;
 <script>
 const IS_EDIT = true;
 const PRODUCT_ID = <?= $product_id ?>;
+const RECIPE_STRINGS = {
+    recipeLabel: <?= json_encode(t('This is a Recipe (Ingredients)')) ?>,
+    comboLabel: <?= json_encode(t('This is a Combo / Bundle Product')) ?>,
+    recipeHint: <?= json_encode(t('A recipe has no stock of its own — selling it decrements each ingredient\'s stock instead, all at once.')) ?>,
+    comboHint: <?= json_encode(t('A combo has no stock of its own — selling it decrements each component product\'s stock instead, all at once.')) ?>,
+    recipeComponents: <?= json_encode(t('Recipe Ingredients')) ?>,
+    comboComponents: <?= json_encode(t('Combo Components')) ?>,
+};
+
+// Phase 30 (pos_upgrade_plan.md §9) — purely cosmetic relabel of the
+// existing Phase 23 combo section when a kitchen station is assigned; the
+// underlying is_combo mechanism and its component table are unchanged.
+function onKitchenStationChange() {
+    const isRecipe = !!$('#kitchen_station_select').val();
+    $('#comboToggleLabel').text(isRecipe ? RECIPE_STRINGS.recipeLabel : RECIPE_STRINGS.comboLabel);
+    $('#comboToggleHint').text(isRecipe ? RECIPE_STRINGS.recipeHint : RECIPE_STRINGS.comboHint);
+    $('#comboComponentsLabel').text(isRecipe ? RECIPE_STRINGS.recipeComponents : RECIPE_STRINGS.comboComponents);
+}
+
+// Phase 31 (pos_upgrade_plan.md §8) — Product Variants attribute-builder.
+// Purely client-side row bookkeeping; the actual cartesian-product
+// generation happens server-side in api/generate_product_variants.php,
+// which never trusts anything from here beyond the attribute name/value
+// strings themselves.
+let variantAttrRowSeq = 0;
+function addVariantAttributeRow(name = '', values = '') {
+    const rowId = 'va-row-' + (variantAttrRowSeq++);
+    const row = $(`
+        <div class="row g-2 mb-2 align-items-end" id="${rowId}">
+            <div class="col-sm-3">
+                <label class="form-label small"><?= json_encode(t('Attribute name')) ?></label>
+                <input type="text" class="form-control form-control-sm va-name" placeholder="<?= t('e.g. Size') ?>">
+            </div>
+            <div class="col-sm-7">
+                <label class="form-label small"><?= json_encode(t('Values (comma separated)')) ?></label>
+                <input type="text" class="form-control form-control-sm va-values" placeholder="<?= t('e.g. S, M, L') ?>">
+            </div>
+            <div class="col-sm-2">
+                <button type="button" class="btn btn-sm btn-outline-danger w-100" onclick="$('#${rowId}').remove()">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+    `);
+    row.find('.va-name').val(name);
+    row.find('.va-values').val(values);
+    $('#variantAttributeRows').append(row);
+}
+
+function generateProductVariants(btn) {
+    const attributes = {};
+    $('#variantAttributeRows > div').each(function () {
+        const name = $(this).find('.va-name').val().trim();
+        const values = $(this).find('.va-values').val().split(',').map(v => v.trim()).filter(v => v.length);
+        if (name && values.length) attributes[name] = values;
+    });
+    if (Object.keys(attributes).length === 0) {
+        $('#variantGenerateMsg').html('<div class="alert alert-warning py-2 mb-0"><?= json_encode(t('Add at least one attribute type with at least one value.')) ?></div>');
+        return;
+    }
+
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> <?= json_encode(t('Generating...')) ?>';
+
+    $.ajax({
+        url: '<?= buildUrl('api/generate_product_variants.php') ?>',
+        type: 'POST',
+        data: {
+            parent_product_id: PRODUCT_ID,
+            attributes: JSON.stringify(attributes),
+            base_price: $('#variantBasePrice').val(),
+            base_cost: $('#variantBaseCost').val(),
+            _csrf: <?= json_encode(csrf_token()) ?>
+        },
+        dataType: 'json',
+        success: function (res) {
+            if (res.success) {
+                Swal.fire({ icon: 'success', title: res.message, timer: 1800, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                $('#variantGenerateMsg').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(res.message) + '</div>');
+                btn.disabled = false; btn.innerHTML = orig;
+            }
+        },
+        error: function () {
+            $('#variantGenerateMsg').html('<div class="alert alert-danger py-2 mb-0"><?= json_encode(t('Server error.')) ?></div>');
+            btn.disabled = false; btn.innerHTML = orig;
+        }
+    });
+}
 
 $(document).ready(function() {
     $('.select2-static').each(function() {
@@ -459,12 +615,26 @@ function deleteSellingUnit(id) {
                                     <div class="col-md-6 mt-4">
                                         <label for="barcode" class="form-label fw-bold text-muted small"><?= t('Barcode (Universal Code)') ?></label>
                                         <div class="input-group">
-                                            <input type="text" class="form-control bg-light border-0" id="barcode" name="barcode" 
+                                            <input type="text" class="form-control bg-light border-0" id="barcode" name="barcode"
                                                    value="<?= safe_output($product['barcode']) ?>">
                                             <button type="button" class="btn btn-outline-secondary border-0 bg-light" onclick="generateNewBarcode()">
                                                 <i class="bi bi-upc"></i>
                                             </button>
                                         </div>
+                                        <!-- Phase 25 (pos_upgrade_plan.md §9) — pure additive tag on the existing
+                                             single barcode column; zero behaviour change unless a product explicitly
+                                             picks a symbology other than the default CODE128. Format names (Code 128,
+                                             UPC-A, EAN-13, etc.) are industry-standard technical terms, not translated. -->
+                                        <label for="barcode_symbology" class="form-label fw-normal text-muted mt-2 mb-1" style="font-size:0.75rem"><?= t('Barcode Symbology') ?></label>
+                                        <select class="form-select form-select-sm bg-light border-0" id="barcode_symbology" name="barcode_symbology">
+                                            <?php
+                                                $symbologies = ['CODE128' => 'Code 128', 'CODE39' => 'Code 39', 'UPC_A' => 'UPC-A', 'UPC_E' => 'UPC-E', 'EAN_8' => 'EAN-8', 'EAN_13' => 'EAN-13'];
+                                                $current_symbology = $product['barcode_symbology'] ?? 'CODE128';
+                                                foreach ($symbologies as $val => $label):
+                                            ?>
+                                                <option value="<?= $val ?>" <?= $current_symbology === $val ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
                                     </div>
 
                                     <div class="col-md-12 mt-4">
@@ -774,22 +944,28 @@ function deleteSellingUnit(id) {
                         <?php endif; ?>
 
                         <?php if (!$product['is_service']): ?>
-                        <!-- Phase 23 (pos_upgrade_plan.md §8) — Combo/Bundle Product -->
+                        <!-- Phase 23 (pos_upgrade_plan.md §8) — Combo/Bundle Product.
+                             Phase 30 (§9) relabels this "Recipe (Ingredients)" when the
+                             product also has a kitchen_station_id — purely cosmetic;
+                             it's the exact same is_combo mechanism either way, so a
+                             recipe-based dish needs zero new code in process_sale.php. -->
                         <div class="col-md-12 mt-4 p-3 bg-white border rounded">
                             <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" id="is_combo_toggle" name="is_combo"
                                        value="1" <?= !empty($product['is_combo']) ? 'checked' : '' ?>
                                        onchange="$('#comboComponentsSection').toggleClass('d-none', !this.checked); if (this.checked) loadComboComponents();">
                                 <label class="form-check-label fw-bold text-primary" for="is_combo_toggle">
-                                    <i class="bi bi-boxes me-1"></i> <?= t('This is a Combo / Bundle Product') ?>
+                                    <i class="bi bi-boxes me-1" id="comboToggleIcon"></i> <span id="comboToggleLabel"><?= !empty($product['kitchen_station_id']) ? t('This is a Recipe (Ingredients)') : t('This is a Combo / Bundle Product') ?></span>
                                 </label>
                             </div>
-                            <p class="text-muted small mb-3">
-                                <?= t('A combo has no stock of its own — selling it decrements each component product\'s stock instead, all at once.') ?>
+                            <p class="text-muted small mb-3" id="comboToggleHint">
+                                <?= !empty($product['kitchen_station_id'])
+                                    ? t('A recipe has no stock of its own — selling it decrements each ingredient\'s stock instead, all at once.')
+                                    : t('A combo has no stock of its own — selling it decrements each component product\'s stock instead, all at once.') ?>
                             </p>
                             <div id="comboComponentsSection" class="<?= !empty($product['is_combo']) ? '' : 'd-none' ?>">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <strong class="small"><?= t('Combo Components') ?></strong>
+                                    <strong class="small" id="comboComponentsLabel"><?= !empty($product['kitchen_station_id']) ? t('Recipe Ingredients') : t('Combo Components') ?></strong>
                                     <button type="button" class="btn btn-sm btn-outline-primary" onclick="openAddComboComponentModal()">
                                         <i class="bi bi-plus-circle me-1"></i> <?= t('Add Component') ?>
                                     </button>
@@ -809,6 +985,144 @@ function deleteSellingUnit(id) {
                                     </table>
                                 </div>
                             </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if (!$product['is_service'] && canView('pos_advanced')): ?>
+                        <!-- Phase 26 (pos_upgrade_plan.md §9) — serial/IMEI-level stock
+                             tracking. Individual serials are captured at GRN receiving
+                             (Purchase > GRN), not here — this is only the on/off switch. -->
+                        <div class="col-md-12 mt-4 p-3 bg-white border rounded">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="track_serials_toggle" name="track_serials"
+                                       value="1" <?= !empty($product['track_serials']) ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-bold text-primary" for="track_serials_toggle">
+                                    <i class="bi bi-upc-scan me-1"></i> <?= t('Track by Serial / IMEI Number') ?>
+                                </label>
+                            </div>
+                            <p class="text-muted small mb-0">
+                                <?= t('Each unit of this product is sold as a specific, traceable serial/IMEI number instead of a plain quantity. Serial numbers are entered when receiving stock via GRN.') ?>
+                            </p>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if (!$product['is_service'] && $restaurant_pos_entitled): ?>
+                        <!-- Phase 30 (pos_upgrade_plan.md §9) — Kitchen Station + Modifier Groups. -->
+                        <div class="col-md-12 mt-4 p-3 bg-white border rounded">
+                            <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary">
+                                <i class="bi bi-egg-fried me-1"></i> <?= t('Restaurant') ?>
+                            </h6>
+                            <div class="mb-3">
+                                <label class="form-label"><?= t('Kitchen Station') ?></label>
+                                <select class="form-select select2-static" name="kitchen_station_id" id="kitchen_station_select" onchange="onKitchenStationChange()">
+                                    <option value=""><?= t('— None (not routed to a kitchen) —') ?></option>
+                                    <?php foreach ($kitchen_stations as $ks): ?>
+                                    <option value="<?= (int)$ks['station_id'] ?>" <?= (int)($product['kitchen_station_id'] ?? 0) === (int)$ks['station_id'] ? 'selected' : '' ?>>
+                                        <?= safe_output($ks['name']) ?> (<?= safe_output($ks['warehouse_name']) ?>)
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="text-muted"><?= t('Routes this item to a kitchen queue when sold in a restaurant/hybrid warehouse. Setting this also relabels the Combo section above to "Recipe (Ingredients)".') ?></small>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label"><?= t('Modifier Groups') ?></label>
+                                <select class="form-select select2-static" id="modifier_groups_select" multiple style="width:100%">
+                                    <?php foreach ($modifier_groups as $mg): ?>
+                                    <option value="<?= (int)$mg['group_id'] ?>" <?= in_array((int)$mg['group_id'], $product_modifier_group_ids, true) ? 'selected' : '' ?>>
+                                        <?= safe_output($mg['name']) ?>
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="text-muted">
+                                    <?= t('Add-on/option groups (e.g. Size, Toppings) offered when this item is sold.') ?>
+                                    <?= t('Modifier groups are managed from Restaurant > Modifier Group.') ?>
+                                </small>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if ($pos_advanced_entitled && !$product['is_service'] && $variant_parent): ?>
+                        <!-- Phase 31 (pos_upgrade_plan.md §8) — this product IS a variant child.
+                             Read-only info; the generator only lives on the parent. -->
+                        <div class="col-md-12 mt-4 p-3 bg-white border rounded">
+                            <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary">
+                                <i class="bi bi-diagram-2 me-1"></i> <?= t('Product Variant') ?>
+                            </h6>
+                            <p class="mb-2">
+                                <?= t('This is a variant of') ?>
+                                <a href="<?= getUrl('product_edit') ?>?id=<?= (int)$variant_parent['product_id'] ?>"><?= safe_output($variant_parent['product_name']) ?></a>.
+                            </p>
+                            <?php
+                            $va = json_decode($product['variant_attributes'] ?? '{}', true) ?: [];
+                            foreach ($va as $attrName => $attrValue):
+                            ?>
+                            <span class="badge bg-light text-dark border me-1"><?= safe_output($attrName) ?>: <?= safe_output($attrValue) ?></span>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php elseif ($pos_advanced_entitled && !$product['is_service']): ?>
+                        <!-- Phase 31 (pos_upgrade_plan.md §8) — Product Variants (size/color matrix).
+                             A variant is a normal products row; generating a matrix here just bulk-creates
+                             child rows via api/generate_product_variants.php, then the admin fine-tunes
+                             each one (price/cost/sku/stock) through this same edit page, per child. -->
+                        <div class="col-md-12 mt-4 p-3 bg-white border rounded">
+                            <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary">
+                                <i class="bi bi-diagram-2 me-1"></i> <?= t('Product Variants') ?>
+                            </h6>
+
+                            <?php if (!empty($variant_children)): ?>
+                            <div class="table-responsive mb-3">
+                                <table class="table table-sm table-hover border">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th><?= t('Variant') ?></th>
+                                            <th><?= t('Attributes') ?></th>
+                                            <th class="text-end"><?= t('Price') ?></th>
+                                            <th><?= t('Status') ?></th>
+                                            <th class="text-end"><?= t('Actions') ?></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($variant_children as $vc): $vAttrs = json_decode($vc['variant_attributes'] ?? '{}', true) ?: []; ?>
+                                        <tr>
+                                            <td><?= safe_output($vc['product_name']) ?></td>
+                                            <td>
+                                                <?php foreach ($vAttrs as $an => $av): ?>
+                                                <span class="badge bg-light text-dark border me-1"><?= safe_output($an) ?>: <?= safe_output($av) ?></span>
+                                                <?php endforeach; ?>
+                                            </td>
+                                            <td class="text-end"><?= number_format((float)$vc['selling_price'], 2) ?></td>
+                                            <td><span class="badge bg-<?= $vc['status'] === 'active' ? 'success' : 'secondary' ?>"><?= safe_output($vc['status']) ?></span></td>
+                                            <td class="text-end">
+                                                <a class="btn btn-sm btn-outline-primary" href="<?= getUrl('product_edit') ?>?id=<?= (int)$vc['product_id'] ?>">
+                                                    <i class="bi bi-pencil"></i> <?= t('Edit') ?>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php endif; ?>
+
+                            <p class="text-muted small mb-2"><?= t('Define attribute types (e.g. Size, Color) and their values, then generate every combination as its own sellable product — stock, batches, serials and pricing all track the specific variant, not this parent.') ?></p>
+                            <div id="variantAttributeRows"></div>
+                            <button type="button" class="btn btn-sm btn-outline-primary mb-3" onclick="addVariantAttributeRow()">
+                                <i class="bi bi-plus-circle me-1"></i> <?= t('Add Attribute Type') ?>
+                            </button>
+                            <div class="row g-2 mb-2">
+                                <div class="col-sm-4">
+                                    <label class="form-label small"><?= t('Base Selling Price (optional — defaults to this product\'s own price)') ?></label>
+                                    <input type="number" step="0.01" class="form-control form-control-sm" id="variantBasePrice">
+                                </div>
+                                <div class="col-sm-4">
+                                    <label class="form-label small"><?= t('Base Cost Price (optional)') ?></label>
+                                    <input type="number" step="0.01" class="form-control form-control-sm" id="variantBaseCost">
+                                </div>
+                            </div>
+                            <div id="variantGenerateMsg" class="mb-2"></div>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="generateProductVariants(this)">
+                                <i class="bi bi-magic me-1"></i> <?= t('Generate Variants') ?>
+                            </button>
                         </div>
                         <?php endif; ?>
 
@@ -903,9 +1217,36 @@ function deleteSellingUnit(id) {
                                             <label for="serial_number" class="form-label fw-bold small"><?= t('Serial Number') ?></label>
                                             <input type="text" class="form-control border-0 shadow-sm" id="serial_number" name="serial_number" value="<?= safe_output($product['serial_number']) ?>">
                                         </div>
-                                        <div class="col-md-6 mt-4">
-                                            <label for="warranty_period" class="form-label fw-bold small"><?= t('Warranty (Months)') ?></label>
+                                        <div class="col-md-3 mt-4">
+                                            <label for="warranty_period" class="form-label fw-bold small"><?= t('Warranty') ?></label>
                                             <input type="number" class="form-control border-0 shadow-sm" id="warranty_period" name="warranty_period" min="0" value="<?= $product['warranty_period'] ?>">
+                                        </div>
+                                        <div class="col-md-3 mt-4">
+                                            <label for="warranty_unit" class="form-label fw-bold small text-muted">&nbsp;</label>
+                                            <?php $warranty_unit = $product['warranty_unit'] ?? ''; ?>
+                                            <select class="form-select border-0 shadow-sm" id="warranty_unit" name="warranty_unit">
+                                                <option value=""><?= t('Unit...') ?></option>
+                                                <option value="days" <?= $warranty_unit === 'days' ? 'selected' : '' ?>><?= t('Days') ?></option>
+                                                <option value="months" <?= $warranty_unit === 'months' ? 'selected' : '' ?>><?= t('Months') ?></option>
+                                                <option value="years" <?= $warranty_unit === 'years' ? 'selected' : '' ?>><?= t('Years') ?></option>
+                                            </select>
+                                        </div>
+                                        <!-- Phase 25 (pos_upgrade_plan.md §9) — guarantee is a distinct concept
+                                             from warranty (e.g. a manufacturer warranty vs. a store's own money-back
+                                             guarantee window); new columns, both nullable, zero effect until set. -->
+                                        <div class="col-md-3 mt-4">
+                                            <label for="guarantee_period" class="form-label fw-bold small"><?= t('Guarantee') ?></label>
+                                            <input type="number" class="form-control border-0 shadow-sm" id="guarantee_period" name="guarantee_period" min="0" value="<?= safe_output($product['guarantee_period'] ?? '', '') ?>">
+                                        </div>
+                                        <div class="col-md-3 mt-4">
+                                            <label for="guarantee_unit" class="form-label fw-bold small text-muted">&nbsp;</label>
+                                            <?php $guarantee_unit = $product['guarantee_unit'] ?? ''; ?>
+                                            <select class="form-select border-0 shadow-sm" id="guarantee_unit" name="guarantee_unit">
+                                                <option value=""><?= t('Unit...') ?></option>
+                                                <option value="days" <?= $guarantee_unit === 'days' ? 'selected' : '' ?>><?= t('Days') ?></option>
+                                                <option value="months" <?= $guarantee_unit === 'months' ? 'selected' : '' ?>><?= t('Months') ?></option>
+                                                <option value="years" <?= $guarantee_unit === 'years' ? 'selected' : '' ?>><?= t('Years') ?></option>
+                                            </select>
                                         </div>
                                         <div class="col-md-6 mt-4">
                                             <label for="expiry_days" class="form-label fw-bold small text-muted"><?= t('Shelf Life (Days)') ?></label>
@@ -913,6 +1254,25 @@ function deleteSellingUnit(id) {
                                         </div>
                                     </div>
 
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Phase 25 (pos_upgrade_plan.md §9) — promotional pricing manager.
+                             Resolved ahead of price-group tiers by resolveGroupPrices(); a promo
+                             row only makes sense once the product itself already exists. -->
+                        <div class="row g-4">
+                            <div class="col-12 mb-4">
+                                <div class="p-4 bg-light rounded-4 border border-light">
+                                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                                        <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-tags me-2 text-danger"></i> <?= t('Promotional Pricing') ?></h6>
+                                        <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="showAddPromoModal()">
+                                            <i class="bi bi-plus-lg me-1"></i> <?= t('Add Promotion') ?>
+                                        </button>
+                                    </div>
+                                    <div id="promoListContainer">
+                                        <div class="text-muted small py-2"><?= t('Loading...') ?></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1099,4 +1459,147 @@ function deleteSellingUnit(id) {
         </div>
     </div>
 </div>
+
+<!-- Phase 25 (pos_upgrade_plan.md §9) — Add Promotion modal -->
+<div class="modal fade" id="addPromoModal" tabindex="-1" aria-labelledby="addPromoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="addPromoModalLabel">
+                    <i class="bi bi-tags"></i> <?= t('Add Promotion') ?>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addPromoForm" autocomplete="off">
+                <div class="modal-body">
+                    <div id="addPromoMessage" class="mb-2"></div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold"><?= t('Promo Price') ?> <span class="text-danger">*</span></label>
+                        <input type="number" step="0.01" min="0.01" class="form-control" id="promoPrice" required>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label fw-bold"><?= t('Starts') ?> <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control" id="promoStartsAt" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold"><?= t('Ends') ?> <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control" id="promoEndsAt" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-danger"><?= t('Save Promotion') ?></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Phase 25 (pos_upgrade_plan.md §9) — Promotional Pricing manager.
+const PROMO_I18N = <?= json_encode([
+    'no_promotions' => t('No promotions yet for this product.'),
+    'active' => t('Active'),
+    'inactive' => t('Inactive'),
+    'scheduled' => t('Scheduled'),
+    'expired' => t('Expired'),
+    'deactivate' => t('Deactivate'),
+    'reactivate' => t('Reactivate'),
+    'confirm_deactivate' => t('Deactivate this promotion?'),
+    'load_failed' => t('Could not load promotions.'),
+    'saving' => t('Saving...'),
+], JSON_UNESCAPED_UNICODE) ?>;
+
+function promoSafeOutput(s) {
+    return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+function showAddPromoModal() {
+    $('#addPromoForm')[0].reset();
+    $('#addPromoMessage').html('');
+    new bootstrap.Modal(document.getElementById('addPromoModal')).show();
+}
+
+function loadPromotions() {
+    if (typeof PRODUCT_ID === 'undefined' || !PRODUCT_ID) {
+        $('#promoListContainer').html('<div class="text-muted small py-2">' + PROMO_I18N.no_promotions + '</div>');
+        return;
+    }
+    $.getJSON('<?= buildUrl('api/get_product_promotions.php') ?>', { product_id: PRODUCT_ID }, function (res) {
+        if (!res.success) { $('#promoListContainer').html('<div class="text-danger small">' + PROMO_I18N.load_failed + '</div>'); return; }
+        renderPromotions(res.data || []);
+    }).fail(function () {
+        $('#promoListContainer').html('<div class="text-danger small">' + PROMO_I18N.load_failed + '</div>');
+    });
+}
+
+function renderPromotions(rows) {
+    if (!rows.length) {
+        $('#promoListContainer').html('<div class="text-muted small py-2">' + PROMO_I18N.no_promotions + '</div>');
+        return;
+    }
+    const now = new Date();
+    let html = '<div class="table-responsive"><table class="table table-sm align-middle mb-0">' +
+        '<thead><tr><th><?= t('Price') ?></th><th><?= t('Starts') ?></th><th><?= t('Ends') ?></th><th><?= t('Status') ?></th><th class="text-end"><?= t('Actions') ?></th></tr></thead><tbody>';
+    rows.forEach(function (r) {
+        let statusLabel, statusClass;
+        if (r.status !== 'active') { statusLabel = PROMO_I18N.inactive; statusClass = 'secondary'; }
+        else if (r.is_currently_active) { statusLabel = PROMO_I18N.active; statusClass = 'success'; }
+        else if (new Date(r.starts_at) > now) { statusLabel = PROMO_I18N.scheduled; statusClass = 'info'; }
+        else { statusLabel = PROMO_I18N.expired; statusClass = 'dark'; }
+
+        html += '<tr>' +
+            '<td class="fw-bold">' + Number(r.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>' +
+            '<td>' + promoSafeOutput(r.starts_at) + '</td>' +
+            '<td>' + promoSafeOutput(r.ends_at) + '</td>' +
+            '<td><span class="badge bg-' + statusClass + '">' + statusLabel + '</span></td>' +
+            '<td class="text-end">' +
+                (r.status === 'active'
+                    ? '<button type="button" class="btn btn-sm btn-outline-secondary" onclick="togglePromo(' + r.promo_id + ', \'inactive\')">' + PROMO_I18N.deactivate + '</button>'
+                    : '<button type="button" class="btn btn-sm btn-outline-success" onclick="togglePromo(' + r.promo_id + ', \'active\')">' + PROMO_I18N.reactivate + '</button>') +
+            '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table></div>';
+    $('#promoListContainer').html(html);
+}
+
+function togglePromo(id, newStatus) {
+    if (newStatus === 'inactive' && !confirm(PROMO_I18N.confirm_deactivate)) return;
+    $.post('<?= buildUrl('api/toggle_product_promotion.php') ?>', { id: id, status: newStatus, _csrf: <?= json_encode(csrf_token()) ?> }, function (res) {
+        if (res.success) { loadPromotions(); } else { Swal.fire({ icon: 'error', title: 'Error', text: res.message }); }
+    }, 'json');
+}
+
+$(document).on('submit', '#addPromoForm', function (e) {
+    e.preventDefault();
+    const btn = $(this).find('[type="submit"]');
+    const orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + PROMO_I18N.saving);
+
+    $.post('<?= buildUrl('api/save_product_promotion.php') ?>', {
+        product_id: PRODUCT_ID,
+        price: $('#promoPrice').val(),
+        starts_at: $('#promoStartsAt').val(),
+        ends_at: $('#promoEndsAt').val(),
+        _csrf: <?= json_encode(csrf_token()) ?>
+    }, function (res) {
+        if (res.success) {
+            bootstrap.Modal.getInstance(document.getElementById('addPromoModal')).hide();
+            loadPromotions();
+        } else {
+            $('#addPromoMessage').html('<div class="alert alert-danger py-2 mb-0">' + promoSafeOutput(res.message) + '</div>');
+        }
+    }, 'json').fail(function () {
+        $('#addPromoMessage').html('<div class="alert alert-danger py-2 mb-0"><?= t('Server error.') ?></div>');
+    }).always(function () {
+        btn.prop('disabled', false).html(orig);
+    });
+});
+
+$(document).ready(function () { loadPromotions(); });
+</script>
+
 <?php include 'product_create_footer.php'; ?>

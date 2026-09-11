@@ -22,22 +22,48 @@ try {
     global $pdo;
     
     $user_id = $_SESSION['user_id'];
-    
-    // Get held sales for current user
-    $stmt = $pdo->prepare("
-        SELECT 
-            h.*,
-            c.customer_name
-        FROM pos_held_sales h
-        LEFT JOIN customers c ON h.customer_id = c.customer_id
-        WHERE h.user_id = ?
-        AND h.status = 'held'
-        ORDER BY h.held_at DESC
-        LIMIT 20
-    ");
-    
-    $stmt->execute([$user_id]);
-    $held_sales = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Phase 30 (pos_upgrade_plan.md §9) — a table's open order must be
+    // discoverable by whichever staff member selects that table next, not
+    // only by whoever originally held it, so this branch drops the
+    // user_id ownership filter in favour of a warehouse+table lookup. Still
+    // warehouse-scope checked, same as every other warehouse-addressed
+    // endpoint in this plan.
+    $table_id = !empty($_GET['table_id']) ? (int)$_GET['table_id'] : null;
+    if ($table_id) {
+        $warehouse_id = !empty($_GET['warehouse_id']) ? (int)$_GET['warehouse_id'] : null;
+        require_once __DIR__ . '/../../core/project_scope.php';
+        if (!$warehouse_id || !userCan('warehouse', $warehouse_id)) {
+            echo json_encode(['success' => false, 'message' => t('Access denied: this warehouse is not in your assigned scope.')]);
+            exit();
+        }
+        $stmt = $pdo->prepare("
+            SELECT h.*, c.customer_name
+            FROM pos_held_sales h
+            LEFT JOIN customers c ON h.customer_id = c.customer_id
+            WHERE h.table_id = ? AND h.warehouse_id = ? AND h.status = 'held'
+            ORDER BY h.held_at DESC
+            LIMIT 1
+        ");
+        $stmt->execute([$table_id, $warehouse_id]);
+        $held_sales = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        // Get held sales for current user
+        $stmt = $pdo->prepare("
+            SELECT
+                h.*,
+                c.customer_name
+            FROM pos_held_sales h
+            LEFT JOIN customers c ON h.customer_id = c.customer_id
+            WHERE h.user_id = ?
+            AND h.status = 'held'
+            ORDER BY h.held_at DESC
+            LIMIT 20
+        ");
+
+        $stmt->execute([$user_id]);
+        $held_sales = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
     
     echo json_encode([
         'success' => true,

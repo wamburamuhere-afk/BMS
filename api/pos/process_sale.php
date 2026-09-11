@@ -21,6 +21,7 @@ require_once __DIR__ . '/../../core/warehouse_scope.php';
 require_once __DIR__ . '/../../core/pos_override_guard.php';
 require_once __DIR__ . '/../../core/pos_price_groups.php';
 require_once __DIR__ . '/../../core/pos_batch_consumption.php';
+require_once __DIR__ . '/../../core/pos_serial_tracking.php';
 require_once __DIR__ . '/../../core/pos_unit_conversion.php';
 require_once __DIR__ . '/../../core/pos_credit_limit.php';
 
@@ -73,6 +74,16 @@ try {
     $receipt_number = $input['receipt_number'] ?? ('RCP-' . date('Ymd') . '-' . mt_rand(1000, 9999));
     $split_details = $input['split_details'] ?? null;
 
+    // Phase 30 (pos_upgrade_plan.md §9) — Restaurant module. All three fields
+    // are optional and additive: a plain retail sale that never sends them
+    // behaves byte-for-byte as before. table_id is verified below (must
+    // belong to $warehouse_id) before being trusted for the post-commit
+    // status flip.
+    $table_id = $toNullableInt($input['table_id'] ?? null);
+    $sale_type_in = in_array($input['sale_type'] ?? '', ['walk_in', 'customer', 'online', 'delivery', 'dine_in', 'take_away'], true)
+        ? $input['sale_type'] : 'walk_in';
+    $assigned_to = $toNullableInt($input['assigned_to'] ?? null);
+
     // Phase 8 (pos_upgrade_plan.md §7) — persist the true per-tender breakdown of a
     // split sale so shift-close reconciliation (close_shift.php) and any future
     // Z-report can read it back accurately (previously nothing recorded which
@@ -108,6 +119,17 @@ try {
         throw new Exception("Access denied: this warehouse is not in your assigned scope.");
     }
 
+    // Phase 30 — a table_id must genuinely belong to the sale's own
+    // warehouse; never trust it bare from the client (a stale/forged
+    // table_id from a different warehouse must not flip a stranger's table).
+    if ($table_id) {
+        $tblChk = $pdo->prepare("SELECT 1 FROM restaurant_tables WHERE table_id = ? AND warehouse_id = ?");
+        $tblChk->execute([$table_id, $warehouse_id]);
+        if (!$tblChk->fetchColumn()) {
+            throw new Exception(t('The selected table does not belong to this warehouse.'));
+        }
+    }
+
     // Check for active shift — pos_sales.shift_id is NOT NULL, so this must be
     // validated before the insert, not silently passed through as null.
     $stmt = $pdo->prepare("SELECT shift_id, register_id FROM cash_register_shifts WHERE user_id = ? AND status = 'active' LIMIT 1");
@@ -141,11 +163,11 @@ try {
     // Insert sale
     $stmt = $pdo->prepare("
         INSERT INTO pos_sales (
-            receipt_number, shift_id, user_id, customer_id, warehouse_id, project_id,
+            receipt_number, shift_id, user_id, assigned_to, customer_id, warehouse_id, table_id, project_id,
             subtotal, discount_percentage, discount_amount, tax_amount, grand_total,
             payment_method, amount_tendered, change_given, payment_details, register_id, register_name,
-            sale_status, payment_status, sale_date, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', NOW(), NOW())
+            sale_type, sale_status, payment_status, sale_date, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', NOW(), NOW())
     ");
 
     $change = $input['change_given'] ?? ($amount_tendered - $total);
@@ -154,8 +176,10 @@ try {
         $receipt_number,
         $shift_id,
         $user_id,
+        $assigned_to,
         $customer_id,
         $warehouse_id,
+        $table_id,
         $project_id,
         $subtotal,
         $discount_percentage,
@@ -167,7 +191,8 @@ try {
         $change,
         $payment_details_json,
         $register_id,
-        $register_name
+        $register_name,
+        $sale_type_in
     ]);
     
     $sale_id = $pdo->lastInsertId();
@@ -192,7 +217,7 @@ try {
     }
 
     $fetchStmt = $pdo->prepare("
-        SELECT p.product_id, p.product_name, p.selling_price, p.min_selling_price, p.is_service, p.is_combo,
+        SELECT p.product_id, p.product_name, p.selling_price, p.min_selling_price, p.is_service, p.is_combo, p.track_serials,
                COALESCE(SUM(ps.stock_quantity - IFNULL(ps.reserved_quantity, 0)), 0) as general_available,
                $project_stock_subquery as project_available,
                COALESCE(SUM(IFNULL(ps.reserved_quantity, 0)), 0) as current_warehouse_reserved
@@ -214,12 +239,24 @@ try {
     $products_db = $fetchStmt->fetchAll(PDO::FETCH_ASSOC);
     $products_map = array_column($products_db, null, 'product_id');
 
+    // Phase 25 (pos_upgrade_plan.md §9) — snapshot each product's plain catalog
+    // selling_price BEFORE any price-group/promo override is merged in below,
+    // so the printed receipt's "was" price (for lines with an active promo)
+    // reflects the real list price, not a price-group tier — the two concepts
+    // are deliberately not conflated in the cosmetic strikethrough.
+    $catalogSellingPrices = [];
+    foreach ($products_map as $pid => $p) {
+        $catalogSellingPrices[$pid] = (float)$p['selling_price'];
+    }
+    $activePromoProductIds = array_keys(resolveActivePromoPrices($pdo, $product_ids));
+
     // Phase 14 (pos_upgrade_plan.md §8) — resolve each product's authoritative
     // price for the chosen price group BEFORE the item loop below, so
     // core/pos_override_guard.php::resolvePosLineBasePrice() (which reads
     // $db_product['selling_price']) is automatically group-aware without
     // needing to know price groups exist at all. Sparse: a product with no
     // override row for this group keeps its plain selling_price untouched.
+    // (Also promo-aware since Phase 25 — see resolveGroupPrices().)
     $groupPrices = resolveGroupPrices($pdo, $price_group_id, $product_ids);
     foreach ($groupPrices as $pid => $price) {
         if (isset($products_map[$pid])) {
@@ -245,13 +282,47 @@ try {
         }
     }
 
+    // Phase 26 (pos_upgrade_plan.md §9) — serial/IMEI-tracked lines. Every
+    // serial-tracked line must carry EXACTLY one serial number per unit sold
+    // (a serial is qty-always-1, not a decrementing pool), and every serial
+    // number given must currently be in_stock for this product/warehouse —
+    // validated up front, before any writes, for a clear pre-flight error
+    // instead of a partial-failure mid-loop (same reasoning as the combo
+    // check above). tenantFeatureEnabled('pos_advanced') double-checked here
+    // too (Phase 13's runtime-double-check pattern) — a tenant whose
+    // pos_advanced entitlement has been revoked sells a previously
+    // serial-tracked product as a plain quantity-based line instead of
+    // blocking the sale outright.
+    $serialTrackingEnabled = function_exists('tenantFeatureEnabled') ? tenantFeatureEnabled('pos_advanced') : true;
+    foreach ($items as $item) {
+        $pid = (int)$item['product_id'];
+        $db_product = $products_map[$pid] ?? null;
+        if (!$db_product || empty($db_product['track_serials']) || !$serialTrackingEnabled) continue;
+        $qty = (int)round(floatval($item['quantity'] ?? 0));
+        $serials = array_values(array_filter(array_map('trim', (array)($item['serial_numbers'] ?? []))));
+
+        if (count($serials) !== $qty) {
+            throw new Exception(sprintf(t('Select exactly %d serial number(s) for \'%s\'.'), $qty, $db_product['product_name']));
+        }
+        if (count($serials) !== count(array_unique($serials))) {
+            throw new Exception(sprintf(t('Duplicate serial number selected for \'%s\'.'), $db_product['product_name']));
+        }
+        $placeholders2 = implode(',', array_fill(0, count($serials), '?'));
+        $chk = $pdo->prepare("SELECT COUNT(*) FROM product_serials WHERE product_id = ? AND warehouse_id = ? AND status = 'in_stock' AND serial_number IN ($placeholders2)");
+        $chk->execute(array_merge([$pid, (int)$warehouse_id], $serials));
+        if ((int)$chk->fetchColumn() !== count($serials)) {
+            throw new Exception(sprintf(t('One or more selected serial numbers for \'%s\' are no longer available.'), $db_product['product_name']));
+        }
+    }
+
     // Insert sale items and update inventory
     $itemStmt = $pdo->prepare("
         INSERT INTO pos_sale_items (
             sale_id, product_id, product_name, quantity, unit_price,
+            promo_original_price,
             tax_rate, tax_amount, discount_rate, discount_amount, line_total,
             sold_unit_label, sold_unit_quantity
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
     $stockStmt = $pdo->prepare("
@@ -273,6 +344,37 @@ try {
 
         if (!$db_product) {
             throw new Exception("Product ID $pid not found");
+        }
+
+        // Phase 30 (pos_upgrade_plan.md §9) — modifier choices for this line,
+        // resolved server-side FIRST (never trust the client's
+        // price_adjustment/option_name) so the adjustment can be folded into
+        // this line's true price below, before the discount-permission check
+        // runs. Without this, a modifier that REDUCES price (e.g. "No Rice
+        // -500") would look like an unauthorized discount to a cashier who
+        // only holds pos_price_override, not pos_discount_override; a
+        // modifier that raises price is unaffected either way since a
+        // surcharge never trips that check. An unknown/inactive option_id is
+        // silently skipped rather than failing the whole sale (mirrors how an
+        // unknown unit_label is ignored below). $modOptions is reused
+        // verbatim when persisting to pos_sale_item_modifiers further down —
+        // no second query.
+        $modOptions = [];
+        $modifierAdjustmentTotal = 0.0;
+        $chosenModifiers = is_array($item['modifiers'] ?? null) ? $item['modifiers'] : [];
+        if (!empty($chosenModifiers)) {
+            $modOptIds = array_values(array_unique(array_filter(array_map(
+                fn($m) => (int)($m['option_id'] ?? 0), $chosenModifiers
+            ))));
+            if (!empty($modOptIds)) {
+                $modPlaceholders = str_repeat('?,', count($modOptIds) - 1) . '?';
+                $modStmt = $pdo->prepare("SELECT option_id, name, price_adjustment FROM modifier_options WHERE option_id IN ($modPlaceholders) AND status = 'active'");
+                $modStmt->execute($modOptIds);
+                $modOptions = $modStmt->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($modOptions as $mo) {
+                    $modifierAdjustmentTotal += (float)$mo['price_adjustment'];
+                }
+            }
         }
 
         // Phase 15 (pos_upgrade_plan.md §8) — unit conversion at the register.
@@ -338,6 +440,15 @@ try {
         if ($priceResolution['requested_price'] !== null) {
             $requested_price = $priceResolution['requested_price'];
         }
+        // Phase 30 — fold the server-validated modifier total into this
+        // line's TRUE price (not a discount), for the normal add-to-cart
+        // path. Skipped when a manual price override was attempted: the
+        // cashier's typed price (or the forced-back catalog price, if the
+        // override wasn't permitted) is already the final intended figure —
+        // adding the modifier again would double-count it.
+        if (empty($item['manual_price_override'])) {
+            $original_price += $modifierAdjustmentTotal;
+        }
         $tax_rate = floatval($item['tax_rate']);
         $discount_percent = floatval($item['discount_percent']);
 
@@ -358,6 +469,18 @@ try {
         $calculated_discount += $item_discount_amount;
         $calculated_tax += $item_tax_amount;
         
+        // Phase 25 (pos_upgrade_plan.md §9) — cosmetic "was / now" strikethrough
+        // on the printed receipt: only set when this product had an active
+        // promo at sale time, and only when it actually undercuts the catalog
+        // price (defensive — never shows a "was" lower than "now").
+        $promo_original_price = null;
+        if (in_array((int)$pid, $activePromoProductIds, true)) {
+            $catalogPrice = $catalogSellingPrices[$pid] ?? null;
+            if ($catalogPrice !== null && $catalogPrice > $original_price) {
+                $promo_original_price = $catalogPrice;
+            }
+        }
+
         // Prepare DB record
         $itemStmt->execute([
             $sale_id,
@@ -365,6 +488,7 @@ try {
             $db_product['product_name'], // Use DB name to be safe
             $qty,
             $original_price,
+            $promo_original_price,
             $tax_rate,
             $item_tax_amount,
             $discount_percent,
@@ -375,6 +499,19 @@ try {
         ]);
         $sale_item_id = (int)$pdo->lastInsertId();
 
+        // Phase 30 (pos_upgrade_plan.md §9) — persist the modifier choices
+        // already resolved server-side above (same $modOptions — no second
+        // query) now that $sale_item_id exists.
+        if (!empty($modOptions)) {
+            $insModStmt = $pdo->prepare("
+                INSERT INTO pos_sale_item_modifiers (sale_item_id, option_id, option_name, price_adjustment, created_at)
+                VALUES (?, ?, ?, ?, NOW())
+            ");
+            foreach ($modOptions as $mo) {
+                $insModStmt->execute([$sale_item_id, $mo['option_id'], $mo['name'], $mo['price_adjustment']]);
+            }
+        }
+
         // Phase 23 (pos_upgrade_plan.md §8) — a combo product carries no
         // stock of its own; selling it decrements each COMPONENT's stock
         // instead (availability for the whole cart was already verified
@@ -382,11 +519,26 @@ try {
         if (!empty($db_product['is_combo'])) {
             consumeComboComponents($pdo, $pid, $qty, (int)$warehouse_id, $project_id, $sale_id, $receipt_number, $_SESSION['user_id']);
         } elseif (!$db_product['is_service']) {
-            // Phase 17b (pos_upgrade_plan.md §8) — FEFO batch consumption, a
-            // bookkeeping layer on top of the product_stocks decrement below,
-            // not a replacement for it. No-op for a product with no open
-            // batches in this warehouse (not batch-tracked).
-            consumeFefoBatches($pdo, $pid, (int)$warehouse_id, $qty, $sale_item_id);
+            // Phase 26 (pos_upgrade_plan.md §9) — a serial-tracked line locks
+            // its specific serial(s) instead of drawing from FEFO batches;
+            // already validated available above, this is the real
+            // row-locked consumption. A hard failure here (should be
+            // unreachable given the pre-check, but a concurrent sale could
+            // theoretically win the race) rolls back the whole sale rather
+            // than silently under-selling a specific physical unit.
+            if (!empty($db_product['track_serials']) && $serialTrackingEnabled) {
+                $serials = array_values(array_filter(array_map('trim', (array)($item['serial_numbers'] ?? []))));
+                $consumedSerials = consumeSerials($pdo, $pid, (int)$warehouse_id, $serials, $sale_item_id);
+                if (count($consumedSerials) !== count($serials)) {
+                    throw new Exception(sprintf(t('A selected serial number for \'%s\' was just sold by another transaction. Please reselect.'), $db_product['product_name']));
+                }
+            } else {
+                // Phase 17b (pos_upgrade_plan.md §8) — FEFO batch consumption, a
+                // bookkeeping layer on top of the product_stocks decrement below,
+                // not a replacement for it. No-op for a product with no open
+                // batches in this warehouse (not batch-tracked).
+                consumeFefoBatches($pdo, $pid, (int)$warehouse_id, $qty, $sale_item_id);
+            }
 
             // 1. Global Update
             $stockStmt->execute([ $qty, $qty, $pid ]);
@@ -567,6 +719,21 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
     }
 
     $pdo->commit();
+
+    // Phase 30 (pos_upgrade_plan.md §9) — closing a table's bill frees the
+    // table for the next guest. Best-effort, after commit: a failure here
+    // must never undo an already-completed sale. The held order itself
+    // (pos_held_sales) is cleared by the existing client-side call to
+    // delete_held_sale.php once it sees this response's success=true —
+    // unchanged by this phase.
+    if ($table_id) {
+        try {
+            $pdo->prepare("UPDATE restaurant_tables SET status = 'available', updated_at = NOW() WHERE table_id = ?")
+                ->execute([$table_id]);
+        } catch (Throwable $e) {
+            error_log("POS Phase 30 table-release warning for table_id={$table_id}: " . $e->getMessage());
+        }
+    }
 
     // Log the activity
     $username = $_SESSION['username'] ?? 'User';

@@ -26,6 +26,7 @@ require_once __DIR__ . '/../../core/permissions.php';
 require_once __DIR__ . '/../../core/stock_ledger.php';
 require_once __DIR__ . '/../../core/warehouse_scope.php';
 require_once __DIR__ . '/../../core/pos_batch_consumption.php';
+require_once __DIR__ . '/../../core/pos_serial_tracking.php';
 require_once __DIR__ . '/../../core/pos_combo_products.php';
 
 header('Content-Type: application/json');
@@ -110,6 +111,11 @@ try {
         // this line originally drew from (FEFO), not just a generic quantity
         // bump. No-op for a non-batch-tracked line (no pos_sale_item_batches rows).
         reverseFefoBatchConsumption($pdo, (int)$ln['sale_item_id']);
+
+        // Phase 26 (pos_upgrade_plan.md §9) — restore every serial this line
+        // sold back to in_stock. No-op for a non-serial-tracked line (no
+        // pos_sale_item_serials rows).
+        reverseSerialsForSaleItem($pdo, (int)$ln['sale_item_id']);
     }
 
     // Refund the cash drawer for cash sales, against the operator's active shift.

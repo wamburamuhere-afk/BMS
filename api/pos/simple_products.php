@@ -41,6 +41,12 @@ try {
     // "no group chosen" -> plain products.selling_price, same as before this
     // phase (fully backward compatible).
     $price_group_id = isset($_GET['price_group_id']) ? intval($_GET['price_group_id']) : 0;
+    // Phase 31 (pos_upgrade_plan.md §8) — Product Variants. Absent/0 = the
+    // normal top-level grid (a variant parent renders as ONE tile with a
+    // variant_count badge; its children never appear as separate tiles).
+    // Passed and >0 = the picker's own request for one parent's children —
+    // completely different WHERE shape, same endpoint, no new file needed.
+    $parent_product_id = isset($_GET['parent_product_id']) ? intval($_GET['parent_product_id']) : 0;
 
     // A specific warehouse must be one this user is actually scoped to;
     // omitting it entirely is only allowed for admins / grant-all users
@@ -77,7 +83,7 @@ try {
                 p.barcode,
                 p.selling_price,
                 p.min_selling_price,
-                COALESCE(MAX(pgp.price), p.selling_price) as effective_price,
+                COALESCE(MAX(promo.price), MAX(pgp.price), p.selling_price) as effective_price,
                 p.tax_rate,
                 p.is_taxable,
                 COALESCE(SUM(ps.stock_quantity), 0) as total_physical,
@@ -86,13 +92,34 @@ try {
                 $project_stock_subquery as project_stock,
                 p.is_service,
                 p.category_id,
-                p.image_url
+                p.image_url,
+                p.track_serials,
+                p.parent_product_id,
+                p.variant_attributes,
+                (SELECT COUNT(*) FROM products vc WHERE vc.parent_product_id = p.product_id AND vc.status = 'active') as variant_count
             FROM products p
             LEFT JOIN product_stocks ps ON p.product_id = ps.product_id $ps_warehouse_filter"
             . ($price_group_id > 0
                 ? " LEFT JOIN product_price_group_prices pgp ON pgp.product_id = p.product_id AND pgp.price_group_id = :price_group_id"
                 : " LEFT JOIN product_price_group_prices pgp ON 1=0") .
+            // Phase 25 (pos_upgrade_plan.md §9) — an active, in-window promo
+            // price wins over the price-group tier; joined the same
+            // MAX()-wrapped way as pgp above to stay ONLY_FULL_GROUP_BY-safe.
+            " LEFT JOIN product_promotions promo ON promo.product_id = p.product_id
+                AND promo.status = 'active'
+                AND promo.starts_at <= NOW() AND promo.ends_at >= NOW()" .
             " WHERE p.status = 'active'";
+
+    // Phase 31 (pos_upgrade_plan.md §8) — a variant child never appears as
+    // its own top-level tile (it's reached only through its parent's picker);
+    // requesting one specific parent's children flips that around entirely —
+    // every other filter (category/search/price group) still applies so the
+    // children view respects the same grid context the cashier was already in.
+    if ($parent_product_id > 0) {
+        $sql .= " AND p.parent_product_id = :parent_product_id";
+    } else {
+        $sql .= " AND p.parent_product_id IS NULL";
+    }
 
     // A specific warehouse was chosen: only list products actually available
     // there — a physical product needs a product_stocks row for THIS
@@ -130,6 +157,10 @@ try {
         $params[':price_group_id'] = $price_group_id;
     }
 
+    if ($parent_product_id > 0) {
+        $params[':parent_product_id'] = $parent_product_id;
+    }
+
     $sql .= " GROUP BY p.product_id ";
     
     // Sort by project stock first if a project is selected
@@ -143,8 +174,18 @@ try {
     $stmt->execute($params);
     $raw_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    // Phase 26 (pos_upgrade_plan.md §9) — a runtime double-check, not just a
+    // sale-time one: if pos_advanced has since been revoked, the POS grid
+    // must not show the serial picker at all for a product that was flagged
+    // track_serials=1 while the tenant was entitled (process_sale.php would
+    // ignore it as a plain quantity line anyway — this keeps the UI honest
+    // about what checkout will actually do).
+    $serialTrackingEnabled = function_exists('tenantFeatureEnabled') ? tenantFeatureEnabled('pos_advanced') : true;
+    // Phase 31 (pos_upgrade_plan.md §8) — variants are gated the same way.
+    $variantsEnabled = $serialTrackingEnabled;
+
     // Process products
-    $products = array_map(function($p) use ($project_id) {
+    $products = array_map(function($p) use ($project_id, $serialTrackingEnabled, $variantsEnabled) {
         $p['product_id'] = intval($p['product_id']);
         $p['selling_price'] = floatval($p['selling_price']);
         // Phase 14 — the price a cashier actually sees/starts from: the chosen
@@ -154,16 +195,25 @@ try {
 
         $general = floatval($p['general_available']);
         $p_stock = floatval($p['project_stock'] ?? 0);
-        
+
         // Final Available = General Stock + This Project's Reserved Stock
         $p['stock_quantity'] = $general + $p_stock;
         $p['project_stock'] = $p_stock;
-        
+
         $p['is_service'] = (bool)$p['is_service'];
         $p['is_taxable'] = (bool)$p['is_taxable'];
         $p['category_id'] = intval($p['category_id']);
         $p['tax_rate'] = (bool)$p['is_taxable'] ? floatval($p['tax_rate'] ?? 0) : 0;
-        
+        $p['track_serials'] = $serialTrackingEnabled ? (int)$p['track_serials'] : 0;
+
+        // Phase 31 (pos_upgrade_plan.md §8) — same runtime double-check
+        // pattern as track_serials above: a tenant whose pos_advanced
+        // entitlement has since been revoked never sees the variant picker,
+        // even for a product that has variant children on file.
+        $p['parent_product_id'] = $p['parent_product_id'] !== null ? (int)$p['parent_product_id'] : null;
+        $p['variant_attributes'] = $p['variant_attributes'] ?? null;
+        $p['variant_count'] = $variantsEnabled ? (int)($p['variant_count'] ?? 0) : 0;
+
         return $p;
     }, $raw_products);
     

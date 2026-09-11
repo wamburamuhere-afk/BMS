@@ -365,13 +365,28 @@ function createProduct(status = 'active') {
                 } else {
                     logReportAction('Created Product', 'User successfully created new product: ' + $('#product_name').val());
                 }
-                Swal.fire({
+                // Phase 30 (pos_upgrade_plan.md §9) — modifier-group links are a
+                // separate table (product_modifier_groups), saved via their own
+                // full-replace endpoint, not a column update_product.php touches.
+                // Only present on the edit page (linking needs an existing
+                // product_id) and only when the restaurant_pos entitlement
+                // rendered the picker at all.
+                const finish = () => Swal.fire({
                     icon: 'success',
                     title: isEdit ? PE_I18N.product_updated : PE_I18N.product_created,
                     text: res.message,
                     confirmButtonColor: '#28a745',
                     confirmButtonText: PE_I18N.ok
                 }).then(() => window.location.href = 'products');
+
+                if (isEdit && $('#modifier_groups_select').length) {
+                    $.post('<?= getUrl("/api/restaurant/save_product_modifier_links.php") ?>', {
+                        product_id: PRODUCT_ID,
+                        group_ids: $('#modifier_groups_select').val() || []
+                    }, finish, 'json').fail(finish);
+                } else {
+                    finish();
+                }
             } else {
                 Swal.fire({ icon: 'error', title: isEdit ? PE_I18N.update_failed : PE_I18N.creation_failed, text: res.message });
                 submitBtn.prop('disabled', false).html(originalText);

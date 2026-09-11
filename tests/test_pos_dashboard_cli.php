@@ -236,6 +236,173 @@ try {
         }
     }
 
+    // ── G. Phase 29 — Dashboard Intelligence (Sales Targets, Top Cashiers, Damage/Shrinkage) ──
+    section('G. Phase 29 — static wiring (source patterns)');
+
+    $metricsFile = "$root/core/pos_dashboard_metrics.php";
+    ok(is_file($metricsFile), 'core/pos_dashboard_metrics.php exists');
+    $mSrc = src($metricsFile);
+    $o = []; $rc = 0; exec('php -l ' . escapeshellarg($metricsFile) . ' 2>&1', $o, $rc);
+    ok($rc === 0, 'core/pos_dashboard_metrics.php lint-clean');
+    ok(strpos($mSrc, 'function damageShrinkageSummary')  !== false, 'damageShrinkageSummary() defined');
+    ok(strpos($mSrc, 'function topCashiers')              !== false, 'topCashiers() defined');
+    ok(strpos($mSrc, 'function salesTargetAchievement')   !== false, 'salesTargetAchievement() defined');
+
+    $saveTargetFile = "$root/api/pos/save_sales_target.php";
+    ok(is_file($saveTargetFile), 'api/pos/save_sales_target.php exists');
+    $stSrc = src($saveTargetFile);
+    $o = []; $rc = 0; exec('php -l ' . escapeshellarg($saveTargetFile) . ' 2>&1', $o, $rc);
+    ok($rc === 0, 'api/pos/save_sales_target.php lint-clean');
+    ok(strpos($stSrc, "canView('pos_advanced')") !== false, 'save_sales_target gated on canView(pos_advanced)');
+    ok(strpos($stSrc, "canEdit('pos_advanced')") !== false, 'save_sales_target gated on canEdit(pos_advanced)');
+    ok(strpos($stSrc, 'csrf_check()') !== false, 'save_sales_target enforces CSRF');
+    ok(strpos($stSrc, "userCan('warehouse'") !== false, 'save_sales_target verifies warehouse scope before writing');
+
+    $a2 = src($api);
+    ok(strpos($a2, "canView('pos_advanced')") !== false, 'get_dashboard.php gates the sales_target block on canView(pos_advanced)');
+    ok(strpos($a2, "'sales_target'") !== false, 'get_dashboard.php response includes a sales_target key');
+    ok(strpos($a2, "'damage_shrinkage'") !== false, 'get_dashboard.php response includes damage_shrinkage (base pos, ungated)');
+    ok(strpos($a2, "'top_cashiers'") !== false, 'get_dashboard.php response includes top_cashiers (base pos, ungated)');
+
+    ok(strpos($p, 'id="damageShrinkage"') !== false, 'Damage/Shrinkage tile container present');
+    ok(strpos($p, 'id="topCashiers"')     !== false, 'Top Cashiers tile container present');
+    ok(strpos($p, 'id="salesTarget"')     !== false, 'Sales Target tile container present');
+    ok(strpos($p, 'id="targetModal"')     !== false, 'Set Sales Target modal present');
+    ok(strpos($p, '$can_view_targets')    !== false, 'page computes $can_view_targets = canView(pos_advanced)');
+    ok(strpos($p, '$can_edit_targets')    !== false, 'page computes $can_edit_targets = canEdit(pos_advanced)');
+    // The Sales Target CARD and the Set-Target MODAL must each be wrapped in
+    // their own PHP gate — genuinely absent from the HTML, not CSS-hidden.
+    $tileGatePos  = strpos($p, '<?php if ($can_view_targets): ?>');
+    $tileIdPos    = strpos($p, 'id="salesTarget"');
+    ok($tileGatePos !== false && $tileGatePos < $tileIdPos, 'Sales Target tile is wrapped in a $can_view_targets PHP if-block (genuinely absent, not hidden)');
+    $modalGatePos = strpos($p, '<?php if ($can_view_targets && $can_edit_targets): ?>');
+    $modalIdPos   = strpos($p, 'id="targetModal"');
+    ok($modalGatePos !== false && $modalGatePos < $modalIdPos, 'Set Sales Target modal is wrapped in a $can_view_targets && $can_edit_targets PHP if-block');
+    ok(strpos($p, 'name="_csrf"', $modalGatePos) !== false, 'Set Sales Target modal carries a CSRF token');
+
+    section('G2. Phase 29 — achievement-band boundaries (pure function, exact edges)');
+
+    $bandCases = [
+        [100.0, 'achieved'],           [99.99, 'on_track'],
+        [75.0,  'on_track'],           [74.99, 'needs_improvement'],
+        [50.0,  'needs_improvement'],  [49.99, 'action_required'],
+        [0.0,   'action_required'],    [150.0, 'achieved'],
+    ];
+    foreach ($bandCases as [$pct, $expected]) {
+        $band = salesTargetAchievementBand($pct);
+        ok($band['key'] === $expected, "band($pct%) == '$expected' (got '{$band['key']}')");
+    }
+
+    section('G3. Phase 29 — live reconciliation (in-process, admin scope)');
+
+    if (!(bool)$pdo->query("SHOW TABLES LIKE 'pos_sales_targets'")->fetch()) {
+        ok(true, 'pos_sales_targets absent — Phase 29 live checks skipped');
+    } else {
+        $mfrom = date('Y-m-01'); $today = date('Y-m-d'); $periodMonth = date('Y-m-01');
+
+        // Damage/Shrinkage reconciles to direct SQL (admin scope == unscoped).
+        $ds = damageShrinkageSummary($pdo, '', $mfrom, $today);
+        $sqlDs = $pdo->prepare("SELECT movement_type, SUM(ABS(quantity)) AS qty FROM stock_movements WHERE movement_type IN ('damaged','expired','theft') AND DATE(movement_date) BETWEEN ? AND ? GROUP BY movement_type");
+        $sqlDs->execute([$mfrom, $today]);
+        $expectDs = ['damaged' => 0.0, 'expired' => 0.0, 'theft' => 0.0, 'total' => 0.0];
+        foreach ($sqlDs->fetchAll(PDO::FETCH_ASSOC) as $row) { $expectDs[$row['movement_type']] = round((float)$row['qty'], 3); $expectDs['total'] += round((float)$row['qty'], 3); }
+        ok(approx($ds['damaged'], $expectDs['damaged']) && approx($ds['expired'], $expectDs['expired']) && approx($ds['theft'], $expectDs['theft']),
+            sprintf('damageShrinkageSummary() == direct SQL (damaged=%.3f expired=%.3f theft=%.3f)', $expectDs['damaged'], $expectDs['expired'], $expectDs['theft']));
+
+        // Top Cashiers reconciles to direct SQL.
+        $tc = topCashiers($pdo, '', $mfrom, $today, 5);
+        $sqlTc = $pdo->prepare("SELECT ps.user_id, SUM(ps.grand_total - ps.tax_amount) AS total, COUNT(*) AS cnt FROM pos_sales ps WHERE ps.sale_status='completed' AND ps.is_return_sale=0 AND DATE(ps.sale_date) BETWEEN ? AND ? GROUP BY ps.user_id ORDER BY total DESC LIMIT 5");
+        $sqlTc->execute([$mfrom, $today]);
+        $expectTc = $sqlTc->fetchAll(PDO::FETCH_ASSOC);
+        ok(count($tc) === count($expectTc), 'topCashiers() row count == direct SQL (' . count($expectTc) . ')');
+        $tcMatches = true;
+        foreach ($tc as $i => $row) {
+            if (!isset($expectTc[$i]) || (int)$expectTc[$i]['user_id'] !== $row['user_id'] || !approx($expectTc[$i]['total'], $row['total']) || (int)$expectTc[$i]['cnt'] !== $row['count']) { $tcMatches = false; break; }
+        }
+        ok($tcMatches, 'topCashiers() rows (user_id/total/count) == direct SQL, in order');
+
+        // Sales Target — no row exists yet for this month/scope (table just created).
+        $existing = $pdo->prepare("SELECT COUNT(*) FROM pos_sales_targets WHERE warehouse_id=0 AND user_id=0 AND period_month=?");
+        $existing->execute([$periodMonth]);
+        $hadRowAlready = (int)$existing->fetchColumn() > 0;
+        if (!$hadRowAlready) {
+            $sa = salesTargetAchievement($pdo, 0, $periodMonth);
+            ok($sa['has_target'] === false, 'salesTargetAchievement() reports has_target=false when no target row exists');
+        } else {
+            ok(true, 'a company-wide target already exists for this month — has_target=false path skipped (not a fresh-data condition)');
+        }
+
+        // Synthetic, transaction-wrapped: insert a damage movement + a sales
+        // target row, verify both functions pick them up correctly, then roll
+        // back so nothing touches real data.
+        $pdo->beginTransaction();
+        try {
+            $sampleProduct   = (int)$pdo->query("SELECT product_id FROM products LIMIT 1")->fetchColumn();
+            $sampleWarehouse = (int)$pdo->query("SELECT warehouse_id FROM warehouses LIMIT 1")->fetchColumn();
+            $adminUid = $uid ?: 1;
+
+            if ($sampleProduct && $sampleWarehouse) {
+                $pdo->prepare("INSERT INTO stock_movements (product_id, movement_type, quantity, warehouse_id, movement_date, created_by, reason) VALUES (?, 'damaged', 7, ?, NOW(), ?, 'Phase 29 test fixture')")
+                    ->execute([$sampleProduct, $sampleWarehouse, $adminUid]);
+
+                $dsAfter = damageShrinkageSummary($pdo, '', $mfrom, $today);
+                ok(approx($dsAfter['damaged'], $expectDs['damaged'] + 7), 'damageShrinkageSummary() picks up a freshly-inserted damaged-stock row (+7)');
+            } else {
+                ok(true, 'no product/warehouse row available to build the damage-movement fixture — skipped');
+            }
+
+            // Target amount chosen so actual/target lands precisely at a
+            // known, non-trivial band for whatever the real "actual" happens
+            // to be right now (actual could legitimately be 0.00).
+            $baseline = salesTargetAchievement($pdo, 0, $periodMonth);
+            $actualNow = $baseline['actual'];
+            $targetAmount = $actualNow > 0 ? round($actualNow / 0.80, 2) : 1000.00; // actual/target = 80% => 'on_track'
+            $pdo->prepare("INSERT INTO pos_sales_targets (warehouse_id, user_id, period_month, target_amount, created_by) VALUES (0, 0, ?, ?, ?)
+                            ON DUPLICATE KEY UPDATE target_amount = VALUES(target_amount)")
+                ->execute([$periodMonth, $targetAmount, $adminUid]);
+
+            $sa2 = salesTargetAchievement($pdo, 0, $periodMonth);
+            $expectedPct = $targetAmount > 0 ? round(($actualNow / $targetAmount) * 100, 1) : 0.0;
+            ok($sa2['has_target'] === true, 'salesTargetAchievement() reports has_target=true once a row exists');
+            ok(approx($sa2['target_amount'], $targetAmount), 'salesTargetAchievement() target_amount == inserted row');
+            ok(approx($sa2['pct'], $expectedPct), sprintf('salesTargetAchievement() pct == actual/target*100 (%.1f%%)', $expectedPct));
+            ok($sa2['band'] === salesTargetAchievementBand($expectedPct)['key'], 'salesTargetAchievement() band matches salesTargetAchievementBand() for the same pct');
+
+            // Entitlement behavioural check — same $GLOBALS['__bms_features']
+            // technique as test_pos_phase13_entitlement_cli.php. With
+            // pos_advanced forced off, the API must omit sales_target entirely
+            // while still returning damage_shrinkage/top_cashiers (base pos).
+            if (function_exists('allFeatureKeys')) {
+                $prevFeatures = $GLOBALS['__bms_features'] ?? null;
+                $GLOBALS['__bms_features'] = array_fill_keys(allFeatureKeys(), true);
+                $GLOBALS['__bms_features']['pos_advanced'] = false;
+
+                $_GET = [];
+                ob_start(); include $api; $json2 = ob_get_clean();
+                $d2 = json_decode($json2, true);
+                ok($d2 && !empty($d2['success']) && $d2['data']['sales_target'] === null,
+                    'get_dashboard.php omits sales_target when pos_advanced is off, even for an admin session');
+                ok($d2 && isset($d2['data']['damage_shrinkage']) && isset($d2['data']['top_cashiers']),
+                    'get_dashboard.php still returns damage_shrinkage/top_cashiers when pos_advanced is off (base pos)');
+
+                $GLOBALS['__bms_features'] = $prevFeatures;
+                $_GET = [];
+                ob_start(); include $api; ob_get_clean(); // restore session state for anything after this block
+                ok((canView('pos_advanced') === true), 'canView(pos_advanced) restored to true after resetting the feature map');
+            } else {
+                ok(true, 'allFeatureKeys() not available — entitlement toggle check skipped');
+            }
+        } finally {
+            $pdo->rollBack();
+        }
+
+        // Post-rollback sanity: the synthetic rows must be gone.
+        $existing2 = $pdo->prepare("SELECT COUNT(*) FROM pos_sales_targets WHERE warehouse_id=0 AND user_id=0 AND period_month=? AND target_amount = ?");
+        $gone = true;
+        try { $existing2->execute([$periodMonth, $targetAmount ?? -1]); $gone = ((int)$existing2->fetchColumn() === 0) || $hadRowAlready; } catch (Throwable $e) { $gone = true; }
+        ok($gone, 'synthetic sales-target row rolled back cleanly (or a pre-existing row was left untouched)');
+    }
+
 } catch (Throwable $e) {
     ok(false, 'threw: ' . $e->getMessage());
 }

@@ -65,8 +65,8 @@ try {
     // audit entry. Service products and non-tracked items are skipped.
     $itemsStmt = $pdo->prepare("
         SELECT ri.product_id, ri.quantity_received AS qty,
-               ri.batch_number, ri.expiry_date, ri.unit_price,
-               p.is_service, p.track_inventory
+               ri.batch_number, ri.expiry_date, ri.unit_price, ri.serial_numbers,
+               p.is_service, p.track_inventory, p.track_serials
         FROM receipt_items ri
         LEFT JOIN products p ON ri.product_id = p.product_id
         WHERE ri.receipt_id = ?
@@ -90,6 +90,14 @@ try {
     $insertBatch  = $pdo->prepare("
         INSERT INTO product_batches (product_id, warehouse_id, batch_number, expiry_date, quantity_received, quantity_remaining, unit_cost, receipt_id, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    ");
+    // Phase 26 (pos_upgrade_plan.md §9) — one product_serials row per
+    // physical unit, written only for track_serials=1 products, at the
+    // moment stock genuinely enters the warehouse (same "stock arrives on
+    // approval, not creation" rule Phase 17 established for batches).
+    $insertSerial = $pdo->prepare("
+        INSERT IGNORE INTO product_serials (product_id, warehouse_id, serial_number, status, receipt_id, created_at)
+        VALUES (?, ?, ?, 'in_stock', ?, NOW())
     ");
     // stock_movements has two strict ENUMs:
     //   movement_type  must be one of: purchase_in, sale_out, adjustment_in, adjustment_out, transfer_in, transfer_out, return_in, return_out, production_in, production_out, damaged, expired, found, theft, correction, issue_out
@@ -145,6 +153,22 @@ try {
                 (float)($it['unit_price'] ?? 0),
                 $receipt_id,
             ]);
+        }
+
+        // Phase 26 — only for a track_serials=1 product with serial numbers
+        // actually entered on this line. Lenient by design: whatever count of
+        // valid, non-empty, de-duplicated serials was entered is written —
+        // this does not block approval on a count mismatch against qty
+        // (an operator can still add the rest later via a future GRN or a
+        // manual adjustment), consistent with GRN approval never blocking on
+        // batch/expiry sparsity either.
+        if (!empty($it['track_serials']) && !empty($it['serial_numbers'])) {
+            $raw = (string)$it['serial_numbers'];
+            $serials = preg_split('/[\r\n,]+/', $raw);
+            $serials = array_values(array_unique(array_filter(array_map('trim', $serials), fn($s) => $s !== '')));
+            foreach ($serials as $sn) {
+                $insertSerial->execute([$pid, $warehouse_id, $sn, $receipt_id]);
+            }
         }
     }
 
