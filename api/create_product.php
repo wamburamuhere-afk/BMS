@@ -164,6 +164,8 @@ try {
         'barcode_symbology' => in_array($_POST['barcode_symbology'] ?? '', ['CODE128', 'CODE39', 'UPC_A', 'UPC_E', 'EAN_8', 'EAN_13'], true) ? $_POST['barcode_symbology'] : 'CODE128',
         // Phase 26 (pos_upgrade_plan.md §9) — see api/update_product.php for context.
         'track_serials' => (isset($_POST['track_serials']) && canView('pos_advanced')) ? 1 : 0,
+        // Phase 30 (pos_upgrade_plan.md §9) — see api/update_product.php for context.
+        'kitchen_station_id' => (!empty($_POST['kitchen_station_id']) && canView('restaurant_pos')) ? intval($_POST['kitchen_station_id']) : null,
         'expiry_days' => !empty($_POST['expiry_days']) ? intval($_POST['expiry_days']) : 0,
         'created_by' => $user_id
     ];

@@ -148,6 +148,11 @@ try {
         // from the client alone: a raw POST can't turn this on for a tenant
         // without the pos_advanced entitlement.
         'track_serials' => (isset($_POST['track_serials']) && canView('pos_advanced')) ? 1 : 0,
+        // Phase 30 (pos_upgrade_plan.md §9) — routes this product to a
+        // kitchen station for Send-to-Kitchen/KDS; only meaningful behind
+        // the restaurant_pos entitlement, gated the same way track_serials
+        // is gated behind pos_advanced above.
+        'kitchen_station_id' => (!empty($_POST['kitchen_station_id']) && canView('restaurant_pos')) ? intval($_POST['kitchen_station_id']) : null,
         'expiry_days' => !empty($_POST['expiry_days']) ? intval($_POST['expiry_days']) : 0,
         'updated_by' => $user_id,
         'updated_at' => date('Y-m-d H:i:s')

@@ -71,6 +71,43 @@ try {
     $warehouses = [];
 }
 
+// Phase 30 (pos_upgrade_plan.md §9) — Kitchen station + Modifier Groups,
+// only relevant behind the restaurant_pos entitlement. Kitchen stations are
+// warehouse-scoped but products are a company-wide catalog, so every
+// station across every restaurant/hybrid warehouse the user can see is
+// offered, labeled with its own warehouse — the admin picks the one
+// specific station this product routes to.
+$restaurant_pos_entitled = canView('restaurant_pos');
+$kitchen_stations = [];
+$modifier_groups = [];
+$product_modifier_group_ids = [];
+if ($restaurant_pos_entitled) {
+    try {
+        require_once ROOT_DIR . '/core/restaurant_scope.php';
+        $restaurant_warehouses = restaurantWarehousesForSelect($pdo);
+        if (!empty($restaurant_warehouses)) {
+            $whIds = array_map(fn($w) => (int)$w['warehouse_id'], $restaurant_warehouses);
+            $ph = implode(',', array_fill(0, count($whIds), '?'));
+            $stmt = $pdo->prepare("
+                SELECT ks.station_id, ks.name, w.warehouse_name
+                FROM kitchen_stations ks
+                JOIN warehouses w ON w.warehouse_id = ks.warehouse_id
+                WHERE ks.warehouse_id IN ($ph) AND ks.status = 'active'
+                ORDER BY w.warehouse_name, ks.name
+            ");
+            $stmt->execute($whIds);
+            $kitchen_stations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+        $modifier_groups = $pdo->query("SELECT group_id, name FROM modifier_groups WHERE status = 'active' ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+        $linkStmt = $pdo->prepare("SELECT group_id FROM product_modifier_groups WHERE product_id = ?");
+        $linkStmt->execute([$product_id]);
+        $product_modifier_group_ids = array_map('intval', $linkStmt->fetchAll(PDO::FETCH_COLUMN));
+    } catch (PDOException $e) {
+        $kitchen_stations = [];
+        $modifier_groups = [];
+    }
+}
+
 // Fetch current stock per warehouse for this product
 $stock_per_warehouse = [];
 try {
@@ -115,6 +152,24 @@ $dim_height = $dimensions[2] ?? 0;
 <script>
 const IS_EDIT = true;
 const PRODUCT_ID = <?= $product_id ?>;
+const RECIPE_STRINGS = {
+    recipeLabel: <?= json_encode(t('This is a Recipe (Ingredients)')) ?>,
+    comboLabel: <?= json_encode(t('This is a Combo / Bundle Product')) ?>,
+    recipeHint: <?= json_encode(t('A recipe has no stock of its own — selling it decrements each ingredient\'s stock instead, all at once.')) ?>,
+    comboHint: <?= json_encode(t('A combo has no stock of its own — selling it decrements each component product\'s stock instead, all at once.')) ?>,
+    recipeComponents: <?= json_encode(t('Recipe Ingredients')) ?>,
+    comboComponents: <?= json_encode(t('Combo Components')) ?>,
+};
+
+// Phase 30 (pos_upgrade_plan.md §9) — purely cosmetic relabel of the
+// existing Phase 23 combo section when a kitchen station is assigned; the
+// underlying is_combo mechanism and its component table are unchanged.
+function onKitchenStationChange() {
+    const isRecipe = !!$('#kitchen_station_select').val();
+    $('#comboToggleLabel').text(isRecipe ? RECIPE_STRINGS.recipeLabel : RECIPE_STRINGS.comboLabel);
+    $('#comboToggleHint').text(isRecipe ? RECIPE_STRINGS.recipeHint : RECIPE_STRINGS.comboHint);
+    $('#comboComponentsLabel').text(isRecipe ? RECIPE_STRINGS.recipeComponents : RECIPE_STRINGS.comboComponents);
+}
 
 $(document).ready(function() {
     $('.select2-static').each(function() {
@@ -788,22 +843,28 @@ function deleteSellingUnit(id) {
                         <?php endif; ?>
 
                         <?php if (!$product['is_service']): ?>
-                        <!-- Phase 23 (pos_upgrade_plan.md §8) — Combo/Bundle Product -->
+                        <!-- Phase 23 (pos_upgrade_plan.md §8) — Combo/Bundle Product.
+                             Phase 30 (§9) relabels this "Recipe (Ingredients)" when the
+                             product also has a kitchen_station_id — purely cosmetic;
+                             it's the exact same is_combo mechanism either way, so a
+                             recipe-based dish needs zero new code in process_sale.php. -->
                         <div class="col-md-12 mt-4 p-3 bg-white border rounded">
                             <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" id="is_combo_toggle" name="is_combo"
                                        value="1" <?= !empty($product['is_combo']) ? 'checked' : '' ?>
                                        onchange="$('#comboComponentsSection').toggleClass('d-none', !this.checked); if (this.checked) loadComboComponents();">
                                 <label class="form-check-label fw-bold text-primary" for="is_combo_toggle">
-                                    <i class="bi bi-boxes me-1"></i> <?= t('This is a Combo / Bundle Product') ?>
+                                    <i class="bi bi-boxes me-1" id="comboToggleIcon"></i> <span id="comboToggleLabel"><?= !empty($product['kitchen_station_id']) ? t('This is a Recipe (Ingredients)') : t('This is a Combo / Bundle Product') ?></span>
                                 </label>
                             </div>
-                            <p class="text-muted small mb-3">
-                                <?= t('A combo has no stock of its own — selling it decrements each component product\'s stock instead, all at once.') ?>
+                            <p class="text-muted small mb-3" id="comboToggleHint">
+                                <?= !empty($product['kitchen_station_id'])
+                                    ? t('A recipe has no stock of its own — selling it decrements each ingredient\'s stock instead, all at once.')
+                                    : t('A combo has no stock of its own — selling it decrements each component product\'s stock instead, all at once.') ?>
                             </p>
                             <div id="comboComponentsSection" class="<?= !empty($product['is_combo']) ? '' : 'd-none' ?>">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <strong class="small"><?= t('Combo Components') ?></strong>
+                                    <strong class="small" id="comboComponentsLabel"><?= !empty($product['kitchen_station_id']) ? t('Recipe Ingredients') : t('Combo Components') ?></strong>
                                     <button type="button" class="btn btn-sm btn-outline-primary" onclick="openAddComboComponentModal()">
                                         <i class="bi bi-plus-circle me-1"></i> <?= t('Add Component') ?>
                                     </button>
@@ -841,6 +902,41 @@ function deleteSellingUnit(id) {
                             <p class="text-muted small mb-0">
                                 <?= t('Each unit of this product is sold as a specific, traceable serial/IMEI number instead of a plain quantity. Serial numbers are entered when receiving stock via GRN.') ?>
                             </p>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if (!$product['is_service'] && $restaurant_pos_entitled): ?>
+                        <!-- Phase 30 (pos_upgrade_plan.md §9) — Kitchen Station + Modifier Groups. -->
+                        <div class="col-md-12 mt-4 p-3 bg-white border rounded">
+                            <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary">
+                                <i class="bi bi-egg-fried me-1"></i> <?= t('Restaurant') ?>
+                            </h6>
+                            <div class="mb-3">
+                                <label class="form-label"><?= t('Kitchen Station') ?></label>
+                                <select class="form-select select2-static" name="kitchen_station_id" id="kitchen_station_select" onchange="onKitchenStationChange()">
+                                    <option value=""><?= t('— None (not routed to a kitchen) —') ?></option>
+                                    <?php foreach ($kitchen_stations as $ks): ?>
+                                    <option value="<?= (int)$ks['station_id'] ?>" <?= (int)($product['kitchen_station_id'] ?? 0) === (int)$ks['station_id'] ? 'selected' : '' ?>>
+                                        <?= safe_output($ks['name']) ?> (<?= safe_output($ks['warehouse_name']) ?>)
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="text-muted"><?= t('Routes this item to a kitchen queue when sold in a restaurant/hybrid warehouse. Setting this also relabels the Combo section above to "Recipe (Ingredients)".') ?></small>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label"><?= t('Modifier Groups') ?></label>
+                                <select class="form-select select2-static" id="modifier_groups_select" multiple style="width:100%">
+                                    <?php foreach ($modifier_groups as $mg): ?>
+                                    <option value="<?= (int)$mg['group_id'] ?>" <?= in_array((int)$mg['group_id'], $product_modifier_group_ids, true) ? 'selected' : '' ?>>
+                                        <?= safe_output($mg['name']) ?>
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="text-muted">
+                                    <?= t('Add-on/option groups (e.g. Size, Toppings) offered when this item is sold.') ?>
+                                    <?= t('Modifier groups are managed from Restaurant > Modifier Group.') ?>
+                                </small>
+                            </div>
                         </div>
                         <?php endif; ?>
 

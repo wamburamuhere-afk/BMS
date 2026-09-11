@@ -1,5 +1,77 @@
 # BMS Changelog
 
+## 2026-09-11 (feat/pos-tier4-professional-retail) - POS Tier-4 Phase 30 (UI/nav/tests half, completing the phase): Restaurant Module
+
+**Scope note:** completes Phase 30 (the backend/schema half shipped earlier the same day — see the
+entry below). This commit is the UI half described in that entry's "follow-up commit" note, plus the
+dedicated regression suites, plus one real bug found and fixed while writing them. `pos_upgrade_plan.md`'s
+Phase 30 section is now marked ✅ DONE.
+
+**Bug found and fixed:** `api/pos/process_sale.php` resolved a modifier's `price_adjustment`
+server-side (correct — never trusted the client), but only folded it into the line's
+`discounted_price` *after* the discount-permission check had already run against the raw catalog
+price. A modifier that **reduces** price (e.g. "No Rice", -500) looked like an unauthorized discount
+and would have been rejected for any cashier without `pos_discount_override`; a modifier that raises
+price was never affected (a surcharge never trips that check), which is why hand-testing the common
+case wouldn't have caught it. Fixed by resolving the modifier total earlier in the per-item loop
+(before the price/discount validation block) and folding it into `$original_price` — the line's TRUE
+price — for the normal add-to-cart path; skipped for a manual price override, where the cashier's
+typed price is already final. Regression-guarded by `tests/test_restaurant_pos_cli.php` §D4, which
+also proves the fix is load-bearing (the unfixed calculation really would have failed).
+
+**Files (new — UI/nav):** `app/bms/restaurant/index.php` (sub-hub), `floors.php` (floor+table admin,
+combined one-screen view), `tables.php` (flat-list CRUD), `kitchen.php` (station admin),
+`kitchen_dashboard.php` (live KDS, auto-refresh poll), `modifier_group.php` (list + option manager +
+product-linking), `reservations.php`, `menu_type.php` (redirects to the existing product-categories
+page — reuse, not a parallel concept). `core/restaurant_scope.php`
+(`restaurantWarehousesForSelect()` — the existing project+warehouse scope narrowed to warehouses whose
+`pos_mode !== 'retail'`).
+
+**Files (modified — POS terminal + nav + product form):** `app/bms/pos/pos.php` (restaurant-mode
+warehouse map + Table/Send-to-Kitchen buttons, hidden unless the selected warehouse's `pos_mode !==
+'retail'` and the tenant holds `restaurant_pos`), `pos_modals_new.php` (table-picker modal),
+`pos_scripts_new.php` (table picker, modifier picker + validation, Send-to-Kitchen, all additive —
+byte-for-byte unchanged behaviour for a plain retail sale), `app/bms/pos/pos_dashboard.php` (the hub:
+`posNavGroups()`-driven destination cards replacing the old dropdown), `header.php` (the old 3-item
+POS dropdown block collapses to one static link to `pos/dashboard` — net *fewer* lines, the only touch
+to this shared file in the whole tier), `roots.php` (8 new `restaurant/*` routes), `app/bms/product/
+product_edit.php` (Kitchen Station + Modifier Groups picker; the existing Phase 23 combo toggle
+relabels to "Recipe (Ingredients)" purely cosmetically when a kitchen station is set — zero change to
+the underlying mechanism), `product_create_footer.php` (saves modifier-group links via a full-replace
+endpoint on edit), `api/create_product.php` / `api/update_product.php` (persist `kitchen_station_id`,
+gated on `canView('restaurant_pos')` same as `track_serials` is gated on `pos_advanced`), `lang/sw.php`
+(new Restaurant-module translation keys), `tests/test_pos_i18n_coverage_cli.php` (registers the new
+files for coverage scanning).
+
+**Files (new — tests):** `tests/test_restaurant_pos_cli.php` (173 assertions: lint, schema, per-endpoint
+CSRF/permission/warehouse-scope wiring regression guard, table lifecycle, kitchen-ticket routing by
+station, modifier price resolution incl. the fix above, held-sale→table linkage, recipe stock
+consumption via the unmodified Phase 23 combo path, reservation CRUD + reminder milestone dedup, and a
+full regression sweep of every sibling `tests/test_pos_*_cli.php` suite — three pre-existing, unrelated
+failures excluded by name with a documented reason: `test_pos_batch_expiry_cli.php`,
+`test_pos_color_settings_split_cli.php`, `test_pos_dashboard_cli.php`). `tests/test_pos_nav_wiring_cli.php`
+(47 assertions: header.php carries exactly one POS link with a git-diff blast-radius guard,
+`posNavGroups()`/`roots.php` wiring, and a subprocess-worker live render of the hub + Restaurant
+sub-hub across 5 entitlement scenarios proving a gated card is genuinely absent from the HTML, not
+merely hidden).
+
+**Pre-existing, unrelated failures found while running the full regression sweep (not touched by this
+phase, not fixed here — flagged for separate follow-up):**
+- `tests/test_pos_batch_expiry_cli.php` — throws an uncaught `PDOException` at its own line 183 (bad
+  bound-parameter count) AFTER its own counter already printed "Failures: 0".
+- `tests/test_pos_color_settings_split_cli.php` — a stale form-count assertion against
+  `system_settings.php` + a warning surfaced from `pos_config_settings.php`.
+- `tests/test_pos_dashboard_cli.php` — one check asserts a literal `>S/NO<` in `pos_dashboard.php`'s
+  raw PHP source, but that string has been `t()`-wrapped since the POS i18n pass (commit `8c8741ee`) —
+  a stale test expectation.
+- `tests/test_warehouse_scope_cli.php` — its §G fixture inserts `purchase_orders.status =
+  'pending_approval'`, a value that does not exist in that column's ENUM (only `pending`, `reviewed`,
+  `approved`, ... do). The same literal is used by `app/dashboard.php`'s own `get_pending_approvals()`
+  query (line ~507) — meaning the Pending-Approvals dashboard widget for Purchase Orders can never
+  match a real row either. Worth a dedicated fix; out of scope for this phase.
+
+---
+
 ## 2026-09-11 (feat/pos-tier4-professional-retail) - POS Tier-4 Phase 30 (backend/schema half): Restaurant Module
 
 **Scope note:** Phase 30 is unusually large, so its actual construction is split into two commits — this

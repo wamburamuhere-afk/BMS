@@ -4,10 +4,16 @@
 ob_start();
 
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/pos_nav.php';
 autoEnforcePermission('pos');
 
 $page_title = 'POS Workspace';
 require_once 'header.php';
+
+// Phase 30 (pos_upgrade_plan.md §9) — this page is the POS hub: header.php's
+// old three-item dropdown collapsed to one link into here. posNavGroups()
+// is the single gated source of truth for which destination cards render.
+$pos_nav_groups = posNavGroups();
 
 $can_create = canCreate('pos');
 $can_delete = canDelete('pos');
@@ -42,6 +48,41 @@ $company_logo = getSetting('company_logo', '');
             </a>
         </div>
     </div>
+
+    <!-- ═══════════════ POS HUB — destination cards (Phase 30) ═══════════════ -->
+    <?php
+    $pos_nav_icons = [
+        'terminal'      => 'bi-bag-plus',
+        'shift_history' => 'bi-clock-history',
+        'catalog_setup' => 'bi-tags',
+        'restaurant'    => 'bi-egg-fried',
+        'settings'      => 'bi-gear',
+    ];
+    ?>
+    <div class="row g-3 mb-4">
+        <?php foreach ($pos_nav_groups as $navCard): ?>
+        <div class="col-6 col-md-<?= $navCard['primary'] ? 4 : 3 ?>">
+            <a href="<?= getUrl($navCard['url']) ?>" class="text-decoration-none">
+                <div class="card border-0 shadow-sm h-100 p-3 pos-hub-card<?= $navCard['primary'] ? ' pos-hub-card-primary' : '' ?>">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="fs-3 <?= $navCard['primary'] ? 'text-white' : 'text-primary' ?>">
+                            <i class="bi <?= safe_output($pos_nav_icons[$navCard['key']] ?? 'bi-grid') ?>"></i>
+                        </div>
+                        <div>
+                            <div class="fw-bold <?= $navCard['primary'] ? 'text-white' : '' ?>"><?= safe_output($navCard['label']) ?></div>
+                            <div class="small <?= $navCard['primary'] ? 'text-white-50' : 'text-muted' ?>"><?= safe_output($navCard['description']) ?></div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <style>
+        .pos-hub-card { transition: transform .15s ease, box-shadow .15s ease; }
+        .pos-hub-card:hover { transform: translateY(-2px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.1) !important; }
+        .pos-hub-card-primary { background: linear-gradient(135deg, #0d6efd, #0b5ed7); }
+    </style>
 
     <!-- ═══════════════════ SALES HISTORY (top) ═══════════════════ -->
     <div id="paneHistory">

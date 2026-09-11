@@ -94,7 +94,17 @@ $price_groups = $price_groups_enabled
 // Phase 20 (pos_upgrade_plan.md §8) — cash denomination counting.
 require_once ROOT_DIR . '/core/pos_denominations.php';
 $pos_denomination_list = posDenominationList();
+
+// Phase 30 (pos_upgrade_plan.md §9) — restaurant module entitlement + the
+// per-warehouse pos_mode map built above.
+$restaurant_pos_enabled = canView('restaurant_pos');
 ?>
+<script>
+// Phase 30 (pos_upgrade_plan.md §9) — populated once from PHP, never fetched
+// per warehouse-change; the JS layer just looks up the selected id.
+const POS_WAREHOUSE_MODES = <?= json_encode($_pos_warehouse_modes ?? []) ?>;
+const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
+</script>
 
 <div class="container-fluid px-0" id="pos-container" style="height: auto; min-height: 100vh;">
     <!-- Hidden input that captures barcode scanner keystrokes (scanner acts as keyboard) -->
@@ -174,6 +184,24 @@ $pos_denomination_list = posDenominationList();
                                     fn($w) => userCan('warehouse', (int)$w['warehouse_id'])
                                 ));
                                 echo renderWarehouseOptions($_pos_warehouse_scoped);
+
+                                // Phase 30 (pos_upgrade_plan.md §9) — a warehouse-scoped
+                                // pos_mode map, so the JS layer can show/hide restaurant
+                                // affordances (table picker, send-to-kitchen) purely
+                                // client-side on warehouse change, no extra round trip.
+                                // A plain 'retail' warehouse (the default, every warehouse
+                                // until an admin explicitly changes it) never triggers any
+                                // of this — byte-for-byte unchanged behaviour.
+                                $_pos_warehouse_modes = [];
+                                if (!empty($_pos_warehouse_scoped)) {
+                                    $_ids = array_column($_pos_warehouse_scoped, 'warehouse_id');
+                                    $_ph = implode(',', array_fill(0, count($_ids), '?'));
+                                    $_modeStmt = $pdo->prepare("SELECT warehouse_id, pos_mode FROM warehouses WHERE warehouse_id IN ($_ph)");
+                                    $_modeStmt->execute($_ids);
+                                    foreach ($_modeStmt->fetchAll(PDO::FETCH_ASSOC) as $_mr) {
+                                        $_pos_warehouse_modes[(int)$_mr['warehouse_id']] = $_mr['pos_mode'];
+                                    }
+                                }
                                 ?>
                             </select>
                         </div>
@@ -251,6 +279,16 @@ $pos_denomination_list = posDenominationList();
                         <button class="btn btn-outline-info" onclick="showHeldSales()" title="<?= t('View Held Sales') ?>">
                             <i class="bi bi-list"></i>
                         </button>
+                        <!-- Phase 30 (pos_upgrade_plan.md §9) — restaurant-only affordances,
+                             hidden unless the selected warehouse's pos_mode !== 'retail' AND
+                             the tenant holds restaurant_pos. A plain retail warehouse never
+                             shows these. -->
+                        <button class="btn btn-outline-success d-none" id="restaurantTableBtn" onclick="openTablePicker()" title="<?= t('Select Table') ?>">
+                            <i class="bi bi-grid-3x3-gap"></i>
+                        </button>
+                        <button class="btn btn-outline-dark d-none" id="sendToKitchenBtn" onclick="sendCurrentOrderToKitchen()" title="<?= t('Send to Kitchen') ?>">
+                            <i class="bi bi-fire"></i>
+                        </button>
                     </div>
                 </div>
                 <div class="row g-2 small">
@@ -262,6 +300,10 @@ $pos_denomination_list = posDenominationList();
                         <div class="text-muted"><?= t('Items') ?></div>
                         <strong id="cartItemCount" class="badge bg-primary">0</strong>
                     </div>
+                </div>
+                <div class="mt-2 d-none" id="restaurantTableIndicator">
+                    <span class="badge bg-success"><i class="bi bi-table"></i> <span id="restaurantTableIndicatorText"></span></span>
+                    <button type="button" class="btn btn-link btn-sm p-0 ms-1 text-decoration-none" onclick="clearTableSelection()"><?= t('change') ?></button>
                 </div>
             </div>
 

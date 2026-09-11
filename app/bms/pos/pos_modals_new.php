@@ -19,6 +19,23 @@
     </div>
 </div>
 
+<!-- Table Picker Modal — Phase 30 (pos_upgrade_plan.md §9). Only ever opened
+     from the Table button, which itself is hidden unless the selected
+     warehouse's pos_mode !== 'retail' and the tenant holds restaurant_pos. -->
+<div class="modal fade" id="tablePickerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-grid-3x3-gap me-1"></i> <?= t('Select Table') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="tablePickerBody" style="max-height:65vh;overflow-y:auto;">
+                <!-- Populated by openTablePicker() in pos_scripts_new.php -->
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Quick Add Customer Modal — Phase 10 (pos_upgrade_plan.md §7) -->
 <div class="modal fade" id="quickAddCustomerModal" tabindex="-1">
     <div class="modal-dialog modal-sm">

@@ -2051,8 +2051,37 @@ boundary for a genuine analytics capability).
 ### Phase 30 — Restaurant Module + POS Navigation Reorganization (Floors,
 Tables, Kitchen, Modifiers, Recipes, Reservations)
 
-**Status:** IN PROGRESS — backend/schema half shipped, UI/nav/tests half
-pending. **Depends on:** nothing structurally
+**Status:** ✅ DONE · **Built:** 2026-09-11 · **Branch:** `feat/pos-tier4-professional-retail`.
+UI/nav/tests half completed and verified live: `tests/test_restaurant_pos_cli.php`
+(173 assertions — schema, per-endpoint CSRF/permission/warehouse-scope wiring,
+table lifecycle, kitchen-ticket routing by station, modifier price resolution
++ a fix found and shipped in this pass (below), held-sale→table linkage,
+recipe stock consumption via the unmodified Phase 23 combo path, reservation
+CRUD + reminder dedup, and a full regression sweep of every sibling
+`tests/test_pos_*_cli.php` suite) and `tests/test_pos_nav_wiring_cli.php`
+(47 assertions — header.php carries exactly one POS link with a git-diff
+blast-radius guard, `posNavGroups()` wiring, and live per-entitlement
+rendering of the hub + Restaurant sub-hub across 5 scenarios, proving a
+gated card is genuinely absent from the HTML, not merely hidden). All prior
+Phase 7-29 POS suites re-run clean.
+
+**Bug found and fixed during this pass:** `process_sale.php` resolved a
+modifier's price_adjustment server-side (correct — never trusted the
+client) but only folded it into the line's `discounted_price` *after* the
+discount-permission check had already run against the raw catalog price. A
+modifier that **reduces** price (e.g. "No Rice", -500) therefore looked
+like an unauthorized discount and would have been rejected for any cashier
+without `pos_discount_override` — a modifier that raises price was never
+affected, since a surcharge never trips that check, which is why this
+wasn't caught by hand-testing the common case. Fixed by resolving the
+modifier total earlier in the loop (before the price/discount validation
+block) and folding it into `$original_price` — the line's *true* price —
+for the normal add-to-cart path (skipped for a manual price override, where
+the cashier's typed price is already final). Regression-guarded by
+`test_restaurant_pos_cli.php`'s §D4, which also asserts the fix is
+load-bearing (proves the unfixed calculation really would have failed).
+
+**Depends on:** nothing structurally
 (its reservation feature is now self-contained, not borrowed from a
 separate Booking phase — see Phase 28's merge note above); sequenced after
 25/26/29 for pacing only, so the lower-risk groundwork (feature-registry
@@ -2069,13 +2098,13 @@ actual construction was split into two commits, still tracked as one Phase
 18 `api/restaurant/*.php` endpoints, `process_sale.php`/`hold_sale.php`/
 `get_held_sales.php` wiring, the `restaurant_pos` feature-registry entry, the
 `restaurant.reservation_upcoming` cron reminder block) — see `changelog.md`
-for the full file list and live-verification method. Everything below in
-this section describing UI/nav/pages/tests is **NOT yet built** — that is
-the next commit's scope: the POS terminal mode/table/modifier pickers, the
-`app/bms/restaurant/*` admin pages, the Kitchen Display page, the
-`header.php`/`pos_dashboard.php` hub navigation reorg, and
-`tests/test_restaurant_pos_cli.php` + `tests/test_pos_nav_wiring_cli.php`.
-One deliberate scope call made during the backend half: the plan text below
+for the full file list and live-verification method. **UI/nav/tests half —
+also DONE** (same day, second commit): the POS terminal mode/table/modifier
+pickers, the `app/bms/restaurant/*` admin pages, the Kitchen Display page,
+the `header.php`/`pos_dashboard.php` hub navigation reorg, and
+`tests/test_restaurant_pos_cli.php` + `tests/test_pos_nav_wiring_cli.php` —
+see the Status line above for the verification summary and the bug fixed
+along the way. One deliberate scope call made during the backend half: the plan text below
 sketches minute-level reservation reminders, but the actual notification
 cron (`cron/run_notification_checks.php`) runs at most once per day by its
 own documented design — the shipped reminder uses day-granularity milestones

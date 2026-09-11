@@ -346,6 +346,37 @@ try {
             throw new Exception("Product ID $pid not found");
         }
 
+        // Phase 30 (pos_upgrade_plan.md §9) — modifier choices for this line,
+        // resolved server-side FIRST (never trust the client's
+        // price_adjustment/option_name) so the adjustment can be folded into
+        // this line's true price below, before the discount-permission check
+        // runs. Without this, a modifier that REDUCES price (e.g. "No Rice
+        // -500") would look like an unauthorized discount to a cashier who
+        // only holds pos_price_override, not pos_discount_override; a
+        // modifier that raises price is unaffected either way since a
+        // surcharge never trips that check. An unknown/inactive option_id is
+        // silently skipped rather than failing the whole sale (mirrors how an
+        // unknown unit_label is ignored below). $modOptions is reused
+        // verbatim when persisting to pos_sale_item_modifiers further down —
+        // no second query.
+        $modOptions = [];
+        $modifierAdjustmentTotal = 0.0;
+        $chosenModifiers = is_array($item['modifiers'] ?? null) ? $item['modifiers'] : [];
+        if (!empty($chosenModifiers)) {
+            $modOptIds = array_values(array_unique(array_filter(array_map(
+                fn($m) => (int)($m['option_id'] ?? 0), $chosenModifiers
+            ))));
+            if (!empty($modOptIds)) {
+                $modPlaceholders = str_repeat('?,', count($modOptIds) - 1) . '?';
+                $modStmt = $pdo->prepare("SELECT option_id, name, price_adjustment FROM modifier_options WHERE option_id IN ($modPlaceholders) AND status = 'active'");
+                $modStmt->execute($modOptIds);
+                $modOptions = $modStmt->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($modOptions as $mo) {
+                    $modifierAdjustmentTotal += (float)$mo['price_adjustment'];
+                }
+            }
+        }
+
         // Phase 15 (pos_upgrade_plan.md §8) — unit conversion at the register.
         // Resolved BEFORE every other per-line step (price validation, stock
         // check, Phase 16 override guard, discount, FEFO) so all of them
@@ -409,6 +440,15 @@ try {
         if ($priceResolution['requested_price'] !== null) {
             $requested_price = $priceResolution['requested_price'];
         }
+        // Phase 30 — fold the server-validated modifier total into this
+        // line's TRUE price (not a discount), for the normal add-to-cart
+        // path. Skipped when a manual price override was attempted: the
+        // cashier's typed price (or the forced-back catalog price, if the
+        // override wasn't permitted) is already the final intended figure —
+        // adding the modifier again would double-count it.
+        if (empty($item['manual_price_override'])) {
+            $original_price += $modifierAdjustmentTotal;
+        }
         $tax_rate = floatval($item['tax_rate']);
         $discount_percent = floatval($item['discount_percent']);
 
@@ -459,31 +499,16 @@ try {
         ]);
         $sale_item_id = (int)$pdo->lastInsertId();
 
-        // Phase 30 (pos_upgrade_plan.md §9) — modifier choices for this line.
-        // Never trust the client's price_adjustment/option_name — resolve
-        // both from modifier_options so a tampered request can't under/over
-        // price a modifier. An unknown/inactive option_id is silently
-        // skipped rather than failing the whole sale (mirrors how an unknown
-        // unit_label is ignored above).
-        $chosenModifiers = is_array($item['modifiers'] ?? null) ? $item['modifiers'] : [];
-        if (!empty($chosenModifiers)) {
-            $modOptIds = array_values(array_unique(array_filter(array_map(
-                fn($m) => (int)($m['option_id'] ?? 0), $chosenModifiers
-            ))));
-            if (!empty($modOptIds)) {
-                $modPlaceholders = str_repeat('?,', count($modOptIds) - 1) . '?';
-                $modStmt = $pdo->prepare("SELECT option_id, name, price_adjustment FROM modifier_options WHERE option_id IN ($modPlaceholders) AND status = 'active'");
-                $modStmt->execute($modOptIds);
-                $modOptions = $modStmt->fetchAll(PDO::FETCH_ASSOC);
-                if (!empty($modOptions)) {
-                    $insModStmt = $pdo->prepare("
-                        INSERT INTO pos_sale_item_modifiers (sale_item_id, option_id, option_name, price_adjustment, created_at)
-                        VALUES (?, ?, ?, ?, NOW())
-                    ");
-                    foreach ($modOptions as $mo) {
-                        $insModStmt->execute([$sale_item_id, $mo['option_id'], $mo['name'], $mo['price_adjustment']]);
-                    }
-                }
+        // Phase 30 (pos_upgrade_plan.md §9) — persist the modifier choices
+        // already resolved server-side above (same $modOptions — no second
+        // query) now that $sale_item_id exists.
+        if (!empty($modOptions)) {
+            $insModStmt = $pdo->prepare("
+                INSERT INTO pos_sale_item_modifiers (sale_item_id, option_id, option_name, price_adjustment, created_at)
+                VALUES (?, ?, ?, ?, NOW())
+            ");
+            foreach ($modOptions as $mo) {
+                $insModStmt->execute([$sale_item_id, $mo['option_id'], $mo['name'], $mo['price_adjustment']]);
             }
         }
 
