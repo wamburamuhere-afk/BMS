@@ -161,40 +161,52 @@ try {
     $db_payment_method = ($payment_method === 'split') ? 'mixed' : $payment_method;
 
     // Insert sale
-    $stmt = $pdo->prepare("
-        INSERT INTO pos_sales (
-            receipt_number, shift_id, user_id, assigned_to, customer_id, warehouse_id, table_id, project_id,
-            subtotal, discount_percentage, discount_amount, tax_amount, grand_total,
-            payment_method, amount_tendered, change_given, payment_details, register_id, register_name,
-            sale_type, sale_status, payment_status, sale_date, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', NOW(), NOW())
-    ");
-
     $change = $input['change_given'] ?? ($amount_tendered - $total);
 
-    $stmt->execute([
-        $receipt_number,
-        $shift_id,
-        $user_id,
-        $assigned_to,
-        $customer_id,
-        $warehouse_id,
-        $table_id,
-        $project_id,
-        $subtotal,
-        $discount_percentage,
-        $discount_amount,
-        $tax,
-        $total,
-        $db_payment_method,
-        $amount_tendered,
-        $change,
-        $payment_details_json,
-        $register_id,
-        $register_name,
-        $sale_type_in
-    ]);
-    
+    // Defensive: a tenant whose database hasn't yet had the Phase 30
+    // migration applied (pos_sales.assigned_to/table_id missing) must never
+    // be unable to sell at all over it — retry without those two columns
+    // rather than letting the whole sale fail. Both are Phase 30-only
+    // metadata (waiter assignment / dine-in table); omitting them for an
+    // un-migrated tenant is identical to how this endpoint behaved before
+    // that phase shipped.
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO pos_sales (
+                receipt_number, shift_id, user_id, assigned_to, customer_id, warehouse_id, table_id, project_id,
+                subtotal, discount_percentage, discount_amount, tax_amount, grand_total,
+                payment_method, amount_tendered, change_given, payment_details, register_id, register_name,
+                sale_type, sale_status, payment_status, sale_date, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', NOW(), NOW())
+        ");
+        $stmt->execute([
+            $receipt_number, $shift_id, $user_id, $assigned_to, $customer_id, $warehouse_id, $table_id, $project_id,
+            $subtotal, $discount_percentage, $discount_amount, $tax, $total,
+            $db_payment_method, $amount_tendered, $change, $payment_details_json, $register_id, $register_name,
+            $sale_type_in
+        ]);
+    } catch (PDOException $e) {
+        $missingCol = stripos($e->getMessage(), 'assigned_to') !== false || stripos($e->getMessage(), "'table_id'") !== false;
+        if (!$missingCol) {
+            throw $e; // a real, unrelated DB error — let the outer catch roll back normally
+        }
+        error_log('process_sale.php: pos_sales.assigned_to/table_id missing (tenant DB likely missing the Phase 30 migration) — retrying without them: ' . $e->getMessage());
+        $stmt = $pdo->prepare("
+            INSERT INTO pos_sales (
+                receipt_number, shift_id, user_id, customer_id, warehouse_id, project_id,
+                subtotal, discount_percentage, discount_amount, tax_amount, grand_total,
+                payment_method, amount_tendered, change_given, payment_details, register_id, register_name,
+                sale_type, sale_status, payment_status, sale_date, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 'pending', NOW(), NOW())
+        ");
+        $stmt->execute([
+            $receipt_number, $shift_id, $user_id, $customer_id, $warehouse_id, $project_id,
+            $subtotal, $discount_percentage, $discount_amount, $tax, $total,
+            $db_payment_method, $amount_tendered, $change, $payment_details_json, $register_id, $register_name,
+            $sale_type_in
+        ]);
+    }
+
     $sale_id = $pdo->lastInsertId();
     
     // Insert sale items and update inventory
