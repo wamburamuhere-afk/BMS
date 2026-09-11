@@ -71,16 +71,24 @@ if (!function_exists('bmsFeatureRegistry')) {
      * (Income Statement, Balance Sheet, Cash Flow, Trial Balance, General
      * Ledger, Consolidated Expenses, Receivables Aging, Customer Statement,
      * Expense Report, Tax Report, WHT Credit, Audit Report, Compliance
-     * Report, Sales Report, Inventory Report), CRM, Documents (except
-     * e_signatures), Settings and System Settings. A company must always be
-     * able to invoice, see its own ledger and manage its own staff access,
-     * even with every optional module switched off.
+     * Report, Sales Report, Inventory Report), Settings and System Settings.
+     * A company must always be able to invoice, see its own ledger and
+     * manage its own staff access, even with every optional module switched
+     * off.
      *
      * 2026-09-10: everything else under Reports WAS also in this always-on
      * set — a gap, not a deliberate exemption (see each feature's own
      * 'page_keys' comment above for the report entries added that day and
      * why). Reports whose entire dataset comes from one optional module now
      * follow that module like every other page does.
+     *
+     * 2026-09-07: CRM, Communication ("Comms") and Compliance moved OUT of
+     * this always-on set into their own switchable features ('crm',
+     * 'communication', 'compliance' below) — see the note above the 'crm'
+     * entry. 2026-09-11: Documents ("Docs") did the same, into the new
+     * 'documents' feature below — this docblock previously still listed
+     * "CRM, Documents (except e_signatures)" as always-on after CRM had
+     * already moved, which was stale, not a second exemption; fixed here.
      */
     function bmsFeatureRegistry(): array
     {
@@ -380,11 +388,17 @@ if (!function_exists('bmsFeatureRegistry')) {
             ],
             'communication' => [
                 'label'       => 'Messaging & Reminders',
-                'description' => 'In-app message center, notification center, SMS alerts, payment reminders and collection letters.',
+                'description' => 'In-app message center, notification center, email templates, SMS alerts, payment reminders and collection letters.',
                 'default'     => true,
                 'sort_order'  => 120,
                 'page_keys'   => [
                     'message_center', 'notification_center',
+                    // 2026-09-11: email_templates had no feature behind it at
+                    // all (reachable regardless of any toggle) — a gap, same
+                    // class as the Reports one noted above, closed here since
+                    // it's the same "Comms" surface as message/notification
+                    // center, just never wired in when built.
+                    'email_templates',
                     // permission rows with no page behind them yet (see
                     // permissions.module_name = 'Communication').
                     'sms_alerts', 'payment_reminders', 'collection_letters',
@@ -392,6 +406,41 @@ if (!function_exists('bmsFeatureRegistry')) {
                 'paths'       => [
                     'app/constant/communication/message_center.php',
                     'app/constant/communication/notification_center.php',
+                    'app/constant/communication/email_templates.php',
+                ],
+            ],
+            // 2026-09-11 (product owner request: "comms and docs to be
+            // modules to switch on or off, superadmin only") — Document
+            // Library, Templates, Workflow approvals and Customer Documents.
+            // Compliance Documents and E-Signatures are deliberately NOT
+            // included: both already have their own switchable feature
+            // ('compliance' / 'esignature' above) since 2026-09-07, and
+            // folding them in here would mean ONE toggle silently also
+            // flipping the OTHER already-independent feature's pages.
+            // Was previously in the always-on set (see the docblock above
+            // bmsFeatureRegistry()) — not a deliberate exemption, the same
+            // "never wired in" gap CRM/Communication/Compliance closed.
+            'documents' => [
+                'label'       => 'Document Library',
+                'description' => 'General document library, templates, workflow approvals and customer document uploads. Compliance Documents and E-Signatures are separate features.',
+                'default'     => true,
+                'sort_order'  => 115,
+                'page_keys'   => [
+                    'documents', 'document_library', 'document_templates',
+                    'document_workflow', 'customer_documents',
+                    // permission row with no dedicated page of its own yet —
+                    // drives the "expiring documents" dashboard widget/link.
+                    'document_expiry_alerts',
+                ],
+                'paths'       => [
+                    'app/constant/document/document_library.php',
+                    'app/constant/document/document_templates.php',
+                    'app/constant/document/document_workflow.php',
+                    'app/constant/document/customer_documents.php',
+                    'app/constant/document/create_document.php',
+                    'app/constant/document/new_document.php',
+                    'app/constant/document/preview_template.php',
+                    'app/constant/document/select_document_add_esignature.php',
                 ],
             ],
             'compliance' => [
