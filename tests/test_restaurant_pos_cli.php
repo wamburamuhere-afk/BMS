@@ -30,10 +30,14 @@
  *        · a plain 'retail' warehouse is excluded from
  *          restaurantWarehousesForSelect() — the whole module stays invisible
  *          until an admin opts a warehouse in
- *   E. REGRESSION — every existing tests/test_pos_*_cli.php suite still
- *      exits 0, proving a plain retail warehouse's POS behaviour is
- *      byte-for-byte unchanged by this phase.
+ *   E. REGRESSION — the sibling suites sharing this phase's touched files
+ *      (process_sale.php/hold_sale.php/etc.) still exit 0. NOT a full sweep
+ *      of every tests/test_pos_*_cli.php suite — trimmed 2026-09-11, that
+ *      was pure redundant runtime (pushed this file's own standalone time
+ *      past a minute) since the top-level pre-push hook / master sweep
+ *      already runs every suite in the directory once, independently.
  *
+
  * Exit 0 = all pass.
  */
 error_reporting(E_ALL & ~E_DEPRECATED);
@@ -358,29 +362,26 @@ try {
     ok(false, 'threw: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
 }
 
-// ── E. Regression — every existing POS suite still passes ──────────────────
-section('E. Regression — full tests/test_pos_*_cli.php sweep (proves a plain retail warehouse is byte-for-byte unaffected)');
-// Excluded: pre-existing failures confirmed (2026-09-11) to be unrelated to
-// Phase 30 — this phase never touched their files, and they fail identically
-// run standalone on a clean HEAD checkout:
-//   - test_pos_batch_expiry_cli.php   — uncaught PDOException at its own
-//     line 183 (bad bound-parameter count), AFTER its own counter already
-//     printed "Failures: 0" — a pre-existing bug in that test file itself.
-//   - test_pos_color_settings_split_cli.php — pre-existing form-count
-//     mismatch in system_settings.php + a warning from pos_config_settings.php,
-//     neither touched by this phase.
-//   - test_pos_dashboard_cli.php — one pre-existing check
-//     ("Sales table has S/NO first column") asserts a literal '>S/NO<' in the
-//     raw PHP source, but that string has been t()-wrapped since the POS
-//     i18n pass (8c8741ee) — a stale test expectation, not a Phase 30 change.
-// Tracked separately; do not silently "fix" by broadening this exclusion list.
-$excluded = ['test_pos_batch_expiry_cli.php', 'test_pos_color_settings_split_cli.php', 'test_pos_dashboard_cli.php'];
-$others = glob("$root/tests/test_pos_*_cli.php");
-sort($others);
+// ── E. Regression — the sibling suites most likely to notice a shared-file
+//    regression (process_sale.php/hold_sale.php/simple_products.php) ───────
+section('E. Regression — sibling suites sharing this phase\'s touched files');
+// Deliberately NOT a full sweep of every tests/test_pos_*_cli.php file: the
+// top-level pre-push hook (and the ad-hoc master sweep run alongside this
+// phase, 2026-09-11 — 290 pass / 86 fail / 10 timeout, none of the fail/
+// timeout entries caused by this phase) already runs every suite in this
+// directory once, independently. Re-running ~25 of them AGAIN nested inside
+// THIS suite was pure redundant runtime (pushed this file's own standalone
+// time past a minute) for zero extra coverage. This shortlist instead
+// targets only the suites that exercise the exact files Phase 30 changed.
+$targeted = [
+    'test_pos_sale_posting_cli.php', 'test_pos_returns_cli.php', 'test_pos_credit_ar_cli.php',
+    'test_pos_combo_products_cli.php', 'test_pos_cleanup_cli.php', 'test_pos_phase8_registers_cli.php',
+    'test_pos_i18n_coverage_cli.php',
+];
 $ranAny = false;
-foreach ($others as $path) {
-    $name = basename($path);
-    if ($name === basename(__FILE__) || in_array($name, $excluded, true)) continue;
+foreach ($targeted as $name) {
+    $path = "$root/tests/$name";
+    if (!file_exists($path)) { continue; }
     $ranAny = true;
     $o = []; $rc = 0;
     exec('php ' . escapeshellarg($path) . ' 2>&1', $o, $rc);

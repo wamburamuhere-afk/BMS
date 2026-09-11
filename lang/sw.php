@@ -1980,4 +1980,7 @@ return [
     'Select Variant' => 'Chagua Aina',
     'Loading variants...' => 'Inapakia aina...',
     'No variants available.' => 'Hakuna aina zinazopatikana.',
+
+    // Mobile POS-grid render cap.
+    'Showing %shown% of %total% products — search to find more.' => 'Inaonyesha %shown% kati ya %total% — tafuta ili kuona zaidi.',
 ];

@@ -1,5 +1,54 @@
 # BMS Changelog
 
+## 2026-09-11 (feat/pos-tier4-professional-retail) - POS terminal mobile view + master-sweep follow-up
+
+**Scope note:** user-reported, screenshot-confirmed mobile issue on `pos.php`'s live site — the header
+bar's Cash Balance / Open Drawer / End Shift / Start Shift controls overflowed off the right edge,
+needing horizontal scroll to reach; everything on the page ran larger than needed on a phone; product
+tiles rendered one per row. Desktop layout is completely untouched (every fix is either inside a
+`@media (max-width: 767.98px)` block or a `window.innerWidth` check in JS).
+
+**Files (modified):**
+- `app/bms/pos/pos.php` — mobile media-query block: `#posHeaderBar` stacks vertically and wraps instead
+  of overflowing; font sizes reduced across the header, category-button pills, and warehouse/search
+  inputs; the shift-button group (`id="posShiftButtons"`, new) gets its own flex-wrap so two buttons
+  never force horizontal scroll even on a ~320px-wide phone.
+- `app/bms/pos/pos_scripts_new.php` — product tile column classes changed from `col-xl-3 col-lg-4
+  col-md-6 col-sm-6` (one per row below 576px — no base `col-` class was ever set) to `col-6 col-sm-6
+  col-md-6 col-lg-4 col-xl-3` (two per row on every phone width; `sm` and up are byte-for-byte
+  unchanged). Product-card padding/icon/font sizes reduced to match, inside the same media query in
+  `pos.php`. Added a mobile-only (`window.innerWidth < 768`) render cap: the default "no active search"
+  grid renders at most 20 tiles instead of the full (server-capped at 100) result set, with a "Showing
+  20 of N — search to find more" hint; typing a search still fetches and renders the real, complete
+  match set immediately, same as before. Desktop is unaffected — the cap only ever applies below the
+  mobile breakpoint.
+- `lang/sw.php` — Swahili translation for the new "Showing %shown% of %total%..." hint string;
+  `tests/test_pos_i18n_coverage_cli.php` re-verified clean at 132/132.
+- `tests/test_restaurant_pos_cli.php` — §E's regression check trimmed from a full sweep of every
+  sibling `tests/test_pos_*_cli.php` suite (~25 files) down to the 7 suites that actually share this
+  phase's touched files (`process_sale.php`/`hold_sale.php`/etc.). Found while running a full
+  `tests/test_*_cli.php` master sweep (386 suites: 290 pass / 86 fail / 10 timeout, all 86+10 confirmed
+  pre-existing and unrelated to this branch's work — see below) — the untrimmed §E alone took this one
+  file's standalone runtime past a minute and past the master sweep's own diagnostic timeout. The
+  top-level pre-push hook / master sweep already runs every suite in the directory once, independently,
+  so the nested re-run inside this file was pure redundant runtime, not extra coverage. Trimmed from
+  173 to 153 assertions; still 100% passing, now in ~26s instead of ~56s.
+
+**Pre-existing failures surfaced by the 386-suite master sweep (none caused by this branch — every file
+in this list is untouched by any commit on `feat/pos-tier4-professional-retail`; flagged for separate
+follow-up, not fixed here):**
+- 86 `FAIL` + 10 `TIMEOUT` suites, spanning modules never touched by this branch (tenant admin/quotas/
+  resource-audit, zoom notifications, accounts tree columns, and others).
+- Of the `test_pos_*`/product-adjacent ones specifically: `test_pos_batch_expiry_cli.php`,
+  `test_pos_color_settings_split_cli.php`, `test_pos_dashboard_cli.php` (all three already documented
+  in the Phase 30 entry below), plus newly identified `test_products_scope_visibility_cli.php` — 3
+  checks fail because `products.php`/`services.php` return 0/2 rows instead of the expected 12/3 for a
+  zero-project non-admin; confirmed pre-existing via `git log`/`git status` (commit `b06a2b06`, "Products
+  list excludes products absent from a non-admin's warehouse(s)" — no working-tree changes on either
+  page or the test from this branch).
+
+---
+
 ## 2026-09-11 (feat/pos-tier4-professional-retail) - POS Tier-4 Phase 31: Product Variants (size/color matrix) — completes the Tier-4 plan
 
 **Scope note:** the final phase of `pos_upgrade_plan.md`'s Tier-4 tranche (Phases 25/26/29/30/31, all now

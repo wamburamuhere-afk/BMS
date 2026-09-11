@@ -2053,12 +2053,15 @@ Tables, Kitchen, Modifiers, Recipes, Reservations)
 
 **Status:** ✅ DONE · **Built:** 2026-09-11 · **Branch:** `feat/pos-tier4-professional-retail`.
 UI/nav/tests half completed and verified live: `tests/test_restaurant_pos_cli.php`
-(173 assertions — schema, per-endpoint CSRF/permission/warehouse-scope wiring,
+(153 assertions — schema, per-endpoint CSRF/permission/warehouse-scope wiring,
 table lifecycle, kitchen-ticket routing by station, modifier price resolution
 + a fix found and shipped in this pass (below), held-sale→table linkage,
 recipe stock consumption via the unmodified Phase 23 combo path, reservation
-CRUD + reminder dedup, and a full regression sweep of every sibling
-`tests/test_pos_*_cli.php` suite) and `tests/test_pos_nav_wiring_cli.php`
+CRUD + reminder dedup, and a targeted regression check of the sibling suites
+sharing this phase's touched files — trimmed 2026-09-11 from an initial
+full sweep of every sibling `tests/test_pos_*_cli.php` suite, which was pure
+redundant runtime given the top-level pre-push hook / master sweep already
+runs every suite in the directory once on its own) and `tests/test_pos_nav_wiring_cli.php`
 (47 assertions — header.php carries exactly one POS link with a git-diff
 blast-radius guard, `posNavGroups()` wiring, and live per-entitlement
 rendering of the hub + Restaurant sub-hub across 5 scenarios, proving a

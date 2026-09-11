@@ -140,7 +140,7 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
                 <small><?= t('Starting:') ?> <?= format_currency($starting_cash, $currency) ?></small>
             </div>
             <div class="vr text-white opacity-50"></div>
-            <div>
+            <div id="posShiftButtons">
                 <?php if ($shift_active): ?>
                 <button class="btn btn-light btn-sm me-2" onclick="openCashDrawer()">
                     <i class="bi bi-cash"></i> <?= t('Open Drawer') ?>
@@ -559,6 +559,112 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
     border-radius: 20px;
     padding: 4px 15px;
     font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Mobile view — desktop layout above is completely untouched by this block.
+   Fixes: (1) the header bar's Cash Balance + Open Drawer/End Shift/Start
+   Shift controls overflowing off the right edge (needed a horizontal
+   scroll to reach them), (2) everything on this page running noticeably
+   larger than it needs to on a phone, (3) product tiles rendering one per
+   row when two fit comfortably.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 767.98px) {
+    #posHeaderBar {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 8px;
+        padding: 10px 12px !important;
+    }
+    #posHeaderBar h4 {
+        font-size: 1.05rem;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+    #posHeaderBar small.opacity-75 {
+        font-size: 0.68rem;
+        line-height: 1.3;
+        display: block;
+    }
+    /* The Cash Balance + divider + shift buttons row: was a fixed-width
+       flex row that never wrapped, pushing the buttons off-screen. Now
+       wraps onto its own line(s) and never needs horizontal scrolling. */
+    #posHeaderBar > .d-flex.align-items-center.gap-3 {
+        width: 100%;
+        justify-content: space-between !important;
+        flex-wrap: wrap;
+        gap: 8px !important;
+    }
+    #posHeaderBar .vr {
+        display: none;
+    }
+    #posHeaderBar .fs-6 {
+        font-size: 0.7rem !important;
+    }
+    #posHeaderBar .fs-4 {
+        font-size: 1.15rem !important;
+    }
+    #posHeaderBar small {
+        font-size: 0.65rem;
+    }
+    #posHeaderBar .btn-sm {
+        font-size: 0.72rem;
+        padding: 5px 9px;
+    }
+    /* Extra safety on very narrow phones (≤360px): if two shift buttons
+       still don't fit side by side, wrap rather than overflow. */
+    #posShiftButtons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    #posShiftButtons .me-2 {
+        margin-right: 0 !important;
+    }
+    #posHeaderBar #scannerReadyBadge {
+        font-size: 0.6rem !important;
+    }
+
+    /* Warehouse/project selectors + search + category row — smaller text,
+       tighter spacing, still full width so nothing needs pinch-zoom. */
+    #posWarehouseId, #posProjectId, #productSearch {
+        font-size: 0.85rem;
+    }
+    #categoryButtons .btn {
+        font-size: 0.72rem;
+        padding: 3px 10px;
+    }
+
+    /* Product tiles: two per row instead of one, with everything inside
+       scaled down to match — image/icon area, title, price, stock line. */
+    .product-card .card-body {
+        padding: 0.5rem !important;
+    }
+    .product-card .card-body > div:first-child {
+        height: 55px !important;
+    }
+    .product-card .card-body i.bi {
+        font-size: 1.8rem !important;
+    }
+    .product-card .card-title {
+        font-size: 0.72rem;
+        white-space: normal;
+        line-height: 1.2;
+        min-height: 1.9em;
+    }
+    .product-card .card-text {
+        font-size: 0.68rem;
+        margin-bottom: 0.15rem !important;
+    }
+    .product-card .card-text.fw-bold {
+        font-size: 0.75rem;
+    }
+    .product-card .badge {
+        font-size: 6px !important;
+        padding: 2px 4px;
+    }
 }
 </style>
 

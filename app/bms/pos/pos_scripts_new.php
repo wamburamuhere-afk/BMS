@@ -177,7 +177,9 @@ const PT = {
     variantsLabel: <?= json_encode(t('Variants')) ?>,
     selectVariant: <?= json_encode(t('Select Variant')) ?>,
     loadingVariants: <?= json_encode(t('Loading variants...')) ?>,
-    noVariantsAvailable: <?= json_encode(t('No variants available.')) ?>
+    noVariantsAvailable: <?= json_encode(t('No variants available.')) ?>,
+    // Mobile product-grid render cap.
+    showingFirstNProducts: <?= json_encode(t('Showing %shown% of %total% products — search to find more.')) ?>
 };
 
 // Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split: a cashier
@@ -532,10 +534,21 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                 }
                 const grid = $('#productGrid');
                 grid.empty();
-                
-                console.log('Rendering', products.length, 'products...');
-                
-                response.data.forEach(product => {
+
+                // Mobile-only render cap: a phone screen never benefits from
+                // rendering hundreds of tiles at once (slow, mostly scrolled
+                // past unseen) — cap the DEFAULT (no active search) grid at
+                // 20 tiles there; typing a search reveals the real matches
+                // immediately, same server-side result set as before. Desktop
+                // is completely unaffected (window.innerWidth check below).
+                const MOBILE_BREAKPOINT = 768;
+                const isMobileView = window.innerWidth < MOBILE_BREAKPOINT;
+                const cappedForMobile = isMobileView && !searchTerm && response.data.length > 20;
+                const renderList = cappedForMobile ? response.data.slice(0, 20) : response.data;
+
+                console.log('Rendering', renderList.length, 'of', products.length, 'products...');
+
+                renderList.forEach(product => {
                     const isService = product.is_service == 1 || product.is_service == '1';
                     const projectStock = parseFloat(product.project_stock) || 0;
                     
@@ -562,7 +575,7 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                         : `showProductQuickView(${product.product_id})`;
 
                     const card = `
-                        <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6">
+                        <div class="col-6 col-sm-6 col-md-6 col-lg-4 col-xl-3">
                             <div class="card product-card h-100 ${projectStock > 0 ? 'border-info shadow-sm' : ''}" onclick="${tileClickHandler}">
                                 <div class="card-body text-center p-2">
                                     <div class="mb-2" style="height: 80px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
@@ -584,7 +597,15 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                     `;
                     grid.append(card);
                 });
-                
+
+                if (cappedForMobile) {
+                    grid.append(`
+                        <div class="col-12 text-center py-2">
+                            <small class="text-muted">${PT.showingFirstNProducts.replace('%shown%', renderList.length).replace('%total%', response.data.length)}</small>
+                        </div>
+                    `);
+                }
+
                 console.log('Products rendered successfully!');
             } else {
                 console.warn('No products in response');
