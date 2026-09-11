@@ -14,10 +14,18 @@
  * between "code deployed" and "every tenant's schema migrated" is a real,
  * recurring operating condition for this multi-tenant app, not a one-off.
  *
- * This suite proves the fix directly: with the Phase 30/31 columns
+ * Found live again, same day: canView('restaurant_pos') is a control-DB
+ * feature-flag GRANT, entirely independent of the tenant's own schema — a
+ * tenant (bms_t9005) was entitled to the feature before its migration had
+ * run, and hit two more uncaught crashes: app/bms/restaurant/floors.php
+ * (via core/restaurant_scope.php's own pos_mode query) and
+ * api/restaurant/get_modifier_groups.php ("Table 'modifier_groups' doesn't
+ * exist" — a whole missing table, not just a column).
+ *
+ * This suite proves the fix directly: with the Phase 30/31 columns/tables
  * TEMPORARILY DROPPED from a copy of the live schema (DDL auto-commits in
- * MySQL — there is no way to "roll back" a DROP COLUMN, so every drop here
- * is undone by an explicit, unconditional ADD COLUMN in a finally block,
+ * MySQL — there is no way to "roll back" a DROP COLUMN/TABLE, so every drop
+ * here is undone by an explicit, unconditional restore in a finally block,
  * even if an assertion in between throws):
  *   1. app/bms/pos/pos.php renders without a fatal error when
  *      warehouses.pos_mode is missing (degrades to "every warehouse is
@@ -30,13 +38,44 @@
  *      fallback column list when assigned_to/table_id are missing — this
  *      is the sharpest of the three: without it, a tenant literally cannot
  *      sell anything.
+ *   4. Every api/restaurant/*.php endpoint (all 20, checked statically) and
+ *      every app/bms/restaurant/*.php admin page (protected for free via
+ *      core/restaurant_scope.php's own restaurantSchemaReady() guard,
+ *      inside restaurantWarehousesForSelect()) degrades to a clean "not set
+ *      up yet" response instead of an uncaught exception, when pos_mode
+ *      AND the modifier_groups table family are both missing at once
+ *      (replicating the exact bms_t9005 state).
  *
- * All three drops/restores are scoped to single ALTER TABLE statements this
- * script owns end-to-end; nothing else on this server is touched. Exit 0 =
- * all pass AND schema fully restored.
+ * Every drop/restore is scoped to statements this script owns end-to-end;
+ * nothing else on this server is touched. Exit 0 = all pass AND schema
+ * fully restored.
  */
 error_reporting(E_ALL & ~E_DEPRECATED);
 $root = dirname(__DIR__);
+
+if (($argv[1] ?? '') === 'endpoint_worker') {
+    // Runs one api/restaurant/*.php endpoint in a genuinely separate PHP
+    // process, dumping whatever it echoed. Never run such an endpoint via an
+    // in-process include() from the main test body below: its own
+    // schema-readiness guard deliberately calls exit() on failure (correct
+    // for a real request), which would otherwise kill the PARENT test
+    // process before it reaches its finally block and leave the schema
+    // permanently dropped on this machine.
+    require_once "$root/roots.php";
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $cfg = json_decode(file_get_contents($argv[2]), true);
+    foreach (($cfg['session'] ?? []) as $k => $v) { $_SESSION[$k] = $v; }
+    $captured = '';
+    register_shutdown_function(function () use (&$captured) {
+        $buf = ob_get_contents();
+        if ($buf !== false) { $captured .= $buf; @ob_end_clean(); }
+        echo "\n___ENDPOINT_WORKER_OUTPUT___\n" . $captured;
+    });
+    ob_start();
+    require "$root/" . $cfg['endpoint'];
+    exit;
+}
+
 require_once "$root/roots.php";
 global $pdo;
 
@@ -203,5 +242,120 @@ try {
 }
 ok(colExists($pdo, 'pos_sales', 'assigned_to') && colExists($pdo, 'pos_sales', 'table_id'),
     'pos_sales.assigned_to + table_id restored after the test');
+
+// ── 4. The whole Restaurant module (app/bms/restaurant/*.php + all 20
+//    api/restaurant/*.php endpoints) survives a tenant that's entitled to
+//    restaurant_pos but whose database was never migrated ──────────────────
+// Found live, same day (2026-09-11), a second time: canView('restaurant_pos')
+// is a control-DB feature-flag grant, independent of the tenant's own
+// schema — a tenant can be entitled before its migration has run. Tenant
+// bms_t9005 hit this on BOTH app/bms/restaurant/floors.php (via
+// restaurantWarehousesForSelect()'s own pos_mode query) and
+// api/restaurant/get_modifier_groups.php (querying the modifier_groups
+// table, which didn't exist at all — not just a missing column).
+section('4. Restaurant module survives a restaurant_pos-entitled-but-unmigrated tenant');
+require_once "$root/core/restaurant_scope.php";
+
+$restaurantApiFiles = glob("$root/api/restaurant/*.php");
+$missingGuard = [];
+foreach ($restaurantApiFiles as $path) {
+    $src = file_get_contents($path);
+    if (strpos($src, 'restaurantSchemaReady($pdo)') === false) {
+        $missingGuard[] = basename($path);
+    }
+}
+ok(count($restaurantApiFiles) >= 20, 'found at least 20 api/restaurant/*.php endpoints to check (found ' . count($restaurantApiFiles) . ')');
+ok(empty($missingGuard), 'every api/restaurant/*.php endpoint calls restaurantSchemaReady($pdo) before touching its schema'
+    . (empty($missingGuard) ? '' : ' — missing in: ' . implode(', ', $missingGuard)));
+
+$hadPosMode2 = colExists($pdo, 'warehouses', 'pos_mode');
+$hadModGroups = (bool)$pdo->query("SHOW TABLES LIKE 'modifier_groups'")->fetch();
+ok($hadPosMode2 && $hadModGroups, 'warehouses.pos_mode + modifier_groups table both present before the test (sanity)');
+
+try {
+    // Replicate the exact tenant bms_t9005 state: pos_mode column missing
+    // AND the modifier_groups family of tables missing entirely (not just
+    // one column) — the two distinct crash shapes reported live.
+    $pdo->exec("ALTER TABLE warehouses DROP COLUMN pos_mode");
+    $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+    $pdo->exec("DROP TABLE IF EXISTS modifier_options");
+    $pdo->exec("DROP TABLE IF EXISTS product_modifier_groups");
+    $pdo->exec("DROP TABLE IF EXISTS modifier_groups");
+    $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
+
+    ok(restaurantSchemaReady($pdo) === false, 'restaurantSchemaReady() correctly reports false once pos_mode + modifier_groups are gone');
+    ok(restaurantWarehousesForSelect($pdo) === [], 'restaurantWarehousesForSelect() degrades to [] instead of throwing — every restaurant/*.php admin page that calls it (floors/tables/kitchen/kitchen_dashboard/reservations) is protected for free');
+
+    // The exact endpoint from the second live crash — run via the
+    // endpoint_worker subprocess dispatch at the top of this file (see its
+    // comment for why this can never be an in-process include()).
+    $cfgFile = tempnam(sys_get_temp_dir(), 'rsg');
+    file_put_contents($cfgFile, json_encode([
+        'session' => ['user_id' => (int)($pdo->query("SELECT user_id FROM users LIMIT 1")->fetchColumn() ?: 1), 'is_admin' => true],
+        'endpoint' => 'api/restaurant/get_modifier_groups.php',
+    ]));
+    $workerOut = shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' endpoint_worker ' . escapeshellarg($cfgFile) . ' 2>&1');
+    @unlink($cfgFile);
+    $marker = '___ENDPOINT_WORKER_OUTPUT___';
+    $markerPos = strpos((string)$workerOut, $marker);
+    $out = $markerPos === false ? (string)$workerOut : substr($workerOut, $markerPos + strlen($marker) + 1);
+    $json = json_decode($out, true);
+    ok(is_array($json) && ($json['success'] ?? true) === false, 'get_modifier_groups.php returns a clean success:false instead of crashing (raw: ' . substr((string)$workerOut, 0, 200) . ')');
+    ok(strpos((string)$workerOut, 'Fatal error') === false && strpos((string)$workerOut, 'Uncaught') === false, 'get_modifier_groups.php output contains no fatal/uncaught error');
+} finally {
+    if (!colExists($pdo, 'warehouses', 'pos_mode')) {
+        $pdo->exec("ALTER TABLE warehouses ADD COLUMN pos_mode ENUM('retail','restaurant','hybrid') NOT NULL DEFAULT 'retail'");
+    }
+    if (!(bool)$pdo->query("SHOW TABLES LIKE 'modifier_groups'")->fetch()) {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `modifier_groups` (
+                `group_id` INT NOT NULL AUTO_INCREMENT,
+                `name` VARCHAR(150) NOT NULL,
+                `selection_type` ENUM('single','multiple') NOT NULL DEFAULT 'single',
+                `min_select` INT NOT NULL DEFAULT 0,
+                `max_select` INT NOT NULL DEFAULT 1,
+                `is_required` TINYINT(1) NOT NULL DEFAULT 0,
+                `status` ENUM('active','inactive') NOT NULL DEFAULT 'active',
+                `created_by` INT DEFAULT NULL,
+                `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (`group_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+    }
+    if (!(bool)$pdo->query("SHOW TABLES LIKE 'modifier_options'")->fetch()) {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `modifier_options` (
+                `option_id` INT NOT NULL AUTO_INCREMENT,
+                `group_id` INT NOT NULL,
+                `name` VARCHAR(150) NOT NULL,
+                `price_adjustment` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+                `status` ENUM('active','inactive') NOT NULL DEFAULT 'active',
+                `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (`option_id`),
+                KEY `idx_mo_group` (`group_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+    }
+    if (!(bool)$pdo->query("SHOW TABLES LIKE 'product_modifier_groups'")->fetch()) {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `product_modifier_groups` (
+                `id` INT NOT NULL AUTO_INCREMENT,
+                `product_id` INT NOT NULL,
+                `group_id` INT NOT NULL,
+                `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `uq_pmg_product_group` (`product_id`, `group_id`),
+                KEY `idx_pmg_group` (`group_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+    }
+}
+ok(colExists($pdo, 'warehouses', 'pos_mode'), 'warehouses.pos_mode restored after the test');
+ok((bool)$pdo->query("SHOW TABLES LIKE 'modifier_groups'")->fetch()
+    && (bool)$pdo->query("SHOW TABLES LIKE 'modifier_options'")->fetch()
+    && (bool)$pdo->query("SHOW TABLES LIKE 'product_modifier_groups'")->fetch(),
+    'modifier_groups/modifier_options/product_modifier_groups restored after the test');
 
 exit($fail === 0 ? 0 : 1);
