@@ -214,12 +214,24 @@ try {
     $products_db = $fetchStmt->fetchAll(PDO::FETCH_ASSOC);
     $products_map = array_column($products_db, null, 'product_id');
 
+    // Phase 25 (pos_upgrade_plan.md §9) — snapshot each product's plain catalog
+    // selling_price BEFORE any price-group/promo override is merged in below,
+    // so the printed receipt's "was" price (for lines with an active promo)
+    // reflects the real list price, not a price-group tier — the two concepts
+    // are deliberately not conflated in the cosmetic strikethrough.
+    $catalogSellingPrices = [];
+    foreach ($products_map as $pid => $p) {
+        $catalogSellingPrices[$pid] = (float)$p['selling_price'];
+    }
+    $activePromoProductIds = array_keys(resolveActivePromoPrices($pdo, $product_ids));
+
     // Phase 14 (pos_upgrade_plan.md §8) — resolve each product's authoritative
     // price for the chosen price group BEFORE the item loop below, so
     // core/pos_override_guard.php::resolvePosLineBasePrice() (which reads
     // $db_product['selling_price']) is automatically group-aware without
     // needing to know price groups exist at all. Sparse: a product with no
     // override row for this group keeps its plain selling_price untouched.
+    // (Also promo-aware since Phase 25 — see resolveGroupPrices().)
     $groupPrices = resolveGroupPrices($pdo, $price_group_id, $product_ids);
     foreach ($groupPrices as $pid => $price) {
         if (isset($products_map[$pid])) {
@@ -249,9 +261,10 @@ try {
     $itemStmt = $pdo->prepare("
         INSERT INTO pos_sale_items (
             sale_id, product_id, product_name, quantity, unit_price,
+            promo_original_price,
             tax_rate, tax_amount, discount_rate, discount_amount, line_total,
             sold_unit_label, sold_unit_quantity
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     
     $stockStmt = $pdo->prepare("
@@ -358,6 +371,18 @@ try {
         $calculated_discount += $item_discount_amount;
         $calculated_tax += $item_tax_amount;
         
+        // Phase 25 (pos_upgrade_plan.md §9) — cosmetic "was / now" strikethrough
+        // on the printed receipt: only set when this product had an active
+        // promo at sale time, and only when it actually undercuts the catalog
+        // price (defensive — never shows a "was" lower than "now").
+        $promo_original_price = null;
+        if (in_array((int)$pid, $activePromoProductIds, true)) {
+            $catalogPrice = $catalogSellingPrices[$pid] ?? null;
+            if ($catalogPrice !== null && $catalogPrice > $original_price) {
+                $promo_original_price = $catalogPrice;
+            }
+        }
+
         // Prepare DB record
         $itemStmt->execute([
             $sale_id,
@@ -365,6 +390,7 @@ try {
             $db_product['product_name'], // Use DB name to be safe
             $qty,
             $original_price,
+            $promo_original_price,
             $tax_rate,
             $item_tax_amount,
             $discount_percent,

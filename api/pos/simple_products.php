@@ -77,7 +77,7 @@ try {
                 p.barcode,
                 p.selling_price,
                 p.min_selling_price,
-                COALESCE(MAX(pgp.price), p.selling_price) as effective_price,
+                COALESCE(MAX(promo.price), MAX(pgp.price), p.selling_price) as effective_price,
                 p.tax_rate,
                 p.is_taxable,
                 COALESCE(SUM(ps.stock_quantity), 0) as total_physical,
@@ -92,6 +92,12 @@ try {
             . ($price_group_id > 0
                 ? " LEFT JOIN product_price_group_prices pgp ON pgp.product_id = p.product_id AND pgp.price_group_id = :price_group_id"
                 : " LEFT JOIN product_price_group_prices pgp ON 1=0") .
+            // Phase 25 (pos_upgrade_plan.md §9) — an active, in-window promo
+            // price wins over the price-group tier; joined the same
+            // MAX()-wrapped way as pgp above to stay ONLY_FULL_GROUP_BY-safe.
+            " LEFT JOIN product_promotions promo ON promo.product_id = p.product_id
+                AND promo.status = 'active'
+                AND promo.starts_at <= NOW() AND promo.ends_at >= NOW()" .
             " WHERE p.status = 'active'";
 
     // A specific warehouse was chosen: only list products actually available

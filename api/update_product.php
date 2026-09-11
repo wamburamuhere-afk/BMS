@@ -137,6 +137,13 @@ try {
         'model' => !empty($_POST['model']) ? trim($_POST['model']) : null,
         'serial_number' => !empty($_POST['serial_number']) ? trim($_POST['serial_number']) : null,
         'warranty_period' => !empty($_POST['warranty_period']) ? intval($_POST['warranty_period']) : 0,
+        // Phase 25 (pos_upgrade_plan.md §9) — resolves the pre-existing warranty_period
+        // column's day/month/year ambiguity, adds a distinct guarantee concept, and
+        // tags the barcode with a symbology for correct print rendering.
+        'warranty_unit' => in_array($_POST['warranty_unit'] ?? '', ['days', 'months', 'years'], true) ? $_POST['warranty_unit'] : null,
+        'guarantee_period' => !empty($_POST['guarantee_period']) ? intval($_POST['guarantee_period']) : null,
+        'guarantee_unit' => in_array($_POST['guarantee_unit'] ?? '', ['days', 'months', 'years'], true) ? $_POST['guarantee_unit'] : null,
+        'barcode_symbology' => in_array($_POST['barcode_symbology'] ?? '', ['CODE128', 'CODE39', 'UPC_A', 'UPC_E', 'EAN_8', 'EAN_13'], true) ? $_POST['barcode_symbology'] : 'CODE128',
         'expiry_days' => !empty($_POST['expiry_days']) ? intval($_POST['expiry_days']) : 0,
         'updated_by' => $user_id,
         'updated_at' => date('Y-m-d H:i:s')

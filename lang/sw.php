@@ -925,6 +925,16 @@ return [
     'Dimensions (L x W x H)' => 'Vipimo (Urefu x Upana x Kimo)',
     'Combined automatically as "LxWxH cm"' => 'Vinaunganishwa kiotomatiki kama "UxUxK cm"',
     'Warranty (Months)' => 'Dhamana (Miezi)',
+    // Phase 25 (pos_upgrade_plan.md §9) — warranty gets an explicit unit
+    // (previously ambiguous), and guarantee is a distinct concept (e.g. a
+    // store's own money-back window vs. the manufacturer's warranty).
+    'Warranty' => 'Dhamana',
+    'Guarantee' => 'Uhakikisho',
+    'Unit...' => 'Kipimo...',
+    'Days' => 'Siku',
+    'Months' => 'Miezi',
+    'Years' => 'Miaka',
+    'Barcode Symbology' => 'Aina ya Barcode',
     'Manufacturer' => 'Mtengenezaji',
     'Manufacturer name' => 'Jina la mtengenezaji',
     'Model' => 'Mfano',
@@ -1209,6 +1219,7 @@ return [
     'Email Receipt' => 'Tuma Risiti kwa Barua Pepe',
     'Goods sold are not returnable' => 'Bidhaa zilizouzwa hazirudishwi',
     'ITEM' => 'BIDHAA',
+    'now' => 'sasa',
     'PRICE' => 'BEI',
     'Payment (%s):' => 'Malipo (%s):',
     'Please keep this receipt for your records' => 'Tafadhali hifadhi risiti hii kwa kumbukumbu zako',
@@ -1720,4 +1731,30 @@ return [
     'Search product by name or SKU' => 'Tafuta bidhaa kwa jina au SKU',
     'The default price group cannot be deactivated.' => 'Kundi la bei la chaguo-msingi haliwezi kuzimwa.',
     'The default price group cannot be renamed.' => 'Kundi la bei la chaguo-msingi haliwezi kubadilishwa jina.',
+
+    // ------------------------------------------------------------------
+    // POS — Product Promotions, Phase 25 (app/bms/product/product_edit.php +
+    // api/*product_promotion*.php)
+    // ------------------------------------------------------------------
+    'A promo price and start/end dates are required.' => 'Bei ya ofa na tarehe za kuanza/kuisha zinahitajika.',
+    'Add Promotion' => 'Ongeza Ofa',
+    'Could not load promotions.' => 'Imeshindwa kupakia ofa.',
+    'Deactivate this promotion?' => 'Zima ofa hii?',
+    'Ends' => 'Inaisha',
+    'Expired' => 'Imepitwa na Muda',
+    'Invalid product ID' => 'Kitambulisho cha bidhaa si sahihi',
+    'Invalid promotion ID' => 'Kitambulisho cha ofa si sahihi',
+    'No promotions yet for this product.' => 'Hakuna ofa bado kwa bidhaa hii.',
+    'Product not found' => 'Bidhaa haikupatikana',
+    'Promo Price' => 'Bei ya Ofa',
+    'Promotion added.' => 'Ofa imeongezwa.',
+    'Promotion deactivated.' => 'Ofa imezimwa.',
+    'Promotion not found' => 'Ofa haikupatikana',
+    'Promotion reactivated.' => 'Ofa imewezeshwa tena.',
+    'Promotional Pricing' => 'Bei za Ofa',
+    'Reactivate' => 'Wezesha Tena',
+    'Save Promotion' => 'Hifadhi Ofa',
+    'Scheduled' => 'Imepangwa',
+    'Starts' => 'Inaanza',
+    'The promotion end date must be after its start date.' => 'Tarehe ya kumaliza ofa lazima iwe baada ya tarehe ya kuanza.',
 ];

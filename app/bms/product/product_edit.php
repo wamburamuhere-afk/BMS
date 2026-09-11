@@ -459,12 +459,26 @@ function deleteSellingUnit(id) {
                                     <div class="col-md-6 mt-4">
                                         <label for="barcode" class="form-label fw-bold text-muted small"><?= t('Barcode (Universal Code)') ?></label>
                                         <div class="input-group">
-                                            <input type="text" class="form-control bg-light border-0" id="barcode" name="barcode" 
+                                            <input type="text" class="form-control bg-light border-0" id="barcode" name="barcode"
                                                    value="<?= safe_output($product['barcode']) ?>">
                                             <button type="button" class="btn btn-outline-secondary border-0 bg-light" onclick="generateNewBarcode()">
                                                 <i class="bi bi-upc"></i>
                                             </button>
                                         </div>
+                                        <!-- Phase 25 (pos_upgrade_plan.md §9) — pure additive tag on the existing
+                                             single barcode column; zero behaviour change unless a product explicitly
+                                             picks a symbology other than the default CODE128. Format names (Code 128,
+                                             UPC-A, EAN-13, etc.) are industry-standard technical terms, not translated. -->
+                                        <label for="barcode_symbology" class="form-label fw-normal text-muted mt-2 mb-1" style="font-size:0.75rem"><?= t('Barcode Symbology') ?></label>
+                                        <select class="form-select form-select-sm bg-light border-0" id="barcode_symbology" name="barcode_symbology">
+                                            <?php
+                                                $symbologies = ['CODE128' => 'Code 128', 'CODE39' => 'Code 39', 'UPC_A' => 'UPC-A', 'UPC_E' => 'UPC-E', 'EAN_8' => 'EAN-8', 'EAN_13' => 'EAN-13'];
+                                                $current_symbology = $product['barcode_symbology'] ?? 'CODE128';
+                                                foreach ($symbologies as $val => $label):
+                                            ?>
+                                                <option value="<?= $val ?>" <?= $current_symbology === $val ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
                                     </div>
 
                                     <div class="col-md-12 mt-4">
@@ -903,9 +917,36 @@ function deleteSellingUnit(id) {
                                             <label for="serial_number" class="form-label fw-bold small"><?= t('Serial Number') ?></label>
                                             <input type="text" class="form-control border-0 shadow-sm" id="serial_number" name="serial_number" value="<?= safe_output($product['serial_number']) ?>">
                                         </div>
-                                        <div class="col-md-6 mt-4">
-                                            <label for="warranty_period" class="form-label fw-bold small"><?= t('Warranty (Months)') ?></label>
+                                        <div class="col-md-3 mt-4">
+                                            <label for="warranty_period" class="form-label fw-bold small"><?= t('Warranty') ?></label>
                                             <input type="number" class="form-control border-0 shadow-sm" id="warranty_period" name="warranty_period" min="0" value="<?= $product['warranty_period'] ?>">
+                                        </div>
+                                        <div class="col-md-3 mt-4">
+                                            <label for="warranty_unit" class="form-label fw-bold small text-muted">&nbsp;</label>
+                                            <?php $warranty_unit = $product['warranty_unit'] ?? ''; ?>
+                                            <select class="form-select border-0 shadow-sm" id="warranty_unit" name="warranty_unit">
+                                                <option value=""><?= t('Unit...') ?></option>
+                                                <option value="days" <?= $warranty_unit === 'days' ? 'selected' : '' ?>><?= t('Days') ?></option>
+                                                <option value="months" <?= $warranty_unit === 'months' ? 'selected' : '' ?>><?= t('Months') ?></option>
+                                                <option value="years" <?= $warranty_unit === 'years' ? 'selected' : '' ?>><?= t('Years') ?></option>
+                                            </select>
+                                        </div>
+                                        <!-- Phase 25 (pos_upgrade_plan.md §9) — guarantee is a distinct concept
+                                             from warranty (e.g. a manufacturer warranty vs. a store's own money-back
+                                             guarantee window); new columns, both nullable, zero effect until set. -->
+                                        <div class="col-md-3 mt-4">
+                                            <label for="guarantee_period" class="form-label fw-bold small"><?= t('Guarantee') ?></label>
+                                            <input type="number" class="form-control border-0 shadow-sm" id="guarantee_period" name="guarantee_period" min="0" value="<?= safe_output($product['guarantee_period'] ?? '', '') ?>">
+                                        </div>
+                                        <div class="col-md-3 mt-4">
+                                            <label for="guarantee_unit" class="form-label fw-bold small text-muted">&nbsp;</label>
+                                            <?php $guarantee_unit = $product['guarantee_unit'] ?? ''; ?>
+                                            <select class="form-select border-0 shadow-sm" id="guarantee_unit" name="guarantee_unit">
+                                                <option value=""><?= t('Unit...') ?></option>
+                                                <option value="days" <?= $guarantee_unit === 'days' ? 'selected' : '' ?>><?= t('Days') ?></option>
+                                                <option value="months" <?= $guarantee_unit === 'months' ? 'selected' : '' ?>><?= t('Months') ?></option>
+                                                <option value="years" <?= $guarantee_unit === 'years' ? 'selected' : '' ?>><?= t('Years') ?></option>
+                                            </select>
                                         </div>
                                         <div class="col-md-6 mt-4">
                                             <label for="expiry_days" class="form-label fw-bold small text-muted"><?= t('Shelf Life (Days)') ?></label>
@@ -913,6 +954,25 @@ function deleteSellingUnit(id) {
                                         </div>
                                     </div>
 
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Phase 25 (pos_upgrade_plan.md §9) — promotional pricing manager.
+                             Resolved ahead of price-group tiers by resolveGroupPrices(); a promo
+                             row only makes sense once the product itself already exists. -->
+                        <div class="row g-4">
+                            <div class="col-12 mb-4">
+                                <div class="p-4 bg-light rounded-4 border border-light">
+                                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                                        <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-tags me-2 text-danger"></i> <?= t('Promotional Pricing') ?></h6>
+                                        <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="showAddPromoModal()">
+                                            <i class="bi bi-plus-lg me-1"></i> <?= t('Add Promotion') ?>
+                                        </button>
+                                    </div>
+                                    <div id="promoListContainer">
+                                        <div class="text-muted small py-2"><?= t('Loading...') ?></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1099,4 +1159,147 @@ function deleteSellingUnit(id) {
         </div>
     </div>
 </div>
+
+<!-- Phase 25 (pos_upgrade_plan.md §9) — Add Promotion modal -->
+<div class="modal fade" id="addPromoModal" tabindex="-1" aria-labelledby="addPromoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="addPromoModalLabel">
+                    <i class="bi bi-tags"></i> <?= t('Add Promotion') ?>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addPromoForm" autocomplete="off">
+                <div class="modal-body">
+                    <div id="addPromoMessage" class="mb-2"></div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold"><?= t('Promo Price') ?> <span class="text-danger">*</span></label>
+                        <input type="number" step="0.01" min="0.01" class="form-control" id="promoPrice" required>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label fw-bold"><?= t('Starts') ?> <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control" id="promoStartsAt" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold"><?= t('Ends') ?> <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control" id="promoEndsAt" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-danger"><?= t('Save Promotion') ?></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Phase 25 (pos_upgrade_plan.md §9) — Promotional Pricing manager.
+const PROMO_I18N = <?= json_encode([
+    'no_promotions' => t('No promotions yet for this product.'),
+    'active' => t('Active'),
+    'inactive' => t('Inactive'),
+    'scheduled' => t('Scheduled'),
+    'expired' => t('Expired'),
+    'deactivate' => t('Deactivate'),
+    'reactivate' => t('Reactivate'),
+    'confirm_deactivate' => t('Deactivate this promotion?'),
+    'load_failed' => t('Could not load promotions.'),
+    'saving' => t('Saving...'),
+], JSON_UNESCAPED_UNICODE) ?>;
+
+function promoSafeOutput(s) {
+    return s == null ? '' : String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+function showAddPromoModal() {
+    $('#addPromoForm')[0].reset();
+    $('#addPromoMessage').html('');
+    new bootstrap.Modal(document.getElementById('addPromoModal')).show();
+}
+
+function loadPromotions() {
+    if (typeof PRODUCT_ID === 'undefined' || !PRODUCT_ID) {
+        $('#promoListContainer').html('<div class="text-muted small py-2">' + PROMO_I18N.no_promotions + '</div>');
+        return;
+    }
+    $.getJSON('<?= buildUrl('api/get_product_promotions.php') ?>', { product_id: PRODUCT_ID }, function (res) {
+        if (!res.success) { $('#promoListContainer').html('<div class="text-danger small">' + PROMO_I18N.load_failed + '</div>'); return; }
+        renderPromotions(res.data || []);
+    }).fail(function () {
+        $('#promoListContainer').html('<div class="text-danger small">' + PROMO_I18N.load_failed + '</div>');
+    });
+}
+
+function renderPromotions(rows) {
+    if (!rows.length) {
+        $('#promoListContainer').html('<div class="text-muted small py-2">' + PROMO_I18N.no_promotions + '</div>');
+        return;
+    }
+    const now = new Date();
+    let html = '<div class="table-responsive"><table class="table table-sm align-middle mb-0">' +
+        '<thead><tr><th><?= t('Price') ?></th><th><?= t('Starts') ?></th><th><?= t('Ends') ?></th><th><?= t('Status') ?></th><th class="text-end"><?= t('Actions') ?></th></tr></thead><tbody>';
+    rows.forEach(function (r) {
+        let statusLabel, statusClass;
+        if (r.status !== 'active') { statusLabel = PROMO_I18N.inactive; statusClass = 'secondary'; }
+        else if (r.is_currently_active) { statusLabel = PROMO_I18N.active; statusClass = 'success'; }
+        else if (new Date(r.starts_at) > now) { statusLabel = PROMO_I18N.scheduled; statusClass = 'info'; }
+        else { statusLabel = PROMO_I18N.expired; statusClass = 'dark'; }
+
+        html += '<tr>' +
+            '<td class="fw-bold">' + Number(r.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>' +
+            '<td>' + promoSafeOutput(r.starts_at) + '</td>' +
+            '<td>' + promoSafeOutput(r.ends_at) + '</td>' +
+            '<td><span class="badge bg-' + statusClass + '">' + statusLabel + '</span></td>' +
+            '<td class="text-end">' +
+                (r.status === 'active'
+                    ? '<button type="button" class="btn btn-sm btn-outline-secondary" onclick="togglePromo(' + r.promo_id + ', \'inactive\')">' + PROMO_I18N.deactivate + '</button>'
+                    : '<button type="button" class="btn btn-sm btn-outline-success" onclick="togglePromo(' + r.promo_id + ', \'active\')">' + PROMO_I18N.reactivate + '</button>') +
+            '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table></div>';
+    $('#promoListContainer').html(html);
+}
+
+function togglePromo(id, newStatus) {
+    if (newStatus === 'inactive' && !confirm(PROMO_I18N.confirm_deactivate)) return;
+    $.post('<?= buildUrl('api/toggle_product_promotion.php') ?>', { id: id, status: newStatus, _csrf: <?= json_encode(csrf_token()) ?> }, function (res) {
+        if (res.success) { loadPromotions(); } else { Swal.fire({ icon: 'error', title: 'Error', text: res.message }); }
+    }, 'json');
+}
+
+$(document).on('submit', '#addPromoForm', function (e) {
+    e.preventDefault();
+    const btn = $(this).find('[type="submit"]');
+    const orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + PROMO_I18N.saving);
+
+    $.post('<?= buildUrl('api/save_product_promotion.php') ?>', {
+        product_id: PRODUCT_ID,
+        price: $('#promoPrice').val(),
+        starts_at: $('#promoStartsAt').val(),
+        ends_at: $('#promoEndsAt').val(),
+        _csrf: <?= json_encode(csrf_token()) ?>
+    }, function (res) {
+        if (res.success) {
+            bootstrap.Modal.getInstance(document.getElementById('addPromoModal')).hide();
+            loadPromotions();
+        } else {
+            $('#addPromoMessage').html('<div class="alert alert-danger py-2 mb-0">' + promoSafeOutput(res.message) + '</div>');
+        }
+    }, 'json').fail(function () {
+        $('#addPromoMessage').html('<div class="alert alert-danger py-2 mb-0"><?= t('Server error.') ?></div>');
+    }).always(function () {
+        btn.prop('disabled', false).html(orig);
+    });
+});
+
+$(document).ready(function () { loadPromotions(); });
+</script>
+
 <?php include 'product_create_footer.php'; ?>

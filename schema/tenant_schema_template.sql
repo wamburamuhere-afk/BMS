@@ -5422,6 +5422,7 @@ CREATE TABLE `pos_sale_items` (
   `quantity` decimal(10,3) NOT NULL DEFAULT '1.000',
   `unit` varchar(50) DEFAULT 'pcs',
   `unit_price` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `promo_original_price` decimal(15,2) DEFAULT NULL,
   `tax_rate` decimal(5,2) DEFAULT '0.00',
   `tax_amount` decimal(15,2) DEFAULT '0.00',
   `discount_rate` decimal(5,2) DEFAULT '0.00',
@@ -5560,6 +5561,27 @@ CREATE TABLE `price_groups` (
   PRIMARY KEY (`price_group_id`),
   UNIQUE KEY `uq_price_group_name` (`name`),
   KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `product_promotions`
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_promotions` (
+  `promo_id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `price` decimal(15,2) NOT NULL,
+  `starts_at` datetime NOT NULL,
+  `ends_at` datetime NOT NULL,
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `created_by` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`promo_id`),
+  KEY `idx_product_window` (`product_id`,`status`,`starts_at`,`ends_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -5770,6 +5792,7 @@ CREATE TABLE `products` (
   `project_id` int DEFAULT NULL,
   `status` enum('active','inactive','discontinued','draft','pending','approved') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'active',
   `barcode` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `barcode_symbology` enum('CODE128','CODE39','UPC_A','UPC_E','EAN_8','EAN_13') NOT NULL DEFAULT 'CODE128',
   `created_by` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -5794,6 +5817,9 @@ CREATE TABLE `products` (
   `model` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `serial_number` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `warranty_period` int DEFAULT '0',
+  `warranty_unit` enum('days','months','years') DEFAULT NULL,
+  `guarantee_period` int DEFAULT NULL,
+  `guarantee_unit` enum('days','months','years') DEFAULT NULL,
   `expiry_days` int DEFAULT '0',
   PRIMARY KEY (`product_id`),
   UNIQUE KEY `product_code` (`product_code`),

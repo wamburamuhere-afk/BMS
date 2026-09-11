@@ -1,5 +1,48 @@
 # BMS Changelog
 
+## 2026-09-11 (feat/pos-tier4-professional-retail) - POS Tier-4 Phase 25: product professional fields (warranty/guarantee units, barcode symbology, promotional pricing)
+
+**Files (new):** `migrations/tenant/2026_09_10_pos_product_professional_fields.php`,
+`migrations/2026_09_10_pos_product_professional_fields_legacy_db.php` (mirrors the tenant migration
+onto the legacy/non-tenant DB in the same commit, per the lesson learned in Tier-3),
+`api/get_product_promotions.php`, `api/save_product_promotion.php`, `api/toggle_product_promotion.php`.
+
+**Files (modified):** `core/pos_price_groups.php` (new `resolveActivePromoPrices()`;
+`resolveGroupPrices()` now merges an active promo on top of the price-group tier — promo wins, no
+longer requires a price group to be chosen for a promo to apply), `api/pos/simple_products.php`
+(grid SQL: `COALESCE(MAX(promo.price), MAX(pgp.price), p.selling_price)`), `api/pos/process_sale.php`
+(promo-aware via the same `resolveGroupPrices()` call; snapshots the plain catalog price and writes
+`pos_sale_items.promo_original_price` when a promo applied, for the receipt), `api/pos/print_receipt.php`
+("was / now" strikethrough line, browser-rendered receipt only), `api/update_product.php` /
+`api/create_product.php` (persist the four new product columns), `app/bms/product/product_edit.php`
+(warranty unit select, distinct guarantee period+unit, barcode symbology select, and a full
+Promotional Pricing manager: list + add + deactivate/reactivate, AJAX-backed), `schema/tenant_schema_template.sql`,
+`tests/test_pos_price_groups_cli.php` (extended, not a new file — same resolver), `lang/sw.php`
+(Swahili translations for every new string, including the API-side JSON messages on the three new
+endpoints).
+
+**Schema:** `products.warranty_unit`/`guarantee_period`/`guarantee_unit` (all new, nullable, zero
+effect on existing rows), `products.barcode_symbology` (new, `DEFAULT 'CODE128'`), new table
+`product_promotions`, `pos_sale_items.promo_original_price` (new, nullable — the cosmetic "was"
+price for a promo-priced line).
+
+**Scope decision:** the receipt "was/now" strikethrough compares against the plain catalog
+`selling_price`, not a customer's price-group tier — mixing "this customer's normal tier price" and
+"today's promo price" on one line would be confusing, and the plan scoped this as cosmetic only.
+Editing an existing promo is not supported — deactivate and create a new one instead, so a promo
+that already priced a sale can never be silently rewritten under it.
+
+Verified live: `php tests/test_pos_price_groups_cli.php` — 66/66 (added §2 schema checks, §4 wiring
+checks, and a new §8 with 7 runtime checks: active promo wins over an in-window/expired/future
+window and over a price-group override, reconciled to direct SQL on `product_promotions`). Migration
+applied and re-run for idempotency against the local dev DB (single-tenant/legacy path — no
+`tenants` control table configured locally, so the `_legacy_db.php` mirror is what was actually
+exercised). Regression re-run clean: `test_pos_sale_posting_cli` (18), `test_pos_credit_ar_cli` (19),
+`test_pos_returns_cli` (25), `test_pos_cleanup_cli` (9), `test_pos_phase13_entitlement_cli` (20).
+`test_pos_dashboard_cli` has one pre-existing, unrelated failure ("Sales table has S/NO first
+column") confirmed present on the branch tip before any Phase 25 change (verified via `git stash`) —
+not touched by this phase.
+
 ## 2026-09-10 (fix/ui) - Shift History: fixed stuck-register root cause, redesigned table to the standard DataTable + gear-dropdown pattern
 
 **Files (modified):** `app/bms/pos/shift_history.php`
