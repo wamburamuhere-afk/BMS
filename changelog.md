@@ -1,5 +1,55 @@
 # BMS Changelog
 
+## 2026-09-11 (feat/pos-tier4-professional-retail) - CRITICAL follow-up: whole Restaurant module crashed the same way for an entitled-but-unmigrated tenant
+
+**Severity: P0, same root cause as the earlier critical fix, different code path.** Two more Sentry
+alerts from `shop.demo.bjptechnologies.co.tz` (tenant `bms_t9005`, same tenant as before): (1)
+`app/bms/restaurant/floors.php` uncaught `PDOException: Unknown column 'pos_mode'` via
+`core/restaurant_scope.php`'s own, separate `pos_mode` query (not the one already fixed in
+`app/bms/pos/pos.php`); (2) `api/restaurant/get_modifier_groups.php` uncaught
+`PDOException: Table 'bms_t9005.modifier_groups' doesn't exist` — confirming this tenant's database
+never had the Phase 30 migration applied AT ALL (missing tables, not just one column).
+
+**Root cause, confirmed:** `canView('restaurant_pos')` is a control-DB feature-flag **grant**, entirely
+independent of the tenant's own per-tenant schema — a tenant can be entitled to the Restaurant module
+before its database migration has actually run. The earlier fix only hardened the 3 files on the core
+POS-terminal path (`pos.php`, `simple_products.php`, `process_sale.php`); it did not cover the
+Restaurant module's OWN 8 admin pages and 20 API endpoints, all of which query the Phase 30 schema
+directly and would ALL crash the same way for this tenant.
+
+**Fix — a single, shared, reusable guard instead of 28 individual patches:** `core/restaurant_scope.php`
+gets a new `restaurantSchemaReady($pdo): bool` (cached per-request) that checks for both `warehouses
+.pos_mode` and the `modifier_groups` table. `restaurantWarehousesForSelect()` now calls it and returns
+`[]` when not ready — this alone protects every admin page that uses it for free (`floors.php`,
+`tables.php`, `kitchen.php`, `kitchen_dashboard.php`, `reservations.php`), since they already have an
+empty-state branch for "no warehouse in scope". All 20 `api/restaurant/*.php` endpoints (+
+`save_product_modifier_links.php`'s own, separately-gated case) now call the same guard right after
+their `canView('restaurant_pos')` check and return a clean `success:false` with a friendly "being set up
+for your account" message instead of letting the query throw.
+
+**This is still a safety net, not a substitute for the real migration** — `bms_t9005` needs
+`core/tenant_migration_runner.php` run against it before Restaurant Module functionality actually works
+there; this fix only stops it from crashing.
+
+**Files (modified):** `core/restaurant_scope.php` (new `restaurantSchemaReady()`,
+`restaurantWarehousesForSelect()` now uses it), all 20 `api/restaurant/*.php` endpoints (guard added
+right after the existing `canView('restaurant_pos')` check), `lang/sw.php` (translation for the new
+guard message).
+
+**Files (new/extended):** `tests/test_pos_migration_resilience_cli.php` — extended with a 4th section
+(9 new assertions, 26 total): confirms every endpoint calls the guard (static check across all 20
+files), then replicates the EXACT `bms_t9005` state (drops `pos_mode` AND the whole `modifier_groups`/
+`modifier_options`/`product_modifier_groups` table family at once) and confirms
+`restaurantWarehousesForSelect()` degrades to `[]` and the exact crashing endpoint
+(`get_modifier_groups.php`, run as a genuine subprocess — its own guard calls `exit()` on the failure
+path, which would otherwise have killed an in-process test before its schema-restore `finally` block
+ran) returns a clean error instead of crashing. Caught and fixed exactly this in-process-`exit()` risk
+while writing the test — the first version of this section left the local schema dropped after a run
+because of it. Full regression sweep after restoring schema: clean (same one pre-existing, unrelated
+failure as before).
+
+---
+
 ## 2026-09-11 (feat/pos-tier4-professional-retail) - POS terminal mobile header: professional redesign (visual polish, not just no-overflow)
 
 **Scope note:** follow-up to the earlier "no longer scrolls sideways" fix — that fix stopped the overflow
