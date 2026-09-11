@@ -1940,7 +1940,40 @@ document's numbering convention (see the note above §9 Phase 25).
 ### Phase 29 — POS Dashboard Intelligence (Sales Targets, Top Cashiers,
 Damage/Shrinkage)
 
-**Status:** APPROVED, not yet built. **Depends on:** nothing (independent of
+**Status:** ✅ DONE · **Built:** 2026-09-11 · **Branch:** `feat/pos-tier4-professional-retail`
+
+Shipped exactly as scoped below. `core/pos_dashboard_metrics.php` holds the three
+independently-tested aggregates (`damageShrinkageSummary()`, `topCashiers()`,
+`salesTargetAchievement()` + `salesTargetAchievementBand()`); `api/pos/get_dashboard.php`
+folds `damage_shrinkage`/`top_cashiers` into its existing response unconditionally
+(base `pos`) and `sales_target` only when `canView('pos_advanced')` — verified live by
+forcing the tenant's feature map to `pos_advanced=false` and confirming the key comes
+back `null` even for an admin session, then confirming it's restored once the gate is
+back on. New `api/pos/save_sales_target.php` upserts a `pos_sales_targets` row (CSRF,
+`canEdit('pos_advanced')`, plus `userCan('warehouse', …)` for a specific warehouse or
+`hasAllWarehouseAccess()` for the company-wide `warehouse_id=0` row). `pos_dashboard.php`
+gained three tiles plus a "Set Sales Target" modal, both target-specific pieces wrapped
+in their own `$can_view_targets`/`$can_edit_targets` PHP `if`-blocks so a base-`pos`
+tenant's rendered HTML never contains them at all.
+
+`tests/test_pos_dashboard_cli.php` extended (not a new file) to 143 checks: static
+wiring, the four achievement bands asserted at exact edges (100/99.99/75/74.99/50/49.99%
++ 0/150 for the outer ranges), live reconciliation of Damage/Shrinkage and Top Cashiers
+against direct SQL, a transaction-wrapped synthetic damaged-stock movement + sales-target
+row (rolled back, never touching real data) proving both aggregates pick up a live insert
+correctly, and the entitlement on/off behavioural check above. All pre-existing POS
+regression suites re-run clean (`test_pos_phase13_entitlement_cli` 20,
+`test_feature_registry_cli` 110, `test_pos_serial_tracking_cli` 42,
+`test_pos_price_groups_cli` 66, `test_pos_returns_cli` 25, `test_pos_sale_posting_cli` 18,
+`test_pos_cleanup_cli` 9, `test_pos_i18n_coverage_cli` 82 with zero translation gaps).
+
+**Pre-existing, unrelated failure confirmed, not fixed:** the dashboard test's "Sales
+table has S/NO first column" check was already broken before this phase (its literal
+`>S/NO<` string match against the raw source stopped matching once `S/NO` became
+`t('S/NO')` for i18n) — same finding the Phase 25 agent flagged via `git stash`. Out of
+this phase's scope to fix; documented in `changelog.md`.
+
+**Depends on:** nothing (independent of
 every other phase in this tier — pure additions to the already-shipped,
 already-tested `app/bms/pos/pos_dashboard.php` from §3 Phase 4). **Closes:**
 three dashboard ideas found live on the fasteeypos.com benchmark that are

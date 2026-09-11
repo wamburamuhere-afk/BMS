@@ -84,8 +84,18 @@ $apiFiles = [
     'api/pos/print_receipt.php', 'api/pos/test_network_printer.php',
     // Phase 26 (pos_upgrade_plan.md §9) — serial/IMEI-level stock tracking.
     'api/pos/get_available_serials.php',
+    // Phase 29 (pos_upgrade_plan.md §9) — POS Dashboard Intelligence.
+    'api/pos/save_sales_target.php',
 ];
-$allFiles = array_merge($pageFiles, $apiFiles);
+// Core helper files that call t()/te() directly (achievement-band labels
+// etc.) but aren't a page or an API endpoint themselves, so section 2's
+// "loads the caller's language preference" check doesn't apply to them —
+// still scanned for lint + translation completeness like everything else.
+$coreFiles = [
+    // Phase 29 (pos_upgrade_plan.md §9) — POS Dashboard Intelligence.
+    'core/pos_dashboard_metrics.php',
+];
+$allFiles = array_merge($pageFiles, $apiFiles, $coreFiles);
 
 // ─────────────────────────────────────────────────────────────────────────
 section('1. All ' . count($allFiles) . ' files lint-clean');

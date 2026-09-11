@@ -22,6 +22,8 @@ if (isset($_SESSION['user_lang'])) {
 }
 
 require_once __DIR__ . '/../../core/permissions.php';   // loads core/project_scope.php
+require_once __DIR__ . '/../../core/warehouse_scope.php';
+require_once __DIR__ . '/../../core/pos_dashboard_metrics.php';
 
 header('Content-Type: application/json');
 
@@ -154,6 +156,30 @@ try {
         'party'          => $r['party'],
     ], $pdo->query($recentSql)->fetchAll(PDO::FETCH_ASSOC));
 
+    // Phase 29 (pos_upgrade_plan.md §9) — Damage/Shrinkage + Top Cashiers are
+    // base 'pos' (loss-control/till-hygiene visibility every tenant needs).
+    // Same "this month" window as the existing Top Products tile above, same
+    // warehouse+project scoping style (rebuilt for the stock_movements alias).
+    $smScope = scopeFilterSqlNullable('project', 'sm') . scopeFilterSqlNullable('warehouse', 'sm');
+    $damage_shrinkage = damageShrinkageSummary($pdo, $smScope, $month_from, $today);
+    $top_cashiers     = topCashiers($pdo, $scope, $month_from, $today);
+
+    // Sales Targets vs Actual — pos_advanced only (management-set goal with
+    // its own settings UI, same boundary as Phase 14/18). Genuinely absent
+    // from the response for a base-'pos' tenant, not merely hidden client-side.
+    $sales_target = null;
+    if (canView('pos_advanced')) {
+        $targetWarehouseId = 0; // 0 = company-wide sentinel (admin / grant-all / ambiguous multi-warehouse scope)
+        if (!hasAllWarehouseAccess()) {
+            $whIds = $_SESSION['scope']['warehouses'] ?? [];
+            if (count($whIds) === 1 && is_numeric($whIds[0])) {
+                $targetWarehouseId = (int)$whIds[0];
+            }
+        }
+        $sales_target = salesTargetAchievement($pdo, $targetWarehouseId, date('Y-m-01'));
+        $sales_target['warehouse_id'] = $targetWarehouseId;
+    }
+
     logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Viewed POS Dashboard');
     echo json_encode([
         'success' => true,
@@ -165,6 +191,9 @@ try {
             'top_products' => $top_products,
             'low_stock' => $low_stock,
             'recent' => $recent,
+            'damage_shrinkage' => $damage_shrinkage,
+            'top_cashiers' => $top_cashiers,
+            'sales_target' => $sales_target,
         ],
     ]);
 

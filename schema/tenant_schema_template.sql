@@ -5563,6 +5563,30 @@ CREATE TABLE `pos_sales` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `pos_sales_targets`
+-- Phase 29 (pos_upgrade_plan.md §9) — Sales Targets vs Actual dashboard tile.
+-- warehouse_id/user_id use 0 (never NULL) as the "all warehouses"/"all
+-- cashiers" sentinel so the UNIQUE key can't admit duplicate company-wide
+-- rows for the same month.
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `pos_sales_targets` (
+  `target_id` int NOT NULL AUTO_INCREMENT,
+  `warehouse_id` int NOT NULL DEFAULT '0',
+  `user_id` int NOT NULL DEFAULT '0',
+  `period_month` date NOT NULL,
+  `target_amount` decimal(14,2) NOT NULL DEFAULT '0.00',
+  `created_by` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`target_id`),
+  UNIQUE KEY `uq_pos_target_scope_month` (`warehouse_id`,`user_id`,`period_month`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `price_groups`
 -- Phase 14 (pos_upgrade_plan.md §8) — selling price tiers.
 --

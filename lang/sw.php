@@ -1775,4 +1775,34 @@ return [
     'Serial Numbers' => 'Namba za Serial',
     'Serial-tracked products only — comma or newline separated' => 'Kwa bidhaa zenye ufuatiliaji wa serial tu — tenganisha kwa mkato au mstari mpya',
     'Track by Serial / IMEI Number' => 'Fuatilia kwa Namba ya Serial / IMEI',
+
+    // ------------------------------------------------------------------
+    // POS — Dashboard Intelligence, Phase 29 (core/pos_dashboard_metrics.php +
+    // app/bms/pos/pos_dashboard.php + api/pos/get_dashboard.php +
+    // api/pos/save_sales_target.php)
+    // ------------------------------------------------------------------
+    'Access denied: setting a company-wide target requires all-warehouse access.' => 'Ruhusa imekataliwa: kuweka lengo la kampuni nzima kunahitaji ufikiaji wa maghala yote.',
+    'Achieved' => 'Imefikiwa',
+    'Action Required' => 'Hatua Inahitajika',
+    'A valid target month is required.' => 'Mwezi sahihi wa lengo unahitajika.',
+    'Damage / Shrinkage (this month)' => 'Uharibifu / Upungufu (mwezi huu)',
+    'Damaged' => 'Imeharibika',
+    'Expired' => 'Imeisha Muda',
+    'Needs Improvement' => 'Inahitaji Kuboreshwa',
+    'No completed sales this month.' => 'Hakuna mauzo yaliyokamilika mwezi huu.',
+    'No damage, expiry, or theft recorded this month.' => 'Hakuna uharibifu, muda kuisha, au wizi ulioripotiwa mwezi huu.',
+    'No target set for this month.' => 'Hakuna lengo lililowekwa kwa mwezi huu.',
+    'of target' => 'ya lengo',
+    'On Track' => 'Njiani Sawa',
+    'Sales target saved' => 'Lengo la mauzo limehifadhiwa',
+    'Sales target saved.' => 'Lengo la mauzo limehifadhiwa.',
+    'Sales Target (this month)' => 'Lengo la Mauzo (mwezi huu)',
+    'Sales Targets are not included in your plan.' => 'Malengo ya Mauzo hayamo kwenye mpango wako.',
+    'sales' => 'mauzo',
+    'Save Target' => 'Hifadhi Lengo',
+    'Set Sales Target' => 'Weka Lengo la Mauzo',
+    'Target amount is required.' => 'Kiasi cha lengo kinahitajika.',
+    'Target Amount' => 'Kiasi cha Lengo',
+    'Theft' => 'Wizi',
+    'Top Performing Cashiers' => 'Wahudumu wa Fedha Bora',
 ];

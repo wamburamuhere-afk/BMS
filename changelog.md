@@ -1,5 +1,38 @@
 # BMS Changelog
 
+## 2026-09-11 (feat/pos-tier4-professional-retail) - POS Tier-4 Phase 29: dashboard intelligence (Sales Targets, Top Cashiers, Damage/Shrinkage)
+
+**Files (new):** `migrations/tenant/2026_09_11_pos_sales_targets.php` + legacy-DB mirror
+`migrations/2026_09_11_pos_sales_targets_legacy_db.php` (new table `pos_sales_targets`, `0` sentinel
+for warehouse_id/user_id — never NULL — so the UNIQUE key can't admit duplicate company-wide rows for
+the same month), `core/pos_dashboard_metrics.php` (`damageShrinkageSummary()`, `topCashiers()`,
+`salesTargetAchievement()`, `salesTargetAchievementBand()` — independently unit-tested, matching the
+extraction pattern of `core/pos_shift_reporting.php`), `api/pos/save_sales_target.php` (CSRF,
+`canEdit('pos_advanced')`, `userCan('warehouse', …)` before writing a specific warehouse's target,
+`hasAllWarehouseAccess()` gate before writing the company-wide row).
+
+**Files (modified):** `api/pos/get_dashboard.php` (extends its existing response with
+`damage_shrinkage`/`top_cashiers` — base `pos`, always present — and `sales_target`, only present when
+`canView('pos_advanced')`; genuinely absent from the JSON otherwise, not just hidden client-side),
+`app/bms/pos/pos_dashboard.php` (three new tiles + a "Set Sales Target" modal, the target tile/modal
+each wrapped in their own PHP `if` gate), `schema/tenant_schema_template.sql`,
+`tests/test_pos_dashboard_cli.php` (extended, not a new file — static wiring checks, exact
+achievement-band boundary assertions at 100/75/50%, live reconciliation of all three tiles to direct
+SQL including a transaction-wrapped synthetic damage-movement + target row, and an entitlement
+behavioural check forcing `pos_advanced` off/on), `tests/test_pos_i18n_coverage_cli.php` (added the
+new API file and the new core file to its scanned lists), `lang/sw.php` (Swahili translations for
+every new string).
+
+**Gate:** Damage/Shrinkage and Top Cashiers are base `pos` (loss-control/till-hygiene visibility every
+tenant needs). Sales Targets is `pos_advanced` (a management-set goal with its own settings UI).
+
+**Pre-existing, unrelated finding (not fixed here):** `tests/test_pos_dashboard_cli.php`'s "Sales table
+has S/NO first column" assertion (`strpos($p, '>S/NO<')` against the raw PHP source) has failed since
+`S/NO` was converted to `t('S/NO')` for i18n — the literal `>S/NO<` substring no longer appears in the
+source text (it's now `>` + `<?= t('S/NO') ?>` + `<`). Confirmed present before this phase via `git
+stash` in the prior Phase 25 run; re-confirmed present and unchanged by this phase. Left as-is —
+fixing a stale test assertion for an unrelated tile is out of this phase's scope.
+
 ## 2026-09-11 (feat/pos-tier4-professional-retail) - POS Tier-4 Phase 26: serial/IMEI-level stock tracking
 
 **Files (new):** `migrations/tenant/2026_09_11_pos_product_serials.php`,

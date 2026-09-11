@@ -12,6 +12,11 @@ require_once 'header.php';
 $can_create = canCreate('pos');
 $can_delete = canDelete('pos');
 $can_edit   = canEdit('pos');
+// Phase 29 (pos_upgrade_plan.md §9) — Sales Targets is a pos_advanced-only
+// tile; genuinely absent from the rendered HTML for a base-'pos' tenant, not
+// merely hidden by CSS.
+$can_view_targets = canView('pos_advanced');
+$can_edit_targets = canEdit('pos_advanced');
 
 logActivity($pdo, $_SESSION['user_id'] ?? 0, 'Viewed POS Workspace');
 
@@ -297,6 +302,51 @@ $company_logo = getSetting('company_logo', '');
             </div>
         </div>
 
+        <!-- Phase 29 (pos_upgrade_plan.md §9) — Damage/Shrinkage, Top Cashiers (base 'pos'), Sales Targets (pos_advanced) -->
+        <div class="row g-3 mt-1">
+            <div class="col-12 col-lg-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0 fw-bold text-primary">
+                        <i class="bi bi-box-seam me-1"></i> <?= t('Damage / Shrinkage (this month)') ?>
+                    </div>
+                    <div class="card-body p-2">
+                        <div id="damageShrinkage" class="small text-center text-muted py-3">
+                            <span class="spinner-border spinner-border-sm me-1"></span> <?= t('Loading…') ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0 fw-bold text-primary">
+                        <i class="bi bi-person-badge me-1"></i> <?= t('Top Performing Cashiers') ?>
+                    </div>
+                    <div class="card-body p-2">
+                        <div id="topCashiers" class="small text-center text-muted py-3">
+                            <span class="spinner-border spinner-border-sm me-1"></span> <?= t('Loading…') ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php if ($can_view_targets): ?>
+            <div class="col-12 col-lg-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0 fw-bold text-primary d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-bullseye me-1"></i> <?= t('Sales Target (this month)') ?></span>
+                        <?php if ($can_edit_targets): ?>
+                        <button class="btn btn-sm btn-outline-primary" id="btnSetTarget"><i class="bi bi-pencil-square"></i></button>
+                        <?php endif; ?>
+                    </div>
+                    <div class="card-body p-2">
+                        <div id="salesTarget" class="small text-center text-muted py-3">
+                            <span class="spinner-border spinner-border-sm me-1"></span> <?= t('Loading…') ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
+
         <div class="row g-3 mt-1">
             <div class="col-12 col-lg-5">
                 <div class="card border-0 shadow-sm h-100">
@@ -457,6 +507,39 @@ $company_logo = getSetting('company_logo', '');
 </div>
 <?php endif; ?>
 
+<!-- ═══ Set Sales Target modal (Phase 29, pos_advanced only) ═══ -->
+<?php if ($can_view_targets && $can_edit_targets): ?>
+<div class="modal fade" id="targetModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-bullseye me-1"></i> <?= t('Set Sales Target') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="targetForm" autocomplete="off">
+                <div class="modal-body">
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                    <input type="hidden" name="warehouse_id" id="tgt_warehouse_id" value="0">
+                    <div id="tgt-message" class="mb-2"></div>
+                    <div class="mb-3">
+                        <label class="form-label"><?= t('Month') ?> <span class="text-danger">*</span></label>
+                        <input type="month" class="form-control" name="period_month" id="tgt_month" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><?= t('Target Amount') ?> <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" name="target_amount" id="tgt_amount" min="0" step="any" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> <?= t('Save Target') ?></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 const DASH_URL    = '<?= buildUrl('api/pos/get_dashboard.php') ?>';
@@ -466,10 +549,12 @@ const VOID_URL    = '<?= buildUrl('api/pos/void_sale.php') ?>';
 const RETURN_URL  = '<?= buildUrl('api/pos/create_return.php') ?>';
 const RECEIVE_URL = '<?= buildUrl('api/pos/receive_payment.php') ?>';
 const RECEIPT_URL = '<?= buildUrl('api/pos/print_receipt.php') ?>';
+const TARGET_URL  = '<?= buildUrl('api/pos/save_sales_target.php') ?>';
 const CURRENCY    = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
 const CAN_CREATE  = <?= json_encode($can_create) ?>;
 const CAN_DELETE  = <?= json_encode($can_delete) ?>;
 const CAN_EDIT    = <?= json_encode($can_edit) ?>;
+const CAN_EDIT_TARGETS = <?= json_encode($can_view_targets && $can_edit_targets) ?>;
 <?php
 $_print_username = htmlspecialchars(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
 $_print_role     = htmlspecialchars($_SESSION['user_role'] ?? 'User');
@@ -527,7 +612,16 @@ const T = {
     returnProcessed: <?= json_encode(t('Return processed')) ?>,
     saving: <?= json_encode(t('Saving...')) ?>,
     paymentReceived: <?= json_encode(t('Payment received')) ?>,
-    selectPlaceholder: <?= json_encode(t('Select...')) ?>
+    selectPlaceholder: <?= json_encode(t('Select...')) ?>,
+    noDamageShrinkage: <?= json_encode(t('No damage, expiry, or theft recorded this month.')) ?>,
+    damagedLabel: <?= json_encode(t('Damaged')) ?>,
+    expiredLabel: <?= json_encode(t('Expired')) ?>,
+    theftLabel: <?= json_encode(t('Theft')) ?>,
+    noSalesThisMonthCashiers: <?= json_encode(t('No completed sales this month.')) ?>,
+    salesLabel: <?= json_encode(t('sales')) ?>,
+    noTargetSet: <?= json_encode(t('No target set for this month.')) ?>,
+    ofTargetLabel: <?= json_encode(t('of target')) ?>,
+    targetSaved: <?= json_encode(t('Sales target saved')) ?>
 };
 
 const money = n => (parseFloat(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -771,6 +865,7 @@ let trendChart;
 function loadDashboard() {
     $('#btnRefreshDash').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
     $('#topProducts').html('<div class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> ' + T.loading + '</div>');
+    $('#damageShrinkage,#topCashiers,#salesTarget').html('<div class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> ' + T.loading + '</div>');
     $('#lowStockSpinner,#recentSalesSpinner').removeClass('d-none');
     $('#lowStockWrap,#recentSalesWrap').addClass('d-none');
     $('#stat-today-net,#stat-today-count,#stat-today-aov,#stat-today-items,#stat-month-net,#stat-low-stock').html('<span class="spinner-border spinner-border-sm text-primary"></span>');
@@ -782,6 +877,7 @@ function loadDashboard() {
             $('#topProducts').html(`<div class="text-danger text-center py-3"><i class="bi bi-exclamation-triangle me-1"></i>${errMsg}</div>`);
             $('#lowStockSpinner').html(`<div class="text-danger text-center py-3"><i class="bi bi-exclamation-triangle me-1"></i>${errMsg}</div>`);
             $('#recentSalesSpinner').html(`<div class="text-danger text-center py-3"><i class="bi bi-exclamation-triangle me-1"></i>${errMsg}</div>`);
+            $('#damageShrinkage,#topCashiers,#salesTarget').html(`<div class="text-danger text-center py-3"><i class="bi bi-exclamation-triangle me-1"></i>${errMsg}</div>`);
             $('#stat-today-net,#stat-today-count,#stat-today-aov,#stat-today-items,#stat-month-net,#stat-low-stock').text('—');
             return;
         }
@@ -822,6 +918,47 @@ function loadDashboard() {
             $('#topProducts').html(html + '</tbody></table>');
         }
 
+        // Damage / Shrinkage tile (Phase 29)
+        const ds = d.damage_shrinkage || { damaged: 0, expired: 0, theft: 0, total: 0 };
+        if (!ds.total) {
+            $('#damageShrinkage').html('<div class="text-muted text-center py-3">' + T.noDamageShrinkage + '</div>');
+        } else {
+            $('#damageShrinkage').html(`
+                <div class="d-flex justify-content-around text-center py-2">
+                    <div><div class="fw-bold text-danger fs-6">${(+ds.damaged).toLocaleString()}</div><div class="small text-muted">${T.damagedLabel}</div></div>
+                    <div><div class="fw-bold text-warning fs-6">${(+ds.expired).toLocaleString()}</div><div class="small text-muted">${T.expiredLabel}</div></div>
+                    <div><div class="fw-bold text-dark fs-6">${(+ds.theft).toLocaleString()}</div><div class="small text-muted">${T.theftLabel}</div></div>
+                </div>`);
+        }
+
+        // Top Performing Cashiers tile (Phase 29)
+        const cashiers = d.top_cashiers || [];
+        if (!cashiers.length) {
+            $('#topCashiers').html('<div class="text-muted text-center py-3">' + T.noSalesThisMonthCashiers + '</div>');
+        } else {
+            let cHtml = '<table class="table table-sm mb-0"><tbody>';
+            cashiers.forEach((c, i) => {
+                cHtml += `<tr><td class="text-center text-muted" style="width:28px">${i+1}</td><td>${safeOutput(c.name)}</td><td class="text-end text-muted small">${c.count} ${T.salesLabel}</td><td class="text-end fw-bold text-primary">${money(c.total)}</td></tr>`;
+            });
+            $('#topCashiers').html(cHtml + '</tbody></table>');
+        }
+
+        // Sales Target tile (Phase 29, pos_advanced only — element absent otherwise)
+        if (d.sales_target && $('#salesTarget').length) {
+            const st = d.sales_target;
+            if (!st.has_target) {
+                $('#salesTarget').html('<div class="text-muted text-center py-3">' + T.noTargetSet + '</div>');
+            } else {
+                const bandColor = { achieved: '#198754', on_track: '#0d6efd', needs_improvement: '#fd7e14', action_required: '#dc3545' }[st.band] || '#6c757d';
+                $('#salesTarget').html(`
+                    <div class="text-center py-2">
+                        <div class="fs-5 fw-bold text-primary">${CURRENCY} ${money(st.actual)}</div>
+                        <div class="small text-muted">${T.ofTargetLabel} ${CURRENCY} ${money(st.target_amount)}</div>
+                        <span class="badge mt-2" style="background:${bandColor};color:#fff;padding:5px 12px;border-radius:20px;">${safeOutput(st.band_label)} (${st.pct}%)</span>
+                    </div>`);
+            }
+        }
+
         // Low Stock DataTable
         $('#lowStockSpinner').addClass('d-none');
         $('#lowStockWrap').removeClass('d-none');
@@ -838,6 +975,9 @@ function loadDashboard() {
         $('#topProducts').html(errHtml);
         $('#lowStockSpinner').html(errHtml).removeClass('d-none');
         $('#recentSalesSpinner').html(errHtml).removeClass('d-none');
+        $('#damageShrinkage').html(errHtml);
+        $('#topCashiers').html(errHtml);
+        $('#salesTarget').html(errHtml);
         $('#stat-today-net,#stat-today-count,#stat-today-aov,#stat-today-items,#stat-month-net,#stat-low-stock').text('Err');
     });
 }
@@ -988,6 +1128,34 @@ $('#receiveForm').on('submit', function (e) {
                 bootstrap.Modal.getInstance(document.getElementById('receiveModal')).hide();
                 loadSales();
                 Swal.fire({ icon:'success', title: T.paymentReceived, text: res.message, timer:2200, showConfirmButton:false });
+            } else { Swal.fire({ icon:'error', title: T.error, text: res.message || T.failed }); }
+        },
+        error: function () { Swal.fire({ icon:'error', title: T.error, text: T.serverError }); },
+        complete: function () { btn.prop('disabled', false).html(orig); }
+    });
+});
+<?php endif; ?>
+
+<?php if ($can_view_targets && $can_edit_targets): ?>
+// ══════════════════════ SALES TARGET (Phase 29) ══════════════════════
+$('#btnSetTarget').on('click', function () {
+    const now = new Date();
+    $('#tgt_month').val(now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'));
+    $('#tgt_amount').val('');
+    new bootstrap.Modal(document.getElementById('targetModal')).show();
+});
+$('#targetModal').on('hidden.bs.modal', function () { $('#targetForm')[0].reset(); $('#tgt-message').html(''); });
+$('#targetForm').on('submit', function (e) {
+    e.preventDefault();
+    const btn = $(this).find('[type=submit]'), orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> ' + T.saving);
+    $.ajax({
+        url: TARGET_URL, type:'POST', data:new FormData(this), contentType:false, processData:false, dataType:'json',
+        success: function (res) {
+            if (res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('targetModal')).hide();
+                loadDashboard();
+                Swal.fire({ icon:'success', title: T.targetSaved, text: res.message, timer:2200, showConfirmButton:false });
             } else { Swal.fire({ icon:'error', title: T.error, text: res.message || T.failed }); }
         },
         error: function () { Swal.fire({ icon:'error', title: T.error, text: T.serverError }); },
