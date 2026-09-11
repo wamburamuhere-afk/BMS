@@ -1983,4 +1983,8 @@ return [
 
     // Mobile POS-grid render cap.
     'Showing %shown% of %total% products — search to find more.' => 'Inaonyesha %shown% kati ya %total% — tafuta ili kuona zaidi.',
+
+    // Restaurant-schema readiness guard (2026-09-11) — a tenant entitled to
+    // restaurant_pos before its database migration has actually run.
+    'Restaurant module is being set up for your account — please check back shortly.' => 'Moduli ya Mkahawa inaandaliwa kwa akaunti yako — tafadhali angalia tena hivi karibuni.',
 ];

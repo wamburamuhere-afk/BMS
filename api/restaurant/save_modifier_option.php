@@ -7,12 +7,14 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../roots.php';
+require_once __DIR__ . '/../../core/restaurant_scope.php';
 if (isset($_SESSION['user_lang'])) {
     loadLanguage($_SESSION['user_lang']);
 }
 
 if (!isAuthenticated())         { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
 if (!canView('restaurant_pos')) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Restaurant POS is not included in your plan.')]); exit; }
+if (!restaurantSchemaReady($pdo)) { echo json_encode(['success' => false, 'message' => t('Restaurant module is being set up for your account — please check back shortly.')]); exit; }
 if (!canEdit('restaurant_pos')) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => t('Method not allowed')]); exit; }
 csrf_check();

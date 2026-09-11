@@ -123,11 +123,9 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
                     <i class="bi bi-upc-scan"></i> <?= t('SCANNER READY') ?>
                 </span>
             </h4>
-            <small class="opacity-75">
+            <small class="opacity-75" id="posShiftInfoLine">
                 <?php if ($shift_active): ?>
-                <?= t('Shift:') ?> <?= $shift_active['shift_code'] ?> |
-                <?= t('Started:') ?> <?= date('H:i', strtotime($shift_active['start_time'])) ?> |
-                <?= t('Cashier:') ?> <?= htmlspecialchars($_SESSION['username'] ?? t('User')) ?>
+                <span class="pos-shift-info-item"><?= t('Shift:') ?> <?= $shift_active['shift_code'] ?></span><span class="pos-shift-info-sep"> | </span><span class="pos-shift-info-item"><?= t('Started:') ?> <?= date('H:i', strtotime($shift_active['start_time'])) ?></span><span class="pos-shift-info-sep"> | </span><span class="pos-shift-info-item"><?= t('Cashier:') ?> <?= htmlspecialchars($_SESSION['username'] ?? t('User')) ?></span>
                 <?php else: ?>
                 <?= t('No active shift') ?>
                 <?php endif; ?>
@@ -581,61 +579,95 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
    row when two fit comfortably.
    ═══════════════════════════════════════════════════════════════════════ */
 @media (max-width: 767.98px) {
+    /* Header bar — redesigned as three clearly-separated, stacked sections
+       (Title → Shift info → Cash Balance → Actions) instead of squeezing
+       the original two-column desktop layout down. Nothing is removed —
+       every piece of text/data still renders, just arranged so it reads
+       top-to-bottom instead of wrapping mid-word. */
     #posHeaderBar {
         flex-direction: column !important;
         align-items: stretch !important;
-        gap: 8px;
-        padding: 10px 12px !important;
+        gap: 10px;
+        padding: 14px 14px !important;
     }
     #posHeaderBar h4 {
-        font-size: 1.05rem;
+        font-size: 1.15rem;
+        white-space: nowrap;
         display: flex;
         align-items: center;
-        flex-wrap: wrap;
-        gap: 4px;
+        gap: 6px;
+        margin-bottom: 2px;
     }
+    /* Scanner badge, when the scanner is active, drops to its own line
+       under the title instead of squeezing the title text. */
+    #posHeaderBar h4 #scannerReadyBadge {
+        flex-basis: 100%;
+        margin-left: 0 !important;
+        width: fit-content;
+    }
+    #posHeaderBar #scannerReadyBadge {
+        font-size: 0.62rem !important;
+    }
+    /* Shift info: each piece (Shift/Started/Cashier) is its own nowrap
+       chip, wrapping cleanly between items — never mid-value. The "|"
+       separators (meaningful only as an inline run-on) are hidden in
+       favour of a visible gap between chips. */
     #posHeaderBar small.opacity-75 {
-        font-size: 0.68rem;
-        line-height: 1.3;
-        display: block;
+        font-size: 0.7rem;
+        line-height: 1.5;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 10px;
+        opacity: 0.85 !important;
     }
-    /* The Cash Balance + divider + shift buttons row: was a fixed-width
-       flex row that never wrapped, pushing the buttons off-screen. Now
-       wraps onto its own line(s) and never needs horizontal scrolling. */
+    .pos-shift-info-item {
+        white-space: nowrap;
+    }
+    .pos-shift-info-sep {
+        display: none;
+    }
+
+    /* Cash Balance — its own full-width, centered section with a subtle
+       divider above/below so it reads as a distinct block, not squeezed
+       next to the action buttons. */
     #posHeaderBar > .d-flex.align-items-center.gap-3 {
         width: 100%;
-        justify-content: space-between !important;
-        flex-wrap: wrap;
-        gap: 8px !important;
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 10px !important;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255,255,255,.2);
     }
     #posHeaderBar .vr {
         display: none;
     }
     #posHeaderBar .fs-6 {
-        font-size: 0.7rem !important;
+        font-size: 0.72rem !important;
+        letter-spacing: .03em;
+        text-transform: uppercase;
+        opacity: .8;
     }
     #posHeaderBar .fs-4 {
-        font-size: 1.15rem !important;
+        font-size: 1.5rem !important;
     }
     #posHeaderBar small {
-        font-size: 0.65rem;
+        font-size: 0.68rem;
     }
-    #posHeaderBar .btn-sm {
-        font-size: 0.72rem;
-        padding: 5px 9px;
-    }
-    /* Extra safety on very narrow phones (≤360px): if two shift buttons
-       still don't fit side by side, wrap rather than overflow. */
+    /* Action buttons — a clean, evenly-balanced row (not stacked/squeezed),
+       each button taking equal width so the pair looks deliberate. */
     #posShiftButtons {
         display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
+        gap: 8px;
+        width: 100%;
     }
-    #posShiftButtons .me-2 {
+    #posShiftButtons .btn {
+        flex: 1 1 0;
         margin-right: 0 !important;
     }
-    #posHeaderBar #scannerReadyBadge {
-        font-size: 0.6rem !important;
+    #posHeaderBar .btn-sm {
+        font-size: 0.8rem;
+        padding: 8px 10px;
+        font-weight: 600;
     }
 
     /* Warehouse/project selectors + search + category row — smaller text,

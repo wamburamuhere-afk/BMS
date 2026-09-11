@@ -14,12 +14,48 @@
 
 require_once __DIR__ . '/warehouse_scope.php';
 
+if (!function_exists('restaurantSchemaReady')) {
+    /**
+     * True once this tenant's database actually has the Phase 30 schema
+     * (pos_upgrade_plan.md §9) applied. `restaurant_pos` is a tenant
+     * FEATURE-FLAG grant (control-DB, independent of the tenant's own
+     * schema) — a tenant can be entitled to the feature before its
+     * database migration has run (found live, 2026-09-11: tenant bms_t9005
+     * was granted restaurant_pos but its DB never had
+     * migrations/tenant/2026_09_11_pos_restaurant_module.php applied,
+     * causing every Restaurant page/endpoint to hard-crash with "Unknown
+     * column 'pos_mode'" / "Table 'modifier_groups' doesn't exist").
+     * Every restaurant/* page and api/restaurant/*.php endpoint must check
+     * this BEFORE running any query against the new schema, and degrade to
+     * a clear "not set up yet" state instead of a raw exception.
+     * Cached per-request (static) — this is checked at the top of every
+     * request into this module, so it must not add a repeated SHOW
+     * TABLES/SHOW COLUMNS round trip per call within the same request.
+     */
+    function restaurantSchemaReady(PDO $pdo): bool
+    {
+        static $ready = null;
+        if ($ready !== null) return $ready;
+        try {
+            $hasPosMode = (bool)$pdo->query("SHOW COLUMNS FROM warehouses LIKE 'pos_mode'")->fetch();
+            $hasTables  = (bool)$pdo->query("SHOW TABLES LIKE 'modifier_groups'")->fetch();
+            $ready = $hasPosMode && $hasTables;
+        } catch (Throwable $e) {
+            $ready = false;
+        }
+        return $ready;
+    }
+}
+
 if (!function_exists('restaurantWarehousesForSelect')) {
     /**
      * @return array<int, array{warehouse_id:int, warehouse_name:string, project_id:?int, pos_mode:string}>
      */
     function restaurantWarehousesForSelect(PDO $pdo): array
     {
+        if (!restaurantSchemaReady($pdo)) {
+            return [];
+        }
         $scoped = array_values(array_filter(
             warehousesForSelect($pdo),
             fn($w) => userCan('warehouse', (int)$w['warehouse_id'])
