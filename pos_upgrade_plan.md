@@ -2101,8 +2101,10 @@ columns), `kitchen.php` (station admin), `kitchen_dashboard.php` (the live
 KDS view, auto-refresh poll same UX as SalePro's 5/10/15/30/60-second
 selector). Standard page skeleton throughout.
 
-**POS Navigation Reorganization — the second half of this phase, grounded in
-a direct read of the real, current wiring, not an assumed one:**
+**POS Navigation Reorganization — the second half of this phase. Redefined
+2026-09-11 from an in-header dropdown-accordion into a dashboard-hub design,
+per the product owner's own suggestion, because it is the more professional
+of the two and, on inspection, also the lower-risk one for `header.php`:**
 
 *Current state, confirmed by reading `header.php` and `roots.php` directly:*
 POS's existing pages are scattered across **two unrelated dropdowns** and
@@ -2118,53 +2120,79 @@ reachable today only via in-page buttons inside `pos_dashboard.php`. This
 is exactly the "not well linked" problem flagged from the fasteeypos.com
 walkthrough, just discovered inside BMS's own POS instead of a competitor's.
 
-*The fix, scoped to touch only POS's own lines:* a new `core/pos_nav.php`
-(`posNavGroups(): array`) becomes the single source of truth for POS's menu
-tree — an array of named groups, each entry carrying its route, its label,
-its icon, and the `canView()` key that gates it:
-- **Sell** — POS Terminal (`pos`).
-- **Session & Tills** — Shift History (`pos/shifts`, *newly linked — closes
-  the gap above*), Z-Report (`pos/zreport`, *newly linked*).
-- **Dashboard & Reports** — POS Dashboard & Sales (`pos/dashboard`).
-- **Catalog Setup** (group itself gated `canView('pos_advanced')`) — Price
-  Groups (`pos/price-groups`), Product Variants (once Phase 31 ships).
-- **Restaurant** (group itself gated `canView('restaurant_pos')`) — Floors,
-  Tables, Reservations, Menu Type, Modifier Group, Kitchen, Kitchen
-  Dashboard.
+*The decision, and why it beats the dropdown-accordion design this section
+originally proposed:* `header.php`'s POS entries collapse down to **one
+single, always-present link** — `POS` → `pos/dashboard` — replacing the
+three-item dropdown entirely. `app/bms/pos/pos_dashboard.php` (already
+shipped, §3 Phase 4; already gaining Phase 29's intelligence tiles) becomes
+the **hub**: a row of destination cards/toggles above its existing stat
+tiles, each click navigating to that specific area, so nothing is ever
+buried in a long dropdown. This isn't just cosmetic — it also means
+`header.php` is touched **once, ever**, for this whole tier, instead of
+needing another edit every time a later phase (or Phase 31's Variants) adds
+one more POS page. Every future addition is a new card on an existing page,
+not another shared-file edit — a strictly smaller footprint on `header.php`
+than the dropdown-accordion version had.
 
-`header.php`'s existing `<?php if(canView('pos')): ?>` block (the one
-already there today) is changed to loop over `posNavGroups()` and render
-each group as a small Bootstrap `collapse` accordion **inside that same
-`<li>`** — using element IDs uniquely prefixed `posNavGroup-*` so they
-cannot collide with any other module's collapse/accordion IDs anywhere else
-in the app. **No new global JS/CSS is added; the shared dropdown wrapper
-`<li class="nav-item dropdown">` and Bootstrap's own dropdown behaviour,
-used by every other module's menu, are untouched.** `POS Settings`
-deliberately **stays** in the System/Settings dropdown — every module's own
-settings page lives there by system-wide convention, and moving only POS's
-would be an inconsistent one-off exception rather than a fix; a single
-cross-link line is added to the top of `pos_config_settings.php` pointing
-back to the POS menu instead, so nothing feels orphaned without breaking
-the convention.
+**The hub's cards, and where each one goes (still driven by one small,
+testable source of truth, not scattered `if` statements):** a new
+`core/pos_nav.php` (`posNavGroups(): array`) returns the same gated
+structure as before — `pos_dashboard.php` loops over it to render cards
+instead of `header.php` looping over it to render dropdown items:
+- **"Open Terminal"** — always present, rendered first and visually
+  primary (the one-extra-click trade-off of a hub landing page is answered
+  by making the most common action the unmissable one, not by skipping the
+  hub). Links to `pos` (the terminal itself, unchanged).
+- **"Shift History"** — always present. Z-Report is deliberately **not**
+  its own card: it is a per-shift report (`pos/zreport?shift_id=`), not a
+  standalone destination, so it stays reachable exactly where §3 Phase 9
+  already put it — from a row in Shift History, and from the close-shift
+  success dialog's "View Z-Report" button. Forcing it onto the hub as a
+  generic card would just be a dead link with nothing to show until a shift
+  is picked.
+- **"Catalog Setup"** card (gated `canView('pos_advanced')`, genuinely
+  absent otherwise) → its own small landing (Price Groups today; Product
+  Variants once Phase 31 ships).
+- **"Restaurant"** card (gated `canView('restaurant_pos')`, genuinely
+  absent otherwise) → not five separate hub cards, but **one nested
+  sub-hub** at `app/bms/restaurant/index.php`, reusing the exact same hub
+  pattern one level down: its own toggle strip for Floors & Tables, Kitchen
+  Display, Modifier Group, Reservations, Menu Type. This keeps the main POS
+  hub uncluttered regardless of how many Restaurant screens exist, and
+  reuses one design idiom twice instead of inventing a second one.
+- **"Settings"** — always present, small/secondary placement — a
+  convenience shortcut to `pos_config_settings.php`. The page itself
+  **stays** filed under System → Settings in `header.php`, unchanged, since
+  every module's settings page lives there by system-wide convention;
+  moving it would be the inconsistent one-off exception. The hub card is
+  purely an additional door to the same room, not a relocation.
+
+**A `pos`-only tenant (nothing else granted) sees exactly two cards: "Open
+Terminal" and "Shift History," plus the small "Settings" shortcut** — the
+concrete, testable answer to "the POS module should look complete and
+understandable for whatever is actually enabled," not a page hinting at
+features that redirect nowhere.
 
 **Files:** `migrations/tenant/2026_09_10_pos_restaurant_module.php` (+ schema
 template + seed defaults for a default floor/station on existing
 warehouses — inert until `pos_mode` is changed), `app/bms/restaurant/*.php`
-(new), `api/restaurant/*.php` (new — tables, reservations, kitchen tickets,
-modifier groups), `app/bms/pos/pos.php` + `pos_modals_new.php` +
-`pos_scripts_new.php` (mode picker, table picker, modifier modal,
-Send-to-Kitchen action — all inside `if ($warehouse['pos_mode'] !==
-'retail')` branches), `api/pos/process_sale.php` (accepts the three new
-optional fields; no change to its existing logic), `api/pos/hold_sale.php`/
-`get_held_sales.php` (table/warehouse addressing), `app/bms/product/
-product_edit.php` (Kitchen station + Modifier Groups picker + Recipe
-ingredients picker relabeling the existing combo-component UI, "Modifier
-groups are managed from Restaurant > Modifier Group" cross-link matching the
-SalePro UX note), new `core/pos_nav.php` (the menu-tree source of truth),
-`header.php` (only the existing `canView('pos')` "Sales"-dropdown block is
-restructured to loop over it; two new links added for Shift History/
-Z-Report), `app/bms/pos/pos_config_settings.php` (the cross-link line back
-to the POS menu).
+(new, including the new `index.php` sub-hub), `api/restaurant/*.php` (new —
+tables, reservations, kitchen tickets, modifier groups), `app/bms/pos/pos.php`
++ `pos_modals_new.php` + `pos_scripts_new.php` (mode picker, table picker,
+modifier modal, Send-to-Kitchen action — all inside `if
+($warehouse['pos_mode'] !== 'retail')` branches), `api/pos/process_sale.php`
+(accepts the three new optional fields; no change to its existing logic),
+`api/pos/hold_sale.php`/`get_held_sales.php` (table/warehouse addressing),
+`app/bms/product/product_edit.php` (Kitchen station + Modifier Groups picker
++ Recipe ingredients picker relabeling the existing combo-component UI,
+"Modifier groups are managed from Restaurant > Modifier Group" cross-link
+matching the SalePro UX note), new `core/pos_nav.php` (the card-tree source
+of truth), **`header.php`** (the existing three-item "Sales"-dropdown POS
+block is replaced by one static link — net *fewer* lines than today, the
+only touch to this shared file in the whole tier), `app/bms/pos/
+pos_dashboard.php` (the new hub card row), new `app/bms/restaurant/index.php`
+(the Restaurant sub-hub), `app/bms/pos/pos_config_settings.php` (unchanged
+location; the hub links to it, not the other way round).
 
 **Tests:** `tests/test_restaurant_pos_cli.php` — table lifecycle
 (available→occupied→available), kitchen ticket routing by station, modifier
@@ -2174,19 +2202,24 @@ stock via the unmodified Phase 23 combo path, reservation CRUD and reminder
 milestone dedup, and a full regression re-run of every existing
 `tests/test_pos_*_cli.php` suite proving a plain retail warehouse's POS
 output is byte-for-byte unchanged. **New `tests/test_pos_nav_wiring_cli.php`**
-for the navigation half specifically: a `pos`-only user sees Shift
-History/Z-Report now present and correctly routed, while Catalog Setup and
-Restaurant groups are **completely absent from the rendered HTML** (not
-merely hidden) — and every dropdown belonging to every *other* module
-renders byte-for-byte identical to a snapshot taken before this phase; a
-`pos_advanced` user additionally sees Catalog Setup; a `restaurant_pos` user
-additionally sees all seven Restaurant links; an admin sees everything.
+for the navigation half specifically: `header.php` carries exactly one POS
+link (`pos/dashboard`) regardless of which features a tenant has — the
+dropdown it used to be part of is gone, so there is nothing left to gate at
+that layer — and every *other* module's menu renders byte-for-byte identical
+to a snapshot taken before this phase; separately, a `pos`-only tenant's
+rendered `pos_dashboard.php` contains "Open Terminal"/"Shift History"/
+"Settings" but the strings "Catalog Setup" and "Restaurant" are **absent
+from the HTML entirely** (not merely hidden); a `pos_advanced` tenant
+additionally sees Catalog Setup; a `restaurant_pos` tenant additionally sees
+Restaurant, and its sub-hub (`restaurant/index.php`) in turn shows all five
+of its own toggles only when that same gate holds; an admin sees everything
+at both levels.
 
 **Gate:** new `restaurant_pos` feature-registry entry, `default: false`,
-`depends_on: ['pos']`. The navigation reorganization itself is not
-separately gated — it always renders — but each group inside it respects
-the exact same per-feature gate it already used before this phase, per
-`posNavGroups()` above.
+`depends_on: ['pos']`. The hub itself is not separately gated — it always
+renders for anyone who can already view `pos` — but each card on it, and
+each toggle on the Restaurant sub-hub, respects the exact same per-feature
+gate it already used before this redesign, per `posNavGroups()` above.
 
 ---
 

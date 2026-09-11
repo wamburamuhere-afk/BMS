@@ -1,5 +1,22 @@
 # BMS Changelog
 
+## 2026-09-11 (plan) - Phase 30 POS navigation redesigned: dashboard-hub instead of dropdown-accordion
+
+**Files (modified):** `pos_upgrade_plan.md` (§9 Phase 30 navigation subsection rewritten)
+
+**No code changed — planning only.** On the product owner's own suggestion, replaced the
+dropdown-accordion navigation design (a collapsible menu tree stuffed inside `header.php`'s
+existing "Sales" dropdown) with a dashboard-hub design: `header.php` collapses to one static
+`POS` link → `pos/dashboard`, which becomes a landing hub of destination cards ("Open Terminal"
+primary, "Shift History", "Settings" shortcut, plus "Catalog Setup"/"Restaurant" only when
+`pos_advanced`/`restaurant_pos` are granted). Restaurant's five screens nest under their own
+sub-hub (`app/bms/restaurant/index.php`) rather than becoming five more top-level cards. Net
+effect: `header.php` is touched once for this entire tier instead of once per future POS phase,
+and a `pos`-only tenant sees exactly two cards with nothing implying a locked/broken feature —
+directly answering the "should look complete for whatever's enabled" requirement. Z-Report
+deliberately stays out of the hub (it's per-shift, not a standalone destination — reachable from
+Shift History and the close-shift dialog exactly as §3 Phase 9 already built it).
+
 ## 2026-09-11 (fix) - Plain (non-batch-tracked) products now get expiry email/in-app alerts too
 
 **Files (new):** `migrations/tenant/2026_09_11_product_expiry_notifications.php`
