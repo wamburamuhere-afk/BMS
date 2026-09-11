@@ -31,7 +31,7 @@ $company_name = getSetting('company_name', 'BMS');
 $company_logo = getSetting('company_logo', '');
 ?>
 
-<div class="container-fluid mt-4">
+<div class="container-fluid mt-4" id="posDashboardContainer">
 
     <!-- ── Page header ── -->
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
@@ -82,6 +82,54 @@ $company_logo = getSetting('company_logo', '');
         .pos-hub-card { transition: transform .15s ease, box-shadow .15s ease; }
         .pos-hub-card:hover { transform: translateY(-2px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.1) !important; }
         .pos-hub-card-primary { background: linear-gradient(135deg, #0d6efd, #0b5ed7); }
+    </style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Mobile view — desktop layout above is completely untouched by this
+         block. Fixes the page shifting/scrolling sideways on a phone: the
+         5-button Period filter (Daily/Weekly/.../Yearly) is a Bootstrap
+         .btn-group, which never wraps by default, so it forced the whole
+         page wider than the screen; the Low Stock / Recent Sales mini-tables
+         had no overflow container of their own, so a long row could do the
+         same. Both are now contained (their own small internal scroll if
+         truly needed, never the page), plus lighter fonts/columns so that
+         internal scroll is rarely needed at all.
+         ═══════════════════════════════════════════════════════════════════ -->
+    <style>
+    @media (max-width: 767.98px) {
+        /* Defense in depth: even after fixing the specific overflow sources
+           below, clip anything that still tries to push wider than the
+           screen rather than letting the whole page shift sideways. */
+        #posDashboardContainer {
+            overflow-x: hidden;
+        }
+        #periodGroup {
+            display: flex !important;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        #periodGroup .period-btn {
+            border-radius: 6px !important;
+            font-size: 0.72rem;
+            padding: 4px 8px;
+        }
+        #lowStockTable, #recentSalesTable, #topProducts table, #topCashiers table {
+            font-size: 0.72rem;
+        }
+        /* The S/NO column is the least useful cell on a narrow screen —
+           dropping it buys back just enough width that these mini-tables
+           fit without ever needing their own internal scroll either. */
+        #lowStockTable th:nth-child(1), #lowStockTable td:nth-child(1),
+        #recentSalesTable th:nth-child(1), #recentSalesTable td:nth-child(1),
+        #topProducts table th:nth-child(1), #topProducts table td:nth-child(1),
+        #topCashiers table td:first-child {
+            display: none;
+        }
+        #recentSalesTable .badge, #lowStockTable .badge {
+            font-size: 0.62rem;
+            padding: 2px 5px;
+        }
+    }
     </style>
 
     <!-- ═══════════════════ SALES HISTORY (top) ═══════════════════ -->
@@ -398,7 +446,7 @@ $company_logo = getSetting('company_logo', '');
                         <div id="lowStockSpinner" class="small text-center text-muted py-3">
                             <span class="spinner-border spinner-border-sm me-1"></span> <?= t('Loading…') ?>
                         </div>
-                        <div id="lowStockWrap" class="d-none">
+                        <div id="lowStockWrap" class="d-none table-responsive">
                             <table id="lowStockTable" class="table table-sm table-hover align-middle w-100 mb-0">
                                 <thead>
                                     <tr class="text-primary">
@@ -423,7 +471,7 @@ $company_logo = getSetting('company_logo', '');
                         <div id="recentSalesSpinner" class="small text-center text-muted py-3">
                             <span class="spinner-border spinner-border-sm me-1"></span> <?= t('Loading…') ?>
                         </div>
-                        <div id="recentSalesWrap" class="d-none">
+                        <div id="recentSalesWrap" class="d-none table-responsive">
                             <table id="recentSalesTable" class="table table-sm table-hover align-middle w-100 mb-0">
                                 <thead>
                                     <tr class="text-primary">
