@@ -26,23 +26,12 @@ if (!function_exists('posNavGroups')) {
     {
         $groups = [];
 
-        // Always present, rendered first and visually primary.
-        $groups[] = [
-            'key'         => 'terminal',
-            'label'       => t('Open Terminal'),
-            'description' => t('Start selling at the POS terminal.'),
-            'url'         => 'pos',
-            'primary'     => true,
-        ];
-
-        // Always present.
-        $groups[] = [
-            'key'         => 'shift_history',
-            'label'       => t('Shift History'),
-            'description' => t('Past and active shifts, with Z-Report drill-through.'),
-            'url'         => 'pos/shifts',
-            'primary'     => false,
-        ];
+        // 'terminal' (-> pos) and 'shift_history' (-> pos/shifts) used to be
+        // the first two cards here, but pos_dashboard.php's own header row
+        // already links to both ("Open POS" / "Shift History"), so having
+        // them again below was a reported duplicate with no distinct
+        // purpose. The header row is now the one place for those two;
+        // this hub covers only the destinations that aren't already there.
 
         // Gated pos_advanced — genuinely absent otherwise, not hidden.
         if (canView('pos_advanced')) {
