@@ -880,7 +880,17 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         <?php endif; ?>
 
                         <!-- Sales -->
-                        <?php if(canView('sales_orders') || canView('pos')): ?>
+                        <?php
+                        // 'sales_orders' is the flagship page_key for the whole Sales
+                        // module — the same signal this dropdown's own outer gate
+                        // already relied on. When Sales is closed for this tenant,
+                        // POS stands alone as a direct header link instead of being
+                        // buried inside a "Sales" dropdown that would otherwise exist
+                        // only to hold it. Once Sales is open again, POS moves back
+                        // inside it as before.
+                        $salesModuleOpen = canView('sales_orders');
+                        ?>
+                        <?php if($salesModuleOpen): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="salesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-cart"></i> <?= t('Sales') ?>
@@ -910,6 +920,12 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('credit_notes') ?>"><i class="bi bi-receipt"></i> <?= t('Credit Notes') ?></a></li>
                                 <?php endif; ?>
                             </ul>
+                        </li>
+                        <?php elseif(canView('pos')): ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= getUrl('pos/dashboard') ?>">
+                                <i class="bi bi-cart-check"></i> <?= t('POS') ?>
+                            </a>
                         </li>
                         <?php endif; ?>
                         

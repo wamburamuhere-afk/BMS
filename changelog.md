@@ -1,5 +1,30 @@
 # BMS Changelog
 
+## 2026-09-12 (feat/pos-standalone-nav-when-sales-off) - header.php: POS is a direct link when Sales is closed, a dropdown item when Sales is open
+
+**Request:** "if sales is closed, then pos i need to be seen directly in the header and not as dropdown
+of sales. But once sales is allowed pos should be as dropdown." Previously the "Sales" dropdown's own
+outer gate was `canView('sales_orders') || canView('pos')` — meaning a tenant with Sales OFF but POS ON
+still saw a "Sales" dropdown menu that existed only to hold the one POS item, with every other item
+inside it (Quotations/Sales Orders/LPO/DN/Returns/Credit Notes) invisible.
+
+**Fix:** `canView('sales_orders')` (the flagship page_key for the whole Sales module, already used as the
+existing gate's primary signal) now decides the branch. When Sales is open, the dropdown renders exactly
+as before, POS included as one of its items. When Sales is closed but POS is still viewable, POS instead
+renders as a direct, standalone header link (`<li class="nav-item"><a class="nav-link">`, matching the
+existing pattern used by "Projects" elsewhere in this same nav) — no dropdown wrapper at all.
+
+**Tested:** `php -l` clean; live in-process render of `app/dashboard.php` (which includes `header.php`)
+under three scenarios confirmed: Sales+POS both on → dropdown present, POS nested inside it, no
+standalone link; Sales off + POS on → dropdown genuinely absent (not just empty), POS renders as the
+direct standalone link; both off → neither form renders. `tests/test_pos_nav_wiring_cli.php` — updated
+the static "POS link count" assertion (now 2 source occurrences by design, one per branch, only one ever
+renders per tenant) and added a new Section E (6 new live-render assertions covering all three scenarios)
+— 61/61 passing after committing (the stale numstat diff-size guard from an earlier phase, which compares
+against the uncommitted working tree, resolves itself once there's no diff left to measure — same
+self-resolving pattern seen throughout this session). `tests/test_pos_i18n_coverage_cli.php` (132/132)
+and `tests/test_dashboard_time_range_cli.php` (16/16) both re-run clean.
+
 ## 2026-09-12 (feat/dashboard-clickable-cards) - dashboard.php's 4 Statistics Cards are now clickable, each to the exact data behind its number
 
 **Request:** advance `dashboard.php`'s static stat cards — referenced a Loan Management System's richer card style
