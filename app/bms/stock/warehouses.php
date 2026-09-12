@@ -645,6 +645,32 @@ function get_primary_badge($is_primary) {
         page-break-inside: avoid;
     }
 }
+
+@media (max-width: 767.98px) {
+    body { overflow-x: hidden; }
+    .container-fluid { overflow-x: hidden; padding-left: 0.75rem; padding-right: 0.75rem; }
+
+    /* Actions Bar (Print/Export + Show:N on the left, result count on the
+       right) previously forced onto one un-wrapped flex line — wider than
+       any phone viewport, dragging the whole page left/right. Let it wrap
+       and stack instead of scrolling. */
+    #warehousesActionsBar {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    #warehousesActionsBar > div {
+        width: 100%;
+        justify-content: center;
+    }
+    #warehousesActionsBar .btn-group .btn {
+        padding-left: 0.6rem !important;
+        padding-right: 0.6rem !important;
+        font-size: 0.8rem;
+    }
+
+    .custom-stat-card h4 { font-size: 1.35rem; }
+    .custom-stat-card .card-body { padding: 0.85rem; }
+}
 </style>
 </style>
 </head>
@@ -849,8 +875,8 @@ function get_primary_badge($is_primary) {
         </div>
 
         <!-- Actions Bar -->
-        <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
-            <div class="d-flex align-items-center gap-3">
+        <div id="warehousesActionsBar" class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
                 <div class="btn-group shadow-sm" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                     <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="logReportAction('Printed Warehouse List', 'User generated a printed list of warehouses'); window.print()" style="background: #fff; color: #444;">
                         <i class="bi bi-printer text-primary me-1"></i> Print
@@ -860,7 +886,7 @@ function get_primary_badge($is_primary) {
                         <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> Export
                     </button>
                 </div>
-                
+
                 <div class="d-flex align-items-center bg-white shadow-sm px-3 py-1" style="border: 1px solid #dee2e6; border-radius: 8px;">
                     <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> Show:</span>
                     <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 60px; box-shadow: none; background: transparent;" onchange="$('#warehousesTable').DataTable().page.len(this.value).draw();">
