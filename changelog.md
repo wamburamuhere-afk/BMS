@@ -1,5 +1,37 @@
 # BMS Changelog
 
+## 2026-09-12 (feat/pos-hub-dedupe) - pos_dashboard.php: removed the "Open Terminal"/"Shift History" hub-card duplicates; uniform header-row buttons
+
+**Request:** "there is many buttons but others work or redirect the same way... suggest what to remain
+to avoid duplication." Investigation (`app/bms/pos/pos_dashboard.php` + `core/pos_nav.php`) confirmed
+two genuine duplicate pairs: the page header's "Open POS" button and the hub grid's "Open Terminal" card
+both linked to `pos`; the header's "Shift History" button and the hub grid's "Shift History" card both
+linked to `pos/shifts`. User's decision (asked via clarifying question, since either side could have been
+kept): keep the header row's three buttons, remove the two duplicate hub cards.
+
+**Fix:**
+- `core/pos_nav.php`'s `posNavGroups()` no longer returns the `terminal`/`shift_history` entries — the
+  hub grid now shows only Catalog Setup (pos_advanced), Restaurant (restaurant_pos), and Settings
+  (always), each gated exactly as before. For a base pos-only tenant, the hub now shows just "Settings".
+- `pos_dashboard.php`'s header row: all three buttons ("Sales Dashboard" toggle, "Shift History",
+  "Open POS") are now one uniform style (`btn-primary`, matching the hub cards' blue) with equal `flex: 1
+  1 0` sizing so they're the same width regardless of label length. Desktop: unchanged one-row layout.
+  Mobile: forced to stay one row (`flex-wrap: nowrap` on the button group specifically, even though the
+  outer header row itself can still wrap the title above it), shrinking font/padding instead of stacking
+  or overflowing.
+- Added `id="posWorkspaceOpenPos"` / `id="posWorkspaceShiftHistory"` to the two links for unambiguous
+  testing (and future maintenance) — these are now the ONLY places those two destinations are reachable
+  from this page.
+
+**Tested:** `php -l` clean on both files; live in-process render (pos-only entitlement scenario)
+confirmed the hub grid renders only the "Settings" card and the header row shows all three buttons
+uniformly styled. `tests/test_pos_nav_wiring_cli.php` — rewrote Section C's duplicated-card assertions
+into new ones (each header-row link appears exactly once; the hub grid no longer contains either
+removed card's description text) — 55/55 passing across all 4 entitlement scenarios.
+`tests/test_pos_dashboard_cli.php` (142/143, the 1 failure being the pre-existing unrelated S/NO
+string-match issue) and `tests/test_pos_i18n_coverage_cli.php` (132/132) both re-run clean, no new
+untranslated strings since all three header buttons reuse existing `t()` calls.
+
 ## 2026-09-12 (feat/locations-products-mobile-fix) - locations.php no longer scrolls sideways; products.php's mobile CSS no longer bleeds into the shared header nav
 
 **Request:** (1) `locations.php` should not scroll left/right on mobile. (2) On `products.php`, the block

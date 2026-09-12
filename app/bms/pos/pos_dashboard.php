@@ -36,14 +36,14 @@ $company_logo = getSetting('company_logo', '');
     <!-- ── Page header ── -->
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h4 class="mb-0 text-primary"><i class="bi bi-shop me-2"></i><?= t('POS Workspace') ?></h4>
-        <div class="d-flex align-items-center gap-2">
-            <button id="btnToggleDash" class="btn btn-outline-primary btn-sm">
+        <div id="posWorkspaceActions" class="d-flex align-items-center gap-2">
+            <button id="btnToggleDash" class="btn btn-primary btn-sm pos-workspace-action">
                 <i class="bi bi-speedometer2 me-1"></i> <?= t('Sales Dashboard') ?>
             </button>
-            <a href="<?= getUrl('pos/shifts') ?>" class="btn btn-outline-secondary btn-sm">
+            <a id="posWorkspaceShiftHistory" href="<?= getUrl('pos/shifts') ?>" class="btn btn-primary btn-sm pos-workspace-action">
                 <i class="bi bi-clock-history me-1"></i> <?= t('Shift History') ?>
             </a>
-            <a href="<?= getUrl('pos') ?>" class="btn btn-primary btn-sm">
+            <a id="posWorkspaceOpenPos" href="<?= getUrl('pos') ?>" class="btn btn-primary btn-sm pos-workspace-action">
                 <i class="bi bi-bag-plus me-1"></i> <?= t('Open POS') ?>
             </a>
         </div>
@@ -79,10 +79,8 @@ $company_logo = getSetting('company_logo', '');
         <?php endforeach; ?>
     </div>
     <style>
-        /* Every hub card now shares the same blue treatment and the same
-           size — previously only "Open Terminal" was blue/wider (primary)
-           while the rest were plain white cards of a different width,
-           which also meant they never reliably fit one row together. */
+        /* Every hub card shares the same blue treatment and the same size,
+           regardless of how many cards a tenant's entitlements produce. */
         .pos-hub-card {
             background: linear-gradient(135deg, #0d6efd, #0b5ed7);
             transition: transform .15s ease, box-shadow .15s ease;
@@ -97,6 +95,28 @@ $company_logo = getSetting('company_logo', '');
             .pos-hub-card .fs-3 { font-size: 1.3rem !important; }
             .pos-hub-card .fw-bold { font-size: 0.82rem; }
             .pos-hub-card .small { font-size: 0.68rem; line-height: 1.25; }
+        }
+
+        /* Page-header action row (Sales Dashboard / Shift History / Open
+           POS) — all three now the same solid-blue style and, via equal
+           flex, the exact same size regardless of label length. Desktop:
+           already one row (the header's own flex layout). Mobile: forced
+           into one row too (never wrapping/stacking) with each button
+           shrinking to an equal share of the width instead. */
+        .pos-workspace-action {
+            flex: 1 1 0;
+            min-width: 0;
+            white-space: nowrap;
+        }
+        @media (max-width: 767.98px) {
+            #posWorkspaceActions {
+                width: 100%;
+                flex-wrap: nowrap !important;
+            }
+            .pos-workspace-action {
+                font-size: 0.7rem;
+                padding: 0.4rem 0.3rem;
+            }
         }
     </style>
 

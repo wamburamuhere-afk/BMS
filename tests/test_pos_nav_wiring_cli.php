@@ -17,14 +17,19 @@
  *      four entitlement combinations and asserts the hub cards that appear
  *      are EXACTLY the ones the plan specifies — most importantly that a
  *      gated card is genuinely ABSENT from the HTML, not merely hidden:
- *        1. pos-only tenant      -> Open Terminal, Shift History, Settings
- *                                   only; "Catalog Setup"/"Restaurant" absent
+ *        1. pos-only tenant      -> hub shows Settings only; "Catalog Setup"/
+ *                                   "Restaurant" absent. "Open Terminal" and
+ *                                   "Shift History" are NOT hub cards — the
+ *                                   page's own header row links (#posWorkspaceOpenPos
+ *                                   / #posWorkspaceShiftHistory) are the one place
+ *                                   for those two, always present, never duplicated
+ *                                   in the hub grid below.
  *        2. + pos_advanced       -> Catalog Setup also appears
  *        3. + restaurant_pos     -> Restaurant also appears; its sub-hub
  *                                   (restaurant/index.php) shows all 5 toggles
  *        4. restaurant_pos OFF   -> restaurant/index.php renders NOTHING
  *                                   (redirected before any HTML is emitted)
- *        5. admin / everything on -> every card present at both levels
+ *        5. admin / everything on -> every remaining card present at both levels
  *
  * Exit 0 = all pass.
  */
@@ -149,14 +154,23 @@ try {
 
     foreach ($scenarios as $label => $features) {
         $html = _nav_worker_run($root, 'app/bms/pos/pos_dashboard.php', $session, $features);
-        $hasTerminal = strpos($html, '>' . 'Open Terminal' . '<') !== false || strpos($html, 'Open Terminal') !== false;
-        $hasShiftHistory = strpos($html, 'Shift History') !== false;
+        // 'Open Terminal' and 'Shift History' were removed from the hub grid
+        // (pos_nav.php) — a reported duplicate of this page's own header-row
+        // links (#posWorkspaceOpenPos / #posWorkspaceShiftHistory), which are
+        // always present regardless of entitlement and are the only place
+        // these two destinations should now appear.
+        $openPosCount = substr_count($html, 'id="posWorkspaceOpenPos"');
+        $shiftHistoryLinkCount = substr_count($html, 'id="posWorkspaceShiftHistory"');
+        $hubStillHasTerminalCard = strpos($html, 'Start selling at the POS terminal.') !== false;
+        $hubStillHasShiftHistoryCard = strpos($html, 'Past and active shifts, with Z-Report drill-through.') !== false;
         $hasSettings = strpos($html, 'POS configuration: registers, receipts, loyalty.') !== false;
         $hasCatalog = strpos($html, 'Catalog Setup') !== false;
         $hasRestaurant = strpos($html, '>Restaurant<') !== false || strpos($html, 'Floors &amp; Tables, Kitchen Display') !== false;
 
-        ok($hasTerminal, "[$label] hub always shows 'Open Terminal'");
-        ok($hasShiftHistory, "[$label] hub always shows 'Shift History'");
+        ok($openPosCount === 1, "[$label] header row's 'Open POS' link appears exactly once (got $openPosCount)");
+        ok($shiftHistoryLinkCount === 1, "[$label] header row's 'Shift History' link appears exactly once (got $shiftHistoryLinkCount)");
+        ok(!$hubStillHasTerminalCard, "[$label] hub grid no longer duplicates 'Open Terminal' as a card");
+        ok(!$hubStillHasShiftHistoryCard, "[$label] hub grid no longer duplicates 'Shift History' as a card");
         ok($hasSettings, "[$label] hub always shows the 'Settings' shortcut");
 
         $wantCatalog = $features['pos_advanced'] === true;
