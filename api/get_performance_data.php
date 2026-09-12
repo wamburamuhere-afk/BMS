@@ -21,7 +21,10 @@ try {
 
     // Date range logic
     $endDate = date('Y-m-d');
-    if ($period === 'monthly') {
+    if ($period === 'daily') {
+        $startDate = date('Y-m-d', strtotime('-29 days'));
+        $dateFormat = '%Y-%m-%d';
+    } elseif ($period === 'monthly') {
         $startDate = date('Y-m-d', strtotime('-11 months'));
         $dateFormat = '%Y-%m';
     } elseif ($period === 'weekly') {
@@ -132,7 +135,9 @@ try {
         $cashOut = (float)($cashByPeriod[$key]['cash_out'] ?? 0);
 
         $label = $key;
-        if ($period === 'monthly') {
+        if ($period === 'daily') {
+            $label = date('M d', strtotime($key));
+        } elseif ($period === 'monthly') {
             $label = date('M Y', strtotime($key . '-01'));
         } elseif ($period === 'weekly') {
             $parts = explode('-', $key);
