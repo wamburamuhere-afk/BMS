@@ -1368,6 +1368,12 @@ function get_progress_color($percentage) {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #eee; border-radius: 10px; }
         .action-row:hover { background-color: #fcfcfc; transition: 0.2s; }
         .btn-xs { padding: 0.1rem 0.3rem; font-size: 0.75rem; }
+        /* Statistics Cards are now links through to the exact data behind
+           each figure — a small lift on hover is the only visual cue needed
+           to signal that, since the cards already look identical otherwise. */
+        .dashboard-stat-link { display: block; }
+        .dashboard-stat-link .card { transition: transform .15s ease, box-shadow .15s ease; }
+        .dashboard-stat-link:hover .card { transform: translateY(-2px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.15); }
     </style>
     <?php endif; ?>
 
@@ -1467,9 +1473,12 @@ function get_progress_color($percentage) {
     <!-- flex-wrap + flex-fill (not fixed Bootstrap columns) so the row always
          spans full width no matter how many cards a tenant's modules leave visible -->
     <div class="d-flex flex-wrap gap-3 mb-4">
-        <!-- 1. Monthly Revenue -->
+        <!-- 1. Monthly Revenue — clicks through to the Income Statement for
+             this exact date range: that's the same glProfitLoss() figure,
+             not a re-derived approximation. -->
         <?php if(canView('invoices') || canView('sales_report') || hasReportsAccess()): ?>
-        <div class="flex-fill" style="min-width: 240px;">
+        <a class="flex-fill text-decoration-none dashboard-stat-link" style="min-width: 240px;"
+           href="<?= getUrl('income_statement') . '?start_date=' . urlencode($start_date) . '&end_date=' . urlencode($end_date) ?>">
             <div class="card bg-primary text-white h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
@@ -1489,12 +1498,16 @@ function get_progress_color($percentage) {
                     </div>
                 </div>
             </div>
-        </div>
+        </a>
         <?php endif; ?>
 
-        <!-- 2. Today's POS Sales -->
+        <!-- 2. Today's POS Sales — ?period=daily deep-links into the POS
+             Workspace's Sales History, which defaults its own date picker to
+             today already (initFilterDefaults()), reproducing this exact
+             figure instead of whatever period the hub happens to default to. -->
         <?php if(canView('pos')): ?>
-        <div class="flex-fill" style="min-width: 240px;">
+        <a class="flex-fill text-decoration-none dashboard-stat-link" style="min-width: 240px;"
+           href="<?= getUrl('pos/dashboard') . '?period=daily' ?>">
             <div class="card bg-success text-white h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
@@ -1514,12 +1527,16 @@ function get_progress_color($percentage) {
                     </div>
                 </div>
             </div>
-        </div>
+        </a>
         <?php endif; ?>
 
-        <!-- 3. Overdue Invoices -->
+        <!-- 3. Overdue Invoices — ?attention=1 is the SAME deep-link already
+             used by the System Alerts widget further down this page; that
+             page's own comment confirms it shows ONLY overdue invoices,
+             matching this card's definition exactly. -->
         <?php if(canView('invoices')): ?>
-        <div class="flex-fill" style="min-width: 240px;">
+        <a class="flex-fill text-decoration-none dashboard-stat-link" style="min-width: 240px;"
+           href="<?= getUrl('invoices') . '?attention=1' ?>">
             <div class="card bg-warning text-dark h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
@@ -1539,12 +1556,15 @@ function get_progress_color($percentage) {
                     </div>
                 </div>
             </div>
-        </div>
+        </a>
         <?php endif; ?>
 
-        <!-- 4. Inventory Value -->
+        <!-- 4. Inventory Value — plain, unfiltered products.php: its own
+             default ($status_filter = 'active', is_service = 0) already
+             matches this card's query exactly, no extra params needed. -->
         <?php if(canView('products') || canView('inventory_report')): ?>
-        <div class="flex-fill" style="min-width: 240px;">
+        <a class="flex-fill text-decoration-none dashboard-stat-link" style="min-width: 240px;"
+           href="<?= getUrl('products') ?>">
             <div class="card bg-info text-white h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
@@ -1564,7 +1584,7 @@ function get_progress_color($percentage) {
                     </div>
                 </div>
             </div>
-        </div>
+        </a>
         <?php endif; ?>
     </div>
 

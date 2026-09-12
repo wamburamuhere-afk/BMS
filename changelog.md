@@ -1,5 +1,38 @@
 # BMS Changelog
 
+## 2026-09-12 (feat/dashboard-clickable-cards) - dashboard.php's 4 Statistics Cards are now clickable, each to the exact data behind its number
+
+**Request:** advance `dashboard.php`'s static stat cards — referenced a Loan Management System's richer card style
+as an example of the PATTERN wanted (not to build a Loans module in BMS itself, confirmed after
+investigating: BMS has a real, populated `loans`/`loan_repayment_schedule`/etc. schema but no live page
+uses it — out of scope here). The actual ask: apply that pattern's clickability to the 4 cards BMS
+already has (Monthly Revenue, Today's POS Sales, Overdue Invoices, Inventory Value) — "once clicked
+should open specific data by filter only that bring that output as seen in the card."
+
+**Verified each destination reproduces the card's exact figure before wiring the link, not assumed:**
+- **Monthly Revenue** → `income_statement.php?start_date=…&end_date=…` — same `glProfitLoss()` call,
+  same date range as the card.
+- **Today's POS Sales** → `pos/dashboard?period=daily` — required one small JS addition to
+  `pos_dashboard.php` (reads `?period=` on load and pre-selects that tab, since the page's own default
+  is "Yearly"); `#fDay` already defaults to today via the existing `initFilterDefaults()`, so no `?date=`
+  param was needed.
+- **Overdue Invoices** → `invoices.php?attention=1` — an existing deep-link already used by this same
+  page's System Alerts widget. Confirmed byte-for-byte identical WHERE clause between dashboard.php's
+  card query and `api/account/get_invoices.php`'s own `attention=1` stats query (`status NOT IN
+  ('paid','cancelled','draft') AND due_date < CURDATE() AND paid_amount < grand_total`) — not just
+  similar, the same condition.
+- **Inventory Value** → plain `products.php`, no params — its own default (`status='active'`,
+  `is_service=0`) already matches the card's query exactly.
+
+**Also added:** a subtle hover-lift on each card (`.dashboard-stat-link`) as the only visual cue that
+they're now links, since the cards otherwise look unchanged.
+
+**Tested:** `php -l` clean on both files; live in-process render of `app/dashboard.php` confirmed no PHP
+warnings and all 4 hrefs present with the correct query strings; live render of `pos_dashboard.php`
+confirmed the new `?period=` deep-link JS is present. `tests/test_dashboard_time_range_cli.php` (16/16)
+and `tests/test_pos_dashboard_cli.php` (142/143, the 1 failure being the pre-existing, previously
+documented S/NO column issue, unrelated) both re-run clean.
+
 ## 2026-09-12 (feat/finance-module-toggle) - "Finance" is now a superadmin-switchable module
 
 **Request:** "I was thinking to hide or just this 'Finance' to be allowed by superadmin or restricted as
