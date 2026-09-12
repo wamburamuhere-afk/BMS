@@ -745,6 +745,19 @@ function showProductQuickView(productId) {
 
     $('#quickViewContent').html(html);
 
+    // Fast-service shortcut: type the quantity, hit Enter, item's in the
+    // cart — no need to reach for the mouse to click "Add to Cart" for the
+    // common case. Not wired for serial-tracked products: those need the
+    // cashier to pick specific serials from a checklist, not just a
+    // quantity, so #quickViewQty stays hidden and this handler is moot for
+    // them regardless.
+    $('#quickViewQty').off('keydown').on('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addToCart();
+        }
+    });
+
     // Proper way to handle focus in Bootstrap modals to avoid aria-hidden issues
     $('#productQuickView').off('shown.bs.modal').on('shown.bs.modal', function () {
         if (!isSerialTracked) $('#quickViewQty').focus().select();

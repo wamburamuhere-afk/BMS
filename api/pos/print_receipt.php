@@ -54,6 +54,14 @@ if (!$sale) {
     die("Sale not found");
 }
 
+// A walk-in sale has no customer_id at all (see process_sale.php), so the
+// LEFT JOIN above leaves customer_name null — print "Walk-in Customer"
+// explicitly instead of silently omitting the line, so every receipt always
+// shows who it was rung up for.
+if (empty($sale['customer_name'])) {
+    $sale['customer_name'] = t('Walk-in Customer');
+}
+
 // Warehouse-scope guard: a non-admin may only print a receipt for a sale
 // drawn from their assigned warehouse(s).
 $wid = $sale['warehouse_id'] !== null && $sale['warehouse_id'] !== '' ? (int)$sale['warehouse_id'] : null;
@@ -283,7 +291,7 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
         <?php if ($sale['customer_name']): ?>
         <div>
             <span><?= t('Customer:') ?></span>
-            <span><?= $sale['customer_name'] ?></span>
+            <span><?= htmlspecialchars($sale['customer_name']) ?></span>
         </div>
         <?php endif; ?>
     </div>
