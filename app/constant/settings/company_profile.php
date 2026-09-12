@@ -104,21 +104,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value, setting_group, is_public) VALUES ('company_logo', ?, 'company', 1) ON DUPLICATE KEY UPDATE setting_value = ?");
                     $stmt->execute([$logoPath, $logoPath]);
                 } else {
-                    $error_msg = "Failed to upload logo.";
+                    $error_msg = t('Failed to upload logo.');
                 }
             } else {
-                $error_msg = "Invalid file type. Only JPG, PNG, and GIF allowed.";
+                $error_msg = t('Invalid file type. Only JPG, PNG, and GIF allowed.');
             }
         }
 
         $pdo->commit();
-        $_SESSION['success_msg'] = "Company profile updated successfully!";
+        $_SESSION['success_msg'] = t('Company profile updated successfully!');
         header("Location: " . $_SERVER['REQUEST_URI']);
         exit();
 
     } catch (Exception $e) {
         $pdo->rollBack();
-        $_SESSION['error_msg'] = "Error creating/updating profile: " . $e->getMessage();
+        $_SESSION['error_msg'] = t('Error creating/updating profile:') . ' ' . $e->getMessage();
         header("Location: " . $_SERVER['REQUEST_URI']);
         exit();
     }
@@ -147,8 +147,8 @@ try {
         <div class="col-12 mt-4">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h2 class="mb-0"><i class="bi bi-building"></i> Company Profile</h2>
-                    <p class="text-muted">Manage your organization's details and branding</p>
+                    <h2 class="mb-0"><i class="bi bi-building"></i> <?= t('Company Profile') ?></h2>
+                    <p class="text-muted"><?= t("Manage your organization's details and branding") ?></p>
                 </div>
             </div>
 
@@ -172,14 +172,14 @@ try {
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm rounded-4">
                 <div class="card-header bg-white p-4 border-0">
-                    <h5 class="mb-0 fw-bold">General Information</h5>
+                    <h5 class="mb-0 fw-bold"><?= t('General Information') ?></h5>
                 </div>
                 <div class="card-body p-4">
                     <form method="POST" enctype="multipart/form-data">
                         <div class="row g-4">
                             <!-- Logo Upload -->
                             <div class="col-12 mb-3">
-                                <label class="form-label fw-bold">Company Logo</label>
+                                <label class="form-label fw-bold"><?= t('Company Logo') ?></label>
                                 <div class="d-flex align-items-center gap-4">
                                     <div class="bg-light rounded-3 d-flex align-items-center justify-content-center" style="width: 100px; height: 100px; overflow: hidden; border: 2px dashed #dee2e6;">
                                         <?php if (!empty($current_settings['company_logo'])): ?>
@@ -190,89 +190,89 @@ try {
                                     </div>
                                     <div>
                                         <input type="file" class="form-control" name="company_logo" accept="image/*">
-                                        <div class="form-text">Recommended size: 200x200px. Max size: 2MB. Formats: PNG, JPG.</div>
+                                        <div class="form-text"><?= t('Recommended size: 200x200px. Max size: 2MB. Formats: PNG, JPG.') ?></div>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="col-md-6">
-                                <label for="company_name" class="form-label">Company Name *</label>
+                                <label for="company_name" class="form-label"><?= t('Company Name') ?> *</label>
                                 <input type="text" class="form-control" id="company_name" name="company_name" value="<?= htmlspecialchars($current_settings['company_name']) ?>" required>
                             </div>
 
                             <div class="col-md-6">
-                                <label for="company_email" class="form-label">Company Email *</label>
+                                <label for="company_email" class="form-label"><?= t('Company Email') ?> *</label>
                                 <input type="email" class="form-control" id="company_email" name="company_email" value="<?= htmlspecialchars($current_settings['company_email']) ?>" required>
                             </div>
 
                             <div class="col-md-6">
                                 <label for="company_code_prefix" class="form-label">
-                                    Document Code Prefix
-                                    <i class="bi bi-info-circle text-muted" title="The 3-letter tag that starts every auto-generated code (invoices, POs, items, customers...). Auto-suggested from the company name; you can override it."></i>
+                                    <?= t('Document Code Prefix') ?>
+                                    <i class="bi bi-info-circle text-muted" title="<?= t('The 3-letter tag that starts every auto-generated code (invoices, POs, items, customers...). Auto-suggested from the company name; you can override it.') ?>"></i>
                                 </label>
                                 <div class="input-group">
                                     <input type="text" class="form-control text-uppercase fw-bold" id="company_code_prefix" name="company_code_prefix"
                                            value="<?= htmlspecialchars($current_settings['company_code_prefix']) ?>"
                                            maxlength="5" style="max-width:120px" placeholder="e.g. BFS">
-                                    <button type="button" class="btn btn-outline-secondary" id="suggestPrefixBtn" title="Suggest from company name">
+                                    <button type="button" class="btn btn-outline-secondary" id="suggestPrefixBtn" title="<?= t('Suggest from company name') ?>">
                                         <i class="bi bi-magic"></i>
                                     </button>
                                 </div>
                                 <div class="form-text">
-                                    New codes will look like <code id="prefixPreview">BFS-INV-0001</code>.
-                                    Existing documents keep their old code unless re-saved while still editable.
+                                    <?= t('New codes will look like') ?> <code id="prefixPreview">BFS-INV-0001</code>.
+                                    <?= t('Existing documents keep their old code unless re-saved while still editable.') ?>
                                 </div>
                             </div>
 
                             <div class="col-md-6">
-                                <label for="company_phone" class="form-label">Phone Number</label>
+                                <label for="company_phone" class="form-label"><?= t('Phone Number') ?></label>
                                 <input type="text" class="form-control" id="company_phone" name="company_phone" value="<?= htmlspecialchars($current_settings['company_phone']) ?>">
                             </div>
 
                             <div class="col-md-6">
-                                <label for="company_website" class="form-label">Website</label>
+                                <label for="company_website" class="form-label"><?= t('Website') ?></label>
                                 <input type="url" class="form-control" id="company_website" name="company_website" value="<?= htmlspecialchars($current_settings['company_website']) ?>" placeholder="https://">
                             </div>
 
                             <div class="col-md-6">
-                                <label for="company_postal_address" class="form-label">Postal Address</label>
+                                <label for="company_postal_address" class="form-label"><?= t('Postal Address') ?></label>
                                 <input type="text" class="form-control" id="company_postal_address" name="company_postal_address" value="<?= htmlspecialchars($current_settings['company_postal_address']) ?>" placeholder="e.g. P.O. Box 123, Machame">
                             </div>
 
                             <div class="col-md-6">
-                                <label for="company_physical_address" class="form-label">Physical Address</label>
+                                <label for="company_physical_address" class="form-label"><?= t('Physical Address') ?></label>
                                 <input type="text" class="form-control" id="company_physical_address" name="company_physical_address" value="<?= htmlspecialchars($current_settings['company_physical_address']) ?>" placeholder="e.g. Moshi-Kilimanjaro">
                             </div>
-                            
+
 
                             <div class="col-md-6">
-                                <label for="company_currency" class="form-label">Currency Code</label>
+                                <label for="company_currency" class="form-label"><?= t('Currency Code') ?></label>
                                 <input type="text" class="form-control" id="company_currency" name="company_currency" value="<?= htmlspecialchars($current_settings['company_currency']) ?>" placeholder="e.g. TZS, USD">
                             </div>
 
                             <div class="col-md-6">
-                                <label for="company_tin" class="form-label">TIN</label>
+                                <label for="company_tin" class="form-label"><?= t('TIN') ?></label>
                                 <input type="text" class="form-control" id="company_tin" name="company_tin" value="<?= htmlspecialchars($current_settings['company_tin']) ?>">
                             </div>
 
                             <div class="col-md-6">
-                                <label for="company_vrn" class="form-label">VRN</label>
+                                <label for="company_vrn" class="form-label"><?= t('VRN') ?></label>
                                 <input type="text" class="form-control" id="company_vrn" name="company_vrn" value="<?= htmlspecialchars($current_settings['company_vrn']) ?>">
                             </div>
 
                             <!-- Equity (Balance Sheet) -->
                             <div class="col-12 mt-3">
-                                <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-cash-stack me-1"></i> Equity</h6>
+                                <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-cash-stack me-1"></i> <?= t('Equity') ?></h6>
                             </div>
                             <div class="col-md-6">
-                                <label for="share_capital_paid_in" class="form-label">Share Capital (Paid-up, TZS)</label>
+                                <label for="share_capital_paid_in" class="form-label"><?= t('Share Capital (Paid-up, TZS)') ?></label>
                                 <input type="number" step="0.01" min="0" class="form-control" id="share_capital_paid_in" name="share_capital_paid_in" value="<?= htmlspecialchars($current_settings['share_capital_paid_in']) ?>">
-                                <small class="text-muted">Owner's paid-in capital. Used by the Balance Sheet Equity section.</small>
+                                <small class="text-muted"><?= t("Owner's paid-in capital. Used by the Balance Sheet Equity section.") ?></small>
                             </div>
 
                             <div class="col-12 mt-4">
                                 <button type="submit" class="btn btn-primary px-4 py-2">
-                                    <i class="bi bi-save me-2"></i>Save Changes
+                                    <i class="bi bi-save me-2"></i><?= t('Save Changes') ?>
                                 </button>
                             </div>
                         </div>
@@ -284,24 +284,24 @@ try {
         <div class="col-lg-4">
             <div class="card border-0 shadow-sm rounded-4 mb-4">
                 <div class="card-body p-4">
-                    <h5 class="fw-bold mb-3"><i class="bi bi-info-circle text-primary me-2"></i>About</h5>
+                    <h5 class="fw-bold mb-3"><i class="bi bi-info-circle text-primary me-2"></i><?= t('About') ?></h5>
                     <p class="text-muted small">
-                        This information will be used across the system, including:
+                        <?= t('This information will be used across the system, including:') ?>
                     </p>
                     <ul class="text-muted small mb-0">
-                        <li class="mb-2">Invoices and Receipts headers</li>
-                        <li class="mb-2">Email notifications signatures</li>
-                        <li class="mb-2">Reports and exported documents</li>
-                        <li>System branding</li>
+                        <li class="mb-2"><?= t('Invoices and Receipts headers') ?></li>
+                        <li class="mb-2"><?= t('Email notifications signatures') ?></li>
+                        <li class="mb-2"><?= t('Reports and exported documents') ?></li>
+                        <li><?= t('System branding') ?></li>
                     </ul>
                 </div>
             </div>
-            
+
             <div class="card border-0 shadow-sm rounded-4 bg-primary text-white">
                 <div class="card-body p-4 position-relative overflow-hidden">
                     <div class="position-relative z-1">
-                        <h5 class="fw-bold mb-2">Need Help?</h5>
-                        <p class="small opacity-75 mb-0">Contact system administrator if you need dynamic changes to core system configurations.</p>
+                        <h5 class="fw-bold mb-2"><?= t('Need Help?') ?></h5>
+                        <p class="small opacity-75 mb-0"><?= t('Contact system administrator if you need dynamic changes to core system configurations.') ?></p>
                     </div>
                     <i class="bi bi-headset position-absolute bottom-0 end-0 opacity-25" style="font-size: 5rem; transform: translate(10%, 20%);"></i>
                 </div>

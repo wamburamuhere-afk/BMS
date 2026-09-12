@@ -69,28 +69,28 @@ if ($_POST) {
                             throw new Exception("Failed to move uploaded file to destination.");
                         }
                     } else {
-                        throw new Exception("Invalid file type. Allowed: " . implode(', ', $allowed_extensions));
+                        throw new Exception(t('Invalid file type. Allowed:') . ' ' . implode(', ', $allowed_extensions));
                     }
                 } else {
                     $upload_errors = [
-                        UPLOAD_ERR_INI_SIZE => 'The uploaded file exceeds the upload_max_filesize directive in php.ini.',
-                        UPLOAD_ERR_FORM_SIZE => 'The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form.',
-                        UPLOAD_ERR_PARTIAL => 'The uploaded file was only partially uploaded.',
-                        UPLOAD_ERR_NO_TMP_DIR => 'Missing a temporary folder.',
-                        UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk.',
-                        UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the file upload.'
+                        UPLOAD_ERR_INI_SIZE => t('The uploaded file exceeds the upload_max_filesize directive in php.ini.'),
+                        UPLOAD_ERR_FORM_SIZE => t('The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form.'),
+                        UPLOAD_ERR_PARTIAL => t('The uploaded file was only partially uploaded.'),
+                        UPLOAD_ERR_NO_TMP_DIR => t('Missing a temporary folder.'),
+                        UPLOAD_ERR_CANT_WRITE => t('Failed to write file to disk.'),
+                        UPLOAD_ERR_EXTENSION => t('A PHP extension stopped the file upload.')
                     ];
                     $error_code = $_FILES['company_logo']['error'];
-                    throw new Exception($upload_errors[$error_code] ?? 'Unknown upload error.');
+                    throw new Exception($upload_errors[$error_code] ?? t('Unknown upload error.'));
                 }
             }
-            
+
             foreach ($settings as $key => $value) {
                 save_setting($key, $value);
             }
-            $success_messages[] = "General settings updated successfully";
+            $success_messages[] = t('General settings updated successfully');
         } catch (Exception $e) {
-            $error_messages[] = "Error updating general settings: " . $e->getMessage();
+            $error_messages[] = t('Error updating general settings:') . ' ' . $e->getMessage();
         }
     }
     
@@ -111,9 +111,9 @@ if ($_POST) {
             foreach ($settings as $key => $value) {
                 save_setting($key, $value);
             }
-            $success_messages[] = "Email settings updated successfully";
+            $success_messages[] = t('Email settings updated successfully');
         } catch (Exception $e) {
-            $error_messages[] = "Error updating email settings: " . $e->getMessage();
+            $error_messages[] = t('Error updating email settings:') . ' ' . $e->getMessage();
         }
     }
 
@@ -131,9 +131,9 @@ if ($_POST) {
             foreach ($settings as $key => $value) {
                 save_setting($key, $value);
             }
-            $success_messages[] = "SMS settings updated successfully";
+            $success_messages[] = t('SMS settings updated successfully');
         } catch (Exception $e) {
-            $error_messages[] = "Error updating SMS settings: " . $e->getMessage();
+            $error_messages[] = t('Error updating SMS settings:') . ' ' . $e->getMessage();
         }
     }
     
@@ -152,9 +152,9 @@ if ($_POST) {
             foreach ($settings as $key => $value) {
                 save_setting($key, $value);
             }
-            $success_messages[] = "Security settings updated successfully";
+            $success_messages[] = t('Security settings updated successfully');
         } catch (Exception $e) {
-            $error_messages[] = "Error updating security settings: " . $e->getMessage();
+            $error_messages[] = t('Error updating security settings:') . ' ' . $e->getMessage();
         }
     }
 
@@ -167,8 +167,8 @@ if ($_POST) {
     <!-- Page Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <h2><i class="bi bi-gear"></i> System Settings</h2>
-            <p class="text-muted">Manage system configurations and preferences</p>
+            <h2><i class="bi bi-gear"></i> <?= t('System Settings') ?></h2>
+            <p class="text-muted"><?= t('Manage system configurations and preferences') ?></p>
         </div>
     </div>
 
@@ -198,7 +198,7 @@ if ($_POST) {
             <div class="card border-0 shadow-sm sticky-top" style="top: 100px; z-index: 100;">
                 <div class="card-body p-0">
                     <div class="list-group list-group-flush settings-nav" id="settingsTabs" role="tablist">
-                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header">System Configuration</div>
+                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header"><?= t('System Configuration') ?></div>
                         <a class="list-group-item list-group-item-action active py-3 px-4 border-0 border-start border-4 border-transparent"
                            id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab" aria-selected="true">
                             <div class="d-flex align-items-center">
@@ -206,8 +206,8 @@ if ($_POST) {
                                     <i class="bi bi-building"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold">General</h6>
-                                    <small class="text-muted">Business identity & basics</small>
+                                    <h6 class="mb-0 fw-bold"><?= t('General') ?></h6>
+                                    <small class="text-muted"><?= t('Business identity & basics') ?></small>
                                 </div>
                             </div>
                         </a>
@@ -218,8 +218,8 @@ if ($_POST) {
                                     <i class="bi bi-envelope"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold">Email Config</h6>
-                                    <small class="text-muted">SMTP & notifications</small>
+                                    <h6 class="mb-0 fw-bold"><?= t('Email Config') ?></h6>
+                                    <small class="text-muted"><?= t('SMTP & notifications') ?></small>
                                 </div>
                             </div>
                         </a>
@@ -230,8 +230,8 @@ if ($_POST) {
                                     <i class="bi bi-chat-text"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold">SMS Gateway</h6>
-                                    <small class="text-muted">Providers & settings</small>
+                                    <h6 class="mb-0 fw-bold"><?= t('SMS Gateway') ?></h6>
+                                    <small class="text-muted"><?= t('Providers & settings') ?></small>
                                 </div>
                             </div>
                         </a>
@@ -242,8 +242,8 @@ if ($_POST) {
                                     <i class="bi bi-shield-lock"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold">Security</h6>
-                                    <small class="text-muted">Sessions & audits</small>
+                                    <h6 class="mb-0 fw-bold"><?= t('Security') ?></h6>
+                                    <small class="text-muted"><?= t('Sessions & audits') ?></small>
                                 </div>
                             </div>
                         </a>
@@ -256,7 +256,7 @@ if ($_POST) {
                              under sub-headers (2026-07-31) purely for visual scanning — same links,
                              same order-independent gates, just sectioned like the top-nav Settings
                              dropdown's "System Configuration" / "Business Settings" headers. -->
-                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header">Access & Security</div>
+                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header"><?= t('Access & Security') ?></div>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            href="<?= getUrl('users') ?>">
                             <div class="d-flex align-items-center">
@@ -264,8 +264,8 @@ if ($_POST) {
                                     <i class="bi bi-people"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold">Users</h6>
-                                    <small class="text-muted">Accounts & roles</small>
+                                    <h6 class="mb-0 fw-bold"><?= t('Users') ?></h6>
+                                    <small class="text-muted"><?= t('Accounts & roles') ?></small>
                                 </div>
                             </div>
                         </a>
@@ -276,8 +276,8 @@ if ($_POST) {
                                     <i class="bi bi-shield-check"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold">Roles & Permissions</h6>
-                                    <small class="text-muted">What each role can do</small>
+                                    <h6 class="mb-0 fw-bold"><?= t('Roles & Permissions') ?></h6>
+                                    <small class="text-muted"><?= t('What each role can do') ?></small>
                                 </div>
                             </div>
                         </a>
@@ -291,12 +291,12 @@ if ($_POST) {
                                     <i class="bi bi-cloud-arrow-down"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold">Backup</h6>
-                                    <small class="text-muted">Database recovery</small>
+                                    <h6 class="mb-0 fw-bold"><?= t('Backup') ?></h6>
+                                    <small class="text-muted"><?= t('Database recovery') ?></small>
                                 </div>
                             </div>
                         </a>
-                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header">Plan &amp; Modules</div>
+                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header"><?= t('Plan & Modules') ?></div>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            href="<?= getUrl('available_modules') ?>">
                             <div class="d-flex align-items-center">
@@ -304,12 +304,12 @@ if ($_POST) {
                                     <i class="bi bi-grid"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold">Available Modules</h6>
-                                    <small class="text-muted">What your plan includes, request more</small>
+                                    <h6 class="mb-0 fw-bold"><?= t('Available Modules') ?></h6>
+                                    <small class="text-muted"><?= t('What your plan includes, request more') ?></small>
                                 </div>
                             </div>
                         </a>
-                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header">Business & Finance</div>
+                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header"><?= t('Business & Finance') ?></div>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            href="<?= getUrl('payment_settings') ?>">
                             <div class="d-flex align-items-center">
@@ -317,8 +317,8 @@ if ($_POST) {
                                     <i class="bi bi-credit-card"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold">Payments</h6>
-                                    <small class="text-muted">Bank & gateway details</small>
+                                    <h6 class="mb-0 fw-bold"><?= t('Payments') ?></h6>
+                                    <small class="text-muted"><?= t('Bank & gateway details') ?></small>
                                 </div>
                             </div>
                         </a>
@@ -329,12 +329,12 @@ if ($_POST) {
                                     <i class="bi bi-building"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold">Company Profile</h6>
-                                    <small class="text-muted">Logo, TIN/VRN, addresses</small>
+                                    <h6 class="mb-0 fw-bold"><?= t('Company Profile') ?></h6>
+                                    <small class="text-muted"><?= t('Logo, TIN/VRN, addresses') ?></small>
                                 </div>
                             </div>
                         </a>
-                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header">Communication & Integrations</div>
+                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header"><?= t('Communication & Integrations') ?></div>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            href="<?= getUrl('notification_rules') ?>">
                             <div class="d-flex align-items-center">
@@ -342,8 +342,8 @@ if ($_POST) {
                                     <i class="bi bi-bell-fill"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold">Notification Rules</h6>
-                                    <small class="text-muted">Who's notified, per event</small>
+                                    <h6 class="mb-0 fw-bold"><?= t('Notification Rules') ?></h6>
+                                    <small class="text-muted"><?= t("Who's notified, per event") ?></small>
                                 </div>
                             </div>
                         </a>
@@ -354,8 +354,8 @@ if ($_POST) {
                                     <i class="bi bi-camera-video"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold">Zoom Integration</h6>
-                                    <small class="text-muted">Video meeting config</small>
+                                    <h6 class="mb-0 fw-bold"><?= t('Zoom Integration') ?></h6>
+                                    <small class="text-muted"><?= t('Video meeting config') ?></small>
                                 </div>
                             </div>
                         </a>
@@ -366,12 +366,12 @@ if ($_POST) {
                                     <i class="bi bi-stars"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold">AI Assistant</h6>
-                                    <small class="text-muted">AI configuration &amp; API key</small>
+                                    <h6 class="mb-0 fw-bold"><?= t('AI Assistant') ?></h6>
+                                    <small class="text-muted"><?= t('AI configuration & API key') ?></small>
                                 </div>
                             </div>
                         </a>
-                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header">Projects</div>
+                        <div class="list-group-item bg-light border-0 py-1 px-4 text-muted text-uppercase fw-bold sidebar-group-header"><?= t('Projects') ?></div>
                         <a class="list-group-item list-group-item-action py-3 px-4 border-0 border-start border-4 border-transparent"
                            href="<?= getUrl('user_projects') ?>">
                             <div class="d-flex align-items-center">
@@ -379,8 +379,8 @@ if ($_POST) {
                                     <i class="bi bi-diagram-3"></i>
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold">Project Assignments</h6>
-                                    <small class="text-muted">Who's assigned to which project</small>
+                                    <h6 class="mb-0 fw-bold"><?= t('Project Assignments') ?></h6>
+                                    <small class="text-muted"><?= t("Who's assigned to which project") ?></small>
                                 </div>
                             </div>
                         </a>
@@ -397,16 +397,16 @@ if ($_POST) {
                 <div class="tab-pane fade show active" id="general" role="tabpanel">
                     <form method="POST" enctype="multipart/form-data">
                         <div class="d-flex align-items-center mb-4">
-                            <h4 class="section-title mb-0">General Settings</h4>
-                            <span class="badge bg-primary-soft text-primary ms-3">System Identity</span>
+                            <h4 class="section-title mb-0"><?= t('General Settings') ?></h4>
+                            <span class="badge bg-primary-soft text-primary ms-3"><?= t('System Identity') ?></span>
                         </div>
 
                         <div class="row g-4">
                             <div class="col-md-5">
                                 <div class="card info-card h-100">
                                     <div class="card-body p-4">
-                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1">Branding</h6>
-                                        
+                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1"><?= t('Branding') ?></h6>
+
                                         <div class="mb-4 text-center">
                                             <?php $logo = get_setting('company_logo'); ?>
                                             <div class="position-relative d-inline-block mb-3">
@@ -423,32 +423,32 @@ if ($_POST) {
                                                 </label>
                                             </div>
                                             <input type="file" id="company_logo" name="company_logo" class="d-none" accept="image/*">
-                                            <p class="small text-muted mb-0">Upload company logo (PNG/JPG)</p>
+                                            <p class="small text-muted mb-0"><?= t('Upload company logo (PNG/JPG)') ?></p>
                                         </div>
 
                                         <div class="mb-3">
-                                            <label for="company_name" class="form-label">Company Name *</label>
-                                            <input type="text" class="form-control" id="company_name" name="company_name" 
+                                            <label for="company_name" class="form-label"><?= t('Company Name') ?> *</label>
+                                            <input type="text" class="form-control" id="company_name" name="company_name"
                                                    value="<?= get_setting('company_name', 'Microfinance Institution') ?>" required>
                                         </div>
-                                        
+
                                         <div class="mb-3">
-                                            <label class="form-label d-block fw-bold">Module Settings</label>
+                                            <label class="form-label d-block fw-bold"><?= t('Module Settings') ?></label>
                                             <div class="form-check form-switch p-2 bg-light rounded border">
                                                 <input class="form-check-input ms-0 me-2" type="checkbox" id="enable_projects" name="enable_projects" value="1" <?= get_setting('enable_projects') == '1' ? 'checked' : '' ?>>
-                                                <label class="form-check-label" for="enable_projects">Enable Projects Module</label>
-                                                <div class="small text-muted mt-1">Manage projects and link finances (expenses, invoices, etc.) to specific projects.</div>
+                                                <label class="form-check-label" for="enable_projects"><?= t('Enable Projects Module') ?></label>
+                                                <div class="small text-muted mt-1"><?= t('Manage projects and link finances (expenses, invoices, etc.) to specific projects.') ?></div>
                                             </div>
                                         </div>
 
                                         <div class="mb-0">
-                                            <label for="company_type" class="form-label">Business Type *</label>
+                                            <label for="company_type" class="form-label"><?= t('Business Type') ?> *</label>
                                             <select class="form-select" id="company_type" name="company_type" required>
-                                                <option value="microfinance" <?= get_setting('company_type', 'microfinance') == 'microfinance' ? 'selected' : '' ?>>Microfinance / Lending</option>
-                                                <option value="retail" <?= get_setting('company_type') == 'retail' ? 'selected' : '' ?>>Retail / Sales</option>
-                                                <option value="service" <?= get_setting('company_type') == 'service' ? 'selected' : '' ?>>Service / Inventory</option>
+                                                <option value="microfinance" <?= get_setting('company_type', 'microfinance') == 'microfinance' ? 'selected' : '' ?>><?= t('Microfinance / Lending') ?></option>
+                                                <option value="retail" <?= get_setting('company_type') == 'retail' ? 'selected' : '' ?>><?= t('Retail / Sales') ?></option>
+                                                <option value="service" <?= get_setting('company_type') == 'service' ? 'selected' : '' ?>><?= t('Service / Inventory') ?></option>
                                             </select>
-                                            <div class="form-text small">Adapts modules based on business model.</div>
+                                            <div class="form-text small"><?= t('Adapts modules based on business model.') ?></div>
                                         </div>
                                     </div>
                                 </div>
@@ -457,54 +457,54 @@ if ($_POST) {
                             <div class="col-md-7">
                                 <div class="card info-card h-100">
                                     <div class="card-body p-4">
-                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1">Contact & Region</h6>
-                                        
+                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1"><?= t('Contact & Region') ?></h6>
+
                                          <div class="row">
                                             <div class="col-md-6">
                                                 <div class="mb-3">
-                                                    <label for="company_phone" class="form-label">Phone Number</label>
-                                                    <input type="text" class="form-control" id="company_phone" name="company_phone" 
+                                                    <label for="company_phone" class="form-label"><?= t('Phone Number') ?></label>
+                                                    <input type="text" class="form-control" id="company_phone" name="company_phone"
                                                            value="<?= get_setting('company_phone') ?>">
                                                 </div>
                                             </div>
                                             <div class="col-md-6">
                                                 <div class="mb-3">
-                                                    <label for="company_email" class="form-label">Email Address</label>
-                                                    <input type="email" class="form-control" id="company_email" name="company_email" 
+                                                    <label for="company_email" class="form-label"><?= t('Email Address') ?></label>
+                                                    <input type="email" class="form-control" id="company_email" name="company_email"
                                                            value="<?= get_setting('company_email') ?>">
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div class="mb-3">
-                                            <label for="company_website" class="form-label">Company Website</label>
-                                            <input type="text" class="form-control" id="company_website" name="company_website" 
+                                            <label for="company_website" class="form-label"><?= t('Company Website') ?></label>
+                                            <input type="text" class="form-control" id="company_website" name="company_website"
                                                    value="<?= get_setting('company_website') ?>" placeholder="https://example.com">
                                         </div>
 
                                         <div class="mb-3">
-                                            <label for="company_address" class="form-label">Address</label>
-                                            <textarea class="form-control" id="company_address" name="company_address" 
+                                            <label for="company_address" class="form-label"><?= t('Address') ?></label>
+                                            <textarea class="form-control" id="company_address" name="company_address"
                                                       rows="2"><?= get_setting('company_address') ?></textarea>
                                         </div>
 
                                         <div class="row">
                                             <div class="col-md-6">
                                                 <div class="mb-3">
-                                                    <label for="currency" class="form-label">Currency *</label>
+                                                    <label for="currency" class="form-label"><?= t('Currency') ?> *</label>
                                                     <select class="form-control" id="currency" name="currency" required>
-                                                        <option value="USD" <?= get_setting('currency') == 'USD' ? 'selected' : '' ?>>US Dollar ($)</option>
-                                                        <option value="TZS" <?= get_setting('currency') == 'TZS' ? 'selected' : '' ?>>Tanzanian Shilling (TSh)</option>
-                                                        <option value="KES" <?= get_setting('currency') == 'KES' ? 'selected' : '' ?>>Kenyan Shilling (KSh)</option>
-                                                        <option value="EUR" <?= get_setting('currency') == 'EUR' ? 'selected' : '' ?>>Euro (€)</option>
+                                                        <option value="USD" <?= get_setting('currency') == 'USD' ? 'selected' : '' ?>><?= t('US Dollar ($)') ?></option>
+                                                        <option value="TZS" <?= get_setting('currency') == 'TZS' ? 'selected' : '' ?>><?= t('Tanzanian Shilling (TSh)') ?></option>
+                                                        <option value="KES" <?= get_setting('currency') == 'KES' ? 'selected' : '' ?>><?= t('Kenyan Shilling (KSh)') ?></option>
+                                                        <option value="EUR" <?= get_setting('currency') == 'EUR' ? 'selected' : '' ?>><?= t('Euro (€)') ?></option>
                                                     </select>
                                                 </div>
                                             </div>
                                             <div class="col-md-6">
                                                 <div class="mb-3">
-                                                    <label for="timezone" class="form-label">Timezone *</label>
+                                                    <label for="timezone" class="form-label"><?= t('Timezone') ?> *</label>
                                                     <select class="form-control" id="timezone" name="timezone" required>
-                                                        <option value="Africa/Nairobi" <?= get_setting('timezone') == 'Africa/Nairobi' ? 'selected' : '' ?>>East Africa (Nairobi)</option>
+                                                        <option value="Africa/Nairobi" <?= get_setting('timezone') == 'Africa/Nairobi' ? 'selected' : '' ?>><?= t('East Africa (Nairobi)') ?></option>
                                                         <option value="UTC" <?= get_setting('timezone') == 'UTC' ? 'selected' : '' ?>>UTC</option>
                                                     </select>
                                                 </div>
@@ -514,7 +514,7 @@ if ($_POST) {
                                         <div class="row">
                                             <div class="col-md-6">
                                                 <div class="mb-3">
-                                                    <label for="date_format" class="form-label">Date Format *</label>
+                                                    <label for="date_format" class="form-label"><?= t('Date Format') ?> *</label>
                                                     <select class="form-control" id="date_format" name="date_format" required>
                                                         <option value="Y-m-d" <?= get_setting('date_format') == 'Y-m-d' ? 'selected' : '' ?>>YYYY-MM-DD</option>
                                                         <option value="d/m/Y" <?= get_setting('date_format') == 'd/m/Y' ? 'selected' : '' ?>>DD/MM/YYYY</option>
@@ -523,7 +523,7 @@ if ($_POST) {
                                             </div>
                                             <div class="col-md-6">
                                                 <div class="mb-3">
-                                                    <label for="items_per_page" class="form-label">Items Per Page *</label>
+                                                    <label for="items_per_page" class="form-label"><?= t('Items Per Page') ?> *</label>
                                                     <select class="form-control" id="items_per_page" name="items_per_page" required>
                                                         <option value="10" <?= get_setting('items_per_page') == '10' ? 'selected' : '' ?>>10</option>
                                                         <option value="25" <?= get_setting('items_per_page') == '25' ? 'selected' : '' ?>>25</option>
@@ -536,11 +536,11 @@ if ($_POST) {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="mt-5 pt-3 border-top d-flex justify-content-between align-items-center">
-                            <span class="text-muted small">System Version: <span class="fw-bold">v2.1.0</span></span>
+                            <span class="text-muted small"><?= t('System Version:') ?> <span class="fw-bold">v2.1.0</span></span>
                             <button type="submit" name="save_general" class="btn btn-primary px-5">
-                                <i class="bi bi-save me-2"></i> Save Changes
+                                <i class="bi bi-save me-2"></i> <?= t('Save Changes') ?>
                             </button>
                         </div>
                     </form>
@@ -550,38 +550,38 @@ if ($_POST) {
                 <div class="tab-pane fade" id="email" role="tabpanel">
                     <form method="POST">
                         <div class="d-flex align-items-center mb-4">
-                            <h4 class="section-title mb-0">Email Configuration</h4>
-                            <span class="badge bg-info-soft text-info ms-3">Communication</span>
+                            <h4 class="section-title mb-0"><?= t('Email Configuration') ?></h4>
+                            <span class="badge bg-info-soft text-info ms-3"><?= t('Communication') ?></span>
                         </div>
 
                         <div class="row g-4">
                             <div class="col-md-7">
                                 <div class="card info-card h-100">
                                     <div class="card-body p-4">
-                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1">SMTP Server Details</h6>
+                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1"><?= t('SMTP Server Details') ?></h6>
                                         <div class="row g-3">
                                             <div class="col-md-8">
-                                                <label for="smtp_host" class="form-label">SMTP Host *</label>
+                                                <label for="smtp_host" class="form-label"><?= t('SMTP Host') ?> *</label>
                                                 <input type="text" class="form-control" id="smtp_host" name="smtp_host" value="<?= get_setting('smtp_host', 'smtp.gmail.com') ?>" required>
                                             </div>
                                             <div class="col-md-4">
-                                                <label for="smtp_port" class="form-label">Port *</label>
+                                                <label for="smtp_port" class="form-label"><?= t('Port') ?> *</label>
                                                 <input type="number" class="form-control" id="smtp_port" name="smtp_port" value="<?= get_setting('smtp_port', '587') ?>" required>
                                             </div>
                                             <div class="col-md-6">
-                                                <label for="smtp_username" class="form-label">Username *</label>
+                                                <label for="smtp_username" class="form-label"><?= t('Username') ?> *</label>
                                                 <input type="text" class="form-control" id="smtp_username" name="smtp_username" value="<?= get_setting('smtp_username') ?>" required>
                                             </div>
                                             <div class="col-md-6">
-                                                <label for="smtp_password" class="form-label">Password *</label>
+                                                <label for="smtp_password" class="form-label"><?= t('Password') ?> *</label>
                                                 <input type="password" class="form-control" id="smtp_password" name="smtp_password" value="<?= get_setting('smtp_password') ?>" required>
                                             </div>
                                             <div class="col-md-6">
-                                                <label for="smtp_encryption" class="form-label">Encryption *</label>
+                                                <label for="smtp_encryption" class="form-label"><?= t('Encryption') ?> *</label>
                                                 <select class="form-select" id="smtp_encryption" name="smtp_encryption" required>
                                                     <option value="tls" <?= get_setting('smtp_encryption') == 'tls' ? 'selected' : '' ?>>TLS</option>
                                                     <option value="ssl" <?= get_setting('smtp_encryption') == 'ssl' ? 'selected' : '' ?>>SSL</option>
-                                                    <option value="" <?= get_setting('smtp_encryption') == '' ? 'selected' : '' ?>>None</option>
+                                                    <option value="" <?= get_setting('smtp_encryption') == '' ? 'selected' : '' ?>><?= t('None') ?></option>
                                                 </select>
                                             </div>
                                         </div>
@@ -592,19 +592,19 @@ if ($_POST) {
                             <div class="col-md-5">
                                 <div class="card info-card h-100">
                                     <div class="card-body p-4">
-                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1">Sender Identification</h6>
+                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1"><?= t('Sender Identification') ?></h6>
                                         <div class="mb-3">
-                                            <label for="from_email" class="form-label">From Email Address *</label>
+                                            <label for="from_email" class="form-label"><?= t('From Email Address') ?> *</label>
                                             <input type="email" class="form-control" id="from_email" name="from_email" value="<?= get_setting('from_email', get_setting('company_email')) ?>" required>
                                         </div>
                                         <div class="mb-3">
-                                            <label for="from_name" class="form-label">From Name *</label>
+                                            <label for="from_name" class="form-label"><?= t('From Name') ?> *</label>
                                             <input type="text" class="form-control" id="from_name" name="from_name" value="<?= get_setting('from_name', get_setting('company_name')) ?>" required>
                                         </div>
                                         <div class="mb-0">
                                             <div class="form-check form-switch p-0 ms-0">
                                                 <div class="d-flex justify-content-between align-items-center">
-                                                    <label class="form-check-label fw-bold" for="enable_email_notifications">Enable Alerts</label>
+                                                    <label class="form-check-label fw-bold" for="enable_email_notifications"><?= t('Enable Alerts') ?></label>
                                                     <input class="form-check-input" type="checkbox" id="enable_email_notifications" name="enable_email_notifications" value="1" <?= get_setting('enable_email_notifications') ? 'checked' : '' ?>>
                                                 </div>
                                             </div>
@@ -619,11 +619,11 @@ if ($_POST) {
                                         <i class="bi bi-info-circle-fill"></i>
                                     </div>
                                     <div class="flex-grow-1">
-                                        <h6 class="fw-bold mb-1">Verify your connection</h6>
-                                        <p class="small text-muted mb-0">Use the test button to ensure your mail server is configured correctly before saving.</p>
+                                        <h6 class="fw-bold mb-1"><?= t('Verify your connection') ?></h6>
+                                        <p class="small text-muted mb-0"><?= t('Use the test button to ensure your mail server is configured correctly before saving.') ?></p>
                                     </div>
                                     <button type="button" class="btn btn-white border-0 shadow-sm fw-bold px-4" id="testEmailConfig">
-                                        <i class="bi bi-lightning-auto me-2"></i> Test Connection
+                                        <i class="bi bi-lightning-auto me-2"></i> <?= t('Test Connection') ?>
                                     </button>
                                 </div>
                             </div>
@@ -631,7 +631,7 @@ if ($_POST) {
 
                         <div class="mt-5 pt-3 border-top d-flex justify-content-end">
                             <button type="submit" name="save_email" class="btn btn-primary px-5">
-                                <i class="bi bi-save me-2"></i> Save Configuration
+                                <i class="bi bi-save me-2"></i> <?= t('Save Configuration') ?>
                             </button>
                         </div>
                     </form>
@@ -641,29 +641,29 @@ if ($_POST) {
                 <div class="tab-pane fade" id="sms" role="tabpanel">
                     <form method="POST">
                         <div class="d-flex align-items-center mb-4">
-                            <h4 class="section-title mb-0">SMS Gateway Config</h4>
-                            <span class="badge bg-warning-soft text-warning ms-3">Short Message Service</span>
+                            <h4 class="section-title mb-0"><?= t('SMS Gateway Config') ?></h4>
+                            <span class="badge bg-warning-soft text-warning ms-3"><?= t('Short Message Service') ?></span>
                         </div>
 
                         <div class="row g-4">
                             <div class="col-md-7">
                                 <div class="card info-card h-100">
                                     <div class="card-body p-4">
-                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1">Provider Authentication</h6>
+                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1"><?= t('Provider Authentication') ?></h6>
                                         <div class="mb-3">
-                                            <label for="sms_gateway_type" class="form-label">Gateway Provider *</label>
+                                            <label for="sms_gateway_type" class="form-label"><?= t('Gateway Provider') ?> *</label>
                                             <select class="form-select" id="sms_gateway_type" name="sms_gateway_type">
-                                                <option value="placeholder" <?= get_setting('sms_gateway_type') == 'placeholder' ? 'selected' : '' ?>>Simulator (Demo Mode)</option>
+                                                <option value="placeholder" <?= get_setting('sms_gateway_type') == 'placeholder' ? 'selected' : '' ?>><?= t('Simulator (Demo Mode)') ?></option>
                                                 <option value="twilio" <?= get_setting('sms_gateway_type') == 'twilio' ? 'selected' : '' ?>>Twilio</option>
                                                 <option value="infobip" <?= get_setting('sms_gateway_type') == 'infobip' ? 'selected' : '' ?>>Infobip</option>
                                             </select>
                                         </div>
                                         <div class="mb-3">
-                                            <label for="sms_api_key" class="form-label">API Key / Access Token</label>
+                                            <label for="sms_api_key" class="form-label"><?= t('API Key / Access Token') ?></label>
                                             <input type="text" class="form-control" id="sms_api_key" name="sms_api_key" value="<?= get_setting('sms_api_key') ?>">
                                         </div>
                                         <div class="mb-0">
-                                            <label for="sms_api_secret" class="form-label">API Secret / Auth Token</label>
+                                            <label for="sms_api_secret" class="form-label"><?= t('API Secret / Auth Token') ?></label>
                                             <input type="password" class="form-control" id="sms_api_secret" name="sms_api_secret" value="<?= get_setting('sms_api_secret') ?>">
                                         </div>
                                     </div>
@@ -673,15 +673,15 @@ if ($_POST) {
                             <div class="col-md-5">
                                 <div class="card info-card h-100">
                                     <div class="card-body p-4">
-                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1">Broadcast Details</h6>
+                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1"><?= t('Broadcast Details') ?></h6>
                                         <div class="mb-4">
-                                            <label for="sms_sender_id" class="form-label">Sender ID / Mask</label>
+                                            <label for="sms_sender_id" class="form-label"><?= t('Sender ID / Mask') ?></label>
                                             <input type="text" class="form-control" id="sms_sender_id" name="sms_sender_id" value="<?= get_setting('sms_sender_id') ?>" placeholder="e.g. BEJUNDAS">
                                         </div>
                                         <div class="mb-0">
                                             <div class="form-check form-switch p-0 ms-0">
                                                 <div class="d-flex justify-content-between align-items-center">
-                                                    <label class="form-check-label fw-bold" for="sms_enable_notifications">SMS Alerts</label>
+                                                    <label class="form-check-label fw-bold" for="sms_enable_notifications"><?= t('SMS Alerts') ?></label>
                                                     <input class="form-check-input" type="checkbox" id="sms_enable_notifications" name="enable_sms_notifications" value="1" <?= get_setting('enable_sms_notifications') ? 'checked' : '' ?>>
                                                 </div>
                                             </div>
@@ -696,11 +696,11 @@ if ($_POST) {
                                         <i class="bi bi-broadcast-pin"></i>
                                     </div>
                                     <div class="flex-grow-1">
-                                        <h6 class="fw-bold mb-1">Verify SMS Gateway</h6>
-                                        <p class="small text-muted mb-0">Standard charges apply. Ensure your API credentials are correct to avoid broadcast failures.</p>
+                                        <h6 class="fw-bold mb-1"><?= t('Verify SMS Gateway') ?></h6>
+                                        <p class="small text-muted mb-0"><?= t('Standard charges apply. Ensure your API credentials are correct to avoid broadcast failures.') ?></p>
                                     </div>
                                     <button type="button" class="btn btn-white border-0 shadow-sm fw-bold px-4" id="testSmsConfig">
-                                        <i class="bi bi-send-check me-2"></i> Test Send
+                                        <i class="bi bi-send-check me-2"></i> <?= t('Test Send') ?>
                                     </button>
                                 </div>
                             </div>
@@ -708,7 +708,7 @@ if ($_POST) {
 
                         <div class="mt-5 pt-3 border-top d-flex justify-content-end">
                             <button type="submit" name="save_sms" class="btn btn-primary px-5">
-                                <i class="bi bi-save me-2"></i> Save SMS Gateway
+                                <i class="bi bi-save me-2"></i> <?= t('Save SMS Gateway') ?>
                             </button>
                         </div>
                     </form>
@@ -718,28 +718,28 @@ if ($_POST) {
                 <div class="tab-pane fade" id="security" role="tabpanel">
                     <form method="POST">
                         <div class="d-flex align-items-center mb-4">
-                            <h4 class="section-title mb-0">Security & Access</h4>
-                            <span class="badge bg-dark-soft text-dark ms-3">Hardening</span>
+                            <h4 class="section-title mb-0"><?= t('Security & Access') ?></h4>
+                            <span class="badge bg-dark-soft text-dark ms-3"><?= t('Hardening') ?></span>
                         </div>
 
                         <div class="row g-4">
                             <div class="col-md-7">
                                 <div class="card info-card h-100">
                                     <div class="card-body p-4">
-                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1">Authentication Policies</h6>
+                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1"><?= t('Authentication Policies') ?></h6>
                                         <div class="row g-3">
                                             <div class="col-md-6">
-                                                <label for="session_timeout" class="form-label">Session Timeout (Min)</label>
+                                                <label for="session_timeout" class="form-label"><?= t('Session Timeout (Min)') ?></label>
                                                 <input type="number" class="form-control" id="session_timeout" name="session_timeout" value="<?= get_setting('session_timeout', '30') ?>" required>
                                             </div>
                                             <div class="col-md-6">
-                                                <label for="max_login_attempts" class="form-label">Max Login Retries</label>
+                                                <label for="max_login_attempts" class="form-label"><?= t('Max Login Retries') ?></label>
                                                 <input type="number" class="form-control" id="max_login_attempts" name="max_login_attempts" value="<?= get_setting('max_login_attempts', '5') ?>" required>
                                             </div>
                                             <div class="col-12">
-                                                <label for="password_expiry_days" class="form-label">Password Rotation (Days)</label>
+                                                <label for="password_expiry_days" class="form-label"><?= t('Password Rotation (Days)') ?></label>
                                                 <input type="number" class="form-control" id="password_expiry_days" name="password_expiry_days" value="<?= get_setting('password_expiry_days', '90') ?>">
-                                                <div class="form-text small">Set to 0 to disable periodic password changes.</div>
+                                                <div class="form-text small"><?= t('Set to 0 to disable periodic password changes.') ?></div>
                                             </div>
                                         </div>
                                     </div>
@@ -749,11 +749,11 @@ if ($_POST) {
                             <div class="col-md-5">
                                 <div class="card info-card h-100">
                                     <div class="card-body p-4">
-                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1">Advanced Controls</h6>
+                                        <h6 class="fw-bold mb-4 text-dark text-uppercase small letter-spacing-1"><?= t('Advanced Controls') ?></h6>
                                         <div class="mb-4">
                                             <div class="form-check form-switch p-0 ms-0">
                                                 <div class="d-flex justify-content-between align-items-center">
-                                                    <label class="form-check-label fw-bold" for="require_strong_password">Strong Passwords</label>
+                                                    <label class="form-check-label fw-bold" for="require_strong_password"><?= t('Strong Passwords') ?></label>
                                                     <input class="form-check-input" type="checkbox" id="require_strong_password" name="require_strong_password" value="1" <?= get_setting('require_strong_password') ? 'checked' : '' ?>>
                                                 </div>
                                             </div>
@@ -761,7 +761,7 @@ if ($_POST) {
                                         <div class="mb-4">
                                             <div class="form-check form-switch p-0 ms-0">
                                                 <div class="d-flex justify-content-between align-items-center">
-                                                    <label class="form-check-label fw-bold" for="enable_2fa">2FA Verification</label>
+                                                    <label class="form-check-label fw-bold" for="enable_2fa"><?= t('2FA Verification') ?></label>
                                                     <input class="form-check-input" type="checkbox" id="enable_2fa" name="enable_2fa" value="1" <?= get_setting('enable_2fa') ? 'checked' : '' ?>>
                                                 </div>
                                             </div>
@@ -769,7 +769,7 @@ if ($_POST) {
                                         <div class="mb-0">
                                             <div class="form-check form-switch p-0 ms-0">
                                                 <div class="d-flex justify-content-between align-items-center">
-                                                    <label class="form-check-label fw-bold" for="enable_audit_log">Audit Logs</label>
+                                                    <label class="form-check-label fw-bold" for="enable_audit_log"><?= t('Audit Logs') ?></label>
                                                     <input class="form-check-input" type="checkbox" id="enable_audit_log" name="enable_audit_log" value="1" <?= get_setting('enable_audit_log', '1') ? 'checked' : '' ?>>
                                                 </div>
                                             </div>
@@ -783,13 +783,11 @@ if ($_POST) {
                             <div class="col-12">
                                 <div class="card info-card h-100">
                                     <div class="card-body p-4">
-                                        <h6 class="fw-bold mb-1 text-dark text-uppercase small letter-spacing-1">Unfamiliar Login &amp; Concurrent Login Response</h6>
+                                        <h6 class="fw-bold mb-1 text-dark text-uppercase small letter-spacing-1"><?= t('Unfamiliar Login & Concurrent Login Response') ?></h6>
                                         <p class="text-muted small mb-0">
-                                            When a user signs in from a country + device combination never seen on their account before, or signs in
-                                            again while a previous session is still open, an admin is <strong>always emailed</strong> — nothing else
-                                            happens automatically. Only two things can ever end a session on their own: the user clicking Logout, or the
-                                            30-minute idle timeout. For anything else, an admin reviews Login History and decides manually — for example,
-                                            using <strong>End Session</strong> or <strong>Block Account</strong> on the account in question.
+                                            <?= t('When a user signs in from a country + device combination never seen on their account before, or signs in again while a previous session is still open, an admin is') ?>
+                                            <strong><?= t('always emailed') ?></strong> — <?= t('nothing else happens automatically. Only two things can ever end a session on their own: the user clicking Logout, or the 30-minute idle timeout. For anything else, an admin reviews Login History and decides manually — for example, using') ?>
+                                            <strong><?= t('End Session') ?></strong> <?= t('or') ?> <strong><?= t('Block Account') ?></strong> <?= t('on the account in question.') ?>
                                         </p>
                                     </div>
                                 </div>
@@ -798,7 +796,7 @@ if ($_POST) {
 
                         <div class="mt-5 pt-3 border-top d-flex justify-content-end">
                             <button type="submit" name="save_security" class="btn btn-primary px-5">
-                                <i class="bi bi-shield-check me-2"></i> Save Security Policy
+                                <i class="bi bi-shield-check me-2"></i> <?= t('Save Security Policy') ?>
                             </button>
                         </div>
                     </form>
@@ -965,6 +963,18 @@ body {
 
 <script>
 $(document).ready(function() {
+    const SS_STRINGS = {
+        logoPreviewUpdated: <?= json_encode(t('Logo preview updated. Click "Save Changes" to finalize.')) ?>,
+        testing: <?= json_encode(t('Testing...')) ?>,
+        emailTestSuccess: <?= json_encode(t('Email configuration test successful!')) ?>,
+        emailTestFailed: <?= json_encode(t('Email test failed:')) ?>,
+        unknownError: <?= json_encode(t('Unknown error')) ?>,
+        errorTestingEmail: <?= json_encode(t('Error testing email configuration')) ?>,
+        smsTestSuccess: <?= json_encode(t('SMS configuration test successful!')) ?>,
+        smsTestFailed: <?= json_encode(t('SMS test failed:')) ?>,
+        errorTestingSms: <?= json_encode(t('Error testing SMS configuration')) ?>,
+    };
+
     // Logo Upload Interaction
     $('#company_logo').change(function(e) {
         if (this.files && this.files[0]) {
@@ -977,9 +987,9 @@ $(document).ready(function() {
                 }
             }
             reader.readAsDataURL(this.files[0]);
-            
+
             // Helpful tip: user still needs to click Save to persist
-            showToast('info', 'Logo preview updated. Click "Save Changes" to finalize.');
+            showToast('info', SS_STRINGS.logoPreviewUpdated);
         }
     });
 
@@ -987,9 +997,9 @@ $(document).ready(function() {
     $('#testEmailConfig').click(function() {
         const btn = $(this);
         const originalText = btn.html();
-        
-        btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Testing...');
-        
+
+        btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> ' + SS_STRINGS.testing);
+
         $.ajax({
             url: 'api/test_email_config.php',
             type: 'POST',
@@ -1005,13 +1015,13 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(response) {
                 if (response.success) {
-                    showToast('success', 'Email configuration test successful!');
+                    showToast('success', SS_STRINGS.emailTestSuccess);
                 } else {
-                    showToast('error', 'Email test failed: ' + (response.message || 'Unknown error'));
+                    showToast('error', SS_STRINGS.emailTestFailed + ' ' + (response.message || SS_STRINGS.unknownError));
                 }
             },
             error: function() {
-                showToast('error', 'Error testing email configuration');
+                showToast('error', SS_STRINGS.errorTestingEmail);
             },
             complete: function() {
                 btn.prop('disabled', false).html(originalText);
@@ -1023,9 +1033,9 @@ $(document).ready(function() {
     $('#testSmsConfig').click(function() {
         const btn = $(this);
         const originalText = btn.html();
-        
-        btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Testing...');
-        
+
+        btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> ' + SS_STRINGS.testing);
+
         $.ajax({
             url: 'api/test_sms_config.php',
             type: 'POST',
@@ -1038,13 +1048,13 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(response) {
                 if (response.success) {
-                    showToast('success', 'SMS configuration test successful!');
+                    showToast('success', SS_STRINGS.smsTestSuccess);
                 } else {
-                    showToast('error', 'SMS test failed: ' + (response.message || 'Unknown error'));
+                    showToast('error', SS_STRINGS.smsTestFailed + ' ' + (response.message || SS_STRINGS.unknownError));
                 }
             },
             error: function() {
-                showToast('error', 'Error testing SMS configuration');
+                showToast('error', SS_STRINGS.errorTestingSms);
             },
             complete: function() {
                 btn.prop('disabled', false).html(originalText);

@@ -25,8 +25,8 @@ require_once __DIR__ . '/../../../header.php';
     <!-- Page Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <h2><i class="bi bi-bell"></i> Notification Settings</h2>
-            <p class="text-muted">Configure system notifications, alerts, and communication templates</p>
+            <h2><i class="bi bi-bell"></i> <?= t('Notification Settings') ?></h2>
+            <p class="text-muted"><?= t('Configure system notifications, alerts, and communication templates') ?></p>
         </div>
     </div>
 

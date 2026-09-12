@@ -28,14 +28,12 @@ $modules  = listAvailableModulesForTenant($tenantId);
 
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <h4 class="mb-0"><i class="bi bi-grid text-primary me-2"></i>Available Modules</h4>
+        <h4 class="mb-0"><i class="bi bi-grid text-primary me-2"></i><?= t('Available Modules') ?></h4>
     </div>
 
     <div class="alert alert-light border small mb-4">
         <i class="bi bi-info-circle text-primary me-1"></i>
-        These are the optional modules your subscription can include. <strong>Active</strong> modules are
-        already part of your plan. For anything else, send a request — a platform administrator reviews
-        it and lets you know the decision.
+        <?= t('These are the optional modules your subscription can include.') ?> <strong><?= t('Active') ?></strong> <?= t('modules are already part of your plan. For anything else, send a request — a platform administrator reviews it and lets you know the decision.') ?>
     </div>
 
     <div class="row g-3">
@@ -46,11 +44,11 @@ $modules  = listAvailableModulesForTenant($tenantId);
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <h6 class="fw-bold mb-0"><?= safe_output($m['label'], '') ?></h6>
                         <?php if ($m['active']): ?>
-                            <span class="badge" style="background:#0d6efd;color:#fff;">Active</span>
+                            <span class="badge" style="background:#0d6efd;color:#fff;"><?= t('Active') ?></span>
                         <?php elseif ($m['pending']): ?>
-                            <span class="badge" style="background:#e9ecef;color:#495057;">Requested</span>
+                            <span class="badge" style="background:#e9ecef;color:#495057;"><?= t('Requested') ?></span>
                         <?php else: ?>
-                            <span class="badge" style="background:#e9ecef;color:#495057;">Available</span>
+                            <span class="badge" style="background:#e9ecef;color:#495057;"><?= t('Available') ?></span>
                         <?php endif; ?>
                     </div>
                     <p class="text-muted small mb-2 flex-grow-1"><?= safe_output($m['description'], '') ?></p>
@@ -58,24 +56,24 @@ $modules  = listAvailableModulesForTenant($tenantId);
                     <?php if (!$m['active'] && $m['requires']): ?>
                     <p class="small mb-2">
                         <i class="bi bi-link-45deg text-muted"></i>
-                        Requires:
+                        <?= t('Requires:') ?>
                         <?= implode(', ', array_map(fn($r) => safe_output($r['label'], ''), $m['requires'])) ?>
                     </p>
                     <?php endif; ?>
 
                     <?php if ($m['active']): ?>
                         <button class="btn btn-sm btn-outline-primary mt-auto" disabled>
-                            <i class="bi bi-check-circle me-1"></i> Included in your plan
+                            <i class="bi bi-check-circle me-1"></i> <?= t('Included in your plan') ?>
                         </button>
                     <?php elseif ($m['pending']): ?>
                         <button class="btn btn-sm btn-outline-secondary mt-auto" disabled>
-                            <i class="bi bi-hourglass-split me-1"></i> Awaiting approval
+                            <i class="bi bi-hourglass-split me-1"></i> <?= t('Awaiting approval') ?>
                         </button>
                     <?php else: ?>
                         <button class="btn btn-sm btn-primary mt-auto btn-request-module"
                                 data-key="<?= safe_output($m['key'], '') ?>"
                                 data-label="<?= safe_output($m['label'], '') ?>">
-                            <i class="bi bi-send me-1"></i> Request this module
+                            <i class="bi bi-send me-1"></i> <?= t('Request this module') ?>
                         </button>
                     <?php endif; ?>
                 </div>
@@ -93,15 +91,15 @@ $(document).ready(function () {
         const $btn = $(this);
 
         Swal.fire({
-            title: 'Request ' + label,
+            title: <?= json_encode(t('Request')) ?> + ' ' + label,
             input: 'textarea',
-            inputPlaceholder: 'Optional note for the platform administrator (e.g. why you need it)...',
+            inputPlaceholder: <?= json_encode(t('Optional note for the platform administrator (e.g. why you need it)...')) ?>,
             showCancelButton: true,
-            confirmButtonText: 'Send request',
+            confirmButtonText: <?= json_encode(t('Send request')) ?>,
             confirmButtonColor: '#0d6efd'
         }).then(function (result) {
             if (!result.isConfirmed) return;
-            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Sending...');
+            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> ' + <?= json_encode(t('Sending...')) ?>);
             $.ajax({
                 url: '<?= buildUrl('api/request_module_access.php') ?>',
                 type: 'POST',
@@ -109,15 +107,15 @@ $(document).ready(function () {
                 data: { feature_key: key, note: result.value || '', _csrf: CSRF_TOKEN }
             }).done(function (res) {
                 if (res.success) {
-                    Swal.fire({ icon: 'success', title: 'Request sent', text: res.message, timer: 2500, showConfirmButton: false })
+                    Swal.fire({ icon: 'success', title: <?= json_encode(t('Request sent')) ?>, text: res.message, timer: 2500, showConfirmButton: false })
                         .then(() => location.reload());
                 } else {
-                    Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Something went wrong.' });
-                    $btn.prop('disabled', false).html('<i class="bi bi-send me-1"></i> Request this module');
+                    Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: res.message || <?= json_encode(t('Something went wrong.')) ?> });
+                    $btn.prop('disabled', false).html('<i class="bi bi-send me-1"></i> ' + <?= json_encode(t('Request this module')) ?>);
                 }
             }).fail(function () {
-                Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' });
-                $btn.prop('disabled', false).html('<i class="bi bi-send me-1"></i> Request this module');
+                Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: <?= json_encode(t('Server error. Please try again.')) ?> });
+                $btn.prop('disabled', false).html('<i class="bi bi-send me-1"></i> ' + <?= json_encode(t('Request this module')) ?>);
             });
         });
     });

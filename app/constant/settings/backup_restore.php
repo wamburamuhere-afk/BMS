@@ -84,16 +84,16 @@ $apiUrl = getUrl('api/backup_actions.php');
         <div class="col-12 mt-4">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h2 class="mb-0"><i class="bi bi-hdd-network"></i> Backup & Restore</h2>
-                    <p class="text-muted mb-0">Manage database backups and system restoration points</p>
+                    <h2 class="mb-0"><i class="bi bi-hdd-network"></i> <?= t('Backup & Restore') ?></h2>
+                    <p class="text-muted mb-0"><?= t('Manage database backups and system restoration points') ?></p>
                 </div>
-                <span class="badge bg-info p-2 rounded-pill fs-6">Database: <?= htmlspecialchars((string)$dbSize) ?> MB</span>
+                <span class="badge bg-info p-2 rounded-pill fs-6"><?= t('Database:') ?> <?= htmlspecialchars((string)$dbSize) ?> MB</span>
             </div>
 
             <?php if ($autoBackupNotice): ?>
                 <div class="alert alert-info alert-dismissible fade show" role="alert">
                     <i class="bi bi-clock-history me-2"></i>
-                    <strong>Auto backup created:</strong> <?= htmlspecialchars($autoBackupNotice) ?>
+                    <strong><?= t('Auto backup created:') ?></strong> <?= htmlspecialchars($autoBackupNotice) ?>
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             <?php endif; ?>
@@ -110,10 +110,10 @@ $apiUrl = getUrl('api/backup_actions.php');
                     <div class="mb-3">
                         <i class="bi bi-cloud-arrow-down text-primary" style="font-size:3rem;"></i>
                     </div>
-                    <h5 class="fw-bold">Create New Backup</h5>
-                    <p class="text-muted small mb-4">Generate a complete snapshot of your current database state.</p>
+                    <h5 class="fw-bold"><?= t('Create New Backup') ?></h5>
+                    <p class="text-muted small mb-4"><?= t('Generate a complete snapshot of your current database state.') ?></p>
                     <button type="button" class="btn btn-primary w-100 py-2" onclick="createBackup()">
-                        <i class="bi bi-plus-circle me-2"></i>Generate Backup
+                        <i class="bi bi-plus-circle me-2"></i><?= t('Generate Backup') ?>
                     </button>
                 </div>
             </div>
@@ -126,13 +126,13 @@ $apiUrl = getUrl('api/backup_actions.php');
                     <div class="mb-3">
                         <i class="bi bi-cloud-arrow-up text-success" style="font-size:3rem;"></i>
                     </div>
-                    <h5 class="fw-bold">Restore from File</h5>
-                    <p class="text-muted small mb-4">Upload a .sql file to restore your database to a previous state.</p>
+                    <h5 class="fw-bold"><?= t('Restore from File') ?></h5>
+                    <p class="text-muted small mb-4"><?= t('Upload a .sql file to restore your database to a previous state.') ?></p>
                     <div class="input-group mb-3">
                         <input type="file" class="form-control" id="uploadBackupFile" accept=".sql">
                     </div>
                     <button type="button" class="btn btn-success w-100 py-2" onclick="uploadRestore()">
-                        <i class="bi bi-upload me-2"></i>Upload & Restore
+                        <i class="bi bi-upload me-2"></i><?= t('Upload & Restore') ?>
                     </button>
                 </div>
             </div>
@@ -142,12 +142,12 @@ $apiUrl = getUrl('api/backup_actions.php');
         <div class="col-md-4 mb-4">
             <div class="card border-0 shadow-sm h-100 rounded-4 bg-light">
                 <div class="card-body p-4">
-                    <h5 class="fw-bold mb-3"><i class="bi bi-info-circle text-primary me-2"></i>Important Notes</h5>
+                    <h5 class="fw-bold mb-3"><i class="bi bi-info-circle text-primary me-2"></i><?= t('Important Notes') ?></h5>
                     <ul class="text-muted small ps-3 mb-0">
-                        <li class="mb-2">Restoring a backup will <strong>overwrite</strong> all current data.</li>
-                        <li class="mb-2">Create a new backup before restoring an old one.</li>
-                        <li class="mb-2">Auto backups run daily and keep the last 7 files.</li>
-                        <li>Large restores may take a few minutes.</li>
+                        <li class="mb-2"><?= t('Restoring a backup will') ?> <strong><?= t('overwrite') ?></strong> <?= t('all current data.') ?></li>
+                        <li class="mb-2"><?= t('Create a new backup before restoring an old one.') ?></li>
+                        <li class="mb-2"><?= t('Auto backups run daily and keep the last 7 files.') ?></li>
+                        <li><?= t('Large restores may take a few minutes.') ?></li>
                     </ul>
                 </div>
             </div>
@@ -159,18 +159,18 @@ $apiUrl = getUrl('api/backup_actions.php');
         <div class="col-12">
             <div class="card border-0 shadow-sm rounded-4">
                 <div class="card-header bg-white p-4 border-0 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-bold">Existing Backups</h5>
-                    <span class="badge bg-secondary"><?= count($backups) ?> Files</span>
+                    <h5 class="mb-0 fw-bold"><?= t('Existing Backups') ?></h5>
+                    <span class="badge bg-secondary"><?= count($backups) ?> <?= t('Files') ?></span>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table id="backupsTable" class="table table-hover align-middle mb-0 w-100">
                             <thead class="bg-light text-muted small text-uppercase fw-bold">
                                 <tr>
-                                    <th class="ps-4">Filename</th>
-                                    <th>Date Created</th>
-                                    <th>Size</th>
-                                    <th class="text-end pe-4">Actions</th>
+                                    <th class="ps-4"><?= t('Filename') ?></th>
+                                    <th><?= t('Date Created') ?></th>
+                                    <th><?= t('Size') ?></th>
+                                    <th class="text-end pe-4"><?= t('Actions') ?></th>
                                 </tr>
                             </thead>
                             <tbody id="backupsTableBody">
@@ -199,20 +199,20 @@ $apiUrl = getUrl('api/backup_actions.php');
                                                         <li>
                                                             <button type="button" class="dropdown-item"
                                                                 onclick="restoreBackup('<?= $fnJs ?>')">
-                                                                <i class="bi bi-clock-history me-2 text-warning"></i> Restore
+                                                                <i class="bi bi-clock-history me-2 text-warning"></i> <?= t('Restore') ?>
                                                             </button>
                                                         </li>
                                                         <li>
                                                             <a href="<?= htmlspecialchars(getUrl('download_backup')) ?>?file=<?= urlencode($fn) ?>"
                                                                class="dropdown-item">
-                                                                <i class="bi bi-download me-2 text-primary"></i> Download
+                                                                <i class="bi bi-download me-2 text-primary"></i> <?= t('Download') ?>
                                                             </a>
                                                         </li>
                                                         <li><hr class="dropdown-divider"></li>
                                                         <li>
                                                             <button type="button" class="dropdown-item text-danger"
                                                                 onclick="deleteBackup('<?= $fnJs ?>', '<?= md5($fn) ?>')">
-                                                                <i class="bi bi-trash me-2"></i> Delete
+                                                                <i class="bi bi-trash me-2"></i> <?= t('Delete') ?>
                                                             </button>
                                                         </li>
                                                     </ul>
@@ -242,7 +242,7 @@ $(function () {
             pageLength: 25,
             order: [],
             columnDefs: [{ orderable: false, targets: -1 }],
-            language: { emptyTable: 'No backups found. Create one to get started.', zeroRecords: 'No matching backups.' }
+            language: { emptyTable: <?= json_encode(t('No backups found. Create one to get started.')) ?>, zeroRecords: <?= json_encode(t('No matching backups.')) ?> }
         });
     }
 });
@@ -287,28 +287,28 @@ function showLoading(title, text) {
 function createBackup() {
     Swal.fire({
         icon: 'question',
-        title: 'Generate Backup?',
-        text: 'A full snapshot of the current database will be created.',
+        title: <?= json_encode(t('Generate Backup?')) ?>,
+        text: <?= json_encode(t('A full snapshot of the current database will be created.')) ?>,
         showCancelButton: true,
-        confirmButtonText: 'Yes, generate it',
-        cancelButtonText: 'Cancel'
+        confirmButtonText: <?= json_encode(t('Yes, generate it')) ?>,
+        cancelButtonText: <?= json_encode(t('Cancel')) ?>
     }).then(result => {
         if (!result.isConfirmed) return;
-        showLoading('Creating Backup…', 'Please wait, this may take a moment.');
+        showLoading(<?= json_encode(t('Creating Backup…')) ?>, <?= json_encode(t('Please wait, this may take a moment.')) ?>);
         backupPost({ action: 'create_backup' })
             .then(res => {
                 if (res.success) {
                     Swal.fire({
                         icon: 'success',
-                        title: 'Backup Created',
+                        title: <?= json_encode(t('Backup Created')) ?>,
                         html: `<p>${res.message}</p><p class="text-muted small mb-0"><strong>${res.filename}</strong> &mdash; ${res.size}</p>`,
-                        confirmButtonText: 'OK'
+                        confirmButtonText: <?= json_encode(t('OK')) ?>
                     }).then(() => location.reload());
                 } else {
-                    Swal.fire({ icon: 'error', title: 'Failed', text: res.message });
+                    Swal.fire({ icon: 'error', title: <?= json_encode(t('Failed')) ?>, text: res.message });
                 }
             })
-            .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'An unexpected error occurred.' }));
+            .catch(() => Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: <?= json_encode(t('An unexpected error occurred.')) ?> }));
     });
 }
 
@@ -316,33 +316,33 @@ function createBackup() {
 function restoreBackup(filename) {
     Swal.fire({
         icon: 'warning',
-        title: 'Restore Database?',
-        html: `<p>You are about to restore:</p>
+        title: <?= json_encode(t('Restore Database?')) ?>,
+        html: `<p>${<?= json_encode(t('You are about to restore:')) ?>}</p>
                <p class="fw-bold text-dark">${filename}</p>
                <p class="text-danger mb-0"><i class="bi bi-exclamation-triangle-fill me-1"></i>
-               This will <strong>overwrite all current data</strong>. This action cannot be undone.</p>`,
+               ${<?= json_encode(t('This will')) ?>} <strong>${<?= json_encode(t('overwrite all current data')) ?>}</strong>. ${<?= json_encode(t('This action cannot be undone.')) ?>}</p>`,
         showCancelButton: true,
-        confirmButtonText: 'Yes, restore it',
+        confirmButtonText: <?= json_encode(t('Yes, restore it')) ?>,
         confirmButtonColor: '#dc3545',
-        cancelButtonText: 'Cancel',
+        cancelButtonText: <?= json_encode(t('Cancel')) ?>,
         reverseButtons: true
     }).then(result => {
         if (!result.isConfirmed) return;
-        showLoading('Restoring Database…', 'Please wait — do not close this page.');
+        showLoading(<?= json_encode(t('Restoring Database…')) ?>, <?= json_encode(t('Please wait — do not close this page.')) ?>);
         backupPost({ action: 'restore_backup', filename })
             .then(res => {
                 if (res.success) {
                     Swal.fire({
                         icon: 'success',
-                        title: 'Restore Successful',
+                        title: <?= json_encode(t('Restore Successful')) ?>,
                         text: res.message,
-                        confirmButtonText: 'OK'
+                        confirmButtonText: <?= json_encode(t('OK')) ?>
                     }).then(() => location.reload());
                 } else {
-                    Swal.fire({ icon: 'error', title: 'Restore Failed', text: res.message });
+                    Swal.fire({ icon: 'error', title: <?= json_encode(t('Restore Failed')) ?>, text: res.message });
                 }
             })
-            .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'An unexpected error occurred.' }));
+            .catch(() => Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: <?= json_encode(t('An unexpected error occurred.')) ?> }));
     });
 }
 
@@ -350,30 +350,30 @@ function restoreBackup(filename) {
 function uploadRestore() {
     const fileInput = document.getElementById('uploadBackupFile');
     if (!fileInput.files.length) {
-        Swal.fire({ icon: 'warning', title: 'No File Selected', text: 'Please select a .sql backup file first.' });
+        Swal.fire({ icon: 'warning', title: <?= json_encode(t('No File Selected')) ?>, text: <?= json_encode(t('Please select a .sql backup file first.')) ?> });
         return;
     }
     const file = fileInput.files[0];
     if (!file.name.toLowerCase().endsWith('.sql')) {
-        Swal.fire({ icon: 'error', title: 'Invalid File', text: 'Only .sql files are allowed.' });
+        Swal.fire({ icon: 'error', title: <?= json_encode(t('Invalid File')) ?>, text: <?= json_encode(t('Only .sql files are allowed.')) ?> });
         return;
     }
 
     Swal.fire({
         icon: 'warning',
-        title: 'Upload & Restore?',
-        html: `<p>You are about to upload and restore:</p>
+        title: <?= json_encode(t('Upload & Restore?')) ?>,
+        html: `<p>${<?= json_encode(t('You are about to upload and restore:')) ?>}</p>
                <p class="fw-bold text-dark">${file.name}</p>
                <p class="text-danger mb-0"><i class="bi bi-exclamation-triangle-fill me-1"></i>
-               This will <strong>overwrite all current data</strong>. This action cannot be undone.</p>`,
+               ${<?= json_encode(t('This will')) ?>} <strong>${<?= json_encode(t('overwrite all current data')) ?>}</strong>. ${<?= json_encode(t('This action cannot be undone.')) ?>}</p>`,
         showCancelButton: true,
-        confirmButtonText: 'Yes, upload & restore',
+        confirmButtonText: <?= json_encode(t('Yes, upload & restore')) ?>,
         confirmButtonColor: '#dc3545',
-        cancelButtonText: 'Cancel',
+        cancelButtonText: <?= json_encode(t('Cancel')) ?>,
         reverseButtons: true
     }).then(result => {
         if (!result.isConfirmed) return;
-        showLoading('Uploading & Restoring…', 'Please wait — do not close this page.');
+        showLoading(<?= json_encode(t('Uploading & Restoring…')) ?>, <?= json_encode(t('Please wait — do not close this page.')) ?>);
         const fd = new FormData();
         fd.append('action', 'upload_restore');
         fd.append('backup_file', file);
@@ -382,15 +382,15 @@ function uploadRestore() {
                 if (res.success) {
                     Swal.fire({
                         icon: 'success',
-                        title: 'Restore Successful',
+                        title: <?= json_encode(t('Restore Successful')) ?>,
                         text: res.message,
-                        confirmButtonText: 'OK'
+                        confirmButtonText: <?= json_encode(t('OK')) ?>
                     }).then(() => location.reload());
                 } else {
-                    Swal.fire({ icon: 'error', title: 'Restore Failed', text: res.message });
+                    Swal.fire({ icon: 'error', title: <?= json_encode(t('Restore Failed')) ?>, text: res.message });
                 }
             })
-            .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'An unexpected error occurred.' }));
+            .catch(() => Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: <?= json_encode(t('An unexpected error occurred.')) ?> }));
     });
 }
 
@@ -398,12 +398,12 @@ function uploadRestore() {
 function deleteBackup(filename, rowHash) {
     Swal.fire({
         icon: 'warning',
-        title: 'Delete Backup?',
-        html: `<p class="fw-bold text-dark">${filename}</p><p class="mb-0">This backup file will be permanently deleted.</p>`,
+        title: <?= json_encode(t('Delete Backup?')) ?>,
+        html: `<p class="fw-bold text-dark">${filename}</p><p class="mb-0">${<?= json_encode(t('This backup file will be permanently deleted.')) ?>}</p>`,
         showCancelButton: true,
-        confirmButtonText: 'Delete',
+        confirmButtonText: <?= json_encode(t('Delete')) ?>,
         confirmButtonColor: '#dc3545',
-        cancelButtonText: 'Cancel',
+        cancelButtonText: <?= json_encode(t('Cancel')) ?>,
         reverseButtons: true
     }).then(result => {
         if (!result.isConfirmed) return;
@@ -412,12 +412,12 @@ function deleteBackup(filename, rowHash) {
                 if (res.success) {
                     const row = document.getElementById('row-' + rowHash);
                     if (row) row.remove();
-                    Swal.fire({ icon: 'success', title: 'Deleted', text: res.message, timer: 1800, showConfirmButton: false });
+                    Swal.fire({ icon: 'success', title: <?= json_encode(t('Deleted')) ?>, text: res.message, timer: 1800, showConfirmButton: false });
                 } else {
-                    Swal.fire({ icon: 'error', title: 'Failed', text: res.message });
+                    Swal.fire({ icon: 'error', title: <?= json_encode(t('Failed')) ?>, text: res.message });
                 }
             })
-            .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'An unexpected error occurred.' }));
+            .catch(() => Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: <?= json_encode(t('An unexpected error occurred.')) ?> }));
     });
 }
 </script>

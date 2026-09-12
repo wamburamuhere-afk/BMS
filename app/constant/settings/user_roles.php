@@ -59,14 +59,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare("DELETE FROM role_permissions WHERE role_id = ?");
                 $stmt->execute([$role_id]);
                 
-                $message = "Role updated successfully";
+                $message = t('Role updated successfully');
             } else {
                 // Create new role
                 $stmt = $pdo->prepare("INSERT INTO roles (role_name, description, created_at) VALUES (?, ?, NOW())");
                 $stmt->execute([$role_name, $role_description]);
                 $role_id = $pdo->lastInsertId();
                 
-                $message = "Role created successfully";
+                $message = t('Role created successfully');
             }
             
             // Add granular permissions
@@ -108,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } catch (Exception $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
-            $error_messages[] = "Error saving role: " . $e->getMessage();
+            $error_messages[] = t('Error saving role:') . ' ' . $e->getMessage();
         }
     }
     
@@ -149,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("DELETE FROM roles WHERE role_id = ?");
             $stmt->execute([$role_id]);
 
-            $success_messages[] = "Role \"" . htmlspecialchars($role_name) . "\" deleted successfully";
+            $success_messages[] = sprintf(t('Role "%s" deleted successfully'), htmlspecialchars($role_name));
 
             // Clear, human-readable record of WHAT was deleted. WHO + WHEN are
             // captured automatically by logActivity/logAudit (user id + timestamp).
@@ -175,7 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $log_detail
             );
         } catch (Exception $e) {
-            $error_messages[] = "Error deleting role: " . $e->getMessage();
+            $error_messages[] = t('Error deleting role:') . ' ' . $e->getMessage();
         }
     }
     
@@ -188,7 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("UPDATE users SET role_id = ? WHERE user_id = ?");
             $stmt->execute([$role_id, $user_id]);
             
-            $success_messages[] = "User role updated successfully";
+            $success_messages[] = t('User role updated successfully');
 
             // Log action — to both audit_logs AND activity_logs.
             logAudit($pdo, $_SESSION['user_id'], 'update_user_role', [
@@ -199,7 +199,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
             logActivity($pdo, $_SESSION['user_id'], 'Edit user role', "User changed role assignment for user ID $user_id to role ID $role_id");
         } catch (Exception $e) {
-            $error_messages[] = "Error updating user role: " . $e->getMessage();
+            $error_messages[] = t('Error updating user role:') . ' ' . $e->getMessage();
         }
     }
 
@@ -299,18 +299,26 @@ function getRoleBadgeColor($role_name) {
     <!-- Page Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <h2><i class="bi bi-person-badge"></i> User Roles & Permissions</h2>
-            <p class="text-muted">Manage user roles, permissions, and access control across the system</p>
+            <h2><i class="bi bi-person-badge"></i> <?= t('User Roles & Permissions') ?></h2>
+            <p class="text-muted"><?= t('Manage user roles, permissions, and access control across the system') ?></p>
         </div>
     </div>
 
     <!-- Messages -->
+    <?php
+    // $success_messages/$error_messages are set during POST handling, before
+    // header.php resolves the user's language (the POST branch above redirects
+    // and exit()s well before header.php ever runs on that request) —
+    // translated here, at display time, on the follow-up GET, once the
+    // correct language is loaded. t() no-ops gracefully on a message with
+    // dynamic data interpolated into it (e.g. a role name or a raw exception).
+    ?>
     <?php if (!empty($success_messages)): ?>
         <script>
             Swal.fire({
                 icon: 'success',
-                title: 'Success!',
-                text: '<?= addslashes(implode("\\n", $success_messages)) ?>',
+                title: <?= json_encode(t('Success!')) ?>,
+                text: <?= json_encode(implode("\n", array_map('t', $success_messages))) ?>,
                 timer: 3000
             });
         </script>
@@ -320,8 +328,8 @@ function getRoleBadgeColor($role_name) {
         <script>
             Swal.fire({
                 icon: 'error',
-                title: 'Error!',
-                text: '<?= addslashes(implode("\\n", $error_messages)) ?>'
+                title: <?= json_encode(t('Error!')) ?>,
+                text: <?= json_encode(implode("\n", array_map('t', $error_messages))) ?>
             });
         </script>
     <?php endif; ?>
@@ -350,7 +358,7 @@ function getRoleBadgeColor($role_name) {
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h4 class="mb-0 fw-bold"><?= number_format($stats['total_roles']) ?></h4>
-                            <p class="small mb-0 opacity-75 text-uppercase">Total Roles</p>
+                            <p class="small mb-0 opacity-75 text-uppercase"><?= t('Total Roles') ?></p>
                         </div>
                         <i class="bi bi-person-badge opacity-50 fs-2"></i>
                     </div>
@@ -364,7 +372,7 @@ function getRoleBadgeColor($role_name) {
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h4 class="mb-0 fw-bold"><?= number_format($stats['total_permissions']) ?></h4>
-                            <p class="small mb-0 opacity-75 text-uppercase">Total Permissions</p>
+                            <p class="small mb-0 opacity-75 text-uppercase"><?= t('Total Permissions') ?></p>
                         </div>
                         <i class="bi bi-shield-check opacity-50 fs-2"></i>
                     </div>
@@ -378,7 +386,7 @@ function getRoleBadgeColor($role_name) {
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h4 class="mb-0 fw-bold"><?= number_format($stats['total_users']) ?></h4>
-                            <p class="small mb-0 opacity-75 text-uppercase">System Users</p>
+                            <p class="small mb-0 opacity-75 text-uppercase"><?= t('System Users') ?></p>
                         </div>
                         <i class="bi bi-people opacity-50 fs-2"></i>
                     </div>
@@ -392,7 +400,7 @@ function getRoleBadgeColor($role_name) {
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h4 class="mb-0 fw-bold"><?= number_format($stats['total_modules']) ?></h4>
-                            <p class="small mb-0 opacity-75 text-uppercase">System Modules</p>
+                            <p class="small mb-0 opacity-75 text-uppercase"><?= t('System Modules') ?></p>
                         </div>
                         <i class="bi bi-puzzle opacity-50 fs-2"></i>
                     </div>
@@ -408,19 +416,19 @@ function getRoleBadgeColor($role_name) {
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="roles-tab" data-bs-toggle="tab" 
                             data-bs-target="#roles" type="button" role="tab">
-                        <i class="bi bi-person-badge"></i> Roles Management
+                        <i class="bi bi-person-badge"></i> <?= t('Roles Management') ?>
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="users-tab" data-bs-toggle="tab" 
+                    <button class="nav-link" id="users-tab" data-bs-toggle="tab"
                             data-bs-target="#users" type="button" role="tab">
-                        <i class="bi bi-people"></i> User Assignments
+                        <i class="bi bi-people"></i> <?= t('User Assignments') ?>
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="audit-tab" data-bs-toggle="tab" 
+                    <button class="nav-link" id="audit-tab" data-bs-toggle="tab"
                             data-bs-target="#audit" type="button" role="tab">
-                        <i class="bi bi-clock-history"></i> Access Audit
+                        <i class="bi bi-clock-history"></i> <?= t('Access Audit') ?>
                     </button>
                 </li>
             </ul>
@@ -434,9 +442,9 @@ function getRoleBadgeColor($role_name) {
                         <div class="col-md-4">
                             <div class="card">
                                 <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h5 class="mb-0">System Roles</h5>
+                                    <h5 class="mb-0"><?= t('System Roles') ?></h5>
                                     <button class="btn btn-primary btn-sm" id="addRoleBtn">
-                                        <i class="bi bi-plus-circle"></i> Add Role
+                                        <i class="bi bi-plus-circle"></i> <?= t('Add Role') ?>
                                     </button>
                                 </div>
                                 <div class="card-body">
@@ -447,7 +455,7 @@ function getRoleBadgeColor($role_name) {
                                                     <h6 class="mb-1"><?= htmlspecialchars($role['role_name']) ?></h6>
                                                     <p class="mb-1 text-muted small"><?= htmlspecialchars($role['description'] ?? '') ?></p>
                                                     <small class="text-muted">
-                                                        <?= $role['user_count'] ?> user(s)
+                                                        <?= $role['user_count'] ?> <?= t('user(s)') ?>
                                                     </small>
                                                 </div>
                                                 <div class="btn-group">
@@ -473,7 +481,7 @@ function getRoleBadgeColor($role_name) {
                         <div class="col-md-8">
                             <div class="card">
                                 <div class="card-header">
-                                    <h5 class="mb-0" id="roleFormTitle">Add New Role</h5>
+                                    <h5 class="mb-0" id="roleFormTitle"><?= t('Add New Role') ?></h5>
                                 </div>
                                 <div class="card-body">
                                     <form method="POST" id="roleForm">
@@ -482,23 +490,23 @@ function getRoleBadgeColor($role_name) {
                                         <div class="row">
                                             <div class="col-md-6">
                                                 <div class="mb-3">
-                                                    <label for="role_name" class="form-label">Role Name *</label>
+                                                    <label for="role_name" class="form-label"><?= t('Role Name') ?> *</label>
                                                     <input type="text" class="form-control" id="role_name" name="role_name" required>
                                                 </div>
                                             </div>
                                             <div class="col-md-6">
                                                 <div class="mb-3">
-                                                    <label for="role_description" class="form-label">Description</label>
+                                                    <label for="role_description" class="form-label"><?= t('Description') ?></label>
                                                     <input type="text" class="form-control" id="role_description" name="role_description">
                                                 </div>
                                             </div>
                                         </div>
 
                                         <h6 class="mt-4 mb-3 d-flex justify-content-between align-items-center">
-                                            <span><i class="bi bi-shield-lock me-2"></i>Configure Permissions</span>
+                                            <span><i class="bi bi-shield-lock me-2"></i><?= t('Configure Permissions') ?></span>
                                             <div class="input-group input-group-sm w-50">
                                                 <span class="input-group-text"><i class="bi bi-search"></i></span>
-                                                <input type="text" class="form-control" id="permSearch" placeholder="Search permissions...">
+                                                <input type="text" class="form-control" id="permSearch" placeholder="<?= t('Search permissions...') ?>">
                                             </div>
                                         </h6>
                                         
@@ -538,40 +546,40 @@ function getRoleBadgeColor($role_name) {
                                                             <table class="table table-hover table-sm align-middle mb-0">
                                                                 <thead class="bg-light-subtle sticky-top">
                                                                     <tr>
-                                                                        <th class="ps-3" style="width: 22%;">Feature / Page</th>
+                                                                        <th class="ps-3" style="width: 22%;"><?= t('Feature / Page') ?></th>
                                                                         <th class="text-center" style="width: 12%;">
                                                                             <div class="d-flex flex-column align-items-center">
-                                                                                <span class="small text-muted mb-1">VIEW</span>
+                                                                                <span class="small text-muted mb-1"><?= t('VIEW') ?></span>
                                                                                 <input type="checkbox" class="form-check-input select-all-col" data-module="<?= $tabId ?>" data-type="view">
                                                                             </div>
                                                                         </th>
                                                                         <th class="text-center" style="width: 12%;">
                                                                             <div class="d-flex flex-column align-items-center">
-                                                                                <span class="small text-muted mb-1">CREATE</span>
+                                                                                <span class="small text-muted mb-1"><?= t('CREATE') ?></span>
                                                                                 <input type="checkbox" class="form-check-input select-all-col" data-module="<?= $tabId ?>" data-type="create">
                                                                             </div>
                                                                         </th>
                                                                         <th class="text-center" style="width: 12%;">
                                                                             <div class="d-flex flex-column align-items-center">
-                                                                                <span class="small text-muted mb-1">EDIT</span>
+                                                                                <span class="small text-muted mb-1"><?= t('EDIT') ?></span>
                                                                                 <input type="checkbox" class="form-check-input select-all-col" data-module="<?= $tabId ?>" data-type="edit">
                                                                             </div>
                                                                         </th>
                                                                         <th class="text-center" style="width: 12%;">
                                                                             <div class="d-flex flex-column align-items-center">
-                                                                                <span class="small text-muted mb-1">DELETE</span>
+                                                                                <span class="small text-muted mb-1"><?= t('DELETE') ?></span>
                                                                                 <input type="checkbox" class="form-check-input select-all-col" data-module="<?= $tabId ?>" data-type="delete">
                                                                             </div>
                                                                         </th>
                                                                         <th class="text-center" style="width: 13%;">
                                                                             <div class="d-flex flex-column align-items-center">
-                                                                                <span class="small mb-1" style="color:#0d6efd;font-weight:700;">REVIEW</span>
+                                                                                <span class="small mb-1" style="color:#0d6efd;font-weight:700;"><?= t('REVIEW') ?></span>
                                                                                 <input type="checkbox" class="form-check-input select-all-col" data-module="<?= $tabId ?>" data-type="review">
                                                                             </div>
                                                                         </th>
                                                                         <th class="text-center" style="width: 13%;">
                                                                             <div class="d-flex flex-column align-items-center">
-                                                                                <span class="small mb-1" style="color:#198754;font-weight:700;">APPROVE</span>
+                                                                                <span class="small mb-1" style="color:#198754;font-weight:700;"><?= t('APPROVE') ?></span>
                                                                                 <input type="checkbox" class="form-check-input select-all-col" data-module="<?= $tabId ?>" data-type="approve">
                                                                             </div>
                                                                         </th>
@@ -637,10 +645,10 @@ function getRoleBadgeColor($role_name) {
 
                                         <div class="mt-4 pt-3 border-top d-flex justify-content-between">
                                             <button type="button" class="btn btn-light border" id="cancelEdit">
-                                                <i class="bi bi-x-circle me-1"></i> Cancel
+                                                <i class="bi bi-x-circle me-1"></i> <?= t('Cancel') ?>
                                             </button>
                                             <button type="submit" name="save_role" class="btn btn-primary px-4 shadow-sm">
-                                                <i class="bi bi-check-circle me-1"></i> Save Access Level
+                                                <i class="bi bi-check-circle me-1"></i> <?= t('Save Access Level') ?>
                                             </button>
                                         </div>
                                     </form>
@@ -656,19 +664,19 @@ function getRoleBadgeColor($role_name) {
                         <div class="col-12">
                             <div class="card">
                                 <div class="card-header">
-                                    <h5 class="mb-0">User Role Assignments</h5>
+                                    <h5 class="mb-0"><?= t('User Role Assignments') ?></h5>
                                 </div>
                                 <div class="card-body">
                                     <div class="table-responsive">
                                         <table class="table table-striped table-hover" id="usersTable">
                                             <thead>
                                                 <tr>
-                                                    <th>User</th>
-                                                    <th>Username</th>
-                                                    <th>Department</th>
-                                                    <th>Current Role</th>
-                                                    <th>Status</th>
-                                                    <th>Actions</th>
+                                                    <th><?= t('User') ?></th>
+                                                    <th><?= t('Username') ?></th>
+                                                    <th><?= t('Department') ?></th>
+                                                    <th><?= t('Current Role') ?></th>
+                                                    <th><?= t('Status') ?></th>
+                                                    <th><?= t('Actions') ?></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -679,23 +687,23 @@ function getRoleBadgeColor($role_name) {
                                                             <br><small class="text-muted"><?= htmlspecialchars($user['email']) ?></small>
                                                         </td>
                                                         <td><?= htmlspecialchars($user['username']) ?></td>
-                                                        <td><?= htmlspecialchars($user['department_name'] ?? 'N/A') ?></td>
+                                                        <td><?= htmlspecialchars($user['department_name'] ?? t('N/A')) ?></td>
                                                         <td>
                                                             <span class="badge bg-<?= getRoleBadgeColor($user['role_name']) ?>">
-                                                                <?= htmlspecialchars($user['role_name'] ?? 'Unassigned') ?>
+                                                                <?= $user['role_name'] ? htmlspecialchars($user['role_name']) : t('Unassigned') ?>
                                                             </span>
                                                         </td>
                                                         <td>
                                                             <span class="badge bg-<?= $user['status'] == 'active' ? 'success' : 'secondary' ?>">
-                                                                <?= ucfirst($user['status']) ?>
+                                                                <?= $user['status'] == 'active' ? t('Active') : t('Inactive') ?>
                                                             </span>
                                                         </td>
                                                         <td>
-                                                            <button class="btn btn-sm btn-outline-primary assign-role" 
+                                                            <button class="btn btn-sm btn-outline-primary assign-role"
                                                                     data-user-id="<?= $user['user_id'] ?>"
                                                                     data-user-name="<?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?>"
                                                                     data-current-role="<?= $user['role_id'] ?>">
-                                                                <i class="bi bi-person-gear"></i> Assign Role
+                                                                <i class="bi bi-person-gear"></i> <?= t('Assign Role') ?>
                                                             </button>
                                                         </td>
                                                     </tr>
@@ -716,24 +724,24 @@ function getRoleBadgeColor($role_name) {
                         <div class="col-md-8">
                             <div class="card">
                                 <div class="card-header">
-                                    <h5 class="mb-0">Access Log</h5>
+                                    <h5 class="mb-0"><?= t('Access Log') ?></h5>
                                 </div>
                                 <div class="card-body">
                                     <div class="table-responsive">
                                         <table class="table table-striped table-hover" id="accessLogTable">
                                             <thead>
                                                 <tr>
-                                                    <th>User</th>
-                                                    <th>Action</th>
-                                                    <th>Resource</th>
-                                                    <th>Timestamp</th>
-                                                    <th>IP Address</th>
+                                                    <th><?= t('User') ?></th>
+                                                    <th><?= t('Action') ?></th>
+                                                    <th><?= t('Resource') ?></th>
+                                                    <th><?= t('Timestamp') ?></th>
+                                                    <th><?= t('IP Address') ?></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <tr>
                                                     <td colspan="5" class="text-center text-muted">
-                                                        Loading access log...
+                                                        <?= t('Loading access log...') ?>
                                                     </td>
                                                 </tr>
                                             </tbody>
@@ -745,13 +753,13 @@ function getRoleBadgeColor($role_name) {
                         <div class="col-md-4">
                             <div class="card">
                                 <div class="card-header">
-                                    <h5 class="mb-0">Access Statistics</h5>
+                                    <h5 class="mb-0"><?= t('Access Statistics') ?></h5>
                                 </div>
                                 <div class="card-body">
                                     <div id="accessStats">
                                         <div class="text-center text-muted">
                                             <i class="bi bi-hourglass-split"></i><br>
-                                            Loading statistics...
+                                            <?= t('Loading statistics...') ?>
                                         </div>
                                     </div>
                                 </div>
@@ -759,17 +767,17 @@ function getRoleBadgeColor($role_name) {
 
                             <div class="card mt-3">
                                 <div class="card-header">
-                                    <h5 class="mb-0">Quick Actions</h5>
+                                    <h5 class="mb-0"><?= t('Quick Actions') ?></h5>
                                 </div>
                                 <div class="card-body">
                                     <button class="btn btn-outline-primary btn-sm w-100 mb-2" id="generateAccessReport">
-                                        <i class="bi bi-file-earmark-text"></i> Generate Access Report
+                                        <i class="bi bi-file-earmark-text"></i> <?= t('Generate Access Report') ?>
                                     </button>
                                     <button class="btn btn-outline-secondary btn-sm w-100 mb-2" id="clearOldLogs">
-                                        <i class="bi bi-trash"></i> Clear Old Logs
+                                        <i class="bi bi-trash"></i> <?= t('Clear Old Logs') ?>
                                     </button>
                                     <button class="btn btn-outline-info btn-sm w-100" id="refreshAudit">
-                                        <i class="bi bi-arrow-clockwise"></i> Refresh Data
+                                        <i class="bi bi-arrow-clockwise"></i> <?= t('Refresh Data') ?>
                                     </button>
                                 </div>
                             </div>
@@ -786,20 +794,20 @@ function getRoleBadgeColor($role_name) {
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Assign Role to User</h5>
+                <h5 class="modal-title"><?= t('Assign Role to User') ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST">
                 <input type="hidden" id="assign_user_id" name="user_id">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">User</label>
+                        <label class="form-label"><?= t('User') ?></label>
                         <input type="text" class="form-control" id="assign_user_name" readonly>
                     </div>
                     <div class="mb-3">
-                        <label for="assign_role_id" class="form-label">Select Role *</label>
+                        <label for="assign_role_id" class="form-label"><?= t('Select Role') ?> *</label>
                         <select class="form-control" id="assign_role_id" name="role_id" required>
-                            <option value="">Select a role...</option>
+                            <option value=""><?= t('Select a role...') ?></option>
                             <?php foreach ($roles as $role): ?>
                                 <option value="<?= $role['role_id'] ?>"><?= htmlspecialchars($role['role_name']) ?></option>
                             <?php endforeach; ?>
@@ -807,8 +815,8 @@ function getRoleBadgeColor($role_name) {
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="update_user_role" class="btn btn-primary">Assign Role</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" name="update_user_role" class="btn btn-primary"><?= t('Assign Role') ?></button>
                 </div>
             </form>
         </div>
@@ -820,18 +828,18 @@ function getRoleBadgeColor($role_name) {
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Confirm Delete</h5>
+                <h5 class="modal-title"><?= t('Confirm Delete') ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete the role "<strong id="deleteRoleName"></strong>"?</p>
-                <p class="text-danger">This action cannot be undone.</p>
+                <p><?= t('Are you sure you want to delete the role') ?> "<strong id="deleteRoleName"></strong>"?</p>
+                <p class="text-danger"><?= t('This action cannot be undone.') ?></p>
             </div>
             <div class="modal-footer">
                 <form method="POST">
                     <input type="hidden" id="delete_role_id" name="role_id">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="delete_role" class="btn btn-danger">Delete Role</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" name="delete_role" class="btn btn-danger"><?= t('Delete Role') ?></button>
                 </form>
             </div>
         </div>
@@ -902,6 +910,33 @@ function getRoleBadgeColor($role_name) {
 </style>
 
 <script>
+const UR_STRINGS = {
+    createNewSystemRole: <?= json_encode(t('Create New System Role')) ?>,
+    modifyingRole: <?= json_encode(t('Modifying Role:')) ?>,
+    errorLoadingRoleDetails: <?= json_encode(t('Error loading role details')) ?>,
+    exportingMatrix: <?= json_encode(t('Exporting permissions matrix...')) ?>,
+    noAccessLogsFound: <?= json_encode(t('No access logs found')) ?>,
+    totalLogs: <?= json_encode(t('Total Logs:')) ?>,
+    todaysActivities: <?= json_encode(t("Today's Activities:")) ?>,
+    mostActiveUser: <?= json_encode(t('Most Active User:')) ?>,
+    lastUpdated: <?= json_encode(t('Last Updated:')) ?>,
+    errorLoadingAccessLog: <?= json_encode(t('Error loading access log')) ?>,
+    generating: <?= json_encode(t('Generating...')) ?>,
+    accessReportGenerated: <?= json_encode(t('Access report generated successfully!')) ?>,
+    areYouSure: <?= json_encode(t('Are you sure?')) ?>,
+    confirmClearLogs: <?= json_encode(t('Are you sure you want to clear logs older than 90 days? This action cannot be undone.')) ?>,
+    yesClearThem: <?= json_encode(t('Yes, clear them!')) ?>,
+    clearing: <?= json_encode(t('Clearing...')) ?>,
+    oldLogsCleared: <?= json_encode(t('Old logs cleared successfully!')) ?>,
+    errorClearingLogs: <?= json_encode(t('Error clearing logs:')) ?>,
+    unknownError: <?= json_encode(t('Unknown error')) ?>,
+    errorClearingLogsPlain: <?= json_encode(t('Error clearing logs')) ?>,
+    auditDataRefreshed: <?= json_encode(t('Audit data refreshed')) ?>,
+    success: <?= json_encode(t('Success!')) ?>,
+    error: <?= json_encode(t('Error!')) ?>,
+    information: <?= json_encode(t('Information')) ?>,
+};
+
 $(document).ready(function() {
     // Initialize DataTables
     $('#usersTable').DataTable({
@@ -957,7 +992,7 @@ $(document).ready(function() {
 
     // Add Role Button
     $('#addRoleBtn').click(function() {
-        $('#roleFormTitle').html('<i class="bi bi-plus-circle me-2"></i>Create New System Role');
+        $('#roleFormTitle').html('<i class="bi bi-plus-circle me-2"></i>' + UR_STRINGS.createNewSystemRole);
         $('#roleForm')[0].reset();
         $('#role_id').val('');
         $('.perm-check').prop('checked', false);
@@ -977,7 +1012,7 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(response) {
                 if (response.success) {
-                    $('#roleFormTitle').html('<i class="bi bi-pencil-square me-2"></i>Modifying Role: <span class="text-primary">' + response.role.role_name + '</span>');
+                    $('#roleFormTitle').html('<i class="bi bi-pencil-square me-2"></i>' + UR_STRINGS.modifyingRole + ' <span class="text-primary">' + response.role.role_name + '</span>');
                     $('#role_id').val(response.role.role_id);
                     $('#role_name').val(response.role.role_name);
                     $('#role_description').val(response.role.description);
@@ -1004,11 +1039,11 @@ $(document).ready(function() {
                     }, 500);
 
                 } else {
-                    showToast('error', response.message || 'Error loading role details');
+                    showToast('error', response.message || UR_STRINGS.errorLoadingRoleDetails);
                 }
             },
             error: function() {
-                showToast('error', 'Error loading role details');
+                showToast('error', UR_STRINGS.errorLoadingRoleDetails);
             }
         });
     });
@@ -1025,7 +1060,7 @@ $(document).ready(function() {
 
     // Cancel Edit
     $('#cancelEdit').click(function() {
-        $('#roleFormTitle').html('<i class="bi bi-plus-circle me-2"></i>Create New System Role');
+        $('#roleFormTitle').html('<i class="bi bi-plus-circle me-2"></i>' + UR_STRINGS.createNewSystemRole);
         $('#roleForm')[0].reset();
         $('#role_id').val('');
         $('.perm-check').prop('checked', false);
@@ -1047,7 +1082,7 @@ $(document).ready(function() {
     // Export Permissions Matrix
     $('#exportMatrix').click(function() {
         window.open('ajax/export_permissions_matrix.php', '_blank');
-        showToast('info', 'Exporting permissions matrix...');
+        showToast('info', UR_STRINGS.exportingMatrix);
     });
 
     // Load access log
@@ -1072,33 +1107,33 @@ $(document).ready(function() {
                             `;
                         });
                     } else {
-                        html = '<tr><td colspan="5" class="text-center text-muted">No access logs found</td></tr>';
+                        html = `<tr><td colspan="5" class="text-center text-muted">${UR_STRINGS.noAccessLogsFound}</td></tr>`;
                     }
                     $('#accessLogTable tbody').html(html);
-                    
+
                     // Update statistics
                     $('#accessStats').html(`
                         <div class="mb-3">
                             <div class="d-flex justify-content-between">
-                                <span>Total Logs:</span>
+                                <span>${UR_STRINGS.totalLogs}</span>
                                 <strong>${response.stats.total_logs}</strong>
                             </div>
                         </div>
                         <div class="mb-3">
                             <div class="d-flex justify-content-between">
-                                <span>Today's Activities:</span>
+                                <span>${UR_STRINGS.todaysActivities}</span>
                                 <strong>${response.stats.today_activities}</strong>
                             </div>
                         </div>
                         <div class="mb-3">
                             <div class="d-flex justify-content-between">
-                                <span>Most Active User:</span>
+                                <span>${UR_STRINGS.mostActiveUser}</span>
                                 <strong>${response.stats.most_active_user}</strong>
                             </div>
                         </div>
                         <div class="mb-3">
                             <div class="d-flex justify-content-between">
-                                <span>Last Updated:</span>
+                                <span>${UR_STRINGS.lastUpdated}</span>
                                 <strong>${response.stats.last_updated}</strong>
                             </div>
                         </div>
@@ -1106,7 +1141,7 @@ $(document).ready(function() {
                 }
             },
             error: function() {
-                $('#accessLogTable tbody').html('<tr><td colspan="5" class="text-center text-danger">Error loading access log</td></tr>');
+                $('#accessLogTable tbody').html(`<tr><td colspan="5" class="text-center text-danger">${UR_STRINGS.errorLoadingAccessLog}</td></tr>`);
             }
         });
     }
@@ -1116,10 +1151,10 @@ $(document).ready(function() {
         const btn = $(this);
         const originalText = btn.html();
         
-        btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Generating...');
-        
+        btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> ' + UR_STRINGS.generating);
+
         setTimeout(() => {
-            showToast('success', 'Access report generated successfully!');
+            showToast('success', UR_STRINGS.accessReportGenerated);
             btn.prop('disabled', false).html(originalText);
             window.open('ajax/generate_access_report.php', '_blank');
         }, 2000);
@@ -1128,20 +1163,20 @@ $(document).ready(function() {
     // Clear Old Logs
     $('#clearOldLogs').click(function() {
         Swal.fire({
-            title: 'Are you sure?',
-            text: 'Are you sure you want to clear logs older than 90 days? This action cannot be undone.',
+            title: UR_STRINGS.areYouSure,
+            text: UR_STRINGS.confirmClearLogs,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
             cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Yes, clear them!'
+            confirmButtonText: UR_STRINGS.yesClearThem
         }).then((result) => {
             if (result.isConfirmed) {
                 const btn = $(this);
                 const originalText = btn.html();
-                
-                btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Clearing...');
-                
+
+                btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> ' + UR_STRINGS.clearing);
+
                 $.ajax({
                     url: 'ajax/clear_old_logs.php',
                     type: 'POST',
@@ -1149,14 +1184,14 @@ $(document).ready(function() {
                     dataType: 'json',
                     success: function(response) {
                         if (response.success) {
-                            showToast('success', 'Old logs cleared successfully!');
+                            showToast('success', UR_STRINGS.oldLogsCleared);
                             loadAccessLog();
                         } else {
-                            showToast('error', 'Error clearing logs: ' + (response.message || 'Unknown error'));
+                            showToast('error', UR_STRINGS.errorClearingLogs + ' ' + (response.message || UR_STRINGS.unknownError));
                         }
                     },
                     error: function() {
-                        showToast('error', 'Error clearing logs');
+                        showToast('error', UR_STRINGS.errorClearingLogsPlain);
                     },
                     complete: function() {
                         btn.prop('disabled', false).html(originalText);
@@ -1169,14 +1204,14 @@ $(document).ready(function() {
     // Refresh Audit Data
     $('#refreshAudit').click(function() {
         loadAccessLog();
-        showToast('info', 'Audit data refreshed');
+        showToast('info', UR_STRINGS.auditDataRefreshed);
     });
 
     // Toast notification function
     function showToast(type, message) {
         Swal.fire({
             icon: type,
-            title: type === 'success' ? 'Success!' : (type === 'error' ? 'Error!' : 'Information'),
+            title: type === 'success' ? UR_STRINGS.success : (type === 'error' ? UR_STRINGS.error : UR_STRINGS.information),
             text: message,
             timer: 3000
         });

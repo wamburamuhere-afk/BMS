@@ -28,7 +28,7 @@ try {
     $stmt = $pdo->query("SELECT role_id, role_name FROM roles ORDER BY role_name");
     $roles = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    $errors['database'] = 'Error fetching roles: ' . $e->getMessage();
+    $errors['database'] = t('Error fetching roles:') . ' ' . $e->getMessage();
 }
 
 // Initialize variables
@@ -47,7 +47,7 @@ if ($user_id > 0) {
         $stmt->execute([$user_id]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
-        $errors['database'] = 'Error fetching user: ' . $e->getMessage();
+        $errors['database'] = t('Error fetching user:') . ' ' . $e->getMessage();
     }
 }
 
@@ -91,53 +91,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Validate inputs
     if (empty($username)) {
-        $errors['username'] = 'Username is required';
+        $errors['username'] = t('Username is required');
     } elseif (strlen($username) < 4) {
-        $errors['username'] = 'Username must be at least 4 characters';
+        $errors['username'] = t('Username must be at least 4 characters');
     } else {
         // Check if username exists (excluding current user)
         $stmt = $pdo->prepare("SELECT user_id FROM users WHERE username = ? AND user_id != ?");
         $stmt->execute([$username, $user_id]);
         if ($stmt->fetch()) {
-            $errors['username'] = 'Username already exists';
+            $errors['username'] = t('Username already exists');
         }
     }
 
     if (empty($email)) {
-        $errors['email'] = 'Email is required';
+        $errors['email'] = t('Email is required');
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $errors['email'] = 'Invalid email format';
+        $errors['email'] = t('Invalid email format');
     } else {
         // Check if email exists (excluding current user)
         $stmt = $pdo->prepare("SELECT user_id FROM users WHERE email = ? AND user_id != ?");
         $stmt->execute([$email, $user_id]);
         if ($stmt->fetch()) {
-            $errors['email'] = 'Email already exists';
+            $errors['email'] = t('Email already exists');
         }
     }
 
     if (empty($first_name)) {
-        $errors['first_name'] = 'First name is required';
+        $errors['first_name'] = t('First name is required');
     }
 
     if (empty($last_name)) {
-        $errors['last_name'] = 'Last name is required';
+        $errors['last_name'] = t('Last name is required');
     }
 
     // Validate role against database values
     $valid_role_ids = array_column($roles, 'role_id');
     if (empty($role_id) || !in_array($role_id, $valid_role_ids)) {
-        $errors['role_id'] = 'Invalid role selected';
+        $errors['role_id'] = t('Invalid role selected');
     }
 
     // Only validate password if provided
     if (!empty($password)) {
         if (strlen($password) < 8) {
-            $errors['password'] = 'Password must be at least 8 characters';
+            $errors['password'] = t('Password must be at least 8 characters');
         }
 
         if ($password !== $confirm_password) {
-            $errors['confirm_password'] = 'Passwords do not match';
+            $errors['confirm_password'] = t('Passwords do not match');
         }
     }
 
@@ -186,16 +186,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
 
                 $success = true;
-                $_SESSION['success_message'] = 'User updated successfully!';
+                $_SESSION['success_message'] = t('User updated successfully!');
                 // Clear buffer before redirect
                 ob_end_clean();
                 header("Location: users.php");
                 exit();
             } else {
-                $errors['database'] = 'Error updating user. Please try again.';
+                $errors['database'] = t('Error updating user. Please try again.');
             }
         } catch (PDOException $e) {
-            $errors['database'] = 'Database error: ' . $e->getMessage();
+            $errors['database'] = t('Database error:') . ' ' . $e->getMessage();
         }
     }
 }
@@ -206,12 +206,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="col-12">
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="<?= getUrl('users') ?>">Users</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Edit User</li>
+                    <li class="breadcrumb-item"><a href="<?= getUrl('users') ?>"><?= t('Users') ?></a></li>
+                    <li class="breadcrumb-item active" aria-current="page"><?= t('Edit User') ?></li>
                 </ol>
             </nav>
-            <h2><i class="bi bi-person-gear"></i> Edit User: <?php echo htmlspecialchars($user['username']); ?></h2>
-            <p class="text-muted">Edit user information and permissions</p>
+            <h2><i class="bi bi-person-gear"></i> <?= t('Edit User:') ?> <?php echo htmlspecialchars($user['username']); ?></h2>
+            <p class="text-muted"><?= t('Edit user information and permissions') ?></p>
         </div>
     </div>
 
@@ -224,7 +224,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <form method="POST" novalidate>
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label for="username" class="form-label">Username *</label>
+                            <label for="username" class="form-label"><?= t('Username') ?> *</label>
                             <input type="text" class="form-control <?= isset($errors['username']) ? 'is-invalid' : '' ?>" 
                                    id="username" name="username" value="<?= htmlspecialchars($username) ?>" required>
                             <?php if (isset($errors['username'])): ?>
@@ -233,7 +233,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                         
                         <div class="col-md-6">
-                            <label for="email" class="form-label">Email *</label>
+                            <label for="email" class="form-label"><?= t('Email') ?> *</label>
                             <input type="email" class="form-control <?= isset($errors['email']) ? 'is-invalid' : '' ?>" 
                                    id="email" name="email" value="<?= htmlspecialchars($email) ?>" required>
                             <?php if (isset($errors['email'])): ?>
@@ -242,7 +242,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                         
                         <div class="col-md-6">
-                            <label for="first_name" class="form-label">First Name *</label>
+                            <label for="first_name" class="form-label"><?= t('First Name') ?> *</label>
                             <input type="text" class="form-control <?= isset($errors['first_name']) ? 'is-invalid' : '' ?>" 
                                    id="first_name" name="first_name" value="<?= htmlspecialchars($first_name) ?>" required>
                             <?php if (isset($errors['first_name'])): ?>
@@ -251,7 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                         
                         <div class="col-md-6">
-                            <label for="last_name" class="form-label">Last Name *</label>
+                            <label for="last_name" class="form-label"><?= t('Last Name') ?> *</label>
                             <input type="text" class="form-control <?= isset($errors['last_name']) ? 'is-invalid' : '' ?>" 
                                    id="last_name" name="last_name" value="<?= htmlspecialchars($last_name) ?>" required>
                             <?php if (isset($errors['last_name'])): ?>
@@ -260,10 +260,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                         
                         <div class="col-md-6">
-                            <label for="role_id" class="form-label">Role *</label>
-                            <select class="form-select <?= isset($errors['role_id']) ? 'is-invalid' : '' ?>" 
+                            <label for="role_id" class="form-label"><?= t('Role') ?> *</label>
+                            <select class="form-select <?= isset($errors['role_id']) ? 'is-invalid' : '' ?>"
                                     id="role_id" name="role_id" required>
-                                <option value="">Select Role</option>
+                                <option value=""><?= t('Select Role') ?></option>
                                 <?php foreach ($roles as $role): ?>
                                     <option value="<?= $role['role_id'] ?>" <?= $role_id == $role['role_id'] ? 'selected' : '' ?>>
                                         <?= htmlspecialchars($role['role_name']) ?>
@@ -276,7 +276,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
 
                         <div class="col-md-6">
-                            <label for="employee_id" class="form-label">Linked Employee <small class="text-muted">(optional — enables self-service)</small></label>
+                            <label for="employee_id" class="form-label"><?= t('Linked Employee') ?> <small class="text-muted">(<?= t('optional — enables self-service') ?>)</small></label>
                             <select class="form-select" id="employee_id" name="employee_id" style="width:100%">
                                 <?php if (!empty($linked_employee_id) && $linked_employee_name !== ''): ?>
                                 <option value="<?= (int)$linked_employee_id ?>" selected><?= htmlspecialchars($linked_employee_name) ?></option>
@@ -285,7 +285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                         
                         <div class="col-md-6">
-                            <label for="password" class="form-label">New Password (leave blank to keep current)</label>
+                            <label for="password" class="form-label"><?= t('New Password (leave blank to keep current)') ?></label>
                             <div class="input-group">
                                 <input type="password" class="form-control <?= isset($errors['password']) ? 'is-invalid' : '' ?>" 
                                        id="password" name="password">
@@ -296,12 +296,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <?php if (isset($errors['password'])): ?>
                                 <div class="invalid-feedback d-block"><?= $errors['password'] ?></div>
                             <?php else: ?>
-                                <small class="text-muted">Minimum 8 characters</small>
+                                <small class="text-muted"><?= t('Minimum 8 characters') ?></small>
                             <?php endif; ?>
                         </div>
-                        
+
                         <div class="col-md-6">
-                            <label for="confirm_password" class="form-label">Confirm New Password</label>
+                            <label for="confirm_password" class="form-label"><?= t('Confirm New Password') ?></label>
                             <div class="input-group">
                                 <input type="password" class="form-control <?= isset($errors['confirm_password']) ? 'is-invalid' : '' ?>" 
                                        id="confirm_password" name="confirm_password">
@@ -316,10 +316,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         <div class="col-12 mt-4">
                             <button type="submit" class="btn btn-primary me-2">
-                                <i class="bi bi-check-circle"></i> Update User
+                                <i class="bi bi-check-circle"></i> <?= t('Update User') ?>
                             </button>
                             <a href="<?= getUrl('users') ?>" class="btn btn-outline-secondary px-4 shadow-sm">
-                                <i class="bi bi-x-circle"></i> Cancel
+                                <i class="bi bi-x-circle"></i> <?= t('Cancel') ?>
                             </a>
                         </div>
                     </div>
@@ -349,7 +349,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $(function () {
         if (window.jQuery && $.fn.select2) {
             $('#employee_id').select2({
-                theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'Not linked',
+                theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: <?= json_encode(t('Not linked')) ?>,
                 minimumInputLength: 1,
                 ajax: {
                     url: '<?= buildUrl('api/account/search_employees.php') ?>',
@@ -377,16 +377,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     valid = false;
                     Swal.fire({
                         icon: 'error',
-                        title: 'Error',
-                        text: 'Password must be at least 8 characters long',
+                        title: <?= json_encode(t('Error')) ?>,
+                        text: <?= json_encode(t('Password must be at least 8 characters long')) ?>,
                         confirmButtonColor: '#6c757d'
                     });
                 } else if (password !== confirmPassword) {
                     valid = false;
                     Swal.fire({
                         icon: 'error',
-                        title: 'Error',
-                        text: 'Passwords do not match',
+                        title: <?= json_encode(t('Error')) ?>,
+                        text: <?= json_encode(t('Passwords do not match')) ?>,
                         confirmButtonColor: '#6c757d'
                     });
                 }
