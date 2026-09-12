@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-09-12 (feat/pos-cart-mobile-fix) - pos.php: Current Sale header buttons + cart line items no longer overflow on mobile
+
+**Request:** screenshot showed the "Current Sale" panel's header action buttons (Discount %, Clear Cart,
+Hold Sale, Held Sales) with the rightmost one cut off at the edge of the screen, and the cart line item
+row (product / price / qty stepper / total / remove) needing to scroll left/right to reach the quantity
+control and the remove button.
+
+**Root cause:** the header's `.btn-group.btn-group-sm` (up to 6 buttons once restaurant-mode buttons are
+shown) never wrapped, so it ran wider than the phone screen with no way to reach the last button(s). The
+cart line-item `<table id="cartTable">` (Product 35% / Price 15% / Qty 20% / Total 20% / Action 10%) had
+no mobile-specific sizing and wasn't wrapped in any scroll boundary, so its natural content width (price/
+total figures, the quantity stepper's two buttons + number input, and the remove button) exceeded the
+phone's width and dragged the whole cart panel sideways to reach the hidden columns.
+
+**Fix (`max-width: 767.98px` only, desktop untouched):** added `id="cartHeaderActions"` to the header
+button group and let it wrap onto a second line instead of running off-screen. Added `id="cartTable"`'s
+mobile rules (smaller font, tighter cell padding) plus a further shrink of the quantity stepper's
+buttons/input (targeted via existing `.btn-outline-secondary`/`input[type=number]` selectors, no JS
+changes needed since CSS `!important` overrides the JS-generated inline styles) so the whole row —
+including the remove button — now fits without needing to scroll. `#cartItemsScrollArea` (the cart
+items' existing scroll container) gained `overflow-x: auto` as a safety net for unusually long product
+names, scoped to just that panel, never the whole page.
+
+**Tested:** `php -l` clean; live in-process render of `pos.php` (admin session) confirmed no PHP
+warnings and all three new mobile hook markers (`cartHeaderActions`, `cartItemsScrollArea`, the
+`#cartTable` mobile rule) present in the output HTML; `tests/test_pos_i18n_coverage_cli.php` (132/132,
+unaffected since no translatable strings were touched).
+
 ## 2026-09-12 (feat/docs-menu-entitlement-visibility) - "Nyaraka" (Docs) header menu now fully disappears when its features are off
 
 **Request:** when a superadmin switches off Document Library (and the tenant also has no E-Signatures/

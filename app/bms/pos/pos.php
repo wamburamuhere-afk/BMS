@@ -273,7 +273,7 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
             <div class="p-3 border-bottom bg-white">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0"><i class="bi bi-cart3"></i> <?= t('Current Sale') ?></h5>
-                    <div class="btn-group btn-group-sm">
+                    <div id="cartHeaderActions" class="btn-group btn-group-sm">
                         <?php if (canEdit('pos_discount_override')): ?>
                         <button class="btn btn-outline-warning" onclick="openDiscountModal()" title="<?= t('Apply Discount') ?>">
                             <i class="bi bi-percent"></i>
@@ -317,7 +317,7 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
             </div>
 
             <!-- Cart Items -->
-            <div class="flex-grow-1 p-2" style="overflow-y: auto; background: #f8f9fa;">
+            <div class="flex-grow-1 p-2" id="cartItemsScrollArea" style="overflow-y: auto; background: #f8f9fa;">
                 <table class="table table-sm table-hover bg-white" id="cartTable" style="display: none;">
                     <thead class="table-light">
                         <tr>
@@ -707,6 +707,48 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
     .product-card .badge {
         font-size: 6px !important;
         padding: 2px 4px;
+    }
+
+    /* Current Sale header actions (%, Clear, Hold, Held Sales) — a
+       btn-group that never wrapped, so the rightmost button(s) ran off the
+       edge of the screen with no way to reach them. Let it wrap onto a
+       second line instead, still grouped and readable. */
+    #cartHeaderActions {
+        flex-wrap: wrap;
+        border-radius: 0.25rem;
+        overflow: visible !important;
+    }
+    #cartHeaderActions .btn {
+        flex: 0 0 auto;
+        padding: 4px 8px;
+    }
+
+    /* Cart line items table — kept as one row per item (not a page-level
+       scroll) by shrinking padding/fonts and the qty stepper so the
+       Product/Price/Qty/Total/Action columns all fit the phone's width;
+       overflow-x is a safety net for unusually long product names, and
+       scrolls only this panel, never the whole page. */
+    #cartItemsScrollArea {
+        overflow-x: auto;
+    }
+    #cartTable {
+        font-size: 0.72rem;
+    }
+    #cartTable th, #cartTable td {
+        padding: 0.25rem 0.2rem !important;
+    }
+    #cartTable .btn-outline-secondary {
+        min-width: 15px !important;
+        padding: 1px 3px !important;
+        font-size: 9px !important;
+    }
+    #cartTable input[type="number"] {
+        width: 26px !important;
+        padding: 1px !important;
+        font-size: 10px !important;
+    }
+    #cartTable .btn-link {
+        font-size: 9px !important;
     }
 }
 </style>
