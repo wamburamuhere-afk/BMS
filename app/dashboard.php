@@ -1677,6 +1677,7 @@ function get_progress_color($percentage) {
                     <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-line text-primary me-2"></i> <?= t('Performance Overview') ?></h6>
                     <div class="d-flex gap-2">
                         <select class="form-select form-select-sm w-auto border-0 bg-light" id="chartPeriod">
+                            <option value="daily"><?= t('Daily') ?></option>
                             <option value="weekly"><?= t('Weekly') ?></option>
                             <option value="monthly" selected><?= t('Monthly') ?></option>
                             <option value="quarterly"><?= t('Quarterly') ?></option>

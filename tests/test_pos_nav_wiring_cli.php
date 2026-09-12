@@ -95,8 +95,15 @@ try {
     section('A. header.php — single POS link, no collateral changes elsewhere');
     $hdr = src("$root/header.php");
 
+    // 2026-09-12 (product owner request: "if sales is closed, POS should be
+    // seen directly in the header, not as a dropdown of sales; once sales is
+    // allowed, POS should be a dropdown item again") — header.php now has TWO
+    // literal occurrences of this URL: one inside the Sales dropdown (used
+    // when Sales is open) and one in the new standalone <li> (used when
+    // Sales is closed but POS is still on). Only one of the two ever
+    // actually renders for a given tenant — proven live in section C below.
     $posDashCount = substr_count($hdr, "getUrl('pos/dashboard')");
-    ok($posDashCount === 1, "header.php links to pos/dashboard exactly once (found $posDashCount)");
+    ok($posDashCount === 2, "header.php links to pos/dashboard from exactly two branches — the Sales dropdown and the standalone fallback (found $posDashCount)");
     ok(strpos($hdr, "getUrl('pos/price-groups')") === false, "header.php no longer links pos/price-groups directly (moved behind the hub's Catalog Setup card)");
     ok(!preg_match('/canView\(\'pos_advanced\'\).*?pos\/price-groups/s', $hdr), "header.php's Sales dropdown no longer gates a POS sub-item on pos_advanced — nothing left to gate at that layer");
 
@@ -198,6 +205,36 @@ try {
         && strpos($subHtmlOff, 'Kitchen Display') === false
         && strpos($subHtmlOff, 'Modifier Group') === false;
     ok($noSubHubContent, 'without restaurant_pos, app/bms/restaurant/index.php emits none of its sub-hub toggle labels — redirected before any content, not just visually hidden');
+
+    // ── E. header.php — POS is standalone when Sales is closed, nested when open ──
+    section("E. header.php — POS direct link when Sales is closed, dropdown item when Sales is open");
+    // Product owner request, 2026-09-12: "if sales is closed, POS should be
+    // seen directly in the header, not as a dropdown of sales; once sales is
+    // allowed, POS should be a dropdown item again." Rendered via
+    // app/dashboard.php (the simplest page that includes header.php).
+    $navScenarios = [
+        'sales ON, pos ON'  => ['sales' => true,  'pos' => true],
+        'sales OFF, pos ON' => ['sales' => false, 'pos' => true],
+        'sales OFF, pos OFF'=> ['sales' => false, 'pos' => false],
+    ];
+    foreach ($navScenarios as $label => $features) {
+        $features = array_merge($baseFeatures, $features);
+        $html = _nav_worker_run($root, 'app/dashboard.php', $session, $features);
+        $hasSalesDropdown = strpos($html, 'id="salesDropdown"') !== false;
+        $hasStandalonePos = (bool)preg_match('/<li class="nav-item">\s*<a class="nav-link" href="[^"]*\/pos\/dashboard">/', $html);
+        $hasNestedPos      = strpos($html, 'class="dropdown-item" href="' ) !== false && strpos($html, "/pos/dashboard\"><i class=\"bi bi-cart-check\"") !== false;
+
+        if ($label === 'sales ON, pos ON') {
+            ok($hasSalesDropdown, "[$label] Sales dropdown is present");
+            ok(!$hasStandalonePos, "[$label] POS is NOT a standalone link (it's nested in Sales)");
+        } elseif ($label === 'sales OFF, pos ON') {
+            ok(!$hasSalesDropdown, "[$label] Sales dropdown is genuinely absent, not just empty");
+            ok($hasStandalonePos, "[$label] POS renders as a direct, standalone header link");
+        } else { // sales OFF, pos OFF
+            ok(!$hasSalesDropdown, "[$label] Sales dropdown is absent");
+            ok(!$hasStandalonePos && strpos($html, 'href="/pos/dashboard"') === false, "[$label] no POS link anywhere — neither form renders");
+        }
+    }
 
 } catch (Throwable $e) {
     ok(false, 'threw: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());

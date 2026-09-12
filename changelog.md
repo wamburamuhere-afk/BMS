@@ -1,5 +1,52 @@
 # BMS Changelog
 
+## 2026-09-12 (feat/dashboard-chart-daily-period) - Performance Overview chart: added a "Daily" period option
+
+**Request:** "add also filtering of daily. not endup with weekly. i need also daily and make sure is
+working." The chart's period dropdown only offered Weekly/Monthly/Quarterly/Yearly — `api/get_performance_data.php`
+had no `'daily'` branch at all, so selecting it (had it existed) would have silently fallen through to the
+`yearly` else-case.
+
+**Fix:** added a real `daily` branch — last 30 days, grouped by calendar day (`DATE_FORMAT(je.entry_date,
+'%Y-%m-%d')`), labeled "Mon D" (e.g. "Sep 12") to match the existing "Mon YYYY" monthly style — plus the
+corresponding `<option value="daily">` in `app/dashboard.php`'s `#chartPeriod` dropdown (placed first, as
+the finest granularity). No change to the accrual/cash ledger math itself — same `journal_entries` ⨝
+`journal_entry_items` ⨝ `accounts` query every other period already uses, just grouped by day instead of
+week/month/quarter/year.
+
+**Tested:** `php -l` clean on both files. New `tests/test_dashboard_performance_chart_cli.php` (19
+assertions): confirms the dropdown option and backend branch both exist; live-calls the real endpoint for
+`period=daily` and checks every data point carries the expected fields and a correctly-formatted label;
+**reconciles today's daily figure against a direct SQL query over the same ledger tables** (not just "did
+it return 200") — confirmed exact match (revenue 400, expense 300, both to the cent); and re-confirms
+Weekly/Monthly/Quarterly/Yearly still work (no regression). `tests/test_dashboard_time_range_cli.php`
+(16/16) also re-run clean.
+
+## 2026-09-12 (feat/pos-standalone-nav-when-sales-off) - header.php: POS is a direct link when Sales is closed, a dropdown item when Sales is open
+
+**Request:** "if sales is closed, then pos i need to be seen directly in the header and not as dropdown
+of sales. But once sales is allowed pos should be as dropdown." Previously the "Sales" dropdown's own
+outer gate was `canView('sales_orders') || canView('pos')` — meaning a tenant with Sales OFF but POS ON
+still saw a "Sales" dropdown menu that existed only to hold the one POS item, with every other item
+inside it (Quotations/Sales Orders/LPO/DN/Returns/Credit Notes) invisible.
+
+**Fix:** `canView('sales_orders')` (the flagship page_key for the whole Sales module, already used as the
+existing gate's primary signal) now decides the branch. When Sales is open, the dropdown renders exactly
+as before, POS included as one of its items. When Sales is closed but POS is still viewable, POS instead
+renders as a direct, standalone header link (`<li class="nav-item"><a class="nav-link">`, matching the
+existing pattern used by "Projects" elsewhere in this same nav) — no dropdown wrapper at all.
+
+**Tested:** `php -l` clean; live in-process render of `app/dashboard.php` (which includes `header.php`)
+under three scenarios confirmed: Sales+POS both on → dropdown present, POS nested inside it, no
+standalone link; Sales off + POS on → dropdown genuinely absent (not just empty), POS renders as the
+direct standalone link; both off → neither form renders. `tests/test_pos_nav_wiring_cli.php` — updated
+the static "POS link count" assertion (now 2 source occurrences by design, one per branch, only one ever
+renders per tenant) and added a new Section E (6 new live-render assertions covering all three scenarios)
+— 61/61 passing after committing (the stale numstat diff-size guard from an earlier phase, which compares
+against the uncommitted working tree, resolves itself once there's no diff left to measure — same
+self-resolving pattern seen throughout this session). `tests/test_pos_i18n_coverage_cli.php` (132/132)
+and `tests/test_dashboard_time_range_cli.php` (16/16) both re-run clean.
+
 ## 2026-09-12 (feat/dashboard-warehouse-card) - dashboard.php: new "Total Warehouses" card, naming the single highest-value warehouse
 
 **Request:** "I expect either to have another card which shows number of warehouse, and the highest value
