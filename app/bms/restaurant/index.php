@@ -10,6 +10,7 @@
 ob_start();
 
 require_once __DIR__ . '/../../../roots.php';
+require_once __DIR__ . '/../../../core/pos_nav.php';
 
 $page_title = 'Restaurant';
 require_once 'header.php';
@@ -19,13 +20,7 @@ if (!canView('restaurant_pos')) {
     exit();
 }
 
-$sub_hub_cards = [
-    ['icon' => 'bi-diagram-3',      'label' => t('Floors & Tables'), 'description' => t('Define dining floors and their tables.'), 'url' => 'restaurant/floors'],
-    ['icon' => 'bi-egg-fried',      'label' => t('Kitchen Display'), 'description' => t('Live kitchen queue — advance tickets as they cook.'), 'url' => 'restaurant/kitchen-dashboard'],
-    ['icon' => 'bi-list-check',     'label' => t('Modifier Group'),  'description' => t('Add-on/option groups linked to menu items.'), 'url' => 'restaurant/modifier-group'],
-    ['icon' => 'bi-calendar-check', 'label' => t('Reservations'),    'description' => t('Book and manage table reservations.'), 'url' => 'restaurant/reservations'],
-    ['icon' => 'bi-tags',           'label' => t('Menu Type'),       'description' => t('Categorize menu items (uses the shared product categories).'), 'url' => 'restaurant/menu-type'],
-];
+$sub_hub_cards = restaurantSubHubCards();
 ?>
 
 <div class="container-fluid mt-4">
