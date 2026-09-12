@@ -43,6 +43,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $is_primary = isset($_POST['is_primary']) ? 1 : 0;
         $project_id = ($_POST['project_id'] ?? null) ?: null;
         $notes = trim($_POST['notes'] ?? '');
+        // POS Mode (Phase 30, pos_upgrade_plan.md §9) — whitelisted against the
+        // enum, never trusted verbatim from POST.
+        $pos_mode = in_array($_POST['pos_mode'] ?? '', ['retail', 'restaurant', 'hybrid'], true)
+            ? $_POST['pos_mode'] : 'retail';
 
         // Validate input
         $errors = [];
@@ -89,18 +93,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!empty($country)) $location_info .= ($location_info ? ', ' : '') . $country;
 
                 $query = "INSERT INTO warehouses (
-                    warehouse_name, warehouse_code, location, address, 
+                    warehouse_name, warehouse_code, location, address,
                     city, state, country, postal_code,
-                    contact_person, phone, email, 
-                    capacity, status, is_primary, project_id, notes, created_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-                
+                    contact_person, phone, email,
+                    capacity, status, is_primary, project_id, notes, pos_mode, created_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
                 $stmt = $pdo->prepare($query);
                 $stmt->execute([
                     $warehouse_name, $warehouse_code, $location_info, $address,
                     $city, $state, $country, $postal_code,
                     $manager_name, $phone, $email,
-                    $capacity, $status, $is_primary, $project_id, $notes, $user_id
+                    $capacity, $status, $is_primary, $project_id, $notes, $pos_mode, $user_id
                 ]);
 
                 $warehouse_id = $pdo->lastInsertId();
@@ -160,6 +164,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $is_primary = isset($_POST['is_primary']) ? 1 : 0;
         $project_id = ($_POST['project_id'] ?? null) ?: null;
         $notes = trim($_POST['notes'] ?? '');
+        // POS Mode (Phase 30, pos_upgrade_plan.md §9) — whitelisted against the
+        // enum, never trusted verbatim from POST.
+        $pos_mode = in_array($_POST['pos_mode'] ?? '', ['retail', 'restaurant', 'hybrid'], true)
+            ? $_POST['pos_mode'] : 'retail';
 
         // Validate input
         $errors = [];
@@ -212,18 +220,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $location_info = $address; // Or parse it if needed
 
                 $query = "UPDATE warehouses SET
-                    warehouse_name = ?, warehouse_code = ?, location = ?, address = ?, 
+                    warehouse_name = ?, warehouse_code = ?, location = ?, address = ?,
                     city = ?, state = ?, country = ?, postal_code = ?,
-                    contact_person = ?, phone = ?, email = ?, 
-                    capacity = ?, status = ?, is_primary = ?, project_id = ?, notes = ?, updated_by = ?
+                    contact_person = ?, phone = ?, email = ?,
+                    capacity = ?, status = ?, is_primary = ?, project_id = ?, notes = ?, pos_mode = ?, updated_by = ?
                     WHERE warehouse_id = ?";
-                
+
                 $stmt = $pdo->prepare($query);
                 $stmt->execute([
                     $warehouse_name, $warehouse_code, $location_info, $address,
                     $city, $state, $country, $postal_code,
                     $manager_name, $phone, $email,
-                    $capacity, $status, $is_primary, $project_id, $notes, $user_id, $warehouse_id
+                    $capacity, $status, $is_primary, $project_id, $notes, $pos_mode, $user_id, $warehouse_id
                 ]);
 
                 logActivity($pdo, $user_id, 'Edit warehouse', "User edited warehouse: $warehouse_name ($warehouse_code)");
@@ -1211,6 +1219,18 @@ function get_primary_badge($is_primary) {
                                         <?= t('Set as Primary Warehouse') ?>
                                     </label>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="pos_mode" class="form-label"><?= t('POS Mode') ?></label>
+                                <select class="form-select" id="pos_mode" name="pos_mode">
+                                    <option value="retail" selected><?= t('Retail') ?></option>
+                                    <option value="restaurant"><?= t('Restaurant') ?></option>
+                                    <option value="hybrid"><?= t('Hybrid (Retail + Restaurant)') ?></option>
+                                </select>
+                                <small class="text-muted"><?= t('Restaurant/Hybrid unlocks Floors & Tables, Kitchen Display, Reservations for this warehouse in POS.') ?></small>
                             </div>
                         </div>
 

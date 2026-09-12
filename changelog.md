@@ -38,6 +38,50 @@ appears in a `sw`-language render and the English text in an `en`-language rende
 translation keys introduced (checked file-wide via a duplicate-key tokenizer against the pre-existing
 baseline).
 
+## 2026-09-12 (feat/restaurant-pos-mode-setup) - Restaurant setup is now fully operable: real POS Mode field, a fix-it button, and a hub popup
+
+**Request:** hitting the Restaurant sub-hub showed "No warehouse in your scope is set to Restaurant or
+Hybrid mode yet. Switch a warehouse's POS Mode first" on every one of its 5 pages, with no actual UI
+anywhere to switch it. Also asked for the POS Workspace's "Restaurant" card to open a professional popup
+of its 5 destinations instead of navigating straight to a full sub-hub page, and for the warning itself to
+carry a button moving an authorized user straight to where they can fix it — gated on actual access, with
+superadmin always able to act.
+
+**Root cause, found by testing rather than assumed:** `warehouses.pos_mode` (`enum('retail','restaurant','hybrid')`)
+was only ever *read* (`pos.php`, `core/restaurant_scope.php`) — no page anywhere let an admin *write* it.
+The warning was accurate; there was just no way to act on it.
+
+**Fix:**
+- **`app/bms/stock/warehouses.php`** (Add modal, static form) + **`ajax_get_warehouse.php`** (Edit modal,
+  AJAX-rendered form) both gained a real "POS Mode" selector, wired into both `add_warehouse` and
+  `update_warehouse` POST handlers with the value whitelisted against the enum (never trusted verbatim
+  from POST).
+- Each of the 5 warehouse-scoped restaurant pages (`floors.php`, `tables.php`, `kitchen.php`,
+  `kitchen_dashboard.php`, `reservations.php`) now shows a **"Go to Warehouses"** button alongside the
+  existing warning — gated on `canEdit('warehouses')` (which already covers `isAdmin()` — superadmin
+  always sees it), so only a user who can actually act on it ever sees the button.
+- **`pos_dashboard.php`**'s "Restaurant" hub card now opens a **popup modal** listing its 5 destinations
+  (Floors & Tables, Kitchen Display, Modifier Group, Reservations, Menu Type) instead of navigating
+  straight to `restaurant/index.php`; picking one still lands on that exact page as before. The list
+  itself was extracted into a new shared `restaurantSubHubCards()` (`core/pos_nav.php`) so the popup and
+  the full-page sub-hub (`restaurant/index.php`, refactored to use the same function) can never drift
+  apart into two different lists.
+
+**Tested exhaustively, not assumed:** new `tests/test_restaurant_pos_mode_setup_cli.php` (36 assertions,
+0 failures) — confirms the POS Mode selector exists and offers all 3 values in both the Add and Edit
+forms; **live-persists a real warehouse's `pos_mode` to 'restaurant' and confirms
+`restaurantWarehousesForSelect()` actually picks it up** (not just that the column saved), restoring the
+original value in a `finally` block; confirms the "Go to Warehouses" button renders for an admin across
+all 5 pages and is genuinely absent for a real non-admin user with a real, temporary `role_permissions`
+grant (restaurant_pos view only, no warehouses edit) — cleaned up after the check, not faked in session,
+since header.php's own bootstrap reloads real permissions from the DB for any real user id regardless of
+what a test presets; confirms the popup modal renders with all 5 cards when `restaurant_pos` is on and is
+genuinely absent (not just hidden) when it's off; confirms `restaurant/index.php` is unaffected by the
+shared-function refactor. Also re-ran `tests/test_restaurant_pos_cli.php` (153/153),
+`tests/test_pos_nav_wiring_cli.php` (61/61), `tests/test_pos_i18n_coverage_cli.php` (132/132 — added the
+missing Swahili translation for "Go to Warehouses"), and `tests/test_warehouse_scope_cli.php` (162/163,
+the 1 failure being the pre-existing, previously documented `pending_approval` enum issue, unrelated).
+
 ## 2026-09-12 (feat/dashboard-chart-daily-period) - Performance Overview chart: added a "Daily" period option
 
 **Request:** "add also filtering of daily. not endup with weekly. i need also daily and make sure is

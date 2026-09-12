@@ -110,6 +110,7 @@ return [
     'Valuation' => 'Uthamini',
     'Warehouse' => 'Ghala',
     'Warehouses' => 'Maghala',
+    'Go to Warehouses' => 'Nenda kwa Maghala',
     'Locations' => 'Maeneo',
 
     // ------------------------------------------------------------------
@@ -2268,4 +2269,10 @@ return [
     'Location updated successfully!' => 'Eneo limesasishwa kwa mafanikio!',
     'Cannot delete location with existing stock.' => 'Haiwezekani kufuta eneo lenye hisa iliyopo.',
     'Location deleted successfully!' => 'Eneo limefutwa kwa mafanikio!',
+
+    // Warehouses — POS Mode field (merged from feat/restaurant-pos-mode-setup)
+    'POS Mode' => 'Hali ya POS',
+    'Retail' => 'Rejareja',
+    'Hybrid (Retail + Restaurant)' => 'Mchanganyiko (Rejareja + Mkahawa)',
+    'Restaurant/Hybrid unlocks Floors & Tables, Kitchen Display, Reservations for this warehouse in POS.' => 'Mkahawa/Mchanganyiko hufungua Sakafu na Meza, Onyesho la Jikoni, na Uhifadhi wa Nafasi kwa ghala hili katika POS.',
 ];
