@@ -33,6 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $loc_type = $_POST['location_type'];
         $status = $_POST['status'];
         
+        // Stored untranslated: header.php (which resolves the user's language)
+        // hasn't run yet on this POST request — translation happens at
+        // display time on the following GET, once the language is loaded.
         if (!empty($loc_name) && $wh_id > 0 && !userCan('warehouse', $wh_id)) {
             $_SESSION['error'] = "Access denied: this warehouse is not in your assigned scope.";
         } elseif (!empty($loc_name) && $wh_id > 0) {
@@ -362,21 +365,21 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
     <!-- Print Header -->
     <div class="d-none d-print-block text-center mb-4" id="printHeaderSection">
         
-        <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">Storage Locations Report</h2>
-        <p style="color: #6c757d; margin: 0; font-size: 10pt;">Generated on: <?= date('F j, Y, g:i a') ?></p>
+        <h2 style="color: #495057; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;"><?= t('Storage Locations Report') ?></h2>
+        <p style="color: #6c757d; margin: 0; font-size: 10pt;"><?= t('Generated on:') ?> <?= date('F j, Y, g:i a') ?></p>
         <div style="border-bottom: 3px solid #0d6efd; margin-top: 10px; margin-bottom: 20px;"></div>
     </div>
 
     <!-- Breadcrumbs -->
     <nav aria-label="breadcrumb" class="mb-3 d-print-none">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
             <?php if($project_id > 0): ?>
-                <li class="breadcrumb-item"><a href="<?= getUrl('project_view') . '?id=' . $project_id . '#procurements' ?>">Project Details</a></li>
+                <li class="breadcrumb-item"><a href="<?= getUrl('project_view') . '?id=' . $project_id . '#procurements' ?>"><?= t('Project Details') ?></a></li>
             <?php else: ?>
-                <li class="breadcrumb-item"><a href="<?= getUrl('warehouses') ?>">Inventory</a></li>
+                <li class="breadcrumb-item"><a href="<?= getUrl('warehouses') ?>"><?= t('Inventory') ?></a></li>
             <?php endif; ?>
-            <li class="breadcrumb-item active">Storage Locations</li>
+            <li class="breadcrumb-item active"><?= t('Storage Locations') ?></li>
         </ol>
     </nav>
 
@@ -385,18 +388,18 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h2 class="fw-bold text-dark mb-1"><i class="bi bi-geo-alt-fill text-primary"></i> Storage Locations</h2>
-                    <p class="text-muted mb-0">Manage and track inventory storage slots</p>
+                    <h2 class="fw-bold text-dark mb-1"><i class="bi bi-geo-alt-fill text-primary"></i> <?= t('Storage Locations') ?></h2>
+                    <p class="text-muted mb-0"><?= t('Manage and track inventory storage slots') ?></p>
                 </div>
                 <div class="d-flex gap-2">
                     <?php if($project_id > 0): ?>
                         <a href="<?= getUrl('project_view') . '?id=' . $project_id . '#procurements' ?>" class="btn btn-outline-secondary px-4 shadow-sm">
-                            <i class="bi bi-arrow-left me-2"></i> Back to Project
+                            <i class="bi bi-arrow-left me-2"></i> <?= t('Back to Project') ?>
                         </a>
                     <?php endif; ?>
                     <?php if ($can_add): ?>
                     <button class="btn btn-primary px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#locationModal" onclick="prepareAdd()">
-                        <i class="bi bi-plus-circle me-2"></i> Add Location
+                        <i class="bi bi-plus-circle me-2"></i> <?= t('Add Location') ?>
                     </button>
                     <?php endif; ?>
                 </div>
@@ -412,7 +415,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <div class="d-flex justify-content-between">
                         <div>
                             <h4 class="mb-0"><?= number_format($stats['total']) ?></h4>
-                            <p class="mb-0">Total Locations</p>
+                            <p class="mb-0"><?= t('Total Locations') ?></p>
                         </div>
                         <div class="align-self-center">
                             <i class="bi bi-geo-alt" style="font-size: 2rem;"></i>
@@ -428,7 +431,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <div class="d-flex justify-content-between">
                         <div>
                             <h4 class="mb-0"><?= number_format($stats['active']) ?></h4>
-                            <p class="mb-0">Active Locations</p>
+                            <p class="mb-0"><?= t('Active Locations') ?></p>
                         </div>
                         <div class="align-self-center">
                             <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
@@ -444,7 +447,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <div class="d-flex justify-content-between">
                         <div>
                             <h4 class="mb-0"><?= number_format($stats['inactive']) ?></h4>
-                            <p class="mb-0">Inactive Only</p>
+                            <p class="mb-0"><?= t('Inactive Only') ?></p>
                         </div>
                         <div class="align-self-center">
                             <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
@@ -460,7 +463,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <div class="d-flex justify-content-between">
                         <div>
                             <h4 class="mb-0"><?= number_format($stats['occupied']) ?></h4>
-                            <p class="mb-0">With Stock</p>
+                            <p class="mb-0"><?= t('With Stock') ?></p>
                         </div>
                         <div class="align-self-center">
                             <i class="bi bi-box-seam" style="font-size: 2rem;"></i>
@@ -474,14 +477,14 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
     <!-- Filters Section -->
     <div class="card border-0 shadow-sm mb-4 d-print-none">
         <div class="card-header bg-light">
-            <h6 class="mb-0"><i class="bi bi-funnel"></i> Filters & Parameters</h6>
+            <h6 class="mb-0"><i class="bi bi-funnel"></i> <?= t('Filters & Parameters') ?></h6>
         </div>
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-center">
                 <div class="col-md-4">
-                    <label class="form-label">Warehouse</label>
+                    <label class="form-label"><?= t('Warehouse') ?></label>
                     <select name="warehouse_id" id="filter_warehouse" class="form-select select2-static">
-                        <option value="0">All Warehouses</option>
+                        <option value="0"><?= t('All Warehouses') ?></option>
                         <?php foreach ($warehouses as $wh): ?>
                             <option value="<?= $wh['warehouse_id'] ?>" <?= $warehouse_id == $wh['warehouse_id'] ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($wh['warehouse_name']) ?>
@@ -490,19 +493,19 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Filter by Status</label>
+                    <label class="form-label"><?= t('Filter by Status') ?></label>
                     <select name="status" id="filter_status" class="form-select select2-static">
-                        <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>>All Statuses</option>
-                        <option value="active" <?= $status_filter == 'active' ? 'selected' : '' ?>>Active Only</option>
-                        <option value="inactive" <?= $status_filter == 'inactive' ? 'selected' : '' ?>>Inactive Only</option>
+                        <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>><?= t('All Statuses') ?></option>
+                        <option value="active" <?= $status_filter == 'active' ? 'selected' : '' ?>><?= t('Active Only') ?></option>
+                        <option value="inactive" <?= $status_filter == 'inactive' ? 'selected' : '' ?>><?= t('Inactive Only') ?></option>
                     </select>
                 </div>
                 <div class="col-md-5 d-flex align-items-end justify-content-end">
                     <button type="submit" class="btn btn-primary me-2">
-                        <i class="bi bi-filter"></i> Apply Filters
+                        <i class="bi bi-filter"></i> <?= t('Apply Filters') ?>
                     </button>
                     <a href="<?= getUrl('locations') . ($project_id > 0 ? '?project_id=' . $project_id : '') ?>" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-clockwise"></i> Reset
+                        <i class="bi bi-arrow-clockwise"></i> <?= t('Reset') ?>
                     </a>
                 </div>
             </form>
@@ -514,36 +517,42 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
         <div class="d-flex align-items-center gap-3 flex-wrap">
             <div class="btn-group shadow-sm" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                 <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="logReportAction('Printed Locations List', 'User generated a printed list of storage locations'); window.print()" style="background: #fff; color: #444;">
-                    <i class="bi bi-printer text-primary me-1"></i> Print
+                    <i class="bi bi-printer text-primary me-1"></i> <?= t('Print') ?>
                 </button>
                 <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
                 <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="exportLocations()" style="background: #fff; color: #444;">
-                    <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> Export
+                    <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> <?= t('Export') ?>
                 </button>
             </div>
 
             <div class="d-flex align-items-center bg-white shadow-sm px-3 py-1" style="border: 1px solid #dee2e6; border-radius: 8px;">
-                <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> Show:</span>
+                <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> <?= t('Show:') ?></span>
                 <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 60px; box-shadow: none; background: transparent;" onchange="$('#locationsTable').DataTable().page.len(this.value).draw();">
                     <option value="10">10</option>
                     <option value="25" selected>25</option>
                     <option value="50">50</option>
                     <option value="100">100</option>
-                    <option value="-1">All</option>
+                    <option value="-1"><?= t('All') ?></option>
                 </select>
             </div>
         </div>
         <div>
             <span class="badge bg-success-soft text-success border border-success px-3 py-2 fs-6 rounded-pill">
-                <i class="bi bi-check-circle-fill me-1"></i> <?= $stats['total'] ?> locations
+                <i class="bi bi-check-circle-fill me-1"></i> <?= $stats['total'] ?> <?= t('locations') ?>
             </span>
         </div>
     </div>
 
+    <?php
+    // $_SESSION['success']/['error'] are set during POST handling, before
+    // header.php resolves the user's language — translated here, at display
+    // time, once the correct language is loaded. t() no-ops gracefully on a
+    // message with dynamic data interpolated into it (e.g. a raw DB error).
+    ?>
     <?php if (isset($_SESSION['success'])): ?>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        Swal.fire({ icon: 'success', title: 'Success!', text: <?= json_encode($_SESSION['success']) ?>, confirmButtonColor: '#198754' });
+        Swal.fire({ icon: 'success', title: <?= json_encode(t('Success!')) ?>, text: <?= json_encode(t($_SESSION['success'])) ?>, confirmButtonColor: '#198754' });
     });
     </script>
     <?php unset($_SESSION['success']); ?>
@@ -552,7 +561,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
     <?php if (isset($_SESSION['error'])): ?>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        Swal.fire({ icon: 'error', title: 'Error', text: <?= json_encode($_SESSION['error']) ?>, confirmButtonColor: '#dc3545' });
+        Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: <?= json_encode(t($_SESSION['error'])) ?>, confirmButtonColor: '#dc3545' });
     });
     </script>
     <?php unset($_SESSION['error']); ?>
@@ -562,7 +571,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white py-3 border-bottom d-print-none">
             <div class="d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 fw-bold">Locations List</h5>
+                <h5 class="mb-0 fw-bold"><?= t('Locations List') ?></h5>
             </div>
         </div>
         <div class="card-body">
@@ -570,15 +579,15 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                 <table class="table table-hover align-middle" id="locationsTable">
                     <thead class="table-light">
                         <tr>
-                            <th style="width:50px;">S/NO</th>
-                            <th>Location Name</th>
-                            <th>Code</th>
-                            <th>Warehouse</th>
-                            <th>Type</th>
-                            <th class="text-center">Products</th>
-                            <th class="text-center">Sub-qty</th>
-                            <th class="text-center">Status</th>
-                            <th class="text-center">Actions</th>
+                            <th style="width:50px;"><?= t('S/NO') ?></th>
+                            <th><?= t('Location Name') ?></th>
+                            <th><?= t('Code') ?></th>
+                            <th><?= t('Warehouse') ?></th>
+                            <th><?= t('Type') ?></th>
+                            <th class="text-center"><?= t('Products') ?></th>
+                            <th class="text-center"><?= t('Sub-qty') ?></th>
+                            <th class="text-center"><?= t('Status') ?></th>
+                            <th class="text-center"><?= t('Actions') ?></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -590,7 +599,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                             <td><strong><?= htmlspecialchars($loc['location_name'] ?? '') ?></strong></td>
                             <td><code class="custom-code"><?= htmlspecialchars($loc['location_code'] ?? '') ?></code></td>
                             <td><?= htmlspecialchars($loc['warehouse_name'] ?? '') ?></td>
-                            <td class="text-capitalize"><?= htmlspecialchars($loc['location_type'] ?? '') ?></td>
+                            <td class="text-capitalize"><?= htmlspecialchars(t(ucfirst($loc['location_type'] ?? ''))) ?></td>
                             <td class="text-center"><span class="badge bg-secondary"><?= $loc['item_count'] ?></span></td>
                             <td class="text-center"><?= number_format($loc['total_quantity'] ?? 0, 0) ?></td>
                             <td class="text-center"><?= get_status_badge($loc['status'] ?? '') ?></td>
@@ -602,9 +611,9 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                     <ul class="dropdown-menu dropdown-menu-end">
                                         <?php if ($can_edit): ?>
                                         <li>
-                                            <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#locationModal" 
+                                            <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#locationModal"
                                                onclick='prepareEdit(<?= json_encode($loc) ?>)'>
-                                                <i class="bi bi-pencil"></i> Edit
+                                                <i class="bi bi-pencil"></i> <?= t('Edit') ?>
                                             </a>
                                         </li>
                                         <?php endif; ?>
@@ -612,7 +621,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                                         <li><hr class="dropdown-divider"></li>
                                         <li>
                                             <a class="dropdown-item text-danger" href="#" onclick="deleteLocation(<?= $loc['location_id'] ?>)">
-                                                <i class="bi bi-trash"></i> Delete
+                                                <i class="bi bi-trash"></i> <?= t('Delete') ?>
                                             </a>
                                         </li>
                                         <?php endif; ?>
@@ -636,22 +645,22 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <div class="text-muted mb-1">
                         <code class="custom-code"><?= htmlspecialchars($loc['location_code'] ?? '') ?></code>
                         &nbsp;|&nbsp; <?= htmlspecialchars($loc['warehouse_name'] ?? '') ?>
-                        &nbsp;|&nbsp; <span class="text-capitalize"><?= htmlspecialchars($loc['location_type'] ?? '') ?></span>
+                        &nbsp;|&nbsp; <span class="text-capitalize"><?= htmlspecialchars(t(ucfirst($loc['location_type'] ?? ''))) ?></span>
                     </div>
                     <div class="text-muted mb-1" style="font-size:0.78rem;">
-                        <i class="bi bi-box"></i> <?= $loc['item_count'] ?> products &nbsp;|&nbsp; Qty: <?= number_format($loc['total_quantity'] ?? 0, 0) ?>
+                        <i class="bi bi-box"></i> <?= $loc['item_count'] ?> <?= t('products') ?> &nbsp;|&nbsp; <?= t('Qty:') ?> <?= number_format($loc['total_quantity'] ?? 0, 0) ?>
                     </div>
                     <div style="display:flex;flex-wrap:nowrap;gap:4px;padding-top:0.5rem;border-top:1px solid #dee2e6;background:#fff;">
                         <?php if ($can_edit): ?>
                         <button class="btn btn-outline-primary btn-sm" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"
                             data-bs-toggle="modal" data-bs-target="#locationModal"
-                            onclick='prepareEdit(<?= json_encode($loc) ?>)' title="Edit">
+                            onclick='prepareEdit(<?= json_encode($loc) ?>)' title="<?= t('Edit') ?>">
                             <i class="bi bi-pencil"></i>
                         </button>
                         <?php endif; ?>
                         <?php if ($can_delete && $loc['item_count'] == 0): ?>
                         <button class="btn btn-outline-danger btn-sm" style="flex:1;min-width:0;padding:3px 4px;font-size:0.72rem;"
-                            onclick="deleteLocation(<?= $loc['location_id'] ?>)" title="Delete">
+                            onclick="deleteLocation(<?= $loc['location_id'] ?>)" title="<?= t('Delete') ?>">
                             <i class="bi bi-trash"></i>
                         </button>
                         <?php endif; ?>
@@ -659,7 +668,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                 </div>
                 <?php endforeach; ?>
                 <?php if (empty($locations)): ?>
-                <div class="text-center text-muted py-4">No locations found.</div>
+                <div class="text-center text-muted py-4"><?= t('No locations found.') ?></div>
                 <?php endif; ?>
             </div>
         </div>
@@ -671,15 +680,15 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
     <div class="modal-dialog">
         <form method="POST" id="locationForm" class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="modalTitle">Add Location</h5>
+                <h5 class="modal-title" id="modalTitle"><?= t('Add Location') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" name="location_id" id="loc_id">
                 <div class="mb-3">
-                    <label class="form-label">Warehouse *</label>
+                    <label class="form-label"><?= t('Warehouse') ?> *</label>
                     <select name="warehouse_id" id="loc_wh" class="form-select select2-static" required>
-                        <option value="">Select Warehouse</option>
+                        <option value=""><?= t('Select Warehouse') ?></option>
                         <?php foreach ($warehouses as $wh): ?>
                             <option value="<?= $wh['warehouse_id'] ?>"><?= htmlspecialchars($wh['warehouse_name']) ?></option>
                         <?php endforeach; ?>
@@ -687,40 +696,40 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                 </div>
                 <div class="row">
                     <div class="col-md-8 mb-3">
-                        <label class="form-label">Location Name *</label>
-                        <input type="text" name="location_name" id="loc_name" class="form-control" required placeholder="e.g. Shelf A1">
+                        <label class="form-label"><?= t('Location Name') ?> *</label>
+                        <input type="text" name="location_name" id="loc_name" class="form-control" required placeholder="<?= t('e.g. Shelf A1') ?>">
                     </div>
                     <div class="col-md-4 mb-3">
-                        <label class="form-label">Code</label>
+                        <label class="form-label"><?= t('Code') ?></label>
                         <input type="text" name="location_code" id="loc_code" class="form-control" placeholder="A1">
                     </div>
                 </div>
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label class="form-label">Type</label>
+                        <label class="form-label"><?= t('Type') ?></label>
                         <select name="location_type" id="loc_type" class="form-select select2-static">
-                            <option value="storage">Storage</option>
-                            <option value="receiving">Receiving</option>
-                            <option value="shipping">Shipping</option>
-                            <option value="picking">Picking</option>
+                            <option value="storage"><?= t('Storage') ?></option>
+                            <option value="receiving"><?= t('Receiving') ?></option>
+                            <option value="shipping"><?= t('Shipping') ?></option>
+                            <option value="picking"><?= t('Picking') ?></option>
                         </select>
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label class="form-label">Capacity (Optional)</label>
+                        <label class="form-label"><?= t('Capacity (Optional)') ?></label>
                         <input type="number" name="capacity" id="loc_cap" class="form-control" placeholder="0">
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Status</label>
+                    <label class="form-label"><?= t('Status') ?></label>
                     <select name="status" id="loc_status" class="form-select select2-static">
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
+                        <option value="active"><?= t('Active') ?></option>
+                        <option value="inactive"><?= t('Inactive') ?></option>
                     </select>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" name="add_location" id="submitBtn" class="btn btn-primary">Save Location</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                <button type="submit" name="add_location" id="submitBtn" class="btn btn-primary"><?= t('Save Location') ?></button>
             </div>
         </form>
     </div>
@@ -730,7 +739,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 function exportLocations() {
     logReportAction('Exported Locations List', 'User exported storage locations records to CSV');
     const table = document.getElementById('locationsTable');
-    let csv = 'Name,Code,Warehouse,Type,Products,Qty,Status\n';
+    let csv = '<?= t('Name') ?>,<?= t('Code') ?>,<?= t('Warehouse') ?>,<?= t('Type') ?>,<?= t('Products') ?>,<?= t('Qty') ?>,<?= t('Status') ?>\n';
     const rows = table.querySelectorAll('tbody tr');
     rows.forEach(row => {
         const cols = row.querySelectorAll('td');
@@ -791,10 +800,10 @@ $(document).ready(function() {
 });
 
 function prepareAdd() {
-    $('#modalTitle').text('Add New Location');
+    $('#modalTitle').text(<?= json_encode(t('Add New Location')) ?>);
     $('#locationForm')[0].reset();
     $('#loc_id').val('');
-    $('#submitBtn').attr('name', 'add_location').text('Save Location');
+    $('#submitBtn').attr('name', 'add_location').text(<?= json_encode(t('Save Location')) ?>);
     // Set warehouse if filtered
     <?php if ($warehouse_id > 0): ?>
     $('#loc_wh').val('<?= $warehouse_id ?>');
@@ -802,7 +811,7 @@ function prepareAdd() {
 }
 
 function prepareEdit(loc) {
-    $('#modalTitle').text('Edit Location');
+    $('#modalTitle').text(<?= json_encode(t('Edit Location')) ?>);
     $('#loc_id').val(loc.location_id);
     $('#loc_wh').val(loc.warehouse_id);
     $('#loc_name').val(loc.location_name);
@@ -810,18 +819,18 @@ function prepareEdit(loc) {
     $('#loc_type').val(loc.location_type);
     $('#loc_cap').val(loc.capacity);
     $('#loc_status').val(loc.status);
-    $('#submitBtn').attr('name', 'update_location').text('Update Location');
+    $('#submitBtn').attr('name', 'update_location').text(<?= json_encode(t('Update Location')) ?>);
 }
 
 function deleteLocation(id) {
     Swal.fire({
-        title: 'Are you sure?',
-        text: "You won't be able to revert this!",
+        title: <?= json_encode(t('Are you sure?')) ?>,
+        text: <?= json_encode(t("You won't be able to revert this!")) ?>,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#3085d6',
         cancelButtonColor: '#d33',
-        confirmButtonText: 'Yes, delete it!'
+        confirmButtonText: <?= json_encode(t('Yes, delete it!')) ?>
     }).then((result) => {
         if (result.isConfirmed) {
             // Usually we'd use AJAX here or a hidden form

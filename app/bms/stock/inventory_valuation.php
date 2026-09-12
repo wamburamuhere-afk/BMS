@@ -102,18 +102,18 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
        
 
         <h2 style="color: #000; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">
-            Inventory Valuation Report
+            <?= t('Inventory Valuation Report') ?>
         </h2>
 
         <p style="color: #000; margin: 0; font-size: 10pt;">
-            Report Date: <?= date('d M Y, H:i') ?>
+            <?= t('Report Date:') ?> <?= date('d M Y, H:i') ?>
 
             <?php if ($warehouse_id > 0): ?>
-                | Warehouse: <?php 
-                    $wh = array_filter($warehouses, function($w) use ($warehouse_id) { 
-                        return $w['warehouse_id'] == $warehouse_id; 
+                | <?= t('Warehouse:') ?> <?php
+                    $wh = array_filter($warehouses, function($w) use ($warehouse_id) {
+                        return $w['warehouse_id'] == $warehouse_id;
                     });
-                    echo htmlspecialchars(reset($wh)['warehouse_name'] ?? 'All');
+                    echo htmlspecialchars(reset($wh)['warehouse_name'] ?? t('All'));
                 ?>
             <?php endif; ?>
         </p>
@@ -124,23 +124,23 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
 <!-- Print Summary Cards -->
 <div class="summary-print d-none d-print-flex">
     <div class="summary-item">
-        <div class="summary-label">Total Items</div>
+        <div class="summary-label"><?= t('Total Items') ?></div>
         <div class="summary-value"><?= number_format($total_items) ?></div>
     </div>
     <div class="summary-item">
-        <div class="summary-label">Total Quantity</div>
+        <div class="summary-label"><?= t('Total Quantity') ?></div>
         <div class="summary-value"><?= format_number($total_quantity, 0) ?></div>
     </div>
     <div class="summary-item">
-        <div class="summary-label">Cost Value</div>
+        <div class="summary-label"><?= t('Cost Value') ?></div>
         <div class="summary-value"><?= format_currency($total_cost_value) ?></div>
     </div>
     <div class="summary-item">
-        <div class="summary-label">Selling Value</div>
+        <div class="summary-label"><?= t('Selling Value') ?></div>
         <div class="summary-value"><?= format_currency($total_selling_value) ?></div>
     </div>
     <div class="summary-item">
-        <div class="summary-label">Potential Profit</div>
+        <div class="summary-label"><?= t('Potential Profit') ?></div>
         <div class="summary-value"><?= format_currency($total_potential_profit) ?></div>
     </div>
 </div>
@@ -149,9 +149,9 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
     <!-- Breadcrumbs -->
     <nav aria-label="breadcrumb" class="mb-3 d-print-none">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
-            <li class="breadcrumb-item"><a href="<?= getUrl('products') ?>">Inventory</a></li>
-            <li class="breadcrumb-item active">Inventory Valuation</li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('products') ?>"><?= t('Inventory') ?></a></li>
+            <li class="breadcrumb-item active"><?= t('Inventory Valuation') ?></li>
         </ol>
     </nav>
 
@@ -160,8 +160,8 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h2 class="fw-bold text-dark mb-1"><i class="bi bi-calculator-fill text-primary"></i> Inventory Valuation</h2>
-                    <p class="text-muted mb-0">Total value and stock assessment of your inventory</p>
+                    <h2 class="fw-bold text-dark mb-1"><i class="bi bi-calculator-fill text-primary"></i> <?= t('Inventory Valuation') ?></h2>
+                    <p class="text-muted mb-0"><?= t('Total value and stock assessment of your inventory') ?></p>
                 </div>
             </div>
         </div>
@@ -175,7 +175,7 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
                     <div class="d-flex justify-content-between">
                         <div>
                             <h4 class="mb-0"><?= number_format($total_items) ?></h4>
-                            <p class="mb-0">Total Items</p>
+                            <p class="mb-0"><?= t('Total Items') ?></p>
                         </div>
                         <div class="align-self-center">
                             <i class="bi bi-box-seam" style="font-size: 2rem;"></i>
@@ -190,7 +190,7 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
                     <div class="d-flex justify-content-between">
                         <div>
                             <h4 class="mb-0"><?= format_number($total_quantity, 0) ?></h4>
-                            <p class="mb-0">Total Quantity</p>
+                            <p class="mb-0"><?= t('Total Quantity') ?></p>
                         </div>
                         <div class="align-self-center">
                             <i class="bi bi-boxes" style="font-size: 2rem;"></i>
@@ -205,7 +205,7 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
                     <div class="d-flex justify-content-between">
                         <div>
                             <h4 class="mb-0"><?= format_currency($total_cost_value) ?></h4>
-                            <p class="mb-0">Cost Value</p>
+                            <p class="mb-0"><?= t('Cost Value') ?></p>
                         </div>
                         <div class="align-self-center">
                             <i class="bi bi-currency-dollar" style="font-size: 2rem;"></i>
@@ -220,7 +220,7 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
                     <div class="d-flex justify-content-between">
                         <div>
                             <h4 class="mb-0"><?= format_currency($total_selling_value) ?></h4>
-                            <p class="mb-0">Selling Value</p>
+                            <p class="mb-0"><?= t('Selling Value') ?></p>
                         </div>
                         <div class="align-self-center">
                             <i class="bi bi-graph-up-arrow" style="font-size: 2rem;"></i>
@@ -234,14 +234,14 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
     <!-- Filters -->
     <div class="card mb-4 d-print-none">
         <div class="card-header bg-light">
-            <h6 class="mb-0"><i class="bi bi-funnel"></i> Filters & Parameters</h6>
+            <h6 class="mb-0"><i class="bi bi-funnel"></i> <?= t('Filters & Parameters') ?></h6>
         </div>
         <div class="card-body">
             <form method="GET" action="" class="row g-3">
                 <div class="col-md-3">
-                    <label class="form-label">Warehouse</label>
+                    <label class="form-label"><?= t('Warehouse') ?></label>
                     <select class="form-select" name="warehouse">
-                        <option value="0">All Warehouses</option>
+                        <option value="0"><?= t('All Warehouses') ?></option>
                         <?php foreach ($warehouses as $warehouse): ?>
                             <option value="<?= $warehouse['warehouse_id'] ?>" <?= $warehouse_id == $warehouse['warehouse_id'] ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($warehouse['warehouse_name']) ?>
@@ -251,9 +251,9 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
                 </div>
 
                 <div class="col-md-3">
-                    <label class="form-label">Category</label>
+                    <label class="form-label"><?= t('Category') ?></label>
                     <select class="form-select" name="category">
-                        <option value="0">All Categories</option>
+                        <option value="0"><?= t('All Categories') ?></option>
                         <?php foreach ($categories as $category): ?>
                             <option value="<?= $category['category_id'] ?>" <?= $category_id == $category['category_id'] ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($category['category_name']) ?>
@@ -263,25 +263,25 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
                 </div>
 
                 <div class="col-md-3">
-                    <label class="form-label">Valuation Method</label>
+                    <label class="form-label"><?= t('Valuation Method') ?></label>
                     <select class="form-select" name="method">
-                        <option value="average_cost" <?= $valuation_method == 'average_cost' ? 'selected' : '' ?>>Average Cost</option>
-                        <option value="fifo" <?= $valuation_method == 'fifo' ? 'selected' : '' ?>>FIFO</option>
-                        <option value="lifo" <?= $valuation_method == 'lifo' ? 'selected' : '' ?>>LIFO</option>
+                        <option value="average_cost" <?= $valuation_method == 'average_cost' ? 'selected' : '' ?>><?= t('Average Cost') ?></option>
+                        <option value="fifo" <?= $valuation_method == 'fifo' ? 'selected' : '' ?>><?= t('FIFO') ?></option>
+                        <option value="lifo" <?= $valuation_method == 'lifo' ? 'selected' : '' ?>><?= t('LIFO') ?></option>
                     </select>
                 </div>
 
                 <div class="col-md-3">
-                    <label class="form-label">As of Date</label>
+                    <label class="form-label"><?= t('As of Date') ?></label>
                     <input type="date" class="form-control" name="as_of_date" value="<?= $as_of_date ?>">
                 </div>
 
                 <div class="col-12 d-flex justify-content-end">
                     <button type="submit" class="btn btn-primary me-2">
-                        <i class="bi bi-search"></i> Apply Filters
+                        <i class="bi bi-search"></i> <?= t('Apply Filters') ?>
                     </button>
                     <a href="inventory_valuation.php" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-clockwise"></i> Reset
+                        <i class="bi bi-arrow-clockwise"></i> <?= t('Reset') ?>
                     </a>
                 </div>
             </form>
@@ -293,21 +293,21 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
         <div class="d-flex align-items-center gap-3">
             <div class="btn-group shadow-sm" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                 <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="copyTable()" style="background: #fff; color: #444;">
-                    <i class="bi bi-clipboard text-info me-1"></i> Copy
+                    <i class="bi bi-clipboard text-info me-1"></i> <?= t('Copy') ?>
                 </button>
                 <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
                 <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="exportToExcel()" style="background: #fff; color: #444;">
-                    <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> Excel
+                    <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> <?= t('Excel') ?>
                 </button>
                 <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
                 <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="logReportAction('Printed Inventory Valuation', 'User generated a printed inventory valuation report'); window.print()" style="background: #fff; color: #444;">
-                    <i class="bi bi-printer text-primary me-1"></i> Print
+                    <i class="bi bi-printer text-primary me-1"></i> <?= t('Print') ?>
                 </button>
             </div>
         </div>
         <div>
             <span class="badge bg-success-soft text-success border border-success px-3 py-2 fs-6 rounded-pill">
-                <i class="bi bi-check-circle-fill me-1"></i> <?= number_format($total_items) ?> items
+                <i class="bi bi-check-circle-fill me-1"></i> <?= number_format($total_items) ?> <?= t('items') ?>
             </span>
         </div>
     </div>
@@ -315,7 +315,7 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
     <!-- Inventory Table -->
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white border-bottom">
-            <h5 class="mb-0"><i class="bi bi-table"></i> Inventory Details</h5>
+            <h5 class="mb-0"><i class="bi bi-table"></i> <?= t('Inventory Details') ?></h5>
         </div>
         <div class="card-body">
             <?php if (count($inventory_items) > 0): ?>
@@ -323,16 +323,16 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
                     <table class="table table-hover" id="inventoryTable">
                         <thead class="table-light">
                             <tr>
-                                <th>S/NO</th>
-                                <th>Product</th>
-                                <th>SKU</th>
-                                <th>Category</th>
-                                <th class="text-end">Quantity</th>
-                                <th class="text-end">Cost Price</th>
-                                <th class="text-end">Selling Price</th>
-                                <th class="text-end">Cost Value</th>
-                                <th class="text-end">Selling Value</th>
-                                <th class="text-end">Potential Profit</th>
+                                <th><?= t('S/NO') ?></th>
+                                <th><?= t('Product') ?></th>
+                                <th><?= t('SKU') ?></th>
+                                <th><?= t('Category') ?></th>
+                                <th class="text-end"><?= t('Quantity') ?></th>
+                                <th class="text-end"><?= t('Cost Price') ?></th>
+                                <th class="text-end"><?= t('Selling Price') ?></th>
+                                <th class="text-end"><?= t('Cost Value') ?></th>
+                                <th class="text-end"><?= t('Selling Value') ?></th>
+                                <th class="text-end"><?= t('Potential Profit') ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -346,7 +346,7 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
                                     <?php endif; ?>
                                 </td>
                                 <td><code><?= htmlspecialchars($item['sku'] ?? '') ?></code></td>
-                                <td><?= htmlspecialchars($item['category_name'] ?? 'N/A') ?></td>
+                                <td><?= htmlspecialchars($item['category_name'] ?? t('N/A')) ?></td>
                                 <td class="text-end"><?= format_number($item['total_quantity'], 0) ?></td>
                                 <td class="text-end"><?= format_currency($item['cost_price']) ?></td>
                                 <td class="text-end"><?= format_currency($item['selling_price']) ?></td>
@@ -358,7 +358,7 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
                         </tbody>
                         <tfoot class="table-light">
                             <tr class="fw-bold">
-                                <td colspan="4" class="text-end">TOTAL:</td>
+                                <td colspan="4" class="text-end"><?= t('TOTAL:') ?></td>
                                 <td class="text-end"><?= format_number($total_quantity, 0) ?></td>
                                 <td colspan="2"></td>
                                 <td class="text-end text-danger"><?= format_currency($total_cost_value) ?></td>
@@ -371,8 +371,8 @@ $total_quantity = array_sum(array_column($inventory_items, 'total_quantity'));
             <?php else: ?>
                 <div class="text-center py-5">
                     <i class="bi bi-inbox" style="font-size: 4rem; color: #ccc;"></i>
-                    <h4 class="mt-3">No Inventory Data</h4>
-                    <p class="text-muted">No products found with the selected filters.</p>
+                    <h4 class="mt-3"><?= t('No Inventory Data') ?></h4>
+                    <p class="text-muted"><?= t('No products found with the selected filters.') ?></p>
                 </div>
             <?php endif; ?>
         </div>
@@ -389,7 +389,7 @@ function copyTable() {
     window.getSelection().addRange(range);
     try {
         document.execCommand('copy');
-        Swal.fire({ icon: 'success', title: 'Copied!', text: 'Inventory table data copied to clipboard', timer: 1500, showConfirmButton: false });
+        Swal.fire({ icon: 'success', title: <?= json_encode(t('Copied!')) ?>, text: <?= json_encode(t('Inventory table data copied to clipboard')) ?>, timer: 1500, showConfirmButton: false });
     } catch (err) {
         console.error('Unable to copy', err);
     }
@@ -399,7 +399,7 @@ function copyTable() {
 function exportToExcel() {
     logReportAction('Exported Inventory Valuation', 'User exported inventory valuation to CSV/Excel');
     // Simple export to CSV
-    let csv = 'Product,SKU,Category,Quantity,Cost Price,Selling Price,Cost Value,Selling Value,Potential Profit\n';
+    let csv = '<?= t('Product') ?>,<?= t('SKU') ?>,<?= t('Category') ?>,<?= t('Quantity') ?>,<?= t('Cost Price') ?>,<?= t('Selling Price') ?>,<?= t('Cost Value') ?>,<?= t('Selling Value') ?>,<?= t('Potential Profit') ?>\n';
     
     <?php foreach ($inventory_items as $item): 
         $name     = addslashes(str_replace(["\r","\n",'"'], ['','','""'], $item['product_name']));
@@ -437,16 +437,16 @@ $(document).ready(function() {
              '<"row"<"col-sm-12"tr>>' +
              '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
         language: {
-            lengthMenu: "Show _MENU_ entries",
-            search: "Search:",
-            info: "Showing _START_ to _END_ of _TOTAL_ entries",
-            infoEmpty: "Showing 0 to 0 of 0 entries",
-            infoFiltered: "(filtered from _MAX_ total entries)",
+            lengthMenu: <?= json_encode(t('Show _MENU_ entries')) ?>,
+            search: <?= json_encode(t('Search:')) ?>,
+            info: <?= json_encode(t('Showing _START_ to _END_ of _TOTAL_ entries')) ?>,
+            infoEmpty: <?= json_encode(t('Showing 0 to 0 of 0 entries')) ?>,
+            infoFiltered: <?= json_encode(t('(filtered from _MAX_ total entries)')) ?>,
             paginate: {
-                first: "First",
-                last: "Last",
-                next: "Next",
-                previous: "Previous"
+                first: <?= json_encode(t('First')) ?>,
+                last: <?= json_encode(t('Last')) ?>,
+                next: <?= json_encode(t('Next')) ?>,
+                previous: <?= json_encode(t('Previous')) ?>
             }
         },
         responsive: true,
