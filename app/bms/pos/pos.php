@@ -271,7 +271,7 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
         <div class="col-md-5 bg-light">
             <!-- Current Sale Header -->
             <div class="p-3 border-bottom bg-white">
-                <div class="d-flex justify-content-between align-items-center mb-3">
+                <div id="cartHeaderTop" class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0"><i class="bi bi-cart3"></i> <?= t('Current Sale') ?></h5>
                     <div id="cartHeaderActions" class="btn-group btn-group-sm">
                         <?php if (canEdit('pos_discount_override')): ?>
@@ -422,7 +422,19 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
                                    id="payment<?= ucfirst($value) ?>" value="<?= $value ?>"
                                    <?= $value == 'cash' ? 'checked' : '' ?>>
                             <label class="btn btn-outline-primary btn-sm" for="payment<?= ucfirst($value) ?>">
-                                <?= $value == 'mobile_money' ? t('Mobile') : ($value == 'bank_transfer' ? t('Bank') : $label) ?>
+                                <?php if ($value == 'mobile_money'): ?>
+                                    <?= t('Mobile') ?>
+                                <?php elseif ($value == 'bank_transfer'): ?>
+                                    <?= t('Bank') ?>
+                                <?php elseif ($value == 'card'): ?>
+                                    <span class="d-none d-md-inline"><?= $label ?></span>
+                                    <span class="d-inline d-md-none"><?= t('Card') ?></span>
+                                <?php elseif ($value == 'credit'): ?>
+                                    <span class="d-none d-md-inline"><?= $label ?></span>
+                                    <span class="d-inline d-md-none"><?= t('Credit') ?></span>
+                                <?php else: ?>
+                                    <?= $label ?>
+                                <?php endif; ?>
                             </label>
                         <?php endforeach; ?>
                     </div>
@@ -711,16 +723,42 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
 
     /* Current Sale header actions (%, Clear, Hold, Held Sales) — a
        btn-group that never wrapped, so the rightmost button(s) ran off the
-       edge of the screen with no way to reach them. Let it wrap onto a
-       second line instead, still grouped and readable. */
+       edge of the screen with no way to reach them. Stacking the title
+       above gives the button row the FULL width to itself, so every button
+       (icon-only) fits on one single row, evenly spaced — never wrapping
+       to a second line and never hidden off-screen. */
+    #cartHeaderTop {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 8px;
+    }
     #cartHeaderActions {
-        flex-wrap: wrap;
-        border-radius: 0.25rem;
-        overflow: visible !important;
+        display: flex;
+        flex-wrap: nowrap;
+        width: 100%;
     }
     #cartHeaderActions .btn {
-        flex: 0 0 auto;
-        padding: 4px 8px;
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 5px 2px;
+    }
+
+    /* Payment Method row (Cash / Card / Mobile / Bank / Customer Credit) —
+       5 buttons in one un-wrapped btn-group meant the last one(s) ran off
+       the edge, unreachable. Each button now flexes to an equal share of
+       the full-width row instead, so all 5 stay on one row, fully visible,
+       never needing a horizontal scroll. Longer labels (Card/Credit) swap
+       to their short mobile-only form so the text still fits. */
+    #paymentMethodGroup {
+        flex-wrap: nowrap;
+    }
+    #paymentMethodGroup .btn {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 5px 1px !important;
+        font-size: 0.62rem !important;
+        white-space: normal;
+        line-height: 1.15;
     }
 
     /* Cart line items table — kept as one row per item (not a page-level
