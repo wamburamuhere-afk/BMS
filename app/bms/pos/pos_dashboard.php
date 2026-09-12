@@ -1302,6 +1302,18 @@ $(document).ready(function () {
         if (table) loadSales();
     });
 
+    // Deep-link from the main dashboard's "Today's POS Sales" card
+    // (?period=daily): pre-select that tab so the unconditional loadSales()
+    // call below shows exactly what the card showed, instead of this page's
+    // own default (Yearly). #fDay already defaults to today via
+    // initFilterDefaults() above, so no separate ?date= param is needed.
+    const urlPeriod = new URLSearchParams(window.location.search).get('period');
+    if (urlPeriod && $('.period-btn[data-period="' + urlPeriod + '"]').length) {
+        $('.period-btn').removeClass('btn-primary').addClass('btn-outline-primary');
+        $('.period-btn[data-period="' + urlPeriod + '"]').removeClass('btn-outline-primary').addClass('btn-primary');
+        showFilterPanel(urlPeriod);
+    }
+
     // Apply buttons (all panels)
     $(document).on('click', '.apply-btn', function () { loadSales(); });
 
