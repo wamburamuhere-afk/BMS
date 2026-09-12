@@ -737,7 +737,7 @@ function get_quick_actions($product) {
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-2 flex-wrap flex-grow-1">
                     <!-- Buttons group: full-width on mobile, auto on desktop -->
-                    <div class="d-flex shadow-sm bg-white product-action-btns" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
+                    <div class="d-flex shadow-sm bg-white product-action-btns products-toolbar" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                         <button type="button" class="btn btn-white fw-medium border-0 text-center px-2 px-md-3 py-2" onclick="copyTable()" style="background: #fff; color: #444; min-width: 0;">
                             <i class="bi bi-clipboard text-info me-1" style="font-size: 0.9rem;"></i><span style="font-size: 0.78rem;"><?= t('Copy') ?></span>
                         </button>
@@ -757,9 +757,9 @@ function get_quick_actions($product) {
 
                     <!-- Show + Search: flex row, search grows -->
                     <div class="d-flex align-items-center gap-2 flex-grow-1 flex-nowrap">
-                        <div class="d-flex align-items-center bg-white shadow-sm px-2 px-sm-3 py-1 flex-shrink-0" style="border: 1px solid #dee2e6; border-radius: 8px; height: 38px;">
+                        <div class="d-flex align-items-center bg-white shadow-sm px-2 px-sm-3 py-1 flex-shrink-0 products-per-page-box" style="border: 1px solid #dee2e6; border-radius: 8px; height: 38px;">
                             <span class="small text-muted me-1 me-sm-2 text-nowrap"><i class="bi bi-list-ol d-none d-sm-inline"></i> <?= t('Show:') ?></span>
-                            <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 45px; box-shadow: none; background: transparent;" onchange="updatePerPage(this.value)">
+                            <select class="form-select form-select-sm border-0 fw-bold p-0 products-per-page-select" style="width: 45px; box-shadow: none; background: transparent;" onchange="updatePerPage(this.value)">
                                 <option value="10" <?= $per_page == 10 ? 'selected' : '' ?>>10</option>
                                 <option value="25" <?= $per_page == 25 ? 'selected' : '' ?>>25</option>
                                 <option value="50" <?= $per_page == 50 ? 'selected' : '' ?>>50</option>
@@ -1735,6 +1735,74 @@ $(document).keydown(function(e) {
 @media (max-width: 768px) {
     .product-action-btns {
         width: 100% !important;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Mobile view — desktop layout above is completely untouched by this block.
+   Fixes a white/unreadable toolbar + dropdown controls reported on Android
+   Chrome: this page never declared color-scheme, so a phone with "Force
+   dark mode for web content" enabled (a real Android Chrome setting) can
+   re-color native form controls (the <select> popups here) in ways that
+   clash with THIS page's own explicit light colors — worst right after
+   opening/choosing an option, exactly as reported. Declaring color-scheme:
+   light tells the browser this page is deliberately light-only and already
+   handles its own contrast, so it stops "fixing" it. On top of that
+   defensive baseline, the toolbar right under the header is recolored to
+   the same blue used elsewhere in the app (POS hub's primary card), and
+   the adjacent "Show:" dropdown + the row-actions dropdown get fully
+   explicit, opaque colors that can never blend away regardless of cause.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 767.98px) {
+    :root {
+        color-scheme: light;
+    }
+
+    /* Actions toolbar (Copy / CSV / Print / Reports) — was plain white. */
+    .products-toolbar {
+        background: #0d6efd !important;
+        border-color: #0d6efd !important;
+    }
+    .products-toolbar .btn {
+        background: #0d6efd !important;
+        color: #fff !important;
+    }
+    .products-toolbar .btn i {
+        color: #fff !important;
+    }
+    .products-toolbar > div {
+        background: rgba(255, 255, 255, .35) !important;
+    }
+
+    /* "Show: N" per-page control, right next to the toolbar above — an
+       explicit, opaque background so tapping it can never go invisible. */
+    .products-per-page-box {
+        background: #ffffff !important;
+        color: #212529 !important;
+    }
+    .products-per-page-select {
+        background: #ffffff !important;
+        color: #212529 !important;
+    }
+    .products-per-page-select option {
+        background: #ffffff !important;
+        color: #212529 !important;
+    }
+
+    /* Row-actions dropdown (⋮ menu) — explicit colors, never left to
+       inherit/default. */
+    .dropdown-menu {
+        background: #ffffff !important;
+    }
+    .dropdown-item {
+        background: transparent !important;
+        color: #212529 !important;
+    }
+    .dropdown-item:hover,
+    .dropdown-item:focus,
+    .dropdown-item:active {
+        background: #f1f5f9 !important;
+        color: #0d6efd !important;
     }
 }
 </style>

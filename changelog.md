@@ -1,5 +1,44 @@
 # BMS Changelog
 
+## 2026-09-11 (feat/mobile-blue-ui-fixes) - products.php mobile toolbar/dropdown blue recolor + pos_dashboard.php uniform hub cards
+
+**Request:** "in products.php the header the below block of header is white and even once we click its
+option is appears white not seen well... please can you help this to be blue like it is in another
+page? Just in mobile view only. Also in pos/dashboard i need this cards should be in the same row and
+with the same size and should have the same color as blue... keep them to be responsive and feet one
+row." Asked a clarifying question about which white block on products.php was meant; user answered "no
+preference," so the fix below covers the most likely candidates found via code inspection rather than
+guessing one element.
+
+**`app/bms/product/products.php` (mobile only, `max-width: 767.98px`):** Investigation via
+`toggleView()` JS confirmed products.php's mobile view always renders the card template (never the
+desktop table), and that card template's Edit/Delete buttons are plain buttons, not a dropdown — so the
+per-row action menu was ruled out. Added `:root { color-scheme: light; }` as the likely root cause
+(Android Chrome's "Force Dark mode for web content" setting can repaint native form controls/dropdowns
+white-on-white on pages that don't declare a color-scheme). Also added CSS hook classes
+(`products-toolbar` on the Copy/CSV/Print/Reports toolbar div, `products-per-page-box` /
+`products-per-page-select` on the "Show: N" dropdown) and recolored: toolbar to solid blue
+(`#0d6efd`) with white text/icons, the per-page dropdown to explicit opaque white background with dark
+text, and hardened the generic `.dropdown-menu`/`.dropdown-item` rules with explicit colors so no
+dropdown on this page can render white-on-white again. Desktop view untouched.
+
+**`app/bms/pos/pos_dashboard.php` (hub cards):** Removed the `pos-hub-card-primary` / non-primary split
+(previously: primary card blue, others white/light with dark text) — all hub cards (Open Terminal,
+Shift History, Catalog Setup, Restaurant, Settings) now use one `.pos-hub-card` class with the same blue
+gradient background and white text, regardless of tenant entitlement count (3 cards for a base tenant,
+up to 5 for a fully-entitled one). Changed the card wrapper's column class from
+`col-6 col-md-<?= $navCard['primary'] ? 4 : 3 ?>` to `col-6 col-md-4 col-lg` (Bootstrap's unnumbered
+`col-lg` auto-distributes equal width across however many cards a tenant actually has, so they fit one
+row on desktop regardless of count) and added a mobile-only block shrinking `.pos-hub-card` padding/font
+sizes to keep the now-larger cards readable on small screens.
+
+**Tested:** `php -l` clean on both files; live in-process render of products.php confirmed no PHP
+warnings and all three new CSS hook markers present in output HTML; `tests/test_pos_nav_wiring_cli.php`
+(47/47, all four entitlement scenarios — pos-only/+advanced/+restaurant/all — still show the right
+cards present/absent by label) and `tests/test_pos_dashboard_cli.php` (142/143 passing; the one failure,
+`Sales table has S/NO first column`, is a pre-existing unrelated string-match issue, not touched by this
+change) both re-run clean on this branch after rebasing off latest `develop`.
+
 ## 2026-09-11 (feat/tenant-migration-automation) - close the two remaining manual steps in tenant deploy
 
 **Request:** "every migration in production should run automatically and not wait for manual run — is
