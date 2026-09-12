@@ -3050,4 +3050,8 @@ return [
     'SMS configuration test successful!' => 'Jaribio la usanidi wa SMS limefanikiwa!',
     'SMS test failed:' => 'Jaribio la SMS limeshindwa:',
     'Error testing SMS configuration' => 'Hitilafu wakati wa kujaribu usanidi wa SMS',
+
+    // POS terminal — "Workspace" link back to the stats/shift-history hub
+    'Workspace' => 'Sehemu ya Kazi',
+    'POS Workspace — stats, shift history, catalog setup' => 'Sehemu ya Kazi ya POS — takwimu, historia ya zamu, usanidi wa katalogi',
 ];
