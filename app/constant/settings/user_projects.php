@@ -49,6 +49,16 @@ if (!isAdmin()) {
 
 global $pdo;
 
+// The AJAX GET/POST branches below exit() before header.php ever runs (it's
+// only reached by the full-page render at the bottom of this file), so t()
+// would otherwise always resolve via the English catalog for those two
+// endpoints regardless of the user's saved preference. Load the real
+// language now — mirrors header.php's own resolution logic exactly, so both
+// code paths agree.
+if (isset($_SESSION['user_id'])) {
+    loadLanguage($_SESSION['user_lang'] ?? get_setting('user_language_' . $_SESSION['user_id'], 'en'));
+}
+
 // See the file-level comment above — this is the ONE switch that hides the
 // project-specific sections (both here and in the JS below) while leaving
 // Warehouse Access fully functional. Reflects BOTH the superadmin's platform
@@ -93,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $grant_all_warehouses = !empty($_POST['grant_all_warehouses']);
 
     if (!$user_id) {
-        echo json_encode(['success' => false, 'message' => 'Invalid user.']);
+        echo json_encode(['success' => false, 'message' => t('Invalid user.')]);
         exit;
     }
 
@@ -152,10 +162,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $uStmt->execute([$user_id]);
         $uname = $uStmt->fetchColumn() ?: "User #$user_id";
 
-        $warehouseSummary = $grant_all_warehouses ? 'ALL warehouses' : (count($warehouse_ids) . ' warehouse(s)');
+        $warehouseSummary = $grant_all_warehouses ? t('ALL warehouses') : (count($warehouse_ids) . ' ' . t('warehouse(s)'));
         if ($projectsEnabled) {
             $projectCountForResponse = count($project_ids);
-            $message = "Saved {$projectCountForResponse} project(s) and {$warehouseSummary} for {$uname}.";
+            $message = sprintf(t('Saved %d project(s) and %s for %s.'), $projectCountForResponse, $warehouseSummary, $uname);
         } else {
             // Untouched by this save — report the real, still-current count
             // rather than 0, so the UI badge doesn't lie about assignments
@@ -163,7 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM user_projects WHERE user_id = ?");
             $cntStmt->execute([$user_id]);
             $projectCountForResponse = (int)$cntStmt->fetchColumn();
-            $message = "Saved {$warehouseSummary} for {$uname}.";
+            $message = sprintf(t('Saved %s for %s.'), $warehouseSummary, $uname);
         }
         echo json_encode([
             'success' => true,
@@ -173,7 +183,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
-        echo json_encode(['success' => false, 'message' => 'Save failed: ' . $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => t('Save failed:') . ' ' . $e->getMessage()]);
     }
     exit;
 }
@@ -239,20 +249,18 @@ require_once 'header.php';
     <!-- Page Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <h2><i class="bi bi-diagram-3"></i> <?= $projectsEnabled ? 'Project & Warehouse Access' : 'Warehouse Access' ?></h2>
+            <h2><i class="bi bi-diagram-3"></i> <?= $projectsEnabled ? t('Project & Warehouse Access') : t('Warehouse Access') ?></h2>
             <p class="text-muted">
                 <?= $projectsEnabled
-                    ? 'Assign users to projects and warehouses. Each user only sees data that belongs to their assigned projects/warehouses.'
-                    : 'Assign users to warehouses.' ?>
+                    ? t('Assign users to projects and warehouses. Each user only sees data that belongs to their assigned projects/warehouses.')
+                    : t('Assign users to warehouses.') ?>
             </p>
             <?php if (!$projectsEnabled): ?>
             <div class="alert alert-info d-flex align-items-start gap-2 mb-0">
                 <i class="bi bi-info-circle fs-5"></i>
                 <div>
-                    <strong>Projects module is off for this company.</strong>
-                    Project-scope assignment is hidden below — Warehouse Access is unaffected and works
-                    normally. Any project assignments made before Projects was switched off are kept
-                    untouched and will reappear here the moment it's switched back on.
+                    <strong><?= t('Projects module is off for this company.') ?></strong>
+                    <?= t("Project-scope assignment is hidden below — Warehouse Access is unaffected and works normally. Any project assignments made before Projects was switched off are kept untouched and will reappear here the moment it's switched back on.") ?>
                 </div>
             </div>
             <?php endif; ?>
@@ -273,12 +281,12 @@ require_once 'header.php';
     </style>
     <div class="row mb-4">
         <?php foreach ([
-            ['total_roles',       'Roles',              'bi-person-badge'],
-            ['total_users',       'Active Users',        'bi-people'],
-            ['total_projects',    'Projects',            'bi-briefcase'],
-            ['total_assignments', 'Scope Assignments',   'bi-diagram-3'],
-            ['total_warehouses',       'Warehouses',         'bi-building'],
-            ['total_warehouse_grants', 'Warehouse Grants',   'bi-key'],
+            ['total_roles',       t('Roles'),              'bi-person-badge'],
+            ['total_users',       t('Active Users'),        'bi-people'],
+            ['total_projects',    t('Projects'),            'bi-briefcase'],
+            ['total_assignments', t('Scope Assignments'),   'bi-diagram-3'],
+            ['total_warehouses',       t('Warehouses'),         'bi-building'],
+            ['total_warehouse_grants', t('Warehouse Grants'),   'bi-key'],
         ] as [$key, $label, $icon]): ?>
         <div class="col-6 col-md-3 mb-3">
             <div class="card custom-stat-card h-100 shadow-sm border-0">
@@ -305,7 +313,7 @@ require_once 'header.php';
                 <div class="col-12 col-md-3 border-end">
                     <div class="p-3 border-bottom bg-light d-flex justify-content-between align-items-center">
                         <span class="fw-bold small text-uppercase text-muted">
-                            <i class="bi bi-person-badge me-1"></i>System Roles
+                            <i class="bi bi-person-badge me-1"></i><?= t('System Roles') ?>
                         </span>
                     </div>
                     <div class="list-group list-group-flush" id="roleList" style="max-height:520px;overflow-y:auto;">
@@ -328,13 +336,13 @@ require_once 'header.php';
                 <div class="col-12 col-md-3 border-end">
                     <div class="p-3 border-bottom bg-light">
                         <span class="fw-bold small text-uppercase text-muted">
-                            <i class="bi bi-people me-1"></i><span id="col2-heading">Users</span>
+                            <i class="bi bi-people me-1"></i><span id="col2-heading"><?= t('Users') ?></span>
                         </span>
                     </div>
                     <div id="userList" style="max-height:520px;overflow-y:auto;">
                         <div class="p-4 text-center text-muted">
                             <i class="bi bi-arrow-left fs-4 d-block mb-2"></i>
-                            Select a role to see its users
+                            <?= t('Select a role to see its users') ?>
                         </div>
                     </div>
                 </div>
@@ -343,25 +351,25 @@ require_once 'header.php';
                 <div class="col-12 col-md-6">
                     <div class="p-3 border-bottom bg-light d-flex justify-content-between align-items-center">
                         <span class="fw-bold small text-uppercase text-muted">
-                            <i class="bi bi-briefcase me-1"></i><span id="col3-heading">Access Assignments</span>
+                            <i class="bi bi-briefcase me-1"></i><span id="col3-heading"><?= t('Access Assignments') ?></span>
                         </span>
                         <div id="col3-actions" class="d-none">
-                            <span class="text-muted small me-2 d-none d-lg-inline">Projects:</span>
-                            <button type="button" class="btn btn-sm btn-outline-secondary me-1" id="btnSelectAll">All</button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearAll">None</button>
+                            <span class="text-muted small me-2 d-none d-lg-inline"><?= t('Projects:') ?></span>
+                            <button type="button" class="btn btn-sm btn-outline-secondary me-1" id="btnSelectAll"><?= t('All') ?></button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearAll"><?= t('None') ?></button>
                         </div>
                     </div>
                     <div id="projectPanel" style="max-height:460px;overflow-y:auto;">
                         <div class="p-4 text-center text-muted">
                             <i class="bi bi-diagram-3 fs-4 d-block mb-2"></i>
-                            Select a user to manage their project and warehouse access
+                            <?= t('Select a user to manage their project and warehouse access') ?>
                         </div>
                     </div>
                     <!-- Save bar — hidden until a user is selected -->
                     <div id="saveBar" class="d-none border-top p-3 d-flex justify-content-between align-items-center bg-white">
-                        <small class="text-muted" id="saveHint">Tick the projects and warehouses this user may access.</small>
+                        <small class="text-muted" id="saveHint"><?= t('Tick the projects and warehouses this user may access.') ?></small>
                         <button type="button" class="btn btn-primary px-4" id="btnSave">
-                            <i class="bi bi-check-circle me-1"></i> Save Assignments
+                            <i class="bi bi-check-circle me-1"></i> <?= t('Save Assignments') ?>
                         </button>
                     </div>
                 </div>
@@ -384,6 +392,49 @@ require_once 'header.php';
     // comment at the top of this file for why the whole page stays reachable
     // instead of 404ing when Projects is off.
     const PROJECTS_ENABLED = <?= $projectsEnabled ? 'true' : 'false' ?>;
+    const UP_STRINGS = {
+        noActiveUsers: <?= json_encode(t('No active users in this role.')) ?>,
+        admin: <?= json_encode(t('Admin')) ?>,
+        project: <?= json_encode(t('project')) ?>,
+        projects: <?= json_encode(t('projects')) ?>,
+        none: <?= json_encode(t('None')) ?>,
+        loading: <?= json_encode(t('Loading...')) ?>,
+        isSystemAdminNotice: <?= json_encode(t('is a system administrator and has full access to')) ?>,
+        allProjectsAndWarehouses: <?= json_encode(t('all projects and all warehouses')) ?>,
+        automaticallyIgnored: <?= json_encode(t('automatically. Assignments are ignored for admin accounts.')) ?>,
+        failedToLoadAssignments: <?= json_encode(t('Failed to load assignments.')) ?>,
+        projectsModuleOff: <?= json_encode(t('Projects module is off for this company.')) ?>,
+        noProjectsYet: <?= json_encode(t('No projects in the system yet.')) ?>,
+        warehouseAccess: <?= json_encode(t('Warehouse Access')) ?>,
+        grantAllWarehouses: <?= json_encode(t('Grant access to ALL warehouses')) ?>,
+        grantAllOverride: <?= json_encode(t('Overrides the list(s) below — use for roles that need to see every warehouse (e.g. Managing Director).')) ?>,
+        assignProjectWarehouses: <?= json_encode(t("Assign Project & its Warehouses")) ?>,
+        tickProjectToReveal: <?= json_encode(t('Tick a project above to reveal its own warehouses here.')) ?>,
+        assignExternalWarehouse: <?= json_encode(t('Assign External Warehouse')) ?>,
+        warehousesNotTiedToProject: <?= json_encode(t('Warehouses not tied to any project.')) ?>,
+        assignWarehouse: <?= json_encode(t('Assign Warehouse')) ?>,
+        tickWhichWarehouses: <?= json_encode(t('Tick which warehouses this user may access.')) ?>,
+        noProjectTickedYet: <?= json_encode(t('No project ticked yet.')) ?>,
+        tickedProjectsNoWarehouses: <?= json_encode(t('The ticked project(s) have no warehouses of their own.')) ?>,
+        noExternalWarehouses: <?= json_encode(t('No external (unassigned-to-project) warehouses exist.')) ?>,
+        noWarehousesYet: <?= json_encode(t('No warehouses exist yet.')) ?>,
+        allWarehouses: <?= json_encode(t('ALL warehouses')) ?>,
+        allShort: <?= json_encode(t('ALL')) ?>,
+        warehousesCount: <?= json_encode(t('warehouse(s)')) ?>,
+        selected: <?= json_encode(t('selected.')) ?>,
+        of: <?= json_encode(t('of')) ?>,
+        projectsSelected: <?= json_encode(t("project(s) selected")) ?>,
+        accessAssignments: <?= json_encode(t('Access Assignments')) ?>,
+        selectUserToManage: <?= json_encode(t('Select a user to manage their project and warehouse access')) ?>,
+        saving: <?= json_encode(t('Saving…')) ?>,
+        saved: <?= json_encode(t('Saved!')) ?>,
+        error: <?= json_encode(t('Error')) ?>,
+        serverErrorTryAgain: <?= json_encode(t('Server error. Please try again.')) ?>,
+        statusActive: <?= json_encode(t('Active')) ?>,
+        statusCompleted: <?= json_encode(t('Completed')) ?>,
+        statusOnHold: <?= json_encode(t('On Hold')) ?>,
+        statusCancelled: <?= json_encode(t('Cancelled')) ?>,
+    };
 
     let selectedUserId   = null;
     let selectedUserName = '';
@@ -391,7 +442,8 @@ require_once 'header.php';
     // ── Helpers ───────────────────────────────────────────────────────────
     function statusBadge(status) {
         const map = { active: 'success', completed: 'info', on_hold: 'warning', cancelled: 'secondary' };
-        return `<span class="badge bg-${map[status] || 'secondary'}">${status}</span>`;
+        const labels = { active: UP_STRINGS.statusActive, completed: UP_STRINGS.statusCompleted, on_hold: UP_STRINGS.statusOnHold, cancelled: UP_STRINGS.statusCancelled };
+        return `<span class="badge bg-${map[status] || 'secondary'}">${labels[status] || status}</span>`;
     }
 
     function safeHtml(s) {
@@ -413,17 +465,17 @@ require_once 'header.php';
 
             if (!users.length) {
                 document.getElementById('userList').innerHTML =
-                    `<div class="p-4 text-center text-muted">No active users in this role.</div>`;
+                    `<div class="p-4 text-center text-muted">${UP_STRINGS.noActiveUsers}</div>`;
                 return;
             }
 
             let html = '';
             users.forEach(u => {
                 const badge = u.is_admin == 1
-                    ? `<span class="badge project-badge bg-danger rounded-pill">Admin</span>`
+                    ? `<span class="badge project-badge bg-danger rounded-pill">${UP_STRINGS.admin}</span>`
                     : (u.assignment_count > 0
-                        ? `<span class="badge project-badge bg-success rounded-pill">${u.assignment_count} project${u.assignment_count > 1 ? 's' : ''}</span>`
-                        : `<span class="badge project-badge bg-light text-muted border rounded-pill">None</span>`);
+                        ? `<span class="badge project-badge bg-success rounded-pill">${u.assignment_count} ${u.assignment_count > 1 ? UP_STRINGS.projects : UP_STRINGS.project}</span>`
+                        : `<span class="badge project-badge bg-light text-muted border rounded-pill">${UP_STRINGS.none}</span>`);
                 const whBadge = u.is_admin != 1
                     ? (u.warehouse_grant_count > 0
                         ? `<span class="badge warehouse-badge bg-info-subtle text-info border border-info-subtle rounded-pill ms-1"><i class="bi bi-building"></i> ${u.warehouse_grant_count}</span>`
@@ -479,16 +531,15 @@ require_once 'header.php';
         document.getElementById('saveBar').style.display = 'flex';
 
         const panel = document.getElementById('projectPanel');
-        panel.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading...</div>`;
+        panel.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm me-2"></div>${UP_STRINGS.loading}</div>`;
 
         if (isAdmin) {
             panel.innerHTML = `
                 <div class="p-4">
                     <div class="alert alert-warning mb-0">
                         <i class="bi bi-shield-check me-2"></i>
-                        <strong>${safeHtml(userName)}</strong> is a system administrator and has
-                        full access to <strong>all projects and all warehouses</strong> automatically.
-                        Assignments are ignored for admin accounts.
+                        <strong>${safeHtml(userName)}</strong> ${UP_STRINGS.isSystemAdminNotice}
+                        <strong>${UP_STRINGS.allProjectsAndWarehouses}</strong> ${UP_STRINGS.automaticallyIgnored}
                     </div>
                 </div>`;
             document.getElementById('saveBar').classList.add('d-none');
@@ -505,7 +556,7 @@ require_once 'header.php';
                 renderProjects(panel, assignedProjectSet, !!data.grant_all_warehouses);
             })
             .catch(() => {
-                panel.innerHTML = `<div class="p-4 text-center text-danger">Failed to load assignments.</div>`;
+                panel.innerHTML = `<div class="p-4 text-center text-danger">${UP_STRINGS.failedToLoadAssignments}</div>`;
             });
     }
 
@@ -513,9 +564,9 @@ require_once 'header.php';
         let html = '<div class="p-3">';
 
         if (!PROJECTS_ENABLED) {
-            html += `<div class="text-center text-muted py-3"><i class="bi bi-slash-circle d-block fs-4 mb-1"></i>Projects module is off for this company.</div>`;
+            html += `<div class="text-center text-muted py-3"><i class="bi bi-slash-circle d-block fs-4 mb-1"></i>${UP_STRINGS.projectsModuleOff}</div>`;
         } else if (!ALL_PROJECTS.length) {
-            html += `<div class="text-center text-muted py-3">No projects in the system yet.</div>`;
+            html += `<div class="text-center text-muted py-3">${UP_STRINGS.noProjectsYet}</div>`;
         } else {
             html += '<div class="row g-2">';
             ALL_PROJECTS.forEach(p => {
@@ -541,28 +592,28 @@ require_once 'header.php';
         html += `
         <hr class="my-0">
         <div class="p-3">
-            <h6 class="text-uppercase small text-muted fw-bold mb-2"><i class="bi bi-building me-1"></i> Warehouse Access</h6>
+            <h6 class="text-uppercase small text-muted fw-bold mb-2"><i class="bi bi-building me-1"></i> ${UP_STRINGS.warehouseAccess}</h6>
             <div class="form-check form-switch mb-3">
                 <input class="form-check-input" type="checkbox" id="grantAllWarehousesChk" ${grantAllWarehouses ? 'checked' : ''}>
-                <label class="form-check-label fw-bold" for="grantAllWarehousesChk">Grant access to ALL warehouses</label>
-                <div class="form-text">Overrides the list(s) below — use for roles that need to see every warehouse (e.g. Managing Director).</div>
+                <label class="form-check-label fw-bold" for="grantAllWarehousesChk">${UP_STRINGS.grantAllWarehouses}</label>
+                <div class="form-text">${UP_STRINGS.grantAllOverride}</div>
             </div>
             <div id="warehouseListsWrap">`;
 
         if (PROJECTS_ENABLED) {
             html += `
-                <div class="mb-1"><small class="text-muted fw-bold text-uppercase">Assign Project &amp; its Warehouses</small></div>
-                <p class="text-muted small mb-2">Tick a project above to reveal its own warehouses here.</p>
+                <div class="mb-1"><small class="text-muted fw-bold text-uppercase">${UP_STRINGS.assignProjectWarehouses}</small></div>
+                <p class="text-muted small mb-2">${UP_STRINGS.tickProjectToReveal}</p>
                 <div id="projectWarehousesPanel" class="row g-2 mb-3"></div>
-                <div class="mb-1"><small class="text-muted fw-bold text-uppercase">Assign External Warehouse</small></div>
-                <p class="text-muted small mb-2">Warehouses not tied to any project.</p>
+                <div class="mb-1"><small class="text-muted fw-bold text-uppercase">${UP_STRINGS.assignExternalWarehouse}</small></div>
+                <p class="text-muted small mb-2">${UP_STRINGS.warehousesNotTiedToProject}</p>
                 <div id="externalWarehousesPanel" class="row g-2"></div>`;
         } else {
             // No project concept in play at all — every warehouse is just
             // directly assignable, one flat list.
             html += `
-                <div class="mb-1"><small class="text-muted fw-bold text-uppercase">Assign Warehouse</small></div>
-                <p class="text-muted small mb-2">Tick which warehouses this user may access.</p>
+                <div class="mb-1"><small class="text-muted fw-bold text-uppercase">${UP_STRINGS.assignWarehouse}</small></div>
+                <p class="text-muted small mb-2">${UP_STRINGS.tickWhichWarehouses}</p>
                 <div id="externalWarehousesPanel" class="row g-2"></div>`;
         }
 
@@ -611,11 +662,11 @@ require_once 'header.php';
         if (!container) return;
 
         if (!checkedProjectIds.size) {
-            container.innerHTML = `<div class="col-12 text-muted small fst-italic">No project ticked yet.</div>`;
+            container.innerHTML = `<div class="col-12 text-muted small fst-italic">${UP_STRINGS.noProjectTickedYet}</div>`;
             return;
         }
         if (!list.length) {
-            container.innerHTML = `<div class="col-12 text-muted small fst-italic">The ticked project(s) have no warehouses of their own.</div>`;
+            container.innerHTML = `<div class="col-12 text-muted small fst-italic">${UP_STRINGS.tickedProjectsNoWarehouses}</div>`;
             return;
         }
         container.innerHTML = list.map(w => warehouseCheckboxHtml(w, 'pwh')).join('');
@@ -629,7 +680,7 @@ require_once 'header.php';
         // — every warehouse is just directly assignable.
         const list = PROJECTS_ENABLED ? ALL_WAREHOUSES.filter(w => !w.project_id) : ALL_WAREHOUSES;
         if (!list.length) {
-            container.innerHTML = `<div class="col-12 text-muted small fst-italic">${PROJECTS_ENABLED ? 'No external (unassigned-to-project) warehouses exist.' : 'No warehouses exist yet.'}</div>`;
+            container.innerHTML = `<div class="col-12 text-muted small fst-italic">${PROJECTS_ENABLED ? UP_STRINGS.noExternalWarehouses : UP_STRINGS.noWarehousesYet}</div>`;
             return;
         }
         container.innerHTML = list.map(w => warehouseCheckboxHtml(w, 'ewh')).join('');
@@ -669,27 +720,27 @@ require_once 'header.php';
     function updateSaveHint() {
         const grantAll = document.getElementById('grantAllWarehousesChk')?.checked;
         const wChecked = document.querySelectorAll('.warehouse-chk:checked').length;
-        const warehouseText = grantAll ? 'ALL warehouses' : `${wChecked} warehouse(s)`;
+        const warehouseText = grantAll ? UP_STRINGS.allWarehouses : `${wChecked} ${UP_STRINGS.warehousesCount}`;
         if (!PROJECTS_ENABLED) {
-            document.getElementById('saveHint').textContent = `${warehouseText} selected.`;
+            document.getElementById('saveHint').textContent = `${warehouseText} ${UP_STRINGS.selected}`;
             return;
         }
         const pChecked = document.querySelectorAll('.project-chk:checked').length;
         const pTotal   = document.querySelectorAll('.project-chk').length;
         document.getElementById('saveHint').textContent =
-            `${pChecked} of ${pTotal} project(s) selected · ${warehouseText} selected.`;
+            `${pChecked} ${UP_STRINGS.of} ${pTotal} ${UP_STRINGS.projectsSelected} · ${warehouseText} ${UP_STRINGS.selected}`;
     }
 
     function resetCol3() {
         selectedUserId = null;
         selectedUserName = '';
         assignedWarehouseSet = new Set();
-        document.getElementById('col3-heading').textContent = 'Access Assignments';
+        document.getElementById('col3-heading').textContent = UP_STRINGS.accessAssignments;
         document.getElementById('col3-actions').classList.add('d-none');
         document.getElementById('projectPanel').innerHTML =
             `<div class="p-4 text-center text-muted">
                 <i class="bi bi-diagram-3 fs-4 d-block mb-2"></i>
-                Select a user to manage their project and warehouse access
+                ${UP_STRINGS.selectUserToManage}
              </div>`;
         document.getElementById('saveBar').classList.add('d-none');
     }
@@ -724,7 +775,7 @@ require_once 'header.php';
         const btn     = this;
         const orig    = btn.innerHTML;
         btn.disabled  = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving…';
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> ' + UP_STRINGS.saving;
 
         const fd = new FormData();
         fd.append('user_id', selectedUserId);
@@ -736,7 +787,7 @@ require_once 'header.php';
             .then(r => r.json())
             .then(res => {
                 if (res.success) {
-                    Swal.fire({ icon: 'success', title: 'Saved!', text: res.message,
+                    Swal.fire({ icon: 'success', title: UP_STRINGS.saved, text: res.message,
                                 timer: 2000, showConfirmButton: false });
                     // Refresh both badges on the user item
                     const uBtn = document.querySelector(`.user-item[data-user-id="${selectedUserId}"]`);
@@ -745,17 +796,17 @@ require_once 'header.php';
                         if (pBadge) {
                             if (res.count > 0) {
                                 pBadge.className = 'badge project-badge bg-success rounded-pill';
-                                pBadge.textContent = `${res.count} project${res.count > 1 ? 's' : ''}`;
+                                pBadge.textContent = `${res.count} ${res.count > 1 ? UP_STRINGS.projects : UP_STRINGS.project}`;
                             } else {
                                 pBadge.className = 'badge project-badge bg-light text-muted border rounded-pill';
-                                pBadge.textContent = 'None';
+                                pBadge.textContent = UP_STRINGS.none;
                             }
                         }
                         const wBadge = uBtn.querySelector('.warehouse-badge');
                         if (wBadge) {
                             if (res.warehouse_count === -1) {
                                 wBadge.className = 'badge warehouse-badge bg-info-subtle text-info border border-info-subtle rounded-pill ms-1';
-                                wBadge.innerHTML = '<i class="bi bi-building"></i> ALL';
+                                wBadge.innerHTML = '<i class="bi bi-building"></i> ' + UP_STRINGS.allShort;
                             } else if (res.warehouse_count > 0) {
                                 wBadge.className = 'badge warehouse-badge bg-info-subtle text-info border border-info-subtle rounded-pill ms-1';
                                 wBadge.innerHTML = `<i class="bi bi-building"></i> ${res.warehouse_count}`;
@@ -766,10 +817,10 @@ require_once 'header.php';
                         }
                     }
                 } else {
-                    Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                    Swal.fire({ icon: 'error', title: UP_STRINGS.error, text: res.message });
                 }
             })
-            .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Server error. Please try again.' }))
+            .catch(() => Swal.fire({ icon: 'error', title: UP_STRINGS.error, text: UP_STRINGS.serverErrorTryAgain }))
             .finally(() => { btn.disabled = false; btn.innerHTML = orig; });
     });
 })();

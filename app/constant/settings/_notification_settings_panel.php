@@ -27,9 +27,9 @@ if ($_POST) {
             foreach ($settings as $key => $value) {
                 save_setting($key, $value);
             }
-            $success_messages[] = "Notification settings updated successfully";
+            $success_messages[] = t('Notification settings updated successfully');
         } catch (Exception $e) {
-            $error_messages[] = "Error updating notification settings: " . $e->getMessage();
+            $error_messages[] = t('Error updating notification settings:') . ' ' . $e->getMessage();
         }
     }
 
@@ -50,9 +50,9 @@ if ($_POST) {
             foreach ($templates as $key => $value) {
                 save_setting($key, $value);
             }
-            $success_messages[] = "Email templates updated successfully";
+            $success_messages[] = t('Email templates updated successfully');
         } catch (Exception $e) {
-            $error_messages[] = "Error updating email templates: " . $e->getMessage();
+            $error_messages[] = t('Error updating email templates:') . ' ' . $e->getMessage();
         }
     }
 
@@ -70,9 +70,9 @@ if ($_POST) {
             foreach ($templates as $key => $value) {
                 save_setting($key, $value);
             }
-            $success_messages[] = "SMS templates updated successfully";
+            $success_messages[] = t('SMS templates updated successfully');
         } catch (Exception $e) {
-            $error_messages[] = "Error updating SMS templates: " . $e->getMessage();
+            $error_messages[] = t('Error updating SMS templates:') . ' ' . $e->getMessage();
         }
     }
 
@@ -94,9 +94,9 @@ if ($_POST) {
             foreach ($rules as $key => $value) {
                 save_setting($key, $value);
             }
-            $success_messages[] = "Alert rules updated successfully";
+            $success_messages[] = t('Alert rules updated successfully');
         } catch (Exception $e) {
-            $error_messages[] = "Error updating alert rules: " . $e->getMessage();
+            $error_messages[] = t('Error updating alert rules:') . ' ' . $e->getMessage();
         }
     }
 }
@@ -132,31 +132,31 @@ if ($_POST) {
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="general-tab" data-bs-toggle="tab"
                             data-bs-target="#general" type="button" role="tab">
-                        <i class="bi bi-gear"></i> General Settings
+                        <i class="bi bi-gear"></i> <?= t('General Settings') ?>
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="email-tab" data-bs-toggle="tab"
                             data-bs-target="#email" type="button" role="tab">
-                        <i class="bi bi-envelope"></i> Email Templates
+                        <i class="bi bi-envelope"></i> <?= t('Email Templates') ?>
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="sms-tab" data-bs-toggle="tab"
                             data-bs-target="#sms" type="button" role="tab">
-                        <i class="bi bi-chat-text"></i> SMS Templates
+                        <i class="bi bi-chat-text"></i> <?= t('SMS Templates') ?>
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="alerts-tab" data-bs-toggle="tab"
                             data-bs-target="#alerts" type="button" role="tab">
-                        <i class="bi bi-exclamation-triangle"></i> Alert Rules
+                        <i class="bi bi-exclamation-triangle"></i> <?= t('Alert Rules') ?>
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="test-tab" data-bs-toggle="tab"
                             data-bs-target="#test" type="button" role="tab">
-                        <i class="bi bi-play-circle"></i> Test Notifications
+                        <i class="bi bi-play-circle"></i> <?= t('Test Notifications') ?>
                     </button>
                 </li>
             </ul>
@@ -169,7 +169,7 @@ if ($_POST) {
                     <form method="POST">
                         <div class="row">
                             <div class="col-md-6">
-                                <h5 class="mb-3 text-primary">Notification Channels</h5>
+                                <h5 class="mb-3 text-primary"><?= t('Notification Channels') ?></h5>
 
                                 <div class="mb-3">
                                     <div class="form-check form-switch">
@@ -177,10 +177,10 @@ if ($_POST) {
                                                name="enable_email_notifications" value="1"
                                                <?= get_setting('enable_email_notifications') ? 'checked' : '' ?>>
                                         <label class="form-check-label" for="enable_email_notifications">
-                                            Enable Email Notifications
+                                            <?= t('Enable Email Notifications') ?>
                                         </label>
                                     </div>
-                                    <div class="form-text">Send notifications via email to customers and staff</div>
+                                    <div class="form-text"><?= t('Send notifications via email to customers and staff') ?></div>
                                 </div>
 
                                 <div class="mb-3">
@@ -189,10 +189,10 @@ if ($_POST) {
                                                name="enable_sms_notifications" value="1"
                                                <?= get_setting('enable_sms_notifications') ? 'checked' : '' ?>>
                                         <label class="form-check-label" for="enable_sms_notifications">
-                                            Enable SMS Notifications
+                                            <?= t('Enable SMS Notifications') ?>
                                         </label>
                                     </div>
-                                    <div class="form-text">Send SMS alerts for important events (requires SMS gateway)</div>
+                                    <div class="form-text"><?= t('Send SMS alerts for important events (requires SMS gateway)') ?></div>
                                 </div>
 
                                 <div class="mb-3">
@@ -201,10 +201,10 @@ if ($_POST) {
                                                name="enable_push_notifications" value="1"
                                                <?= get_setting('enable_push_notifications') ? 'checked' : '' ?>>
                                         <label class="form-check-label" for="enable_push_notifications">
-                                            Enable Push Notifications
+                                            <?= t('Enable Push Notifications') ?>
                                         </label>
                                     </div>
-                                    <div class="form-text">Show browser push notifications for system alerts</div>
+                                    <div class="form-text"><?= t('Show browser push notifications for system alerts') ?></div>
                                 </div>
 
                                 <div class="mb-3">
@@ -213,15 +213,15 @@ if ($_POST) {
                                                name="enable_desktop_notifications" value="1"
                                                <?= get_setting('enable_desktop_notifications') ? 'checked' : '' ?>>
                                         <label class="form-check-label" for="enable_desktop_notifications">
-                                            Enable Desktop Notifications
+                                            <?= t('Enable Desktop Notifications') ?>
                                         </label>
                                     </div>
-                                    <div class="form-text">Show desktop notifications for important system events</div>
+                                    <div class="form-text"><?= t('Show desktop notifications for important system events') ?></div>
                                 </div>
                             </div>
 
                             <div class="col-md-6">
-                                <h5 class="mb-3 text-primary">Notification Preferences</h5>
+                                <h5 class="mb-3 text-primary"><?= t('Notification Preferences') ?></h5>
 
                                 <div class="mb-3">
                                     <div class="form-check form-switch">
@@ -229,10 +229,10 @@ if ($_POST) {
                                                name="notification_sound" value="1"
                                                <?= get_setting('notification_sound') ? 'checked' : '' ?>>
                                         <label class="form-check-label" for="notification_sound">
-                                            Enable Notification Sound
+                                            <?= t('Enable Notification Sound') ?>
                                         </label>
                                     </div>
-                                    <div class="form-text">Play sound when new notifications arrive</div>
+                                    <div class="form-text"><?= t('Play sound when new notifications arrive') ?></div>
                                 </div>
 
                                 <div class="mb-3">
@@ -241,34 +241,34 @@ if ($_POST) {
                                                name="auto_dismiss_notifications" value="1"
                                                <?= get_setting('auto_dismiss_notifications') ? 'checked' : '' ?>>
                                         <label class="form-check-label" for="auto_dismiss_notifications">
-                                            Auto-dismiss Notifications
+                                            <?= t('Auto-dismiss Notifications') ?>
                                         </label>
                                     </div>
-                                    <div class="form-text">Automatically dismiss notifications after timeout</div>
+                                    <div class="form-text"><?= t('Automatically dismiss notifications after timeout') ?></div>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label for="notification_timeout" class="form-label">Notification Timeout (ms)</label>
+                                    <label for="notification_timeout" class="form-label"><?= t('Notification Timeout (ms)') ?></label>
                                     <input type="number" class="form-control" id="notification_timeout"
                                            name="notification_timeout" value="<?= get_setting('notification_timeout', '5000') ?>">
-                                    <div class="form-text">Time in milliseconds before notifications auto-dismiss</div>
+                                    <div class="form-text"><?= t('Time in milliseconds before notifications auto-dismiss') ?></div>
                                 </div>
 
                                 <div class="alert alert-info">
                                     <i class="bi bi-info-circle"></i>
-                                    <strong>Notification Types:</strong><br>
-                                    • System alerts<br>
-                                    • Payment reminders<br>
-                                    • Loan status updates<br>
-                                    • Overdue alerts<br>
-                                    • Report notifications
+                                    <strong><?= t('Notification Types:') ?></strong><br>
+                                    • <?= t('System alerts') ?><br>
+                                    • <?= t('Payment reminders') ?><br>
+                                    • <?= t('Loan status updates') ?><br>
+                                    • <?= t('Overdue alerts') ?><br>
+                                    • <?= t('Report notifications') ?>
                                 </div>
                             </div>
                         </div>
 
                         <div class="mt-4">
                             <button type="submit" name="save_notification_settings" class="btn btn-primary">
-                                <i class="bi bi-check-circle"></i> Save Notification Settings
+                                <i class="bi bi-check-circle"></i> <?= t('Save Notification Settings') ?>
                             </button>
                         </div>
                     </form>
@@ -279,17 +279,17 @@ if ($_POST) {
                     <form method="POST">
                         <div class="row">
                             <div class="col-md-6">
-                                <h5 class="mb-3 text-primary">Loan Approval Email</h5>
+                                <h5 class="mb-3 text-primary"><?= t('Loan Approval Email') ?></h5>
 
                                 <div class="mb-3">
-                                    <label for="loan_approval_email_subject" class="form-label">Subject Template</label>
+                                    <label for="loan_approval_email_subject" class="form-label"><?= t('Subject Template') ?></label>
                                     <input type="text" class="form-control" id="loan_approval_email_subject"
                                            name="loan_approval_email_subject"
                                            value="<?= get_setting('loan_approval_email_subject', 'Loan Application Approved - {company_name}') ?>">
                                 </div>
 
                                 <div class="mb-3">
-                                    <label for="loan_approval_email_body" class="form-label">Email Body Template</label>
+                                    <label for="loan_approval_email_body" class="form-label"><?= t('Email Body Template') ?></label>
                                     <textarea class="form-control" id="loan_approval_email_body"
                                               name="loan_approval_email_body" rows="6"><?= get_setting('loan_approval_email_body', 'Dear {customer_name},
 
@@ -307,17 +307,17 @@ Best regards,
 {company_name}') ?></textarea>
                                 </div>
 
-                                <h5 class="mb-3 text-primary mt-4">Payment Reminder Email</h5>
+                                <h5 class="mb-3 text-primary mt-4"><?= t('Payment Reminder Email') ?></h5>
 
                                 <div class="mb-3">
-                                    <label for="payment_reminder_email_subject" class="form-label">Subject Template</label>
+                                    <label for="payment_reminder_email_subject" class="form-label"><?= t('Subject Template') ?></label>
                                     <input type="text" class="form-control" id="payment_reminder_email_subject"
                                            name="payment_reminder_email_subject"
                                            value="<?= get_setting('payment_reminder_email_subject', 'Payment Reminder - Loan #{loan_id}') ?>">
                                 </div>
 
                                 <div class="mb-3">
-                                    <label for="payment_reminder_email_body" class="form-label">Email Body Template</label>
+                                    <label for="payment_reminder_email_body" class="form-label"><?= t('Email Body Template') ?></label>
                                     <textarea class="form-control" id="payment_reminder_email_body"
                                               name="payment_reminder_email_body" rows="6"><?= get_setting('payment_reminder_email_body', 'Dear {customer_name},
 
@@ -336,17 +336,17 @@ Thank you,
                             </div>
 
                             <div class="col-md-6">
-                                <h5 class="mb-3 text-primary">Overdue Notice Email</h5>
+                                <h5 class="mb-3 text-primary"><?= t('Overdue Notice Email') ?></h5>
 
                                 <div class="mb-3">
-                                    <label for="overdue_notice_email_subject" class="form-label">Subject Template</label>
+                                    <label for="overdue_notice_email_subject" class="form-label"><?= t('Subject Template') ?></label>
                                     <input type="text" class="form-control" id="overdue_notice_email_subject"
                                            name="overdue_notice_email_subject"
                                            value="<?= get_setting('overdue_notice_email_subject', 'URGENT: Overdue Payment - Loan #{loan_id}') ?>">
                                 </div>
 
                                 <div class="mb-3">
-                                    <label for="overdue_notice_email_body" class="form-label">Email Body Template</label>
+                                    <label for="overdue_notice_email_body" class="form-label"><?= t('Email Body Template') ?></label>
                                     <textarea class="form-control" id="overdue_notice_email_body"
                                               name="overdue_notice_email_body" rows="6"><?= get_setting('overdue_notice_email_body', 'Dear {customer_name},
 
@@ -364,17 +364,17 @@ Sincerely,
 {company_name}') ?></textarea>
                                 </div>
 
-                                <h5 class="mb-3 text-primary mt-4">Loan Disbursement Email</h5>
+                                <h5 class="mb-3 text-primary mt-4"><?= t('Loan Disbursement Email') ?></h5>
 
                                 <div class="mb-3">
-                                    <label for="loan_disbursement_email_subject" class="form-label">Subject Template</label>
+                                    <label for="loan_disbursement_email_subject" class="form-label"><?= t('Subject Template') ?></label>
                                     <input type="text" class="form-control" id="loan_disbursement_email_subject"
                                            name="loan_disbursement_email_subject"
                                            value="<?= get_setting('loan_disbursement_email_subject', 'Loan Funds Disbursed - #{loan_id}') ?>">
                                 </div>
 
                                 <div class="mb-3">
-                                    <label for="loan_disbursement_email_body" class="form-label">Email Body Template</label>
+                                    <label for="loan_disbursement_email_body" class="form-label"><?= t('Email Body Template') ?></label>
                                     <textarea class="form-control" id="loan_disbursement_email_body"
                                               name="loan_disbursement_email_body" rows="6"><?= get_setting('loan_disbursement_email_body', 'Dear {customer_name},
 
@@ -396,13 +396,13 @@ Best regards,
 
                         <div class="alert alert-info">
                             <i class="bi bi-info-circle"></i>
-                            <strong>Available Template Variables:</strong><br>
+                            <strong><?= t('Available Template Variables:') ?></strong><br>
                             <code>{customer_name}, {loan_id}, {loan_amount}, {interest_rate}, {loan_term}, {monthly_payment}, {due_date}, {due_amount}, {outstanding_balance}, {overdue_days}, {late_fee}, {disbursement_date}, {disbursement_method}, {first_payment_date}, {company_name}, {company_phone}, {company_email}</code>
                         </div>
 
                         <div class="mt-4">
                             <button type="submit" name="save_email_templates" class="btn btn-primary">
-                                <i class="bi bi-check-circle"></i> Save Email Templates
+                                <i class="bi bi-check-circle"></i> <?= t('Save Email Templates') ?>
                             </button>
                         </div>
                     </form>
@@ -413,55 +413,55 @@ Best regards,
                     <form method="POST">
                         <div class="row">
                             <div class="col-md-6">
-                                <h5 class="mb-3 text-primary">Payment Reminder SMS</h5>
+                                <h5 class="mb-3 text-primary"><?= t('Payment Reminder SMS') ?></h5>
                                 <div class="mb-3">
-                                    <label for="payment_reminder_sms" class="form-label">SMS Template</label>
+                                    <label for="payment_reminder_sms" class="form-label"><?= t('SMS Template') ?></label>
                                     <textarea class="form-control" id="payment_reminder_sms"
                                               name="payment_reminder_sms" rows="3" maxlength="160"><?= get_setting('payment_reminder_sms', 'Hi {customer_name}, your payment of {due_amount} for loan #{loan_id} is due on {due_date}. - {company_name}') ?></textarea>
                                     <div class="form-text">
-                                        <span id="payment_reminder_counter">0</span>/160 characters
+                                        <span id="payment_reminder_counter">0</span>/160 <?= t('characters') ?>
                                     </div>
                                 </div>
 
-                                <h5 class="mb-3 text-primary mt-4">Overdue Alert SMS</h5>
+                                <h5 class="mb-3 text-primary mt-4"><?= t('Overdue Alert SMS') ?></h5>
                                 <div class="mb-3">
-                                    <label for="overdue_alert_sms" class="form-label">SMS Template</label>
+                                    <label for="overdue_alert_sms" class="form-label"><?= t('SMS Template') ?></label>
                                     <textarea class="form-control" id="overdue_alert_sms"
                                               name="overdue_alert_sms" rows="3" maxlength="160"><?= get_setting('overdue_alert_sms', 'URGENT: Loan #{loan_id} is {overdue_days} days overdue. Amount: {overdue_amount}. Call {company_phone}. - {company_name}') ?></textarea>
                                     <div class="form-text">
-                                        <span id="overdue_alert_counter">0</span>/160 characters
+                                        <span id="overdue_alert_counter">0</span>/160 <?= t('characters') ?>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="col-md-6">
-                                <h5 class="mb-3 text-primary">Loan Approval SMS</h5>
+                                <h5 class="mb-3 text-primary"><?= t('Loan Approval SMS') ?></h5>
                                 <div class="mb-3">
-                                    <label for="loan_approval_sms" class="form-label">SMS Template</label>
+                                    <label for="loan_approval_sms" class="form-label"><?= t('SMS Template') ?></label>
                                     <textarea class="form-control" id="loan_approval_sms"
                                               name="loan_approval_sms" rows="3" maxlength="160"><?= get_setting('loan_approval_sms', 'Good news! Your loan #{loan_id} for {loan_amount} is approved. Visit us to complete. - {company_name}') ?></textarea>
                                     <div class="form-text">
-                                        <span id="loan_approval_counter">0</span>/160 characters
+                                        <span id="loan_approval_counter">0</span>/160 <?= t('characters') ?>
                                     </div>
                                 </div>
 
-                                <h5 class="mb-3 text-primary mt-4">Loan Disbursement SMS</h5>
+                                <h5 class="mb-3 text-primary mt-4"><?= t('Loan Disbursement SMS') ?></h5>
                                 <div class="mb-3">
-                                    <label for="loan_disbursement_sms" class="form-label">SMS Template</label>
+                                    <label for="loan_disbursement_sms" class="form-label"><?= t('SMS Template') ?></label>
                                     <textarea class="form-control" id="loan_disbursement_sms"
                                               name="loan_disbursement_sms" rows="3" maxlength="160"><?= get_setting('loan_disbursement_sms', 'Your loan #{loan_id} funds have been disbursed. First payment due: {first_payment_date}. - {company_name}') ?></textarea>
                                     <div class="form-text">
-                                        <span id="loan_disbursement_counter">0</span>/160 characters
+                                        <span id="loan_disbursement_counter">0</span>/160 <?= t('characters') ?>
                                     </div>
                                 </div>
 
-                                <h5 class="mb-3 text-primary mt-4">General Notification SMS</h5>
+                                <h5 class="mb-3 text-primary mt-4"><?= t('General Notification SMS') ?></h5>
                                 <div class="mb-3">
-                                    <label for="general_notification_sms" class="form-label">SMS Template</label>
+                                    <label for="general_notification_sms" class="form-label"><?= t('SMS Template') ?></label>
                                     <textarea class="form-control" id="general_notification_sms"
                                               name="general_notification_sms" rows="3" maxlength="160"><?= get_setting('general_notification_sms', 'Important update from {company_name}. Please check your email or contact us at {company_phone}.') ?></textarea>
                                     <div class="form-text">
-                                        <span id="general_notification_counter">0</span>/160 characters
+                                        <span id="general_notification_counter">0</span>/160 <?= t('characters') ?>
                                     </div>
                                 </div>
                             </div>
@@ -469,13 +469,13 @@ Best regards,
 
                         <div class="alert alert-warning">
                             <i class="bi bi-exclamation-triangle"></i>
-                            <strong>SMS Character Limit:</strong> Standard SMS messages are limited to 160 characters.
-                            Messages longer than this will be split into multiple messages.
+                            <strong><?= t('SMS Character Limit:') ?></strong> <?= t('Standard SMS messages are limited to 160 characters.') ?>
+                            <?= t('Messages longer than this will be split into multiple messages.') ?>
                         </div>
 
                         <div class="mt-4">
                             <button type="submit" name="save_sms_templates" class="btn btn-primary">
-                                <i class="bi bi-check-circle"></i> Save SMS Templates
+                                <i class="bi bi-check-circle"></i> <?= t('Save SMS Templates') ?>
                             </button>
                         </div>
                     </form>
@@ -486,22 +486,22 @@ Best regards,
                     <form method="POST">
                         <div class="row">
                             <div class="col-md-6">
-                                <h5 class="mb-3 text-primary">Payment Alerts</h5>
+                                <h5 class="mb-3 text-primary"><?= t('Payment Alerts') ?></h5>
 
                                 <div class="mb-3">
-                                    <label for="send_payment_reminder_days" class="form-label">Send Payment Reminder (days before due date)</label>
+                                    <label for="send_payment_reminder_days" class="form-label"><?= t('Send Payment Reminder (days before due date)') ?></label>
                                     <input type="number" class="form-control" id="send_payment_reminder_days"
                                            name="send_payment_reminder_days"
                                            value="<?= get_setting('send_payment_reminder_days', '3') ?>">
-                                    <div class="form-text">Send reminder this many days before payment due date</div>
+                                    <div class="form-text"><?= t('Send reminder this many days before payment due date') ?></div>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label for="send_overdue_alert_days" class="form-label">Send Overdue Alert (days after due date)</label>
+                                    <label for="send_overdue_alert_days" class="form-label"><?= t('Send Overdue Alert (days after due date)') ?></label>
                                     <input type="number" class="form-control" id="send_overdue_alert_days"
                                            name="send_overdue_alert_days"
                                            value="<?= get_setting('send_overdue_alert_days', '1') ?>">
-                                    <div class="form-text">Send overdue alert this many days after due date</div>
+                                    <div class="form-text"><?= t('Send overdue alert this many days after due date') ?></div>
                                 </div>
 
                                 <div class="mb-3">
@@ -510,10 +510,10 @@ Best regards,
                                                name="send_loan_approval_notification" value="1"
                                                <?= get_setting('send_loan_approval_notification', '1') ? 'checked' : '' ?>>
                                         <label class="form-check-label" for="send_loan_approval_notification">
-                                            Send Loan Approval Notifications
+                                            <?= t('Send Loan Approval Notifications') ?>
                                         </label>
                                     </div>
-                                    <div class="form-text">Notify customer when loan is approved</div>
+                                    <div class="form-text"><?= t('Notify customer when loan is approved') ?></div>
                                 </div>
 
                                 <div class="mb-3">
@@ -522,15 +522,15 @@ Best regards,
                                                name="send_loan_disbursement_notification" value="1"
                                                <?= get_setting('send_loan_disbursement_notification', '1') ? 'checked' : '' ?>>
                                         <label class="form-check-label" for="send_loan_disbursement_notification">
-                                            Send Loan Disbursement Notifications
+                                            <?= t('Send Loan Disbursement Notifications') ?>
                                         </label>
                                     </div>
-                                    <div class="form-text">Notify customer when loan funds are disbursed</div>
+                                    <div class="form-text"><?= t('Notify customer when loan funds are disbursed') ?></div>
                                 </div>
                             </div>
 
                             <div class="col-md-6">
-                                <h5 class="mb-3 text-primary">Report Alerts</h5>
+                                <h5 class="mb-3 text-primary"><?= t('Report Alerts') ?></h5>
 
                                 <div class="mb-3">
                                     <div class="form-check form-switch">
@@ -538,10 +538,10 @@ Best regards,
                                                name="send_daily_collection_report" value="1"
                                                <?= get_setting('send_daily_collection_report') ? 'checked' : '' ?>>
                                         <label class="form-check-label" for="send_daily_collection_report">
-                                            Send Daily Collection Report
+                                            <?= t('Send Daily Collection Report') ?>
                                         </label>
                                     </div>
-                                    <div class="form-text">Email daily collection summary to managers</div>
+                                    <div class="form-text"><?= t('Email daily collection summary to managers') ?></div>
                                 </div>
 
                                 <div class="mb-3">
@@ -550,10 +550,10 @@ Best regards,
                                                name="send_weekly_performance_report" value="1"
                                                <?= get_setting('send_weekly_performance_report') ? 'checked' : '' ?>>
                                         <label class="form-check-label" for="send_weekly_performance_report">
-                                            Send Weekly Performance Report
+                                            <?= t('Send Weekly Performance Report') ?>
                                         </label>
                                     </div>
-                                    <div class="form-text">Email weekly performance metrics to management</div>
+                                    <div class="form-text"><?= t('Email weekly performance metrics to management') ?></div>
                                 </div>
 
                                 <div class="mb-3">
@@ -562,13 +562,13 @@ Best regards,
                                                name="send_monthly_portfolio_report" value="1"
                                                <?= get_setting('send_monthly_portfolio_report') ? 'checked' : '' ?>>
                                         <label class="form-check-label" for="send_monthly_portfolio_report">
-                                            Send Monthly Portfolio Report
+                                            <?= t('Send Monthly Portfolio Report') ?>
                                         </label>
                                     </div>
-                                    <div class="form-text">Email comprehensive portfolio analysis monthly</div>
+                                    <div class="form-text"><?= t('Email comprehensive portfolio analysis monthly') ?></div>
                                 </div>
 
-                                <h5 class="mb-3 text-primary mt-4">Risk Alerts</h5>
+                                <h5 class="mb-3 text-primary mt-4"><?= t('Risk Alerts') ?></h5>
 
                                 <div class="mb-3">
                                     <div class="form-check form-switch">
@@ -576,25 +576,25 @@ Best regards,
                                                name="high_risk_loan_alert" value="1"
                                                <?= get_setting('high_risk_loan_alert') ? 'checked' : '' ?>>
                                         <label class="form-check-label" for="high_risk_loan_alert">
-                                            High-Risk Loan Alerts
+                                            <?= t('High-Risk Loan Alerts') ?>
                                         </label>
                                     </div>
-                                    <div class="form-text">Alert managers when high-risk loans are applied for</div>
+                                    <div class="form-text"><?= t('Alert managers when high-risk loans are applied for') ?></div>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label for="large_loan_alert_threshold" class="form-label">Large Loan Alert Threshold</label>
+                                    <label for="large_loan_alert_threshold" class="form-label"><?= t('Large Loan Alert Threshold') ?></label>
                                     <input type="number" step="0.01" class="form-control" id="large_loan_alert_threshold"
                                            name="large_loan_alert_threshold"
                                            value="<?= get_setting('large_loan_alert_threshold', '5000.00') ?>">
-                                    <div class="form-text">Alert managers for loans above this amount</div>
+                                    <div class="form-text"><?= t('Alert managers for loans above this amount') ?></div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="mt-4">
                             <button type="submit" name="save_alert_rules" class="btn btn-primary">
-                                <i class="bi bi-check-circle"></i> Save Alert Rules
+                                <i class="bi bi-check-circle"></i> <?= t('Save Alert Rules') ?>
                             </button>
                         </div>
                     </form>
@@ -604,87 +604,87 @@ Best regards,
                 <div class="tab-pane fade" id="test" role="tabpanel">
                     <div class="row">
                         <div class="col-md-6">
-                            <h5 class="mb-3 text-primary">Test Email Notifications</h5>
+                            <h5 class="mb-3 text-primary"><?= t('Test Email Notifications') ?></h5>
 
                             <div class="card mb-4">
                                 <div class="card-body">
                                     <div class="mb-3">
-                                        <label for="test_email_address" class="form-label">Test Email Address</label>
+                                        <label for="test_email_address" class="form-label"><?= t('Test Email Address') ?></label>
                                         <input type="email" class="form-control" id="test_email_address"
-                                               placeholder="Enter email address to test">
+                                               placeholder="<?= t('Enter email address to test') ?>">
                                     </div>
 
                                     <div class="mb-3">
-                                        <label for="test_email_type" class="form-label">Email Type</label>
+                                        <label for="test_email_type" class="form-label"><?= t('Email Type') ?></label>
                                         <select class="form-control" id="test_email_type">
-                                            <option value="loan_approval">Loan Approval</option>
-                                            <option value="payment_reminder">Payment Reminder</option>
-                                            <option value="overdue_notice">Overdue Notice</option>
-                                            <option value="loan_disbursement">Loan Disbursement</option>
+                                            <option value="loan_approval"><?= t('Loan Approval') ?></option>
+                                            <option value="payment_reminder"><?= t('Payment Reminder') ?></option>
+                                            <option value="overdue_notice"><?= t('Overdue Notice') ?></option>
+                                            <option value="loan_disbursement"><?= t('Loan Disbursement') ?></option>
                                         </select>
                                     </div>
 
                                     <button type="button" class="btn btn-primary" id="testEmail">
-                                        <i class="bi bi-envelope"></i> Send Test Email
+                                        <i class="bi bi-envelope"></i> <?= t('Send Test Email') ?>
                                     </button>
                                 </div>
                             </div>
 
-                            <h5 class="mb-3 text-primary">Test SMS Notifications</h5>
+                            <h5 class="mb-3 text-primary"><?= t('Test SMS Notifications') ?></h5>
 
                             <div class="card">
                                 <div class="card-body">
                                     <div class="mb-3">
-                                        <label for="test_phone_number" class="form-label">Test Phone Number</label>
+                                        <label for="test_phone_number" class="form-label"><?= t('Test Phone Number') ?></label>
                                         <input type="text" class="form-control" id="test_phone_number"
-                                               placeholder="Enter phone number to test">
+                                               placeholder="<?= t('Enter phone number to test') ?>">
                                     </div>
 
                                     <div class="mb-3">
-                                        <label for="test_sms_type" class="form-label">SMS Type</label>
+                                        <label for="test_sms_type" class="form-label"><?= t('SMS Type') ?></label>
                                         <select class="form-control" id="test_sms_type">
-                                            <option value="payment_reminder">Payment Reminder</option>
-                                            <option value="overdue_alert">Overdue Alert</option>
-                                            <option value="loan_approval">Loan Approval</option>
-                                            <option value="loan_disbursement">Loan Disbursement</option>
+                                            <option value="payment_reminder"><?= t('Payment Reminder') ?></option>
+                                            <option value="overdue_alert"><?= t('Overdue Alert') ?></option>
+                                            <option value="loan_approval"><?= t('Loan Approval') ?></option>
+                                            <option value="loan_disbursement"><?= t('Loan Disbursement') ?></option>
                                         </select>
                                     </div>
 
                                     <button type="button" class="btn btn-primary" id="testSMS">
-                                        <i class="bi bi-chat-text"></i> Send Test SMS
+                                        <i class="bi bi-chat-text"></i> <?= t('Send Test SMS') ?>
                                     </button>
                                 </div>
                             </div>
                         </div>
 
                         <div class="col-md-6">
-                            <h5 class="mb-3 text-primary">Test System Notifications</h5>
+                            <h5 class="mb-3 text-primary"><?= t('Test System Notifications') ?></h5>
 
                             <div class="card mb-4">
                                 <div class="card-body">
                                     <div class="mb-3">
-                                        <label for="test_notification_type" class="form-label">Notification Type</label>
+                                        <label for="test_notification_type" class="form-label"><?= t('Notification Type') ?></label>
                                         <select class="form-control" id="test_notification_type">
-                                            <option value="success">Success Notification</option>
-                                            <option value="warning">Warning Notification</option>
-                                            <option value="error">Error Notification</option>
-                                            <option value="info">Info Notification</option>
+                                            <option value="success"><?= t('Success Notification') ?></option>
+                                            <option value="warning"><?= t('Warning Notification') ?></option>
+                                            <option value="error"><?= t('Error Notification') ?></option>
+                                            <option value="info"><?= t('Info Notification') ?></option>
                                         </select>
                                     </div>
 
                                     <div class="mb-3">
-                                        <label for="test_notification_message" class="form-label">Message</label>
+                                        <label for="test_notification_message" class="form-label"><?= t('Message') ?></label>
                                         <input type="text" class="form-control" id="test_notification_message"
-                                               value="This is a test notification from the system">
+                                               value="<?= t('This is a test notification from the system') ?>">
                                     </div>
 
                                     <button type="button" class="btn btn-primary" id="testSystemNotification">
-                                        <i class="bi bi-bell"></i> Show Test Notification
+                                        <i class="bi bi-bell"></i> <?= t('Show Test Notification') ?>
                                     </button>
                                 </div>
                             </div>
 
-                            <h5 class="mb-3 text-primary">Notification Log</h5>
+                            <h5 class="mb-3 text-primary"><?= t('Notification Log') ?></h5>
 
                             <div class="card">
                                 <div class="card-body">
@@ -692,16 +692,16 @@ Best regards,
                                         <table class="table table-sm table-hover" id="notificationLog">
                                             <thead>
                                                 <tr>
-                                                    <th>Type</th>
-                                                    <th>Message</th>
-                                                    <th>Date</th>
-                                                    <th>Status</th>
+                                                    <th><?= t('Type') ?></th>
+                                                    <th><?= t('Message') ?></th>
+                                                    <th><?= t('Date') ?></th>
+                                                    <th><?= t('Status') ?></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <tr>
                                                     <td colspan="4" class="text-center text-muted">
-                                                        No test notifications sent yet
+                                                        <?= t('No test notifications sent yet') ?>
                                                     </td>
                                                 </tr>
                                             </tbody>
@@ -709,7 +709,7 @@ Best regards,
                                     </div>
 
                                     <button type="button" class="btn btn-outline-secondary btn-sm mt-2" id="clearLog">
-                                        <i class="bi bi-trash"></i> Clear Log
+                                        <i class="bi bi-trash"></i> <?= t('Clear Log') ?>
                                     </button>
                                 </div>
                             </div>
@@ -768,6 +768,28 @@ Best regards,
 </style>
 
 <script>
+const NSP_STRINGS = {
+    enterTestEmail: <?= json_encode(t('Please enter a test email address')) ?>,
+    sending: <?= json_encode(t('Sending...')) ?>,
+    testEmailSent: <?= json_encode(t('Test email sent successfully!')) ?>,
+    failedTestEmail: <?= json_encode(t('Failed to send test email:')) ?>,
+    unknownError: <?= json_encode(t('Unknown error')) ?>,
+    testEmailSentTo: <?= json_encode(t('Test %type% email sent to %recipient%')) ?>,
+    failedToSendTestEmail: <?= json_encode(t('Failed to send test %type% email')) ?>,
+    errorSendingTestEmail: <?= json_encode(t('Error sending test email')) ?>,
+    enterTestPhone: <?= json_encode(t('Please enter a test phone number')) ?>,
+    testSmsSent: <?= json_encode(t('Test SMS sent successfully!')) ?>,
+    failedTestSms: <?= json_encode(t('Failed to send test SMS:')) ?>,
+    testSmsSentTo: <?= json_encode(t('Test %type% SMS sent to %recipient%')) ?>,
+    failedToSendTestSms: <?= json_encode(t('Failed to send test %type% SMS')) ?>,
+    errorSendingTestSms: <?= json_encode(t('Error sending test SMS')) ?>,
+    noTestNotificationsSent: <?= json_encode(t('No test notifications sent yet')) ?>,
+    logCleared: <?= json_encode(t('Notification log cleared')) ?>,
+    typeEmail: <?= json_encode(t('Email')) ?>,
+    typeSms: <?= json_encode(t('SMS')) ?>,
+    typeSystem: <?= json_encode(t('System')) ?>,
+};
+
 $(document).ready(function() {
     // Character counters for SMS templates
     function updateCharacterCounters() {
@@ -808,13 +830,13 @@ $(document).ready(function() {
         const type = $('#test_email_type').val();
 
         if (!email) {
-            showToast('error', 'Please enter a test email address');
+            showToast('error', NSP_STRINGS.enterTestEmail);
             return;
         }
 
         const btn = $(this);
         const originalText = btn.html();
-        btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Sending...');
+        btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> ' + NSP_STRINGS.sending);
 
         $.ajax({
             url: 'api/test_notification.php',
@@ -827,16 +849,16 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(response) {
                 if (response.success) {
-                    showToast('success', 'Test email sent successfully!');
-                    addToNotificationLog('Email', `Test ${type} email sent to ${email}`, 'success');
+                    showToast('success', NSP_STRINGS.testEmailSent);
+                    addToNotificationLog(NSP_STRINGS.typeEmail, NSP_STRINGS.testEmailSentTo.replace('%type%', type).replace('%recipient%', email), 'success');
                 } else {
-                    showToast('error', 'Failed to send test email: ' + (response.message || 'Unknown error'));
-                    addToNotificationLog('Email', `Failed to send test ${type} email`, 'error');
+                    showToast('error', NSP_STRINGS.failedTestEmail + ' ' + (response.message || NSP_STRINGS.unknownError));
+                    addToNotificationLog(NSP_STRINGS.typeEmail, NSP_STRINGS.failedToSendTestEmail.replace('%type%', type), 'error');
                 }
             },
             error: function() {
-                showToast('error', 'Error sending test email');
-                addToNotificationLog('Email', 'Error sending test email', 'error');
+                showToast('error', NSP_STRINGS.errorSendingTestEmail);
+                addToNotificationLog(NSP_STRINGS.typeEmail, NSP_STRINGS.errorSendingTestEmail, 'error');
             },
             complete: function() {
                 btn.prop('disabled', false).html(originalText);
@@ -850,13 +872,13 @@ $(document).ready(function() {
         const type = $('#test_sms_type').val();
 
         if (!phone) {
-            showToast('error', 'Please enter a test phone number');
+            showToast('error', NSP_STRINGS.enterTestPhone);
             return;
         }
 
         const btn = $(this);
         const originalText = btn.html();
-        btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Sending...');
+        btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> ' + NSP_STRINGS.sending);
 
         $.ajax({
             url: 'api/test_notification.php',
@@ -869,16 +891,16 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(response) {
                 if (response.success) {
-                    showToast('success', 'Test SMS sent successfully!');
-                    addToNotificationLog('SMS', `Test ${type} SMS sent to ${phone}`, 'success');
+                    showToast('success', NSP_STRINGS.testSmsSent);
+                    addToNotificationLog(NSP_STRINGS.typeSms, NSP_STRINGS.testSmsSentTo.replace('%type%', type).replace('%recipient%', phone), 'success');
                 } else {
-                    showToast('error', 'Failed to send test SMS: ' + (response.message || 'Unknown error'));
-                    addToNotificationLog('SMS', `Failed to send test ${type} SMS`, 'error');
+                    showToast('error', NSP_STRINGS.failedTestSms + ' ' + (response.message || NSP_STRINGS.unknownError));
+                    addToNotificationLog(NSP_STRINGS.typeSms, NSP_STRINGS.failedToSendTestSms.replace('%type%', type), 'error');
                 }
             },
             error: function() {
-                showToast('error', 'Error sending test SMS');
-                addToNotificationLog('SMS', 'Error sending test SMS', 'error');
+                showToast('error', NSP_STRINGS.errorSendingTestSms);
+                addToNotificationLog(NSP_STRINGS.typeSms, NSP_STRINGS.errorSendingTestSms, 'error');
             },
             complete: function() {
                 btn.prop('disabled', false).html(originalText);
@@ -892,7 +914,7 @@ $(document).ready(function() {
         const message = $('#test_notification_message').val();
 
         showToast(type, message);
-        addToNotificationLog('System', message, type);
+        addToNotificationLog(NSP_STRINGS.typeSystem, message, type);
     });
 
     // Clear Log
@@ -900,11 +922,11 @@ $(document).ready(function() {
         $('#notificationLog tbody').html(`
             <tr>
                 <td colspan="4" class="text-center text-muted">
-                    No test notifications sent yet
+                    ${NSP_STRINGS.noTestNotificationsSent}
                 </td>
             </tr>
         `);
-        showToast('info', 'Notification log cleared');
+        showToast('info', NSP_STRINGS.logCleared);
     });
 
     // Add entry to notification log
