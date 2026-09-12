@@ -1,5 +1,43 @@
 # BMS Changelog
 
+## 2026-09-12 (feat/inventory-i18n-coverage) - Full Swahili translation coverage for every page in the Inventory dropdown
+
+**Request:** "here in 'inventory' with all dropdown available within it should be also translated into
+swahili as when language is translated unto swahili by user through language translation also should
+change into swahili. Please start here in products.php up to the last dropdown within here in inventory
+... Check with crud if has all this please change into swahili also." `products.php` and `services.php`
+already had full coverage from earlier work; the other 5 pages reachable from header.php's Inventory
+dropdown (`categories.php`, `stock_adjustments.php`, `inventory_valuation.php`, `warehouses.php`,
+`locations.php`) had zero `t()`/`te()` calls — every label, button, table header, modal field, and
+JS-side Swal/DataTable string was hard-coded English.
+
+**Fix:** wrapped every user-facing string across all 5 pages in `t()` (PHP-rendered HTML) or
+`json_encode(t(...))` (JS-embedded strings — Swal dialogs, DataTable `language` config, CSV export
+headers), following the same convention already established in the POS module and in `products.php`.
+`logActivity()`/`logReportAction()` calls stay in English (existing sitewide convention — audit-trail
+searchability). Added 263 new Swahili entries to `lang/sw.php` (deduplicated against existing keys
+site-wide — reused an existing translation instead of adding a near-duplicate wherever one already
+covered the same word).
+
+One non-obvious fix along the way: `warehouses.php` and `locations.php` both set `$_SESSION['error']` /
+`$_SESSION['success']` flash messages *during POST handling*, before `header.php` (which resolves the
+user's saved language) has run on that request — translating at that point would always resolve to
+English regardless of the user's preference, since the redirect target's language load happens on the
+*next* request. Fixed by storing the flash messages untranslated and translating them at display time on
+the follow-up GET, after `header.php` has loaded the correct language. Messages with raw dynamic content
+spliced in (a caught `PDOException`'s message) are deliberately left untranslated, same as an activity-log
+line.
+
+**Tested:** `php -l` clean on all 5 files plus `lang/sw.php`. A reusable scan script (mirrors
+`tests/test_pos_i18n_coverage_cli.php`'s `extractTKeys()` tokenizer approach) confirms 0 missing Swahili
+translations across all 559 distinct `t()`/`te()` keys spanning all 7 Inventory-dropdown pages. Live
+in-process render of every modified page under both `en` and `sw` sessions confirmed clean output (no
+PHP warnings/notices/fatals) and the expected Swahili text present; the deferred flash-message fix was
+verified directly by pre-seeding `$_SESSION['error']`/`['success']` and confirming the Swahili text
+appears in a `sw`-language render and the English text in an `en`-language render. No duplicate
+translation keys introduced (checked file-wide via a duplicate-key tokenizer against the pre-existing
+baseline).
+
 ## 2026-09-12 (feat/restaurant-pos-mode-setup) - Restaurant setup is now fully operable: real POS Mode field, a fix-it button, and a hub popup
 
 **Request:** hitting the Restaurant sub-hub showed "No warehouse in your scope is set to Restaurant or
