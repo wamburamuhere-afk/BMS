@@ -234,6 +234,7 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
         'customers'        => ['total_customers' => 0, 'active_customers' => 0, 'new_customers' => 0],
         'expenses'         => ['total_expenses' => 0, 'total_expense_amount' => 0],
         'pos_today'        => ['pos_sales_today' => 0, 'pos_revenue_today' => 0],
+        'warehouses'       => ['total_warehouses' => 0, 'top_warehouse_id' => null, 'top_warehouse_name' => '', 'top_warehouse_value' => 0],
     ];
 
     // ── 1. Invoice / Sales stats ──────────────────────────────────────────────
@@ -370,6 +371,45 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
         ");
         $stmt->execute();
         $stats['inventory'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $stats['inventory'];
+    }
+
+    // ── 3b. Warehouses — count + the single highest-value warehouse ──────────
+    // Gate: warehouses module; scope: same warehouse-assignment scope as
+    // warehouses.php's own "Total Warehouses" stat (Phase 6, pos_upgrade_plan.md).
+    // Stock value per warehouse uses the IDENTICAL formula as warehouses.php's
+    // own list (SUM(stock_quantity * cost_price)) so this card's figure always
+    // matches what warehouse_view.php shows after the click-through.
+    // Deleted warehouses are excluded from BOTH queries here (unlike
+    // warehouses.php's own count, which doesn't filter status) — the "top"
+    // pick feeds a direct link to warehouse_view.php, which itself refuses a
+    // deleted warehouse_id, so ranking one first would be a dead link.
+    if (canView('warehouses')) {
+        $whScope = scopeFilterSqlNullable('warehouse', 'w');
+
+        $stmt = $pdo->prepare("SELECT COUNT(*) as total_warehouses FROM warehouses w WHERE w.status != 'deleted' {$whScope}");
+        $stmt->execute();
+        $totalWarehouses = (int)($stmt->fetchColumn() ?: 0);
+
+        $stmt = $pdo->prepare("
+            SELECT w.warehouse_id, w.warehouse_name,
+                   COALESCE(SUM(ps.stock_quantity * p.cost_price), 0) as stock_value
+            FROM warehouses w
+            LEFT JOIN product_stocks ps ON ps.warehouse_id = w.warehouse_id
+            LEFT JOIN products p ON p.product_id = ps.product_id
+            WHERE w.status != 'deleted' {$whScope}
+            GROUP BY w.warehouse_id, w.warehouse_name
+            ORDER BY stock_value DESC
+            LIMIT 1
+        ");
+        $stmt->execute();
+        $top = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $stats['warehouses'] = [
+            'total_warehouses'    => $totalWarehouses,
+            'top_warehouse_id'    => $top['warehouse_id'] ?? null,
+            'top_warehouse_name'  => $top['warehouse_name'] ?? '',
+            'top_warehouse_value' => (float)($top['stock_value'] ?? 0),
+        ];
     }
 
     // ── 4. Customer stats ─────────────────────────────────────────────────────
@@ -1580,6 +1620,40 @@ function get_progress_color($percentage) {
                         <small>
                             <i class="bi bi-box"></i>
                             <?= $dashboard_stats['inventory']['total_products'] ?? 0 ?> <?= t('Products in stock') ?>
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </a>
+        <?php endif; ?>
+
+        <!-- 5. Warehouses — total count + the single highest-value warehouse,
+             named directly. Clicking goes straight to THAT warehouse's own
+             view page (not the general warehouses list), since the point is
+             "be aware of which specific warehouse holds the most value". -->
+        <?php $wh = $dashboard_stats['warehouses'] ?? []; ?>
+        <?php if(canView('warehouses') && ($wh['total_warehouses'] ?? 0) > 0): ?>
+        <a class="flex-fill text-decoration-none dashboard-stat-link" style="min-width: 240px;"
+           href="<?= !empty($wh['top_warehouse_id']) ? (getUrl('warehouse_view') . '?id=' . (int)$wh['top_warehouse_id']) : getUrl('warehouses') ?>">
+            <div class="card bg-dark text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0"><?= $wh['total_warehouses'] ?? 0 ?></h4>
+                            <p class="mb-0"><?= t('Total Warehouses') ?></p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-building" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <small>
+                            <?php if (!empty($wh['top_warehouse_name'])): ?>
+                            <i class="bi bi-trophy"></i>
+                            <?= htmlspecialchars($wh['top_warehouse_name']) ?> — <?= format_currency($wh['top_warehouse_value'] ?? 0) ?> <?= t('(highest value)') ?>
+                            <?php else: ?>
+                            <i class="bi bi-info-circle"></i> <?= t('No stock recorded yet') ?>
+                            <?php endif; ?>
                         </small>
                     </div>
                 </div>
