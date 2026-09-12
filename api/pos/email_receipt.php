@@ -64,6 +64,13 @@ $stmt->execute([$sale_id]);
 $sale = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$sale) { echo json_encode(['success' => false, 'message' => t('Sale not found.')]); exit; }
 
+// A walk-in sale has no customer_id (see process_sale.php), so the LEFT JOIN
+// above leaves customer_name null — show "Walk-in Customer" explicitly,
+// same as print_receipt.php, instead of silently omitting the row/recipient.
+if (empty($sale['customer_name'])) {
+    $sale['customer_name'] = t('Walk-in Customer');
+}
+
 $wid = $sale['warehouse_id'] !== null && $sale['warehouse_id'] !== '' ? (int)$sale['warehouse_id'] : null;
 if ($wid !== null && !userCan('warehouse', $wid)) {
     echo json_encode(['success' => false, 'message' => t('Access denied: this warehouse is not in your assigned scope.')]);
