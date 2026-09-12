@@ -47,6 +47,12 @@
  *   tenantFeatureEnabled(string): bool
  *   tenantModuleAllowsPage(string): bool -> the one the permission layer calls
  *   bmsPrimeTenantFeatures(?int): void   -> called once per request by the bootstrap
+ *   syncFeatureCatalogue(): array        -> low-privilege INSERT-IGNORE sync of
+ *                                           this array into the control DB's
+ *                                           `features` table, safe to run on
+ *                                           every deploy (see its own docblock
+ *                                           for why this is NOT
+ *                                           scripts/setup_control_db.php)
  */
 
 require_once __DIR__ . '/control_db.php';
@@ -863,5 +869,72 @@ if (!function_exists('featureAllDependents')) {
             $frontier = $next;
         }
         return array_keys($dependents);
+    }
+}
+
+if (!function_exists('syncFeatureCatalogue')) {
+    /**
+     * INSERT-IGNORE this registry into the control DB's `features` table —
+     * the exact same seed logic scripts/setup_control_db.php runs once at
+     * initial provisioning, extracted so it can ALSO run automatically on
+     * every deploy without repeating that script's own, deliberate,
+     * documented mistake.
+     *
+     * WHY THIS IS NOT scripts/setup_control_db.php, AND NEVER SHOULD BE.
+     * That script CREATEs the control database and its tables from nothing —
+     * it needs CREATE DATABASE/CREATE TABLE privilege that a hardened
+     * production app user has no reason to hold, and running it from an
+     * automated deploy step already caused a real outage once (2026-08-31,
+     * see that script's own docblock and .github/workflows/deploy.yml's
+     * history): the privileged step failed on the restricted prod DB user,
+     * and back then it was still wired through migrations/runner.php with
+     * script_stop:true, so the WHOLE deploy halted over an optional
+     * subsystem. That is exactly the mistake this function must not repeat.
+     *
+     * This function does only an INSERT IGNORE into a table that must
+     * ALREADY exist — ordinary DML, not DDL, well within the SAME restricted
+     * credentials core/tenant_migration_runner.php already uses successfully
+     * in production every single deploy (getControlPdo(), not an elevated
+     * admin connection). Safe to call unconditionally: no control DB / no
+     * `features` table yet is a graceful no-op (controlDbReady() is exactly
+     * the check core/tenant_migration_runner.php already relies on for the
+     * same "multi-tenancy not set up on this host" case), and INSERT IGNORE
+     * never touches an operator's own is_available/default_enabled edits on
+     * an existing row — only genuinely new feature_keys are added, byte for
+     * byte the same contract scripts/setup_control_db.php already documents.
+     *
+     * @return array{ran:bool, reason:?string, added:int}
+     */
+    function syncFeatureCatalogue(): array
+    {
+        require_once __DIR__ . '/control_db.php';
+
+        if (!controlDbReady()) {
+            return ['ran' => false, 'reason' => 'control database is not set up (single-tenant host, or multi-tenancy not yet configured)', 'added' => 0];
+        }
+
+        try {
+            $pdo = getControlPdo();
+            $seed = $pdo->prepare("
+                INSERT IGNORE INTO features
+                    (feature_key, label, description, is_available, default_enabled, sort_order)
+                VALUES (?, ?, ?, 1, ?, ?)
+            ");
+            $added = 0;
+            foreach (bmsFeatureRegistry() as $key => $def) {
+                $seed->execute([
+                    $key,
+                    $def['label'],
+                    $def['description'] ?? null,
+                    !empty($def['default']) ? 1 : 0,
+                    (int)($def['sort_order'] ?? 0),
+                ]);
+                $added += $seed->rowCount();
+            }
+            return ['ran' => true, 'reason' => null, 'added' => $added];
+        } catch (Throwable $e) {
+            error_log('syncFeatureCatalogue: ' . $e->getMessage());
+            return ['ran' => false, 'reason' => $e->getMessage(), 'added' => 0];
+        }
     }
 }

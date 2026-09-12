@@ -209,6 +209,75 @@ if (!function_exists('runTenantMigrations')) {
     }
 }
 
+if (!function_exists('notifySuperadminsOfTenantMigrationFailures')) {
+    /**
+     * Email every superadmin when this run leaves one or more tenants
+     * un-migrated (a failed migration, or credentials that could not be
+     * decrypted). Same pattern as core/module_requests.php's
+     * notifySuperadminsOfModuleRequest() — platform mail via
+     * core/platform_settings.php, since superadmins have no in-app
+     * notification center of their own (they are platform operators, not
+     * tenant users) and this is exactly the class of event that must never
+     * go unnoticed: a tenant silently running with incomplete schema until
+     * its own users hit a broken page (see migrations/tenant/README.md's
+     * "Known gap" note this closes).
+     *
+     * Fail-silent by design, like every other notifier in this codebase: a
+     * mail-sending problem must never turn a deploy's migration step into a
+     * fatal error on top of the migration failure it's trying to report.
+     *
+     * @param array<int, array{id:int, subdomain:string, failed:?string, error:?string}> $failedTenants
+     */
+    function notifySuperadminsOfTenantMigrationFailures(array $failedTenants): void
+    {
+        if (empty($failedTenants)) return;
+        try {
+            require_once __DIR__ . '/platform_settings.php';
+            require_once __DIR__ . '/mailer.php';
+
+            $mailer = platformMailerOpts();
+            if (!$mailer['configured']) {
+                error_log('notifySuperadminsOfTenantMigrationFailures: platform SMTP not configured — cannot email, see migrations/tenant_deploy.log instead');
+                return;
+            }
+
+            $rows = '';
+            foreach ($failedTenants as $t) {
+                $subdomain = htmlspecialchars((string)$t['subdomain'], ENT_QUOTES, 'UTF-8');
+                $reason = htmlspecialchars($t['failed'] ? "migration {$t['failed']}" : 'credentials/connection', ENT_QUOTES, 'UTF-8');
+                $error = htmlspecialchars(substr((string)$t['error'], 0, 500), ENT_QUOTES, 'UTF-8');
+                $rows .= "<tr><td style=\"padding:6px 10px;border:1px solid #dee2e6;\">#{$t['id']} ({$subdomain})</td>"
+                       . "<td style=\"padding:6px 10px;border:1px solid #dee2e6;\">{$reason}</td>"
+                       . "<td style=\"padding:6px 10px;border:1px solid #dee2e6;font-family:monospace;font-size:12px;\">{$error}</td></tr>";
+            }
+
+            $count = count($failedTenants);
+            $subject = $count === 1
+                ? "Tenant migration failed: {$failedTenants[0]['subdomain']}"
+                : "{$count} tenant migrations failed on this deploy";
+
+            $body = "<p>The following tenant(s) did <strong>not</strong> receive this deploy's schema migration(s) "
+                  . "and are now running with incomplete/stale schema — their users may hit runtime errors on any "
+                  . "page or feature that depends on the missing schema, until this is fixed.</p>"
+                  . "<table style=\"border-collapse:collapse;width:100%;font-size:13px;\">"
+                  . "<tr><th style=\"padding:6px 10px;border:1px solid #dee2e6;text-align:left;background:#f8f9fa;\">Tenant</th>"
+                  . "<th style=\"padding:6px 10px;border:1px solid #dee2e6;text-align:left;background:#f8f9fa;\">Where it stopped</th>"
+                  . "<th style=\"padding:6px 10px;border:1px solid #dee2e6;text-align:left;background:#f8f9fa;\">Error</th></tr>"
+                  . $rows . "</table>"
+                  . "<p style=\"margin-top:16px;\">Full detail: <code>migrations/tenant_deploy.log</code> and the "
+                  . "<code>tenant_migration_log</code> control table. Retry one tenant after fixing the cause: "
+                  . "<code>php core/tenant_migration_runner.php --tenant=&lt;id&gt;</code></p>";
+
+            $emails = getControlPdo()->query("SELECT email FROM superadmins")->fetchAll(PDO::FETCH_COLUMN);
+            foreach ($emails as $email) {
+                sendEmail($email, $subject, $body, $mailer['opts']);
+            }
+        } catch (Throwable $e) {
+            error_log('notifySuperadminsOfTenantMigrationFailures: ' . $e->getMessage());
+        }
+    }
+}
+
 // ── CLI entry point ─────────────────────────────────────────────────────────
 // Guarded so `require_once`-ing this file (from a test, or from a future
 // deploy.yml wiring that wants the functions directly) never triggers a run.
@@ -229,6 +298,21 @@ if (PHP_SAPI === 'cli' && isset($argv[0]) && realpath($argv[0]) === __FILE__) {
     $log('=========================================');
     $log('BMS Tenant Migration Runner' . ($dryRun ? ' [DRY RUN]' : '') . ($onlyId ? " [tenant #$onlyId]" : ''));
     $log('=========================================');
+
+    // Sync the code feature-registry into the control DB's `features` table
+    // before touching any tenant — low-privilege DML only (see
+    // syncFeatureCatalogue()'s own docblock for why this is safe here and
+    // scripts/setup_control_db.php deliberately is not). Skipped on
+    // --dry-run, matching that flag's "report only, change nothing" contract.
+    if (!$dryRun) {
+        require_once __DIR__ . '/feature_registry.php';
+        $catalogue = syncFeatureCatalogue();
+        if ($catalogue['ran']) {
+            $log("Feature catalogue synced" . ($catalogue['added'] ? " ({$catalogue['added']} new key(s))" : ' (no new keys)') . '.');
+        } else {
+            $log('· Feature catalogue sync skipped: ' . $catalogue['reason']);
+        }
+    }
 
     $summary = runTenantMigrations($onlyId, $dryRun);
 
@@ -262,6 +346,13 @@ if (PHP_SAPI === 'cli' && isset($argv[0]) && realpath($argv[0]) === __FILE__) {
         ? 'Result: COMPLETED WITH FAILURES — see above. Every unaffected tenant still received its migrations.'
         : 'Result: SUCCESS — every tenant is up to date.');
     $log('=========================================');
+
+    if ($anyFailed) {
+        $failedTenants = array_values(array_filter($summary['tenants'], fn($t) => $t['failed'] !== null || $t['error'] !== null));
+        notifySuperadminsOfTenantMigrationFailures($failedTenants);
+        $log('Alert emailed to every superadmin (if platform SMTP is configured — see core/platform_settings.php).');
+        $log('=========================================');
+    }
 
     exit($anyFailed ? 1 : 0);
 }
