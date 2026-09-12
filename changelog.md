@@ -1,5 +1,50 @@
 # BMS Changelog
 
+## 2026-09-12 (feat/finance-module-toggle) - "Finance" is now a superadmin-switchable module
+
+**Request:** "I was thinking to hide or just this 'Finance' to be allowed by superadmin or restricted as
+modules... tell me which sections is very important to remain here in finance as POS cannot work without
+the existence of it." Investigation traced how POS/Sales actually post to the ledger
+(`core/sales_posting.php`'s `postPosSale()`) and cross-checked every Finance page for other modules
+linking into it, before agreeing a final list with the user.
+
+**New `finance` feature** (`core/feature_registry.php`), default ON, covering: Expenses, Revenue/Other
+Income, Budget, Bank Accounts, Cash Register (Finance's own manual-count page — not POS's own
+shift/till, which uses separate `cash_register_shifts`/`cash_register_transactions` tables and is
+unaffected), Petty Cash, Bank Transfers, Reconciliation + Bank Statement (both gated by the one shared
+`bank_reconciliation` page_key — verified in code, not assumed), and Journals.
+
+**Deliberately excluded, stays always-on:** Chart of Accounts (not a hard POS dependency, but hiding a
+tenant's own chart while the always-on statutory reports still show figures grouped by it would be an
+inconsistent experience) and every statutory report (Income Statement, Balance Sheet, Trial Balance, Cash
+Flow, General Ledger, aging/statement/tax/audit/compliance/sales/inventory reports) — already permanently
+ungated per this file's own docblock, untouched by this change. `transactions` (no menu entry point at
+all) also left alone as out of scope.
+
+**Two shared page_keys, OR-gated rather than moved** (found by grepping every `getUrl()` call against
+each Finance page): `expenses` is also owned by `procurement` (`supplier_details.php` links to it
+directly) and `payment_vouchers` is also owned by `projects` (`project_view.php` and its
+financial/budget/progress reports link to it) — each stays reachable from its other integration point
+even with Finance switched off for that tenant, matching the existing `dn`-between-Sales-and-Procurement
+pattern.
+
+**Verified POS is unaffected by design, not just by omission:** `postPosSale()` resolves its cash/bank GL
+account automatically (admin setting → code default → first active leaf) and the whole posting library
+is documented as "best-effort... NEVER throws" — a sale can never fail because of this module's state.
+
+**Tested:** `php -l` clean on both files; live in-process render of `app/dashboard.php` under three
+simulated tenant-feature maps confirmed: (1) Finance off + Procurement/Projects on → all 11 Finance pages
+hidden except Expenses/Payment Vouchers (still reachable) and Chart of Accounts (always-on); (2) Finance
+off + Procurement/Projects also off → Expenses/Payment Vouchers now correctly hidden too, Chart of
+Accounts still present; (3) everything on → all 12 Finance menu links present. `tests/test_feature_registry_cli.php`
+— rewrote the reverse-coverage list (`$documentedAlwaysOn`) to move the 11 keys out and added a new
+Section 14 (16 new assertions: each page blocked with Finance off, the two shared keys' OR-gate proven
+both ways, the always-on base set confirmed unaffected) — 141/142 passing (the 1 failure is the
+pre-existing, previously-documented local-DB-state issue in `setup_control_db.php` testing, confirmed
+unrelated by re-running with this change stashed out). `tests/test_tenant_migration_runner_cli.php`
+(50/50), `tests/test_project_view_render_cli.php` (30/30) and `tests/test_supplier_details_related_tabs_cli.php`
+(84/85, the 1 failure also pre-existing/unrelated, confirmed the same way) all re-run clean.
+
 ## 2026-09-12 (feat/pos-hub-dedupe) - pos_dashboard.php: removed the "Open Terminal"/"Shift History" hub-card duplicates; uniform header-row buttons
 
 **Request:** "there is many buttons but others work or redirect the same way... suggest what to remain

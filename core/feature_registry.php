@@ -240,6 +240,11 @@ if (!function_exists('bmsFeatureRegistry')) {
                     // WHT Credit — those stay ungated too). See
                     // migrations/tenant/2026_09_10_*_permission.php.
                     'purchase_report', 'received_invoices', 'ap_aging', 'vendor_statement', 'wht_report',
+                    // 2026-09-12: 'expenses' is ALSO owned by 'finance' (see
+                    // that entry) — supplier_details.php's own "record
+                    // expense" shortcut must survive Finance being switched
+                    // off for a tenant that still has Procurement on.
+                    'expenses',
                 ],
                 // sub_contractors.php gates ITSELF with canView('suppliers') —
                 // that page's path belongs here, not under 'projects' (see the
@@ -323,7 +328,12 @@ if (!function_exists('bmsFeatureRegistry')) {
                 // now does the finer-grained in-page check via
                 // tenantFeatureEnabled('projects') and hides only the
                 // project-specific sections; see that file's own comment.
-                'page_keys'   => ['projects'],
+                // 2026-09-12: 'payment_vouchers' is ALSO owned by 'finance'
+                // (see that entry) — project_view.php and its financial/
+                // budget/progress reports link to it directly, so it must
+                // survive Finance being switched off for a tenant that
+                // still has Projects on.
+                'page_keys'   => ['projects', 'payment_vouchers'],
                 // sub_contractors.php/sub_contractor_details.php moved OUT of
                 // here — see the 'procurement' entry above. Before this fix, a
                 // tenant with Projects on and Procurement off would pass this
@@ -460,6 +470,71 @@ if (!function_exists('bmsFeatureRegistry')) {
                 'paths'       => [
                     'app/constant/document/compliance_documents.php',
                     'app/constant/reports/compliance_report.php',
+                ],
+            ],
+            // 2026-09-12 (product owner request: "finance to be a module to
+            // switch on or off, superadmin only"). Covers the operational
+            // bookkeeping tools under the header's Finance menu — Chart of
+            // Accounts and every statutory report (Income Statement, Balance
+            // Sheet, Trial Balance, Cash Flow, General Ledger, aging/
+            // statement/tax/audit/compliance/sales/inventory reports) are
+            // DELIBERATELY excluded, per this file's own docblock: a company
+            // must always be able to see its own ledger even with every
+            // optional module off. POS/Sales do not need any page in this
+            // feature to post to the ledger — core/sales_posting.php's
+            // postPosSale() resolves its GL account automatically (admin
+            // setting -> code default -> first active cash/bank leaf) and
+            // is best-effort/never-throws by design, so a sale never fails
+            // because this module is switched off.
+            'finance' => [
+                'label'       => 'Finance',
+                'description' => 'Expenses, Revenue/Other Income, Budget, Bank Accounts, Cash Register, Petty Cash, Bank Transfers, Reconciliation, Bank Statement, Journals and Payment Vouchers. Chart of Accounts and the statutory reports stay available regardless.',
+                'default'     => true,
+                'sort_order'  => 135,
+                'page_keys'   => [
+                    // 'expenses' is ALSO listed under 'procurement' below —
+                    // supplier_details.php links to it directly, so a tenant
+                    // with Procurement on must still reach it even with
+                    // Finance off.
+                    'expenses', 'revenue', 'revenue_categories', 'budget',
+                    'bank_accounts', 'cash_register', 'petty_cash', 'bank_transfers',
+                    // 'bank_reconciliation' gates BOTH the "Reconciliation"
+                    // and "Bank Statement" menu items — both files call
+                    // canView('bank_reconciliation'), not two separate keys.
+                    'bank_reconciliation', 'journals',
+                    // 'payment_vouchers' is ALSO listed under 'projects' below
+                    // — project_view.php and its financial/budget/progress
+                    // reports link to it directly, so a tenant with Projects
+                    // on must still reach it even with Finance off.
+                    'payment_vouchers',
+                ],
+                'paths'       => [
+                    'app/constant/accounts/expenses.php',
+                    'app/constant/accounts/expense_details.php',
+                    'app/constant/accounts/edit_expense.php',
+                    'app/constant/accounts/expense_types.php',
+                    'api/export_expenses.php',
+                    'api/account/export_expenses.php',
+                    'app/constant/accounts/revenue.php',
+                    'app/constant/accounts/revenue_categories.php',
+                    'app/constant/accounts/budget.php',
+                    'app/constant/accounts/budget_details.php',
+                    'app/constant/accounts/bank_accounts.php',
+                    'app/constant/accounts/cash_register.php',
+                    'app/constant/accounts/cash_register_details.php',
+                    'app/constant/accounts/petty_cash.php',
+                    'app/constant/accounts/petty_cash_print.php',
+                    'app/constant/accounts/bank_transfers.php',
+                    'app/constant/accounts/bank_reconciliation.php',
+                    'app/constant/accounts/bank_statement.php',
+                    'app/constant/accounts/reconciliation_details.php',
+                    'app/constant/accounts/journals.php',
+                    'app/constant/accounts/journal_details.php',
+                    'app/constant/accounts/add_journal.php',
+                    'app/constant/accounts/edit_journal.php',
+                    'app/constant/accounts/payment_vouchers.php',
+                    'app/constant/accounts/payment_voucher_details.php',
+                    'app/constant/accounts/payment_voucher_print.php',
                 ],
             ],
         ];
