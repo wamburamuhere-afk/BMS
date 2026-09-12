@@ -62,7 +62,17 @@ $company_logo = getSetting('company_logo', '');
     <div class="row g-3 mb-4">
         <?php foreach ($pos_nav_groups as $navCard): ?>
         <div class="col-6 col-md-4 col-lg">
-            <a href="<?= getUrl($navCard['url']) ?>" class="text-decoration-none">
+            <?php
+            // 2026-09-12 (product owner request): clicking "Restaurant" now
+            // opens a popup listing its 5 destinations instead of navigating
+            // straight to the full restaurant/index.php sub-hub page — the
+            // page itself is still exactly where each option lands once
+            // picked from the popup.
+            $isRestaurantCard = $navCard['key'] === 'restaurant';
+            ?>
+            <a href="<?= $isRestaurantCard ? '#' : getUrl($navCard['url']) ?>"
+               class="text-decoration-none"
+               <?= $isRestaurantCard ? 'data-bs-toggle="modal" data-bs-target="#restaurantSubHubModal"' : '' ?>>
                 <div class="card border-0 shadow-sm h-100 p-3 pos-hub-card">
                     <div class="d-flex align-items-center gap-3">
                         <div class="fs-3 text-white">
@@ -78,6 +88,38 @@ $company_logo = getSetting('company_logo', '');
         </div>
         <?php endforeach; ?>
     </div>
+
+    <?php if (canView('restaurant_pos')): ?>
+    <!-- Restaurant popup — same 5 destinations restaurant/index.php shows,
+         via the shared restaurantSubHubCards() so the two never drift apart. -->
+    <div class="modal fade" id="restaurantSubHubModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-shop-window text-primary me-2"></i><?= t('Restaurant') ?></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body pt-2">
+                    <div class="row g-3">
+                        <?php foreach (restaurantSubHubCards() as $subCard): ?>
+                        <div class="col-6 col-md-4">
+                            <a href="<?= getUrl($subCard['url']) ?>" class="text-decoration-none">
+                                <div class="card border-0 shadow-sm h-100 p-3 pos-hub-card">
+                                    <div class="text-center">
+                                        <div class="fs-2 text-white mb-2"><i class="bi <?= safe_output($subCard['icon']) ?>"></i></div>
+                                        <div class="fw-bold text-white"><?= safe_output($subCard['label']) ?></div>
+                                        <div class="small text-white-50"><?= safe_output($subCard['description']) ?></div>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
     <style>
         /* Every hub card shares the same blue treatment and the same size,
            regardless of how many cards a tenant's entitlements produce. */

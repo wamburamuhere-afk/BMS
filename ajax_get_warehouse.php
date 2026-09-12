@@ -148,7 +148,20 @@ try {
             </div>
         </div>
     </div>
-    
+
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <label for="edit_pos_mode" class="form-label">POS Mode</label>
+            <?php $pos_mode = $warehouse['pos_mode'] ?? 'retail'; ?>
+            <select class="form-select" id="edit_pos_mode" name="pos_mode">
+                <option value="retail" <?= $pos_mode === 'retail' ? 'selected' : '' ?>>Retail</option>
+                <option value="restaurant" <?= $pos_mode === 'restaurant' ? 'selected' : '' ?>>Restaurant</option>
+                <option value="hybrid" <?= $pos_mode === 'hybrid' ? 'selected' : '' ?>>Hybrid (Retail + Restaurant)</option>
+            </select>
+            <small class="text-muted">Restaurant/Hybrid unlocks Floors &amp; Tables, Kitchen Display, Reservations for this warehouse in POS.</small>
+        </div>
+    </div>
+
     <div class="mb-3">
         <label for="edit_notes" class="form-label">Notes</label>
         <textarea class="form-control" id="edit_notes" name="notes" rows="3"><?= htmlspecialchars($warehouse['notes'] ?? '') ?></textarea>

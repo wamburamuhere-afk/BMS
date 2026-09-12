@@ -68,3 +68,28 @@ if (!function_exists('posNavGroups')) {
         return $groups;
     }
 }
+
+if (!function_exists('restaurantSubHubCards')) {
+    /**
+     * The Restaurant sub-hub's 5 destination cards — the single source shared
+     * by app/bms/restaurant/index.php (the full-page sub-hub) and
+     * pos_dashboard.php's "Restaurant" popup (2026-09-12: clicking the hub's
+     * Restaurant card now opens this list in a modal instead of navigating
+     * away to a full page first, matching the product owner's "professional
+     * popup, then land on the specific page" request). Not gated here —
+     * both callers only ever show this list after their own
+     * canView('restaurant_pos') check already passed.
+     *
+     * @return array<int, array{icon:string, label:string, description:string, url:string}>
+     */
+    function restaurantSubHubCards(): array
+    {
+        return [
+            ['icon' => 'bi-diagram-3',      'label' => t('Floors & Tables'), 'description' => t('Define dining floors and their tables.'), 'url' => 'restaurant/floors'],
+            ['icon' => 'bi-egg-fried',      'label' => t('Kitchen Display'), 'description' => t('Live kitchen queue — advance tickets as they cook.'), 'url' => 'restaurant/kitchen-dashboard'],
+            ['icon' => 'bi-list-check',     'label' => t('Modifier Group'),  'description' => t('Add-on/option groups linked to menu items.'), 'url' => 'restaurant/modifier-group'],
+            ['icon' => 'bi-calendar-check', 'label' => t('Reservations'),    'description' => t('Book and manage table reservations.'), 'url' => 'restaurant/reservations'],
+            ['icon' => 'bi-tags',           'label' => t('Menu Type'),       'description' => t('Categorize menu items (uses the shared product categories).'), 'url' => 'restaurant/menu-type'],
+        ];
+    }
+}
