@@ -1717,8 +1717,12 @@ $(document).keydown(function(e) {
         flex: 0 0 100%;
         max-width: 100%;
     }
-    
-    .dropdown-menu {
+
+    /* Scoped to #tableView (the row-actions ⋮ menu's real container) — this
+       used to be a bare .dropdown-menu selector, which also caught the
+       shared header nav's own dropdowns and repositioned them as a fixed
+       bottom sheet instead of their normal inline placement. */
+    #tableView .dropdown-menu {
         position: fixed !important;
         top: auto !important;
         left: 50% !important;
@@ -1790,17 +1794,22 @@ $(document).keydown(function(e) {
     }
 
     /* Row-actions dropdown (⋮ menu) — explicit colors, never left to
-       inherit/default. */
-    .dropdown-menu {
+       inherit/default. Scoped to #tableView only (the row-actions menu's
+       real container): the earlier unscoped .dropdown-menu/.dropdown-item
+       rule matched EVERY dropdown on the page, including the shared header
+       nav's own Core/Finance/Sales/Inventory menu — turning its intentional
+       blue background white and washing out its contrast site-wide,
+       exactly on this page, whenever the mobile nav was opened. */
+    #tableView .dropdown-menu {
         background: #ffffff !important;
     }
-    .dropdown-item {
+    #tableView .dropdown-item {
         background: transparent !important;
         color: #212529 !important;
     }
-    .dropdown-item:hover,
-    .dropdown-item:focus,
-    .dropdown-item:active {
+    #tableView .dropdown-item:hover,
+    #tableView .dropdown-item:focus,
+    #tableView .dropdown-item:active {
         background: #f1f5f9 !important;
         color: #0d6efd !important;
     }
