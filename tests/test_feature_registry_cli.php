@@ -95,9 +95,20 @@ $documentedAlwaysOn = [
     // separate concern from the general Document Library, and was not part
     // of this request.
     'loan_documents',
-    'bank_accounts', 'bank_reconciliation', 'bank_transfers', 'budget', 'cash_register', 'chart_of_accounts',
-    'expenses', 'journals', 'loans', 'payment_create', 'payment_vouchers', 'petty_cash',
-    'revenue', 'revenue_categories', 'transactions',
+    // 2026-09-12: 'bank_accounts'/'bank_reconciliation'/'bank_transfers'/
+    // 'budget'/'cash_register'/'expenses'/'journals'/'payment_vouchers'/
+    // 'petty_cash'/'revenue'/'revenue_categories' moved OUT of always-on into
+    // the new 'finance' feature (product owner request: "finance to be a
+    // module to switch on or off") — same class of gap as CRM/Communication/
+    // Compliance/Documents before it, not a bug fix. 'chart_of_accounts' and
+    // 'transactions' deliberately stay here — Chart of Accounts must remain
+    // visible alongside the always-on statutory reports it feeds, and
+    // 'transactions' has no menu entry point at all (out of scope for this
+    // request). 'expenses' and 'payment_vouchers' are ALSO listed under
+    // 'procurement'/'projects' respectively (see core/feature_registry.php)
+    // — an OR-gate, not a plain move — so each stays reachable from its
+    // other integration point even with Finance off.
+    'loans', 'payment_create', 'chart_of_accounts', 'transactions',
     'categories', 'inventory_valuation', 'stock_adjustments',
     'products',
     'audit_report', 'balance_sheet', 'cash_flow',
@@ -157,7 +168,7 @@ ok('every documented always-on key is actually still live and ungated'
 // ─────────────────────────────────────────────────────────────────────────────
 section('2. The always-on base set is not gateable');
 
-foreach (['dashboard', 'customers', 'products', 'expenses', 'chart_of_accounts',
+foreach (['dashboard', 'customers', 'products', 'chart_of_accounts',
           'trial_balance', 'balance_sheet', 'users', 'user_roles', 'system_settings'] as $baseKey) {
     ok("base page_key '$baseKey' belongs to no feature", featureForPageKey($baseKey) === []);
 }
@@ -494,6 +505,47 @@ try {
     ok("canView('email_templates') is true again once 'communication' is re-enabled", canView('email_templates') === true);
 } finally {
     $GLOBALS['__bms_features'] = $prevFeatures2;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+section("14. 'finance' actually gates its pages live, and its two shared keys use OR");
+// Product owner request, 2026-09-12: "finance to be a module to switch on or
+// off, superadmin only". Chart of Accounts and the statutory reports must
+// stay reachable regardless (per this file's own docblock); 'expenses' and
+// 'payment_vouchers' are shared with 'procurement'/'projects' respectively,
+// so each must survive Finance being off as long as its OTHER owner is on.
+$prevFeatures3 = $GLOBALS['__bms_features'] ?? null;
+try {
+    $GLOBALS['__bms_features'] = array_fill_keys(allFeatureKeys(), true);
+    $GLOBALS['__bms_features']['finance'] = false;
+
+    foreach ([
+        'bank_accounts', 'cash_register', 'petty_cash', 'bank_transfers',
+        'bank_reconciliation', 'journals', 'revenue', 'revenue_categories', 'budget',
+    ] as $pk) {
+        ok("canView('$pk') is false with 'finance' off (even for this admin session — entitlement checked before the admin bypass)", canView($pk) === false);
+    }
+
+    // 'expenses' and 'payment_vouchers' are shared — off with BOTH owners off...
+    $GLOBALS['__bms_features']['procurement'] = false;
+    $GLOBALS['__bms_features']['projects'] = false;
+    ok("canView('expenses') is false with 'finance' AND 'procurement' both off", canView('expenses') === false);
+    ok("canView('payment_vouchers') is false with 'finance' AND 'projects' both off", canView('payment_vouchers') === false);
+
+    // ...but reachable the moment their OTHER owner is on, Finance still off.
+    $GLOBALS['__bms_features']['procurement'] = true;
+    ok("canView('expenses') is true with 'finance' off but 'procurement' on (supplier_details.php's shortcut survives)", canView('expenses') === true);
+    $GLOBALS['__bms_features']['projects'] = true;
+    ok("canView('payment_vouchers') is true with 'finance' off but 'projects' on (project_view.php's link survives)", canView('payment_vouchers') === true);
+
+    // The always-on base set must be completely unaffected.
+    ok("canView('chart_of_accounts') stays TRUE — deliberately excluded from 'finance'", canView('chart_of_accounts') === true);
+    ok("canView('trial_balance') stays TRUE — a statutory report, never gateable", canView('trial_balance') === true);
+
+    $GLOBALS['__bms_features']['finance'] = true;
+    ok("canView('bank_accounts') is true again once 'finance' is re-enabled", canView('bank_accounts') === true);
+} finally {
+    $GLOBALS['__bms_features'] = $prevFeatures3;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
