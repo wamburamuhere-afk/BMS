@@ -1,5 +1,33 @@
 # BMS Changelog
 
+## 2026-09-12 (feat/warehouse-mobile-responsive) - warehouses.php + warehouse_view.php no longer scroll left/right on mobile
+
+**Request:** "in warehouse.php and in warehouse > view details... page is not friendly in mobile just
+page moves left and right... in desktop view is perfectly designed just improve in mobile view only."
+
+**Root cause (both pages):** each page's "Actions Bar"/"Actions Row" — a `d-flex justify-content-between`
+row holding a `.btn-group` (Print/Export on the list page; Copy/Excel/Print on the detail page) plus a
+"Show: N" length selector, and on the detail page ALSO a fixed `width: 250px` search box on the right —
+never wrapped. Its total content width comfortably exceeds any phone viewport, so on mobile the whole
+row (and with it the page) had to scroll horizontally to reveal the rest of it. Everything else on both
+pages (stat cards, filter form, sidebar info cards) already stacks correctly via Bootstrap's default
+grid — confirmed via live render, matching the user's own screenshot, which showed those sections
+rendering fine.
+
+**Fix (`max-width: 767.98px` only, desktop untouched):** added `id="warehousesActionsBar"` /
+`id="warehouseViewActionsRow"` to the two Actions bars and let them `flex-wrap` and stack their children
+full-width instead of forcing one line; dropped the detail page's fixed 250px search box to 100% width
+on mobile via a new `.warehouse-search-box` hook; added `overflow-x: hidden` on `body`/`.container-fluid`
+as a safety net against any other stray overflow. The data tables themselves keep their own
+`.table-responsive` inner scrollbar, unchanged — that is the correct, expected way to browse a wide
+table on a narrow screen, not the page-level scroll being fixed here.
+
+**Tested:** `php -l` clean on both files; live in-process render of both pages (admin session, a real
+warehouse id) confirmed no PHP warnings/notices and all new CSS hook markers present in the output HTML.
+`tests/test_warehouse_scope_cli.php` re-run: 162/163 (the 1 failure is the pre-existing, previously
+documented `pending_approval` enum mismatch in `app/dashboard.php`, untouched by this change — confirmed
+via `git diff --stat` showing only the two warehouse files touched).
+
 ## 2026-09-12 (feat/pos-cart-mobile-fix) - pos.php: Current Sale header buttons + cart line items no longer overflow on mobile
 
 **Request:** screenshot showed the "Current Sale" panel's header action buttons (Discount %, Clear Cart,
