@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-09-12 (feat/dashboard-warehouse-card) - dashboard.php: new "Total Warehouses" card, naming the single highest-value warehouse
+
+**Request:** "I expect either to have another card which shows number of warehouse, and the highest value
+for a specific warehouse by mention it... after click it should direct to that specific warehouse."
+Stacked on top of the not-yet-merged `feat/dashboard-clickable-cards` PR.
+
+**Design (proposed and confirmed):** a 5th Statistics Card, `bg-dark` (the four existing cards already use
+primary/success/warning/info, so dark keeps this one visually distinct while staying neutral/professional
+for what is an infrastructure metric, not a financial one). Big number = total warehouse count; secondary
+line names the single highest-value warehouse directly (e.g. "Main Warehouse — TSh 390,142,000 (highest
+value)"). The whole card links straight to THAT warehouse's own `warehouse_view.php` — not the general
+warehouses list — since the point is being aware of exactly which warehouse holds the most value.
+
+**Implementation:** new `get_business_stats()` block (`3b. Warehouses`) computing the count and the
+top-value warehouse using the IDENTICAL stock-value formula `warehouses.php`'s own list already uses
+(`SUM(stock_quantity * cost_price)`), so the card's figure always matches what the warehouse's own page
+shows after the click-through. Applies the same `scopeFilterSqlNullable('warehouse', 'w')` scope as
+`warehouses.php`'s own "Total Warehouses" stat, so a warehouse-restricted user sees the same count/winner
+they'd see on that page.
+
+**Bug caught during testing, fixed before shipping:** the first draft counted/ranked ALL warehouses
+including soft-deleted ones (matching `warehouses.php`'s own count, which also doesn't filter status) —
+but `warehouse_view.php` itself explicitly refuses a deleted `warehouse_id`, so a deleted warehouse
+winning the "highest value" ranking would have made the card link to a dead page. Both queries here now
+exclude `status = 'deleted'`, deliberately diverging from `warehouses.php`'s own (unfiltered) count for
+this reason.
+
+**Tested:** `php -l` clean; live in-process render confirmed no PHP warnings, the correct `bg-dark` card
+markup, and a real (non-deleted) warehouse winning the ranking after the fix. Directly rendered
+`warehouse_view.php?id=<winner>` in-process to confirm the click-through actually resolves (not a dead
+link) — rendered successfully, correct warehouse name present. `tests/test_dashboard_time_range_cli.php`
+(16/16) and `tests/test_warehouse_scope_cli.php` (162/163, the 1 failure being the pre-existing,
+previously documented `pending_approval` enum issue, unrelated) both re-run clean.
+
 ## 2026-09-12 (feat/dashboard-clickable-cards) - dashboard.php's 4 Statistics Cards are now clickable, each to the exact data behind its number
 
 **Request:** advance `dashboard.php`'s static stat cards — referenced a Loan Management System's richer card style
