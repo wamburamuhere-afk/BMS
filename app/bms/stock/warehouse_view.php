@@ -356,8 +356,8 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                 </div>
                 <div class="card-body">
                     <!-- Actions Row -->
-                    <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
-                        <div class="d-flex align-items-center gap-3">
+                    <div id="warehouseViewActionsRow" class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+                        <div class="d-flex align-items-center gap-3 flex-wrap">
                             <div class="btn-group dropdown shadow-sm" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                                 <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="copyTable()" style="background: #fff; color: #444;">
                                     <i class="bi bi-clipboard text-info me-1"></i> Copy
@@ -383,7 +383,7 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                                 </select>
                             </div>
                         </div>
-                        <div class="d-flex align-items-center">
+                        <div class="d-flex align-items-center warehouse-search-box">
                             <div class="input-group input-group-sm shadow-sm" style="width: 250px;">
                                 <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
                                 <input type="text" id="customSearch" class="form-control border-start-0" placeholder="Search inventory...">
@@ -566,6 +566,35 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
         font-size: 0.56rem !important;
         white-space: nowrap !important;
     }
+}
+
+@media (max-width: 767.98px) {
+    body { overflow-x: hidden; }
+    .container-fluid { overflow-x: hidden; padding-left: 0.75rem; padding-right: 0.75rem; }
+
+    /* Actions Row (Copy/Excel/Print + Show:N on the left, a fixed 250px
+       search box on the right) previously forced onto one un-wrapped flex
+       line — far wider than any phone viewport, dragging the whole page
+       left/right. Let it wrap and stack, and drop the fixed search width. */
+    #warehouseViewActionsRow {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    #warehouseViewActionsRow > div {
+        width: 100%;
+        justify-content: center;
+    }
+    #warehouseViewActionsRow .btn-group .btn {
+        padding-left: 0.6rem !important;
+        padding-right: 0.6rem !important;
+        font-size: 0.8rem;
+    }
+    #warehouseViewActionsRow .warehouse-search-box .input-group {
+        width: 100% !important;
+    }
+
+    .custom-stat-card h4 { font-size: 1.35rem; }
+    .stats-icon { width: 38px; height: 38px; font-size: 1.2rem; margin-right: 0.85rem; }
 }
 </style>
 
