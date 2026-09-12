@@ -61,16 +61,16 @@ $company_logo = getSetting('company_logo', '');
     ?>
     <div class="row g-3 mb-4">
         <?php foreach ($pos_nav_groups as $navCard): ?>
-        <div class="col-6 col-md-<?= $navCard['primary'] ? 4 : 3 ?>">
+        <div class="col-6 col-md-4 col-lg">
             <a href="<?= getUrl($navCard['url']) ?>" class="text-decoration-none">
-                <div class="card border-0 shadow-sm h-100 p-3 pos-hub-card<?= $navCard['primary'] ? ' pos-hub-card-primary' : '' ?>">
+                <div class="card border-0 shadow-sm h-100 p-3 pos-hub-card">
                     <div class="d-flex align-items-center gap-3">
-                        <div class="fs-3 <?= $navCard['primary'] ? 'text-white' : 'text-primary' ?>">
+                        <div class="fs-3 text-white">
                             <i class="bi <?= safe_output($pos_nav_icons[$navCard['key']] ?? 'bi-grid') ?>"></i>
                         </div>
                         <div>
-                            <div class="fw-bold <?= $navCard['primary'] ? 'text-white' : '' ?>"><?= safe_output($navCard['label']) ?></div>
-                            <div class="small <?= $navCard['primary'] ? 'text-white-50' : 'text-muted' ?>"><?= safe_output($navCard['description']) ?></div>
+                            <div class="fw-bold text-white"><?= safe_output($navCard['label']) ?></div>
+                            <div class="small text-white-50"><?= safe_output($navCard['description']) ?></div>
                         </div>
                     </div>
                 </div>
@@ -79,9 +79,25 @@ $company_logo = getSetting('company_logo', '');
         <?php endforeach; ?>
     </div>
     <style>
-        .pos-hub-card { transition: transform .15s ease, box-shadow .15s ease; }
+        /* Every hub card now shares the same blue treatment and the same
+           size — previously only "Open Terminal" was blue/wider (primary)
+           while the rest were plain white cards of a different width,
+           which also meant they never reliably fit one row together. */
+        .pos-hub-card {
+            background: linear-gradient(135deg, #0d6efd, #0b5ed7);
+            transition: transform .15s ease, box-shadow .15s ease;
+        }
         .pos-hub-card:hover { transform: translateY(-2px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.1) !important; }
-        .pos-hub-card-primary { background: linear-gradient(135deg, #0d6efd, #0b5ed7); }
+
+        /* Mobile — smaller text/icons/padding so 2-per-row (col-6) stays
+           comfortable instead of cramped; desktop is untouched by this
+           block (only the row/col changes above apply there). */
+        @media (max-width: 767.98px) {
+            .pos-hub-card { padding: 0.65rem !important; }
+            .pos-hub-card .fs-3 { font-size: 1.3rem !important; }
+            .pos-hub-card .fw-bold { font-size: 0.82rem; }
+            .pos-hub-card .small { font-size: 0.68rem; line-height: 1.25; }
+        }
     </style>
 
     <!-- ═══════════════════════════════════════════════════════════════════
