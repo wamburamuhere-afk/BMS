@@ -151,8 +151,8 @@ $total_adjustments = $total_count;
 
 function get_adjustment_type_badge($type) {
     $b = ['adjustment_in'=>'success','adjustment_out'=>'danger','correction'=>'warning','damaged'=>'dark','expired'=>'secondary','found'=>'info','theft'=>'danger'];
-    $l = ['adjustment_in'=>'Stock In','adjustment_out'=>'Stock Out','correction'=>'Correction','damaged'=>'Damaged','expired'=>'Expired','found'=>'Found','theft'=>'Theft'];
-    return '<span class="badge bg-'.($b[$type]??'secondary').'">'.($l[$type]??$type).'</span>';
+    $l = ['adjustment_in'=>t('Stock In'),'adjustment_out'=>t('Stock Out'),'correction'=>t('Correction'),'damaged'=>t('Damaged'),'expired'=>t('Expired'),'found'=>t('Found'),'theft'=>t('Theft')];
+    return '<span class="badge bg-'.($b[$type]??'secondary').'">'.htmlspecialchars($l[$type]??$type).'</span>';
 }
 
 function get_pagination_url($page) {
@@ -166,8 +166,8 @@ function get_pagination_url($page) {
     <!-- ===== PRINT HEADER ===== -->
     <div class="d-none d-print-block text-center mb-3">
        
-        <h2 style="color:#495057;font-weight:600;text-transform:uppercase;margin:6px 0 2px;font-size:13pt;letter-spacing:2px;">STOCK ADJUSTMENTS</h2>
-        <p style="color:#444;margin:0;font-size:8pt;font-weight:600;text-transform:uppercase;">Generated At: <?= date('d M Y, H:i') ?></p>
+        <h2 style="color:#495057;font-weight:600;text-transform:uppercase;margin:6px 0 2px;font-size:13pt;letter-spacing:2px;"><?= mb_strtoupper(t('Stock Adjustments')) ?></h2>
+        <p style="color:#444;margin:0;font-size:8pt;font-weight:600;text-transform:uppercase;"><?= t('Generated At:') ?> <?= date('d M Y, H:i') ?></p>
         <div style="border-bottom:3px solid #0d6efd;margin-top:10px;margin-bottom:18px;"></div>
     </div>
 
@@ -175,10 +175,10 @@ function get_pagination_url($page) {
     <div class="d-none d-print-block mb-3">
         <div class="row g-2">
             <?php foreach([
-                ['Total Adjustments', $total_adjustments],
-                ['Stock In (Qty)',    number_format($total_quantity_in,2)],
-                ['Stock Out (Qty)',   number_format($total_quantity_out,2)],
-                ['Net Value Change',  format_currency($net_value_change)]
+                [t('Total Adjustments'), $total_adjustments],
+                [t('Stock In (Qty)'),    number_format($total_quantity_in,2)],
+                [t('Stock Out (Qty)'),   number_format($total_quantity_out,2)],
+                [t('Net Value Change'),  format_currency($net_value_change)]
             ] as $sc): ?>
             <div class="col" style="flex:1 0 0%;">
                 <div style="border:1px solid #dee2e6;padding:8px;text-align:center;">
@@ -197,35 +197,35 @@ function get_pagination_url($page) {
             <strong><?= safe_output($print_user) ?> - <?= safe_output($print_role) ?></strong>
             on <strong><?= $print_date ?></strong>
         </p>
-        <p class="mb-0 fw-bold text-primary" style="font-size:9pt;letter-spacing:0.5px;">Powered By BJP Technologies &copy; 2026</p>
+        <p class="mb-0 fw-bold text-primary" style="font-size:9pt;letter-spacing:0.5px;"><?= str_replace('%d', date('Y'), t('Powered by BJP Technologies © %d, All Rights Reserved.')) ?></p>
     </div>
 
     <!-- ===== BREADCRUMB ===== -->
     <nav aria-label="breadcrumb" class="mb-3 d-print-none">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
-            <li class="breadcrumb-item"><a href="<?= getUrl('products') ?>">Inventory</a></li>
-            <li class="breadcrumb-item active">Stock Adjustments</li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
+            <li class="breadcrumb-item"><a href="<?= getUrl('products') ?>"><?= t('Inventory') ?></a></li>
+            <li class="breadcrumb-item active"><?= t('Stock Adjustments') ?></li>
         </ol>
     </nav>
 
     <!-- ===== PAGE HEADER ===== -->
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-4 d-print-none">
         <div>
-            <h2 class="fw-bold mb-1"><i class="bi bi-arrow-left-right text-primary me-2"></i>Stock Adjustments</h2>
-            <p class="text-muted mb-0 small">Manage stock adjustments, corrections and losses</p>
+            <h2 class="fw-bold mb-1"><i class="bi bi-arrow-left-right text-primary me-2"></i><?= t('Stock Adjustments') ?></h2>
+            <p class="text-muted mb-0 small"><?= t('Manage stock adjustments, corrections and losses') ?></p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <?php if ($project_id_filter > 0): ?>
             <a href="<?= getUrl('project_view?id='.$project_id_filter) ?>" class="btn btn-outline-primary btn-sm">
-                <i class="bi bi-arrow-left me-1"></i> Back to Project
+                <i class="bi bi-arrow-left me-1"></i> <?= t('Back to Project') ?>
             </a>
             <?php endif; ?>
             <button type="button" class="btn btn-primary btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#newAdjustmentModal">
-                <i class="bi bi-plus-circle me-1"></i> New Adjustment
+                <i class="bi bi-plus-circle me-1"></i> <?= t('New Adjustment') ?>
             </button>
             <button type="button" class="btn btn-outline-info btn-sm" onclick="bulkAdjustment()">
-                <i class="bi bi-upload me-1"></i> Bulk Upload
+                <i class="bi bi-upload me-1"></i> <?= t('Bulk Upload') ?>
             </button>
         </div>
     </div>
@@ -257,45 +257,45 @@ function get_pagination_url($page) {
     <!-- ===== FILTERS ===== -->
     <div class="card shadow-sm border-0 mb-4 d-print-none">
         <div class="card-header bg-white py-3">
-            <h6 class="mb-0 fw-bold"><i class="bi bi-funnel text-primary me-2"></i>Filters &amp; Parameters</h6>
+            <h6 class="mb-0 fw-bold"><i class="bi bi-funnel text-primary me-2"></i><?= t('Filters & Parameters') ?></h6>
         </div>
         <div class="card-body">
             <form method="GET" action="" class="row g-3">
                 <div class="col-12 col-sm-6 col-md-3">
-                    <label class="form-label small fw-bold">Search</label>
-                    <input type="text" class="form-control form-control-sm" name="search" value="<?= safe_output($search) ?>" placeholder="Ref #, SKU or Notes">
+                    <label class="form-label small fw-bold"><?= t('Search') ?></label>
+                    <input type="text" class="form-control form-control-sm" name="search" value="<?= safe_output($search) ?>" placeholder="<?= t('Ref #, SKU or Notes') ?>">
                 </div>
                 <div class="col-12 col-sm-6 col-md-2">
-                    <label class="form-label small fw-bold">Warehouse</label>
+                    <label class="form-label small fw-bold"><?= t('Warehouse') ?></label>
                     <select class="form-select form-select-sm" name="warehouse_id">
-                        <option value="">All Warehouses</option>
+                        <option value=""><?= t('All Warehouses') ?></option>
                         <?php foreach ($warehouses as $w): ?>
                         <option value="<?= $w['warehouse_id'] ?>" <?= $warehouse_id==$w['warehouse_id']?'selected':'' ?>><?= safe_output($w['warehouse_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-12 col-sm-6 col-md-2">
-                    <label class="form-label small fw-bold">Type</label>
+                    <label class="form-label small fw-bold"><?= t('Type') ?></label>
                     <select class="form-select form-select-sm" name="adjustment_type">
-                        <option value="">All Types</option>
+                        <option value=""><?= t('All Types') ?></option>
                         <?php foreach ($adjustment_types as $val => $lbl): ?>
-                        <option value="<?= $val ?>" <?= $adjustment_type==$val?'selected':'' ?>><?= $lbl ?></option>
+                        <option value="<?= $val ?>" <?= $adjustment_type==$val?'selected':'' ?>><?= t($lbl) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-6 col-sm-3 col-md-2">
-                    <label class="form-label small fw-bold">From</label>
+                    <label class="form-label small fw-bold"><?= t('From') ?></label>
                     <input type="date" class="form-control form-control-sm" name="date_from" value="<?= $date_from ?>">
                 </div>
                 <div class="col-6 col-sm-3 col-md-2">
-                    <label class="form-label small fw-bold">To</label>
+                    <label class="form-label small fw-bold"><?= t('To') ?></label>
                     <input type="date" class="form-control form-control-sm" name="date_to" value="<?= $date_to ?>">
                 </div>
                 <?php if ($enable_projects): ?>
                 <div class="col-12 col-sm-6 col-md-3">
-                    <label class="form-label small fw-bold">Project</label>
+                    <label class="form-label small fw-bold"><?= t('Project') ?></label>
                     <select class="form-select form-select-sm" name="project_id">
-                        <option value="">All Projects</option>
+                        <option value=""><?= t('All Projects') ?></option>
                         <?php foreach ($projects as $p): ?>
                         <option value="<?= $p['project_id'] ?>" <?= $project_id_filter==$p['project_id']?'selected':'' ?>><?= safe_output($p['project_name']) ?></option>
                         <?php endforeach; ?>
@@ -303,8 +303,8 @@ function get_pagination_url($page) {
                 </div>
                 <?php endif; ?>
                 <div class="col-12 d-flex justify-content-end gap-2">
-                    <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold"><i class="bi bi-filter me-1"></i> Apply</button>
-                    <a href="<?= getUrl('stock_adjustments') ?>" class="btn btn-outline-secondary btn-sm px-4"><i class="bi bi-arrow-clockwise me-1"></i> Reset</a>
+                    <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold"><i class="bi bi-filter me-1"></i> <?= t('Apply') ?></button>
+                    <a href="<?= getUrl('stock_adjustments') ?>" class="btn btn-outline-secondary btn-sm px-4"><i class="bi bi-arrow-clockwise me-1"></i> <?= t('Reset') ?></a>
                 </div>
             </form>
         </div>
@@ -313,21 +313,21 @@ function get_pagination_url($page) {
     <!-- ===== TOOLBAR ===== -->
     <div class="mb-3 d-print-none">
         <span class="badge bg-white text-dark border px-3 py-2 fs-6 rounded-2 shadow-sm">
-            <i class="bi bi-arrow-left-right text-success me-1"></i> Stock Adjustment Records
+            <i class="bi bi-arrow-left-right text-success me-1"></i> <?= t('Stock Adjustment Records') ?>
         </span>
     </div>
     <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
         <div class="btn-group shadow-sm" style="border:1px solid #dee2e6;border-radius:8px;overflow:hidden;">
             <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="copyTable()" style="background:#fff;color:#444;">
-                <i class="bi bi-clipboard text-info me-1"></i> Copy
+                <i class="bi bi-clipboard text-info me-1"></i> <?= t('Copy') ?>
             </button>
             <div style="width:1px;background:#eee;height:24px;margin-top:6px;"></div>
             <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="exportAdjustments()" style="background:#fff;color:#444;">
-                <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> Excel
+                <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> <?= t('Excel') ?>
             </button>
             <div style="width:1px;background:#eee;height:24px;margin-top:6px;"></div>
             <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="window.print()" style="background:#fff;color:#444;">
-                <i class="bi bi-printer text-primary me-1"></i> Print
+                <i class="bi bi-printer text-primary me-1"></i> <?= t('Print') ?>
             </button>
         </div>
     </div>
@@ -340,15 +340,15 @@ function get_pagination_url($page) {
                 <table class="table table-hover align-middle mb-0" id="adjustmentsTable">
                     <thead class="bg-light text-uppercase small fw-bold">
                         <tr>
-                            <th class="ps-3" style="width:45px;">S/NO</th>
-                            <th>Date &amp; Time</th>
-                            <th>Product Details</th>
-                            <th>Warehouse</th>
-                            <?php if ($enable_projects): ?><th>Project</th><?php endif; ?>
-                            <th>Adjustment</th>
-                            <th class="text-end">Value</th>
-                            <th>Reason</th>
-                            <th class="text-center d-print-none" style="width:60px;">Actions</th>
+                            <th class="ps-3" style="width:45px;"><?= t('S/NO') ?></th>
+                            <th><?= t('Date & Time') ?></th>
+                            <th><?= t('Product Details') ?></th>
+                            <th><?= t('Warehouse') ?></th>
+                            <?php if ($enable_projects): ?><th><?= t('Project') ?></th><?php endif; ?>
+                            <th><?= t('Adjustment') ?></th>
+                            <th class="text-end"><?= t('Value') ?></th>
+                            <th><?= t('Reason') ?></th>
+                            <th class="text-center d-print-none" style="width:60px;"><?= t('Actions') ?></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -361,7 +361,7 @@ function get_pagination_url($page) {
                             <td>
                                 <div class="fw-bold small"><?= format_date($adjustment['created_at']) ?></div>
                                 <?php if (!empty($adjustment['reference_number'])): ?>
-                                <small class="text-muted">Ref: <?= safe_output($adjustment['reference_number']) ?></small>
+                                <small class="text-muted"><?= t('Ref:') ?> <?= safe_output($adjustment['reference_number']) ?></small>
                                 <?php endif; ?>
                             </td>
                             <td>
@@ -371,7 +371,7 @@ function get_pagination_url($page) {
                             <td>
                                 <div class="fw-bold small"><?= safe_output($adjustment['warehouse_name']) ?></div>
                                 <?php if (!empty($adjustment['location_name'])): ?>
-                                <small class="text-muted">Loc: <?= safe_output($adjustment['location_name']) ?></small>
+                                <small class="text-muted"><?= t('Loc:') ?> <?= safe_output($adjustment['location_name']) ?></small>
                                 <?php endif; ?>
                             </td>
                             <?php if ($enable_projects): ?>
@@ -379,7 +379,7 @@ function get_pagination_url($page) {
                                 <?php if (!empty($adjustment['project_name'])): ?>
                                 <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 small"><?= safe_output($adjustment['project_name']) ?></span>
                                 <?php else: ?>
-                                <span class="text-muted small">N/A</span>
+                                <span class="text-muted small"><?= t('N/A') ?></span>
                                 <?php endif; ?>
                             </td>
                             <?php endif; ?>
@@ -400,12 +400,12 @@ function get_pagination_url($page) {
                                         <i class="bi bi-gear"></i>
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0" style="border-radius:10px;padding:.4rem;">
-                                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAdjustmentDetails(<?= $adjustment['movement_id'] ?>)"><i class="bi bi-eye text-primary me-2"></i> View</a></li>
-                                        <li><a class="dropdown-item py-2" href="?edit=<?= $adjustment['movement_id'] ?>"><i class="bi bi-pencil text-warning me-2"></i> Edit</a></li>
-                                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printAdjustment(<?= $adjustment['movement_id'] ?>)"><i class="bi bi-printer text-secondary me-2"></i> Print</a></li>
+                                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="viewAdjustmentDetails(<?= $adjustment['movement_id'] ?>)"><i class="bi bi-eye text-primary me-2"></i> <?= t('View') ?></a></li>
+                                        <li><a class="dropdown-item py-2" href="?edit=<?= $adjustment['movement_id'] ?>"><i class="bi bi-pencil text-warning me-2"></i> <?= t('Edit') ?></a></li>
+                                        <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printAdjustment(<?= $adjustment['movement_id'] ?>)"><i class="bi bi-printer text-secondary me-2"></i> <?= t('Print') ?></a></li>
                                         <?php if (isAdmin()): ?>
                                         <li><hr class="dropdown-divider"></li>
-                                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteAdjustment(<?= $adjustment['movement_id'] ?>)"><i class="bi bi-trash me-2"></i> Delete</a></li>
+                                        <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteAdjustment(<?= $adjustment['movement_id'] ?>)"><i class="bi bi-trash me-2"></i> <?= t('Delete') ?></a></li>
                                         <?php endif; ?>
                                     </ul>
                                 </div>
@@ -436,10 +436,10 @@ function get_pagination_url($page) {
                 <div class="col-md-6 mb-3">
                     <div class="card border-0 bg-light">
                         <div class="card-body p-3">
-                            <h6 class="fw-bold mb-2">Adjustment Summary</h6>
+                            <h6 class="fw-bold mb-2"><?= t('Adjustment Summary') ?></h6>
                             <div class="table-responsive">
                                 <table class="table table-sm mb-0">
-                                    <thead><tr><th>Type</th><th>Count</th><th>Qty</th><th>Value</th></tr></thead>
+                                    <thead><tr><th><?= t('Type') ?></th><th><?= t('Count') ?></th><th><?= t('Qty') ?></th><th><?= t('Value') ?></th></tr></thead>
                                     <tbody>
                                         <?php
                                         $tt = [];
@@ -469,11 +469,11 @@ function get_pagination_url($page) {
                 <div class="col-md-6 mb-3">
                     <div class="card border-0 bg-light">
                         <div class="card-body p-3">
-                            <h6 class="fw-bold mb-2">Quick Actions</h6>
+                            <h6 class="fw-bold mb-2"><?= t('Quick Actions') ?></h6>
                             <div class="d-grid gap-2">
-                                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newAdjustmentModal"><i class="bi bi-plus-circle me-1"></i> New Adjustment</button>
-                                <button type="button" class="btn btn-success btn-sm" onclick="exportAdjustments()"><i class="bi bi-download me-1"></i> Export to Excel</button>
-                                <button type="button" class="btn btn-info btn-sm" onclick="bulkAdjustment()"><i class="bi bi-upload me-1"></i> Bulk Adjustment</button>
+                                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newAdjustmentModal"><i class="bi bi-plus-circle me-1"></i> <?= t('New Adjustment') ?></button>
+                                <button type="button" class="btn btn-success btn-sm" onclick="exportAdjustments()"><i class="bi bi-download me-1"></i> <?= t('Export to Excel') ?></button>
+                                <button type="button" class="btn btn-info btn-sm" onclick="bulkAdjustment()"><i class="bi bi-upload me-1"></i> <?= t('Bulk Adjustment') ?></button>
                             </div>
                         </div>
                     </div>
@@ -483,10 +483,10 @@ function get_pagination_url($page) {
             <?php else: ?>
             <div class="text-center py-5">
                 <i class="bi bi-arrow-left-right" style="font-size:3rem;color:#6c757d;"></i>
-                <h5 class="mt-3 text-muted">No Stock Adjustments Found</h5>
-                <p class="text-muted small">No adjustments match your filter criteria.</p>
+                <h5 class="mt-3 text-muted"><?= t('No Stock Adjustments Found') ?></h5>
+                <p class="text-muted small"><?= t('No adjustments match your filter criteria.') ?></p>
                 <button type="button" class="btn btn-primary btn-sm mt-2" data-bs-toggle="modal" data-bs-target="#newAdjustmentModal">
-                    <i class="bi bi-plus-circle me-1"></i> Make Your First Adjustment
+                    <i class="bi bi-plus-circle me-1"></i> <?= t('Make Your First Adjustment') ?>
                 </button>
             </div>
             <?php endif; ?>
@@ -501,7 +501,7 @@ function get_pagination_url($page) {
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="newAdjustmentModalLabel"><i class="bi bi-plus-circle me-1"></i> New Stock Adjustment</h5>
+                <h5 class="modal-title" id="newAdjustmentModalLabel"><i class="bi bi-plus-circle me-1"></i> <?= t('New Stock Adjustment') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -511,10 +511,10 @@ function get_pagination_url($page) {
                         <!-- 1. PROJECT (optional) -->
                         <?php if ($enable_projects): ?>
                         <div class="col-md-6 mb-3" <?= ($project_id_filter > 0) ? 'style="display:none;"' : '' ?>>
-                            <label class="form-label fw-semibold">Project <span class="text-muted small">(Optional)</span></label>
+                            <label class="form-label fw-semibold"><?= t('Project') ?> <span class="text-muted small">(<?= t('Optional') ?>)</span></label>
                             <select class="form-select" id="adjustment_project_id" name="project_id"
                                 onchange="filterAdjustmentWarehouses(this.value)">
-                                <option value="">-- No Project --</option>
+                                <option value=""><?= t('-- No Project --') ?></option>
                                 <?php foreach ($projects as $p): ?>
                                 <option value="<?= $p['project_id'] ?>"
                                     <?= ($p['project_id'] == $project_id_filter) ? 'selected' : '' ?>>
@@ -522,24 +522,24 @@ function get_pagination_url($page) {
                                 </option>
                                 <?php endforeach; ?>
                             </select>
-                            <small class="text-muted">Choose a project to see its warehouses, or leave blank for warehouses not linked to any project</small>
+                            <small class="text-muted"><?= t('Choose a project to see its warehouses, or leave blank for warehouses not linked to any project') ?></small>
                         </div>
                         <?php endif; ?>
 
                         <!-- 2. WAREHOUSE -->
                         <div class="col-md-6 mb-3">
-                            <label class="form-label fw-semibold">Warehouse <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold"><?= t('Warehouse') ?> <span class="text-danger">*</span></label>
                             <select class="form-select" id="adjustment_warehouse_id" name="warehouse_id" required onchange="loadProductStock()">
-                                <option value="">-- Select Warehouse --</option>
+                                <option value=""><?= t('-- Select Warehouse --') ?></option>
                             </select>
                             <small class="text-muted" id="adjWarehouseHint"></small>
                         </div>
 
                         <!-- 3. PRODUCT -->
                         <div class="col-md-6 mb-3">
-                            <label class="form-label fw-semibold">Product <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold"><?= t('Product') ?> <span class="text-danger">*</span></label>
                             <select class="form-select" id="adjustment_product_id" name="product_id" required onchange="loadProductStock()">
-                                <option value="">-- Select Product --</option>
+                                <option value=""><?= t('-- Select Product --') ?></option>
                                 <?php foreach ($products as $product): ?>
                                 <option value="<?= $product['product_id'] ?>">
                                     <?= safe_output($product['product_name']) ?> (<?= safe_output($product['sku']) ?>)
@@ -553,15 +553,15 @@ function get_pagination_url($page) {
                     <!-- Stock info -->
                     <div class="row mb-3">
                         <div class="col-md-4">
-                            <label class="form-label">Current Stock</label>
+                            <label class="form-label"><?= t('Current Stock') ?></label>
                             <input type="text" class="form-control" id="current_stock_display" readonly>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Available Stock</label>
+                            <label class="form-label"><?= t('Available Stock') ?></label>
                             <input type="text" class="form-control" id="available_stock_display" readonly>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Unit</label>
+                            <label class="form-label"><?= t('Unit') ?></label>
                             <input type="text" class="form-control" id="product_unit_display" readonly>
                         </div>
                     </div>
@@ -569,20 +569,20 @@ function get_pagination_url($page) {
                     <!-- Type & Quantity -->
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label fw-semibold">Adjustment Type <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold"><?= t('Adjustment Type') ?> <span class="text-danger">*</span></label>
                             <select class="form-select" id="adjustment_type" name="movement_type" required onchange="updateQuantityPlaceholder()">
-                                <option value="">Select Type</option>
-                                <option value="adjustment_in">Add Stock (Stock In)</option>
-                                <option value="adjustment_out">Remove Stock (Stock Out)</option>
-                                <option value="correction">Stock Correction</option>
-                                <option value="damaged">Damaged Goods</option>
-                                <option value="expired">Expired Products</option>
-                                <option value="found">Found Stock</option>
-                                <option value="theft">Theft/Loss</option>
+                                <option value=""><?= t('Select Type') ?></option>
+                                <option value="adjustment_in"><?= t('Add Stock (Stock In)') ?></option>
+                                <option value="adjustment_out"><?= t('Remove Stock (Stock Out)') ?></option>
+                                <option value="correction"><?= t('Stock Correction') ?></option>
+                                <option value="damaged"><?= t('Damaged Goods') ?></option>
+                                <option value="expired"><?= t('Expired Products') ?></option>
+                                <option value="found"><?= t('Found Stock') ?></option>
+                                <option value="theft"><?= t('Theft/Loss') ?></option>
                             </select>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label fw-semibold">Quantity <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold"><?= t('Quantity') ?> <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <input type="number" class="form-control" id="adjustment_quantity" name="quantity" min="0.001" step="0.001" required>
                                 <span class="input-group-text" id="quantity_unit_display">pcs</span>
@@ -593,49 +593,49 @@ function get_pagination_url($page) {
                     <!-- Cost & Reason -->
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label fw-semibold">Unit Cost</label>
+                            <label class="form-label fw-semibold"><?= t('Unit Cost') ?></label>
                             <div class="input-group">
                                 <span class="input-group-text">TZS</span>
                                 <input type="number" class="form-control" id="unit_cost" name="unit_cost" min="0" step="0.01" value="0.00">
                             </div>
-                            <small class="text-muted">Leave as 0 to use product's cost price</small>
+                            <small class="text-muted"><?= t("Leave as 0 to use product's cost price") ?></small>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label fw-semibold">Reason <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold"><?= t('Reason') ?> <span class="text-danger">*</span></label>
                             <select class="form-select" id="adjustment_reason_select" required>
-                                <option value="">Select Reason</option>
+                                <option value=""><?= t('Select Reason') ?></option>
                                 <?php foreach ($reasons as $value => $label): ?>
-                                <option value="<?= $value ?>"><?= $label ?></option>
+                                <option value="<?= $value ?>"><?= t($label) ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <div id="manual_reason_container" style="display:none;" class="mt-2">
-                                <input type="text" class="form-control" id="adjustment_reason_manual" placeholder="Type your reason...">
+                                <input type="text" class="form-control" id="adjustment_reason_manual" placeholder="<?= t('Type your reason...') ?>">
                             </div>
                             <input type="hidden" id="adjustment_reason" name="reason" required>
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Notes</label>
-                        <textarea class="form-control" id="adjustment_notes" name="notes" rows="2" placeholder="Additional information..."></textarea>
+                        <label class="form-label"><?= t('Notes') ?></label>
+                        <textarea class="form-control" id="adjustment_notes" name="notes" rows="2" placeholder="<?= t('Additional information...') ?>"></textarea>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Reference Number <span class="text-muted small">(Optional)</span></label>
-                        <input type="text" class="form-control" id="reference_number" name="reference_number" placeholder="e.g., Adjustment-001">
+                        <label class="form-label"><?= t('Reference Number') ?> <span class="text-muted small">(<?= t('Optional') ?>)</span></label>
+                        <input type="text" class="form-control" id="reference_number" name="reference_number" placeholder="<?= t('e.g., Adjustment-001') ?>">
                     </div>
 
                     <div class="alert alert-info d-none" id="new_stock_calculation">
                         <div class="row text-center">
-                            <div class="col-4"><strong>Current:</strong> <span id="current_stock_value">0</span></div>
-                            <div class="col-4"><strong>Adjustment:</strong> <span id="adjustment_value">0</span></div>
-                            <div class="col-4"><strong>New Stock:</strong> <span id="new_stock_value">0</span></div>
+                            <div class="col-4"><strong><?= t('Current:') ?></strong> <span id="current_stock_value">0</span></div>
+                            <div class="col-4"><strong><?= t('Adjustment:') ?></strong> <span id="adjustment_value">0</span></div>
+                            <div class="col-4"><strong><?= t('New Stock:') ?></strong> <span id="new_stock_value">0</span></div>
                         </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="submitAdjustment()">Save Adjustment</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                <button type="button" class="btn btn-primary" onclick="submitAdjustment()"><?= t('Save Adjustment') ?></button>
             </div>
         </div>
     </div>
@@ -646,36 +646,36 @@ function get_pagination_url($page) {
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title"><i class="bi bi-upload me-1"></i> Bulk Stock Adjustment</h5>
+                <h5 class="modal-title"><i class="bi bi-upload me-1"></i> <?= t('Bulk Stock Adjustment') ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="alert alert-info">
-                    <i class="bi bi-info-circle me-1"></i> Upload a CSV file with product SKU, quantity, and details.
-                    <a href="#" class="alert-link" onclick="downloadBulkTemplate()">Download template</a>
+                    <i class="bi bi-info-circle me-1"></i> <?= t('Upload a CSV file with product SKU, quantity, and details.') ?>
+                    <a href="#" class="alert-link" onclick="downloadBulkTemplate()"><?= t('Download template') ?></a>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Upload CSV File</label>
+                    <label class="form-label"><?= t('Upload CSV File') ?></label>
                     <input type="file" class="form-control" id="bulkFile" accept=".csv">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Default Adjustment Type</label>
+                    <label class="form-label"><?= t('Default Adjustment Type') ?></label>
                     <select class="form-select" id="bulkAdjustmentType">
-                        <option value="adjustment_in">Add Stock (Stock In)</option>
-                        <option value="adjustment_out">Remove Stock (Stock Out)</option>
-                        <option value="correction">Stock Correction</option>
+                        <option value="adjustment_in"><?= t('Add Stock (Stock In)') ?></option>
+                        <option value="adjustment_out"><?= t('Remove Stock (Stock Out)') ?></option>
+                        <option value="correction"><?= t('Stock Correction') ?></option>
                     </select>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Default Reason</label>
+                    <label class="form-label"><?= t('Default Reason') ?></label>
                     <select class="form-select" id="bulkReason">
                         <?php foreach ($reasons as $value => $label): ?>
-                        <option value="<?= $value ?>"><?= $label ?></option>
+                        <option value="<?= $value ?>"><?= t($label) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Default Warehouse</label>
+                    <label class="form-label"><?= t('Default Warehouse') ?></label>
                     <select class="form-select" id="bulkWarehouse">
                         <?php foreach ($warehouses as $wh): ?>
                         <option value="<?= $wh['warehouse_id'] ?>"><?= safe_output($wh['warehouse_name']) ?></option>
@@ -683,18 +683,18 @@ function get_pagination_url($page) {
                     </select>
                 </div>
                 <div id="bulkPreview" style="display:none;">
-                    <h6>Preview</h6>
+                    <h6><?= t('Preview') ?></h6>
                     <div class="table-responsive">
                         <table class="table table-sm" id="bulkPreviewTable">
-                            <thead><tr><th>Product</th><th>SKU</th><th>Quantity</th><th>Type</th><th>Reason</th></tr></thead>
+                            <thead><tr><th><?= t('Product') ?></th><th><?= t('SKU') ?></th><th><?= t('Quantity') ?></th><th><?= t('Type') ?></th><th><?= t('Reason') ?></th></tr></thead>
                             <tbody></tbody>
                         </table>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-warning" onclick="processBulkAdjustment()">Process Bulk Adjustment</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                <button type="button" class="btn btn-warning" onclick="processBulkAdjustment()"><?= t('Process Bulk Adjustment') ?></button>
             </div>
         </div>
     </div>
@@ -710,6 +710,66 @@ const adjAllWarehouses = <?= json_encode(array_values(array_map(function($w){
     ];
 }, $warehouses))) ?>;
 
+// ── Translated strings (server-rendered once, reused throughout this JS) ──
+const STRINGS = {
+    selectWarehouse: <?= json_encode(t('-- Select Warehouse --')) ?>,
+    showingUnlinked: <?= json_encode(t('Showing warehouses not linked to any project.')) ?>,
+    noWarehousesForProject: <?= json_encode(t('No warehouses found for this project.')) ?>,
+    warehousesAvailable: <?= json_encode(t('warehouse(s) available for this project.')) ?>,
+    editAdjustment: <?= json_encode(t('Edit Adjustment')) ?>,
+    newStockAdjustment: <?= json_encode(t('New Stock Adjustment')) ?>,
+    error: <?= json_encode(t('Error')) ?>,
+    failedToLoadData: <?= json_encode(t('Failed to load data')) ?>,
+    missingProduct: <?= json_encode(t('Missing Product')) ?>,
+    selectAProduct: <?= json_encode(t('Please select a product.')) ?>,
+    missingWarehouse: <?= json_encode(t('Missing Warehouse')) ?>,
+    selectAWarehouse: <?= json_encode(t('Please select a warehouse.')) ?>,
+    missingType: <?= json_encode(t('Missing Type')) ?>,
+    selectAnAdjustmentType: <?= json_encode(t('Please select an adjustment type.')) ?>,
+    invalidQuantity: <?= json_encode(t('Invalid Quantity')) ?>,
+    enterValidQuantity: <?= json_encode(t('Please enter a valid quantity.')) ?>,
+    insufficientStock: <?= json_encode(t('Insufficient Stock')) ?>,
+    cannotRemoveMoreThanAvailable: <?= json_encode(t('Cannot remove more than available')) ?>,
+    proceedAnyway: <?= json_encode(t('Proceed Anyway')) ?>,
+    adjustQuantity: <?= json_encode(t('Adjust Quantity')) ?>,
+    saving: <?= json_encode(t('Saving...')) ?>,
+    success: <?= json_encode(t('Success!')) ?>,
+    adjustmentSaved: <?= json_encode(t('Adjustment saved successfully.')) ?>,
+    ok: <?= json_encode(t('OK')) ?>,
+    serverErrorTryAgain: <?= json_encode(t('Server error. Please try again.')) ?>,
+    adjustmentDetails: <?= json_encode(t('Adjustment Details')) ?>,
+    product: <?= json_encode(t('Product:')) ?>,
+    sku: <?= json_encode(t('SKU:')) ?>,
+    warehouse: <?= json_encode(t('Warehouse:')) ?>,
+    project: <?= json_encode(t('Project:')) ?>,
+    type: <?= json_encode(t('Type:')) ?>,
+    qty: <?= json_encode(t('Qty:')) ?>,
+    stockBefore: <?= json_encode(t('Stock Before:')) ?>,
+    stockAfter: <?= json_encode(t('Stock After:')) ?>,
+    notes: <?= json_encode(t('Notes:')) ?>,
+    edit: <?= json_encode(t('Edit')) ?>,
+    na: <?= json_encode(t('N/A')) ?>,
+    deleteAdjustment: <?= json_encode(t('Delete Adjustment')) ?>,
+    reverseStockConfirm: <?= json_encode(t('This will reverse the stock change. Are you sure?')) ?>,
+    yesDelete: <?= json_encode(t('Yes, Delete')) ?>,
+    cancel: <?= json_encode(t('Cancel')) ?>,
+    deleted: <?= json_encode(t('Deleted!')) ?>,
+    copied: <?= json_encode(t('Copied!')) ?>,
+    tableCopied: <?= json_encode(t('Table copied to clipboard')) ?>,
+    invalidFile: <?= json_encode(t('Invalid File')) ?>,
+    csvMustContainRows: <?= json_encode(t('CSV must contain data rows.')) ?>,
+    noFile: <?= json_encode(t('No File')) ?>,
+    selectCsvFile: <?= json_encode(t('Please select a CSV file.')) ?>,
+    processing: <?= json_encode(t('Processing...')) ?>,
+    done: <?= json_encode(t('Done!')) ?>,
+    processed: <?= json_encode(t('Processed:')) ?>,
+    successLabel: <?= json_encode(t('Success:')) ?>,
+    failed: <?= json_encode(t('Failed:')) ?>,
+    failedToProcess: <?= json_encode(t('Failed to process.')) ?>,
+    quantityToRemove: <?= json_encode(t('Quantity to remove')) ?>,
+    quantityToAdd: <?= json_encode(t('Quantity to add')) ?>,
+};
+
 // ── Warehouse filter function ────────────────────────────────────────────
 function filterAdjustmentWarehouses(projectId) {
     const sel  = document.getElementById('adjustment_warehouse_id');
@@ -719,7 +779,7 @@ function filterAdjustmentWarehouses(projectId) {
     const curVal = parseInt(sel.value) || 0;
 
     // Clear dropdown
-    sel.innerHTML = '<option value="">-- Select Warehouse --</option>';
+    sel.innerHTML = '<option value="">' + STRINGS.selectWarehouse + '</option>';
 
     // Convert projectId to integer safely
     const pid = parseInt(projectId) || 0;
@@ -730,15 +790,15 @@ function filterAdjustmentWarehouses(projectId) {
         filtered = adjAllWarehouses.filter(function(w) {
             return w.project_id === 0;
         });
-        if (hint) hint.textContent = 'Showing warehouses not linked to any project.';
+        if (hint) hint.textContent = STRINGS.showingUnlinked;
     } else {
         // Project selected — show only warehouses of that project
         filtered = adjAllWarehouses.filter(function(w) {
             return w.project_id === pid;
         });
         if (hint) hint.textContent = filtered.length === 0
-            ? 'No warehouses found for this project.'
-            : filtered.length + ' warehouse(s) available for this project.';
+            ? STRINGS.noWarehousesForProject
+            : filtered.length + ' ' + STRINGS.warehousesAvailable;
     }
 
     // Populate options
@@ -817,7 +877,7 @@ $(document).ready(function() {
     // Edit mode
     if (urlParams.has('edit')) {
         const editId = urlParams.get('edit');
-        $('#newAdjustmentModalLabel').html('<i class="bi bi-pencil me-1"></i> Edit Adjustment');
+        $('#newAdjustmentModalLabel').html('<i class="bi bi-pencil me-1"></i> ' + STRINGS.editAdjustment);
         $('#newAdjustmentModal').modal('show');
         $.ajax({
             url: '<?= getUrl("api/get_adjustment.php") ?>',
@@ -858,7 +918,7 @@ $(document).ready(function() {
                         loadProductStock(true);
                     }, 200);
                 } else {
-                    Swal.fire('Error', response.message || 'Failed to load data', 'error');
+                    Swal.fire(STRINGS.error, response.message || STRINGS.failedToLoadData, 'error');
                 }
             }
         });
@@ -872,7 +932,7 @@ $(document).ready(function() {
             window.history.pushState({}, '', url);
         }
         $('#adjustmentForm')[0].reset();
-        $('#newAdjustmentModalLabel').html('<i class="bi bi-plus-circle me-1"></i> New Stock Adjustment');
+        $('#newAdjustmentModalLabel').html('<i class="bi bi-plus-circle me-1"></i> ' + STRINGS.newStockAdjustment);
         $('#adjustment_product_id').val('');
         $('#current_stock_display, #available_stock_display, #product_unit_display').val('');
         $('#new_stock_calculation').addClass('d-none');
@@ -885,7 +945,7 @@ $(document).ready(function() {
     // Button click — clean state
     $('button[data-bs-target="#newAdjustmentModal"]').on('click', function() {
         $('#adjustmentForm')[0].reset();
-        $('#newAdjustmentModalLabel').html('<i class="bi bi-plus-circle me-1"></i> New Stock Adjustment');
+        $('#newAdjustmentModalLabel').html('<i class="bi bi-plus-circle me-1"></i> ' + STRINGS.newStockAdjustment);
         $('#adjustment_reason_select, #adjustment_reason_manual').val('');
         $('#manual_reason_container').hide();
         $('#adjustment_reason').val('');
@@ -923,7 +983,7 @@ function loadProductStock(isEdit = false) {
 function updateQuantityPlaceholder() {
     const type = $('#adjustment_type').val();
     $('#adjustment_quantity').attr('placeholder',
-        ['adjustment_out','damaged','expired','theft'].includes(type) ? 'Quantity to remove' : 'Quantity to add');
+        ['adjustment_out','damaged','expired','theft'].includes(type) ? STRINGS.quantityToRemove : STRINGS.quantityToAdd);
     updateStockCalculation();
 }
 
@@ -944,11 +1004,11 @@ $('#adjustment_quantity').on('input', updateStockCalculation);
 
 // ── submitAdjustment ──────────────────────────────────────────────────────
 function submitAdjustment() {
-    if (!$('#adjustment_product_id').val())   { Swal.fire({icon:'warning',title:'Missing Product',text:'Please select a product.',confirmButtonColor:'#0d6efd'}); return; }
-    if (!$('#adjustment_warehouse_id').val()) { Swal.fire({icon:'warning',title:'Missing Warehouse',text:'Please select a warehouse.',confirmButtonColor:'#0d6efd'}); return; }
-    if (!$('#adjustment_type').val())         { Swal.fire({icon:'warning',title:'Missing Type',text:'Please select an adjustment type.',confirmButtonColor:'#0d6efd'}); return; }
+    if (!$('#adjustment_product_id').val())   { Swal.fire({icon:'warning',title:STRINGS.missingProduct,text:STRINGS.selectAProduct,confirmButtonColor:'#0d6efd'}); return; }
+    if (!$('#adjustment_warehouse_id').val()) { Swal.fire({icon:'warning',title:STRINGS.missingWarehouse,text:STRINGS.selectAWarehouse,confirmButtonColor:'#0d6efd'}); return; }
+    if (!$('#adjustment_type').val())         { Swal.fire({icon:'warning',title:STRINGS.missingType,text:STRINGS.selectAnAdjustmentType,confirmButtonColor:'#0d6efd'}); return; }
     const qty = parseFloat($('#adjustment_quantity').val());
-    if (!qty || qty <= 0) { Swal.fire({icon:'warning',title:'Invalid Quantity',text:'Please enter a valid quantity.',confirmButtonColor:'#0d6efd'}); return; }
+    if (!qty || qty <= 0) { Swal.fire({icon:'warning',title:STRINGS.invalidQuantity,text:STRINGS.enterValidQuantity,confirmButtonColor:'#0d6efd'}); return; }
 
     const type      = $('#adjustment_type').val();
     const available = parseFloat($('#available_stock_display').val()) || 0;
@@ -956,10 +1016,10 @@ function submitAdjustment() {
 
     if (['adjustment_out','damaged','expired','theft'].includes(type) && qty > available) {
         Swal.fire({
-            icon:'warning', title:'Insufficient Stock',
-            text:'Cannot remove more than available ('+available+').',
+            icon:'warning', title:STRINGS.insufficientStock,
+            text:STRINGS.cannotRemoveMoreThanAvailable+' ('+available+').',
             showCancelButton:true, confirmButtonColor:'#dc3545',
-            confirmButtonText:'Proceed Anyway', cancelButtonText:'Adjust Quantity'
+            confirmButtonText:STRINGS.proceedAnyway, cancelButtonText:STRINGS.adjustQuantity
         }).then(r => { if (r.isConfirmed) saveAdjustment(formData); });
         return;
     }
@@ -972,7 +1032,7 @@ function saveAdjustment(formData) {
     const url       = isEdit ? '<?= getUrl("api/update_adjustment.php") ?>' : '<?= getUrl("api/create_stock_adjustment.php") ?>';
     const data      = isEdit ? formData + '&movement_id=' + urlParams.get('edit') : formData;
 
-    Swal.fire({ title:'Saving...', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
+    Swal.fire({ title:STRINGS.saving, allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
 
     $.ajax({
         url: url, type: 'POST', data: data, dataType: 'json',
@@ -980,19 +1040,19 @@ function saveAdjustment(formData) {
             if (r.success) {
                 logReportAction(isEdit ? 'Updated Stock Adjustment' : 'Created Stock Adjustment', '');
                 Swal.fire({
-                    icon:'success', title:'Success!', text: r.message || 'Adjustment saved successfully.',
-                    confirmButtonColor:'#198754', confirmButtonText:'OK'
+                    icon:'success', title:STRINGS.success, text: r.message || STRINGS.adjustmentSaved,
+                    confirmButtonColor:'#198754', confirmButtonText:STRINGS.ok
                 }).then(() => {
                     const pid = new URLSearchParams(window.location.search).get('project_id') || $('#adjustment_project_id').val();
                     if (pid) window.location.href = '<?= getUrl("project_view") ?>?id=' + pid;
                     else { $('#newAdjustmentModal').modal('hide'); location.reload(); }
                 });
             } else {
-                Swal.fire({icon:'error', title:'Error', text: r.message, confirmButtonText:'OK'});
+                Swal.fire({icon:'error', title:STRINGS.error, text: r.message, confirmButtonText:STRINGS.ok});
             }
         },
         error: function() {
-            Swal.fire({icon:'error', title:'Error', text:'Server error. Please try again.', confirmButtonText:'OK'});
+            Swal.fire({icon:'error', title:STRINGS.error, text:STRINGS.serverErrorTryAgain, confirmButtonText:STRINGS.ok});
         }
     });
 }
@@ -1005,14 +1065,14 @@ function viewAdjustmentDetails(id) {
             if (r.success) {
                 const a = r.data;
                 Swal.fire({
-                    title:'Adjustment Details', width:750,
+                    title:STRINGS.adjustmentDetails, width:750,
                     html:`<div class="row text-start">
-                        <div class="col-6"><p><b>Product:</b> ${a.product_name}</p><p><b>SKU:</b> ${a.sku||'N/A'}</p><p><b>Warehouse:</b> ${a.warehouse_name}</p><p><b>Project:</b> ${a.project_name||'N/A'}</p></div>
-                        <div class="col-6"><p><b>Type:</b> ${a.movement_type}</p><p><b>Qty:</b> ${a.quantity} ${a.unit}</p><p><b>Stock Before:</b> ${a.stock_before}</p><p><b>Stock After:</b> ${a.stock_after}</p></div>
-                        ${a.notes?`<div class="col-12"><p><b>Notes:</b> ${a.notes}</p></div>`:''}
+                        <div class="col-6"><p><b>${STRINGS.product}</b> ${a.product_name}</p><p><b>${STRINGS.sku}</b> ${a.sku||STRINGS.na}</p><p><b>${STRINGS.warehouse}</b> ${a.warehouse_name}</p><p><b>${STRINGS.project}</b> ${a.project_name||STRINGS.na}</p></div>
+                        <div class="col-6"><p><b>${STRINGS.type}</b> ${a.movement_type}</p><p><b>${STRINGS.qty}</b> ${a.quantity} ${a.unit}</p><p><b>${STRINGS.stockBefore}</b> ${a.stock_before}</p><p><b>${STRINGS.stockAfter}</b> ${a.stock_after}</p></div>
+                        ${a.notes?`<div class="col-12"><p><b>${STRINGS.notes}</b> ${a.notes}</p></div>`:''}
                     </div>`,
                     showCloseButton:true, showConfirmButton:false,
-                    footer:`<a href="?edit=${id}" class="btn btn-warning btn-sm"><i class="bi bi-pencil me-1"></i>Edit</a>`
+                    footer:`<a href="?edit=${id}" class="btn btn-warning btn-sm"><i class="bi bi-pencil me-1"></i>${STRINGS.edit}</a>`
                 });
             }
         }
@@ -1023,9 +1083,9 @@ function printAdjustment(id) { window.open('<?= getUrl("adjustment_print") ?>?id
 
 function deleteAdjustment(id) {
     Swal.fire({
-        title:'Delete Adjustment', text:'This will reverse the stock change. Are you sure?',
+        title:STRINGS.deleteAdjustment, text:STRINGS.reverseStockConfirm,
         icon:'warning', showCancelButton:true, confirmButtonColor:'#dc3545',
-        confirmButtonText:'Yes, Delete', cancelButtonText:'Cancel'
+        confirmButtonText:STRINGS.yesDelete, cancelButtonText:STRINGS.cancel
     }).then(r => {
         if (r.isConfirmed) {
             $.ajax({
@@ -1033,10 +1093,10 @@ function deleteAdjustment(id) {
                 data:{adjustment_id:id}, dataType:'json',
                 success: function(r) {
                     if (r.success) {
-                        Swal.fire({icon:'success',title:'Deleted!',text:r.message,confirmButtonColor:'#198754',confirmButtonText:'OK'})
+                        Swal.fire({icon:'success',title:STRINGS.deleted,text:r.message,confirmButtonColor:'#198754',confirmButtonText:STRINGS.ok})
                         .then(()=>location.reload());
                     } else {
-                        Swal.fire({icon:'error',title:'Error',text:r.message,confirmButtonText:'OK'});
+                        Swal.fire({icon:'error',title:STRINGS.error,text:r.message,confirmButtonText:STRINGS.ok});
                     }
                 }
             });
@@ -1060,7 +1120,7 @@ function copyTable() {
     window.getSelection().addRange(r);
     document.execCommand('copy');
     window.getSelection().removeAllRanges();
-    Swal.fire({icon:'success',title:'Copied!',text:'Table copied to clipboard',timer:1500,showConfirmButton:false});
+    Swal.fire({icon:'success',title:STRINGS.copied,text:STRINGS.tableCopied,timer:1500,showConfirmButton:false});
 }
 
 function downloadBulkTemplate() {
@@ -1075,7 +1135,7 @@ function previewBulkFile(file) {
     const reader = new FileReader();
     reader.onload = function(e) {
         const lines = e.target.result.split('\n').filter(l=>l.trim()&&!l.startsWith('#'));
-        if (lines.length < 2) { Swal.fire({icon:'warning',title:'Invalid File',text:'CSV must contain data rows.'}); return; }
+        if (lines.length < 2) { Swal.fire({icon:'warning',title:STRINGS.invalidFile,text:STRINGS.csvMustContainRows}); return; }
         const headers = lines[0].split(',');
         const body = $('#bulkPreviewTable tbody').empty();
         for (let i=1;i<Math.min(lines.length,6);i++) {
@@ -1089,26 +1149,26 @@ function previewBulkFile(file) {
 
 function processBulkAdjustment() {
     const file = $('#bulkFile')[0].files[0];
-    if (!file) { Swal.fire({icon:'warning',title:'No File',text:'Please select a CSV file.'}); return; }
+    if (!file) { Swal.fire({icon:'warning',title:STRINGS.noFile,text:STRINGS.selectCsvFile}); return; }
     const fd = new FormData();
     fd.append('file',file);
     fd.append('default_type',$('#bulkAdjustmentType').val());
     fd.append('default_reason',$('#bulkReason').val());
     fd.append('default_warehouse',$('#bulkWarehouse').val());
-    Swal.fire({title:'Processing...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+    Swal.fire({title:STRINGS.processing,allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
     $.ajax({
         url:'<?= getUrl("api/process_bulk_adjustment.php") ?>',type:'POST',
         data:fd,processData:false,contentType:false,dataType:'json',
         success:function(r){
             Swal.close();
             if(r.success){
-                Swal.fire({icon:'success',title:'Done!',html:`<p>${r.message}</p><p>Processed: ${r.processed} | Success: ${r.success_count} | Failed: ${r.failed_count}</p>`,confirmButtonText:'OK'})
+                Swal.fire({icon:'success',title:STRINGS.done,html:`<p>${r.message}</p><p>${STRINGS.processed} ${r.processed} | ${STRINGS.successLabel} ${r.success_count} | ${STRINGS.failed} ${r.failed_count}</p>`,confirmButtonText:STRINGS.ok})
                 .then(()=>{$('#bulkAdjustmentModal').modal('hide');location.reload();});
             } else {
-                Swal.fire({icon:'error',title:'Error',text:r.message,confirmButtonText:'OK'});
+                Swal.fire({icon:'error',title:STRINGS.error,text:r.message,confirmButtonText:STRINGS.ok});
             }
         },
-        error:function(){Swal.close();Swal.fire({icon:'error',title:'Error',text:'Failed to process.',confirmButtonText:'OK'});}
+        error:function(){Swal.close();Swal.fire({icon:'error',title:STRINGS.error,text:STRINGS.failedToProcess,confirmButtonText:STRINGS.ok});}
     });
 }
 

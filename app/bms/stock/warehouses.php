@@ -16,7 +16,11 @@ $can_manage_warehouse_settings = isAdmin() || canEdit('warehouses');
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // CSRF protection
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-        $_SESSION['error'] = "Invalid form submission";
+        // Stored untranslated: header.php (which resolves the user's language)
+        // hasn't run yet on this POST request — translation happens at
+        // display time on the following GET, once the language is loaded
+        // (see the "Messages" block below).
+        $_SESSION['error'] = ['Invalid form submission'];
         header("Location: warehouses.php");
         exit();
     }
@@ -125,17 +129,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->commit();
 
                 logActivity($pdo, $user_id, 'Create warehouse', "User created a new warehouse: $warehouse_name ($warehouse_code)");
-                $_SESSION['success'] = "Warehouse added successfully!";
+                $_SESSION['success'] = ['Warehouse added successfully!'];
                 header("Location: warehouses.php");
                 exit();
             } catch (PDOException $e) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
-                $_SESSION['error'] = "Database error: " . $e->getMessage();
+                $_SESSION['error'] = ["Database error: " . $e->getMessage()];
                 header("Location: warehouses.php");
                 exit();
             }
         } else {
-            $_SESSION['error'] = implode("<br>", $errors);
+            $_SESSION['error'] = $errors;
             header("Location: warehouses.php");
             exit();
         }
@@ -231,16 +235,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
 
                 logActivity($pdo, $user_id, 'Edit warehouse', "User edited warehouse: $warehouse_name ($warehouse_code)");
-                $_SESSION['success'] = "Warehouse updated successfully!";
+                $_SESSION['success'] = ['Warehouse updated successfully!'];
                 header("Location: warehouses.php");
                 exit();
             } catch (PDOException $e) {
-                $_SESSION['error'] = "Database error: " . $e->getMessage();
+                $_SESSION['error'] = ["Database error: " . $e->getMessage()];
                 header("Location: warehouses.php");
                 exit();
             }
         } else {
-            $_SESSION['error'] = implode("<br>", $errors);
+            $_SESSION['error'] = $errors;
             header("Location: warehouses.php");
             exit();
         }
@@ -260,7 +264,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $del_current_project = $del_project_id->fetchColumn();
         if ($del_current_project !== false && $del_current_project !== null
             && !userCan('project', (int)$del_current_project)) {
-            $_SESSION['error'] = "Access denied: this warehouse belongs to a project not in your scope.";
+            $_SESSION['error'] = ['Access denied: this warehouse belongs to a project not in your scope.'];
             header("Location: warehouses.php");
             exit();
         }
@@ -282,11 +286,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             logActivity($pdo, $user_id, 'Deleted Warehouse', "User deleted warehouse ID: $warehouse_id (movement history preserved)");
-            $_SESSION['success'] = "Warehouse deleted successfully!";
+            $_SESSION['success'] = ['Warehouse deleted successfully!'];
             header("Location: warehouses.php");
             exit();
         } catch (PDOException $e) {
-            $_SESSION['error'] = "Database error: " . $e->getMessage();
+            $_SESSION['error'] = ["Database error: " . $e->getMessage()];
             header("Location: warehouses.php");
             exit();
         }
@@ -302,7 +306,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ts_current_project = $ts_project_id->fetchColumn();
         if ($ts_current_project !== false && $ts_current_project !== null
             && !userCan('project', (int)$ts_current_project)) {
-            $_SESSION['error'] = "Access denied: this warehouse belongs to a project not in your scope.";
+            $_SESSION['error'] = ['Access denied: this warehouse belongs to a project not in your scope.'];
             header("Location: warehouses.php");
             exit();
         }
@@ -313,11 +317,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$new_status, $user_id, $warehouse_id]);
 
             logActivity($pdo, $user_id, 'Updated Warehouse Status', "User changed warehouse ID $warehouse_id status to $new_status");
-            $_SESSION['success'] = "Warehouse status updated!";
+            $_SESSION['success'] = ['Warehouse status updated!'];
             header("Location: warehouses.php");
             exit();
         } catch (PDOException $e) {
-            $_SESSION['error'] = "Database error: " . $e->getMessage();
+            $_SESSION['error'] = ["Database error: " . $e->getMessage()];
             header("Location: warehouses.php");
             exit();
         }
@@ -480,7 +484,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 // Helper functions removed, now in helpers.php
 function get_primary_badge($is_primary) {
     if ($is_primary) {
-        return '<span class="badge bg-primary"><i class="bi bi-star-fill"></i> Primary</span>';
+        return '<span class="badge bg-primary"><i class="bi bi-star-fill"></i> ' . t('Primary') . '</span>';
     }
     return '';
 }
@@ -491,7 +495,7 @@ function get_primary_badge($is_primary) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Warehouses  Management</title>
+    <title><?= t('Warehouses Management') ?></title>
     
    
     <style>
@@ -692,11 +696,11 @@ function get_primary_badge($is_primary) {
        
 
         <h2 style="color: #000; font-weight: 600; text-transform: uppercase; margin: 5px 0; font-size: 16pt; letter-spacing: 2px;">
-            Warehouse Management Report
+            <?= t('Warehouse Management Report') ?>
         </h2>
 
         <p style="color: #000; margin: 0; font-size: 10pt;">
-            Report Date: <?= date('d M Y, H:i') ?>
+            <?= t('Report Date:') ?> <?= date('d M Y, H:i') ?>
         </p>
 
     </div>
@@ -707,25 +711,25 @@ function get_primary_badge($is_primary) {
             <div class="row g-3">
                 <div class="col-3">
                     <div style="border: 1px solid #dee2e6; padding: 12px; border-radius: 8px; text-align: center;">
-                        <p style="color: #666; font-size: 9pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;">Total Warehouses</p>
+                        <p style="color: #666; font-size: 9pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;"><?= t('Total Warehouses') ?></p>
                         <h3 style="color: #333; font-weight: 800; margin: 0; font-size: 16pt;"><?= $stats['total_warehouses'] ?></h3>
                     </div>
                 </div>
                 <div class="col-3">
                     <div style="border: 1px solid #dee2e6; padding: 12px; border-radius: 8px; text-align: center;">
-                        <p style="color: #666; font-size: 9pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;">Active Warehouses</p>
+                        <p style="color: #666; font-size: 9pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;"><?= t('Active Warehouses') ?></p>
                         <h3 style="color: #333; font-weight: 800; margin: 0; font-size: 16pt;"><?= $stats['active_warehouses'] ?></h3>
                     </div>
                 </div>
                 <div class="col-3">
                     <div style="border: 1px solid #dee2e6; padding: 12px; border-radius: 8px; text-align: center;">
-                        <p style="color: #666; font-size: 9pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;">Total Locations</p>
+                        <p style="color: #666; font-size: 9pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;"><?= t('Total Locations') ?></p>
                         <h3 style="color: #333; font-weight: 800; margin: 0; font-size: 16pt;"><?= $stats['total_locations'] ?></h3>
                     </div>
                 </div>
                 <div class="col-3">
                     <div style="border: 1px solid #dee2e6; padding: 12px; border-radius: 8px; text-align: center;">
-                        <p style="color: #666; font-size: 9pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;">Primary Warehouses</p>
+                        <p style="color: #666; font-size: 9pt; text-transform: uppercase; margin-bottom: 5px; font-weight: 600;"><?= t('Primary Warehouses') ?></p>
                         <h3 style="color: #333; font-weight: 800; margin: 0; font-size: 16pt;"><?= $stats['primary_warehouses'] ?></h3>
                     </div>
                 </div>
@@ -735,9 +739,9 @@ function get_primary_badge($is_primary) {
         <!-- Breadcrumbs -->
         <nav aria-label="breadcrumb" class="mb-3 d-print-none">
             <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
-                <li class="breadcrumb-item"><a href="<?= getUrl('products') ?>">Inventory</a></li>
-                <li class="breadcrumb-item active">Warehouses</li>
+                <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>"><?= t('Dashboard') ?></a></li>
+                <li class="breadcrumb-item"><a href="<?= getUrl('products') ?>"><?= t('Inventory') ?></a></li>
+                <li class="breadcrumb-item active"><?= t('Warehouses') ?></li>
             </ol>
         </nav>
 
@@ -746,13 +750,13 @@ function get_primary_badge($is_primary) {
             <div class="col-12">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h2 class="fw-bold text-dark mb-1"><i class="bi bi-house-door-fill text-primary"></i> Warehouse Management</h2>
-                        <p class="text-muted mb-0">Manage warehouses, locations and stock distribution</p>
+                        <h2 class="fw-bold text-dark mb-1"><i class="bi bi-house-door-fill text-primary"></i> <?= t('Warehouse Management') ?></h2>
+                        <p class="text-muted mb-0"><?= t('Manage warehouses, locations and stock distribution') ?></p>
                     </div>
                     <div>
                         <?php if ($can_add_warehouses): ?>
                         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addWarehouseModal">
-                            <i class="bi bi-plus-circle"></i> Add New Warehouse
+                            <i class="bi bi-plus-circle"></i> <?= t('Add New Warehouse') ?>
                         </button>
                         <?php endif; ?>
                     </div>
@@ -768,7 +772,7 @@ function get_primary_badge($is_primary) {
                         <div class="d-flex justify-content-between">
                             <div>
                                 <h4 class="mb-0"><?= $stats['total_warehouses'] ?></h4>
-                                <p class="mb-0">Total Warehouses</p>
+                                <p class="mb-0"><?= t('Total Warehouses') ?></p>
                             </div>
                             <div class="align-self-center">
                                 <i class="bi bi-house-door" style="font-size: 2rem;"></i>
@@ -784,7 +788,7 @@ function get_primary_badge($is_primary) {
                         <div class="d-flex justify-content-between">
                             <div>
                                 <h4 class="mb-0"><?= $stats['active_warehouses'] ?></h4>
-                                <p class="mb-0">Active Warehouses</p>
+                                <p class="mb-0"><?= t('Active Warehouses') ?></p>
                             </div>
                             <div class="align-self-center">
                                 <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
@@ -800,7 +804,7 @@ function get_primary_badge($is_primary) {
                         <div class="d-flex justify-content-between">
                             <div>
                                 <h4 class="mb-0"><?= $stats['total_locations'] ?></h4>
-                                <p class="mb-0">Total Locations</p>
+                                <p class="mb-0"><?= t('Total Locations') ?></p>
                             </div>
                             <div class="align-self-center">
                                 <i class="bi bi-map" style="font-size: 2rem;"></i>
@@ -816,7 +820,7 @@ function get_primary_badge($is_primary) {
                         <div class="d-flex justify-content-between">
                             <div>
                                 <h4 class="mb-0"><?= $stats['primary_warehouses'] ?></h4>
-                                <p class="mb-0">Primary Warehouses</p>
+                                <p class="mb-0"><?= t('Primary Warehouses') ?></p>
                             </div>
                             <div class="align-self-center">
                                 <i class="bi bi-star-fill" style="font-size: 2rem;"></i>
@@ -828,17 +832,25 @@ function get_primary_badge($is_primary) {
         </div>
 
         <!-- Messages -->
-        <?php if (isset($_SESSION['error'])): ?>
+        <?php
+        // $_SESSION['error']/['success'] are arrays of untranslated message
+        // strings (set during POST handling, before header.php resolves the
+        // user's language) — translated here, at display time, once the
+        // correct language is loaded. t() no-ops gracefully on a message that
+        // has dynamic data interpolated into it (e.g. a raw DB error), same
+        // as it does for any other untranslated key.
+        ?>
+        <?php if (!empty($_SESSION['error'])): ?>
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-triangle"></i> <?= $_SESSION['error'] ?>
+            <i class="bi bi-exclamation-triangle"></i> <?= implode('<br>', array_map('t', (array)$_SESSION['error'])) ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
         <?php unset($_SESSION['error']); ?>
         <?php endif; ?>
 
-        <?php if (isset($_SESSION['success'])): ?>
+        <?php if (!empty($_SESSION['success'])): ?>
         <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="bi bi-check-circle"></i> <?= $_SESSION['success'] ?>
+            <i class="bi bi-check-circle"></i> <?= implode('<br>', array_map('t', (array)$_SESSION['success'])) ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
         <?php unset($_SESSION['success']); ?>
@@ -849,33 +861,33 @@ function get_primary_badge($is_primary) {
         <!-- Filter Section -->
         <div class="card border-0 shadow-sm mb-4 d-print-none">
             <div class="card-header bg-light">
-                <h6 class="mb-0"><i class="bi bi-funnel"></i> Filters & Parameters</h6>
+                <h6 class="mb-0"><i class="bi bi-funnel"></i> <?= t('Filters & Parameters') ?></h6>
             </div>
             <div class="card-body">
                 <form method="GET" action="" class="row g-3">
                     <div class="col-md-5">
-                        <label class="form-label">Search Warehouse</label>
+                        <label class="form-label"><?= t('Search Warehouse') ?></label>
                         <div class="input-group">
                             <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
-                            <input type="text" name="search" class="form-control border-start-0" 
-                                   placeholder="Search by name, code, or location..." value="<?= htmlspecialchars($search) ?>">
+                            <input type="text" name="search" class="form-control border-start-0"
+                                   placeholder="<?= t('Search by name, code, or location...') ?>" value="<?= htmlspecialchars($search) ?>">
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Filter by Status</label>
+                        <label class="form-label"><?= t('Filter by Status') ?></label>
                         <select name="status" class="form-select">
-                            <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>>All Statuses</option>
-                            <option value="active" <?= $status_filter == 'active' ? 'selected' : '' ?>>Active Warehouses</option>
-                            <option value="inactive" <?= $status_filter == 'inactive' ? 'selected' : '' ?>>Inactive Warehouses</option>
-                            <option value="maintenance" <?= $status_filter == 'maintenance' ? 'selected' : '' ?>>Maintenance</option>
+                            <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>><?= t('All Statuses') ?></option>
+                            <option value="active" <?= $status_filter == 'active' ? 'selected' : '' ?>><?= t('Active Warehouses') ?></option>
+                            <option value="inactive" <?= $status_filter == 'inactive' ? 'selected' : '' ?>><?= t('Inactive Warehouses') ?></option>
+                            <option value="maintenance" <?= $status_filter == 'maintenance' ? 'selected' : '' ?>><?= t('Maintenance') ?></option>
                         </select>
                     </div>
                     <div class="col-md-4 d-flex align-items-end justify-content-end">
                         <button type="submit" class="btn btn-primary me-2">
-                            <i class="bi bi-filter"></i> Apply Filters
+                            <i class="bi bi-filter"></i> <?= t('Apply Filters') ?>
                         </button>
                         <a href="warehouses.php" class="btn btn-outline-secondary">
-                            <i class="bi bi-arrow-clockwise"></i> Reset
+                            <i class="bi bi-arrow-clockwise"></i> <?= t('Reset') ?>
                         </a>
                     </div>
                 </form>
@@ -887,28 +899,28 @@ function get_primary_badge($is_primary) {
             <div class="d-flex align-items-center gap-3 flex-wrap">
                 <div class="btn-group shadow-sm" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                     <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="logReportAction('Printed Warehouse List', 'User generated a printed list of warehouses'); window.print()" style="background: #fff; color: #444;">
-                        <i class="bi bi-printer text-primary me-1"></i> Print
+                        <i class="bi bi-printer text-primary me-1"></i> <?= t('Print') ?>
                     </button>
                     <div style="width: 1px; background: #eee; height: 24px; margin-top: 6px;"></div>
                     <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="exportWarehouses()" style="background: #fff; color: #444;">
-                        <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> Export
+                        <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> <?= t('Export') ?>
                     </button>
                 </div>
 
                 <div class="d-flex align-items-center bg-white shadow-sm px-3 py-1" style="border: 1px solid #dee2e6; border-radius: 8px;">
-                    <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> Show:</span>
+                    <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> <?= t('Show:') ?></span>
                     <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 60px; box-shadow: none; background: transparent;" onchange="$('#warehousesTable').DataTable().page.len(this.value).draw();">
                         <option value="10">10</option>
                         <option value="25" selected>25</option>
                         <option value="50">50</option>
                         <option value="100">100</option>
-                        <option value="-1">All</option>
+                        <option value="-1"><?= t('All') ?></option>
                     </select>
                 </div>
             </div>
             <div>
                 <span class="badge bg-success-soft text-success border border-success px-3 py-2 fs-6 rounded-pill">
-                    <i class="bi bi-check-circle-fill me-1"></i> <?= $total_count ?> warehouses
+                    <i class="bi bi-check-circle-fill me-1"></i> <?= $total_count ?> <?= t('warehouses') ?>
                 </span>
             </div>
         </div>
@@ -917,9 +929,9 @@ function get_primary_badge($is_primary) {
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-bottom py-3">
                 <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-table"></i> Warehouses List</h5>
+                    <h5 class="mb-0"><i class="bi bi-table"></i> <?= t('Warehouses List') ?></h5>
                     <span class="badge bg-light text-dark border">
-                        Showing <?= count($warehouses) ?> of <?= $total_count ?> results
+                        <?= t('Showing') ?> <?= count($warehouses) ?> <?= t('of') ?> <?= $total_count ?> <?= t('results') ?>
                     </span>
                 </div>
             </div>
@@ -929,16 +941,16 @@ function get_primary_badge($is_primary) {
                         <table class="table table-hover align-middle" id="warehousesTable">
                             <thead class="table-light">
                                 <tr>
-                                    <th>S/NO</th>
-                                    <th>Warehouse Code</th>
-                                    <th>Warehouse Name</th>
-                                    <th>Location</th>
-                                    <th>Contact</th>
-                                    <th class="text-center">Locations</th>
-                                    <th class="text-center">Products</th>
-                                    <th class="text-end">Stock Value</th>
-                                    <th class="text-center">Status</th>
-                                    <th class="text-center">Actions</th>
+                                    <th><?= t('S/NO') ?></th>
+                                    <th><?= t('Warehouse Code') ?></th>
+                                    <th><?= t('Warehouse Name') ?></th>
+                                    <th><?= t('Location') ?></th>
+                                    <th><?= t('Contact') ?></th>
+                                    <th class="text-center"><?= t('Locations') ?></th>
+                                    <th class="text-center"><?= t('Products') ?></th>
+                                    <th class="text-end"><?= t('Stock Value') ?></th>
+                                    <th class="text-center"><?= t('Status') ?></th>
+                                    <th class="text-center"><?= t('Actions') ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -948,7 +960,7 @@ function get_primary_badge($is_primary) {
                                     <td>
                                         <code class="custom-code"><?= htmlspecialchars($warehouse['warehouse_code'] ?? '') ?></code>
                                         <?php if ($warehouse['is_primary']): ?>
-                                            <span class="badge bg-primary ms-1"><i class="bi bi-star-fill"></i> Primary</span>
+                                            <span class="badge bg-primary ms-1"><i class="bi bi-star-fill"></i> <?= t('Primary') ?></span>
                                         <?php endif; ?>
                                     </td>
                                     <td>
@@ -958,14 +970,14 @@ function get_primary_badge($is_primary) {
                                         <?php if (!empty($warehouse['location'])): ?>
                                             <i class="bi bi-geo-alt text-primary"></i> <?= htmlspecialchars($warehouse['location'] ?? '') ?>
                                         <?php else: ?>
-                                            <span class="text-muted fst-italic">No location</span>
+                                            <span class="text-muted fst-italic"><?= t('No location') ?></span>
                                         <?php endif; ?>
                                         <?php if (!empty($warehouse['address'])): ?>
                                             <br><small class="text-muted"><?= htmlspecialchars(substr($warehouse['address'] ?? '', 0, 50)) ?><?= strlen($warehouse['address'] ?? '') > 50 ? '...' : '' ?></small>
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <div class="fw-bold"><?= htmlspecialchars($warehouse['contact_person'] ?? 'N/A') ?></div>
+                                        <div class="fw-bold"><?= htmlspecialchars($warehouse['contact_person'] ?? t('N/A')) ?></div>
                                         <small class="text-muted"><?= htmlspecialchars($warehouse['phone'] ?? '-') ?></small>
                                     </td>
                                     <td class="text-center">
@@ -974,13 +986,13 @@ function get_primary_badge($is_primary) {
                                     <td class="text-center">
                                         <span class="badge bg-secondary"><?= $warehouse['product_count'] ?></span>
                                         <?php if (($warehouse['low_stock_count'] ?? 0) > 0): ?>
-                                            <br><span class="badge bg-warning text-dark mt-1" title="Below reorder level"><i class="bi bi-exclamation-triangle-fill me-1"></i><?= $warehouse['low_stock_count'] ?> low</span>
+                                            <br><span class="badge bg-warning text-dark mt-1" title="<?= t('Below reorder level') ?>"><i class="bi bi-exclamation-triangle-fill me-1"></i><?= $warehouse['low_stock_count'] ?> <?= t('low') ?></span>
                                         <?php endif; ?>
                                         <?php if (($warehouse['zero_stock_count'] ?? 0) > 0): ?>
-                                            <br><span class="badge bg-danger mt-1" title="Out of stock"><i class="bi bi-x-circle-fill me-1"></i><?= $warehouse['zero_stock_count'] ?> out</span>
+                                            <br><span class="badge bg-danger mt-1" title="<?= t('Out of stock') ?>"><i class="bi bi-x-circle-fill me-1"></i><?= $warehouse['zero_stock_count'] ?> <?= t('out') ?></span>
                                         <?php endif; ?>
                                         <?php if (($warehouse['overstock_count'] ?? 0) > 0): ?>
-                                            <br><span class="badge bg-info mt-1" title="Overstocked"><i class="bi bi-arrow-up-circle-fill me-1"></i><?= $warehouse['overstock_count'] ?> over</span>
+                                            <br><span class="badge bg-info mt-1" title="<?= t('Overstocked') ?>"><i class="bi bi-arrow-up-circle-fill me-1"></i><?= $warehouse['overstock_count'] ?> <?= t('over') ?></span>
                                         <?php endif; ?>
                                         <?php
                                         $in30  = (float)($warehouse['inbound_30d']  ?? 0);
@@ -988,9 +1000,9 @@ function get_primary_badge($is_primary) {
                                         if ($in30 > 0 || $out30 > 0):
                                         ?>
                                         <div class="mt-1 text-nowrap" style="font-size:0.68rem;line-height:1.3;">
-                                            <span class="text-success" title="Units received in last 30 days"><i class="bi bi-box-arrow-in-down"></i> <?= number_format($in30, 0) ?></span>
+                                            <span class="text-success" title="<?= t('Units received in last 30 days') ?>"><i class="bi bi-box-arrow-in-down"></i> <?= number_format($in30, 0) ?></span>
                                             &nbsp;&middot;&nbsp;
-                                            <span class="text-danger" title="Units dispatched in last 30 days"><i class="bi bi-box-arrow-up"></i> <?= number_format($out30, 0) ?></span>
+                                            <span class="text-danger" title="<?= t('Units dispatched in last 30 days') ?>"><i class="bi bi-box-arrow-up"></i> <?= number_format($out30, 0) ?></span>
                                         </div>
                                         <?php endif; ?>
                                     </td>
@@ -1007,7 +1019,7 @@ function get_primary_badge($is_primary) {
                                             $t_icon  = $trend >= 0 ? 'bi-arrow-up-short' : 'bi-arrow-down-short';
                                             $t_sign  = $trend >= 0 ? '+' : '';
                                         ?>
-                                        <span class="ms-1 small text-<?= $t_color ?>" title="vs 30 days ago"><i class="bi <?= $t_icon ?>"></i><?= $t_sign . number_format($trend, 1) ?>%</span>
+                                        <span class="ms-1 small text-<?= $t_color ?>" title="<?= t('vs 30 days ago') ?>"><i class="bi <?= $t_icon ?>"></i><?= $t_sign . number_format($trend, 1) ?>%</span>
                                         <?php endif; ?>
                                         <?php
                                         $wh_cap = (float)($warehouse['capacity'] ?? 0);
@@ -1029,7 +1041,7 @@ function get_primary_badge($is_primary) {
                                     </td>
                                     <td class="text-center">
                                         <span class="badge bg-<?= get_status_badge($warehouse['status'] ?? '') ?>">
-                                            <?= ucfirst($warehouse['status'] ?? '') ?>
+                                            <?= t(ucfirst($warehouse['status'] ?? '')) ?>
                                         </span>
                                     </td>
                                     <td class="text-center">
@@ -1040,35 +1052,35 @@ function get_primary_badge($is_primary) {
                                             <ul class="dropdown-menu dropdown-menu-end">
                                                 <li>
                                                     <a class="dropdown-item" href="#" onclick="viewWarehouse(<?= $warehouse['warehouse_id'] ?>)">
-                                                        <i class="bi bi-eye text-primary"></i> View Details
+                                                        <i class="bi bi-eye text-primary"></i> <?= t('View Details') ?>
                                                     </a>
                                                 </li>
                                                 <?php if ($can_edit_warehouses): ?>
                                                 <li>
-                                                    <a class="dropdown-item" href="#" 
-                                                       data-bs-toggle="modal" 
+                                                    <a class="dropdown-item" href="#"
+                                                       data-bs-toggle="modal"
                                                        data-bs-target="#editWarehouseModal"
                                                        onclick="loadWarehouseData(<?= $warehouse['warehouse_id'] ?>)">
-                                                        <i class="bi bi-pencil text-warning"></i> Edit
+                                                        <i class="bi bi-pencil text-warning"></i> <?= t('Edit') ?>
                                                     </a>
                                                 </li>
                                                 <?php endif; ?>
                                                 <li><hr class="dropdown-divider"></li>
                                                 <li>
                                                     <a class="dropdown-item" href="#" onclick="manageLocations(<?= $warehouse['warehouse_id'] ?>)">
-                                                        <i class="bi bi-map text-info"></i> Manage Locations
+                                                        <i class="bi bi-map text-info"></i> <?= t('Manage Locations') ?>
                                                     </a>
                                                 </li>
                                                 <li>
                                                     <a class="dropdown-item" href="#" onclick="transferStock(<?= $warehouse['warehouse_id'] ?>)">
-                                                        <i class="bi bi-truck text-success"></i> Transfer Stock
+                                                        <i class="bi bi-truck text-success"></i> <?= t('Transfer Stock') ?>
                                                     </a>
                                                 </li>
                                                 <?php if ($can_delete_warehouses): ?>
                                                 <li><hr class="dropdown-divider"></li>
                                                 <li>
                                                     <a class="dropdown-item text-danger" href="#" onclick="deleteWarehouse(<?= $warehouse['warehouse_id'] ?>)">
-                                                        <i class="bi bi-trash"></i> Delete
+                                                        <i class="bi bi-trash"></i> <?= t('Delete') ?>
                                                     </a>
                                                 </li>
                                                 <?php endif; ?>
@@ -1083,11 +1095,11 @@ function get_primary_badge($is_primary) {
                 <?php else: ?>
                     <div class="text-center py-5">
                         <i class="bi bi-inbox" style="font-size: 4rem; color: #ccc;"></i>
-                        <h4 class="mt-3">No Warehouses Found</h4>
-                        <p class="text-muted">Start by adding your first warehouse.</p>
+                        <h4 class="mt-3"><?= t('No Warehouses Found') ?></h4>
+                        <p class="text-muted"><?= t('Start by adding your first warehouse.') ?></p>
                         <?php if ($can_add_warehouses): ?>
                         <button type="button" class="btn btn-primary mt-3" data-bs-toggle="modal" data-bs-target="#addWarehouseModal">
-                            <i class="bi bi-plus-circle"></i> Add New Warehouse
+                            <i class="bi bi-plus-circle"></i> <?= t('Add New Warehouse') ?>
                         </button>
                         <?php endif; ?>
                     </div>
@@ -1105,106 +1117,106 @@ function get_primary_badge($is_primary) {
                     <input type="hidden" name="add_warehouse" value="1">
                     
                     <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Add New Warehouse</h5>
+                        <h5 class="modal-title"><i class="bi bi-plus-circle"></i> <?= t('Add New Warehouse') ?></h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    
+
                     <div class="modal-body">
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="warehouse_name" class="form-label">Warehouse Name *</label>
+                                <label for="warehouse_name" class="form-label"><?= t('Warehouse Name') ?> *</label>
                                 <input type="text" class="form-control" id="warehouse_name" name="warehouse_name" required>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="warehouse_code" class="form-label">Warehouse Code <span class="text-muted">(Auto-generated)</span></label>
+                                <label for="warehouse_code" class="form-label"><?= t('Warehouse Code') ?> <span class="text-muted">(<?= t('Auto-generated') ?>)</span></label>
                                 <input type="text" class="form-control bg-light" id="warehouse_code" name="warehouse_code" value="<?= $next_warehouse_code ?>" readonly required>
-                                <small class="text-muted">Unique code automatically assigned by system</small>
+                                <small class="text-muted"><?= t('Unique code automatically assigned by system') ?></small>
                             </div>
                         </div>
-                        
+
                         <?php if (projectsModuleActive()): ?>
                         <div class="row">
                             <div class="col-md-12 mb-3">
-                                <label for="project_id" class="form-label">Project (Optional)</label>
+                                <label for="project_id" class="form-label"><?= t('Project (Optional)') ?></label>
                                 <select class="form-select" id="project_id" name="project_id">
-                                    <option value="">-- No Specific Project --</option>
+                                    <option value=""><?= t('-- No Specific Project --') ?></option>
                                     <?php foreach ($active_projects as $project): ?>
                                         <option value="<?= $project['project_id'] ?>"><?= htmlspecialchars($project['project_name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                                <small class="text-muted">Link this warehouse to a specific project</small>
+                                <small class="text-muted"><?= t('Link this warehouse to a specific project') ?></small>
                             </div>
                         </div>
                         <?php endif; ?>
                         </div>
-                        
+
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="address" class="form-label">Address</label>
+                                <label for="address" class="form-label"><?= t('Address') ?></label>
                                 <input type="text" class="form-control" id="address" name="address">
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="city" class="form-label">City</label>
+                                <label for="city" class="form-label"><?= t('City') ?></label>
                                 <input type="text" class="form-control" id="city" name="city">
                             </div>
                         </div>
-                        
+
                         <div class="row">
                             <div class="col-md-4 mb-3">
-                                <label for="country" class="form-label">Country</label>
+                                <label for="country" class="form-label"><?= t('Country') ?></label>
                                 <input type="text" class="form-control" id="country" name="country" value="Tanzania">
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label for="state" class="form-label">Region</label>
+                                <label for="state" class="form-label"><?= t('Region') ?></label>
                                 <input type="text" class="form-control" id="state" name="state">
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label for="postal_code" class="form-label">Postal Code</label>
+                                <label for="postal_code" class="form-label"><?= t('Postal Code') ?></label>
                                 <input type="text" class="form-control" id="postal_code" name="postal_code">
                             </div>
                         </div>
-                        
+
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="phone" class="form-label">Phone</label>
+                                <label for="phone" class="form-label"><?= t('Phone') ?></label>
                                 <input type="tel" class="form-control" id="phone" name="phone">
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="email" class="form-label">Email</label>
+                                <label for="email" class="form-label"><?= t('Email') ?></label>
                                 <input type="email" class="form-control" id="email" name="email">
                             </div>
                         </div>
-                        
+
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="manager_name" class="form-label">Manager Name</label>
+                                <label for="manager_name" class="form-label"><?= t('Manager Name') ?></label>
                                 <input type="text" class="form-control" id="manager_name" name="manager_name">
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="manager_phone" class="form-label">Manager Phone</label>
+                                <label for="manager_phone" class="form-label"><?= t('Manager Phone') ?></label>
                                 <input type="tel" class="form-control" id="manager_phone" name="manager_phone">
                             </div>
                         </div>
-                        
+
                         <div class="row">
                             <div class="col-md-4 mb-3">
-                                <label for="capacity" class="form-label">Capacity (units)</label>
+                                <label for="capacity" class="form-label"><?= t('Capacity (units)') ?></label>
                                 <input type="number" class="form-control" id="capacity" name="capacity" min="0" step="1">
-                                <small class="text-muted">Maximum storage capacity</small>
+                                <small class="text-muted"><?= t('Maximum storage capacity') ?></small>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label for="status" class="form-label">Status</label>
+                                <label for="status" class="form-label"><?= t('Status') ?></label>
                                 <select class="form-select" id="status" name="status" required>
-                                    <option value="active" selected>Active</option>
-                                    <option value="inactive">Inactive</option>
-                                    <option value="maintenance">Maintenance</option>
+                                    <option value="active" selected><?= t('Active') ?></option>
+                                    <option value="inactive"><?= t('Inactive') ?></option>
+                                    <option value="maintenance"><?= t('Maintenance') ?></option>
                                 </select>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <div class="form-check mt-4">
                                     <input class="form-check-input" type="checkbox" id="is_primary" name="is_primary">
                                     <label class="form-check-label" for="is_primary">
-                                        Set as Primary Warehouse
+                                        <?= t('Set as Primary Warehouse') ?>
                                     </label>
                                 </div>
                             </div>
@@ -1212,25 +1224,25 @@ function get_primary_badge($is_primary) {
 
                         <div class="row">
                             <div class="col-md-4 mb-3">
-                                <label for="pos_mode" class="form-label">POS Mode</label>
+                                <label for="pos_mode" class="form-label"><?= t('POS Mode') ?></label>
                                 <select class="form-select" id="pos_mode" name="pos_mode">
-                                    <option value="retail" selected>Retail</option>
-                                    <option value="restaurant">Restaurant</option>
-                                    <option value="hybrid">Hybrid (Retail + Restaurant)</option>
+                                    <option value="retail" selected><?= t('Retail') ?></option>
+                                    <option value="restaurant"><?= t('Restaurant') ?></option>
+                                    <option value="hybrid"><?= t('Hybrid (Retail + Restaurant)') ?></option>
                                 </select>
-                                <small class="text-muted">Restaurant/Hybrid unlocks Floors &amp; Tables, Kitchen Display, Reservations for this warehouse in POS.</small>
+                                <small class="text-muted"><?= t('Restaurant/Hybrid unlocks Floors & Tables, Kitchen Display, Reservations for this warehouse in POS.') ?></small>
                             </div>
                         </div>
 
                         <div class="mb-3">
-                            <label for="notes" class="form-label">Notes</label>
+                            <label for="notes" class="form-label"><?= t('Notes') ?></label>
                             <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
                         </div>
                     </div>
 
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Save Warehouse</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                        <button type="submit" class="btn btn-primary"><?= t('Save Warehouse') ?></button>
                     </div>
                 </form>
             </div>
@@ -1247,19 +1259,19 @@ function get_primary_badge($is_primary) {
                     <input type="hidden" id="edit_warehouse_id" name="warehouse_id">
                     
                     <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Warehouse</h5>
+                        <h5 class="modal-title"><i class="bi bi-pencil"></i> <?= t('Edit Warehouse') ?></h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    
+
                     <div class="modal-body">
                         <div id="editFormContent">
                             <!-- Content loaded via JavaScript -->
                         </div>
                     </div>
-                    
+
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Update Warehouse</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                        <button type="submit" class="btn btn-primary"><?= t('Update Warehouse') ?></button>
                     </div>
                 </form>
             </div>
@@ -1272,32 +1284,32 @@ function get_primary_badge($is_primary) {
             <div class="modal-content">
                 <form method="GET" action="">
                     <div class="modal-header">
-                        <h5 class="modal-title"><i class="bi bi-funnel"></i> Filters</h5>
+                        <h5 class="modal-title"><i class="bi bi-funnel"></i> <?= t('Filters') ?></h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    
+
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label for="search" class="form-label">Search</label>
-                            <input type="text" class="form-control" id="search" name="search" 
-                                   value="<?= htmlspecialchars($search) ?>" 
-                                   placeholder="Search by name, code, or city">
+                            <label for="search" class="form-label"><?= t('Search') ?></label>
+                            <input type="text" class="form-control" id="search" name="search"
+                                   value="<?= htmlspecialchars($search) ?>"
+                                   placeholder="<?= t('Search by name, code, or city') ?>">
                         </div>
-                        
+
                         <div class="mb-3">
-                            <label for="status" class="form-label">Status</label>
+                            <label for="status" class="form-label"><?= t('Status') ?></label>
                             <select class="form-select" id="status" name="status">
-                                <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>>All Statuses</option>
-                                <option value="active" <?= $status_filter == 'active' ? 'selected' : '' ?>>Active</option>
-                                <option value="inactive" <?= $status_filter == 'inactive' ? 'selected' : '' ?>>Inactive</option>
-                                <option value="maintenance" <?= $status_filter == 'maintenance' ? 'selected' : '' ?>>Maintenance</option>
+                                <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>><?= t('All Statuses') ?></option>
+                                <option value="active" <?= $status_filter == 'active' ? 'selected' : '' ?>><?= t('Active') ?></option>
+                                <option value="inactive" <?= $status_filter == 'inactive' ? 'selected' : '' ?>><?= t('Inactive') ?></option>
+                                <option value="maintenance" <?= $status_filter == 'maintenance' ? 'selected' : '' ?>><?= t('Maintenance') ?></option>
                             </select>
                         </div>
                     </div>
-                    
+
                     <div class="modal-footer">
-                        <a href="warehouses.php" class="btn btn-outline-secondary">Clear All</a>
-                        <button type="submit" class="btn btn-primary">Apply Filters</button>
+                        <a href="warehouses.php" class="btn btn-outline-secondary"><?= t('Clear All') ?></a>
+                        <button type="submit" class="btn btn-primary"><?= t('Apply Filters') ?></button>
                     </div>
                 </form>
             </div>
@@ -1322,8 +1334,8 @@ function get_primary_badge($is_primary) {
             error: function() {
                 Swal.fire({
                     icon: 'error',
-                    title: 'Load Error',
-                    text: 'Error loading warehouse data. Please try again.'
+                    title: <?= json_encode(t('Load Error')) ?>,
+                    text: <?= json_encode(t('Error loading warehouse data. Please try again.')) ?>
                 });
             }
         });
@@ -1346,31 +1358,31 @@ function get_primary_badge($is_primary) {
             csrf_token: '<?= $_SESSION['csrf_token'] ?>'
         }, function(res) {
             if (!res.success) {
-                Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+                Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: res.message });
                 return;
             }
 
             // Build warning lines
             let lines = [];
             if (res.product_count > 0) {
-                lines.push(`• ${res.product_count} product(s) with ${parseFloat(res.total_qty).toLocaleString()} units of stock`);
+                lines.push(`• ${res.product_count} <?= t('product(s) with') ?> ${parseFloat(res.total_qty).toLocaleString()} <?= t('units of stock') ?>`);
             }
             if (res.location_count > 0) {
-                lines.push(`• ${res.location_count} storage location(s)`);
+                lines.push(`• ${res.location_count} <?= t('storage location(s)') ?>`);
             }
             const detail = lines.length
-                ? 'The following will also be permanently removed:\n\n' + lines.join('\n') + '\n\n'
+                ? <?= json_encode(t('The following will also be permanently removed:')) ?> + '\n\n' + lines.join('\n') + '\n\n'
                 : '';
 
             // Step 2 — confirm with full details
             Swal.fire({
-                title: 'Delete Warehouse?',
-                text: detail + 'This action cannot be undone.',
+                title: <?= json_encode(t('Delete Warehouse?')) ?>,
+                text: detail + <?= json_encode(t('This action cannot be undone.')) ?>,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#d33',
                 cancelButtonColor: '#aaa',
-                confirmButtonText: 'Yes, delete everything!'
+                confirmButtonText: <?= json_encode(t('Yes, delete everything!')) ?>
             }).then((result) => {
                 if (!result.isConfirmed) return;
 
@@ -1388,8 +1400,8 @@ function get_primary_badge($is_primary) {
                         if (res2.success) {
                             Swal.fire({
                                 icon: 'success',
-                                title: 'Deleted!',
-                                text: 'Warehouse has been deleted successfully.',
+                                title: <?= json_encode(t('Deleted!')) ?>,
+                                text: <?= json_encode(t('Warehouse has been deleted successfully.')) ?>,
                                 timer: 2000,
                                 showConfirmButton: false
                             }).then(() => {
@@ -1399,7 +1411,7 @@ function get_primary_badge($is_primary) {
                         } else {
                             Swal.fire({
                                 icon: 'error',
-                                title: 'Delete Failed',
+                                title: <?= json_encode(t('Delete Failed')) ?>,
                                 text: res2.message
                             });
                         }
@@ -1407,8 +1419,8 @@ function get_primary_badge($is_primary) {
                     error: function() {
                         Swal.fire({
                             icon: 'error',
-                            title: 'Server Error',
-                            text: 'Error deleting warehouse. Please try again.'
+                            title: <?= json_encode(t('Server Error')) ?>,
+                            text: <?= json_encode(t('Error deleting warehouse. Please try again.')) ?>
                         });
                     }
                 });
@@ -1419,21 +1431,22 @@ function get_primary_badge($is_primary) {
     function toggleWarehouseStatus(warehouseId, currentStatus) {
         const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
         const action = newStatus === 'active' ? 'activate' : 'deactivate';
-        
+        const actionLabel = newStatus === 'active' ? <?= json_encode(t('activate')) ?> : <?= json_encode(t('deactivate')) ?>;
+
         Swal.fire({
-            title: 'Confirm Action',
-            text: `Are you sure you want to ${action} this warehouse?`,
+            title: <?= json_encode(t('Confirm Action')) ?>,
+            text: <?= json_encode(t('Are you sure you want to %s this warehouse?')) ?>.replace('%s', actionLabel),
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: '#3085d6',
             cancelButtonColor: '#aaa',
-            confirmButtonText: `Yes, ${action} it!`
+            confirmButtonText: <?= json_encode(t('Yes, %s it!')) ?>.replace('%s', actionLabel)
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({
                     url: 'ajax_toggle_warehouse_status.php',
                     type: 'POST',
-                    data: { 
+                    data: {
                         warehouse_id: warehouseId,
                         new_status: newStatus,
                         csrf_token: '<?= $_SESSION['csrf_token'] ?>'
@@ -1441,10 +1454,11 @@ function get_primary_badge($is_primary) {
                     success: function(response) {
                         const result = JSON.parse(response);
                         if (result.success) {
+                            const doneLabel = newStatus === 'active' ? <?= json_encode(t('activated')) ?> : <?= json_encode(t('deactivated')) ?>;
                             Swal.fire({
                                 icon: 'success',
-                                title: 'Status Updated',
-                                text: `Warehouse ${action}d successfully!`,
+                                title: <?= json_encode(t('Status Updated')) ?>,
+                                text: `<?= t('Warehouse') ?> ${doneLabel} <?= t('successfully!') ?>`,
                                 timer: 1500,
                                 showConfirmButton: false
                             }).then(() => {
@@ -1454,7 +1468,7 @@ function get_primary_badge($is_primary) {
                         } else {
                             Swal.fire({
                                 icon: 'error',
-                                title: 'Update Failed',
+                                title: <?= json_encode(t('Update Failed')) ?>,
                                 text: result.message
                             });
                         }
@@ -1462,8 +1476,8 @@ function get_primary_badge($is_primary) {
                     error: function() {
                         Swal.fire({
                             icon: 'error',
-                            title: 'Server Error',
-                            text: 'Error updating warehouse status. Please try again.'
+                            title: <?= json_encode(t('Server Error')) ?>,
+                            text: <?= json_encode(t('Error updating warehouse status. Please try again.')) ?>
                         });
                     }
                 });
@@ -1473,19 +1487,19 @@ function get_primary_badge($is_primary) {
 
     function setPrimaryWarehouse(warehouseId) {
         Swal.fire({
-            title: 'Set as Primary?',
-            text: 'Are you sure you want to set this warehouse as primary? All other warehouses will be set as non-primary.',
+            title: <?= json_encode(t('Set as Primary?')) ?>,
+            text: <?= json_encode(t('Are you sure you want to set this warehouse as primary? All other warehouses will be set as non-primary.')) ?>,
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: '#3085d6',
             cancelButtonColor: '#aaa',
-            confirmButtonText: 'Yes, set as primary'
+            confirmButtonText: <?= json_encode(t('Yes, set as primary')) ?>
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({
                     url: 'ajax_set_primary_warehouse.php',
                     type: 'POST',
-                    data: { 
+                    data: {
                         warehouse_id: warehouseId,
                         csrf_token: '<?= $_SESSION['csrf_token'] ?>'
                     },
@@ -1494,8 +1508,8 @@ function get_primary_badge($is_primary) {
                         if (result.success) {
                             Swal.fire({
                                 icon: 'success',
-                                title: 'Primary Updated',
-                                text: 'Primary warehouse updated successfully!',
+                                title: <?= json_encode(t('Primary Updated')) ?>,
+                                text: <?= json_encode(t('Primary warehouse updated successfully!')) ?>,
                                 timer: 2000,
                                 showConfirmButton: false
                             }).then(() => {
@@ -1505,7 +1519,7 @@ function get_primary_badge($is_primary) {
                         } else {
                             Swal.fire({
                                 icon: 'error',
-                                title: 'Update Failed',
+                                title: <?= json_encode(t('Update Failed')) ?>,
                                 text: result.message
                             });
                         }
@@ -1513,8 +1527,8 @@ function get_primary_badge($is_primary) {
                     error: function() {
                         Swal.fire({
                             icon: 'error',
-                            title: 'Server Error',
-                            text: 'Error updating primary warehouse. Please try again.'
+                            title: <?= json_encode(t('Server Error')) ?>,
+                            text: <?= json_encode(t('Error updating primary warehouse. Please try again.')) ?>
                         });
                     }
                 });
@@ -1526,7 +1540,7 @@ function get_primary_badge($is_primary) {
     function exportWarehouses() {
         logReportAction('Exported Warehouse List', 'User exported warehouse records to CSV');
         const table = document.getElementById('warehousesTable');
-        let csv = 'Code,Name,Location,Contact,Locations,Products,Stock Value,Status\n';
+        let csv = '<?= t('Code') ?>,<?= t('Name') ?>,<?= t('Location') ?>,<?= t('Contact') ?>,<?= t('Locations') ?>,<?= t('Products') ?>,<?= t('Stock Value') ?>,<?= t('Status') ?>\n';
         
         const rows = table.querySelectorAll('tbody tr');
         rows.forEach(row => {
@@ -1561,15 +1575,15 @@ function get_primary_badge($is_primary) {
             lengthChange: false, // Disable built-in length menu (we have custom one in actions bar)
             order: [[7, 'desc']], // Sort by Stock Value
             language: {
-                search: "Search:",
-                info: "Showing _START_ to _END_ of _TOTAL_ entries",
-                infoEmpty: "Showing 0 to 0 of 0 entries",
-                infoFiltered: "(filtered from _MAX_ total entries)",
+                search: <?= json_encode(t('Search:')) ?>,
+                info: <?= json_encode(t('Showing _START_ to _END_ of _TOTAL_ entries')) ?>,
+                infoEmpty: <?= json_encode(t('Showing 0 to 0 of 0 entries')) ?>,
+                infoFiltered: <?= json_encode(t('(filtered from _MAX_ total entries)')) ?>,
                 paginate: {
-                    first: "First",
-                    last: "Last",
-                    next: "Next",
-                    previous: "Previous"
+                    first: <?= json_encode(t('First')) ?>,
+                    last: <?= json_encode(t('Last')) ?>,
+                    next: <?= json_encode(t('Next')) ?>,
+                    previous: <?= json_encode(t('Previous')) ?>
                 }
             },
             responsive: true,
