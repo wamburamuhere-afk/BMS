@@ -1,5 +1,53 @@
 # BMS Changelog
 
+## 2026-09-11 (feat/tenant-migration-automation) - close the two remaining manual steps in tenant deploy
+
+**Request:** "every migration in production should run automatically and not wait for manual run — is
+there any migration that needs manual run?" Investigation found the tenant migration runner itself was
+already fully auto-wired into `deploy.yml` since 2026-09-02 (a stale `migrations/tenant/README.md` said
+otherwise, now fixed) — but two real gaps remained, both directly explaining how a tenant stayed
+un-migrated for the Restaurant Module/Product Variants schema until it crashed in front of real users.
+
+**1. Silent failure — fixed.** A tenant migration failure (or undecryptable credentials) was logged to a
+file/DB table but never actively told anyone. `notifySuperadminsOfTenantMigrationFailures()` (new, in
+`core/tenant_migration_runner.php`) now emails every superadmin whenever a run leaves any tenant
+un-migrated — platform mail (`core/platform_settings.php`), the same pattern
+`core/module_requests.php`'s `notifySuperadminsOfModuleRequest()` already established for "superadmins
+have no in-app notification center, email is the whole signal." Fail-silent like every other notifier
+here: if platform SMTP isn't configured, it logs why and moves on.
+
+**2. Feature-registry changes needing a manual step — fixed, without touching the script that's
+deliberately manual.** Every new feature-registry entry (like the Comms/Docs toggles) needed a hand-run
+of `scripts/setup_control_db.php` in production before a superadmin could see/toggle it with the right
+label. That script is intentionally NOT automated — it needs `CREATE DATABASE`/`CREATE TABLE` privilege
+a hardened production DB user has no reason to hold, and auto-running it caused a real outage on
+2026-08-31 (documented in that script's own docblock). Instead, extracted just the low-privilege part —
+`syncFeatureCatalogue()` (new, in `core/feature_registry.php`) does only an `INSERT IGNORE` into the
+`features` table, which must already exist — ordinary DML, using the exact same restricted credentials
+the tenant migration runner already uses successfully in production every deploy. Wired to run
+automatically at the start of every real (non-`--dry-run`) invocation of
+`core/tenant_migration_runner.php` — no new deploy.yml step needed, since that runner already executes
+automatically on every push to `main`.
+
+**Files (modified):** `core/tenant_migration_runner.php` (new
+`notifySuperadminsOfTenantMigrationFailures()`, called at the end of the CLI run whenever any tenant
+failed; catalogue sync call added at the start of a real run), `core/feature_registry.php` (new
+`syncFeatureCatalogue()`), `migrations/tenant/README.md` (both fixes documented in place of the two gap
+notes; also fixed the stale "Not wired into deploy.yml yet" claim about the runner itself, which
+actually has been wired in since 2026-09-02).
+
+**Files (modified — tests):** `tests/test_tenant_migration_runner_cli.php` — 2 new sections, 14 new
+assertions: deletes and restores a real feature-catalogue row to prove the sync reads the live code
+registry (not a stale/hardcoded list) and never clobbers an operator's own edit to an existing row;
+confirms `--dry-run` skips the sync while a real run performs it; confirms the alert function never
+throws (empty list, and a synthetic failure with no SMTP configured) and is actually invoked by the CLI
+flow after a real broken-migration failure (reusing this same suite's own section 7 fixture).
+
+Verified live: full suite 50/50 (up from 36), `tests/test_feature_registry_cli.php` still 124/125 (the
+one failure is the same pre-existing, unrelated real-tenant data drift noted in the previous entry).
+
+---
+
 ## 2026-09-11 (feat/comms-docs-toggle-modules) - "Comms" and "Docs" are now superadmin-switchable modules
 
 **Request:** product owner asked for "comms" and "docs" to become modules a superadmin can switch on/off

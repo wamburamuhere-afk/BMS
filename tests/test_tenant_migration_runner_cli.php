@@ -311,6 +311,87 @@ try {
     putenv('TENANT_MIGRATION_DB_USER'); putenv('TENANT_MIGRATION_DB_PASS');
     ok(strpos((string)$out3, 'refusing') !== false, 'the bootstrap refuses to target bms_control even if pointed at it');
 
+    section('10. Feature catalogue auto-sync (2026-09-11: closes the "run scripts/setup_control_db.php by hand after every registry change" gap)');
+    // scripts/setup_control_db.php is deliberately NOT auto-run (it needs
+    // CREATE DATABASE privilege a hardened prod DB user has no reason to
+    // hold — see that script's own docblock and the 2026-08-31 outage it
+    // documents). syncFeatureCatalogue() is the low-privilege (INSERT IGNORE
+    // into an EXISTING table) subset that IS safe to run on every deploy,
+    // using the exact same restricted credentials core/tenant_migration_runner.php
+    // already uses successfully in production.
+    require_once "$root/core/feature_registry.php";
+    $cpdo = getControlPdo();
+
+    // Pick a real, currently-seeded feature row, delete it, and confirm
+    // syncFeatureCatalogue() puts it back with EXACTLY the code registry's
+    // own values — proves the sync reads bmsFeatureRegistry() correctly,
+    // not a hardcoded/stale list.
+    $probeKey = 'esignature';
+    $before = $cpdo->query("SELECT * FROM features WHERE feature_key = " . $cpdo->quote($probeKey))->fetch(PDO::FETCH_ASSOC);
+    ok($before !== false, "sanity: '$probeKey' is already seeded before this test");
+    if ($before !== false) {
+        $cpdo->prepare("DELETE FROM features WHERE feature_key = ?")->execute([$probeKey]);
+        $syncResult = syncFeatureCatalogue();
+        ok($syncResult['ran'] === true, 'syncFeatureCatalogue() reports ran=true against a live control DB');
+        ok($syncResult['added'] >= 1, "syncFeatureCatalogue() reports at least 1 new key added (got {$syncResult['added']})");
+
+        $after = $cpdo->query("SELECT * FROM features WHERE feature_key = " . $cpdo->quote($probeKey))->fetch(PDO::FETCH_ASSOC);
+        $registryDef = bmsFeatureRegistry()[$probeKey];
+        ok($after !== false, "'$probeKey' row exists again after the sync");
+        ok($after && $after['label'] === $registryDef['label'], "restored row's label matches the code registry ('{$registryDef['label']}')");
+        ok($after && (int)$after['sort_order'] === (int)$registryDef['sort_order'], 'restored row\'s sort_order matches the code registry');
+
+        // Re-running must NOT clobber an operator's own edit to an existing row —
+        // the whole point of INSERT IGNORE over INSERT ... ON DUPLICATE KEY UPDATE.
+        $cpdo->prepare("UPDATE features SET label = ? WHERE feature_key = ?")->execute(['Operator-Renamed Label', $probeKey]);
+        syncFeatureCatalogue();
+        $stillRenamed = $cpdo->query("SELECT label FROM features WHERE feature_key = " . $cpdo->quote($probeKey))->fetchColumn();
+        ok($stillRenamed === 'Operator-Renamed Label', 're-running the sync never overwrites an operator\'s own edit to an existing row');
+
+        // Restore real data exactly (byte for byte, not just re-synced) so this
+        // suite leaves no trace on a row it does not own.
+        $cpdo->prepare("
+            UPDATE features SET label=?, description=?, is_available=?, default_enabled=?, sort_order=?
+            WHERE feature_key=?
+        ")->execute([$before['label'], $before['description'], $before['is_available'], $before['default_enabled'], $before['sort_order'], $probeKey]);
+        $restored = $cpdo->query("SELECT * FROM features WHERE feature_key = " . $cpdo->quote($probeKey))->fetch(PDO::FETCH_ASSOC);
+        ok($restored == $before, "'$probeKey' row restored to its exact original values");
+    }
+
+    // Wiring: --dry-run must NOT sync (its whole contract is "change nothing");
+    // a real, filtered single-tenant run MUST sync.
+    $dryOut = shell_exec('php ' . escapeshellarg("$root/core/tenant_migration_runner.php") . ' --dry-run 2>&1');
+    ok(strpos((string)$dryOut, 'Feature catalogue synced') === false && strpos((string)$dryOut, 'Feature catalogue sync skipped') === false,
+        '--dry-run does not run the catalogue sync at all');
+
+    $realOut = shell_exec('php ' . escapeshellarg("$root/core/tenant_migration_runner.php") . ' --tenant=' . (int)$A['tenant_id'] . ' 2>&1');
+    ok(strpos((string)$realOut, 'Feature catalogue synced') !== false || strpos((string)$realOut, 'Feature catalogue sync skipped') !== false,
+        'a real (non-dry-run) invocation runs the catalogue sync before processing tenants');
+
+    section('11. Superadmin alert on tenant migration failure (2026-09-11: closes the "logged but nobody is told" gap)');
+    ok(function_exists('notifySuperadminsOfTenantMigrationFailures'), 'notifySuperadminsOfTenantMigrationFailures() is defined');
+    try {
+        notifySuperadminsOfTenantMigrationFailures([]);
+        ok(true, 'called with an empty failure list — returns immediately, no side effect, does not throw');
+    } catch (Throwable $e) {
+        ok(false, 'threw on an empty failure list: ' . $e->getMessage());
+    }
+    try {
+        notifySuperadminsOfTenantMigrationFailures([
+            ['id' => 999999, 'subdomain' => 'faketenant', 'failed' => 'fake_migration.php', 'error' => "SQLSTATE[42S22]: Column not found"],
+        ]);
+        ok(true, 'called with a synthetic failure — never throws even when platform SMTP is not configured (fail-silent, matches every other notifier in this codebase)');
+    } catch (Throwable $e) {
+        ok(false, 'threw on a synthetic failure list: ' . $e->getMessage());
+    }
+    // Live wiring proof, reusing section 7's own real broken-migration
+    // scenario captured in the log file above: an actual failed run must
+    // mention the alert step (either it emailed, or it explains why it
+    // could not — SMTP not configured is expected and fine on a test box).
+    $logTail = @file_get_contents(__DIR__ . '/../migrations/tenant_deploy.log');
+    ok($logTail !== false && (strpos($logTail, 'Alert emailed to every superadmin') !== false),
+        'the CLI flow logs that the alert step ran after section 7\'s real broken-migration failure earlier in this suite');
+
 } catch (Throwable $e) {
     $fail++;
     echo "\n\033[31mFATAL: " . $e->getMessage() . "\033[0m\n";
