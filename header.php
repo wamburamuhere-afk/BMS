@@ -910,7 +910,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <li><a class="dropdown-item" href="<?= getUrl('delivery_notes') ?>?type=outbound"><i class="bi bi-box-arrow-up-right"></i> <?= t('DN (Outbound)') ?></a></li>
                                 <?php endif; ?>
                                 <?php if(canView('pos')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('pos/dashboard') ?>"><i class="bi bi-cart-check"></i> <?= t('POS') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> <?= t('POS') ?></a></li>
                                 <?php endif; ?>
                                 <li><h6 class="dropdown-header"><?= t('Returns') ?></h6></li>
                                 <?php if(canView('sales_returns')): ?>
@@ -923,7 +923,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         </li>
                         <?php elseif(canView('pos')): ?>
                         <li class="nav-item">
-                            <a class="nav-link" href="<?= getUrl('pos/dashboard') ?>">
+                            <a class="nav-link" href="<?= getUrl('pos') ?>">
                                 <i class="bi bi-cart-check"></i> <?= t('POS') ?>
                             </a>
                         </li>

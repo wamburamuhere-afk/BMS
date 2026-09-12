@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-09-12 (feat/pos-terminal-default-landing) - POS terminal is now the direct landing page; stats hub demoted to a secondary "Workspace" link
+
+**Request:** follow-up to the POS UX advisory review ("Now i need to improve much custer user friendly of this system... just only for POS from you experise"), where I flagged that `header.php`'s "POS" nav link sent every user to `pos_dashboard.php` (a stats/shift-history hub) instead of straight to the selling screen — an extra click standing between login and actually ringing up a sale, every single day. User selected this fix explicitly: "For what to implement i will select by number. Implement 1 only for now."
+
+**Fix:** `header.php`'s two POS link targets (the Sales-dropdown item, and the standalone link shown when the Sales module is closed) now point at `getUrl('pos')` — the terminal itself — instead of `getUrl('pos/dashboard')`. `pos_dashboard.php` has no separate manager-only permission to branch on (same `autoEnforcePermission('pos')` gate as the terminal), so rather than attempting role-based routing the data model doesn't support, the hub stays one click away: added a "Workspace" link (`bi-speedometer2` icon) inside the terminal's own `#posShiftButtons` header row, which already has mobile-responsive flex CSS that evenly redistributes however many buttons are present — no new mobile styling needed. `app/bms/restaurant/index.php`'s "Back to POS Hub" breadcrumb and `app/dashboard.php`'s POS-stats card correctly keep linking to `pos/dashboard` — both are legitimate "go to the hub for stats" entry points, not the daily default. Added 2 new Swahili entries to `lang/sw.php` ("Workspace" / "Sehemu ya Kazi" and its tooltip).
+
+**Tested:** `php -l` clean on all 4 changed files. Updated `tests/test_pos_nav_wiring_cli.php` (62 assertions, all passing): section A's static check now asserts `getUrl('pos')` appears exactly twice in `header.php` and `getUrl('pos/dashboard')` no longer appears at all; section E's live-rendered scenarios (Sales on/off × POS on/off) now match hrefs ending exactly in `/pos` (anchored on the closing quote so `/pos/dashboard`, `/pos/shifts`, and `/pos_config_settings` can't false-match).
+
 ## 2026-09-12 (feat/pos-walkin-receipt-and-enter-to-cart) - POS: receipts always print "Walk-in Customer", Enter key adds to cart
 
 **Request:** "Nataka kama sjamchagua kwenye risit awe kwenye sehemu ya castomer name iwe ni walk in customer. Iandike kabisa kwenye risit." Plus: "kwenye click product then click enter piah namba paganye kazi" — pressing Enter after typing a quantity should add the item to the cart, same as clicking "Add to Cart".
