@@ -25,8 +25,8 @@ require_once __DIR__ . '/../../../header.php';
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <div>
-            <h4 class="mb-0"><i class="bi bi-bell-fill text-primary me-2"></i>Notification Rules</h4>
-            <p class="text-muted mb-0 small">Choose, per event, <strong>who</strong> is notified and on <strong>which channel</strong>. Only users who already have access to that area can be picked.</p>
+            <h4 class="mb-0"><i class="bi bi-bell-fill text-primary me-2"></i><?= t('Notification Rules') ?></h4>
+            <p class="text-muted mb-0 small"><?= t('Choose, per event,') ?> <strong><?= t('who') ?></strong> <?= t('is notified and on') ?> <strong><?= t('which channel') ?></strong>. <?= t('Only users who already have access to that area can be picked.') ?></p>
         </div>
     </div>
 
@@ -35,17 +35,17 @@ require_once __DIR__ . '/../../../header.php';
         <div class="card-body d-flex flex-wrap gap-4 align-items-center">
             <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" id="g_master" onchange="setGlobal('notif_master_enabled', this.checked)">
-                <label class="form-check-label fw-semibold" for="g_master">Master switch <span class="text-muted small">(all notifications)</span></label>
+                <label class="form-check-label fw-semibold" for="g_master"><?= t('Master switch') ?> <span class="text-muted small">(<?= t('all notifications') ?>)</span></label>
             </div>
             <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" id="g_email" onchange="setGlobal('enable_email_notifications', this.checked)">
-                <label class="form-check-label fw-semibold" for="g_email">Email channel <span class="text-muted small">(global on/off)</span></label>
+                <label class="form-check-label fw-semibold" for="g_email"><?= t('Email channel') ?> <span class="text-muted small">(<?= t('global on/off') ?>)</span></label>
             </div>
             <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" id="g_digest" onchange="setGlobal('notif_digest_enabled', this.checked)">
-                <label class="form-check-label fw-semibold" for="g_digest">AI daily digest <span class="text-muted small">(one summary email/day)</span></label>
+                <label class="form-check-label fw-semibold" for="g_digest"><?= t('AI daily digest') ?> <span class="text-muted small">(<?= t('one summary email/day') ?>)</span></label>
             </div>
-            <div class="text-muted small ms-auto"><i class="bi bi-info-circle me-1"></i>In-app always works; email also needs SMTP set in <a href="<?= getUrl('system_settings') ?>">Settings → Email</a>.</div>
+            <div class="text-muted small ms-auto"><i class="bi bi-info-circle me-1"></i><?= t('In-app always works; email also needs SMTP set in') ?> <a href="<?= getUrl('system_settings') ?>"><?= t('Settings → Email') ?></a>.</div>
         </div>
     </div>
 
@@ -54,7 +54,7 @@ require_once __DIR__ . '/../../../header.php';
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#notifSettingsCollapse" aria-expanded="false" aria-controls="notifSettingsCollapse">
             <div class="d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-gear-fill text-primary me-2"></i><strong>Notification Settings</strong> <span class="text-muted small">— channels, email/SMS templates & alert rules</span></span>
+                <span><i class="bi bi-gear-fill text-primary me-2"></i><strong><?= t('Notification Settings') ?></strong> <span class="text-muted small">— <?= t('channels, email/SMS templates & alert rules') ?></span></span>
                 <i class="bi bi-chevron-down"></i>
             </div>
         </div>
@@ -65,7 +65,7 @@ require_once __DIR__ . '/../../../header.php';
         </div>
     </div>
 
-    <div id="nrLoading" class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading events…</div>
+    <div id="nrLoading" class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span><?= t('Loading events…') ?></div>
     <div id="nrAccordion" class="accordion d-none"></div>
 </div>
 
@@ -74,43 +74,43 @@ require_once __DIR__ . '/../../../header.php';
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header bg-primary text-white">
-        <h5 class="modal-title"><i class="bi bi-person-plus me-1"></i> Add Target</h5>
+        <h5 class="modal-title"><i class="bi bi-person-plus me-1"></i> <?= t('Add Target') ?></h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <form id="addTargetForm" autocomplete="off">
         <div class="modal-body">
           <input type="hidden" id="t_event_key" name="event_key">
-          <div class="mb-2 small text-muted">Event: <strong id="t_event_label"></strong></div>
+          <div class="mb-2 small text-muted"><?= t('Event:') ?> <strong id="t_event_label"></strong></div>
 
           <div class="mb-3">
-            <label class="form-label">Notify <span class="text-danger">*</span></label>
+            <label class="form-label"><?= t('Notify') ?> <span class="text-danger">*</span></label>
             <select class="form-select" id="t_target_type" name="target_type">
-              <option value="permission">Everyone with access</option>
-              <option value="role">A specific role</option>
-              <option value="user">A specific user</option>
+              <option value="permission"><?= t('Everyone with access') ?></option>
+              <option value="role"><?= t('A specific role') ?></option>
+              <option value="user"><?= t('A specific user') ?></option>
             </select>
           </div>
 
           <div class="mb-3 d-none" id="t_role_wrap">
-            <label class="form-label">Role <span class="text-danger">*</span></label>
+            <label class="form-label"><?= t('Role') ?> <span class="text-danger">*</span></label>
             <select class="form-select select2-role" id="t_role" name="role_id" style="width:100%"></select>
           </div>
 
           <div class="mb-3 d-none" id="t_user_wrap">
-            <label class="form-label">User <span class="text-danger">*</span></label>
+            <label class="form-label"><?= t('User') ?> <span class="text-danger">*</span></label>
             <select class="form-select select2-user" id="t_user" name="user_id" style="width:100%"></select>
-            <div class="form-text">If the chosen user lacks access to this area, they simply won't be notified (rules can't grant access).</div>
+            <div class="form-text"><?= t("If the chosen user lacks access to this area, they simply won't be notified (rules can't grant access).") ?></div>
           </div>
 
-          <label class="form-label">Channels <span class="text-danger">*</span></label>
+          <label class="form-label"><?= t('Channels') ?> <span class="text-danger">*</span></label>
           <div class="d-flex gap-3">
-            <div class="form-check"><input class="form-check-input" type="checkbox" id="t_inapp" checked><label class="form-check-label" for="t_inapp">In-app</label></div>
-            <div class="form-check"><input class="form-check-input" type="checkbox" id="t_email"><label class="form-check-label" for="t_email">Email</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="t_inapp" checked><label class="form-check-label" for="t_inapp"><?= t('In-app') ?></label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="t_email"><label class="form-check-label" for="t_email"><?= t('Email') ?></label></div>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> Add</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> <?= t('Add') ?></button>
         </div>
       </form>
     </div>
@@ -122,7 +122,7 @@ require_once __DIR__ . '/../../../header.php';
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header bg-primary text-white">
-        <h5 class="modal-title"><i class="bi bi-people me-1"></i> Who gets notified</h5>
+        <h5 class="modal-title"><i class="bi bi-people me-1"></i> <?= t('Who gets notified') ?></h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body" id="previewBody"></div>
@@ -133,20 +133,49 @@ require_once __DIR__ . '/../../../header.php';
 <script>
 const NR_API = '<?= buildUrl('api/notifications/rules_api.php') ?>';
 let NR_DATA = { roles: [], users: [] };
+const NR_STRINGS = {
+    error: <?= json_encode(t('Error')) ?>,
+    failedToLoad: <?= json_encode(t('Failed to load')) ?>,
+    failedToLoadDot: <?= json_encode(t('Failed to load.')) ?>,
+    noRuleDefault: <?= json_encode(t('No rule — defaults to in-app for everyone with access')) ?>,
+    projectScoped: <?= json_encode(t('(project-scoped)')) ?>,
+    projectScopedBadge: <?= json_encode(t('project-scoped')) ?>,
+    remove: <?= json_encode(t('Remove')) ?>,
+    addTarget: <?= json_encode(t('Add target')) ?>,
+    previewRecipients: <?= json_encode(t('Preview recipients')) ?>,
+    testSendToMe: <?= json_encode(t('Test send (to me)')) ?>,
+    removeTarget: <?= json_encode(t('Remove target?')) ?>,
+    added: <?= json_encode(t('Added')) ?>,
+    resolving: <?= json_encode(t('Resolving…')) ?>,
+    nobodyNotified: <?= json_encode(t('Nobody would be notified. Check the rule targets and that those users have access to')) ?>,
+    recipientsFor: <?= json_encode(t('recipient(s) for')) ?>,
+    name: <?= json_encode(t('Name')) ?>,
+    email: <?= json_encode(t('Email')) ?>,
+    channels: <?= json_encode(t('Channels')) ?>,
+    admin: <?= json_encode(t('admin')) ?>,
+    inApp: <?= json_encode(t('In-app')) ?>,
+    sendingTest: <?= json_encode(t('Sending test…')) ?>,
+    sent: <?= json_encode(t('Sent')) ?>,
+    failed: <?= json_encode(t('Failed')) ?>,
+    selectRole: <?= json_encode(t('-- Select role --')) ?>,
+    selectUser: <?= json_encode(t('-- Select user --')) ?>,
+    selectRolePlaceholder: <?= json_encode(t('Select role')) ?>,
+    typeToSearchUser: <?= json_encode(t('Type to search user')) ?>,
+};
 
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function loadRules() {
     $('#nrLoading').removeClass('d-none'); $('#nrAccordion').addClass('d-none');
     $.getJSON(NR_API, { action: 'list' }, function (res) {
-        if (!res.success) { Swal.fire({icon:'error',title:'Error',text:res.message||'Failed to load'}); return; }
+        if (!res.success) { Swal.fire({icon:'error',title:NR_STRINGS.error,text:res.message||NR_STRINGS.failedToLoad}); return; }
         NR_DATA = res;
         $('#g_master').prop('checked', res.globals.notif_master_enabled === '1');
         $('#g_email').prop('checked', res.globals.enable_email_notifications === '1');
         $('#g_digest').prop('checked', res.globals.notif_digest_enabled === '1');
         renderAccordion(res.events);
         $('#nrLoading').addClass('d-none'); $('#nrAccordion').removeClass('d-none');
-    }).fail(() => { $('#nrLoading').html('<span class="text-danger">Failed to load.</span>'); });
+    }).fail(() => { $('#nrLoading').html('<span class="text-danger">' + NR_STRINGS.failedToLoadDot + '</span>'); });
 }
 
 function renderAccordion(events) {
@@ -177,10 +206,10 @@ function eventCard(e) {
     const chips = (e.rules || []).map(r => `
         <span class="badge bg-light text-dark border me-1 mb-1" style="font-weight:500;">
             ${esc(r.label)} <span class="text-muted">· ${esc(r.channels)}</span>
-            <a href="#" class="text-danger ms-1" onclick="delRule(${r.id});return false;" title="Remove"><i class="bi bi-x-circle"></i></a>
+            <a href="#" class="text-danger ms-1" onclick="delRule(${r.id});return false;" title="${NR_STRINGS.remove}"><i class="bi bi-x-circle"></i></a>
         </span>`).join('');
     const noRules = (e.rules || []).length === 0
-        ? `<span class="text-muted small fst-italic">No rule — defaults to in-app for everyone with access${e.scope_aware ? ' (project-scoped)' : ''}.</span>` : '';
+        ? `<span class="text-muted small fst-italic">${NR_STRINGS.noRuleDefault}${e.scope_aware ? ' ' + NR_STRINGS.projectScoped : ''}.</span>` : '';
     const off = e.is_active ? '' : 'opacity:.55;';
     return `
     <div class="card border-0 shadow-sm mb-2" style="${off}">
@@ -188,7 +217,7 @@ function eventCard(e) {
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
           <div style="min-width:240px;flex:1;">
             <div class="fw-semibold">${esc(e.title)}
-              ${e.scope_aware ? '<span class="badge" style="background:#cfe2ff;color:#084298;">project-scoped</span>' : ''}
+              ${e.scope_aware ? '<span class="badge" style="background:#cfe2ff;color:#084298;">' + NR_STRINGS.projectScopedBadge + '</span>' : ''}
             </div>
             <div class="text-muted small">${esc(e.description || '')} <span class="badge bg-light text-muted border ms-1">${esc(e.event_key)}</span></div>
             <div class="mt-2">${chips}${noRules}</div>
@@ -200,9 +229,9 @@ function eventCard(e) {
             <div class="dropdown">
               <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm" data-bs-toggle="dropdown"><i class="bi bi-gear-fill"></i></button>
               <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
-                <li><button class="dropdown-item py-2 rounded" onclick="openAdd('${esc(e.event_key)}','${esc(e.title)}')"><i class="bi bi-person-plus text-primary me-2"></i>Add target</button></li>
-                <li><button class="dropdown-item py-2 rounded" onclick="previewEvent('${esc(e.event_key)}','${esc(e.title)}')"><i class="bi bi-people text-primary me-2"></i>Preview recipients</button></li>
-                <li><button class="dropdown-item py-2 rounded" onclick="testSend('${esc(e.event_key)}')"><i class="bi bi-send text-primary me-2"></i>Test send (to me)</button></li>
+                <li><button class="dropdown-item py-2 rounded" onclick="openAdd('${esc(e.event_key)}','${esc(e.title)}')"><i class="bi bi-person-plus text-primary me-2"></i>${NR_STRINGS.addTarget}</button></li>
+                <li><button class="dropdown-item py-2 rounded" onclick="previewEvent('${esc(e.event_key)}','${esc(e.title)}')"><i class="bi bi-people text-primary me-2"></i>${NR_STRINGS.previewRecipients}</button></li>
+                <li><button class="dropdown-item py-2 rounded" onclick="testSend('${esc(e.event_key)}')"><i class="bi bi-send text-primary me-2"></i>${NR_STRINGS.testSendToMe}</button></li>
               </ul>
             </div>
           </div>
@@ -213,13 +242,13 @@ function eventCard(e) {
 
 function setGlobal(key, on) {
     $.post(NR_API, { action: 'set_global', key: key, value: on ? 1 : 0 }, function (res) {
-        if (!res.success) Swal.fire({icon:'error',title:'Error',text:res.message});
+        if (!res.success) Swal.fire({icon:'error',title:NR_STRINGS.error,text:res.message});
     }, 'json');
 }
 
 function toggleEvent(key, on) {
     $.post(NR_API, { action: 'toggle_event', event_key: key, is_active: on ? 1 : 0 }, function (res) {
-        if (!res.success) Swal.fire({icon:'error',title:'Error',text:res.message}); else loadRules();
+        if (!res.success) Swal.fire({icon:'error',title:NR_STRINGS.error,text:res.message}); else loadRules();
     }, 'json');
 }
 
@@ -249,51 +278,51 @@ $('#addTargetForm').on('submit', function (e) {
         if (res.success) {
             bootstrap.Modal.getInstance(document.getElementById('addTargetModal')).hide();
             loadRules();
-            Swal.fire({icon:'success',title:'Added',text:res.message,timer:1500,showConfirmButton:false});
-        } else { Swal.fire({icon:'error',title:'Error',text:res.message}); }
+            Swal.fire({icon:'success',title:NR_STRINGS.added,text:res.message,timer:1500,showConfirmButton:false});
+        } else { Swal.fire({icon:'error',title:NR_STRINGS.error,text:res.message}); }
     }, 'json');
 });
 
 function delRule(id) {
-    Swal.fire({title:'Remove target?',icon:'warning',showCancelButton:true,confirmButtonColor:'#dc3545',confirmButtonText:'Remove'})
+    Swal.fire({title:NR_STRINGS.removeTarget,icon:'warning',showCancelButton:true,confirmButtonColor:'#dc3545',confirmButtonText:NR_STRINGS.remove})
       .then(r => { if (!r.isConfirmed) return;
         $.post(NR_API, { action: 'delete', id: id }, function (res) {
-            if (res.success) { loadRules(); } else { Swal.fire({icon:'error',title:'Error',text:res.message}); }
+            if (res.success) { loadRules(); } else { Swal.fire({icon:'error',title:NR_STRINGS.error,text:res.message}); }
         }, 'json');
       });
 }
 
 function previewEvent(key, title) {
-    $('#previewBody').html('<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Resolving…</div>');
+    $('#previewBody').html('<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>' + NR_STRINGS.resolving + '</div>');
     new bootstrap.Modal(document.getElementById('previewModal')).show();
     $.getJSON(NR_API, { action: 'preview', event_key: key }, function (res) {
         if (!res.success) { $('#previewBody').html('<div class="text-danger">'+esc(res.message)+'</div>'); return; }
-        if (!res.count) { $('#previewBody').html('<div class="alert alert-warning mb-0"><i class="bi bi-exclamation-triangle me-1"></i>Nobody would be notified. Check the rule targets and that those users have access to <strong>'+esc(title)+'</strong>.</div>'); return; }
+        if (!res.count) { $('#previewBody').html('<div class="alert alert-warning mb-0"><i class="bi bi-exclamation-triangle me-1"></i>'+NR_STRINGS.nobodyNotified+' <strong>'+esc(title)+'</strong>.</div>'); return; }
         let rows = res.recipients.map(r => `<tr>
-            <td>${esc(r.name)} ${r.is_admin?'<span class="badge bg-primary ms-1">admin</span>':''}</td>
+            <td>${esc(r.name)} ${r.is_admin?'<span class="badge bg-primary ms-1">' + NR_STRINGS.admin + '</span>':''}</td>
             <td class="text-muted">${esc(r.email||'—')}</td>
-            <td>${r.channels.inapp?'<span class="badge" style="background:#cfe2ff;color:#084298;">In-app</span> ':''}${r.channels.email?'<span class="badge bg-primary">Email</span>':''}</td>
+            <td>${r.channels.inapp?'<span class="badge" style="background:#cfe2ff;color:#084298;">' + NR_STRINGS.inApp + '</span> ':''}${r.channels.email?'<span class="badge bg-primary">' + NR_STRINGS.email + '</span>':''}</td>
         </tr>`).join('');
-        $('#previewBody').html('<p class="small text-muted">'+res.count+' recipient(s) for <strong>'+esc(title)+'</strong>:</p>'+
-            '<table class="table table-sm align-middle"><thead><tr><th>Name</th><th>Email</th><th>Channels</th></tr></thead><tbody>'+rows+'</tbody></table>');
+        $('#previewBody').html('<p class="small text-muted">'+res.count+' '+NR_STRINGS.recipientsFor+' <strong>'+esc(title)+'</strong>:</p>'+
+            '<table class="table table-sm align-middle"><thead><tr><th>'+NR_STRINGS.name+'</th><th>'+NR_STRINGS.email+'</th><th>'+NR_STRINGS.channels+'</th></tr></thead><tbody>'+rows+'</tbody></table>');
     });
 }
 
 function testSend(key) {
-    Swal.fire({ title: 'Sending test…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    Swal.fire({ title: NR_STRINGS.sendingTest, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     $.post(NR_API, { action: 'test_send', event_key: key }, function (res) {
-        Swal.fire({ icon: res.success ? 'success' : 'error', title: res.success ? 'Sent' : 'Failed', text: res.message });
+        Swal.fire({ icon: res.success ? 'success' : 'error', title: res.success ? NR_STRINGS.sent : NR_STRINGS.failed, text: res.message });
     }, 'json');
 }
 
 // Init Select2 for role/user pickers when modal opens
 $('#addTargetModal').on('shown.bs.modal', function () {
-    const roleOpts = '<option value="">-- Select role --</option>' + NR_DATA.roles.map(r => `<option value="${r.role_id}">${esc(r.role_name)}</option>`).join('');
-    const userOpts = '<option value="">-- Select user --</option>' + NR_DATA.users.map(u => `<option value="${u.user_id}">${esc(u.name)}</option>`).join('');
+    const roleOpts = '<option value="">' + NR_STRINGS.selectRole + '</option>' + NR_DATA.roles.map(r => `<option value="${r.role_id}">${esc(r.role_name)}</option>`).join('');
+    const userOpts = '<option value="">' + NR_STRINGS.selectUser + '</option>' + NR_DATA.users.map(u => `<option value="${u.user_id}">${esc(u.name)}</option>`).join('');
     ['#t_role','#t_user'].forEach(sel => { if ($(sel).hasClass('select2-hidden-accessible')) $(sel).select2('destroy'); });
     $('#t_role').html(roleOpts); $('#t_user').html(userOpts);
-    $('#t_role').select2({ theme:'bootstrap-5', dropdownParent: $('#addTargetModal'), placeholder:'Select role', allowClear:true, width:'100%' });
-    $('#t_user').select2({ theme:'bootstrap-5', dropdownParent: $('#addTargetModal'), placeholder:'Type to search user', allowClear:true, width:'100%' });
+    $('#t_role').select2({ theme:'bootstrap-5', dropdownParent: $('#addTargetModal'), placeholder:NR_STRINGS.selectRolePlaceholder, allowClear:true, width:'100%' });
+    $('#t_user').select2({ theme:'bootstrap-5', dropdownParent: $('#addTargetModal'), placeholder:NR_STRINGS.typeToSearchUser, allowClear:true, width:'100%' });
 });
 
 $(document).ready(loadRules);
