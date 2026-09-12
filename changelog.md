@@ -1,5 +1,34 @@
 # BMS Changelog
 
+## 2026-09-12 (feat/pos-cart-payment-mobile-fix) - pos.php: Current Sale actions + Payment Method buttons now fit one row on mobile
+
+**Request:** follow-up on the previous cart mobile fix — the Current Sale header buttons (%, Clear, Hold,
+Held Sales), which the prior fix wrapped onto a second line, should instead all stay on ONE row on mobile.
+Separately, the Payment Method row (Cash/Card/Mobile/Bank/Customer Credit) was running one button off the
+right edge of the screen, unreachable — that also needed to fit one row, fully visible, without hiding
+or side-scrolling.
+
+**Fix (`max-width: 767.98px` only, desktop untouched):**
+- Current Sale header: the title and its button group were sharing one row via
+  `justify-content-between`, so the buttons only had the leftover space next to the title — not enough
+  for 4-6 icon buttons without wrapping. Wrapped the header (`#cartHeaderTop`) into two stacked rows —
+  title on its own line, then the button group (`#cartHeaderActions`) below it with the FULL row width to
+  itself — with each icon-only button now `flex: 1 1 0` so they divide that width evenly and never wrap.
+- Payment Method (`#paymentMethodGroup`): same `flex: 1 1 0` treatment so all 5 buttons share the row
+  equally instead of overflowing past the edge. The two longer labels ("Credit/Debit Card", "Customer
+  Credit") swap to a short mobile-only form ("Card", "Credit") via a `d-md-inline`/`d-md-none` pair of
+  spans — desktop still renders the full label unchanged, only the mobile media query's font-size ever
+  applies to the short span.
+- Added the missing Swahili translation for the new "Credit" string in `lang/sw.php` ("Mkopo") — "Card"
+  already existed.
+
+**Tested:** `php -l` clean on both files; live in-process render of `pos.php` (admin session) confirmed
+no PHP warnings and correct output for both payment-method spans under Swahili (short "Kadi"/"Mkopo" vs.
+the full desktop-only label, confirming the `t()` calls resolve correctly for both branches).
+`tests/test_pos_i18n_coverage_cli.php` — 132/132 (was 131/132 before adding the Swahili "Credit" entry,
+which the suite correctly flagged as a missing translation). `tests/test_pos_nav_wiring_cli.php` —
+47/47, no regression.
+
 ## 2026-09-12 (feat/warehouse-mobile-responsive) - warehouses.php + warehouse_view.php no longer scroll left/right on mobile
 
 **Request:** "in warehouse.php and in warehouse > view details... page is not friendly in mobile just
