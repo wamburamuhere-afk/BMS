@@ -1,5 +1,39 @@
 # BMS Changelog
 
+## 2026-09-12 (feat/docs-menu-entitlement-visibility) - "Nyaraka" (Docs) header menu now fully disappears when its features are off
+
+**Request:** when a superadmin switches off Document Library (and the tenant also has no E-Signatures/
+Compliance), the tenant should not see the "Nyaraka" (Docs) header menu at all — screenshot showed the
+menu still opening with two empty section headers ("Usimamizi wa Nyaraka" / Document Management,
+"Uzingatiaji" / Compliance) and only one live link, "Kumbukumbu za Ukaguzi" (Audit Logs).
+
+**Root cause:** `header.php`'s Docs dropdown's outer visibility check
+(`canView('document_library') || ... || canView('audit_logs')`) included `audit_logs` — but `audit_logs`
+is an always-on system report (not tied to the `documents`, `esignature`, or `compliance` features), so
+it alone kept the whole dropdown open — with its two content headers, which were unconditional — for any
+tenant that had switched off every one of the three features actually gating the Docs menu's real items.
+
+**Fix:** removed `audit_logs` from the Docs menu's gate entirely and relocated its link to the Reports
+mega-dropdown's existing "Compliance & Operations" column (next to the pre-existing "Audit Report" — a
+different, already-there report), where it fits contextually and stays reachable regardless of the Docs
+menu's own features. Also made the "Document Management" and "Compliance" `<h6>` section headers inside
+the Docs menu conditional on having at least one visible child (previously unconditional, so an empty
+header could appear even independent of this specific audit_logs issue e.g. if only one of the group's
+own children were off).
+
+**Tested:** live in-process render (`app/dashboard.php`, admin session) under multiple simulated
+tenant-feature maps via a subprocess worker (mirroring `tests/test_pos_nav_wiring_cli.php`'s existing
+pattern) — confirmed: (1) with `documents`/`esignature`/`compliance` all off (the reported case), the
+Docs menu is completely absent from the HTML and Audit Logs still renders under Reports; (2) with only
+`documents` off but `esignature` still on, the Docs menu correctly still shows (grouping E-Sign under
+"Document Management"); (3) with everything on, both headers and all links render as before. Also ran
+`tests/test_pos_nav_wiring_cli.php` (46/47 — the one failure is a stale numstat diff-size guard tied to
+a previous, already-merged phase's specific edit size, which self-resolves once this change is committed
+and the working tree has no diff against `header.php` again) and `tests/test_feature_registry_cli.php`
+(124/125 — Section 13's live entitlement-gating assertions for `documents`/`compliance`/`esignature`
+pass in full; the one unrelated failure, `no entitlement rows were written for the real tenants`, is a
+pre-existing local-DB-state issue in `setup_control_db.php` testing, untouched by this change).
+
 ## 2026-09-11 (feat/mobile-blue-ui-fixes) - products.php mobile toolbar/dropdown blue recolor + pos_dashboard.php uniform hub cards
 
 **Request:** "in products.php the header the below block of header is white and even once we click its
