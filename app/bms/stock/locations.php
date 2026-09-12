@@ -328,6 +328,34 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
         page-break-inside: avoid;
     }
 }
+
+@media (max-width: 767.98px) {
+    body { overflow-x: hidden; }
+    .container-fluid { overflow-x: hidden; padding-left: 0.75rem; padding-right: 0.75rem; }
+
+    /* Actions Bar (Print/Export + Show:N on the left, result count on the
+       right) previously forced onto one un-wrapped flex line — wider than
+       any phone viewport, dragging the whole page left/right. Let it wrap
+       and stack instead of scrolling. The table itself already switches to
+       a dedicated mobile card list (#locationsCards) further down, so no
+       inner table scroll is needed here either. */
+    #locationsActionsBar {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    #locationsActionsBar > div {
+        width: 100%;
+        justify-content: center;
+    }
+    #locationsActionsBar .btn-group .btn {
+        padding-left: 0.6rem !important;
+        padding-right: 0.6rem !important;
+        font-size: 0.8rem;
+    }
+
+    .custom-stat-card h4 { font-size: 1.35rem; }
+    .custom-stat-card .card-body { padding: 0.85rem; }
+}
 </style>
 
 <div class="container-fluid mt-4">
@@ -482,8 +510,8 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
     </div>
 
     <!-- Actions Bar -->
-    <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
-        <div class="d-flex align-items-center gap-3">
+    <div id="locationsActionsBar" class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+        <div class="d-flex align-items-center gap-3 flex-wrap">
             <div class="btn-group shadow-sm" style="border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
                 <button type="button" class="btn btn-white fw-medium px-3 border-0" onclick="logReportAction('Printed Locations List', 'User generated a printed list of storage locations'); window.print()" style="background: #fff; color: #444;">
                     <i class="bi bi-printer text-primary me-1"></i> Print
@@ -493,7 +521,7 @@ $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
                     <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i> Export
                 </button>
             </div>
-            
+
             <div class="d-flex align-items-center bg-white shadow-sm px-3 py-1" style="border: 1px solid #dee2e6; border-radius: 8px;">
                 <span class="small text-muted me-2"><i class="bi bi-list-ol"></i> Show:</span>
                 <select class="form-select form-select-sm border-0 fw-bold p-0" style="width: 60px; box-shadow: none; background: transparent;" onchange="$('#locationsTable').DataTable().page.len(this.value).draw();">

@@ -1,5 +1,38 @@
 # BMS Changelog
 
+## 2026-09-12 (feat/locations-products-mobile-fix) - locations.php no longer scrolls sideways; products.php's mobile CSS no longer bleeds into the shared header nav
+
+**Request:** (1) `locations.php` should not scroll left/right on mobile. (2) On `products.php`, the block
+below the header goes white and its options aren't well seen once clicked — should stay blue like other
+pages, per a comparison screenshot of the header's mobile nav on another page.
+
+**1. `locations.php`:** identical root cause and fix to the earlier `warehouses.php`/`warehouse_view.php`
+mobile fix (PR #1880) — the "Actions Bar" (Print/Export `.btn-group` + a "Show: N" length selector, with
+a result-count badge pinned to the right via `justify-content-between`) never wrapped, so it forced the
+whole page to scroll horizontally on phone widths. Added `id="locationsActionsBar"` and let it wrap/stack
+on mobile only; desktop untouched. This page already had a proper dedicated mobile card list
+(`#locationsCards`) for the table itself, so no table-scroll change was needed.
+
+**2. `products.php`:** the real bug wasn't on products.php's own toolbar (already fixed in PR #1876) — it
+was that fix's `.dropdown-menu`/`.dropdown-item` mobile CSS rules being **unscoped**, so they matched
+every dropdown menu on the page, including the shared `header.php` mobile nav's own Core/Finance/Sales/
+Inventory submenus. Forcing every `.dropdown-menu` to a white background and every `.dropdown-item` to
+dark text overrode the header nav's intentional blue styling specifically whenever the mobile nav was
+opened **on this page** — matching the report exactly ("desktop is fine", "other pages are fine", only
+products.php's header block goes white). A second, older, likewise-unscoped rule (`@media max-width:
+576px`, repositioning any `.dropdown-menu` as a fixed bottom sheet) had the same bleed-through problem,
+explaining the oddly-floating submenu box in the reported screenshot. Both rules are now scoped to
+`#tableView` — the row-actions "⋮" menu's real container (only reachable on mobile if a user manually
+switches to table view; the default mobile view is `#cardView`, which has no dropdown menu at all) — so
+they can no longer reach anything outside this page's own product table.
+
+**Tested:** `php -l` clean on both files; live in-process render of both pages (admin session) confirmed
+no PHP warnings and both new/scoped CSS hooks (`locationsActionsBar`, `#tableView .dropdown-menu`)
+present in the output HTML. `tests/test_location_engine_cli.php` (38/38, unrelated address-lookup
+engine, unaffected). `tests/test_products_scope_visibility_cli.php` — pre-existing failures unrelated to
+this change (confirmed via `git diff --stat`: only the two files' mobile CSS blocks were touched, no
+scope/SQL logic).
+
 ## 2026-09-12 (feat/pos-cart-payment-mobile-fix) - pos.php: Current Sale actions + Payment Method buttons now fit one row on mobile
 
 **Request:** follow-up on the previous cart mobile fix — the Current Sale header buttons (%, Clear, Hold,
