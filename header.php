@@ -1125,13 +1125,22 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                         </li>
                         <?php endif; ?>
 
-                        <!-- Docs -->
-                        <?php if(canView('document_library') || canView('document_templates') || canView('e_signatures') || canView('compliance_documents') || canView('audit_logs')): ?>
+                        <!-- Docs — 'audit_logs' is deliberately NOT part of this menu's gate: it is an
+                             always-on report (not tied to the 'documents'/'compliance' features), and
+                             living here alone used to keep this whole menu visible with empty headers
+                             for a tenant with both features off. It now lives under Reports > Compliance
+                             & Operations instead, so this menu fully disappears when its own features are off. -->
+                        <?php
+                        $show_doc_mgmt = canView('document_library') || canView('document_templates') || canView('e_signatures');
+                        $show_doc_compliance = canView('compliance_documents');
+                        ?>
+                        <?php if($show_doc_mgmt || $show_doc_compliance): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="documentsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-files"></i> <?= t('Docs') ?>
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="documentsDropdown">
+                                <?php if($show_doc_mgmt): ?>
                                 <li><h6 class="dropdown-header"><?= t('Document Management') ?></h6></li>
                                 <?php if(canView('document_library')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('library') ?>"><i class="bi bi-folder"></i> <?= t('Library') ?></a></li>
@@ -1142,12 +1151,10 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                 <?php if(canView('e_signatures')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('e_signatures') ?>"><i class="bi bi-pen"></i> <?= t('E-Sign') ?></a></li>
                                 <?php endif; ?>
-                                <li><h6 class="dropdown-header"><?= t('Compliance') ?></h6></li>
-                                <?php if(canView('compliance_documents')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('compliance_documents') ?>"><i class="bi bi-shield-check"></i> <?= t('Compliance') ?></a></li>
                                 <?php endif; ?>
-                                <?php if(canView('audit_logs')): ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('audit_logs') ?>"><i class="bi bi-clock-history"></i> <?= t('Audit Logs') ?></a></li>
+                                <?php if($show_doc_compliance): ?>
+                                <li><h6 class="dropdown-header"><?= t('Compliance') ?></h6></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('compliance_documents') ?>"><i class="bi bi-shield-check"></i> <?= t('Compliance') ?></a></li>
                                 <?php endif; ?>
                             </ul>
                         </li>
@@ -1198,6 +1205,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
                                         <?php if(canView('wht_report')): ?><a class="dropdown-item" href="<?= getUrl('wht_report') ?>"><i class="bi bi-cash-stack"></i> <?= t('WHT Report') ?></a><?php endif; ?>
                                         <?php if(canView('tax_report')): ?><a class="dropdown-item" href="<?= getUrl('wht_receivable_report') ?>"><i class="bi bi-cash-coin"></i> <?= t('WHT Credit (Received)') ?></a><?php endif; ?>
                                         <?php if(canView('audit_report')): ?><a class="dropdown-item" href="<?= getUrl('audit_report') ?>"><i class="bi bi-shield-check"></i> <?= t('Audit Report') ?></a><?php endif; ?>
+                                        <?php if(canView('audit_logs')): ?><a class="dropdown-item" href="<?= getUrl('audit_logs') ?>"><i class="bi bi-clock-history"></i> <?= t('Audit Logs') ?></a><?php endif; ?>
                                         <?php if(canView('compliance_report')): ?><a class="dropdown-item" href="<?= getUrl('compliance_report') ?>"><i class="bi bi-file-check"></i> <?= t('Compliance') ?></a><?php endif; ?>
                                         <?php if(canView('employee_report')): ?><a class="dropdown-item" href="<?= getUrl('employee_report') ?>"><i class="bi bi-person-badge"></i> <?= t('Employee Report') ?></a><?php endif; ?>
                                         <?php if(canView('asset_report')): ?><a class="dropdown-item" href="<?= getUrl('asset_report') ?>"><i class="bi bi-pc-display"></i> <?= t('Asset Report') ?></a><?php endif; ?>
