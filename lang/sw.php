@@ -87,6 +87,7 @@ return [
     'Valuation' => 'Uthamini',
     'Warehouse' => 'Ghala',
     'Warehouses' => 'Maghala',
+    'Go to Warehouses' => 'Nenda kwa Maghala',
     'Locations' => 'Maeneo',
 
     // ------------------------------------------------------------------

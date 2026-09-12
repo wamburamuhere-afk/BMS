@@ -34,8 +34,15 @@ $warehouses = restaurantWarehousesForSelect($pdo);
     </div>
 
     <?php if (empty($warehouses)): ?>
-    <div class="alert alert-warning"><i class="bi bi-info-circle me-1"></i>
-        <?= t('No warehouse in your scope is set to Restaurant or Hybrid mode yet. Switch a warehouse\'s POS Mode first.') ?>
+    <div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div><i class="bi bi-info-circle me-1"></i>
+            <?= t('No warehouse in your scope is set to Restaurant or Hybrid mode yet. Switch a warehouse\'s POS Mode first.') ?>
+        </div>
+        <?php if (canEdit('warehouses')): ?>
+        <a href="<?= getUrl('warehouses') ?>" class="btn btn-sm btn-warning fw-bold text-nowrap">
+            <i class="bi bi-gear me-1"></i> <?= t('Go to Warehouses') ?>
+        </a>
+        <?php endif; ?>
     </div>
     <?php else: ?>
 
