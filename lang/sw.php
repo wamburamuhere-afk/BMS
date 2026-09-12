@@ -1409,6 +1409,7 @@ return [
     'Daily' => 'Kila Siku',
     'CSV' => 'CSV',
     'Card' => 'Kadi',
+    'Credit' => 'Mkopo',
     'Completed Sales' => 'Mauzo Yaliyokamilika',
     'Dashboard failed to load.' => 'Dashibodi imeshindwa kupakia.',
     'Date' => 'Tarehe',
