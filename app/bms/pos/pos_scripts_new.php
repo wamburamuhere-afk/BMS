@@ -54,7 +54,7 @@ const PT = {
     yesClearIt: <?= json_encode(t('Yes, clear it!')) ?>,
     loyaltyDiscountLabel: <?= json_encode(t('Loyalty discount:')) ?>,
     serialTrackedLabel: <?= json_encode(t('Serial / IMEI numbers (select one per unit)')) ?>,
-    noSerialsAvailable: <?= json_encode(t('No serial numbers available in this warehouse.')) ?>,
+    noSerialsAvailable: <?= json_encode(wLabel('No serial numbers available in this warehouse.', 'No serial numbers available in this shop.', true)) ?>,
     selectAtLeastOneSerial: <?= json_encode(t('Select at least one serial number.')) ?>,
     loadingSerials: <?= json_encode(t('Loading serial numbers...')) ?>,
     emptyCartTitle: <?= json_encode(t('Empty Cart')) ?>,
@@ -62,8 +62,8 @@ const PT = {
     noActiveShiftTitle: <?= json_encode(t('No Active Shift')) ?>,
     noActiveShiftText: <?= json_encode(t('Please start a shift first.')) ?>,
     startShift: <?= json_encode(t('Start Shift')) ?>,
-    warehouseRequiredTitle: <?= json_encode(t('Warehouse required')) ?>,
-    warehouseRequiredText: <?= json_encode(t('Please select a warehouse before processing the sale.')) ?>,
+    warehouseRequiredTitle: <?= json_encode(wLabel('Warehouse required', 'Shop required', true)) ?>,
+    warehouseRequiredText: <?= json_encode(wLabel('Please select a warehouse before processing the sale.', 'Please select a shop before processing the sale.', true)) ?>,
     insufficientPaymentTitle: <?= json_encode(t('Insufficient Payment')) ?>,
     insufficientPaymentText: <?= json_encode(t('Amount tendered is less than total amount.')) ?>,
     customerRequiredTitle: <?= json_encode(t('Customer required')) ?>,
@@ -163,7 +163,7 @@ const PT = {
     // Phase 30 (pos_upgrade_plan.md §9) — Restaurant module strings.
     selectTable: <?= json_encode(t('Select Table')) ?>,
     loadingTables: <?= json_encode(t('Loading tables...')) ?>,
-    noTablesSetUp: <?= json_encode(t('No tables set up for this warehouse yet. Ask an admin to add floors and tables under Restaurant > Floors & Tables.')) ?>,
+    noTablesSetUp: <?= json_encode(wLabel('No tables set up for this warehouse yet. Ask an admin to add floors and tables under Restaurant > Floors & Tables.', 'No tables set up for this shop yet. Ask an admin to add floors and tables under Restaurant > Floors & Tables.', true)) ?>,
     tableLabel: <?= json_encode(t('Table')) ?>,
     dineInTable: <?= json_encode(t('Dine-in: Table %s')) ?>,
     sentToKitchen: <?= json_encode(t('Sent to the kitchen.')) ?>,
@@ -296,7 +296,7 @@ $(document).ready(function() {
         } else if ($realOptions.length === 0) {
             $('#posWarehouseId').after(
                 '<div class="text-danger small mt-1" id="posNoWarehouseWarning">' +
-                '<i class="bi bi-exclamation-triangle"></i> ' + <?= json_encode(t('No warehouse is assigned to your account — contact an administrator.')) ?> + '</div>'
+                '<i class="bi bi-exclamation-triangle"></i> ' + <?= json_encode(wLabel('No warehouse is assigned to your account — contact an administrator.', 'No shop is assigned to your account — contact an administrator.', true)) ?> + '</div>'
             );
         }
     })();

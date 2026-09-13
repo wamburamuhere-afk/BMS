@@ -174,7 +174,7 @@ const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-white"><i class="bi bi-house-door text-primary"></i></span>
                             <select class="form-select" id="posWarehouseId" onchange="loadProducts()" required>
-                                <option value="" selected disabled><?= t('— Select Warehouse —') ?></option>
+                                <option value="" selected disabled><?= wLabel('— Select Warehouse —', '— Select Shop —', true) ?></option>
                                 <?php
                                 // Shared Project ↔ Warehouse mechanism (core/warehouse_scope.php) narrows
                                 // by project scope first; then narrowed again to this specific user's own
